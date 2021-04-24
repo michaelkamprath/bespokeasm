@@ -52,20 +52,20 @@ class LineParser:
         # find comments
         comment_match = re.search(LineParser.PATTERN_COMMENTS, self.line_str)
         if comment_match is not None:
-            self.comment = comment_match.group(1).strip()
+            self._comment = comment_match.group(1).strip()
         else:
-            self.comment = ''
+            self._comment = ''
 
         # find instruction
         instruction_match = re.search(LineParser.PATTERN_INSTRUCTION_CONTENT, self.line_str)
         if instruction_match is not None:
-            match_str = instruction_match.group(1).strip()
+            self._instruction_text = instruction_match.group(1).strip()
         else:
-            match_str = ''
+            self._instruction_text = ''
 
         # parse instruction
-        if len(match_str) > 0:
-            self._parse_instruction_string( match_str )
+        if len(self._instruction_text) > 0:
+            self._parse_instruction_string(self._instruction_text)
         else:
             self.instruction = ''
             self.type = LineType.COMMENT
@@ -78,7 +78,7 @@ class LineParser:
 
     def __str__(self):
         if self.type == LineType.INSTRUCTION:
-            return f'INSTRUCTION : line_num = {self.line_num}, parts = {self.parts_list}, comment = {self.comment}'
+            return f'INSTRUCTION : line_num = {self.line_num}, parts = {self.parts_list}, comment = {self._comment}'
         elif self.type == LineType.LABEL:
             return f'LABEL       : line_num = {self.line_num}, label_name = {self.label_name}'
         elif self.type == LineType.CONSTANT:
@@ -86,7 +86,7 @@ class LineParser:
         elif self.type == LineType.DATA:
             return f'DATA        : line_num = {self.line_num}, bytes = {self._bytes}'
         elif self.type == LineType.COMMENT:
-            return f'COMMENT     : line_num = {self.line_num}, comment = {self.comment}'
+            return f'COMMENT     : line_num = {self.line_num}, comment = {self._comment}'
         else:
             return 'UNKNOWN LINE TYPE'
 
@@ -156,6 +156,17 @@ class LineParser:
     def set_address_label_value(self, value):
         if self.is_address_label():
             self.label_value = value
+
+    #
+    # these are only for display purposes
+    #
+    def get_instruction_text(self):
+        if self.type in [LineType.INSTRUCTION, LineType.DATA]:
+            return '    ' + self._instruction_text
+        else:
+            return self._instruction_text
+    def get_comment_text(self):
+        return self._comment
 
     def get_bytes(self, label_dict):
         if self.type == LineType.INSTRUCTION:
