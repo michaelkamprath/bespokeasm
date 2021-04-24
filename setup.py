@@ -34,7 +34,7 @@ setup (
     long_description=README,
     long_description_content_type="text/markdown",
     license='GPLv3+',
-    url='',
+    url='https://github.com/michaelkamprath/bespokeasm',
     download_url='',
     dependency_links=dependency_links,
     author_email='michael@kamprath.net',
