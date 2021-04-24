@@ -1,7 +1,7 @@
 import math
 import re
 
-from utilities import parse_numeric_string
+from bespokeasm.utilities import parse_numeric_string
 
 class PackedBits:
     def __init__(self):

@@ -1,7 +1,7 @@
 import sys
 import click
 
-from assembler import Assembler
+from bespokeasm.assembler import Assembler
 
 @click.group()
 @click.version_option("0.0.1")

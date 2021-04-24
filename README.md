@@ -4,7 +4,16 @@ This is a customizable byte code assembler that allows for the definition of cus
 **NOTE - This is very much a work in progress**
 
 ## Usage
-
+To install, clone this repository and install using `pip`. Preferably, you have a `python` virtual environment set up when you do this.
+```
+git clone git@github.com:michaelkamprath/bespokeasm.git
+pip install ./bespokeasm/
+```
+Once installed, assembly code can be compiled in this manner:
+```
+ bespokeasm compile -c isa-config.json awesome-code.asm
+```
+Note that supplying a instruction set configuration is required via the `-c`/`--config-file` option.
 
 # Documentation
 ## Assembler Syntax
@@ -52,4 +61,4 @@ constant_var = 10204
 TBC
 
 ## Instruction Set Architecture Definition Syntax
-The Instruction Set Architecture (ISA) defintion is provided in JSON format. 
+The Instruction Set Architecture (ISA) defintion is provided in JSON format.

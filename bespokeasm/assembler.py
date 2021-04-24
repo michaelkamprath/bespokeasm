@@ -1,7 +1,7 @@
 import click
 import json
 import sys
-from line_parser import LineParser
+from bespokeasm.line_parser import LineParser
 
 class Assembler:
 

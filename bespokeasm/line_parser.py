@@ -2,8 +2,8 @@ import re
 import sys
 from enum import Enum, auto
 
-from utilities import parse_numeric_string
-from instruction_parser import parse_instruction, MachineCodePart, PackedBits, calc_byte_size_for_parts
+from bespokeasm.utilities import parse_numeric_string
+from bespokeasm.instruction_parser import parse_instruction, MachineCodePart, PackedBits, calc_byte_size_for_parts
 
 class LineType(Enum):
     INSTRUCTION = auto()
