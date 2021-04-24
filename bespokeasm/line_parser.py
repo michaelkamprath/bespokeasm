@@ -5,39 +5,6 @@ from enum import Enum, auto
 from utilities import parse_numeric_string
 from instruction_parser import parse_instruction, MachineCodePart, PackedBits, calc_byte_size_for_parts
 
-instruction_model = {
-    'address_size': 4,
-    'instructions': [
-        {
-            'prefix': 'lda',
-            'arguments': [
-                {
-                    'type': 'address',
-                    'byte_align': False,
-                }
-            ],
-            'bits': {
-                'value': 1,
-                'size': 4,
-            }
-        },
-        {
-            'prefix': 'jmp',
-            'arguments': [
-                {
-                    'type': 'address',
-                    'byte_align': False,
-                }
-            ],
-            'bits': {
-                'value': 6,
-                'size': 4,
-            }
-        },
-    ],
- }
-
-
 class LineType(Enum):
     INSTRUCTION = auto()
     LABEL = auto()
@@ -63,9 +30,10 @@ class LineParser:
         flags=re.IGNORECASE|re.MULTILINE
     )
 
-    def __init__(self, line_str, line_num):
+    def __init__(self, line_str, line_num, instruction_model):
         self.line_str = line_str
         self.line_num = line_num
+        self._instruction_model = instruction_model
 
         # init attributes
         self.type = None
@@ -130,7 +98,7 @@ class LineParser:
             return
 
         # It must be an instruction
-        self.parts_list = parse_instruction(instruction_str, instruction_model)
+        self.parts_list = parse_instruction(instruction_str, self._instruction_model)
         self.instruction = self.parts_list[0].part_str()
         self.type = LineType.INSTRUCTION
         self.bytes = None

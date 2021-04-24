@@ -12,11 +12,12 @@ def main():
 
 @main.command()
 @click.argument('asm_file')
-@click.option('--verbose', '-v', count=True)
-def compile(asm_file, verbose):
+@click.option('--config-file', '-c', required=True, help='the filepath to the ISA JSON config')
+@click.option('--verbose', '-v', count=True, help='verbosity of logging')
+def compile(asm_file, config_file, verbose):
     if verbose:
         click.echo(f'the file to assemble is {asm_file}')
-    asm = Assembler(asm_file, verbose)
+    asm = Assembler(asm_file, config_file, verbose)
     asm.assemble_bytecode()
 
 if __name__ == '__main__':

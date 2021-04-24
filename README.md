@@ -1,14 +1,19 @@
+# Bespoke ASM
+This is a customizable byte code assembler that allows for the definition of custom instruction set architecture. 
+
+**NOTE - This is very much a work in progress**
+
+## Usage
 
 
-
-## General Syntax
+# Documentation
+## Assembler Syntax
 * Each line pertains to at most one instruction or label
-* Whitespace is generally ignored except for the minimal amount required to seperat parts of an instruction.
+* Whitespace is generally ignored except for the minimal amount required to seperate parts of an instruction.
 * Any characters after and including a semicolon `;` on any given line are consider to be comments
-* White space is generally i
 
 ### Numeric Values
-Anytime a numeric values is to be expressed, whther it be a immediate value or amemory address, it can be written in decimal, hex, or binary form  as shown here:
+Anytime a numeric values is to be expressed, whether it be a immediate value or a memory address, it can be written in decimal, hex, or binary form  as shown here:
 | Type | Syntax |
 |:--|--:|
 | Decimal | 124 |
@@ -22,23 +27,29 @@ Anytime a numeric values is to be expressed, whther it be a immediate value or a
 And instruction has the format of:
 
 ```
-INSTRUCTION [ARG1[,ARG2]]
+INSTRUCTION [ARG1[,ARG2[...]]]
 ```
 
 #### Instruction Arguments
-
+* Instruction arguments are seperated by a comma
+* Instruction arguments may be either a label, a constant, or a numeric value
 
 ### Label
 A label represents a specific address in the byte sequence being assembled. A label does not have a size or sequence of bytes pertaining to it. A label's value is implied by its relative location among the lines to be assembled.
 
 A label is represented by any alphanumeric character string the immediately precedes a colon `:`. There will be only one label allowed per line.
 
+All labels must be distinct.
+
 ### Constant
+A constant is a label that has an explicitely assigned value.
 
 ```
 constant_var = 10204
 ```
 
 ### Data
+TBC
 
-## Instruction Set Definition Syntax
+## Instruction Set Architecture Definition Syntax
+The Instruction Set Architecture (ISA) defintion is provided in JSON format. 

@@ -1,12 +1,17 @@
 import click
+import json
 import sys
 from line_parser import LineParser
 
 class Assembler:
 
-    def __init__(self, source_file, is_verbose):
+    def __init__(self, source_file, config_file, is_verbose):
         self.source_file = source_file
+        self._config_file = config_file
         self._verbose = is_verbose
+
+        with open(self._config_file, 'r') as json_file:
+            self._config_dict = json.load(json_file)
 
     def assemble_bytecode(self):
 
@@ -17,7 +22,7 @@ class Assembler:
                 line_num += 1
                 line_str = line.strip()
                 if len(line_str) > 0:
-                    line_obs.append(LineParser(line_str, line_num))
+                    line_obs.append(LineParser(line_str, line_num, self._config_dict))
 
         if self._verbose:
             click.echo(f'Found {len(line_obs)} lines in source file')
@@ -45,4 +50,8 @@ class Assembler:
             if line_bytes is not None:
                 byte_code.extend(line_bytes)
 
-        print(''.join('0x{:02x}\n'.format(x) for x in byte_code))
+        print('\nAddress | Byte | Binary')
+        for i in range(len(byte_code)):
+            x = byte_code[i]
+            print('0x{0:x} | 0x{1:02x} | {1:08b}'.format(i, x, x))
+

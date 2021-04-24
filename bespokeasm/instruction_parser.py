@@ -88,9 +88,11 @@ def _create_instruction_part(instruction):
 def _extract_argument_parts(args_str, arg_model_list, address_size):
     arg_list = []
     arg_str_list = args_str.split(',')
+    if len(arg_str_list) == 1 and arg_str_list[0] == '':
+        arg_str_list = []
     # first sanity check we have as many arguments as parts
     if len(arg_str_list) != len(arg_model_list):
-        print(f'ERROR - argument list size does not match mode. args = {args_str}')
+        print(f'ERROR - argument list size does not match mode. args = {arg_str_list}, {len(arg_str_list)} != {len(arg_model_list)}')
         return []
     for i in range(len(arg_model_list)):
         arg_model = arg_model_list[i]
