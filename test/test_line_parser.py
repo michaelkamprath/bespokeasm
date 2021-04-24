@@ -9,7 +9,5 @@ class TestLineParser(unittest.TestCase):
         self.assertEqual(lp1.label_value, None)
         self.assertEqual(lp1.line_num, 27)
 
-
-
 if __name__ == '__main__':
     unittest.main()

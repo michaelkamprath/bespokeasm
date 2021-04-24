@@ -12,9 +12,11 @@ def main():
 
 @main.command()
 @click.argument('asm_file')
-def compile(asm_file):
-    click.echo(f'the file to assemble is {asm_file}')
-    asm = Assembler(asm_file)
+@click.option('--verbose', '-v', count=True)
+def compile(asm_file, verbose):
+    if verbose:
+        click.echo(f'the file to assemble is {asm_file}')
+    asm = Assembler(asm_file, verbose)
     asm.assemble_bytecode()
 
 if __name__ == '__main__':
