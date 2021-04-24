@@ -40,7 +40,7 @@ class Assembler:
                 else:
                     sys.exit(f'ERROR: line {l.line_num} - label "{l.get_label()}" is defined multiple lines')
         if self._verbose:
-            click.echo(f'Found {len(label_addresses)} labels: {list(label_addresses.keys())}')
+            click.echo(f'Found {len(label_addresses)} labels: {label_addresses}')
         # second pass: built byte code
         byte_code = bytearray()
         for l in line_obs:

@@ -41,5 +41,17 @@ class TestLineParser(unittest.TestCase):
         self.assertEqual(lp1.label_value, None)
         self.assertEqual(lp1.line_num, 27)
 
+    def test_byte_code_generation(self):
+        label_dict = {'test1':15}
+
+        lp1 = LineParser(' .byte $ff   ; my comments', 33, instruction_model)
+        self.assertEqual(lp1.get_bytes(label_dict), bytearray([255]))
+        self.assertEqual(lp1.byte_size(), 1, '.byte data is 1 byte')
+
+        lp2 = LineParser(' jmp test1   ; my comments', 33, instruction_model)
+        self.assertEqual(lp2.get_bytes(label_dict), bytearray([0x6F]))
+        self.assertEqual(lp2.byte_size(), 1, 'test nstruction is 1 byte')
+
+
 if __name__ == '__main__':
     unittest.main()

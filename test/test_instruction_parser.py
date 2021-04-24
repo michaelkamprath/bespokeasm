@@ -1,7 +1,8 @@
 import unittest
 
 import bespokeasm
-from bespokeasm.instruction_parser import PackedBits, MachineCodePart
+from bespokeasm.instruction_parser import MachineCodePart
+from bespokeasm.packed_bits import PackedBits
 
 instruction_model = {
     'address_size': 4,

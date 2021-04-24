@@ -3,7 +3,8 @@ import sys
 from enum import Enum, auto
 
 from bespokeasm.utilities import parse_numeric_string
-from bespokeasm.instruction_parser import parse_instruction, MachineCodePart, PackedBits, calc_byte_size_for_parts
+from bespokeasm.instruction_parser import parse_instruction, MachineCodePart, calc_byte_size_for_parts
+from bespokeasm.packed_bits import PackedBits
 
 class LineType(Enum):
     INSTRUCTION = auto()
@@ -30,6 +31,11 @@ class LineParser:
         flags=re.IGNORECASE|re.MULTILINE
     )
 
+    PATTERN_DATA_DIRECTIVE = re.compile(
+        r'^(\.byte)\s*(\$[0-9a-f]*|0x[0-9a-f]*|b[01]*|\d*)',
+        flags=re.IGNORECASE|re.MULTILINE
+    )
+
     def __init__(self, line_str, line_num, instruction_model):
         self.line_str = line_str
         self.line_num = line_num
@@ -41,6 +47,7 @@ class LineParser:
         self.label_value = None
         self.parts_list = 0
         self._address = None
+        self._bytes = None
 
         # find comments
         comment_match = re.search(LineParser.PATTERN_COMMENTS, self.line_str)
@@ -77,7 +84,7 @@ class LineParser:
         elif self.type == LineType.CONSTANT:
             return f'CONSTANT    : line_num = {self.line_num}, label_name = {self.label_name}, label_value = {self.label_value}'
         elif self.type == LineType.DATA:
-            return f'DATA        : line_num = {self.line_num}'
+            return f'DATA        : line_num = {self.line_num}, bytes = {self._bytes}'
         elif self.type == LineType.COMMENT:
             return f'COMMENT     : line_num = {self.line_num}, comment = {self.comment}'
         else:
@@ -97,6 +104,12 @@ class LineParser:
             self._set_up_constant(constant_match.group(1).strip(), constant_match.group(2).strip())
             return
 
+        # is it data directive?
+        data_match = re.search(LineParser.PATTERN_DATA_DIRECTIVE, instruction_str)
+        if data_match is not None and len(data_match.groups()) == 2:
+            self._set_up_data_directive(data_match.group(1).strip(), data_match.group(2).strip())
+            return
+
         # It must be an instruction
         self.parts_list = parse_instruction(instruction_str, self._instruction_model)
         self.instruction = self.parts_list[0].part_str()
@@ -112,10 +125,18 @@ class LineParser:
         self.label_name = label_str
         self.label_value = parse_numeric_string(constant_str)
 
+    def _set_up_data_directive(self, directive_str, value_str):
+        self.type = LineType.DATA
+        if directive_str == '.byte':
+            pb = PackedBits()
+            pb.append_bits(parse_numeric_string(value_str), 8, True)
+            self._bytes = pb.get_bytes()
 
     def byte_size(self):
         if self.type == LineType.INSTRUCTION:
             return calc_byte_size_for_parts(self.parts_list)
+        elif self.type == LineType.DATA:
+            return len(self._bytes)
         else:
             return 0
 
@@ -137,18 +158,21 @@ class LineParser:
             self.label_value = value
 
     def get_bytes(self, label_dict):
-        if self.type != LineType.INSTRUCTION:
+        if self.type == LineType.INSTRUCTION:
+            # first set labels as needed
+            for p in self.parts_list:
+                if p.label() is not None and p.value() is None:
+                    if p.label() not in label_dict:
+                        sys.exit(f'ERROR: line {self.line_num} - label "{p.label()}" is undefined')
+                    p.set_value(label_dict[p.label()])
+
+            # second pass pack the bits
+            packed_bits = PackedBits()
+            for p in self.parts_list:
+                packed_bits.append_bits(p.value(), p.value_size(), p.byte_align())
+
+            return packed_bits.get_bytes()
+        elif self.type == LineType.DATA:
+            return self._bytes
+        else:
             return None
-        # first set labels as needed
-        for p in self.parts_list:
-            if p.label() is not None and p.value() is None:
-                if p.label() not in label_dict:
-                    sys.exit(f'ERROR: line {self.line_num} - label "{p.label()}" is undefined')
-                p.set_value(label_dict[p.label()])
-
-        # second pass pack the bits
-        packed_bits = PackedBits()
-        for p in self.parts_list:
-            packed_bits.append_bits(p.value(), p.value_size(), p.byte_align())
-
-        return packed_bits.get_bytes()
