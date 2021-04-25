@@ -111,7 +111,7 @@ class TestInstructionParser(unittest.TestCase):
             MachineCodePart('TEST', None, 15, 4, True),
             MachineCodePart('0xFF', None, 255, 8, False),
             MachineCodePart('0x88', None, 136, 8, False),
-       ]
+        ]
         self.assertEqual(
             bespokeasm.instruction_parser.calc_byte_size_for_parts(parts_list3),
             3,

@@ -107,7 +107,7 @@ def _create_numeric_part(arg_str, bit_size, byte_align):
         )
 
 def calc_byte_size_for_parts(parts_list):
-    # must clculate byte count even though some values
+    # must calculate byte count even though some values
     # may not have been filled in
     byte_count = 0
     cur_byte_bit_count = 0
