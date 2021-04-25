@@ -5,7 +5,6 @@ import math
 import re
 import sys
 
-#from bespokeasm.line_parser import LineParser
 from bespokeasm.line_object import LineWithBytes, LineObject
 from bespokeasm.line_object.data_line import DataLine
 from bespokeasm.line_object.label_line import LabelLine
@@ -47,7 +46,7 @@ class Assembler:
                 if l.get_label() not in label_addresses:
                     label_addresses[l.get_label()] = l.get_value()
                 else:
-                    sys.exit(f'ERROR: line {l.line_num} - label "{l.get_label()}" is defined multiple lines')
+                    sys.exit(f'ERROR: line {l.line_number()} - label "{l.get_label()}" is defined multiple lines')
         if self._verbose:
             click.echo(f'Found {len(label_addresses)} labels: {label_addresses}')
         # second pass: build byte code
