@@ -21,7 +21,7 @@ dependency_links = [x.strip().replace('git+', '') for x in all_reqs \
 setup (
     name = 'bespokeasm',
     description = 'A simple commandline app for searching and looking up opensource vulnerabilities',
-    version = '0.0.1',
+    version = '0.0.2',
     packages = find_packages(), # list of all packages
     install_requires = install_requires,
     python_requires='>=3.9',

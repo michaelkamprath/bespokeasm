@@ -2,9 +2,14 @@ import click
 import io
 import json
 import math
+import re
 import sys
 
-from bespokeasm.line_parser import LineParser
+#from bespokeasm.line_parser import LineParser
+from bespokeasm.line_object import LineWithBytes, LineObject
+from bespokeasm.line_object.data_line import DataLine
+from bespokeasm.line_object.label_line import LabelLine
+from bespokeasm.line_object.instruction_line import InstructionLine
 
 class Assembler:
 
@@ -28,7 +33,7 @@ class Assembler:
                 line_num += 1
                 line_str = line.strip()
                 if len(line_str) > 0:
-                    line_obs.append(LineParser(line_str, line_num, self._config_dict))
+                    line_obs.append(self._parse_line(line_num, line_str))
 
         if self._verbose:
             click.echo(f'Found {len(line_obs)} lines in source file')
@@ -38,11 +43,9 @@ class Assembler:
         for l in line_obs:
             l.set_address(cur_address)
             cur_address += l.byte_size()
-            if l.is_address_label():
-                l.set_address_label_value(cur_address)
-            if l.has_label():
+            if isinstance(l, LabelLine):
                 if l.get_label() not in label_addresses:
-                    label_addresses[l.get_label()] = l.get_label_value()
+                    label_addresses[l.get_label()] = l.get_value()
                 else:
                     sys.exit(f'ERROR: line {l.line_num} - label "{l.get_label()}" is defined multiple lines')
         if self._verbose:
@@ -51,13 +54,15 @@ class Assembler:
         max_instruction_text_size = 0
         byte_code = bytearray()
         for l in line_obs:
-            line_bytes = l.get_bytes(label_addresses)
-            if self._verbose > 2:
-                click.echo(f'Processing line = {l}, with bytes = {line_bytes}')
-            if line_bytes is not None:
-                byte_code.extend(line_bytes)
-            if len(l.get_instruction_text()) > max_instruction_text_size:
-                max_instruction_text_size = len(l.get_instruction_text())
+            if isinstance(l, LineWithBytes):
+                l.generate_bytes(label_addresses)
+                line_bytes = l.get_bytes()
+                if self._verbose > 2:
+                    click.echo(f'Processing line = {l}, with bytes = {line_bytes}')
+                if line_bytes is not None:
+                    byte_code.extend(line_bytes)
+            if len(l.instruction()) > max_instruction_text_size:
+                max_instruction_text_size = len(l.instruction())
 
         click.echo(f'Writing {len(byte_code)} bytes of byte code to {self._output_file}')
         with open(self._output_file, 'wb') as f:
@@ -71,6 +76,47 @@ class Assembler:
                 with open(self._pretty_print_output, 'w') as f:
                     f.write(pretty_str)
 
+    PATTERN_COMMENTS = re.compile(
+        r'((?<=\;).*)$',
+        flags=re.IGNORECASE|re.MULTILINE
+    )
+    PATTERN_INSTRUCTION_CONTENT = re.compile(
+        r'^([^\;\n]*)',
+        flags=re.IGNORECASE|re.MULTILINE
+    )
+    def _parse_line(self, line_num: int, line_str: str):
+        # find comments
+        comment_str = ''
+        comment_match = re.search(Assembler.PATTERN_COMMENTS, line_str)
+        if comment_match is not None:
+            comment_str = comment_match.group(1).strip()
+
+        # find instruction
+        instruction_str = ''
+        instruction_match = re.search(Assembler.PATTERN_INSTRUCTION_CONTENT, line_str)
+        if instruction_match is not None:
+            instruction_str = instruction_match.group(1).strip()
+
+        # parse instruction
+        if len(instruction_str) > 0:
+            # try label
+            line_obj = LabelLine.factory(line_num, instruction_str, comment_str)
+            if line_obj is not None:
+                return line_obj
+
+            # try data
+            line_obj = DataLine.factory(line_num, instruction_str, comment_str)
+            if line_obj is not None:
+                return line_obj
+
+            # try instruction
+            line_obj = InstructionLine.factory(line_num, instruction_str, comment_str, self._config_dict)
+            if line_obj is not None:
+                return line_obj
+
+        # if we got here, the line is only a comment
+        line_obj = LineObject(line_num, instruction_str, comment_str)
+        return line_obj
 
     def _pretty_print_results(self, line_obs, max_instruction_text_size, label_addresses):
         output = io.StringIO()
@@ -103,17 +149,20 @@ class Assembler:
         )
         output.write(f'\n{header_text}\n{header_line_text}\n')
         for l in line_obs:
-            line_str = f'{l.line_num}'.rjust(7)
-            address_value = l.get_address()
+            line_str = f'{l.line_number()}'.rjust(7)
+            address_value = l.address()
             address_str = address_format_str.format(address_value).center(COL_WIDTH_ADDRESS)
-            instruction_str = l.get_instruction_text().ljust(max_instruction_text_size)
-            line_bytes = l.get_bytes(label_addresses)
+            instruction_str = l.instruction().ljust(max_instruction_text_size)
+            if isinstance(l, LineWithBytes):
+                line_bytes = l.get_bytes()
+            else:
+                line_bytes = None
             if line_bytes is not None:
                 bytes_list = list(line_bytes)
                 # print first line
                 output.write(
                     f' {line_str} | {instruction_str} | {address_str} | 0x{bytes_list[0]:02x} | '
-                    f'{bytes_list[0]:08b} | {l.get_comment_text()}\n'
+                    f'{bytes_list[0]:08b} | {l.comment()}\n'
                 )
                 for b in bytes_list[1:]:
                     address_value += 1
@@ -124,6 +173,6 @@ class Assembler:
             else:
                 output.write(
                     f' {line_str} | {instruction_str} | {blank_address_text} | {blank_byte_text} | '
-                    f'{blank_binary_text} | {l.get_comment_text()}\n'
+                    f'{blank_binary_text} | {l.comment()}\n'
                 )
         return output.getvalue()
