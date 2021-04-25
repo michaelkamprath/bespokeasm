@@ -1,4 +1,5 @@
 import click
+import io
 import json
 import math
 import sys
@@ -62,52 +63,67 @@ class Assembler:
         with open(self._output_file, 'wb') as f:
             f.write(byte_code)
 
-        self._pretty_print_results(line_obs, max_instruction_text_size, label_addresses)
-
+        if self._enable_pretty_print:
+            pretty_str = self._pretty_print_results(line_obs, max_instruction_text_size, label_addresses)
+            if self._pretty_print_output == 'stdout':
+                print(pretty_str)
+            else:
+                with open(self._pretty_print_output, 'w') as f:
+                    f.write(pretty_str)
 
 
     def _pretty_print_results(self, line_obs, max_instruction_text_size, label_addresses):
-        if self._enable_pretty_print and self._pretty_print_output == 'stdout':
-            address_size = math.ceil(self._config_dict['address_size']/4)
-            address_format_str = f'0x{{0:0{address_size}x}}'
-            COL_WIDTH_LINE = 7
-            COL_WIDTH_ADDRESS = max(address_size + 3, 7)
-            COL_WIDTH_BYTE = 4
-            COL_WIDTH_BINARY = 8
-            blank_line_num = ''.join([' '*COL_WIDTH_LINE])
-            blank_instruction_text = ''.join([' '*max_instruction_text_size])
-            blank_address_text = ''.join([' '*COL_WIDTH_ADDRESS])
-            blank_byte_text = ''.join([' '*COL_WIDTH_BYTE])
-            blank_binary_text = ''.join([' '*COL_WIDTH_BINARY])
+        output = io.StringIO()
 
-            header_text = ' {0} | {1} | {2} | {3} | {4} | Comment '.format(
-                'Line'.center(COL_WIDTH_LINE),
-                'Code'.ljust(max_instruction_text_size),
-                'Address'.center(COL_WIDTH_ADDRESS),
-                'Byte'.center(COL_WIDTH_BYTE),
-                'Binary'.center(COL_WIDTH_BINARY),
-            )
-            header_line_text = '-{0}-+-{1}-+-{2}-+-{3}-+-{4}-+---------------'.format(
-                ''.join('-'*(COL_WIDTH_LINE)),
-                ''.join('-'*(max_instruction_text_size)),
-                ''.join('-'*(COL_WIDTH_ADDRESS)),
-                ''.join('-'*(COL_WIDTH_BYTE)),
-                ''.join('-'*(COL_WIDTH_BINARY)),
-            )
-            print(f'\n{header_text}\n{header_line_text}')
-            for l in line_obs:
-                line_str = f'{l.line_num}'.rjust(7)
-                address_value = l.get_address()
-                address_str = address_format_str.format(address_value).center(COL_WIDTH_ADDRESS)
-                instruction_str = l.get_instruction_text().ljust(max_instruction_text_size)
-                line_bytes = l.get_bytes(label_addresses)
-                if line_bytes is not None:
-                    bytes_list = list(line_bytes)
-                    # print first line
-                    print(f' {line_str} | {instruction_str} | {address_str} | 0x{bytes_list[0]:02x} | {bytes_list[0]:08b} | {l.get_comment_text()}')
-                    for b in bytes_list[1:]:
-                        address_value += 1
-                        address_str = address_format_str.format(address_value).rjust(7)
-                        print(f'{blank_line_num} | {blank_instruction_text} | {address_str} | 0x{b:02x} | {b:08b} |')
-                else:
-                    print(f' {line_str} | {instruction_str} | {blank_address_text} | {blank_byte_text} | {blank_binary_text} | {l.get_comment_text()}')
+        address_size = math.ceil(self._config_dict['address_size']/4)
+        address_format_str = f'0x{{0:0{address_size}x}}'
+        COL_WIDTH_LINE = 7
+        COL_WIDTH_ADDRESS = max(address_size + 3, 7)
+        COL_WIDTH_BYTE = 4
+        COL_WIDTH_BINARY = 8
+        blank_line_num = ''.join([' '*COL_WIDTH_LINE])
+        blank_instruction_text = ''.join([' '*max_instruction_text_size])
+        blank_address_text = ''.join([' '*COL_WIDTH_ADDRESS])
+        blank_byte_text = ''.join([' '*COL_WIDTH_BYTE])
+        blank_binary_text = ''.join([' '*COL_WIDTH_BINARY])
+
+        header_text = ' {0} | {1} | {2} | {3} | {4} | Comment '.format(
+            'Line'.center(COL_WIDTH_LINE),
+            'Code'.ljust(max_instruction_text_size),
+            'Address'.center(COL_WIDTH_ADDRESS),
+            'Byte'.center(COL_WIDTH_BYTE),
+            'Binary'.center(COL_WIDTH_BINARY),
+        )
+        header_line_text = '-{0}-+-{1}-+-{2}-+-{3}-+-{4}-+---------------'.format(
+            ''.join('-'*(COL_WIDTH_LINE)),
+            ''.join('-'*(max_instruction_text_size)),
+            ''.join('-'*(COL_WIDTH_ADDRESS)),
+            ''.join('-'*(COL_WIDTH_BYTE)),
+            ''.join('-'*(COL_WIDTH_BINARY)),
+        )
+        output.write(f'\n{header_text}\n{header_line_text}\n')
+        for l in line_obs:
+            line_str = f'{l.line_num}'.rjust(7)
+            address_value = l.get_address()
+            address_str = address_format_str.format(address_value).center(COL_WIDTH_ADDRESS)
+            instruction_str = l.get_instruction_text().ljust(max_instruction_text_size)
+            line_bytes = l.get_bytes(label_addresses)
+            if line_bytes is not None:
+                bytes_list = list(line_bytes)
+                # print first line
+                output.write(
+                    f' {line_str} | {instruction_str} | {address_str} | 0x{bytes_list[0]:02x} | '
+                    f'{bytes_list[0]:08b} | {l.get_comment_text()}\n'
+                )
+                for b in bytes_list[1:]:
+                    address_value += 1
+                    address_str = address_format_str.format(address_value).rjust(7)
+                    output.write(
+                        f'{blank_line_num} | {blank_instruction_text} | {address_str} | 0x{b:02x} | {b:08b} |\n'
+                    )
+            else:
+                output.write(
+                    f' {line_str} | {instruction_str} | {blank_address_text} | {blank_byte_text} | '
+                    f'{blank_binary_text} | {l.get_comment_text()}\n'
+                )
+        return output.getvalue()
