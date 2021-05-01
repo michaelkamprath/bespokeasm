@@ -45,10 +45,10 @@ class InstructionLine(LineWithBytes):
         #extract the instruction command
         command_match = re.search(InstructionLine.COMMAND_EXTRACT_PATTERN, line_str)
         if command_match is None or len(command_match.groups()) != 1:
-            sys.executable(f'ERROR: line {line_num} - Wrongly formatted instruction')
+            sys.exit(f'ERROR: line {line_num} - Wrongly formatted instruction: {line_str}')
         command_str = command_match.group(1).strip()
         if command_str not in isa_model['instructions']:
-            sys.executable(f'ERROR: line {line_num} - Unreconized instruction')
+            sys.exit(f'ERROR: line {line_num} - Unreconized instruction: {line_str}')
         argument_str = line_str.strip()[len(command_str):]
         return InstructionLine(line_num, command_str, argument_str, isa_model, line_str, comment)
 
