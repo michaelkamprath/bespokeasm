@@ -4,6 +4,7 @@ import json
 import math
 import re
 import sys
+import yaml
 
 from bespokeasm.line_object import LineWithBytes, LineObject
 from bespokeasm.line_object.data_line import DataLine
@@ -20,8 +21,20 @@ class Assembler:
         self._pretty_print_output = pretty_print_output
         self._verbose = is_verbose
 
-        with open(self._config_file, 'r') as json_file:
-            self._config_dict = json.load(json_file)
+        self._config_dict = self._load_config_dict(self._config_file)
+
+    def _load_config_dict(self, config_file_path: str):
+        if config_file_path.endswith('.json'):
+            with open(config_file_path, 'r') as json_file:
+                return json.load(json_file)
+        elif config_file_path.endswith('.yaml'):
+            with open(config_file_path, 'r') as yaml_file:
+                try:
+                    return yaml.safe_load(yaml_file)
+                except yaml.YAMLError as exc:
+                    sys.exit(f'ERROR: {exc}')
+        else:
+            sys.exit('ERROR: unknown ISA config file type')
 
     def assemble_bytecode(self):
 

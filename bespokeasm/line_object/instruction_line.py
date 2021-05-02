@@ -85,6 +85,8 @@ class InstructionLine(LineWithBytes):
                 )
 
     def _extract_argument_parts(self, args_str, arg_model_list, address_size):
+        if arg_model_list is None:
+            arg_model_list = []
         arg_list = []
         arg_str_list = args_str.split(',')
         if len(arg_str_list) == 1 and arg_str_list[0] == '':
@@ -92,7 +94,7 @@ class InstructionLine(LineWithBytes):
         # first sanity check we have as many arguments as parts
         if len(arg_str_list) != len(arg_model_list):
             print(
-                f'ERROR - argument list size does not match model. args = {arg_str_list}, '
+                f'ERROR: line {self.line_number()} - argument list size does not match model. args = {arg_str_list}, '
                 f'{len(arg_str_list)} != {len(arg_model_list)}'
             )
             return []
