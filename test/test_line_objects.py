@@ -35,6 +35,15 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(d4.byte_size(), 1, 'data line has 1 bytes')
         self.assertEqual(d4.get_bytes(), bytearray([0x0E]), 'onsie')
 
+        d5_values = [ord(c) for c in 'that\'s a test']
+        d5_values.extend([0])
+        d5 = DataLine.factory(42, ' .byte "that\'s a test"', 'string of bytes')
+        d5.generate_bytes(LABEL_DICT)
+        self.assertIsInstance(d5, DataLine)
+        self.assertEqual(d5.byte_size(), 14, 'character string has 14 bytes')
+        self.assertEqual(d5.get_bytes(), bytearray(d5_values), 'character string matches')
+       
+
     def test_label_line_creation(self):
         l1 = LabelLine.factory(13, 'my_label:', 'cool comment')
         l1.set_address(1212)

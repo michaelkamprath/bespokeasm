@@ -178,9 +178,9 @@ class Assembler:
                 )
                 for b in bytes_list[1:]:
                     address_value += 1
-                    address_str = address_format_str.format(address_value).rjust(7)
+                    address_str = address_format_str.format(address_value).center(COL_WIDTH_ADDRESS)
                     output.write(
-                        f'{blank_line_num} | {blank_instruction_text} | {address_str} | 0x{b:02x} | {b:08b} |\n'
+                        f' {blank_line_num} | {blank_instruction_text} | {address_str} | 0x{b:02x} | {b:08b} |\n'
                     )
             else:
                 output.write(
