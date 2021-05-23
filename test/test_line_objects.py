@@ -42,11 +42,10 @@ class TestLineObject(unittest.TestCase):
         self.assertIsInstance(d5, DataLine)
         self.assertEqual(d5.byte_size(), 14, 'character string has 14 bytes')
         self.assertEqual(d5.get_bytes(), bytearray(d5_values), 'character string matches')
-       
 
     def test_label_line_creation(self):
         l1 = LabelLine.factory(13, 'my_label:', 'cool comment')
-        l1.set_address(1212)
+        l1.set_start_address(1212)
         self.assertIsInstance(l1, LabelLine)
         self.assertEqual(l1.byte_size(), 0, 'has no bytes')
         self.assertEqual(l1.get_value(), 1212, 'label value is address')
@@ -54,7 +53,7 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(l1.get_label(),'my_label', 'label string')
 
         l2 = LabelLine.factory(13, 'my_constant = 1945', 'cool comment')
-        l2.set_address(1212)
+        l2.set_start_address(1212)
         self.assertIsInstance(l2, LabelLine)
         self.assertEqual(l2.byte_size(), 0, 'has no bytes')
         self.assertEqual(l2.get_value(), 1945, 'constant value is assigned')
@@ -106,14 +105,14 @@ class TestLineObject(unittest.TestCase):
         LABEL_DICT = {'test1': 0xA}
 
         ins1 = InstructionLine.factory(22, '  lda test1', 'some comment!', isa_model)
-        ins1.set_address(1212)
+        ins1.set_start_address(1212)
         self.assertIsInstance(ins1, InstructionLine)
         self.assertEqual(ins1.byte_size(), 1, 'has 1 byte')
         ins1.generate_bytes(LABEL_DICT)
         self.assertEqual(ins1.get_bytes(), bytearray([0x1a]), 'instruction should match')
 
         ins2 = InstructionLine.factory(22, '  hlt', 'stop it!', isa_model)
-        ins2.set_address(1212)
+        ins2.set_start_address(1212)
         self.assertIsInstance(ins2, InstructionLine)
         self.assertEqual(ins2.byte_size(), 1, 'has 1 byte')
         ins2.generate_bytes(LABEL_DICT)

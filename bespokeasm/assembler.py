@@ -7,7 +7,7 @@ import sys
 import yaml
 
 from bespokeasm.line_object import LineWithBytes, LineObject
-from bespokeasm.line_object.data_line import DataLine
+from bespokeasm.line_object.directive_line import DirectiveLine
 from bespokeasm.line_object.label_line import LabelLine
 from bespokeasm.line_object.instruction_line import InstructionLine
 
@@ -53,8 +53,8 @@ class Assembler:
         cur_address = 0
         label_addresses = {}
         for l in line_obs:
-            l.set_address(cur_address)
-            cur_address += l.byte_size()
+            l.set_start_address(cur_address)
+            cur_address = l.address() + l.byte_size()
             if isinstance(l, LabelLine):
                 if l.get_label() not in label_addresses:
                     label_addresses[l.get_label()] = l.get_value()
@@ -116,8 +116,8 @@ class Assembler:
             if line_obj is not None:
                 return line_obj
 
-            # try data
-            line_obj = DataLine.factory(line_num, instruction_str, comment_str)
+            # try directives
+            line_obj = DirectiveLine.factory(line_num, instruction_str, comment_str)
             if line_obj is not None:
                 return line_obj
 

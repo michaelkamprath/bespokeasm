@@ -9,7 +9,7 @@ class LineObject:
         """Returns the line number that his object was parsed from"""
         return self._line_num
 
-    def set_address(self, address: int):
+    def set_start_address(self, address: int):
         """Sets the address for this line object.
 
         If this object consists of multiple bytes, address pertains to first byte.
