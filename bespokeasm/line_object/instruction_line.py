@@ -2,7 +2,7 @@ import re
 import sys
 
 from bespokeasm.line_object import LineWithBytes
-from bespokeasm.utilities import is_string_numeric
+from bespokeasm.utilities import is_string_numeric, parse_numeric_string
 from bespokeasm.packed_bits import PackedBits
 
 class MachineCodePart:
