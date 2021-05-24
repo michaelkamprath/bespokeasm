@@ -20,7 +20,7 @@ dependency_links = [x.strip().replace('git+', '') for x in all_reqs \
                     if 'git+' not in x]
 setup (
     name = 'bespokeasm',
-    description = 'A simple commandline app for searching and looking up opensource vulnerabilities',
+    description = 'A customizable byte code assembler that allows for the definition of custom instruction set architecture',
     version = '0.0.4',
     packages = find_packages(), # list of all packages
     install_requires = install_requires,
