@@ -66,13 +66,26 @@ class TestLineObject(unittest.TestCase):
 
     def test_instruction_line_creation(self):
         isa_model = {
-            'address_size': 4,
+            'general' : {
+                'endian': 'big'
+            },
+            'argument_types': {
+                '1byte_value': {
+                    'type': 'numeric',
+                    'byte_align': True,
+                    'bit_size': 8
+                },
+                'address': {
+                    'type': 'numeric',
+                    'byte_align': False,
+                    'bit_size': 4
+                }
+            },
             'instructions': {
                 'lda': {
                     'arguments': [
                         {
-                            'type': 'address',
-                            'byte_align': False,
+                            'type': 'address'
                         }
                     ],
                     'bits': {
@@ -83,8 +96,7 @@ class TestLineObject(unittest.TestCase):
                 'add': {
                     'arguments': [
                         {
-                            'type': 'address',
-                            'byte_align': False,
+                            'type': 'address'
                         }
                     ],
                     'bits': {
@@ -118,10 +130,87 @@ class TestLineObject(unittest.TestCase):
         ins2.generate_bytes(LABEL_DICT)
         self.assertEqual(ins2.get_bytes(), bytearray([0xF0]), 'instruction should match')
 
+    def test_instruction_line_creation_little_endian(self):
+        isa_model = {
+            'general' : {
+                'endian': 'little'
+            },
+            'argument_types': {
+                '2byte_value': {
+                    'type': 'numeric',
+                    'byte_align': True,
+                    'bit_size': 16,
+                    'endian': 'big'
+                },
+                'address': {
+                    'type': 'numeric',
+                    'byte_align': True,
+                    'bit_size': 16
+                }
+            },
+            'instructions': {
+                'lda': {
+                    'arguments': [
+                        {
+                            'type': 'address'
+                        }
+                    ],
+                    'bits': {
+                        'value': 1,
+                        'size': 4,
+                    }
+                },
+                'add': {
+                    'arguments': [
+                        {
+                            'type': 'address'
+                        }
+                    ],
+                    'bits': {
+                        'value': 2,
+                        'size': 4,
+                    }
+                },
+                'set': {
+                    'arguments': [
+                        {
+                            'type': '2byte_value'
+                        }
+                    ],
+                    'bits': {
+                        'value': 3,
+                        'size': 4,
+                    }
+                },
+                'hlt': {
+                    'arguments': [
+                    ],
+                    'bits': {
+                        'value': 15,
+                        'size': 4,
+                    }
+                },
+           },
+        }
+        LABEL_DICT = {'test1': 0xABCD}
+        ins1 = InstructionLine.factory(22, '  lda test1', 'some comment!', isa_model)
+        ins1.set_start_address(1212)
+        self.assertIsInstance(ins1, InstructionLine)
+        self.assertEqual(ins1.byte_size(), 3, 'has 3 byte')
+        ins1.generate_bytes(LABEL_DICT)
+        self.assertEqual(ins1.get_bytes(), bytearray([0x10, 0xCD, 0xAB]), 'instruction should match')
+
+        ins2 = InstructionLine.factory(22, 'set test1', 'set it!', isa_model)
+        ins2.set_start_address(1212)
+        self.assertIsInstance(ins2, InstructionLine)
+        self.assertEqual(ins2.byte_size(), 3, 'has 3 byte')
+        ins2.generate_bytes(LABEL_DICT)
+        self.assertEqual(ins2.get_bytes(), bytearray([0x30, 0xAB, 0xCD]), 'instruction should match')
+
     def test_calc_byte_size_for_parts(self):
         parts_list1 = [
-            MachineCodePart('LDA', None, 1, 4, True),
-            MachineCodePart('0xA', None, 10, 4, False),
+            MachineCodePart('LDA', None, 1, 4, True, 'big'),
+            MachineCodePart('0xA', None, 10, 4, False, 'big'),
         ]
         self.assertEqual(
             InstructionLine._calc_byte_size_for_parts(parts_list1),
@@ -130,8 +219,8 @@ class TestLineObject(unittest.TestCase):
         )
 
         parts_list2 = [
-            MachineCodePart('LDA', None, 1, 4, True),
-            MachineCodePart('0xA', None, 10, 4, True),
+            MachineCodePart('LDA', None, 1, 4, True, 'big'),
+            MachineCodePart('0xA', None, 10, 4, True, 'big'),
         ]
         self.assertEqual(
             InstructionLine._calc_byte_size_for_parts(parts_list2),
@@ -140,9 +229,9 @@ class TestLineObject(unittest.TestCase):
         )
 
         parts_list3 = [
-            MachineCodePart('TEST', None, 15, 4, True),
-            MachineCodePart('0xFF', None, 255, 8, False),
-            MachineCodePart('0x88', None, 136, 8, False),
+            MachineCodePart('TEST', None, 15, 4, True, 'big'),
+            MachineCodePart('0xFF', None, 255, 8, False, 'big'),
+            MachineCodePart('0x88', None, 136, 8, False, 'big'),
         ]
         self.assertEqual(
             InstructionLine._calc_byte_size_for_parts(parts_list3),

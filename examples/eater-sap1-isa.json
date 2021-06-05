@@ -1,5 +1,20 @@
 {
-    "address_size": 4,
+    "general": {
+        "address_size": 4,
+        "endian": "big"
+    },
+    "argument_types": {
+        "integer": {
+            "type": "numeric",
+            "byte_align": false,
+            "bit_size": 4
+        },
+        "address": {
+            "type": "numeric",
+            "byte_align": false,
+            "bit_size": 4
+        }
+    },
     "instructions": {
         "nop": {
             "arguments": [],
@@ -11,8 +26,7 @@
         "lda": {
             "arguments": [
                 {
-                    "type": "address",
-                    "byte_align": false
+                    "type": "address"
                 }
             ],
             "bits": {
@@ -23,8 +37,7 @@
         "add": {
             "arguments": [
                 {
-                    "type": "address",
-                    "byte_align": false
+                    "type": "address"
                 }
             ],
             "bits": {
@@ -35,8 +48,7 @@
         "sub": {
             "arguments": [
                 {
-                    "type": "address",
-                    "byte_align": false
+                    "type": "address"
                 }
             ],
             "bits": {
@@ -47,8 +59,7 @@
         "sta": {
              "arguments": [
                 {
-                    "type": "address",
-                    "byte_align": false
+                    "type": "address"
                 }
             ],
             "bits": {
@@ -59,9 +70,7 @@
         "ldi": {
             "arguments": [
                 {
-                    "type": "numeric",
-                    "bit_size": 4,
-                    "byte_align": false
+                    "type": "integer"
                 }
             ],
             "bits": {
@@ -72,8 +81,7 @@
         "jmp": {
             "arguments": [
                 {
-                    "type": "address",
-                    "byte_align": false
+                    "type": "address"
                 }
             ],
             "bits": {
@@ -84,8 +92,7 @@
         "jc": {
             "arguments": [
                 {
-                    "type": "address",
-                    "byte_align": false
+                    "type": "address"
                 }
             ],
             "bits": {
@@ -96,8 +103,7 @@
         "jz": {
             "arguments": [
                 {
-                    "type": "address",
-                    "byte_align": false
+                    "type": "address"
                 }
             ],
             "bits": {

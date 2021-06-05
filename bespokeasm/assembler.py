@@ -13,13 +13,15 @@ from bespokeasm.line_object.instruction_line import InstructionLine
 
 class Assembler:
 
-    def __init__(self, source_file, config_file, output_file, enable_pretty_print, pretty_print_output, is_verbose):
+    def __init__(self, source_file, config_file, output_file, binary_start, binary_end, enable_pretty_print, pretty_print_output, is_verbose):
         self.source_file = source_file
         self._output_file = output_file
         self._config_file = config_file
         self._enable_pretty_print = enable_pretty_print
         self._pretty_print_output = pretty_print_output
         self._verbose = is_verbose
+        self._binary_start = binary_start
+        self._binary_end = binary_end
 
         self._config_dict = self._load_config_dict(self._config_file)
 
@@ -76,9 +78,11 @@ class Assembler:
             if len(l.instruction()) > max_instruction_text_size:
                 max_instruction_text_size = len(l.instruction())
 
-        click.echo(f'Writing {len(byte_code)} bytes of byte code to {self._output_file}')
+        max_address = len(byte_code) if self._binary_end is None else min(self._binary_end + 1, len(byte_code))
+        finalized_byte_code = byte_code[self._binary_start:max_address]
+        click.echo(f'Writing {len(finalized_byte_code)} bytes of byte code to {self._output_file}')
         with open(self._output_file, 'wb') as f:
-            f.write(byte_code)
+            f.write(finalized_byte_code)
 
         if self._enable_pretty_print:
             pretty_str = self._pretty_print_results(line_obs, max_instruction_text_size, label_addresses)
@@ -133,7 +137,7 @@ class Assembler:
     def _pretty_print_results(self, line_obs, max_instruction_text_size, label_addresses):
         output = io.StringIO()
 
-        address_size = math.ceil(self._config_dict['address_size']/4)
+        address_size = math.ceil(self._config_dict['general']['address_size']/4)
         address_format_str = f'0x{{0:0{address_size}x}}'
         COL_WIDTH_LINE = 7
         COL_WIDTH_ADDRESS = max(address_size + 3, 7)

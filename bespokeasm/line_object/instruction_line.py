@@ -6,12 +6,13 @@ from bespokeasm.utilities import is_string_numeric, parse_numeric_string
 from bespokeasm.packed_bits import PackedBits
 
 class MachineCodePart:
-    def __init__(self, part_str, label, value, value_size, byte_align):
+    def __init__(self, part_str, label, value, value_size, byte_align, endian):
         self._part_str = part_str.lower()
         self._label = label
         self._value = value
         self._value_size = value_size
         self._byte_align = byte_align
+        self._endian = endian
 
     def part_str(self):
         return self._part_str
@@ -25,17 +26,20 @@ class MachineCodePart:
         return self._value_size
     def byte_align(self):
         return self._byte_align
+    def endian(self):
+        return self._endian
     def __repr__(self):
         return str(self)
     def __str__(self):
-        return f'{{part="{self._part_str}", value={self._value}, value_size={self._value_size}, label={self._label}, align={self._byte_align}}}'
+        return f'{{part="{self._part_str}", value={self._value}, value_size={self._value_size}, label={self._label}, align={self._byte_align}, endian={self._endian}}}'
     def __eq__(self, other):
         return \
             self._part_str == other._part_str \
             and self._label == other._label \
             and self._value == other._value \
             and self._value_size == other._value_size \
-            and self._byte_align == other._byte_align
+            and self._byte_align == other._byte_align \
+            and self._endian == other._endian
 
 class InstructionLine(LineWithBytes):
     COMMAND_EXTRACT_PATTERN = re.compile(r'^\s*(\w+)', flags=re.IGNORECASE|re.MULTILINE)
@@ -72,7 +76,7 @@ class InstructionLine(LineWithBytes):
         self._parts.extend(self._extract_argument_parts(
                 self._argument_str,
                 self._command_config['arguments'],
-                self._isa_model['address_size']
+                self._isa_model['general'],
             ))
 
     def _create_instruction_part(self, command_str):
@@ -81,10 +85,11 @@ class InstructionLine(LineWithBytes):
                     None,
                     self._command_config['bits']['value'],
                     self._command_config['bits']['size'],
-                    True
+                    True,
+                    'big',
                 )
 
-    def _extract_argument_parts(self, args_str, arg_model_list, address_size):
+    def _extract_argument_parts(self, args_str, arg_model_list, general_config):
         if arg_model_list is None:
             arg_model_list = []
         arg_list = []
@@ -101,21 +106,25 @@ class InstructionLine(LineWithBytes):
         for i in range(len(arg_model_list)):
             arg_model = arg_model_list[i]
             arg_str = arg_str_list[i].strip()
-            if arg_model['type'] == 'address':
-                arg_list.append(self._create_numeric_part(
-                    arg_str,
-                    address_size,
-                    arg_model['byte_align']
-                ))
-            elif arg_model['type'] == 'numeric':
-                arg_list.append(self._create_numeric_part(
-                    arg_str,
-                    arg_model['bit_size'],
-                    arg_model['byte_align']
-                ))
+            arg_model_type = arg_model['type']
+            if arg_model_type in self._isa_model['argument_types']:
+                arg_config = self._isa_model['argument_types'][arg_model['type']]
+                arg_value_type = arg_config['type']
+                arg_endian = arg_config['endian'] if 'endian' in arg_config else (general_config['endian'] if 'endian' in general_config else 'big')
+                if arg_value_type == 'numeric':
+                    arg_list.append(self._create_numeric_part(
+                        arg_str,
+                        arg_config['bit_size'],
+                        arg_config['byte_align'],
+                        arg_endian,
+                    ))
+                else:
+                    sys.exit(f'ERROR: unknow argument type "{arg_value_type}" in configuration file')
+            else:
+                sys.exit(f'ERROR: unlisted argument configuration "{arg_model_type}" in configuration file')
         return arg_list
 
-    def _create_numeric_part(self, arg_str, bit_size, byte_align):
+    def _create_numeric_part(self, arg_str, bit_size, byte_align, endian):
         arg = arg_str.strip()
         if is_string_numeric(arg):
             # its a number
@@ -124,7 +133,8 @@ class InstructionLine(LineWithBytes):
                 None,
                 parse_numeric_string(arg_str),
                 bit_size,
-                byte_align
+                byte_align,
+                endian,
             )
         else:
             # its a label of some sort
@@ -133,7 +143,8 @@ class InstructionLine(LineWithBytes):
                 arg_str,
                 None,
                 bit_size,
-                byte_align
+                byte_align,
+                endian,
             )
 
     def _calc_byte_size_for_parts(parts_list: list):
@@ -169,5 +180,5 @@ class InstructionLine(LineWithBytes):
         # second pass pack the bits
         packed_bits = PackedBits()
         for p in self._parts:
-            packed_bits.append_bits(p.value(), p.value_size(), p.byte_align())
+            packed_bits.append_bits(p.value(), p.value_size(), p.byte_align(), p.endian())
         self._bytes.extend(packed_bits.get_bytes())
