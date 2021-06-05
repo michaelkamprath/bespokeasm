@@ -11,6 +11,7 @@ class TestUtilities(unittest.TestCase):
         self.assertEqual(parse_numeric_string('0x4d2'), 1234, '0x hex integer test: 1234')
         self.assertEqual(parse_numeric_string('b0000010011010010'), 1234, 'binary integer test: 1234')
         self.assertEqual(parse_numeric_string('-1212'), -1212, 'signed interger: -1212')
+        self.assertEqual(parse_numeric_string('%10011001'), 0x99, 'binary interger: 0x99')
 
     def test_is_string_numeric(self):
         self.assertTrue(is_string_numeric('8675309'), 'string is numeric')
@@ -20,6 +21,7 @@ class TestUtilities(unittest.TestCase):
         self.assertFalse(is_string_numeric('Jenny'), 'string is not numeric')
         self.assertFalse(is_string_numeric('test1'), 'string is not numeric')
         self.assertFalse(is_string_numeric(' '), 'string is not numeric')
+        self.assertFalse(is_string_numeric('%01234567'), 'binary integers can only have 1s and 0s')
 
     def test_PackedBits(self):
         ib1 = PackedBits()
