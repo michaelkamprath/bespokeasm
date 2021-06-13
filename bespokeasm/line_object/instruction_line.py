@@ -75,7 +75,7 @@ class InstructionLine(LineWithBytes):
         self._parts.append(self._create_instruction_part(self._command))
         self._parts.extend(self._extract_argument_parts(
                 self._argument_str,
-                self._command_config['arguments'],
+                self._command_config['arguments'] if 'arguments' in self._command_config else [],
                 self._isa_model['general'],
             ))
 
@@ -83,8 +83,8 @@ class InstructionLine(LineWithBytes):
         return MachineCodePart(
                     self._command,
                     None,
-                    self._command_config['bits']['value'],
-                    self._command_config['bits']['size'],
+                    self._command_config['byte_code']['value'],
+                    self._command_config['byte_code']['size'],
                     True,
                     'big',
                 )
@@ -104,11 +104,10 @@ class InstructionLine(LineWithBytes):
             )
             return []
         for i in range(len(arg_model_list)):
-            arg_model = arg_model_list[i]
+            arg_model_type = arg_model_list[i]
             arg_str = arg_str_list[i].strip()
-            arg_model_type = arg_model['type']
-            if arg_model_type in self._isa_model['argument_types']:
-                arg_config = self._isa_model['argument_types'][arg_model['type']]
+            if arg_model_type in self._isa_model['argument_config']:
+                arg_config = self._isa_model['argument_config'][arg_model_type]
                 arg_value_type = arg_config['type']
                 arg_endian = arg_config['endian'] if 'endian' in arg_config else (general_config['endian'] if 'endian' in general_config else 'big')
                 if arg_value_type == 'numeric':

@@ -69,7 +69,7 @@ class TestLineObject(unittest.TestCase):
             'general' : {
                 'endian': 'big'
             },
-            'argument_types': {
+            'argument_config': {
                 '1byte_value': {
                     'type': 'numeric',
                     'byte_align': True,
@@ -84,30 +84,24 @@ class TestLineObject(unittest.TestCase):
             'instructions': {
                 'lda': {
                     'arguments': [
-                        {
-                            'type': 'address'
-                        }
+                        'address'
                     ],
-                    'bits': {
+                    'byte_code': {
                         'value': 1,
                         'size': 4,
                     }
                 },
                 'add': {
                     'arguments': [
-                        {
-                            'type': 'address'
-                        }
+                        'address'
                     ],
-                    'bits': {
+                    'byte_code': {
                         'value': 2,
                         'size': 4,
                     }
                 },
                 'hlt': {
-                    'arguments': [
-                    ],
-                    'bits': {
+                    'byte_code': {
                         'value': 15,
                         'size': 4,
                     }
@@ -135,7 +129,7 @@ class TestLineObject(unittest.TestCase):
             'general' : {
                 'endian': 'little'
             },
-            'argument_types': {
+            'argument_config': {
                 '2byte_value': {
                     'type': 'numeric',
                     'byte_align': True,
@@ -151,33 +145,27 @@ class TestLineObject(unittest.TestCase):
             'instructions': {
                 'lda': {
                     'arguments': [
-                        {
-                            'type': 'address'
-                        }
+                        'address'
                     ],
-                    'bits': {
+                    'byte_code': {
                         'value': 1,
                         'size': 4,
                     }
                 },
                 'add': {
                     'arguments': [
-                        {
-                            'type': 'address'
-                        }
+                        'address'
                     ],
-                    'bits': {
+                    'byte_code': {
                         'value': 2,
                         'size': 4,
                     }
                 },
                 'set': {
                     'arguments': [
-                        {
-                            'type': '2byte_value'
-                        }
+                        '2byte_value'
                     ],
-                    'bits': {
+                    'byte_code': {
                         'value': 3,
                         'size': 4,
                     }
@@ -185,7 +173,7 @@ class TestLineObject(unittest.TestCase):
                 'hlt': {
                     'arguments': [
                     ],
-                    'bits': {
+                    'byte_code': {
                         'value': 15,
                         'size': 4,
                     }

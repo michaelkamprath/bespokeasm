@@ -1,7 +1,7 @@
 general:
   address_size: 4
   endian: big
-argument_types:
+argument_config:
   integer:
     type: numeric
     byte_align: false
@@ -12,65 +12,62 @@ argument_types:
     bit_size: 4
 instructions:
   nop:
-    arguments:
-    bits:
+    byte_code:
       value: 0
       size: 4
   lda:
     arguments:
-      - type: address
-    bits:
+      - address
+    byte_code:
       value: 1
       size: 4
   add:
     arguments:
-      - type: address
-    bits:
+      - address
+    byte_code:
       value: 2
       size: 4
   sub:
     arguments:
-      - type: address
-    bits:
+      - address
+    byte_code:
       value: 3
       size: 4
   sta:
     arguments:
-      - type: address
-    bits:
+      - address
+    byte_code:
       value: 4
       size: 4
   ldi:
     arguments:
-      - type: integer
-    bits:
+      - integer
+    byte_code:
       value: 5
       size: 4
   jmp:
     arguments:
-      - type: address
-    bits:
+      - address
+    byte_code:
       value: 6
       size: 4
   jc:
     arguments:
-      - type: address
-    bits:
+      - address
+    byte_code:
       value: 7
       size: 4
   jz:
     arguments:
-      type: address
-    bits:
+      - address
+    byte_code:
       value: 8
       size: 4
   out:
-    arguments:
-    bits:
+    byte_code:
       value: 14
       size: 4
   hlt:
-    arguments:
-    bits:
+    byte_code:
       value: 15
       size: 4
