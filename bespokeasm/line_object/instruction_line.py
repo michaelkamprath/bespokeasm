@@ -1,27 +1,17 @@
 import re
 import sys
 
+from bespokeasm.expression import parse_expression, ExpresionType
 from bespokeasm.line_object import LineWithBytes
 from bespokeasm.utilities import is_string_numeric, parse_numeric_string
 from bespokeasm.packed_bits import PackedBits
 
 class MachineCodePart:
-    def __init__(self, part_str, label, value, value_size, byte_align, endian):
-        self._part_str = part_str.lower()
-        self._label = label
-        self._value = value
+    def __init__(self, value_size, byte_align, endian):
         self._value_size = value_size
         self._byte_align = byte_align
         self._endian = endian
 
-    def part_str(self):
-        return self._part_str
-    def label(self):
-        return self._label
-    def value(self):
-        return self._value
-    def set_value(self, value):
-        self._value = value
     def value_size(self):
         return self._value_size
     def byte_align(self):
@@ -31,21 +21,85 @@ class MachineCodePart:
     def __repr__(self):
         return str(self)
     def __str__(self):
-        return f'{{part="{self._part_str}", value={self._value}, value_size={self._value_size}, label={self._label}, align={self._byte_align}, endian={self._endian}}}'
+        return 'You really should override MachineCodePart.__str__'
     def __eq__(self, other):
         return \
-            self._part_str == other._part_str \
-            and self._label == other._label \
-            and self._value == other._value \
-            and self._value_size == other._value_size \
+            self._value_size == other._value_size \
             and self._byte_align == other._byte_align \
             and self._endian == other._endian
+    def get_value(self, line_num: int, label_dict: dict[str, int]) -> int:
+        # this should be overridden
+        return 0
+
+
+class CommandMachineCodePart(MachineCodePart):
+    def __init__(self, command_str: str, command_value: int, value_size: int, byte_align = 'True', endian = 'big'):
+        super().__init__(value_size, byte_align, endian)
+        self._command = command_str
+        self._command_value = command_value
+
+    def get_value(self, line_num: int, label_dict: dict[str, int]) -> int:
+        return self._command_value
+
+    def __str__(self):
+        return f'{{command part ="{self._command}", value={self._command_value}, value_size={self._value_size}, align={self.byte_align()}, endian={self.endian()}}}'
+    def __eq__(self, other):
+        return \
+            isinstance(other, CommandMachineCodePart) \
+            and self._command == other._command \
+            and self._command_value == other._command_value \
+            and super.__eq__(other)
+
+class ExpressionMachineCodePart(MachineCodePart):
+    def __init__(self, expression: str, value_size: int, byte_align: bool, endian: str):
+        super().__init__(value_size, byte_align, endian)
+        self._expression = expression
+    def get_value(self, line_num: int, label_dict: dict[str, int]) -> int:
+        e = parse_expression(line_num, self._expression)
+        return e.get_value(label_dict)
+    def __str__(self):
+        return f'{{expression part ="{self._expression}", value_size={self._value_size}, align={self.byte_align()}, endian={self.endian()}}}'
+    def __eq__(self, other):
+        return \
+            isinstance(other, CommandMachineCodePart) \
+            and self._expression == other._expression \
+            and super.__eq__(other)
+
+class NumericMachineCodePart(MachineCodePart):
+    def __init__(self, part_str: str, label: str, value: int, value_size: int, byte_align: bool, endian: str):
+        super().__init__(value_size, byte_align, endian)
+        self._part_str = part_str.lower()
+        self._label = label
+        self._value = value
+
+    def part_str(self):
+        return self._part_str
+    def label(self):
+        return self._label
+    def get_value(self, line_num: int, label_dict: dict[str, int]) -> int:
+        if self.label() is not None and self._value is None:
+            if self.label() not in label_dict:
+                sys.exit(f'ERROR: line {line_num} - label "{self.label()}" is undefined')
+            self._value = label_dict[self.label()]
+        return self._value
+
+    def set_value(self, value):
+        self._value = value
+    def __str__(self):
+        return f'{{numeric part ="{self._part_str}", value={self._value}, value_size={self._value_size}, label={self._label}, align={self.byte_align()}, endian={self.endian()}}}'
+    def __eq__(self, other):
+        return \
+            isinstance(other, NumericMachineCodePart) \
+            and self._part_str == other._part_str \
+            and self._label == other._label \
+            and self._value == other._value \
+            and super.__eq__(other)
 
 class InstructionLine(LineWithBytes):
     COMMAND_EXTRACT_PATTERN = re.compile(r'^\s*(\w+)', flags=re.IGNORECASE|re.MULTILINE)
 
     def factory(line_num: int, line_str: str, comment: str, isa_model: dict):
-        """Tries to contruct a instrion lin object from the passed instruction line"""
+        """Tries to contruct a instruction line object from the passed instruction line"""
         #extract the instruction command
         command_match = re.search(InstructionLine.COMMAND_EXTRACT_PATTERN, line_str)
         if command_match is None or len(command_match.groups()) != 1:
@@ -80,13 +134,10 @@ class InstructionLine(LineWithBytes):
             ))
 
     def _create_instruction_part(self, command_str):
-        return MachineCodePart(
+        return CommandMachineCodePart(
                     self._command,
-                    None,
                     self._command_config['byte_code']['value'],
                     self._command_config['byte_code']['size'],
-                    True,
-                    'big',
                 )
 
     def _extract_argument_parts(self, args_str, arg_model_list, general_config):
@@ -117,6 +168,15 @@ class InstructionLine(LineWithBytes):
                         arg_config['byte_align'],
                         arg_endian,
                     ))
+                elif arg_value_type == 'expression':
+                    arg_list.append(
+                        ExpressionMachineCodePart(
+                            arg_str,
+                            arg_config['bit_size'],
+                            arg_config['byte_align'],
+                            arg_endian,
+                        )
+                    )
                 else:
                     sys.exit(f'ERROR: unknow argument type "{arg_value_type}" in configuration file')
             else:
@@ -127,7 +187,7 @@ class InstructionLine(LineWithBytes):
         arg = arg_str.strip()
         if is_string_numeric(arg):
             # its a number
-            return MachineCodePart(
+            return NumericMachineCodePart(
                 arg_str,
                 None,
                 parse_numeric_string(arg_str),
@@ -137,7 +197,7 @@ class InstructionLine(LineWithBytes):
             )
         else:
             # its a label of some sort
-            return MachineCodePart(
+            return NumericMachineCodePart(
                 arg_str,
                 arg_str,
                 None,
@@ -170,14 +230,12 @@ class InstructionLine(LineWithBytes):
 
     def generate_bytes(self, label_dict: dict[str, int]) -> bytearray:
         """Finalize the bytes for this line with the label assignemnts"""
-        # first set labels as needed
-        for p in self._parts:
-            if p.label() is not None and p.value() is None:
-                if p.label() not in label_dict:
-                    sys.exit(f'ERROR: line {self.line_number()} - label "{p.label()}" is undefined')
-                p.set_value(label_dict[p.label()])
-        # second pass pack the bits
         packed_bits = PackedBits()
         for p in self._parts:
-            packed_bits.append_bits(p.value(), p.value_size(), p.byte_align(), p.endian())
+            packed_bits.append_bits(
+                p.get_value(self.line_number(), label_dict),
+                p.value_size(),
+                p.byte_align(),
+                p.endian()
+            )
         self._bytes.extend(packed_bits.get_bytes())
