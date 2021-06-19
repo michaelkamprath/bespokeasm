@@ -32,5 +32,10 @@ class TestExpression(unittest.TestCase):
         self.assertEqual(parse_expression(1212, 'value_1/5').get_value(TestExpression.label_dict), 2, 'test rounding: 12/5 = 2')
         self.assertEqual(parse_expression(1212, '10/3/2').get_value(TestExpression.label_dict), 1, 'test rounding: 10/3/2 = 1')
 
+    def test_bitwise_operators(self):
+        self.assertEqual(parse_expression(111, 'b11110000&b10101010').get_value(TestExpression.label_dict), int('10100000', 2), 'bitwise AND')
+        self.assertEqual(parse_expression(222, 'b11110000|b10101010').get_value(TestExpression.label_dict), int('11111010', 2), 'bitwise OR')
+        self.assertEqual(parse_expression(222, 'b11110000^b10101010').get_value(TestExpression.label_dict), int('01011010', 2), 'bitwise XOR')
+
 if __name__ == '__main__':
     unittest.main()
