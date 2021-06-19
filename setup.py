@@ -21,7 +21,7 @@ dependency_links = [x.strip().replace('git+', '') for x in all_reqs \
 setup (
     name = 'bespokeasm',
     description = 'A customizable byte code assembler that allows for the definition of custom instruction set architecture',
-    version = '0.0.6',
+    version = '0.0.7',
     packages = find_packages(), # list of all packages
     install_requires = install_requires,
     python_requires='>=3.9',
