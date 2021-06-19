@@ -80,8 +80,6 @@ def _lexical_analysis(line_num: int, s: str) -> list[ExpressionNode]:
     }
 
     tokens = []
-    # split the string on white space
-    # expression_parts = s.split(None)
     expression_parts = re.findall(r'(?:\%|\$|b|0x)?[\w]+|[\+\-\*\/\(\)]', s)
     for part in expression_parts:
         if len(part) == 1 and part in mappings:
