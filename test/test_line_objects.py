@@ -4,7 +4,7 @@ import unittest
 from bespokeasm.line_object import LineObject, LineWithBytes
 from bespokeasm.line_object.data_line import DataLine
 from bespokeasm.line_object.label_line import LabelLine, is_valid_label
-from bespokeasm.line_object.instruction_line import InstructionLine, MachineCodePart
+from bespokeasm.line_object.instruction_line import InstructionLine, MachineCodePart, CommandMachineCodePart, NumericMachineCodePart
 
 class TestLineObject(unittest.TestCase):
 
@@ -86,9 +86,15 @@ class TestLineObject(unittest.TestCase):
                     'bit_size': 8
                 },
                 'address': {
-                    'type': 'numeric',
+                    'type': 'expression',
                     'byte_align': False,
                     'bit_size': 4
+                },
+                '2byte_expression': {
+                    'type': 'expression',
+                    'byte_align': True,
+                    'bit_size': 16,
+                    'endian': 'little'
                 }
             },
             'instructions': {
@@ -110,6 +116,24 @@ class TestLineObject(unittest.TestCase):
                         'size': 4,
                     }
                 },
+                'seta': {
+                    'arguments': [
+                        '2byte_expression'
+                    ],
+                    'byte_code': {
+                        'value': 3,
+                        'size': 4,
+                    }
+                },
+                'plus': {
+                    'arguments': [
+                        '1byte_value'
+                    ],
+                    'byte_code': {
+                        'value': 4,
+                        'size': 4,
+                    }
+                },
                 'hlt': {
                     'byte_code': {
                         'value': 15,
@@ -118,7 +142,10 @@ class TestLineObject(unittest.TestCase):
                 },
            },
         }
-        LABEL_DICT = {'test1': 0xA}
+        LABEL_DICT = {
+            'test1': 0xA,
+            'high_de': 0xde00,
+        }
 
         ins1 = InstructionLine.factory(22, '  lda test1', 'some comment!', isa_model)
         ins1.set_start_address(1212)
@@ -133,6 +160,34 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(ins2.byte_size(), 1, 'has 1 byte')
         ins2.generate_bytes(LABEL_DICT)
         self.assertEqual(ins2.get_bytes(), bytearray([0xF0]), 'instruction should match')
+
+        ins3 = InstructionLine.factory(22, '  seta (high_de + $00AD)', 'is it alive?', isa_model)
+        ins3.set_start_address(1313)
+        self.assertIsInstance(ins3, InstructionLine)
+        self.assertEqual(ins3.byte_size(), 3, 'has 3 bytes')
+        ins3.generate_bytes(LABEL_DICT)
+        self.assertEqual(ins3.get_bytes(), bytearray([0x30, 0xAD, 0xDE]), 'instruction should match')
+
+        ins4 = InstructionLine.factory(22, '  lda test1+2', 'load it', isa_model)
+        ins4.set_start_address(1313)
+        self.assertIsInstance(ins4, InstructionLine)
+        self.assertEqual(ins4.byte_size(), 1, 'has 1 byte')
+        ins4.generate_bytes(LABEL_DICT)
+        self.assertEqual(ins4.get_bytes(), bytearray([0x1c]), 'instruction should match')
+
+        ins5 = InstructionLine.factory(22, '  plus 8', 'plus it', isa_model)
+        ins5.set_start_address(888)
+        self.assertIsInstance(ins5, InstructionLine)
+        self.assertEqual(ins5.byte_size(), 2, 'has 2 bytes')
+        ins5.generate_bytes(LABEL_DICT)
+        self.assertEqual(ins5.get_bytes(), bytearray([0x40, 0x08]), 'instruction should match')
+
+        ins6 = InstructionLine.factory(22, '  lda test1-2', 'load it', isa_model)
+        ins6.set_start_address(888)
+        self.assertIsInstance(ins6, InstructionLine)
+        self.assertEqual(ins6.byte_size(), 1, 'has 1 byte1')
+        ins6.generate_bytes(LABEL_DICT)
+        self.assertEqual(ins6.get_bytes(), bytearray([0x18]), 'instruction should match')
 
     def test_instruction_line_creation_little_endian(self):
         isa_model = {
@@ -207,8 +262,8 @@ class TestLineObject(unittest.TestCase):
 
     def test_calc_byte_size_for_parts(self):
         parts_list1 = [
-            MachineCodePart('LDA', None, 1, 4, True, 'big'),
-            MachineCodePart('0xA', None, 10, 4, False, 'big'),
+            CommandMachineCodePart('LDA', 1, 4),
+            NumericMachineCodePart('0xA', None, 10, 4, False, 'big'),
         ]
         self.assertEqual(
             InstructionLine._calc_byte_size_for_parts(parts_list1),
@@ -217,8 +272,8 @@ class TestLineObject(unittest.TestCase):
         )
 
         parts_list2 = [
-            MachineCodePart('LDA', None, 1, 4, True, 'big'),
-            MachineCodePart('0xA', None, 10, 4, True, 'big'),
+            CommandMachineCodePart('LDA', 1, 4),
+            NumericMachineCodePart('0xA', None, 10, 4, True, 'big'),
         ]
         self.assertEqual(
             InstructionLine._calc_byte_size_for_parts(parts_list2),
@@ -227,9 +282,9 @@ class TestLineObject(unittest.TestCase):
         )
 
         parts_list3 = [
-            MachineCodePart('TEST', None, 15, 4, True, 'big'),
-            MachineCodePart('0xFF', None, 255, 8, False, 'big'),
-            MachineCodePart('0x88', None, 136, 8, False, 'big'),
+            CommandMachineCodePart('TEST', 15, 4),
+            NumericMachineCodePart('0xFF', None, 255, 8, False, 'big'),
+            NumericMachineCodePart('0x88', None, 136, 8, False, 'big'),
         ]
         self.assertEqual(
             InstructionLine._calc_byte_size_for_parts(parts_list3),
