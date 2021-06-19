@@ -4,6 +4,16 @@ import sys
 from bespokeasm.line_object import LineObject
 from bespokeasm.utilities import is_string_numeric, parse_numeric_string
 
+PATTERN_ALLOWED_LABELS = re.compile(
+        r'^(?!\d*$)(?:\.?\w*)$',
+        flags=re.IGNORECASE|re.MULTILINE
+    )
+
+def is_valid_label(s: str):
+    res = re.search(PATTERN_ALLOWED_LABELS, s)
+    return (res is not None)
+
+
 class LabelLine(LineObject):
     PATTERN_LABEL = re.compile(
         r'^\s*(\.?\w*):',
@@ -23,7 +33,9 @@ class LabelLine(LineObject):
         label_match = re.search(LabelLine.PATTERN_LABEL, line_str)
         if label_match is not None:
             # set this line up as a label
-            return LabelLine(line_num, label_match.group(1).strip(), None, line_str, comment)
+            label_val = label_match.group(1).strip()
+            if is_valid_label(label_val):
+                return LabelLine(line_num, label_val, None, line_str, comment)
 
         # Now determine is the line is a constant
         constant_match = re.search(LabelLine.PATTERN_CONSTANT, line_str)
@@ -31,9 +43,12 @@ class LabelLine(LineObject):
             numeric_str = constant_match.group(2).strip()
             if not is_string_numeric(numeric_str):
                 sys.exit(f'ERROR: line {line_num} - constant assigned nonnumeric value')
+            constant_label = constant_match.group(1).strip()
+            if not is_valid_label(constant_label):
+                sys.exit(f'ERROR: line {line_num} - invalid format for constant label: {constant_label}')
             return LabelLine(
                 line_num,
-                constant_match.group(1).strip(),
+                constant_label,
                 parse_numeric_string(numeric_str),
                 line_str,
                 comment,

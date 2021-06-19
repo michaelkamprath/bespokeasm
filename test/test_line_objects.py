@@ -3,7 +3,7 @@ import unittest
 
 from bespokeasm.line_object import LineObject, LineWithBytes
 from bespokeasm.line_object.data_line import DataLine
-from bespokeasm.line_object.label_line import LabelLine
+from bespokeasm.line_object.label_line import LabelLine, is_valid_label
 from bespokeasm.line_object.instruction_line import InstructionLine, MachineCodePart
 
 class TestLineObject(unittest.TestCase):
@@ -63,6 +63,16 @@ class TestLineObject(unittest.TestCase):
         # this should fail
         with self.assertRaises(SystemExit, msg='non-numeric constant assignments should fail'):
             l3 = LabelLine.factory(13, 'my_constant = some_string', 'bad constant')
+
+    def test_valid_labels(self):
+        self.assertTrue(is_valid_label('a_str'),'valid label')
+        self.assertTrue(is_valid_label('12_monkeys'),'valid label')
+        self.assertTrue(is_valid_label('.start_with_dot'),'valid label')
+        self.assertTrue(is_valid_label('_start_with_line'),'valid label')
+
+        self.assertFalse(is_valid_label('8675309'),'invalid label: only numbers')
+        self.assertFalse(is_valid_label('m+g'),'invalid label: operators')
+        self.assertFalse(is_valid_label('final frontier'),'invalid label: contains space')
 
     def test_instruction_line_creation(self):
         isa_model = {
