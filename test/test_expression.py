@@ -11,13 +11,12 @@ class TestExpression(unittest.TestCase):
         }
 
     def test_expression_parsing(self):
-
-
         self.assertEqual(parse_expression(1212, '1 + 2').get_value(TestExpression.label_dict), 3, 'simple expression: 1+2')
         self.assertEqual(parse_expression(1212, '(value_1 - two)/5').get_value(TestExpression.label_dict), 2, 'label expression: (value_1 - two)/5')
         self.assertEqual(parse_expression(1212, '8_ball').get_value(TestExpression.label_dict), 8, 'label expression: 8_ball')
         self.assertEqual(parse_expression(1212, '8675309').get_value(TestExpression.label_dict), 8675309, 'numeric expression: 8675309')
         self.assertEqual(parse_expression(1212, 'value_1-2').get_value(TestExpression.label_dict), 10, 'numeric expression: value_1-2')
+        self.assertEqual(parse_expression(1212, '3+12/3').get_value(TestExpression.label_dict), 7, 'test precedence order: 3+12/3 = 7')
 
         with self.assertRaises(SystemExit, msg='only integer numeric values are supported'):
             value = parse_expression(1212, '(value_1/5)/2.4').get_value(TestExpression.label_dict)
@@ -36,6 +35,8 @@ class TestExpression(unittest.TestCase):
         self.assertEqual(parse_expression(111, 'b11110000&b10101010').get_value(TestExpression.label_dict), int('10100000', 2), 'bitwise AND')
         self.assertEqual(parse_expression(222, 'b11110000|b10101010').get_value(TestExpression.label_dict), int('11111010', 2), 'bitwise OR')
         self.assertEqual(parse_expression(222, 'b11110000^b10101010').get_value(TestExpression.label_dict), int('01011010', 2), 'bitwise XOR')
+        # tests precendence order. + is of higher precednce than &
+        self.assertEqual(parse_expression(111, 'b0000111&$01+$10').get_value(TestExpression.label_dict), 0x01, 'test precedence order')
 
 if __name__ == '__main__':
     unittest.main()
