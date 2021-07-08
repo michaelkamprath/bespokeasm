@@ -1,8 +1,8 @@
 import re
 import sys
 
-from bespokeasm.line_object import LineWithBytes, LineObject
-from bespokeasm.line_object.data_line import DataLine
+from bespokeasm.assembler.line_object import LineWithBytes, LineObject
+from bespokeasm.assembler.line_object.data_line import DataLine
 from bespokeasm.utilities import parse_numeric_string, is_string_numeric
 
 # Directives are lines that tell the assembler to do something. Supported directives are:
@@ -109,6 +109,7 @@ class FillDataLine(LineWithBytes):
         super().__init__(line_num, instruction, comment)
         self._bytes.extend([fill_value&0xFF]*fill_count)
 
+    @property
     def byte_size(self) -> int:
         return len(self._bytes)
 
@@ -118,14 +119,15 @@ class FillUntilDataLine(LineWithBytes):
         self._fill_until_addr = fill_until_address
         self._fill_value = fill_value&0xFF
 
+    @property
     def byte_size(self) -> int:
-        if self._fill_until_addr >= self.address():
-            return self._fill_until_addr - self.address() + 1
+        if self._fill_until_addr >= self.address:
+            return self._fill_until_addr - self.address + 1
         else:
             return 0
 
     def generate_bytes(self, label_dict: dict[str, int]):
         """Finalize the bytes for this fill until line.
         """
-        if self.byte_size() > 0 and len(self._bytes) == 0:
-            self._bytes.extend([self._fill_value]*self.byte_size())
+        if self.byte_size > 0 and len(self._bytes) == 0:
+            self._bytes.extend([self._fill_value]*self.byte_size)

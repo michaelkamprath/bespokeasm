@@ -2,7 +2,7 @@ import re
 import sys
 
 from bespokeasm.utilities import parse_numeric_string, is_string_numeric
-from bespokeasm.line_object import LineWithBytes
+from bespokeasm.assembler.line_object import LineWithBytes
 
 class DataLine(LineWithBytes):
     PATTERN_DATA_DIRECTIVE = re.compile(
@@ -52,6 +52,7 @@ class DataLine(LineWithBytes):
         self._arg_value_list = value_list
         self._directive = directive_str
 
+    @property
     def byte_size(self) -> int:
         """Returns the number of bytes this data line will generate"""
         return len(self._arg_value_list)*DataLine.DIRECTIVE_VALUE_BYTE_SIZE[self._directive]

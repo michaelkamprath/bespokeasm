@@ -13,7 +13,7 @@ import re
 import sys
 
 from bespokeasm.utilities import is_string_numeric, parse_numeric_string
-from bespokeasm.line_object.label_line import is_valid_label
+from bespokeasm.assembler.line_object.label_line import is_valid_label
 
 class TokenType(enum.Enum):
     T_NUM = 0

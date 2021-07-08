@@ -1,11 +1,11 @@
 import re
 import sys
 
-from bespokeasm.line_object import LineObject
+from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.utilities import is_string_numeric, parse_numeric_string
 
 PATTERN_ALLOWED_LABELS = re.compile(
-        r'^(?!\d*$)(?:\.?\w*)$',
+        r'^(?!\d*$)(?:\.?[\w~-]*)$',
         flags=re.IGNORECASE|re.MULTILINE
     )
 
@@ -72,6 +72,6 @@ class LabelLine(LineObject):
         """
         if self._value is None:
             # this is a Label, return the address for value
-            return self.address()
+            return self.address
         else:
             return self._value

@@ -1,21 +1,21 @@
-description: Eater SAP-1 ISA
+description: Kamprath 16-Bit Addressing Breadboard CPU
 general:
-  address_size: 4
-  endian: big
+  address_size: 16
+  endian: little
 registers:
 operand_sets:
-  interger:
+  1byte_value:
     operand_configs:
       int8:
         type: numeric
-        argument_size: 4
-        argument_byte_align: false
+        argument_byte_align: true
+        argument_size: 8
   address:
     operand_configs:
       addr:
         type: numeric
-        argument_size: 4
-        argument_byte_align: false
+        argument_byte_align: true
+        argument_size: 16
 instructions:
   nop:
     operand_count: 0
@@ -23,76 +23,104 @@ instructions:
       value: 0
       size: 4
   lda:
+    operand_count: 1
+    operand_configs:
+      operand_sets:
+        - address
     byte_code:
       value: 1
       size: 4
+  add:
     operand_count: 1
     operand_configs:
       operand_sets:
         - address
-  add:
     byte_code:
       value: 2
       size: 4
+  sub:
     operand_count: 1
     operand_configs:
       operand_sets:
         - address
-  sub:
     byte_code:
       value: 3
       size: 4
+  sta:
     operand_count: 1
     operand_configs:
       operand_sets:
         - address
-  sta:
     byte_code:
       value: 4
       size: 4
+  seta:
     operand_count: 1
     operand_configs:
       operand_sets:
-        - address
-  ldi:
+        - 1byte_value
     byte_code:
       value: 5
       size: 4
+  jmp:
     operand_count: 1
     operand_configs:
       operand_sets:
-        - interger
-  jmp:
+        - address
     byte_code:
       value: 6
       size: 4
+  jc:
     operand_count: 1
     operand_configs:
       operand_sets:
         - address
-  jc:
     byte_code:
       value: 7
       size: 4
+  jz:
     operand_count: 1
     operand_configs:
       operand_sets:
         - address
-  jz:
     byte_code:
       value: 8
       size: 4
+  ldi:
     operand_count: 1
     operand_configs:
       operand_sets:
         - address
+    byte_code:
+      value: 9
+      size: 4
+  mvai:
+    operand_count: 0
+    byte_code:
+      value: 10
+      size: 4
+  mvij:
+    operand_count: 0
+    byte_code:
+      value: 11
+      size: 4
+  deci:
+    operand_count: 0
+    byte_code:
+      value: 12
+      size: 4
+  decj:
+    operand_count: 0
+    byte_code:
+      value: 13
+      size: 4
   out:
+    operand_count: 0
     byte_code:
       value: 14
       size: 4
-    operand_count: 0
   hlt:
+    operand_count: 0
     byte_code:
       value: 15
       size: 4
-    operand_count: 0

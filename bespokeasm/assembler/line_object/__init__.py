@@ -5,6 +5,7 @@ class LineObject:
         self._comment = comment.strip()
         self._address = None
 
+    @property
     def line_number(self):
         """Returns the line number that his object was parsed from"""
         return self._line_num
@@ -16,6 +17,7 @@ class LineObject:
         """
         self._address = address
 
+    @property
     def address(self) -> int:
         """Returns the address for this line object.
 
@@ -23,14 +25,17 @@ class LineObject:
         """
         return self._address
 
+    @property
     def byte_size(self) -> int:
         """Returns the number of bytes this line will generate"""
         return 0
 
+    @property
     def instruction(self) -> str:
         """returns the original instruction text that generated this line object"""
         return self._instruction
 
+    @property
     def comment(self) -> str:
         """returns the code comment associated with this line object"""
         return self._comment
@@ -57,6 +62,7 @@ class LineWithBytes(LineObject):
         """appends the passed byte value to this objects bytes"""
         self._bytes.append(byte_value&0xFF)
 
+    @property
     def instruction(self) -> str:
         """returns the original instruction text that generated this line object"""
-        return '   ' + super().instruction()
+        return '   ' + super().instruction
