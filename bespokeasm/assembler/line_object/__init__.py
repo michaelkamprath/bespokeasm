@@ -5,6 +5,11 @@ class LineObject:
         self._comment = comment.strip()
         self._address = None
 
+    def __repr__(self):
+        return str(self)
+    def __str__(self):
+        return f'LineObject<{self.instruction}>'
+
     @property
     def line_number(self):
         """Returns the line number that his object was parsed from"""

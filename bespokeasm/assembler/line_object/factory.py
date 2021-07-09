@@ -38,7 +38,7 @@ class LineOjectFactory:
                 return line_obj
 
             # try directives
-            line_obj = DirectiveLine.factory(line_num, instruction_str, comment_str)
+            line_obj = DirectiveLine.factory(line_num, instruction_str, comment_str, model.endian)
             if line_obj is not None:
                 return line_obj
 

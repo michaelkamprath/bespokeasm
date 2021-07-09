@@ -6,18 +6,22 @@ from bespokeasm.assembler.line_object import LineWithBytes
 
 class DataLine(LineWithBytes):
     PATTERN_DATA_DIRECTIVE = re.compile(
-        r'^(\.byte)\s*(?:([\w,$\s]+)|(?P<quote>[\"\']{1})((?:\\(?P=quote)|.)*)(?P=quote))',
+        r'^(\.byte|\.2byte|\.4byte)\s*(?:([\w,$\%\s]+)|(?P<quote>[\"\']{1})((?:\\(?P=quote)|.)*)(?P=quote))',
         flags=re.IGNORECASE|re.MULTILINE
     )
 
     DIRECTIVE_VALUE_BYTE_SIZE = {
         '.byte': 1,
+        '.2byte': 2,
+        '.4byte': 4,
     }
 
     DIRECTIVE_VALUE_MASK = {
         '.byte': 0xFF,
+        '.2byte': 0xFFFF,
+        '.4byte': 0xFFFFFFFF,
     }
-    def factory(line_num: int, line_str: str, comment: str):
+    def factory(line_num: int, line_str: str, comment: str, endian: str) -> LineWithBytes:
         """Tries to match the passed line string to the data directive pattern.
         If succcessful, returns a constructed DataLine object. If not, None is
         returned.
@@ -43,14 +47,19 @@ class DataLine(LineWithBytes):
                 values_list,
                 line_str,
                 comment,
+                endian,
             )
         else:
             return None
 
-    def __init__(self, line_num: int, directive_str: str, value_list: list, instruction: str, comment: str, is_string = False):
+    def __init__(self, line_num: int, directive_str: str, value_list: list, instruction: str, comment: str, endian: str):
         super().__init__(line_num, instruction, comment)
         self._arg_value_list = value_list
         self._directive = directive_str
+        self._endian = endian
+
+    def __str__(self):
+        return f'DataLine<{self._directive}: {self._arg_value_list}>'
 
     @property
     def byte_size(self) -> int:
@@ -71,5 +80,11 @@ class DataLine(LineWithBytes):
                     sys.exit(f'ERROR: line {self.line_number()} - unknown label "{arg_item}"')
             else:
                 sys.exit(f'ERROR: line {self.line_number()} - unknown data item "{arg_item}"')
-            self._append_byte(arg_val&DataLine.DIRECTIVE_VALUE_MASK[self._directive])
+            value_bytes = (arg_val&DataLine.DIRECTIVE_VALUE_MASK[self._directive]).to_bytes(
+                DataLine.DIRECTIVE_VALUE_BYTE_SIZE[self._directive],
+                byteorder=self._endian,
+                signed=(arg_val < 0)
+            )
+            for b in value_bytes:
+                self._append_byte(b)
 

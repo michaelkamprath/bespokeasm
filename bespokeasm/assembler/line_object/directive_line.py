@@ -41,7 +41,7 @@ class DirectiveLine:
         flags=re.IGNORECASE|re.MULTILINE
     )
 
-    def factory(line_num: int, line_str: str, comment: str):
+    def factory(line_num: int, line_str: str, comment: str, endian: str) -> LineObject:
         # for efficiency, if it doesn't start with a period, it is not a directive
         cleaned_line_str = line_str.strip()
         if not cleaned_line_str.startswith('.'):
@@ -96,7 +96,7 @@ class DirectiveLine:
                 sys.exit(f'ERROR: line {line_num} - .zero directive value is not numeric')
 
         # nothing was matched here. pass to data directive
-        return DataLine.factory(line_num, line_str, comment)
+        return DataLine.factory(line_num, line_str, comment, endian)
 
 class AddressOrgLine(LineObject):
     def __init__(self, line_num: int, instruction: str, comment: str, address: int):

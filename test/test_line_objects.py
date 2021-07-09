@@ -15,25 +15,25 @@ class TestLineObject(unittest.TestCase):
     def test_data_line_creation(self):
         LABEL_DICT = {'test1': 0x1234}
 
-        d1 = DataLine.factory(27, ' .byte $de, $ad, 0xbe, $ef', 'steak')
+        d1 = DataLine.factory(27, ' .byte $de, $ad, 0xbe, $ef', 'steak', 'big')
         d1.generate_bytes(LABEL_DICT)
         self.assertIsInstance(d1, DataLine)
         self.assertEqual(d1.byte_size, 4, 'data line has 4 bytes')
         self.assertEqual(d1.get_bytes(), bytearray([0xde, 0xad, 0xbe, 0xef]), '$deadbeef')
 
-        d2 = DataLine.factory(38, ' .byte test1, 12', 'label mania')
+        d2 = DataLine.factory(38, ' .byte test1, 12', 'label mania', 'big')
         d2.generate_bytes(LABEL_DICT)
         self.assertIsInstance(d2, DataLine)
         self.assertEqual(d2.byte_size, 2, 'data line has 2 bytes')
         self.assertEqual(d2.get_bytes(), bytearray([0x34, 12]), 'should slice first byte')
 
-        d3 = DataLine.factory(38, ' .byte test1, , 12', 'label mania')
+        d3 = DataLine.factory(38, ' .byte test1, , 12', 'label mania', 'big')
         d3.generate_bytes(LABEL_DICT)
         self.assertIsInstance(d3, DataLine)
         self.assertEqual(d3.byte_size, 2, 'data line has 2 bytes, ignore bad argument')
         self.assertEqual(d3.get_bytes(), bytearray([0x34, 12]), 'should slice first byte, ignore bad argument')
 
-        d4 = DataLine.factory(38, ' .byte b1110', 'label mania')
+        d4 = DataLine.factory(38, ' .byte b1110', 'label mania', 'big')
         d4.generate_bytes(LABEL_DICT)
         self.assertIsInstance(d4, DataLine)
         self.assertEqual(d4.byte_size, 1, 'data line has 1 bytes')
@@ -41,11 +41,29 @@ class TestLineObject(unittest.TestCase):
 
         d5_values = [ord(c) for c in 'that\'s a test']
         d5_values.extend([0])
-        d5 = DataLine.factory(42, ' .byte "that\'s a test"', 'string of bytes')
+        d5 = DataLine.factory(42, ' .byte "that\'s a test"', 'string of bytes', 'big')
         d5.generate_bytes(LABEL_DICT)
         self.assertIsInstance(d5, DataLine)
         self.assertEqual(d5.byte_size, 14, 'character string has 14 bytes')
         self.assertEqual(d5.get_bytes(), bytearray(d5_values), 'character string matches')
+
+        d6 = DataLine.factory(38, ' .2byte test1, 12', '2 byte label mania', 'little')
+        d6.generate_bytes(LABEL_DICT)
+        self.assertIsInstance(d6, DataLine)
+        self.assertEqual(d6.byte_size, 4, 'data line has 4 bytes')
+        self.assertEqual(d6.get_bytes(), bytearray([0x34, 0x12, 12, 0]), 'should slice first two bytes')
+
+        d7 = DataLine.factory(38, '.4byte %11110111011001010100001100100001, $1945', '4 byte label mania', 'little')
+        d7.generate_bytes(LABEL_DICT)
+        self.assertIsInstance(d7, DataLine)
+        self.assertEqual(d7.byte_size, 8, 'data line has 8 bytes')
+        self.assertEqual(d7.get_bytes(), bytearray([0x21, 0x43, 0x65, 0xf7, 0x45, 0x19, 0, 0]), 'should slice first two bytes')
+
+        d8 = DataLine.factory(38, '.4byte %11110111011001010100001100100001, $1945', '4 byte label mania', 'big')
+        d8.generate_bytes(LABEL_DICT)
+        self.assertIsInstance(d8, DataLine)
+        self.assertEqual(d8.byte_size, 8, 'data line has 8 bytes')
+        self.assertEqual(d8.get_bytes(), bytearray([0xf7, 0x65, 0x43, 0x21, 0, 0, 0x19, 0x45]), 'should slice first two bytes')
 
     def test_label_line_creation(self):
         register_set = set(['a', 'b', 'sp', 'mar'])
