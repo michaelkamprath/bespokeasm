@@ -1,4 +1,3 @@
-import sys
 import unittest
 import importlib.resources as pkg_resources
 
@@ -57,13 +56,19 @@ class TestLineObject(unittest.TestCase):
         d7.generate_bytes(LABEL_DICT)
         self.assertIsInstance(d7, DataLine)
         self.assertEqual(d7.byte_size, 8, 'data line has 8 bytes')
-        self.assertEqual(d7.get_bytes(), bytearray([0x21, 0x43, 0x65, 0xf7, 0x45, 0x19, 0, 0]), 'should slice first two bytes')
+        self.assertEqual(d7.get_bytes(), bytearray([0x21, 0x43, 0x65, 0xf7, 0x45, 0x19, 0, 0]), 'should have each 4 byte numbe in litle endian')
 
         d8 = DataLine.factory(38, '.4byte %11110111011001010100001100100001, $1945', '4 byte label mania', 'big')
         d8.generate_bytes(LABEL_DICT)
         self.assertIsInstance(d8, DataLine)
         self.assertEqual(d8.byte_size, 8, 'data line has 8 bytes')
-        self.assertEqual(d8.get_bytes(), bytearray([0xf7, 0x65, 0x43, 0x21, 0, 0, 0x19, 0x45]), 'should slice first two bytes')
+        self.assertEqual(d8.get_bytes(), bytearray([0xf7, 0x65, 0x43, 0x21, 0, 0, 0x19, 0x45]), 'should have each 4 byte numbe in big endian')
+
+        d9 = DataLine.factory(38, '.4byte 0x0123456789abcdef', 'data masked!', 'little')
+        d9.generate_bytes(LABEL_DICT)
+        self.assertIsInstance(d9, DataLine)
+        self.assertEqual(d9.byte_size, 4, 'data line has 4 bytes')
+        self.assertEqual(d9.get_bytes(), bytearray([0xef, 0xcd, 0xab, 0x89]), 'should slice first four bytes')
 
     def test_label_line_creation(self):
         register_set = set(['a', 'b', 'sp', 'mar'])
