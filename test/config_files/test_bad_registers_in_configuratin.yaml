@@ -3,6 +3,11 @@ general:
   address_size: 4
   endian: big
   registers:
+    - a
+    - b
+    - mar
+    - byte
+    - org
 operand_sets:
   interger:
     operand_configs:

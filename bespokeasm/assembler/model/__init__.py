@@ -1,3 +1,4 @@
+from bespokeasm.assembler.line_object import LineObject
 import json
 import sys
 import yaml
@@ -5,7 +6,7 @@ import yaml
 from bespokeasm.assembler.byte_code.assembled import AssembledInstruction
 from bespokeasm.assembler.model.instruction_set import InstructionSet
 from bespokeasm.assembler.model.operand_set import OperandSet, OperandSetCollection
-
+from bespokeasm.assembler.line_object.directive_line import DirectiveLine
 class AssemblerModel:
     def __init__(self, config_file_path: str):
         if config_file_path.endswith('.json'):
@@ -21,6 +22,10 @@ class AssemblerModel:
             sys.exit('ERROR: unknown ISA config file type')
 
         self._config = config_dict
+        registers = self._config['general'].get('registers', [])
+        self._registers = set(registers if registers is not None else [])
+        if len(self._registers.intersection(DirectiveLine.DIRECTIVE_SET)) > 0:
+            sys.exit(f'ERROR: the instruction set configuration file specified unallowed register names: {self._registers.intersection(DirectiveLine.DIRECTIVE_SET)}')
         self._operand_sets = OperandSetCollection(self._config['operand_sets'], self.endian)
         self._instructions = InstructionSet(self._config['instructions'], self._operand_sets)
 
@@ -43,8 +48,8 @@ class AssemblerModel:
     def address_size(self) -> int:
         return self._config['general']['address_size']
     @property
-    def registers(self) -> list[str]:
-        return self._config['general'].get('registers', [])
+    def registers(self) -> set[str]:
+        return self._registers
 
     @property
     def instruction_mnemonics(self) -> list[str]:

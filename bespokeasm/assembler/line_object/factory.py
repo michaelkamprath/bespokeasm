@@ -33,7 +33,7 @@ class LineOjectFactory:
         # parse instruction
         if len(instruction_str) > 0:
             # try label
-            line_obj = LabelLine.factory(line_num, instruction_str, comment_str)
+            line_obj = LabelLine.factory(line_num, instruction_str, comment_str, model.registers)
             if line_obj is not None:
                 return line_obj
 

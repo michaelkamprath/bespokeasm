@@ -24,7 +24,7 @@ class LabelLine(LineObject):
         flags=re.IGNORECASE|re.MULTILINE
     )
 
-    def factory(line_num: int, line_str: str, comment: str):
+    def factory(line_num: int, line_str: str, comment: str, registers: set[str]):
         """Tries to match the passed line string to the Label or Constant directive patterns.
         If succcessful, returns a constructed LabelLine object. If not, None is
         returned.
@@ -35,6 +35,8 @@ class LabelLine(LineObject):
             # set this line up as a label
             label_val = label_match.group(1).strip()
             if is_valid_label(label_val):
+                if label_val in registers:
+                    sys.exit(f'ERROR: line {line_num} - used the register label "{label_val}" as a non-register label')
                 return LabelLine(line_num, label_val, None, line_str, comment)
 
         # Now determine is the line is a constant
@@ -46,6 +48,8 @@ class LabelLine(LineObject):
             constant_label = constant_match.group(1).strip()
             if not is_valid_label(constant_label):
                 sys.exit(f'ERROR: line {line_num} - invalid format for constant label: {constant_label}')
+            if constant_label in registers:
+                sys.exit(f'ERROR: line {line_num} - used the register label "{constant_label}" as a non-register label')
             return LabelLine(
                 line_num,
                 constant_label,
