@@ -47,6 +47,9 @@ class Assembler:
                     sys.exit(f'ERROR: line {l.line_number()} - label "{l.get_label()}" is defined multiple lines')
         if self._verbose:
             click.echo(f'Found {len(label_addresses)} labels: {label_addresses}')
+        # Sort lines according to their assigned address. This allows for .org directives
+        line_obs.sort(key=lambda x: x.address)
+
         # second pass: build byte code
         max_instruction_text_size = 0
         byte_code = bytearray()
