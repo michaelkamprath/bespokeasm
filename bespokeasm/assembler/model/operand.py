@@ -13,31 +13,32 @@ class OperandType(enum.Enum):
     INDIRECT_NUMERIC = 2
 
 class Operand:
-    def factory(arg_config_dict: dict, default_endian: str):
+    def factory(operand_id: str, arg_config_dict: dict, default_endian: str):
         type_str = arg_config_dict['type']
         if type_str == 'numeric':
-            return NumericExpressionOperand(arg_config_dict, default_endian)
+            return NumericExpressionOperand(operand_id, arg_config_dict, default_endian)
         elif type_str == 'register':
-            return RegisterOperand(arg_config_dict, default_endian)
+            return RegisterOperand(operand_id, arg_config_dict, default_endian)
         elif type_str == 'indirect_register':
-            return IndirectRegisterOperand(arg_config_dict, default_endian)
+            return IndirectRegisterOperand(operand_id, arg_config_dict, default_endian)
         elif type_str == 'indirect_numeric':
-            return IndirectNumericOperand(arg_config_dict, default_endian)
+            return IndirectNumericOperand(operand_id, arg_config_dict, default_endian)
         else:
             return None
 
-    def __init__(self, arg_config_dict, default_endian):
+    def __init__(self, operand_id, arg_config_dict, default_endian):
+        self._id = operand_id
         self._config = arg_config_dict
         self._default_endian = default_endian
 
     def __repr__(self):
         return str(self)
     def __str__(self):
-        return f'Operand<{self.type}>'
+        return f'Operand<{self.id}>'
 
-    # @property
-    # def id(self) -> str:
-    #     return self._config['id']
+    @property
+    def id(self) -> str:
+        return self._id
     @property
     def type(self) -> OperandType:
         return OperandType.UNKNOWN
@@ -87,8 +88,8 @@ class Operand:
         return None, None
 
 class NumericExpressionOperand(Operand):
-    def __init__(self, arg_config_dict: dict, default_endian: str):
-        super().__init__(arg_config_dict, default_endian)
+    def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str):
+        super().__init__(operand_id, arg_config_dict, default_endian)
 
     @property
     def type(self) -> OperandType:
@@ -114,11 +115,11 @@ class NumericExpressionOperand(Operand):
         return bytecode_part, arg_part
 
 class RegisterOperand(Operand):
-    def __init__(self, arg_config_dict: dict, default_endian: str):
-        super().__init__(arg_config_dict, default_endian)
+    def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str):
+        super().__init__(operand_id, arg_config_dict, default_endian)
 
     def __str__(self):
-        return f'RegisterOperand<register={self.register}>'
+        return f'RegisterOperand<{self.id},register={self.register}>'
     @property
     def type(self) -> OperandType:
         return OperandType.REGISTER
@@ -137,8 +138,8 @@ class RegisterOperand(Operand):
 class IndirectRegisterOperand(RegisterOperand):
     OPERAND_PATTERN_TEMPLATE = '^\[\s*({0})\s*(?:(\+|\-)\s*([\s\w\+\-\*\/\&\|\^\(\)\$\%]+)\s*)?\]$'
 
-    def __init__(self, arg_config_dict: dict, default_endian: str):
-        super().__init__(arg_config_dict, default_endian)
+    def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str):
+        super().__init__(operand_id, arg_config_dict, default_endian)
         self._match_pattern = re.compile(
             self.OPERAND_PATTERN_TEMPLATE.format(self.register),
             flags=re.IGNORECASE|re.MULTILINE
@@ -184,11 +185,11 @@ class IndirectRegisterOperand(RegisterOperand):
 class IndirectNumericOperand(NumericExpressionOperand):
     OPERAND_PATTERN = re.compile(r'^\[([\s\w\+\-\*\/\&\|\^\(\)\$\%]+)\]$', flags=re.IGNORECASE|re.MULTILINE)
 
-    def __init__(self, arg_config_dict: dict, default_endian: str):
-        super().__init__(arg_config_dict, default_endian)
+    def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str):
+        super().__init__(operand_id, arg_config_dict, default_endian)
 
     def __str__(self):
-        return f'IndirectNumericOperand<arg_size={self.argument_size}>'
+        return f'IndirectNumericOperand<{self.id},arg_size={self.argument_size}>'
 
     @property
     def type(self) -> OperandType:

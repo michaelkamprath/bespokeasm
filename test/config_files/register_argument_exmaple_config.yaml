@@ -113,46 +113,46 @@ instructions:
         list:
           - 8_bit_destination
           - 8_bit_source
-        diallowed_operands:
+        disallowed_pairs:
           - [a, a]
           - [i, i]
           - [sp, sp]
           - [indirect_addr, indirect_addr]
-        specific_operands:
-          - operands:
-              - type: register
-                register: a
-              - type: indirect_register
-                register: mar
-            bytecode_value: 0b000000
-            bytecode_size: 6
-          - operands:
-              - type: register
-                register: i
-              - type: indirect_register
-                register: mar
-            bytecode_value: 0b010010
-            bytecode_size: 6
-          - operands:
-              - type: indirect_register
-                register: sp
-                offset_enabled: true
-                offset_max: 127
-                offset_min: -128
-                offset_size: 8
-                offset_byte_align: true
-              - type: indirect_register
-                register: mar
-            bytecode_value: 0b101101
-            bytecode_size: 6
-          - operands:
-              - type: indirect_numeric
-                argument_size: 16
-                argument_byte_align: true
-              - type: indirect_register
-                register: mar
-            bytecode_value: 0b110110
-            bytecode_size: 6
+      specific_operands:
+        - operands:
+            - type: register
+              register: a
+            - type: indirect_register
+              register: mar
+          bytecode_value: 0b000000
+          bytecode_size: 6
+        - operands:
+            - type: register
+              register: i
+            - type: indirect_register
+              register: mar
+          bytecode_value: 0b010010
+          bytecode_size: 6
+        - operands:
+            - type: indirect_register
+              register: sp
+              offset_enabled: true
+              offset_max: 127
+              offset_min: -128
+              offset_size: 8
+              offset_byte_align: true
+            - type: indirect_register
+              register: mar
+          bytecode_value: 0b101101
+          bytecode_size: 6
+        - operands:
+            - type: indirect_numeric
+              argument_size: 16
+              argument_byte_align: true
+            - type: indirect_register
+              register: mar
+          bytecode_value: 0b110110
+          bytecode_size: 6
   add:
     byte_code:
       value: 0b10111
