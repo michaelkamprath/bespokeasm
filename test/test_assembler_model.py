@@ -23,7 +23,7 @@ class TestConfigObject(unittest.TestCase):
         conf1 = yaml.safe_load(self._eater_sap1_config_str)
         arg_collection1 = AS.OperandSetCollection(conf1['operand_sets'], 'big')
         self.assertEqual(len(arg_collection1),2, 'there are 2 argument sets')
-        self.assertTrue('interger' in arg_collection1)
+        self.assertTrue('integer' in arg_collection1)
         self.assertTrue('address' in arg_collection1)
 
         conf2 = yaml.safe_load(self._register_argument_config_str)

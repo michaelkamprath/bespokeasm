@@ -18,7 +18,8 @@ class Instruction:
     def __init__(self, mnemonic: str, instruction_config: dict, operand_set_collection: OperandSetCollection):
         self._mnemonic = mnemonic
         self._config = instruction_config
-        self._operand_parser = OperandParser(self._config.get('operand_configs', None), operand_set_collection)
+        self._operand_parser = OperandParser(self._config.get('operands', None), operand_set_collection)
+        self._operand_parser.validate(self._mnemonic)
 
     def __repr__(self) -> str:
         return str(self)
@@ -30,7 +31,7 @@ class Instruction:
         return self._mnemonic
     @property
     def operand_count(self) -> int:
-        return self._config.get('operand_count', 0)
+        return self._operand_parser.operand_count
     @property
     def base_bytecode_size(self) -> int:
         return self._config['byte_code']['size']

@@ -6,7 +6,7 @@ class OperandSet:
         self._name = name
         self._config = config_dict
         self._arg_types = {}
-        for arg_type_id, arg_type_conf in self._config['operand_configs'].items():
+        for arg_type_id, arg_type_conf in self._config['operand_values'].items():
             arg_type = Operand.factory(arg_type_conf, default_endian)
             self._arg_types[arg_type_id]=arg_type
         self._ordered_operand_list = list(self._arg_types.values())

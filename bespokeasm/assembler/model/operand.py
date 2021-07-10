@@ -28,9 +28,6 @@ class Operand:
 
     def __init__(self, arg_config_dict, default_endian):
         self._config = arg_config_dict
-        self._bytecode_value = arg_config_dict.get('bytecode_value', None)
-        if self._bytecode_value is not None:
-            self._bytecode_size = arg_config_dict['bytecode_size']
         self._default_endian = default_endian
 
     def __repr__(self):
@@ -47,13 +44,19 @@ class Operand:
 
     @property
     def has_bytecode(self) -> bool:
-        return self._bytecode_value is not None
+        return ('bytecode' in self._config)
     @property
     def bytecode_value(self) -> int:
-        return self._bytecode_value
+        if self.has_bytecode:
+            return self._config['bytecode']['value']
+        else:
+            return None
     @property
     def bytecode_size(self) -> int:
-        return self._bytecode_size
+        if self.has_bytecode:
+            return self._config['bytecode']['size']
+        else:
+            return None
     @property
     def has_offset(self) -> bool:
         return False
@@ -86,9 +89,6 @@ class Operand:
 class NumericExpressionOperand(Operand):
     def __init__(self, arg_config_dict: dict, default_endian: str):
         super().__init__(arg_config_dict, default_endian)
-        self._argument_size = arg_config_dict['argument_size']
-        self._argmunet_byte_align = arg_config_dict['argument_byte_align']
-        self._argmunet_endian = arg_config_dict['argument_endian'] if 'argument_endian' in arg_config_dict else default_endian
 
     @property
     def type(self) -> OperandType:
@@ -99,13 +99,14 @@ class NumericExpressionOperand(Operand):
         return True
     @property
     def argument_size(self) -> int:
-        return self._argument_size
+        return self._config['argument']['size']
     @property
     def argument_byte_align(self) -> bool:
-        return self._argmunet_byte_align
+        return self._config['argument']['byte_align']
     @property
     def argument_endian(self) -> str:
-        return self._argmunet_endian
+        return self._config['argument'].get('endian', self._default_endian)
+
 
     def parse_operand(self, line_num: int, operand: str) -> tuple[ByteCodePart, ByteCodePart]:
         bytecode_part = NumericByteCodePart(self.bytecode_value, self.bytecode_size, False, 'big') if self.bytecode_value is not None else None
@@ -133,7 +134,7 @@ class RegisterOperand(Operand):
         arg_part = None
         return bytecode_part, arg_part
 
-class IndirectRegisterOperand(Operand):
+class IndirectRegisterOperand(RegisterOperand):
     OPERAND_PATTERN_TEMPLATE = '^\[\s*({0})\s*(?:(\+|\-)\s*([\s\w\+\-\*\/\&\|\^\(\)\$\%]+)\s*)?\]$'
 
     def __init__(self, arg_config_dict: dict, default_endian: str):
@@ -145,41 +146,42 @@ class IndirectRegisterOperand(Operand):
 
     @property
     def type(self) -> OperandType:
-        return OperandType.REGISTER
-    @property
-    def register(self) -> str:
-        return self._config['register']
+        return OperandType.INDIRECT_REGISTER
+
     @property
     def has_offset(self) -> bool:
-        return self._config.get('offset_enabled', False)
+        return ('offset' in self._config)
     @property
     def offset_size(self) -> int:
-        return self._config.get('offset_size', None)
+        return self._config['offset']['size']
     @property
     def offset_byte_align(self) -> bool:
-        return self._config.get('offset_byte_align', None)
+        return self._config['offset']['byte_align']
     @property
     def offset_endian(self) -> str:
-        return self._config.get('offset_endian', self._default_endian)
+        return self._config['offset'].get('endian', self._default_endian)
     def parse_operand(self, line_num: int, operand: str) -> tuple[ByteCodePart, ByteCodePart]:
         # first check that operand is what we expect
         match = re.match(self._match_pattern, operand.strip())
         if match is not None and len(match.groups()) > 0:
             bytecode_part = NumericByteCodePart(self.bytecode_value, self.bytecode_size, False, 'big') if self.bytecode_value is not None else None
-            if len(match.groups()) == 3 and match.group(2) is not None and match.group(3) is not None:
-                # we have an offset argument. construct the offset expression. Group 2 is the + or - sign, and our expression
-                # parser expects 2 operands for the + or - sign
-                argument_str = f'0 {match.group(2).strip()} {match.group(3).strip()}'
-                arg_part = ExpressionByteCodePart(argument_str, self.offset_size, self.offset_byte_align, self.offset_endian)
+            if self.has_offset:
+                if len(match.groups()) == 3 and match.group(2) is not None and match.group(3) is not None:
+                    # we have an offset argument. construct the offset expression. Group 2 is the + or - sign, and our expression
+                    # parser expects 2 operands for the + or - sign
+                    argument_str = f'0 {match.group(2).strip()} {match.group(3).strip()}'
+                    arg_part = ExpressionByteCodePart(argument_str, self.offset_size, self.offset_byte_align, self.offset_endian)
+                else:
+                    # must have and offset value of 0
+                    arg_part = NumericByteCodePart(0, self.offset_size, self.offset_byte_align, self.offset_endian)
             else:
-                # must have and offset value of 0
-                arg_part = NumericByteCodePart(0, self.offset_size, self.offset_byte_align, self.offset_endian)
+                arg_part = None
             return bytecode_part, arg_part
         else:
             return None, None
 
 
-class IndirectNumericOperand(Operand):
+class IndirectNumericOperand(NumericExpressionOperand):
     OPERAND_PATTERN = re.compile(r'^\[([\s\w\+\-\*\/\&\|\^\(\)\$\%]+)\]$', flags=re.IGNORECASE|re.MULTILINE)
 
     def __init__(self, arg_config_dict: dict, default_endian: str):
@@ -191,18 +193,6 @@ class IndirectNumericOperand(Operand):
     @property
     def type(self) -> OperandType:
         return OperandType.REGISTER
-    @property
-    def has_argument(self) -> bool:
-        return True
-    @property
-    def argument_size(self) -> int:
-        return self._config['argument_size']
-    @property
-    def argument_byte_align(self) -> bool:
-        return self._config.get('argument_byte_align', True)
-    @property
-    def argument_endian(self) -> str:
-        return self._config.get('argument_endian', self._default_endian)
 
     def parse_operand(self, line_num: int, operand: str) -> tuple[ByteCodePart, ByteCodePart]:
         # first check that operand is what we expect

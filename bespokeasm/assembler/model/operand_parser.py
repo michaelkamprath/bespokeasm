@@ -26,10 +26,10 @@ class OperandParser:
         if instruction_operands_config is not None:
             self._config = instruction_operands_config
         else:
-            self._config = {'operand_count': 0}
+            self._config = {'count': 0}
         self._operand_sets = []
         if 'operand_sets' in self._config:
-            operand_sets = self._config['operand_sets']
+            operand_sets = self._config['operand_sets']['list']
             self._operand_sets = [operand_set_collection.get_operand_set(k) for k in operand_sets]
 
     def __repr__(self) -> str:
@@ -37,9 +37,14 @@ class OperandParser:
     def __str__(self) -> str:
         return f'OperandParser<{self._operand_sets}>'
 
+    def validate(self, instruction: str):
+        # check to make sure we as many operands configured as count.
+        if self.operand_count != len(self._operand_sets):
+            sys.exit(f'ERROR: CONFIGURATION - the number of properly configured operands ({len(self._operand_sets)}) does not match prescribed number ({self.operand_count}) for instruction "{instruction}"')
+
     @property
-    def operand_count(self):
-        return len(self._operand_sets)
+    def operand_count(self) -> int:
+        return self._config['count']
 
     def generate_machine_code(self, line_num:int, operands: list[str]) -> tuple[list[ByteCodePart], list[ByteCodePart]]:
         bytecode_list = []
