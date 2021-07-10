@@ -17,6 +17,7 @@ class TestExpression(unittest.TestCase):
         self.assertEqual(parse_expression(1212, '8675309').get_value(TestExpression.label_dict), 8675309, 'numeric expression: 8675309')
         self.assertEqual(parse_expression(1212, 'value_1-2').get_value(TestExpression.label_dict), 10, 'numeric expression: value_1-2')
         self.assertEqual(parse_expression(1212, '3+12/3').get_value(TestExpression.label_dict), 7, 'test precedence order: 3+12/3 = 7')
+        self.assertEqual(parse_expression(1212, '0-(3+7)').get_value(TestExpression.label_dict), -10, 'test handling of leading sign: -(3+7) = -10')
 
         with self.assertRaises(SystemExit, msg='only integer numeric values are supported'):
             value = parse_expression(1212, '(value_1/5)/2.4').get_value(TestExpression.label_dict)

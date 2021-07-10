@@ -1,8 +1,15 @@
 description: Eater SAP-1 ISA
 general:
   address_size: 4
+  endian: big
+  registers:
+    - a
+    - b
+    - mar
+    - byte
+    - org
 operand_sets:
-  integer:
+  interger:
     operand_values:
       int8:
         type: numeric
@@ -70,11 +77,10 @@ instructions:
     byte_code:
       value: 6
       size: 4
-    operands:
-      count: 1
+    operand_count: 1
+    operand_values:
       operand_sets:
-        list:
-          - address
+        - address
   jc:
     byte_code:
       value: 7

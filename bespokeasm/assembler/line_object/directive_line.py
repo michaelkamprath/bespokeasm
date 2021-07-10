@@ -1,8 +1,8 @@
 import re
 import sys
 
-from bespokeasm.line_object import LineWithBytes, LineObject
-from bespokeasm.line_object.data_line import DataLine
+from bespokeasm.assembler.line_object import LineWithBytes, LineObject
+from bespokeasm.assembler.line_object.data_line import DataLine
 from bespokeasm.utilities import parse_numeric_string, is_string_numeric
 
 # Directives are lines that tell the assembler to do something. Supported directives are:
@@ -15,6 +15,12 @@ from bespokeasm.utilities import parse_numeric_string, is_string_numeric
 
 
 class DirectiveLine:
+    DIRECTIVE_SET = set([
+        '.org', 'org', '.fill', 'fill',
+        '.zero', 'zero', '.zerountil', 'zerountil',
+        '.byte', 'byte', '.2byte', '2byte',
+        '.4byte', '4byte',
+    ])
     PATTERN_ORG_DIRECTIVE = re.compile(
         r'^(?:\.org)\s+(\$[0-9a-f]*|0x[0-9a-f]*|b[01]*|\w*)',
         flags=re.IGNORECASE|re.MULTILINE
@@ -35,7 +41,7 @@ class DirectiveLine:
         flags=re.IGNORECASE|re.MULTILINE
     )
 
-    def factory(line_num: int, line_str: str, comment: str):
+    def factory(line_num: int, line_str: str, comment: str, endian: str) -> LineObject:
         # for efficiency, if it doesn't start with a period, it is not a directive
         cleaned_line_str = line_str.strip()
         if not cleaned_line_str.startswith('.'):
@@ -90,7 +96,7 @@ class DirectiveLine:
                 sys.exit(f'ERROR: line {line_num} - .zero directive value is not numeric')
 
         # nothing was matched here. pass to data directive
-        return DataLine.factory(line_num, line_str, comment)
+        return DataLine.factory(line_num, line_str, comment, endian)
 
 class AddressOrgLine(LineObject):
     def __init__(self, line_num: int, instruction: str, comment: str, address: int):
@@ -109,6 +115,7 @@ class FillDataLine(LineWithBytes):
         super().__init__(line_num, instruction, comment)
         self._bytes.extend([fill_value&0xFF]*fill_count)
 
+    @property
     def byte_size(self) -> int:
         return len(self._bytes)
 
@@ -118,14 +125,15 @@ class FillUntilDataLine(LineWithBytes):
         self._fill_until_addr = fill_until_address
         self._fill_value = fill_value&0xFF
 
+    @property
     def byte_size(self) -> int:
-        if self._fill_until_addr >= self.address():
-            return self._fill_until_addr - self.address() + 1
+        if self._fill_until_addr >= self.address:
+            return self._fill_until_addr - self.address + 1
         else:
             return 0
 
     def generate_bytes(self, label_dict: dict[str, int]):
         """Finalize the bytes for this fill until line.
         """
-        if self.byte_size() > 0 and len(self._bytes) == 0:
-            self._bytes.extend([self._fill_value]*self.byte_size())
+        if self.byte_size > 0 and len(self._bytes) == 0:
+            self._bytes.extend([self._fill_value]*self.byte_size)

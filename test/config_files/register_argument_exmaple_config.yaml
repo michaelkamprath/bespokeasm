@@ -1,0 +1,164 @@
+description: Example ISA
+general:
+  address_size: 16
+  endian: little
+  registers:
+    - a
+    - i
+    - j
+    - sp
+    - ij
+    - mar
+operand_sets:
+  8_bit_source:
+    operand_values:
+      a:
+        type: register
+        register: a
+        bytecode:
+          value: 0
+          size: 3
+      i:
+        type: register
+        register: i
+        bytecode:
+          value: 2
+          size: 3
+      sp:
+        type: indirect_register
+        register: sp
+        bytecode:
+          value: 5
+          size: 3
+        offset:
+          max: 127
+          min: -128
+          size: 8
+          byte_align: true
+      indirect_addr:
+        type: indirect_numeric
+        bytecode:
+          value: 6
+          size: 3
+        argument:
+          size: 16
+          byte_align: true
+      direct_value:
+        type: numeric
+        bytecode:
+          value: 7
+          size: 3
+        argument:
+          size: 8
+          byte_align: true
+  8_bit_destination:
+    operand_values:
+      a:
+        type: register
+        register: a
+        bytecode:
+          value: 0
+          size: 3
+      i:
+        type: register
+        register: i
+        bytecode:
+          value: 2
+          size: 3
+      sp:
+        type: indirect_register
+        register: sp
+        bytecode:
+          value: 5
+          size: 3
+        offset:
+          max: 127
+          min: -128
+          size: 8
+          byte_align: true
+      indirect_addr:
+        type: indirect_numeric
+        bytecode:
+          value: 6
+          size: 3
+        argument:
+          size: 16
+          byte_align: true
+  int8:
+    operand_values:
+      int8:
+        type: numeric
+        argument:
+          size: 8
+          byte_align: true
+  int16:
+    operand_values:
+      int16:
+        type: numeric
+        argument:
+          size: 16
+          byte_align: true
+instructions:
+  nop:
+    byte_code:
+      value: 0
+      size: 4
+  mov:
+    byte_code:
+      value: 1
+      size: 2
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - 8_bit_destination
+          - 8_bit_source
+        diallowed_operands:
+          - [a, a]
+          - [i, i]
+          - [sp, sp]
+          - [indirect_addr, indirect_addr]
+        specific_operands:
+          - operands:
+              - type: register
+                register: a
+              - type: indirect_register
+                register: mar
+            bytecode_value: 0b000000
+            bytecode_size: 6
+          - operands:
+              - type: register
+                register: i
+              - type: indirect_register
+                register: mar
+            bytecode_value: 0b010010
+            bytecode_size: 6
+          - operands:
+              - type: indirect_register
+                register: sp
+                offset_enabled: true
+                offset_max: 127
+                offset_min: -128
+                offset_size: 8
+                offset_byte_align: true
+              - type: indirect_register
+                register: mar
+            bytecode_value: 0b101101
+            bytecode_size: 6
+          - operands:
+              - type: indirect_numeric
+                argument_size: 16
+                argument_byte_align: true
+              - type: indirect_register
+                register: mar
+            bytecode_value: 0b110110
+            bytecode_size: 6
+  add:
+    byte_code:
+      value: 0b10111
+      size: 5
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - 8_bit_source
