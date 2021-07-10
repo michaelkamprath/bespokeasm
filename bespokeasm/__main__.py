@@ -5,7 +5,7 @@ import sys
 from bespokeasm.assembler import Assembler
 
 @click.group()
-@click.version_option("0.0.7")
+@click.version_option("0.1.0")
 def main():
     """A Bespoke ISA Assembler"""
     pass

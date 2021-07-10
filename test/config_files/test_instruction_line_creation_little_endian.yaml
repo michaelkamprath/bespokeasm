@@ -1,0 +1,53 @@
+
+general :
+  address_size: 16
+  endian: little
+registers:
+operand_sets:
+  2byte_value:
+    operand_values:
+      int16:
+        type: numeric
+        argument:
+          byte_align: true
+          size: 16
+          endian: big
+  address:
+    operand_values:
+      addr:
+        type: numeric
+        argument:
+          byte_align: true
+          size: 16
+instructions:
+  lda:
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - address
+    byte_code:
+      value: 1
+      size: 4
+  add:
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - address
+    byte_code:
+      value: 2
+      size: 4
+  set:
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - 2byte_value
+    byte_code:
+      value: 3
+      size: 4
+  hlt:
+    byte_code:
+      value: 15
+      size: 4

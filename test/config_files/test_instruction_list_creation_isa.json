@@ -1,0 +1,108 @@
+{
+    "description": "test_instruction_list_creation_isa",
+    "general" : {
+        "address_size": 4,
+        "endian": "big"
+    },
+    "registers": [],
+    "operand_sets": {
+        "1byte_value": {
+            "operand_values": {
+                "int8": {
+                    "type": "numeric",
+                    "argument": {
+                        "size": 8,
+                        "byte_align": true
+                    }
+                }
+            }
+        },
+        "address": {
+            "operand_values": {
+                "addr": {
+                    "type": "numeric",
+                    "argument": {
+                        "size": 4,
+                        "byte_align": false
+                    }
+                }
+            }
+        },
+        "2byte_expression": {
+            "operand_values": {
+                "int16": {
+                    "type": "numeric",
+                    "argument": {
+                        "byte_align": true,
+                        "size": 16,
+                        "endian": "little"
+                    }
+                }
+            }
+        }
+    },
+    "instructions": {
+        "lda": {
+            "operands": {
+                "count": 1,
+                "operand_sets": {
+                    "list": [
+                        "address"
+                    ]
+                }
+            },
+            "byte_code": {
+                "value": 1,
+                "size": 4
+            }
+        },
+        "add": {
+            "operands": {
+                "count": 1,
+                "operand_sets": {
+                    "list": [
+                        "address"
+                    ]
+                }
+            },
+            "byte_code": {
+                "value": 2,
+                "size": 4
+            }
+        },
+        "seta": {
+            "operands": {
+                "count": 1,
+                "operand_sets": {
+                    "list": [
+                        "2byte_expression"
+                    ]
+                }
+            },
+            "byte_code": {
+                "value": 3,
+                "size": 4
+            }
+        },
+        "plus": {
+            "operands": {
+                "count": 1,
+                "operand_sets": {
+                    "list": [
+                        "1byte_value"
+                    ]
+                }
+            },
+            "byte_code": {
+                "value": 4,
+                "size": 4
+            }
+        },
+        "hlt": {
+            "byte_code": {
+                "value": 15,
+                "size": 4
+            }
+        }
+   }
+}
