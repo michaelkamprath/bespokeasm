@@ -46,20 +46,37 @@ class OperandParser:
     def operand_count(self) -> int:
         return self._config['count']
 
+    @property
+    def _has_operand_sets(self):
+        return ('operand_sets' in self._config)
+
     def generate_machine_code(self, line_num:int, operands: list[str]) -> tuple[list[ByteCodePart], list[ByteCodePart]]:
         bytecode_list = []
         argument_values = []
-
         if len(operands) == self.operand_count:
-            for i in range(self.operand_count):
-                bytecode_part, argument_part = self._operand_sets[i].parse_operand(line_num, operands[i])
-                if bytecode_part is not None:
-                    bytecode_list.append(bytecode_part)
-                if argument_part is not None:
-                    argument_values.append(argument_part)
-                if bytecode_part is None and argument_part is None:
-                    # if there is an argument, something should be produced, so this is and error
-                    sys.exit(f'ERROR: line {line_num} - Unrecognized operand "{operands[i]}"')
+            if self.operand_count > 0 and self._has_operand_sets:
+                bytecode_list, argument_values = self._find_operands_from_operand_sets(line_num, operands)
         else:
             sys.exit(f'ERROR: line {line_num} - INTERNAL - operand list wrongs size. Expected {self.operand_count}, got {len(operands)}')
+        return (bytecode_list, argument_values)
+
+    def _find_operands_from_operand_sets(self, line_num:int, operands: list[str]) -> tuple[list[ByteCodePart], list[ByteCodePart]]:
+        bytecode_list = []
+        argument_values = []
+        operand_ids = []
+        for i in range(self.operand_count):
+            operand_id, bytecode_part, argument_part = self._operand_sets[i].parse_operand(line_num, operands[i])
+            if bytecode_part is not None:
+                bytecode_list.append(bytecode_part)
+            if argument_part is not None:
+                argument_values.append(argument_part)
+            if bytecode_part is None and argument_part is None:
+                # if there is an argument, something should be produced, so this is and error
+                sys.exit(f'ERROR: line {line_num} - Unrecognized operand "{operands[i]}"')
+            else:
+                operand_ids.append(operand_id)
+        # now check to ensure this is an allowed combo
+        if 'disallowed_pairs' in self._config['operand_sets']:
+            if operand_ids in self._config['operand_sets']['disallowed_pairs']:
+                sys.exit(f'ERROR: line {line_num} - unallowed operands {operand_ids} for instruction')
         return (bytecode_list, argument_values)
