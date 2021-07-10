@@ -86,6 +86,11 @@ class TestConfigObject(unittest.TestCase):
         self.assertEqual(piG.byte_size, 3, 'assembled instruciton is 3 byte')
         self.assertEqual(piG.get_bytes(label_dict), bytearray([0b01101111, 0, 0x88]), 'assembled instruction')
 
+        with self.assertRaises(SystemExit, msg='should error on unallowed operand combinations'):
+            model2.parse_instruction(1234, 'mov a, a')
+        with self.assertRaises(SystemExit, msg='should error on unallowed operand combinations'):
+            model2.parse_instruction(1234, 'mov [$8000], [label1]')
+
     def test_bad_registers_in_configuratin(self):
          with pkg_resources.path(config_files, 'test_bad_registers_in_configuratin.yaml') as fp:
             with self.assertRaises(SystemExit, msg='model configuration should not specify prohibited register names'):

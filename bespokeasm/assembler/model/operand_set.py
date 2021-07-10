@@ -5,11 +5,11 @@ class OperandSet:
     def __init__(self, name: str, config_dict: dict, default_endian: str):
         self._name = name
         self._config = config_dict
-        self._arg_types = {}
-        for arg_type_id, arg_type_conf in self._config['operand_values'].items():
-            arg_type = Operand.factory(arg_type_conf, default_endian)
-            self._arg_types[arg_type_id]=arg_type
-        self._ordered_operand_list = list(self._arg_types.values())
+        self._ordered_operand_list = [
+            Operand.factory(arg_type_id, arg_type_conf, default_endian)
+                for arg_type_id, arg_type_conf in self._config['operand_values'].items()
+        ]
+
 
         # Operands are sorted according to matching precedence order, which is set
         # by the enum value of the types. This allows matching to consider an operand
@@ -25,13 +25,13 @@ class OperandSet:
     def default_bytecode_size(self) -> int:
         return self._config.get('bytecode_size', None)
 
-    def parse_operand(self,line_num: int, operand_str: str) -> tuple[ByteCodePart, ByteCodePart]:
+    def parse_operand(self,line_num: int, operand_str: str) -> tuple[str, ByteCodePart, ByteCodePart]:
         for operand in self._ordered_operand_list:
             bytecode_part, argument_part = operand.parse_operand(line_num, operand_str)
             if bytecode_part is not None or argument_part is not None:
                 # if some part was returned, then this is a valid match. Matching
                 # precedence order is important here!
-                return bytecode_part, argument_part
+                return operand.id, bytecode_part, argument_part
         return None, None
 
 class OperandSetCollection(dict):
