@@ -90,6 +90,9 @@ class TestConfigObject(unittest.TestCase):
         self.assertEqual(piH.byte_size, 5, 'assembled instruciton is 5 byte')
         self.assertEqual(piH.get_bytes(label_dict), bytearray([0b01110110, 2, 0, 0, 0x80]), 'arguments should be in reverse order')
 
+        piI = model2.parse_instruction(1234, 'mov [mar], [label1]')
+        self.assertEqual(piI.byte_size, 3, 'assembled instruciton is 3 byte')
+        self.assertEqual(piI.get_bytes(label_dict), bytearray([0b01100110, 2, 0]), 'no offset should be emitted for [mar]')
 
         with self.assertRaises(SystemExit, msg='should error on unallowed operand combinations'):
             model2.parse_instruction(1234, 'mov a, a')

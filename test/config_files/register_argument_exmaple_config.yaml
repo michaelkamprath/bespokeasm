@@ -24,6 +24,12 @@ operand_sets:
         bytecode:
           value: 2
           size: 3
+      mar:
+        type: indirect_register
+        register: mar
+        bytecode:
+          value: 4
+          size: 3
       sp:
         type: indirect_register
         register: sp
@@ -64,6 +70,12 @@ operand_sets:
         register: i
         bytecode:
           value: 2
+          size: 3
+      mar:
+        type: indirect_register
+        register: mar
+        bytecode:
+          value: 4
           size: 3
       sp:
         type: indirect_register
