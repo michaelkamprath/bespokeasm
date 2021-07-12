@@ -72,24 +72,29 @@ class TestConfigObject(unittest.TestCase):
 
         piD = model2.parse_instruction(1234, 'mov [$110D + (label1 + label2)] , 0x88')
         self.assertEqual(piD.byte_size, 4, 'assembled instruciton is 4 byte')
-        self.assertEqual(piD.get_bytes(label_dict), bytearray([0b01110111, 0xFF, 0x11, 0x88]), 'assembled instruction')
+        self.assertEqual(piD.get_bytes(label_dict), bytearray([0b01110111,  0x88, 0xFF, 0x11]), 'arguments should be in reverse order')
 
         piE = model2.parse_instruction(1234, 'mov [sp - label1] , 0x88')
         self.assertEqual(piE.byte_size, 3, 'assembled instruciton is 3 byte')
-        self.assertEqual(piE.get_bytes(label_dict), bytearray([0b01101111, 0b11111110, 0x88]), 'assembled instruction')
+        self.assertEqual(piE.get_bytes(label_dict), bytearray([0b01101111, 0x88, 0b11111110]), 'arguments should be in reverse order')
 
         piF = model2.parse_instruction(1234, 'mov [sp+label1] , 0x88')
         self.assertEqual(piF.byte_size, 3, 'assembled instruciton is 3 byte')
-        self.assertEqual(piF.get_bytes(label_dict), bytearray([0b01101111, 2, 0x88]), 'assembled instruction')
+        self.assertEqual(piF.get_bytes(label_dict), bytearray([0b01101111, 0x88, 2]), 'arguments should be in reverse order')
 
         piG = model2.parse_instruction(1234, 'mov [sp] , 0x88')
         self.assertEqual(piG.byte_size, 3, 'assembled instruciton is 3 byte')
-        self.assertEqual(piG.get_bytes(label_dict), bytearray([0b01101111, 0, 0x88]), 'assembled instruction')
+        self.assertEqual(piG.get_bytes(label_dict), bytearray([0b01101111, 0x88, 0]), 'arguments should be in reverse order')
+
+        piH = model2.parse_instruction(1234, 'mov [$8000], [label1]')
+        self.assertEqual(piH.byte_size, 5, 'assembled instruciton is 5 byte')
+        self.assertEqual(piH.get_bytes(label_dict), bytearray([0b01110110, 2, 0, 0, 0x80]), 'arguments should be in reverse order')
+
 
         with self.assertRaises(SystemExit, msg='should error on unallowed operand combinations'):
             model2.parse_instruction(1234, 'mov a, a')
         with self.assertRaises(SystemExit, msg='should error on unallowed operand combinations'):
-            model2.parse_instruction(1234, 'mov [$8000], [label1]')
+            model2.parse_instruction(1234, 'mov [sp+2], [sp+4]')
 
     def test_bad_registers_in_configuratin(self):
          with pkg_resources.path(config_files, 'test_bad_registers_in_configuratin.yaml') as fp:

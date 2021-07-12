@@ -109,6 +109,7 @@ instructions:
       size: 2
     operands:
       count: 2
+      reverse_argument_order: true
       operand_sets:
         list:
           - 8_bit_destination
@@ -117,7 +118,6 @@ instructions:
           - [a, a]
           - [i, i]
           - [sp, sp]
-          - [indirect_addr, indirect_addr]
       specific_operands:
         - operands:
             - type: register
