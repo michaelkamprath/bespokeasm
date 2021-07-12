@@ -98,6 +98,8 @@ class TestConfigObject(unittest.TestCase):
             model2.parse_instruction(1234, 'mov a, a')
         with self.assertRaises(SystemExit, msg='should error on unallowed operand combinations'):
             model2.parse_instruction(1234, 'mov [sp+2], [sp+4]')
+        with self.assertRaises(SystemExit, msg='[mar] should have no offset'):
+            model2.parse_instruction(1234, 'mov [mar+2], [label1]')
 
     def test_bad_registers_in_configuratin(self):
          with pkg_resources.path(config_files, 'test_bad_registers_in_configuratin.yaml') as fp:

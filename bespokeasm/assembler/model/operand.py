@@ -1,5 +1,6 @@
 import enum
 import re
+import sys
 
 from bespokeasm.assembler.byte_code.parts import ByteCodePart, NumericByteCodePart, ExpressionByteCodePart
 from bespokeasm.utilities import is_string_numeric, parse_numeric_string
@@ -176,6 +177,9 @@ class IndirectRegisterOperand(RegisterOperand):
                     # must have and offset value of 0
                     arg_part = NumericByteCodePart(0, self.offset_size, self.offset_byte_align, self.offset_endian)
             else:
+                if len(match.groups()) == 3 and match.group(2) is not None and match.group(3) is not None:
+                    # and offset was added for an operand that wasn't configured to have one. Error.
+                    sys.exit(f'ERROR: line {line_num} - An offset was provided for indirect register operand "{operand}" when none was expected.')
                 arg_part = None
             return bytecode_part, arg_part
         else:
