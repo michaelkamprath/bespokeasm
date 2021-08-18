@@ -59,5 +59,10 @@ class TestUtilities(unittest.TestCase):
         ib7.append_bits(0xBAD,12, byte_aligned=True, endian='big')
         self.assertEqual(ib7.get_bytes(), bytearray([0xBA, 0xD0]))
 
+        ib8 = PackedBits()
+        ib8.append_bits(1020, 10, byte_aligned=True, endian='big')
+        ib8.append_bits(0xF, 4, byte_aligned=False, endian='big')
+        self.assertEqual(ib8.get_bytes(), bytearray([0xFF, 0x3C]))
+
 if __name__ == '__main__':
     unittest.main()

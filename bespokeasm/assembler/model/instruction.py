@@ -51,7 +51,8 @@ class Instruction:
             sys.exit(f'ERROR: line {line_num} - Instruction "{self.mnemonic}" did not have the expected count of operand {self.operand_count} and instead had {len(operand_list)}, inst = {self}')
 
         # generate the machine code parts
-        machine_code = [NumericByteCodePart(self.base_bytecode_value, self.base_bytecode_size, True, default_endian)]
+        instruction_endian = self._config['byte_code'].get('endian', default_endian)
+        machine_code = [NumericByteCodePart(self.base_bytecode_value, self.base_bytecode_size, True, instruction_endian)]
 
         if operand_list is not None and len(operand_list) > 0:
             operand_bytecode, operand_arguments = self._operand_parser.generate_machine_code(line_num, operand_list)

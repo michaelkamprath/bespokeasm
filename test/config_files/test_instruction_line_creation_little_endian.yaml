@@ -19,6 +19,13 @@ operand_sets:
         argument:
           byte_align: true
           size: 16
+  4bit:
+    operand_values:
+      little_int:
+        type: numeric
+        argument:
+          byte_align: false
+          size: 4
 instructions:
   lda:
     operands:
@@ -47,6 +54,16 @@ instructions:
     byte_code:
       value: 3
       size: 4
+  big:
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - 4bit
+    byte_code:
+      value: 1020
+      size: 10
+      endian: big
   hlt:
     byte_code:
       value: 15

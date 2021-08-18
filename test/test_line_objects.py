@@ -176,5 +176,12 @@ class TestLineObject(unittest.TestCase):
         ins2.generate_bytes(LABEL_DICT)
         self.assertEqual(ins2.get_bytes(), bytearray([0x30, 0xAB, 0xCD]), 'instruction should match')
 
+        ins2 = InstructionLine.factory(22, 'big $f', 'big money', isa_model)
+        ins2.set_start_address(1212)
+        self.assertIsInstance(ins2, InstructionLine)
+        self.assertEqual(ins2.byte_size, 2, 'has 2 byte')
+        ins2.generate_bytes(LABEL_DICT)
+        self.assertEqual(ins2.get_bytes(), bytearray([0xFF, 0x3C]), 'instruction should match')
+
 if __name__ == '__main__':
     unittest.main()

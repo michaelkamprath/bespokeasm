@@ -59,6 +59,10 @@ class OperandParser:
         bytecode_list = []
         argument_values = []
         if len(operands) == self.operand_count:
+            # Step 1 - Look for specific operand matches
+            # TODO
+
+            # Step 2 - Find an allowed combination match from an operand set
             if self.operand_count > 0 and self._has_operand_sets:
                 bytecode_list, argument_values = self._find_operands_from_operand_sets(line_num, operands)
         else:
