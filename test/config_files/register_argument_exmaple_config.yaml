@@ -174,3 +174,18 @@ instructions:
       operand_sets:
         list:
           - 8_bit_source
+  swap:
+    byte_code:
+      value: 3
+      size: 2
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - 8_bit_destination
+          - 8_bit_destination
+        disallowed_pairs:
+          - [a, a]
+          - [i, i]
+          - [sp, sp]
+          - [mar, mar]

@@ -1,3 +1,4 @@
+import binascii
 import click
 import io
 import math
@@ -79,7 +80,8 @@ class Assembler:
                 if line_bytes is not None:
                     insertion_bytes = line_bytes
                     if self._verbose > 2:
-                        click.echo(f'Address ${addr:x} : {l} bytes = {line_bytes}')
+                        line_bytes_str = binascii.hexlify(line_bytes, sep=' ').decode("utf-8")
+                        click.echo(f'Address ${addr:x} : {l} bytes = {line_bytes_str}')
             byte_code.extend(insertion_bytes)
             addr += len(insertion_bytes)
 

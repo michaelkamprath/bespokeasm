@@ -19,7 +19,7 @@ class OperandSet:
     def __repr__(self) -> str:
         return str(self)
     def __str__(self) -> str:
-        arg_type_ids = ','.join([id for id in self._arg_types.keys()])
+        arg_type_ids = ','.join([str(id) for id in self._ordered_operand_list])
         return f'OperandSet<{self._name},[{arg_type_ids}]>'
 
     def default_bytecode_size(self) -> int:

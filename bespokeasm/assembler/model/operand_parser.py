@@ -45,12 +45,15 @@ class OperandParser:
     @property
     def operand_count(self) -> int:
         return self._config['count']
+
+    @property
     def reverse_argument_order(self) -> bool:
         '''Determines whether the order that the instruction's argument values
         emitted in machine code should be in the same order as the argument
         (false) or reversed (true)
         '''
         return self._config.get('reverse_argument_order', False)
+
     @property
     def _has_operand_sets(self):
         return ('operand_sets' in self._config)
