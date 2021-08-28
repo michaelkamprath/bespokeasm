@@ -64,6 +64,8 @@ class LabelLine(LineObject):
         super().__init__(line_num, instruction, comment)
         self._label = label
         self._value = value
+    def __str__(self):
+        return f'LabelLine<{self.get_label()} -> {self.get_value()}>'
 
     def get_label(self) -> str:
         """Returns the label string"""

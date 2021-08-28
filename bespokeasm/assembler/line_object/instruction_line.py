@@ -34,6 +34,8 @@ class InstructionLine(LineWithBytes):
         self._argument_str = argument_str
         self._isa_model = isa_model
         self._assembled_instruction = self._isa_model.parse_instruction(line_num, instruction)
+    def __str__(self):
+        return f'InstructionLine<{self.instruction.strip()}>'
 
     @property
     def byte_size(self) -> int:
