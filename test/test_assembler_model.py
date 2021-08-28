@@ -40,7 +40,7 @@ class TestConfigObject(unittest.TestCase):
 
         label_dict = {
             'label1': 2,
-            'label2': 0xF0,
+            'LABEL2': 0xF0,
         }
 
         pi1 = model1.parse_instruction(1212, 'LDA $f')
@@ -70,7 +70,7 @@ class TestConfigObject(unittest.TestCase):
         self.assertEqual(piC.byte_size, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(piC.get_bytes(label_dict), bytearray([0b10111010]), 'assembled instruction')
 
-        piD = model2.parse_instruction(1234, 'mov [$110D + (label1 + label2)] , 0x88')
+        piD = model2.parse_instruction(1234, 'mov [$110D + (label1 + LABEL2)] , 0x88')
         self.assertEqual(piD.byte_size, 4, 'assembled instruciton is 4 byte')
         self.assertEqual(piD.get_bytes(label_dict), bytearray([0b01110111,  0x88, 0xFF, 0x11]), 'arguments should be in reverse order')
 

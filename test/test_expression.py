@@ -7,12 +7,12 @@ class TestExpression(unittest.TestCase):
     label_dict = {
             'value_1': 12,
             '8_ball': 8,
-            'two': 2,
+            'MixedCase': 2,
         }
 
     def test_expression_parsing(self):
         self.assertEqual(parse_expression(1212, '1 + 2').get_value(TestExpression.label_dict), 3, 'simple expression: 1+2')
-        self.assertEqual(parse_expression(1212, '(value_1 - two)/5').get_value(TestExpression.label_dict), 2, 'label expression: (value_1 - two)/5')
+        self.assertEqual(parse_expression(1212, '(value_1 - MixedCase)/5').get_value(TestExpression.label_dict), 2, 'label expression: (value_1 - two)/5')
         self.assertEqual(parse_expression(1212, '8_ball').get_value(TestExpression.label_dict), 8, 'label expression: 8_ball')
         self.assertEqual(parse_expression(1212, '8675309').get_value(TestExpression.label_dict), 8675309, 'numeric expression: 8675309')
         self.assertEqual(parse_expression(1212, 'value_1-2').get_value(TestExpression.label_dict), 10, 'numeric expression: value_1-2')

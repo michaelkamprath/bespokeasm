@@ -61,7 +61,7 @@ class AssemblerModel:
         instr_parts = instruction.strip().split(' ', 1)
         mnemonic = instr_parts[0].lower()
         if len(instr_parts) > 1:
-            operands = instr_parts[1].lower()
+            operands = instr_parts[1]
         else:
             operands = ''
 

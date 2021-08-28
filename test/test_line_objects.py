@@ -88,14 +88,22 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(l2.address, 1212, 'address value is address')
         self.assertEqual(l2.get_label(),'my_constant', 'label string')
 
+        l3 = LabelLine.factory(13, 'myLabelIsCool:', 'cool comment', register_set)
+        l3.set_start_address(2001)
+        self.assertIsInstance(l3, LabelLine)
+        self.assertEqual(l3.byte_size, 0, 'has no bytes')
+        self.assertEqual(l3.get_value(), 2001, 'label value is address')
+        self.assertEqual(l3.address, 2001, 'address value is address')
+        self.assertEqual(l3.get_label(),'myLabelIsCool', 'label string')
+
         # this should fail
         with self.assertRaises(SystemExit, msg='non-numeric constant assignments should fail'):
-            l3 = LabelLine.factory(13, 'my_constant = some_string', 'bad constant', register_set)
+            l_fail= LabelLine.factory(13, 'my_constant = some_string', 'bad constant', register_set)
 
         with self.assertRaises(SystemExit, msg='labels should not be registers'):
-            l3 = LabelLine.factory(13, 'mar = $1234', 'bad label', register_set)
+            l_fail = LabelLine.factory(13, 'mar = $1234', 'bad label', register_set)
         with self.assertRaises(SystemExit, msg='labels should not be registers'):
-            l3 = LabelLine.factory(13, 'sp:', 'bad label', register_set)
+            l_fail = LabelLine.factory(13, 'sp:', 'bad label', register_set)
 
     def test_valid_labels(self):
         self.assertTrue(is_valid_label('a_str'),'valid label')
