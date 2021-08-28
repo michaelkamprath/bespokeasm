@@ -9,16 +9,18 @@ from bespokeasm.assembler.line_object.factory import LineOjectFactory
 from bespokeasm.assembler.model import AssemblerModel
 
 class Assembler:
-    def __init__(self, source_file, config_file, output_file, binary_start, binary_end, enable_pretty_print, pretty_print_output, is_verbose):
+    def __init__(self, source_file, config_file, output_file, binary_start, binary_end, binary_fill_value, enable_pretty_print, pretty_print_output, is_verbose):
         self.source_file = source_file
         self._output_file = output_file
         self._config_file = config_file
         self._enable_pretty_print = enable_pretty_print
         self._pretty_print_output = pretty_print_output
+        self._binary_fill_value = binary_fill_value&0xff
         self._verbose = is_verbose
         self._binary_start = binary_start
         self._binary_end = binary_end
 
+        print(f'Assembler.__init__: {self._binary_start} to {self._binary_end}')
         self._model = AssemblerModel(self._config_file)
 
     def assemble_bytecode(self):
@@ -49,6 +51,8 @@ class Assembler:
             click.echo(f'Found {len(label_addresses)} labels: {label_addresses}')
         # Sort lines according to their assigned address. This allows for .org directives
         line_obs.sort(key=lambda x: x.address)
+        max_generated_address = line_obs[-1].address
+        line_dict = { l.address: l for l in line_obs if isinstance(l, LineWithBytes)}
 
         # second pass: build byte code
         max_instruction_text_size = 0
@@ -56,19 +60,31 @@ class Assembler:
         for l in line_obs:
             if isinstance(l, LineWithBytes):
                 l.generate_bytes(label_addresses)
+                if self._verbose > 2:
+                    line_bytes = l.get_bytes()
+                    click.echo(f'Processing line = {l}, with bytes = {line_bytes}')
+        #         if line_bytes is not None:
+        #             byte_code.extend(line_bytes)
+            if len(l.instruction) > max_instruction_text_size:
+                max_instruction_text_size = len(l.instruction)
+
+        fill_bytes = bytearray([self._binary_fill_value])
+        addr = self._binary_start
+        while addr <= (max_generated_address if self._binary_end is None else self._binary_end):
+            l = line_dict.get(addr, None)
+            insertion_bytes = fill_bytes
+            if l is not None:
                 line_bytes = l.get_bytes()
                 if self._verbose > 2:
                     click.echo(f'Processing line = {l}, with bytes = {line_bytes}')
                 if line_bytes is not None:
-                    byte_code.extend(line_bytes)
-            if len(l.instruction) > max_instruction_text_size:
-                max_instruction_text_size = len(l.instruction)
+                    insertion_bytes = line_bytes
+            byte_code.extend(insertion_bytes)
+            addr += len(insertion_bytes)
 
-        max_address = len(byte_code) if self._binary_end is None else min(self._binary_end + 1, len(byte_code))
-        finalized_byte_code = byte_code[self._binary_start:max_address]
-        click.echo(f'Writing {len(finalized_byte_code)} bytes of byte code to {self._output_file}')
+        click.echo(f'Writing {len(byte_code)} bytes of byte code to {self._output_file}')
         with open(self._output_file, 'wb') as f:
-            f.write(finalized_byte_code)
+            f.write(byte_code)
 
         if self._enable_pretty_print:
             pretty_str = self._pretty_print_results(line_obs, max_instruction_text_size, label_addresses)
