@@ -24,12 +24,6 @@ operand_sets:
         bytecode:
           value: 2
           size: 3
-      mar:
-        type: indirect_register
-        register: mar
-        bytecode:
-          value: 4
-          size: 3
       sp:
         type: indirect_register
         register: sp
@@ -131,40 +125,65 @@ instructions:
           - [i, i]
           - [sp, sp]
       specific_operands:
-        - operands:
-            - type: register
+        a_mar:
+            a:
+              type: register
               register: a
-            - type: indirect_register
+              bytecode:
+                value: 0
+                size: 3
+            mar:
+              type: indirect_register
               register: mar
-          bytecode_value: 0b000000
-          bytecode_size: 6
-        - operands:
-            - type: register
+              bytecode:
+                value: 0
+                size: 3
+        i_mar:
+            i:
+              type: register
               register: i
-            - type: indirect_register
+              bytecode:
+                value: 0b010
+                size: 3
+            mar:
+              type: indirect_register
               register: mar
-          bytecode_value: 0b010010
-          bytecode_size: 6
-        - operands:
-            - type: indirect_register
+              bytecode:
+                value: 0b010
+                size: 3
+        sp_mar:
+            sp:
+              type: indirect_register
               register: sp
-              offset_enabled: true
-              offset_max: 127
-              offset_min: -128
-              offset_size: 8
-              offset_byte_align: true
-            - type: indirect_register
+              offset:
+                max: 127
+                min: -128
+                size: 8
+                byte_align: true
+              bytecode:
+                value: 0b101
+                size: 3
+            mar:
+              type: indirect_register
               register: mar
-          bytecode_value: 0b101101
-          bytecode_size: 6
-        - operands:
-            - type: indirect_numeric
-              argument_size: 16
-              argument_byte_align: true
-            - type: indirect_register
+              bytecode:
+                value: 0b101
+                size: 3
+        iaddr_mar:
+            iaddr:
+              type: indirect_numeric
+              argument:
+                size: 16
+                byte_align: true
+              bytecode:
+                value: 0b110
+                size: 3
+            mar:
+              type: indirect_register
               register: mar
-          bytecode_value: 0b110110
-          bytecode_size: 6
+              bytecode:
+                value: 0b110
+                size: 3
   add:
     byte_code:
       value: 0b10111

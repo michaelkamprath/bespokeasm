@@ -2,6 +2,7 @@
 from setuptools import setup, find_packages
 from io import open
 from os import path
+from bespokeasm import BESPOKEASM_VERSION_STR
 
 import pathlib
 # The directory containing this file
@@ -21,7 +22,7 @@ dependency_links = [x.strip().replace('git+', '') for x in all_reqs \
 setup (
     name = 'bespokeasm',
     description = 'A customizable byte code assembler that allows for the definition of custom instruction set architecture',
-    version = '0.1.2',
+    version = BESPOKEASM_VERSION_STR,
     packages = find_packages(), # list of all packages
     install_requires = install_requires,
     python_requires='>=3.9',

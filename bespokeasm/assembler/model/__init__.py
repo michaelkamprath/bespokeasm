@@ -1,14 +1,14 @@
-from bespokeasm.assembler.line_object import LineObject
 import json
 import sys
 import yaml
 
+from bespokeasm import BESPOKEASM_VERSION_STR
 from bespokeasm.assembler.byte_code.assembled import AssembledInstruction
 from bespokeasm.assembler.model.instruction_set import InstructionSet
 from bespokeasm.assembler.model.operand_set import OperandSet, OperandSetCollection
 from bespokeasm.assembler.line_object.directive_line import DirectiveLine
 class AssemblerModel:
-    def __init__(self, config_file_path: str):
+    def __init__(self, config_file_path: str, is_verbose: int):
         if config_file_path.endswith('.json'):
             with open(config_file_path, 'r') as json_file:
                 config_dict = json.load(json_file)
@@ -22,12 +22,20 @@ class AssemblerModel:
             sys.exit('ERROR: unknown ISA config file type')
 
         self._config = config_dict
+        # check for min required BespokeASM version
+        if 'min_version' in self._config['general']:
+            required_version = self._config['general']['min_version']
+            if is_verbose > 0:
+                print(f'The ISA configuration file requires BespokeASM version {required_version}. This version of BespokeASM is {BESPOKEASM_VERSION_STR}.')
+            if required_version > BESPOKEASM_VERSION_STR:
+                sys.exit(f'ERROR: the instruction set configuration file requires at least BespokeASM version {required_version}')
+
         registers = self._config['general'].get('registers', [])
         self._registers = set(registers if registers is not None else [])
         if len(self._registers.intersection(DirectiveLine.DIRECTIVE_SET)) > 0:
             sys.exit(f'ERROR: the instruction set configuration file specified unallowed register names: {self._registers.intersection(DirectiveLine.DIRECTIVE_SET)}')
         self._operand_sets = OperandSetCollection(self._config['operand_sets'], self.endian)
-        self._instructions = InstructionSet(self._config['instructions'], self._operand_sets)
+        self._instructions = InstructionSet(self._config['instructions'], self._operand_sets, self.endian)
 
     def __repr__(self) -> str:
         return str(self)

@@ -36,7 +36,7 @@ class TestConfigObject(unittest.TestCase):
 
     def test_instruction_parsing(self):
         with pkg_resources.path(config_files, 'eater-sap1-isa.yaml') as fp:
-            model1 = AssemblerModel(str(fp))
+            model1 = AssemblerModel(str(fp), 0)
 
         label_dict = {
             'label1': 2,
@@ -56,7 +56,7 @@ class TestConfigObject(unittest.TestCase):
         self.assertEqual(pi3.get_bytes(label_dict), bytearray([0xE0]), 'assembled instruction')
 
         with pkg_resources.path(config_files, 'register_argument_exmaple_config.yaml') as fp:
-            model2 = AssemblerModel(str(fp))
+            model2 = AssemblerModel(str(fp), 0)
 
         piA = model2.parse_instruction(1234, 'mov a, i')
         self.assertEqual(piA.byte_size, 1, 'assembled instruciton is 1 byte')
@@ -106,9 +106,13 @@ class TestConfigObject(unittest.TestCase):
             model2.parse_instruction(1234, 'mov [mar+2], [label1]')
 
     def test_bad_registers_in_configuratin(self):
-         with pkg_resources.path(config_files, 'test_bad_registers_in_configuratin.yaml') as fp:
+        with pkg_resources.path(config_files, 'test_bad_registers_in_configuratin.yaml') as fp:
             with self.assertRaises(SystemExit, msg='model configuration should not specify prohibited register names'):
-                model = AssemblerModel(str(fp))
+                model = AssemblerModel(str(fp), 0)
 
+    def test_min_required_version(self):
+        with pkg_resources.path(config_files, 'test_min_required_version_config.yaml') as fp:
+            with self.assertRaises(SystemExit, msg='the min version check should fail'):
+                model = AssemblerModel(str(fp), 0)
 if __name__ == '__main__':
     unittest.main()

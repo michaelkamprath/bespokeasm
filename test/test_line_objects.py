@@ -117,7 +117,7 @@ class TestLineObject(unittest.TestCase):
 
     def test_instruction_line_creation(self):
         with pkg_resources.path(config_files, 'test_instruction_list_creation_isa.json') as fp:
-            isa_model = AssemblerModel(str(fp))
+            isa_model = AssemblerModel(str(fp), 0)
 
         LABEL_DICT = {
             'test1': 0xA,
@@ -168,7 +168,7 @@ class TestLineObject(unittest.TestCase):
 
     def test_instruction_line_creation_little_endian(self):
         with pkg_resources.path(config_files, 'test_instruction_line_creation_little_endian.yaml') as fp:
-            isa_model = AssemblerModel(str(fp))
+            isa_model = AssemblerModel(str(fp), 0)
         LABEL_DICT = {'test1': 0xABCD}
         ins1 = InstructionLine.factory(22, '  lda test1', 'some comment!', isa_model)
         ins1.set_start_address(1212)
@@ -184,12 +184,40 @@ class TestLineObject(unittest.TestCase):
         ins2.generate_bytes(LABEL_DICT)
         self.assertEqual(ins2.get_bytes(), bytearray([0x30, 0xAB, 0xCD]), 'instruction should match')
 
-        ins2 = InstructionLine.factory(22, 'big $f', 'big money', isa_model)
-        ins2.set_start_address(1212)
+        ins3 = InstructionLine.factory(22, 'big $f', 'big money', isa_model)
+        ins3.set_start_address(1212)
+        self.assertIsInstance(ins3, InstructionLine)
+        self.assertEqual(ins3.byte_size, 2, 'has 2 byte')
+        ins3.generate_bytes(LABEL_DICT)
+        self.assertEqual(ins3.get_bytes(), bytearray([0xFF, 0x3C]), 'instruction should match')
+
+    def test_specifc_configured_operands(self):
+        with pkg_resources.path(config_files, 'register_argument_exmaple_config.yaml') as fp:
+            isa_model = AssemblerModel(str(fp), 0)
+        LABEL_DICT = {'test1': 0xABCD}
+
+        ins1 = InstructionLine.factory(22, 'mov i,[mar]', 'specific operands', isa_model)
+        ins1.set_start_address(1234)
+        self.assertIsInstance(ins1, InstructionLine)
+        self.assertEqual(ins1.byte_size, 1, 'has 1 byte')
+        ins1.generate_bytes(LABEL_DICT)
+        self.assertEqual(ins1.get_bytes(), bytearray([0x52]), 'instruction should match')
+
+        ins2 = InstructionLine.factory(22, 'mov [sp+8],[mar]', 'specific operands', isa_model)
+        ins2.set_start_address(1234)
         self.assertIsInstance(ins2, InstructionLine)
         self.assertEqual(ins2.byte_size, 2, 'has 2 byte')
         ins2.generate_bytes(LABEL_DICT)
-        self.assertEqual(ins2.get_bytes(), bytearray([0xFF, 0x3C]), 'instruction should match')
+        self.assertEqual(ins2.get_bytes(), bytearray([0x6D, 0x08]), 'instruction should match')
+
+        # ensure operand sets operands still work when instruction has specific operands configured
+        ins3 = InstructionLine.factory(22, 'mov a,[sp+8]', 'specific operands', isa_model)
+        ins3.set_start_address(1234)
+        self.assertIsInstance(ins3, InstructionLine)
+        self.assertEqual(ins3.byte_size, 2, 'has 2 byte')
+        ins3.generate_bytes(LABEL_DICT)
+        self.assertEqual(ins3.get_bytes(), bytearray([0x45, 0x08]), 'instruction should match')
+
 
 if __name__ == '__main__':
     unittest.main()

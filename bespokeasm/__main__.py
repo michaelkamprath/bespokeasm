@@ -2,10 +2,11 @@ import click
 import os
 import sys
 
+from bespokeasm import BESPOKEASM_VERSION_STR
 from bespokeasm.assembler import Assembler
 
 @click.group()
-@click.version_option("0.1.2")
+@click.version_option(BESPOKEASM_VERSION_STR)
 def main():
     """A Bespoke ISA Assembler"""
     pass

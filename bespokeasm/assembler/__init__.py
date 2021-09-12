@@ -10,7 +10,18 @@ from bespokeasm.assembler.line_object.factory import LineOjectFactory
 from bespokeasm.assembler.model import AssemblerModel
 
 class Assembler:
-    def __init__(self, source_file, config_file, output_file, binary_start, binary_end, binary_fill_value, enable_pretty_print, pretty_print_output, is_verbose):
+    def __init__(
+            self,
+            source_file,
+            config_file,
+            output_file,
+            binary_start,
+            binary_end,
+            binary_fill_value,
+            enable_pretty_print,
+            pretty_print_output,
+            is_verbose,
+        ):
         self.source_file = source_file
         self._output_file = output_file
         self._config_file = config_file
@@ -20,7 +31,7 @@ class Assembler:
         self._verbose = is_verbose
         self._binary_start = binary_start
         self._binary_end = binary_end
-        self._model = AssemblerModel(self._config_file)
+        self._model = AssemblerModel(self._config_file, self._verbose)
 
     def assemble_bytecode(self):
 

@@ -2,6 +2,7 @@ import sys
 
 from bespokeasm.assembler.byte_code.parts import ByteCodePart
 from bespokeasm.assembler.model.operand_set import OperandSet, OperandSetCollection
+from bespokeasm.assembler.model.operand import Operand
 
 # Operand Parser
 #
@@ -22,11 +23,23 @@ from bespokeasm.assembler.model.operand_set import OperandSet, OperandSetCollect
 
 
 class OperandParser:
-    def __init__(self, instruction_operands_config: dict, operand_set_collection: OperandSetCollection):
+    def __init__(self, instruction_operands_config: dict, operand_set_collection: OperandSetCollection, default_endian: str):
         if instruction_operands_config is not None:
             self._config = instruction_operands_config
         else:
             self._config = {'count': 0}
+        # Set up Specific Operand
+        if 'specific_operands' in self._config:
+            self._specific_operands = [
+                [
+                    Operand.factory(arg_type_id, arg_type_conf, default_endian)
+                    for arg_type_id, arg_type_conf in arg_confing_dict.items()
+                ]
+                for arg_confing_dict in self._config['specific_operands'].values()
+            ]
+        else:
+            self._specific_operands = []
+        # Sey Up Operant Sets
         self._operand_sets = []
         if 'operand_sets' in self._config:
             operand_sets = self._config['operand_sets']['list']
@@ -61,16 +74,44 @@ class OperandParser:
     def generate_machine_code(self, line_num:int, operands: list[str]) -> tuple[list[ByteCodePart], list[ByteCodePart]]:
         bytecode_list = []
         argument_values = []
-        if len(operands) == self.operand_count:
+        if len(operands) == self.operand_count and self.operand_count > 0:
             # Step 1 - Look for specific operand matches
-            # TODO
+            if len(self._specific_operands) > 0:
+                bytecode_list, argument_values = self._find_operands_from_specific_operands(line_num, operands)
+                if len(bytecode_list) > 0 or len(argument_values) > 0:
+                    return (bytecode_list, argument_values)
 
             # Step 2 - Find an allowed combination match from an operand set
-            if self.operand_count > 0 and self._has_operand_sets:
+            if self._has_operand_sets:
                 bytecode_list, argument_values = self._find_operands_from_operand_sets(line_num, operands)
+                if len(bytecode_list) > 0 or len(argument_values) > 0:
+                    return (bytecode_list, argument_values)
         else:
             sys.exit(f'ERROR: line {line_num} - INTERNAL - operand list wrongs size. Expected {self.operand_count}, got {len(operands)}')
         return (bytecode_list, argument_values)
+
+    def _find_operands_from_specific_operands(self, line_num:int, operands: list[str]) -> tuple[list[ByteCodePart], list[ByteCodePart]]:
+        bytecode_list = []
+        argument_values = []
+        for configured_operands in self._specific_operands:
+            if len(configured_operands) != self.operand_count:
+                sys.exit(f'ERROR: line {line_num} - specific operand configration "{operands}" has wrongoperant count. Expecting {self.operand_count}.')
+            for i in range(self.operand_count):
+                bytecode_part, argument_part = configured_operands[i].parse_operand(line_num, operands[i])
+                if bytecode_part is not None:
+                    bytecode_list.append(bytecode_part)
+                if argument_part is not None:
+                    argument_values.append(argument_part)
+                if bytecode_part is None and argument_part is None:
+                    # if it doesn't match an operand at any point, go to net specific configuration
+                    # reset the results list
+                    bytecode_list = []
+                    argument_values = []
+                    break
+            if len(bytecode_list) > 0 or len(argument_values) > 0:
+                break
+        return (bytecode_list, argument_values)
+
 
     def _find_operands_from_operand_sets(self, line_num:int, operands: list[str]) -> tuple[list[ByteCodePart], list[ByteCodePart]]:
         bytecode_list = []

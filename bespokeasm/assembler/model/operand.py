@@ -145,7 +145,8 @@ class IndirectRegisterOperand(RegisterOperand):
             self.OPERAND_PATTERN_TEMPLATE.format(self.register),
             flags=re.IGNORECASE|re.MULTILINE
         )
-
+    def __str__(self):
+        return f'IndirectRegisterOperand<{self.id},register={self.register}>'
     @property
     def type(self) -> OperandType:
         return OperandType.INDIRECT_REGISTER

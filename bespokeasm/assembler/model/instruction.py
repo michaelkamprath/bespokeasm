@@ -15,10 +15,10 @@ from bespokeasm.assembler.byte_code.parts import NumericByteCodePart
 
 
 class Instruction:
-    def __init__(self, mnemonic: str, instruction_config: dict, operand_set_collection: OperandSetCollection):
+    def __init__(self, mnemonic: str, instruction_config: dict, operand_set_collection: OperandSetCollection, default_endian: str):
         self._mnemonic = mnemonic
         self._config = instruction_config
-        self._operand_parser = OperandParser(self._config.get('operands', None), operand_set_collection)
+        self._operand_parser = OperandParser(self._config.get('operands', None), operand_set_collection, default_endian)
         self._operand_parser.validate(self._mnemonic)
 
     def __repr__(self) -> str:
