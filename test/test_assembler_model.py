@@ -94,14 +94,16 @@ class TestConfigObject(unittest.TestCase):
         self.assertEqual(piI.byte_size, 3, 'assembled instruciton is 3 byte')
         self.assertEqual(piI.get_bytes(label_dict), bytearray([0b01100110, 2, 0]), 'no offset should be emitted for [mar]')
 
-        piI = model2.parse_instruction(1234, 'swap [$8000], [label1]')
-        self.assertEqual(piI.byte_size, 5, 'assembled instruciton is 3 byte')
-        self.assertEqual(piI.get_bytes(label_dict), bytearray([0b11110110, 0, 0x80, 2, 0]), 'arguments should NOT be in reverse order')
+        piJ = model2.parse_instruction(1234, 'swap [$8000], [label1]')
+        self.assertEqual(piJ.byte_size, 5, 'assembled instruciton is 3 byte')
+        self.assertEqual(piJ.get_bytes(label_dict), bytearray([0b11110110, 0, 0x80, 2, 0]), 'arguments should NOT be in reverse order')
+
+        piK = model2.parse_instruction(1234, 'mov [sp+2], [sp+4]')
+        self.assertEqual(piK.byte_size, 3, 'assembled instruciton is 3 byte')
+        self.assertEqual(piK.get_bytes(label_dict), bytearray([0b01101101, 4, 2]), 'arguments should be in reverse order')
 
         with self.assertRaises(SystemExit, msg='should error on unallowed operand combinations'):
             model2.parse_instruction(1234, 'mov a, a')
-        with self.assertRaises(SystemExit, msg='should error on unallowed operand combinations'):
-            model2.parse_instruction(1234, 'mov [sp+2], [sp+4]')
         with self.assertRaises(SystemExit, msg='[mar] should have no offset'):
             model2.parse_instruction(1234, 'mov [mar+2], [label1]')
 

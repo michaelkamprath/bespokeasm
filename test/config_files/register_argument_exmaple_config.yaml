@@ -115,8 +115,8 @@ instructions:
       size: 2
     operands:
       count: 2
-      reverse_argument_order: true
       operand_sets:
+        reverse_argument_order: true
         list:
           - 8_bit_destination
           - 8_bit_source
@@ -126,6 +126,7 @@ instructions:
           - [sp, sp]
       specific_operands:
         a_mar:
+          list:
             a:
               type: register
               register: a
@@ -139,6 +140,7 @@ instructions:
                 value: 0
                 size: 3
         i_mar:
+          list:
             i:
               type: register
               register: i
@@ -152,6 +154,7 @@ instructions:
                 value: 0b010
                 size: 3
         sp_mar:
+          list:
             sp:
               type: indirect_register
               register: sp
@@ -169,7 +172,33 @@ instructions:
               bytecode:
                 value: 0b101
                 size: 3
+        sp1_sp2:
+          reverse_argument_order: true
+          list:
+            sp1:
+              type: indirect_register
+              register: sp
+              offset:
+                max: 127
+                min: -128
+                size: 8
+                byte_align: true
+              bytecode:
+                value: 0b101
+                size: 3
+            sp2:
+              type: indirect_register
+              register: sp
+              offset:
+                max: 127
+                min: -128
+                size: 8
+                byte_align: true
+              bytecode:
+                value: 0b101
+                size: 3
         iaddr_mar:
+          list:
             iaddr:
               type: indirect_numeric
               argument:

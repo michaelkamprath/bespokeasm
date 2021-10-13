@@ -22,8 +22,17 @@ class OperandSet:
         arg_type_ids = ','.join([str(id) for id in self._ordered_operand_list])
         return f'OperandSet<{self._name},[{arg_type_ids}]>'
 
+    @property
     def default_bytecode_size(self) -> int:
         return self._config.get('bytecode_size', None)
+
+    @property
+    def reverse_argument_order(self) -> bool:
+        '''Determines whether the order that the instruction's argument values
+        emitted in machine code should be in the same order as the argument
+        (false) or reversed (true)
+        '''
+        return self._config.get('reverse_argument_order', False)
 
     def parse_operand(self,line_num: int, operand_str: str) -> tuple[str, ByteCodePart, ByteCodePart]:
         for operand in self._ordered_operand_list:

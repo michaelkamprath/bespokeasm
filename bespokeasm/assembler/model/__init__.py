@@ -2,7 +2,7 @@ import json
 import sys
 import yaml
 
-from bespokeasm import BESPOKEASM_VERSION_STR
+from bespokeasm import BESPOKEASM_VERSION_STR, BESPOKEASM_MIN_REQUIRED_STR
 from bespokeasm.assembler.byte_code.assembled import AssembledInstruction
 from bespokeasm.assembler.model.instruction_set import InstructionSet
 from bespokeasm.assembler.model.operand_set import OperandSet, OperandSetCollection
@@ -29,6 +29,8 @@ class AssemblerModel:
                 print(f'The ISA configuration file requires BespokeASM version {required_version}. This version of BespokeASM is {BESPOKEASM_VERSION_STR}.')
             if required_version > BESPOKEASM_VERSION_STR:
                 sys.exit(f'ERROR: the instruction set configuration file requires at least BespokeASM version {required_version}')
+            if required_version < BESPOKEASM_MIN_REQUIRED_STR:
+                sys.exit(f'ERROR: this version of BespokeASM requires a configuration file that minimally requires BespokeASM version {BESPOKEASM_MIN_REQUIRED_STR}')
 
         registers = self._config['general'].get('registers', [])
         self._registers = set(registers if registers is not None else [])
