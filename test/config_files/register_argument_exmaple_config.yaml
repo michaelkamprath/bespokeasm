@@ -237,3 +237,22 @@ instructions:
           - [i, i]
           - [sp, sp]
           - [mar, mar]
+  pop:
+    byte_code:
+      value: 1
+      size: 5
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - 8_bit_destination
+        disallowed_pairs:
+          - [sp]
+      specific_operands:
+        empty_operand:
+          list:
+            empty_op:
+              type: empty
+              bytecode:
+                value: 0b111
+                size: 3

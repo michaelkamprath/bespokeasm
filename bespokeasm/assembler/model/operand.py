@@ -8,10 +8,11 @@ from bespokeasm.utilities import is_string_numeric, parse_numeric_string
 class OperandType(enum.Enum):
     # these values double as sort order for processing in an operand set
     UNKNOWN = -1
-    NUMERIC = 4
-    REGISTER = 3
-    INDIRECT_REGISTER = 1
-    INDIRECT_NUMERIC = 2
+    EMPTY = 1
+    NUMERIC = 5
+    REGISTER = 4
+    INDIRECT_REGISTER = 2
+    INDIRECT_NUMERIC = 3
 
 class Operand:
     def factory(operand_id: str, arg_config_dict: dict, default_endian: str):
@@ -24,6 +25,8 @@ class Operand:
             return IndirectRegisterOperand(operand_id, arg_config_dict, default_endian)
         elif type_str == 'indirect_numeric':
             return IndirectNumericOperand(operand_id, arg_config_dict, default_endian)
+        elif type_str == 'empty':
+            return EmptyOperand(operand_id, arg_config_dict, default_endian)
         else:
             return None
 
@@ -43,7 +46,10 @@ class Operand:
     @property
     def type(self) -> OperandType:
         return OperandType.UNKNOWN
-
+    @property
+    def null_operand(self) -> bool:
+        '''Indicates whether this operand object expects a non-empty string to be parsed.'''
+        return False
     @property
     def has_bytecode(self) -> bool:
         return ('bytecode' in self._config)
@@ -88,10 +94,29 @@ class Operand:
         # this should be overridden
         return None, None
 
+class EmptyOperand(Operand):
+    def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str):
+        super().__init__(operand_id, arg_config_dict, default_endian)
+
+    def __str__(self):
+        return f'EmptyOperand<{self.id}>'
+    @property
+    def type(self) -> OperandType:
+        return OperandType.EMPTY
+    def null_operand(self) -> bool:
+        '''This operand type does not parse any thing from teh instruction'''
+        return True
+
+    def parse_operand(self, line_num: int, operand: str) -> tuple[ByteCodePart, ByteCodePart]:
+        bytecode_part = NumericByteCodePart(self.bytecode_value, self.bytecode_size, False, 'big') if self.bytecode_value is not None else None
+        return bytecode_part, None
+
 class NumericExpressionOperand(Operand):
     def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str):
         super().__init__(operand_id, arg_config_dict, default_endian)
 
+    def __str__(self):
+        return f'NumericExpressionOperand<{self.id}>'
     @property
     def type(self) -> OperandType:
         return OperandType.NUMERIC
@@ -111,6 +136,9 @@ class NumericExpressionOperand(Operand):
 
 
     def parse_operand(self, line_num: int, operand: str) -> tuple[ByteCodePart, ByteCodePart]:
+        # do not match if expression contains square bracks
+        if "[" in operand or "]" in operand:
+            return None, None
         bytecode_part = NumericByteCodePart(self.bytecode_value, self.bytecode_size, False, 'big') if self.bytecode_value is not None else None
         arg_part = ExpressionByteCodePart(operand, self.argument_size, self.argument_byte_align, self.argument_endian)
         return bytecode_part, arg_part

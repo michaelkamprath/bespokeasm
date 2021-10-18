@@ -102,10 +102,24 @@ class TestConfigObject(unittest.TestCase):
         self.assertEqual(piK.byte_size, 3, 'assembled instruciton is 3 byte')
         self.assertEqual(piK.get_bytes(label_dict), bytearray([0b01101101, 4, 2]), 'arguments should be in reverse order')
 
+        piL = model2.parse_instruction(1234, 'pop i')
+        self.assertEqual(piL.byte_size, 1, 'assembled instruciton is 1 byte')
+        self.assertEqual(piL.get_bytes(label_dict), bytearray([0b00001010]), 'pop to i')
+
+        piM = model2.parse_instruction(1234, 'pop')
+        self.assertEqual(piM.byte_size, 1, 'assembled instruciton is 1 byte')
+        self.assertEqual(piM.get_bytes(label_dict), bytearray([0b00001111]), 'just pop')
+
         with self.assertRaises(SystemExit, msg='should error on unallowed operand combinations'):
             model2.parse_instruction(1234, 'mov a, a')
         with self.assertRaises(SystemExit, msg='[mar] should have no offset'):
             model2.parse_instruction(1234, 'mov [mar+2], [label1]')
+        with self.assertRaises(SystemExit, msg='should error due to too many operands'):
+            model2.parse_instruction(1234, 'mov a, i, j')
+        with self.assertRaises(SystemExit, msg='should error due to too many operands'):
+            model2.parse_instruction(1234, 'nop 123')
+        with self.assertRaises(SystemExit, msg='should error due to too few operands'):
+            model2.parse_instruction(1234, 'mov a')
 
     def test_bad_registers_in_configuratin(self):
         with pkg_resources.path(config_files, 'test_bad_registers_in_configuratin.yaml') as fp:

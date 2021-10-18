@@ -1,3 +1,5 @@
+import sys
+
 from bespokeasm.assembler.model.operand import Operand
 from bespokeasm.assembler.byte_code.parts import ByteCodePart
 
@@ -5,11 +7,13 @@ class OperandSet:
     def __init__(self, name: str, config_dict: dict, default_endian: str):
         self._name = name
         self._config = config_dict
-        self._ordered_operand_list = [
-            Operand.factory(arg_type_id, arg_type_conf, default_endian)
-                for arg_type_id, arg_type_conf in self._config['operand_values'].items()
-        ]
-
+        self._ordered_operand_list = []
+        for arg_type_id, arg_type_conf in self._config['operand_values'].items():
+            operand = Operand.factory(arg_type_id, arg_type_conf, default_endian)
+            if operand.null_operand:
+                # null operands not supported in operand sets. must use specific operand configuration.
+                sys.exit(f'ERROR: The configuration for operand set "{name}" contains unallowed null operand type named "{arg_type_id}".')
+            self._ordered_operand_list.append(operand)
 
         # Operands are sorted according to matching precedence order, which is set
         # by the enum value of the types. This allows matching to consider an operand
@@ -25,14 +29,6 @@ class OperandSet:
     @property
     def default_bytecode_size(self) -> int:
         return self._config.get('bytecode_size', None)
-
-    @property
-    def reverse_argument_order(self) -> bool:
-        '''Determines whether the order that the instruction's argument values
-        emitted in machine code should be in the same order as the argument
-        (false) or reversed (true)
-        '''
-        return self._config.get('reverse_argument_order', False)
 
     def parse_operand(self,line_num: int, operand_str: str) -> tuple[str, ByteCodePart, ByteCodePart]:
         for operand in self._ordered_operand_list:

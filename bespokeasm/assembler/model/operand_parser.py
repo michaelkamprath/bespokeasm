@@ -44,6 +44,10 @@ class OperandSetsModel:
         bytecode_list = []
         argument_values = []
         operand_ids = []
+
+        # the operands list must match configured operand count (null operands not supported here)
+        if len(operands) != self.operand_count:
+            return [], []
         for i in range(self.operand_count):
             operand_id, bytecode_part, argument_part = self._operand_sets[i].parse_operand(line_num, operands[i])
             if bytecode_part is not None:
@@ -118,8 +122,16 @@ class SpecificOperandsModel:
         for configured_operands in self._specific_operands:
             if configured_operands.operand_count != target_operand_count:
                 sys.exit(f'ERROR: line {line_num} - specific operand configration "{configured_operands}" has wrong operant count. Expecting {target_operand_count}.')
+            operand_index = 0
             for i in range(configured_operands.operand_count):
-                bytecode_part, argument_part = configured_operands[i].parse_operand(line_num, operands[i])
+                if configured_operands[i].null_operand:
+                    bytecode_part, argument_part = configured_operands[i].parse_operand(line_num, '')
+                else:
+                    if operand_index >= len(operands):
+                        sys.exit(f'ERROR: line {line_num} - Too few operands found for instruction')
+                    bytecode_part, argument_part = configured_operands[i].parse_operand(line_num, operands[operand_index])
+                    operand_index += 1
+
                 if bytecode_part is not None:
                     bytecode_list.append(bytecode_part)
                 if argument_part is not None:
@@ -130,10 +142,16 @@ class SpecificOperandsModel:
                     bytecode_list = []
                     argument_values = []
                     break
+            if operand_index != len(operands):
+                bytecode_list = []
+                argument_values = []
+                continue
+
             if len(bytecode_list) > 0 or len(argument_values) > 0:
                 if len(argument_values) > 1 and configured_operands.reverse_argument_order:
                     argument_values.reverse()
                 break
+
         return (bytecode_list, argument_values)
 
 
@@ -157,7 +175,7 @@ class OperandParser:
     def __repr__(self) -> str:
         return str(self)
     def __str__(self) -> str:
-        return f'OperandParser<{self._operand_sets}>'
+        return f'OperandParser<>'
 
     def validate(self, instruction: str):
         # check to make sure we as many operands configured as count.
@@ -175,19 +193,22 @@ class OperandParser:
     def generate_machine_code(self, line_num:int, operands: list[str]) -> tuple[list[ByteCodePart], list[ByteCodePart]]:
         bytecode_list = []
         argument_values = []
-        if len(operands) == self.operand_count and self.operand_count > 0:
-            # Step 1 - Look for specific operand matches
-            if self._specific_operands_model is not None:
-                bytecode_list, argument_values = self._specific_operands_model.find_operands_from_specific_operands(line_num, operands, self.operand_count)
-                if len(bytecode_list) > 0 or len(argument_values) > 0:
-                    return (bytecode_list, argument_values)
 
-            # Step 2 - Find an allowed combination match from an operand set
-            if self._has_operand_sets:
-                bytecode_list, argument_values = self._operand_sets_model.find_operands_from_operand_sets(line_num, operands)
-                if len(bytecode_list) > 0 or len(argument_values) > 0:
-                    return (bytecode_list, argument_values)
-        else:
-            sys.exit(f'ERROR: line {line_num} - INTERNAL - operand list wrongs size. Expected {self.operand_count}, got {len(operands)}')
+        # Step 1 - Look for specific operand matches
+        if self._specific_operands_model is not None:
+            bytecode_list, argument_values = self._specific_operands_model.find_operands_from_specific_operands(line_num, operands, self.operand_count)
+            if len(bytecode_list) > 0 or len(argument_values) > 0:
+                return (bytecode_list, argument_values)
+
+        # Step 2 - Find an allowed combination match from an operand set
+        if self._has_operand_sets:
+            bytecode_list, argument_values = self._operand_sets_model.find_operands_from_operand_sets(line_num, operands)
+            if len(bytecode_list) > 0 or len(argument_values) > 0:
+                return (bytecode_list, argument_values)
+
+        if len(operands) != self.operand_count:
+            sys.exit(f'ERROR: line {line_num} - operand list wrongs size. Expected {self.operand_count}, got {len(operands)}')
+
+        # if we are here, it's because no operands were parsed
         return (bytecode_list, argument_values)
 
