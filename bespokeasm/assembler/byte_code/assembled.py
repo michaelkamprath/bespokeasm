@@ -1,4 +1,5 @@
 import math
+import sys
 
 from bespokeasm.assembler.byte_code.parts import ByteCodePart
 from bespokeasm.assembler.byte_code.packed_bits import PackedBits
@@ -31,8 +32,11 @@ class AssembledInstruction:
     def get_bytes(self, label_dict: dict[str, int]) -> bytearray:
         packed_bits = PackedBits()
         for p in self._parts:
+            value = p.get_value(self.line_number, label_dict)
+            if  isinstance( value, str):
+                sys.exit(f'ERROR - assembled instruction "{self}" had a part {p} that did not resolve to an int, got: {value}')
             packed_bits.append_bits(
-                p.get_value(self.line_number, label_dict),
+                value,
                 p.value_size,
                 p.byte_align,
                 p.endian,

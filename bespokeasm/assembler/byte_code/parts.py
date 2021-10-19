@@ -1,3 +1,5 @@
+import sys
+
 from bespokeasm.expression import parse_expression
 
 class ByteCodePart:
@@ -47,4 +49,8 @@ class ExpressionByteCodePart(ByteCodePart):
 
     def get_value(self, line_num: int, label_dict: dict[str, int]) -> int:
         e = parse_expression(line_num, self._expression)
-        return e.get_value(label_dict)
+        value = e.get_value(label_dict)
+        if  isinstance( value, str):
+            print(f'ERROR - expression "{self._expression}" did not resolve to an int, got: {value}')
+            return 0
+        return value

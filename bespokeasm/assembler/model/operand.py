@@ -114,6 +114,9 @@ class EmptyOperand(Operand):
 class NumericExpressionOperand(Operand):
     def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str):
         super().__init__(operand_id, arg_config_dict, default_endian)
+        # validate config
+        if 'argument' not in self._config:
+            sys.exit(f'ERROR: configuration for numeric operand {self} does not have an arument configuration')
 
     def __str__(self):
         return f'NumericExpressionOperand<{self.id}>'

@@ -110,6 +110,10 @@ class TestConfigObject(unittest.TestCase):
         self.assertEqual(piM.byte_size, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(piM.get_bytes(label_dict), bytearray([0b00001111]), 'just pop')
 
+        piN = model2.parse_instruction(1234, 'mov a, [sp+2]')
+        self.assertEqual(piN.byte_size, 2, 'assembled instruciton is 2 byte')
+        self.assertEqual(piN.get_bytes(label_dict), bytearray([0b01000101, 2]), 'just move [sp+2] into a')
+
         with self.assertRaises(SystemExit, msg='should error on unallowed operand combinations'):
             model2.parse_instruction(1234, 'mov a, a')
         with self.assertRaises(SystemExit, msg='[mar] should have no offset'):

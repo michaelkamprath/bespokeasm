@@ -75,7 +75,7 @@ class SpecificOperandsModel:
             self._config = config
             self._operands = [
                 Operand.factory(arg_type_id, arg_type_conf, default_endian)
-                for arg_type_id, arg_type_conf in self._config.get('list', []).items()
+                for arg_type_id, arg_type_conf in self._config.get('list', {}).items()
             ]
 
         def __repr__(self) -> str:

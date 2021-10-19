@@ -18,6 +18,10 @@ class Instruction:
     def __init__(self, mnemonic: str, instruction_config: dict, operand_set_collection: OperandSetCollection, default_endian: str):
         self._mnemonic = mnemonic
         self._config = instruction_config
+        #validate config
+        if 'byte_code' not in self._config:
+            sys.exit(f'ERROR: configuration for inbstruction "{mnemonic}" does not have a cyte code configuration')
+
         self._operand_parser = OperandParser(self._config.get('operands', None), operand_set_collection, default_endian)
         self._operand_parser.validate(self._mnemonic)
 
