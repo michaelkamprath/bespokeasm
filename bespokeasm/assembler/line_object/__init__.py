@@ -1,9 +1,12 @@
+from bespokeasm.assembler.label_scope import LabelScope
+
 class LineObject:
     def __init__(self, line_num: int, instruction: str, comment: str):
         self._line_num = line_num
         self._instruction = instruction.strip()
         self._comment = comment.strip()
         self._address = None
+        self._label_scope = None
 
     def __repr__(self):
         return str(self)
@@ -45,6 +48,12 @@ class LineObject:
         """returns the code comment associated with this line object"""
         return self._comment
 
+    @property
+    def label_scope(self) -> LabelScope:
+        return self._label_scope
+    @label_scope.setter
+    def label_scope(self, value):
+        self._label_scope = value
 
 class LineWithBytes(LineObject):
     def __init__(self, line_num: int, instruction: str, comment: str):
@@ -52,7 +61,7 @@ class LineWithBytes(LineObject):
         self._bytes = bytearray()
 
 
-    def generate_bytes(self, label_dict: dict[str, int]):
+    def generate_bytes(self):
         """Finalize the bytes for this line with the label assignemnts
 
         Must be overriden by subclass

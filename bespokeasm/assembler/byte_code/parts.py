@@ -1,5 +1,6 @@
 import sys
 
+from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.expression import parse_expression
 
 class ByteCodePart:
@@ -47,9 +48,9 @@ class ExpressionByteCodePart(ByteCodePart):
     def __str__(self):
         return f'ExpressionByteCodePart<expression="{self._expression}",size={self.value_size}>'
 
-    def get_value(self, line_num: int, label_dict: dict[str, int]) -> int:
+    def get_value(self, line_num: int, label_scope: LabelScope) -> int:
         e = parse_expression(line_num, self._expression)
-        value = e.get_value(label_dict)
+        value = e.get_value(label_scope)
         if  isinstance( value, str):
             print(f'ERROR - expression "{self._expression}" did not resolve to an int, got: {value}')
             return 0

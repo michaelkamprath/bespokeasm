@@ -5,9 +5,11 @@ import math
 import sys
 
 from bespokeasm.assembler.line_object import LineWithBytes, LineObject
+from bespokeasm.assembler.line_object.directive_line import AddressOrgLine
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.line_object.factory import LineOjectFactory
 from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType
 
 class Assembler:
     def __init__(
@@ -46,19 +48,24 @@ class Assembler:
 
         if self._verbose:
             click.echo(f'Found {len(line_obs)} lines in source file')
+
+        global_label_scope = LabelScope.global_scope()
+        current_file_label_scope = LabelScope(LabelScopeType.FILE, global_label_scope, self.source_file)
+        current_scope = current_file_label_scope
         # First pass: assign addresses to labels
         cur_address = 0
-        label_addresses = {}
         for l in line_obs:
             l.set_start_address(cur_address)
             cur_address = l.address + l.byte_size
             if isinstance(l, LabelLine):
-                if l.get_label() not in label_addresses:
-                    label_addresses[l.get_label()] = l.get_value()
-                else:
-                    sys.exit(f'ERROR: line {l.line_number()} - label "{l.get_label()}" is defined multiple lines')
-        if self._verbose:
-            click.echo(f'Found {len(label_addresses)} labels: {label_addresses}')
+                if not l.is_constant and LabelScopeType.get_label_scope(l.get_label()) != LabelScopeType.LOCAL:
+                    current_scope = LabelScope(LabelScopeType.LOCAL, current_file_label_scope, l.get_label())
+                current_scope.set_label_value(l.get_label(), l.get_value(), l.line_number)
+            elif isinstance(l, AddressOrgLine):
+                current_scope = current_file_label_scope
+            l.label_scope = current_scope
+        # if self._verbose:
+        #     click.echo(f'Found {len(label_addresses)} labels: {label_addresses}')
         # Sort lines according to their assigned address. This allows for .org directives
         line_obs.sort(key=lambda x: x.address)
         max_generated_address = line_obs[-1].address
@@ -71,7 +78,7 @@ class Assembler:
         byte_code = bytearray()
         for l in line_obs:
             if isinstance(l, LineWithBytes):
-                l.generate_bytes(label_addresses)
+                l.generate_bytes()
             if self._verbose > 2:
                 click.echo(f'Processing line {l.line_number} = {l} at address ${l.address:x}')
             if len(l.instruction) > max_instruction_text_size:
@@ -101,7 +108,7 @@ class Assembler:
             f.write(byte_code)
 
         if self._enable_pretty_print:
-            pretty_str = self._pretty_print_results(line_obs, max_instruction_text_size, label_addresses)
+            pretty_str = self._pretty_print_results(line_obs, max_instruction_text_size)
             if self._pretty_print_output == 'stdout':
                 print(pretty_str)
             else:
@@ -110,7 +117,7 @@ class Assembler:
 
 
 
-    def _pretty_print_results(self, line_obs, max_instruction_text_size, label_addresses):
+    def _pretty_print_results(self, line_obs, max_instruction_text_size):
         output = io.StringIO()
 
         address_size = math.ceil(self._model.address_size/4)

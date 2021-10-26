@@ -23,4 +23,4 @@ Note that supplying an instruction set configuration file is required via the `-
 Documentation is availabe on the [Bespoke ASM Wiki](https://github.com/michaelkamprath/bespokeasm/wiki).
 
 # License
-Bespoke ASM is released under [the GMU GPL v3 license](./LICENSE).
+Bespoke ASM is released under [the GNU GPL v3 license](./LICENSE).

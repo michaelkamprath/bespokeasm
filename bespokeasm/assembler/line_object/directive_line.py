@@ -132,7 +132,7 @@ class FillUntilDataLine(LineWithBytes):
         else:
             return 0
 
-    def generate_bytes(self, label_dict: dict[str, int]):
+    def generate_bytes(self):
         """Finalize the bytes for this fill until line.
         """
         if self.byte_size > 0 and len(self._bytes) == 0:

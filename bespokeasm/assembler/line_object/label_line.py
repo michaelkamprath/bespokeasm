@@ -5,7 +5,7 @@ from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.utilities import is_string_numeric, parse_numeric_string
 
 PATTERN_ALLOWED_LABELS = re.compile(
-        r'^(?!\d*$)(?:\.?[\w~-]*)$',
+        r'^(?!__|\.\.)(?:(?:\.|_|[a-zA-Z])[a-zA-Z0-9_]*)$',
         flags=re.IGNORECASE|re.MULTILINE
     )
 
@@ -66,6 +66,10 @@ class LabelLine(LineObject):
         self._value = value
     def __str__(self):
         return f'LabelLine<{self.get_label()} -> {self.get_value()}>'
+
+    @property
+    def is_constant(self):
+        return self._value is not None
 
     def get_label(self) -> str:
         """Returns the label string"""

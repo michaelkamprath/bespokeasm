@@ -42,6 +42,6 @@ class InstructionLine(LineWithBytes):
         """Returns the number of bytes this instruction will generate"""
         return self._assembled_instruction.byte_size
 
-    def generate_bytes(self, label_dict: dict[str, int]) -> bytearray:
+    def generate_bytes(self) -> bytearray:
         """Finalize the bytes for this line with the label assignemnts"""
-        self._bytes.extend(self._assembled_instruction.get_bytes(label_dict))
+        self._bytes.extend(self._assembled_instruction.get_bytes(self.label_scope))

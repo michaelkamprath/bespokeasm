@@ -66,7 +66,7 @@ class DataLine(LineWithBytes):
         """Returns the number of bytes this data line will generate"""
         return len(self._arg_value_list)*DataLine.DIRECTIVE_VALUE_BYTE_SIZE[self._directive]
 
-    def generate_bytes(self, label_dict: dict[str, int]):
+    def generate_bytes(self):
         """Finalize the data bytes for this line with the label assignemnts"""
         for arg_item in self._arg_value_list:
             if isinstance(arg_item, int):
@@ -74,10 +74,12 @@ class DataLine(LineWithBytes):
             elif isinstance(arg_item, str):
                 if is_string_numeric(arg_item):
                     arg_val = parse_numeric_string(arg_item)
-                elif arg_item in label_dict:
-                    arg_val = label_dict[arg_item]
                 else:
-                    sys.exit(f'ERROR: line {self.line_number()} - unknown label "{arg_item}"')
+                    label_val = self.label_scope.get_label_value(arg_item)
+                    if label_val is not None:
+                        arg_val = label_val
+                    else:
+                        sys.exit(f'ERROR: line {self.line_number()} - unknown label "{arg_item}" in current scope "{self.label_scope}"')
             else:
                 sys.exit(f'ERROR: line {self.line_number()} - unknown data item "{arg_item}"')
             value_bytes = (arg_val&DataLine.DIRECTIVE_VALUE_MASK[self._directive]).to_bytes(

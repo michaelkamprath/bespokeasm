@@ -26,7 +26,13 @@ class OperandSetsModel:
     def __init__(self, config: dict, operand_set_collection: OperandSetCollection):
         self._config = config
         operand_sets = self._config['list']
-        self._operand_sets = [operand_set_collection.get_operand_set(k) for k in operand_sets]
+        self._operand_sets = []
+        for k in operand_sets:
+            opset = operand_set_collection.get_operand_set(k)
+            if opset is not None:
+                self._operand_sets.append(opset)
+            else:
+                sys.exit(f'ERROR: instuction set configuration file makes reference to unknow operand set "{k}"')
 
     @property
     def reverse_argument_order(self) -> bool:

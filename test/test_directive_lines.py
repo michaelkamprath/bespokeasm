@@ -1,6 +1,7 @@
 import sys
 import unittest
 
+from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType
 from bespokeasm.assembler.line_object.directive_line import DirectiveLine, AddressOrgLine, FillDataLine, FillUntilDataLine
 
 class TestDirectiveLines(unittest.TestCase):
@@ -44,20 +45,24 @@ class TestDirectiveLines(unittest.TestCase):
         self.assertEqual(o3.get_bytes(), bytearray([0]*256), 'truncated values')
 
     def test_filluntil_directive(self):
-        label_dict = { 'my_label': 0x80}
+        label_values = LabelScope(LabelScopeType.GLOBAL, None, 'global')
+        label_values.set_label_value('my_label', 0x80, 1)
+
         o1 = DirectiveLine.factory(1234, ' .zerountil $100', 'fill with nothing', 'big')
         self.assertIsInstance(o1, FillUntilDataLine)
         o1.set_start_address(0x42)
+        o1.label_scope = label_values
         self.assertEqual(o1.byte_size, (0x100-0x42+1), 'must have the right number of bytes')
-        o1.generate_bytes(label_dict)
+        o1.generate_bytes()
         self.assertEqual(o1.get_bytes(), bytearray([0]*(0x100-0x42+1)), 'must have all the bytes')
 
         # test fill until current address
         o2 = DirectiveLine.factory(1234, '.zerountil 0xF', 'them zeros', 'big')
         self.assertIsInstance(o2, FillUntilDataLine)
         o2.set_start_address(0xF)
+        o2.label_scope = label_values
         self.assertEqual(o2.byte_size, 1, 'must have the right number of bytes')
-        o2.generate_bytes(label_dict)
+        o2.generate_bytes()
         self.assertEqual(o2.get_bytes(), bytearray([0]*1), 'must have all the bytes')
 
 if __name__ == '__main__':

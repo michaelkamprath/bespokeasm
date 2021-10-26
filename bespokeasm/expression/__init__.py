@@ -13,6 +13,7 @@ import re
 import sys
 
 from bespokeasm.utilities import is_string_numeric, parse_numeric_string
+from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.line_object.label_line import is_valid_label
 
 class TokenType(enum.Enum):
@@ -51,29 +52,33 @@ class ExpressionNode:
     def __str__(self):
         return f'<ExpressionNode: type={self.token_type}, value="{self.value}">'
 
-    def _numeric_value(self, label_map: dict) -> int:
+    def _numeric_value(self, label_scope: LabelScope) -> int:
         if self.token_type == TokenType.T_NUM:
             return self.value
         elif self.token_type == TokenType.T_LABEL:
             # in ths case value is a label
-            return label_map[self.value]
+            val = label_scope.get_label_value(self.value)
+            if val is None:
+                print(f'Label resolves to NONE = {self}')
+            return val
         else:
             # this wasn't a numeric value
+            print(f'NOT Numeric = {self}')
             return None
 
-    def _compute(self, label_map: dict[str,int]) -> float:
+    def _compute(self, label_scope: LabelScope) -> float:
         if self.token_type in [TokenType.T_NUM, TokenType.T_LABEL]:
-            return float(self._numeric_value(label_map))
-        left_result = self.left_child._compute(label_map)
-        right_result = self.right_child._compute(label_map)
+            return float(self._numeric_value(label_scope))
+        left_result = self.left_child._compute(label_scope)
+        right_result = self.right_child._compute(label_scope)
         operation = ExpressionNode._operations[self.token_type]
         if self.token_type in [TokenType.T_AND, TokenType.T_OR, TokenType.T_XOR]:
             left_result = int(left_result)
             right_result = int(right_result)
         return operation(left_result, right_result)
 
-    def get_value(self, label_map: dict[str,int]) -> int:
-        return int(self._compute(label_map))
+    def get_value(self, label_scope: LabelScope) -> int:
+        return int(self._compute(label_scope))
 
 ExpresionType = ExpressionNode
 
@@ -97,7 +102,7 @@ def _lexical_analysis(line_num: int, s: str) -> list[ExpressionNode]:
     }
 
     tokens = []
-    expression_parts = re.findall(r'(?:\%|\$|b|0x)?[\w]+|[\+\-\*\/\&\|\^\(\)]', s)
+    expression_parts = re.findall(r'(?:\%|\$|b|0x|\.)?[\w]+|[\+\-\*\/\&\|\^\(\)]', s)
     for part in expression_parts:
         if len(part) == 1 and part in mappings:
             token_type = mappings[part]
@@ -153,4 +158,4 @@ def _match(line_num: int, tokens: list[ExpressionNode], token: TokenType) -> Exp
     if tokens[0].token_type == token:
         return tokens.pop(0)
     else:
-        sys.exit(f'ERROR: line {line_num} - Invalid syntax on token: {tokens[0].token_type}')
+        sys.exit(f'ERROR: line {line_num} - Invalid syntax on token: {tokens[0]}')
