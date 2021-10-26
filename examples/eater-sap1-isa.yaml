@@ -1,5 +1,6 @@
 description: Eater SAP-1 ISA
 general:
+  min_version: 0.1.4
   address_size: 4
 operand_sets:
   integer:
@@ -65,7 +66,7 @@ instructions:
       count: 1
       operand_sets:
         list:
-          - interger
+          - integer
   jmp:
     byte_code:
       value: 6
