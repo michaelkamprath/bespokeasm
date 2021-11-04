@@ -67,13 +67,13 @@ class LabelScope:
             self._line_num = line_num
 
         @property
-        def label(self):
+        def label(self) -> str:
             return self._label
         @property
-        def value(self):
+        def value(self) -> int:
             return self._value
         @property
-        def line_num(self):
+        def line_num(self) -> int:
             return self._line_num
 
     def __init__(self, scope_type: LabelScopeType, parent: LabelScope, scope_reference: str) -> None:
