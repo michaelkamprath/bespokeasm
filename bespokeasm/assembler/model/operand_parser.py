@@ -114,7 +114,10 @@ class SpecificOperandsModel:
     def __repr__(self) -> str:
         return str(self)
     def __str__(self) -> str:
-        operand_str = ','.join(self._specific_operands)
+        names = []
+        for opconfig in self._specific_operands:
+            names.append(str(opconfig))
+        operand_str = ','.join(names)
         return f'SpecificOperandsModel<{operand_str}>'
 
     def find_operands_from_specific_operands(
@@ -125,6 +128,7 @@ class SpecificOperandsModel:
     ) -> tuple[list[ByteCodePart], list[ByteCodePart]]:
         bytecode_list = []
         argument_values = []
+        print(f'evaluation specific operands one line {line_num} with {self}')
         for configured_operands in self._specific_operands:
             if configured_operands.operand_count != target_operand_count:
                 sys.exit(f'ERROR: line {line_num} - specific operand configration "{configured_operands}" has wrong operant count. Expecting {target_operand_count}.')
