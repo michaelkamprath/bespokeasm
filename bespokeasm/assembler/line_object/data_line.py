@@ -75,7 +75,7 @@ class DataLine(LineWithBytes):
                 if is_string_numeric(arg_item):
                     arg_val = parse_numeric_string(arg_item)
                 else:
-                    label_val = self.label_scope.get_label_value(arg_item)
+                    label_val = self.label_scope.get_label_value(arg_item, self.line_number)
                     if label_val is not None:
                         arg_val = label_val
                     else:

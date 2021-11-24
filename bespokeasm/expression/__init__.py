@@ -52,12 +52,12 @@ class ExpressionNode:
     def __str__(self):
         return f'<ExpressionNode: type={self.token_type}, value="{self.value}">'
 
-    def _numeric_value(self, label_scope: LabelScope) -> int:
+    def _numeric_value(self, label_scope: LabelScope, line_num: int) -> int:
         if self.token_type == TokenType.T_NUM:
             return self.value
         elif self.token_type == TokenType.T_LABEL:
             # in ths case value is a label
-            val = label_scope.get_label_value(self.value)
+            val = label_scope.get_label_value(self.value, line_num)
             if val is None:
                 print(f'Label resolves to NONE = {self}')
             return val
@@ -66,19 +66,19 @@ class ExpressionNode:
             print(f'NOT Numeric = {self}')
             return None
 
-    def _compute(self, label_scope: LabelScope) -> float:
+    def _compute(self, label_scope: LabelScope, line_num: int) -> float:
         if self.token_type in [TokenType.T_NUM, TokenType.T_LABEL]:
-            return float(self._numeric_value(label_scope))
-        left_result = self.left_child._compute(label_scope)
-        right_result = self.right_child._compute(label_scope)
+            return float(self._numeric_value(label_scope, line_num))
+        left_result = self.left_child._compute(label_scope, line_num)
+        right_result = self.right_child._compute(label_scope, line_num)
         operation = ExpressionNode._operations[self.token_type]
         if self.token_type in [TokenType.T_AND, TokenType.T_OR, TokenType.T_XOR]:
             left_result = int(left_result)
             right_result = int(right_result)
         return operation(left_result, right_result)
 
-    def get_value(self, label_scope: LabelScope) -> int:
-        return int(self._compute(label_scope))
+    def get_value(self, label_scope: LabelScope, line_num: int) -> int:
+        return int(self._compute(label_scope, line_num))
 
 ExpresionType = ExpressionNode
 

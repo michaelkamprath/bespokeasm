@@ -128,7 +128,6 @@ class SpecificOperandsModel:
     ) -> tuple[list[ByteCodePart], list[ByteCodePart]]:
         bytecode_list = []
         argument_values = []
-        print(f'evaluation specific operands one line {line_num} with {self}')
         for configured_operands in self._specific_operands:
             if configured_operands.operand_count != target_operand_count:
                 sys.exit(f'ERROR: line {line_num} - specific operand configration "{configured_operands}" has wrong operant count. Expecting {target_operand_count}.')
@@ -161,7 +160,6 @@ class SpecificOperandsModel:
                 if len(argument_values) > 1 and configured_operands.reverse_argument_order:
                     argument_values.reverse()
                 break
-
         return (bytecode_list, argument_values)
 
 

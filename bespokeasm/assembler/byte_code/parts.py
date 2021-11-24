@@ -50,7 +50,7 @@ class ExpressionByteCodePart(ByteCodePart):
 
     def get_value(self, line_num: int, label_scope: LabelScope) -> int:
         e = parse_expression(line_num, self._expression)
-        value = e.get_value(label_scope)
+        value = e.get_value(label_scope, line_num)
         if  isinstance( value, str):
             print(f'ERROR - expression "{self._expression}" did not resolve to an int, got: {value}')
             return 0
