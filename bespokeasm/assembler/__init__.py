@@ -49,7 +49,7 @@ class Assembler:
         if self._verbose:
             click.echo(f'Found {len(line_obs)} lines in source file')
 
-        global_label_scope = LabelScope.global_scope()
+        global_label_scope = LabelScope.global_scope(self._model.registers)
         current_file_label_scope = LabelScope(LabelScopeType.FILE, global_label_scope, self.source_file)
         current_scope = current_file_label_scope
         # First pass: assign addresses to labels
@@ -64,8 +64,7 @@ class Assembler:
             elif isinstance(l, AddressOrgLine):
                 current_scope = current_file_label_scope
             l.label_scope = current_scope
-        # if self._verbose:
-        #     click.echo(f'Found {len(label_addresses)} labels: {label_addresses}')
+
         # Sort lines according to their assigned address. This allows for .org directives
         line_obs.sort(key=lambda x: x.address)
         max_generated_address = line_obs[-1].address

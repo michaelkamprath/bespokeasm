@@ -114,7 +114,10 @@ class SpecificOperandsModel:
     def __repr__(self) -> str:
         return str(self)
     def __str__(self) -> str:
-        operand_str = ','.join(self._specific_operands)
+        names = []
+        for opconfig in self._specific_operands:
+            names.append(str(opconfig))
+        operand_str = ','.join(names)
         return f'SpecificOperandsModel<{operand_str}>'
 
     def find_operands_from_specific_operands(
@@ -157,7 +160,6 @@ class SpecificOperandsModel:
                 if len(argument_values) > 1 and configured_operands.reverse_argument_order:
                     argument_values.reverse()
                 break
-
         return (bytecode_list, argument_values)
 
 

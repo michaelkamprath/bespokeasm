@@ -1,7 +1,7 @@
 import unittest
 import importlib.resources as pkg_resources
 
-from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType
+from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType, GlobalLabelScope
 from bespokeasm.assembler.line_object import LineObject, LineWithBytes
 from bespokeasm.assembler.line_object.data_line import DataLine
 from bespokeasm.assembler.line_object.label_line import LabelLine, is_valid_label
@@ -13,7 +13,7 @@ from test import config_files
 class TestLineObject(unittest.TestCase):
 
     def test_data_line_creation(self):
-        label_values = LabelScope(LabelScopeType.GLOBAL, None, 'global')
+        label_values = GlobalLabelScope(set())
         label_values.set_label_value('test1', 0x1234, 1)
 
         d1 = DataLine.factory(27, ' .byte $de, $ad, 0xbe, $ef', 'steak', 'big')
@@ -131,7 +131,7 @@ class TestLineObject(unittest.TestCase):
         with pkg_resources.path(config_files, 'test_instruction_list_creation_isa.json') as fp:
             isa_model = AssemblerModel(str(fp), 0)
 
-        label_values = LabelScope(LabelScopeType.GLOBAL, None, 'global')
+        label_values = GlobalLabelScope(isa_model.registers)
         label_values.set_label_value('test1', 0xA, 1)
         label_values.set_label_value('high_de', 0xde00, 1)
 
@@ -183,11 +183,31 @@ class TestLineObject(unittest.TestCase):
         ins6.generate_bytes()
         self.assertEqual(ins6.get_bytes(), bytearray([0x18]), 'instruction should match')
 
+    def test_bad_instruction_lines(self):
+        with pkg_resources.path(config_files, 'register_argument_exmaple_config.yaml') as fp:
+            isa_model = AssemblerModel(str(fp), 0)
+        label_values = GlobalLabelScope(isa_model.registers)
+
+        # this instruction should fail because register A is not configured to be an
+        # indirect register, so the parser assumes this is a indirect numeric expression
+        # and then sees a register used there.
+        il1 = InstructionLine.factory(22, '  mov [a+2],5', 'move it', isa_model)
+        il1.label_scope = label_values
+        with self.assertRaises(SystemExit, msg='this instruction should fail'):
+            il1.generate_bytes()
+
+        # this instruction should fail because register i is being used in a numeric
+        # expression
+        il2 = InstructionLine.factory(22, '  add i+5', 'add it', isa_model)
+        il2.label_scope = label_values
+        with self.assertRaises(SystemExit, msg='this instruction should fail'):
+            il2.generate_bytes()
+
     def test_instruction_line_creation_little_endian(self):
         with pkg_resources.path(config_files, 'test_instruction_line_creation_little_endian.yaml') as fp:
             isa_model = AssemblerModel(str(fp), 0)
 
-        label_values = LabelScope(LabelScopeType.GLOBAL, None, 'global')
+        label_values = GlobalLabelScope(isa_model.registers)
         label_values.set_label_value('test1', 0xABCD, 1)
 
         ins1 = InstructionLine.factory(22, '  lda test1', 'some comment!', isa_model)
@@ -218,7 +238,7 @@ class TestLineObject(unittest.TestCase):
         with pkg_resources.path(config_files, 'register_argument_exmaple_config.yaml') as fp:
             isa_model = AssemblerModel(str(fp), 0)
 
-        label_values = LabelScope(LabelScopeType.GLOBAL, None, 'global')
+        label_values = GlobalLabelScope(isa_model.registers)
         label_values.set_label_value('test1', 0xABCD, 1)
 
         ins1 = InstructionLine.factory(22, 'mov i,[mar]', 'specific operands', isa_model)

@@ -89,11 +89,11 @@ class LabelScope:
     def type(self) -> LabelScopeType:
         return self._type
 
-    def get_label_value(self, label: str) -> int:
+    def get_label_value(self, label: str, line_num: int) -> int:
         if label in self._labels:
             return self._labels[label].value
         elif self.parent is not None:
-            return self.parent.get_label_value(label)
+            return self.parent.get_label_value(label, line_num)
         else:
             return None
 
@@ -113,10 +113,20 @@ class LabelScope:
 
     _global_scope = None
     @classmethod
-    def global_scope(cls) -> LabelScope:
+    def global_scope(cls, register_labels: set[str]) -> LabelScope:
         if cls._global_scope is None:
-            cls._global_scope = LabelScope(LabelScopeType.GLOBAL, None, '--GLOBAL--')
+            cls._global_scope = GlobalLabelScope(register_labels)
         return cls._global_scope
 
 
+class GlobalLabelScope(LabelScope):
+    def __init__(self, register_labels: set[str]) -> None:
+        super().__init__(LabelScopeType.GLOBAL, None, '--GLOBAL--')
+        self._register_labels = register_labels
 
+    def get_label_value(self, label: str, line_num: int) -> int:
+        '''Global scope version first checks whether passed label is actually a register'''
+        # check to see if label is a register
+        if label in self._register_labels:
+            sys.exit(f'ERROR: line {line_num} - register label "{label}" used in numeric expression')
+        return super().get_label_value(label, line_num)
