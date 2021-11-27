@@ -21,7 +21,8 @@ def main():
 @click.option('--pretty-print', '-p', is_flag=True, default=False, help='if true, a pretty print version of the compilation will be produced.')
 @click.option('--pretty-print-output',  default='stdout', help='if pretty-print is enabled, this specifies the output file. Defaults to stdout.')
 @click.option('--verbose', '-v', count=True, help='Verbosity of logging')
-def compile(asm_file, config_file, output_file, binary_min_address, binary_max_address, binary_fill, pretty_print, pretty_print_output, verbose):
+@click.option('--include-path', '-I', multiple=True, default=[], help='Path to use when searching for included asm files. Multiple paths can be seperately specified.')
+def compile(asm_file, config_file, output_file, binary_min_address, binary_max_address, binary_fill, pretty_print, pretty_print_output, verbose, include_path):
     if output_file is None:
         output_file = os.path.splitext(asm_file)[0] + '.bin'
     if verbose:
@@ -37,6 +38,7 @@ def compile(asm_file, config_file, output_file, binary_min_address, binary_max_a
         int(binary_min_address), int(binary_max_address) if int(binary_max_address) >= 0 else None,
         binary_fill,
         pretty_print, pretty_print_output, verbose,
+        include_path,
     )
     asm.assemble_bytecode()
 

@@ -17,15 +17,16 @@ from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType
 class Assembler:
     def __init__(
             self,
-            source_file,
-            config_file,
-            output_file,
-            binary_start,
-            binary_end,
-            binary_fill_value,
-            enable_pretty_print,
-            pretty_print_output,
-            is_verbose,
+            source_file: str,
+            config_file: str,
+            output_file: str,
+            binary_start: int,
+            binary_end: int,
+            binary_fill_value: int,
+            enable_pretty_print: bool,
+            pretty_print_output: str,
+            is_verbose: int,
+            include_paths: list[str],
         ):
         self.source_file = source_file
         self._output_file = output_file
@@ -37,11 +38,12 @@ class Assembler:
         self._binary_start = binary_start
         self._binary_end = binary_end
         self._model = AssemblerModel(self._config_file, self._verbose)
+        self._include_paths = include_paths
 
     def assemble_bytecode(self):
         global_label_scope = LabelScope.global_scope(self._model.registers)
         # find base file containing directory
-        include_dirs = set([os.path.dirname(self.source_file)])
+        include_dirs = set([os.path.dirname(self.source_file)]+list(self._include_paths))
 
         asm_file = AssemblyFile(self.source_file, global_label_scope)
         line_obs = asm_file.load_line_objects(self._model, include_dirs, self._verbose)
