@@ -3,6 +3,7 @@ import sys
 import yaml
 
 from bespokeasm import BESPOKEASM_VERSION_STR, BESPOKEASM_MIN_REQUIRED_STR
+from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.byte_code.assembled import AssembledInstruction
 from bespokeasm.assembler.model.instruction_set import InstructionSet
 from bespokeasm.assembler.model.operand_set import OperandSet, OperandSetCollection
@@ -67,7 +68,7 @@ class AssemblerModel:
     def get_operand_set(self, operand_set_name: str) -> OperandSet:
         return self._operand_sets.get_operand_set(operand_set_name)
 
-    def parse_instruction(self, line_num: int, instruction: str) -> AssembledInstruction:
+    def parse_instruction(self, line_id: LineIdentifier, instruction: str) -> AssembledInstruction:
         instr_parts = instruction.strip().split(' ', 1)
         mnemonic = instr_parts[0].lower()
         if len(instr_parts) > 1:
@@ -77,5 +78,5 @@ class AssemblerModel:
 
         instr_obj = self._instructions.get(mnemonic)
         if instr_obj is None:
-            sys.exit(f'ERROR: line {line_num} - Unrecognized mnemonic "{mnemonic}"')
-        return instr_obj.generate_bytecode_parts(line_num, mnemonic, operands, self.endian)
+            sys.exit(f'ERROR: {line_id} - Unrecognized mnemonic "{mnemonic}"')
+        return instr_obj.generate_bytecode_parts(line_id, mnemonic, operands, self.endian)

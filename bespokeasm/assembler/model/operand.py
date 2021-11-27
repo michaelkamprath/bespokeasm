@@ -2,6 +2,7 @@ import enum
 import re
 import sys
 
+from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.byte_code.parts import ByteCodePart, NumericByteCodePart, ExpressionByteCodePart
 from bespokeasm.utilities import is_string_numeric, parse_numeric_string
 
@@ -90,7 +91,7 @@ class Operand:
     def argument_endian(self) -> str:
         return None
 
-    def parse_operand(self, line_num: int, operand: str) -> tuple[ByteCodePart, ByteCodePart]:
+    def parse_operand(self, line_id: LineIdentifier, operand: str) -> tuple[ByteCodePart, ByteCodePart]:
         # this should be overridden
         return None, None
 
@@ -107,7 +108,7 @@ class EmptyOperand(Operand):
         '''This operand type does not parse any thing from teh instruction'''
         return True
 
-    def parse_operand(self, line_num: int, operand: str) -> tuple[ByteCodePart, ByteCodePart]:
+    def parse_operand(self, line_id: LineIdentifier, operand: str) -> tuple[ByteCodePart, ByteCodePart]:
         bytecode_part = NumericByteCodePart(self.bytecode_value, self.bytecode_size, False, 'big') if self.bytecode_value is not None else None
         return bytecode_part, None
 
@@ -138,7 +139,7 @@ class NumericExpressionOperand(Operand):
         return self._config['argument'].get('endian', self._default_endian)
 
 
-    def parse_operand(self, line_num: int, operand: str) -> tuple[ByteCodePart, ByteCodePart]:
+    def parse_operand(self, line_id: LineIdentifier, operand: str) -> tuple[ByteCodePart, ByteCodePart]:
         # do not match if expression contains square bracks
         if "[" in operand or "]" in operand:
             return None, None
@@ -159,7 +160,7 @@ class RegisterOperand(Operand):
     def register(self) -> str:
         return self._config['register']
 
-    def parse_operand(self, line_num: int, operand: str) -> tuple[ByteCodePart, ByteCodePart]:
+    def parse_operand(self, line_id: LineIdentifier, operand: str) -> tuple[ByteCodePart, ByteCodePart]:
         # first check that operand is what we expect
         if operand.strip() != self.register:
             return None, None
@@ -194,7 +195,7 @@ class IndirectRegisterOperand(RegisterOperand):
     @property
     def offset_endian(self) -> str:
         return self._config['offset'].get('endian', self._default_endian)
-    def parse_operand(self, line_num: int, operand: str) -> tuple[ByteCodePart, ByteCodePart]:
+    def parse_operand(self, line_id: LineIdentifier, operand: str) -> tuple[ByteCodePart, ByteCodePart]:
         # first check that operand is what we expect
         match = re.match(self._match_pattern, operand.strip())
         if match is not None and len(match.groups()) > 0:
@@ -211,7 +212,7 @@ class IndirectRegisterOperand(RegisterOperand):
             else:
                 if len(match.groups()) == 3 and match.group(2) is not None and match.group(3) is not None:
                     # and offset was added for an operand that wasn't configured to have one. Error.
-                    sys.exit(f'ERROR: line {line_num} - An offset was provided for indirect register operand "{operand}" when none was expected.')
+                    sys.exit(f'ERROR: {line_id} - An offset was provided for indirect register operand "{operand}" when none was expected.')
                 arg_part = None
             return bytecode_part, arg_part
         else:
@@ -231,7 +232,7 @@ class IndirectNumericOperand(NumericExpressionOperand):
     def type(self) -> OperandType:
         return OperandType.REGISTER
 
-    def parse_operand(self, line_num: int, operand: str) -> tuple[ByteCodePart, ByteCodePart]:
+    def parse_operand(self, line_id: LineIdentifier, operand: str) -> tuple[ByteCodePart, ByteCodePart]:
         # first check that operand is what we expect
         match = re.match(IndirectNumericOperand.OPERAND_PATTERN, operand.strip())
         if match is not None and len(match.groups()) > 0:

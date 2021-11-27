@@ -1,5 +1,6 @@
 import re
 
+from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object.label_line import LabelLine
@@ -17,7 +18,7 @@ class LineOjectFactory:
     )
 
     @classmethod
-    def parse_line(cls, line_num: int, line_str: str, model: AssemblerModel) -> LineObject:
+    def parse_line(cls, line_id: LineIdentifier, line_str: str, model: AssemblerModel) -> LineObject:
         # find comments
         comment_str = ''
         comment_match = re.search(LineOjectFactory.PATTERN_COMMENTS, line_str)
@@ -33,20 +34,20 @@ class LineOjectFactory:
         # parse instruction
         if len(instruction_str) > 0:
             # try label
-            line_obj = LabelLine.factory(line_num, instruction_str, comment_str, model.registers)
+            line_obj = LabelLine.factory(line_id, instruction_str, comment_str, model.registers)
             if line_obj is not None:
                 return line_obj
 
             # try directives
-            line_obj = DirectiveLine.factory(line_num, instruction_str, comment_str, model.endian)
+            line_obj = DirectiveLine.factory(line_id, instruction_str, comment_str, model.endian)
             if line_obj is not None:
                 return line_obj
 
             # try instruction
-            line_obj = InstructionLine.factory(line_num, instruction_str, comment_str, model)
+            line_obj = InstructionLine.factory(line_id, instruction_str, comment_str, model)
             if line_obj is not None:
                 return line_obj
 
         # if we got here, the line is only a comment
-        line_obj = LineObject(line_num, instruction_str, comment_str)
+        line_obj = LineObject(line_id, instruction_str, comment_str)
         return line_obj

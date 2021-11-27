@@ -2,8 +2,11 @@ import binascii
 import click
 import io
 import math
+import os
 import sys
+from bespokeasm.assembler import label_scope
 
+from bespokeasm.assembler.assembly_file import AssemblyFile
 from bespokeasm.assembler.line_object import LineWithBytes, LineObject
 from bespokeasm.assembler.line_object.directive_line import AddressOrgLine
 from bespokeasm.assembler.line_object.label_line import LabelLine
@@ -36,52 +39,46 @@ class Assembler:
         self._model = AssemblerModel(self._config_file, self._verbose)
 
     def assemble_bytecode(self):
-
-        line_obs = []
-        with open(self.source_file, 'r') as f:
-            line_num = 0
-            for  line in f:
-                line_num += 1
-                line_str = line.strip()
-                if len(line_str) > 0:
-                    line_obs.append(LineOjectFactory.parse_line(line_num, line_str, self._model))
-
-        if self._verbose:
-            click.echo(f'Found {len(line_obs)} lines in source file')
-
         global_label_scope = LabelScope.global_scope(self._model.registers)
-        current_file_label_scope = LabelScope(LabelScopeType.FILE, global_label_scope, self.source_file)
-        current_scope = current_file_label_scope
+        # find base file containing directory
+        include_dirs = set([os.path.dirname(self.source_file)])
+
+        asm_file = AssemblyFile(self.source_file, global_label_scope)
+        line_obs = asm_file.load_line_objects(self._model, include_dirs, self._verbose)
+
+        if self._verbose > 2:
+            click.echo(f'Found {len(line_obs)} lines across all source files')
+
         # First pass: assign addresses to labels
         cur_address = 0
         for l in line_obs:
             l.set_start_address(cur_address)
             cur_address = l.address + l.byte_size
             if isinstance(l, LabelLine):
-                if not l.is_constant and LabelScopeType.get_label_scope(l.get_label()) != LabelScopeType.LOCAL:
-                    current_scope = LabelScope(LabelScopeType.LOCAL, current_file_label_scope, l.get_label())
-                current_scope.set_label_value(l.get_label(), l.get_value(), l.line_number)
-            elif isinstance(l, AddressOrgLine):
-                current_scope = current_file_label_scope
-            l.label_scope = current_scope
+                l.label_scope.set_label_value(l.get_label(), l.get_value(), l.line_id)
 
         # Sort lines according to their assigned address. This allows for .org directives
         line_obs.sort(key=lambda x: x.address)
         max_generated_address = line_obs[-1].address
         line_dict = { l.address: l for l in line_obs if isinstance(l, LineWithBytes)}
 
-        # second pass: build the machine code
+        # second pass: build the machine code and check for overlaps
         if self._verbose > 2:
             print("\nProcessing lines:")
         max_instruction_text_size = 0
         byte_code = bytearray()
+        last_line = None
         for l in line_obs:
             if isinstance(l, LineWithBytes):
                 l.generate_bytes()
             if self._verbose > 2:
-                click.echo(f'Processing line {l.line_number} = {l} at address ${l.address:x}')
+                click.echo(f'Processing {l.line_id} = {l} at address ${l.address:x}')
             if len(l.instruction) > max_instruction_text_size:
                 max_instruction_text_size = len(l.instruction)
+            if isinstance(l, LineWithBytes):
+                if last_line is not None and (last_line.address + last_line.byte_size) > l.address:
+                    sys.exit(f'ERROR: {l.line_id} - Address of byte code overlaps with bytecode from line {last_line.line_id}')
+                last_line = l
 
         # Finally generate the binaey image
         fill_bytes = bytearray([self._binary_fill_value])
@@ -147,7 +144,7 @@ class Assembler:
         )
         output.write(f'\n{header_text}\n{header_line_text}\n')
         for l in line_obs:
-            line_str = f'{l.line_number}'.rjust(7)
+            line_str = f'{l.line_id.line_num}'.rjust(7)
             address_value = l.address
             address_str = address_format_str.format(address_value).center(COL_WIDTH_ADDRESS)
             instruction_str = l.instruction.ljust(max_instruction_text_size)

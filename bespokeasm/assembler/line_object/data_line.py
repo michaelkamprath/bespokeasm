@@ -1,8 +1,9 @@
 import re
 import sys
 
-from bespokeasm.utilities import parse_numeric_string, is_string_numeric
+from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithBytes
+from bespokeasm.utilities import parse_numeric_string, is_string_numeric
 
 class DataLine(LineWithBytes):
     PATTERN_DATA_DIRECTIVE = re.compile(
@@ -21,7 +22,7 @@ class DataLine(LineWithBytes):
         '.2byte': 0xFFFF,
         '.4byte': 0xFFFFFFFF,
     }
-    def factory(line_num: int, line_str: str, comment: str, endian: str) -> LineWithBytes:
+    def factory(line_id: LineIdentifier, line_str: str, comment: str, endian: str) -> LineWithBytes:
         """Tries to match the passed line string to the data directive pattern.
         If succcessful, returns a constructed DataLine object. If not, None is
         returned.
@@ -42,7 +43,7 @@ class DataLine(LineWithBytes):
                 return None
 
             return DataLine(
-                line_num,
+                line_id,
                 data_match.group(1).strip(),
                 values_list,
                 line_str,
@@ -52,8 +53,8 @@ class DataLine(LineWithBytes):
         else:
             return None
 
-    def __init__(self, line_num: int, directive_str: str, value_list: list, instruction: str, comment: str, endian: str):
-        super().__init__(line_num, instruction, comment)
+    def __init__(self, line_id: LineIdentifier, directive_str: str, value_list: list, instruction: str, comment: str, endian: str):
+        super().__init__(line_id, instruction, comment)
         self._arg_value_list = value_list
         self._directive = directive_str
         self._endian = endian
@@ -75,13 +76,13 @@ class DataLine(LineWithBytes):
                 if is_string_numeric(arg_item):
                     arg_val = parse_numeric_string(arg_item)
                 else:
-                    label_val = self.label_scope.get_label_value(arg_item, self.line_number)
+                    label_val = self.label_scope.get_label_value(arg_item, self.line_id)
                     if label_val is not None:
                         arg_val = label_val
                     else:
-                        sys.exit(f'ERROR: line {self.line_number()} - unknown label "{arg_item}" in current scope "{self.label_scope}"')
+                        sys.exit(f'ERROR: line {self.line_id} - unknown label "{arg_item}" in current scope "{self.label_scope}"')
             else:
-                sys.exit(f'ERROR: line {self.line_number()} - unknown data item "{arg_item}"')
+                sys.exit(f'ERROR: line {self.line_id} - unknown data item "{arg_item}"')
             value_bytes = (arg_val&DataLine.DIRECTIVE_VALUE_MASK[self._directive]).to_bytes(
                 DataLine.DIRECTIVE_VALUE_BYTE_SIZE[self._directive],
                 byteorder=self._endian,
