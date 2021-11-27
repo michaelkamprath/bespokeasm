@@ -42,8 +42,9 @@ from __future__ import annotations
 
 import enum
 import sys
+import inspect
 
-
+from bespokeasm.assembler.line_identifier import LineIdentifier
 
 class LabelScopeType(enum.Enum):
     GLOBAL = 0
@@ -61,10 +62,14 @@ class LabelScopeType(enum.Enum):
 
 class LabelScope:
     class LabelInfo:
-        def __init__(self, label: str, value: int, line_num: int) -> None:
+        def __init__(self, label: str, value: int, line_id: LineIdentifier) -> None:
             self._label = label
             self._value = value
-            self._line_num = line_num
+            self._line_id = line_id
+        def __repr__(self) -> str:
+            return str(self)
+        def __str__(self) -> str:
+            return f'LabelInfo< {self.label} = {self.value} >'
 
         @property
         def label(self) -> str:
@@ -73,14 +78,19 @@ class LabelScope:
         def value(self) -> int:
             return self._value
         @property
-        def line_num(self) -> int:
-            return self._line_num
+        def line_id(self) -> int:
+            return self._line_id
 
     def __init__(self, scope_type: LabelScopeType, parent: LabelScope, scope_reference: str) -> None:
         self._type = scope_type
         self._parent = parent
+        self._reference = scope_reference
         self._labels = {}
 
+    def __repr__(self) -> str:
+        return str(self)
+    def __str__(self) -> str:
+        return f'LabelScope< {self.type}, {self._reference} >'
     @property
     def parent(self) -> LabelScope:
         return self._parent
@@ -89,27 +99,27 @@ class LabelScope:
     def type(self) -> LabelScopeType:
         return self._type
 
-    def get_label_value(self, label: str, line_num: int) -> int:
+    def get_label_value(self, label: str, line_id: LineIdentifier) -> int:
         if label in self._labels:
             return self._labels[label].value
         elif self.parent is not None:
-            return self.parent.get_label_value(label, line_num)
+             return self.parent.get_label_value(label, line_id)
         else:
             return None
 
-    def set_label_value(self, label: str, value: int, line_num: int) -> None:
+    def set_label_value(self, label: str, value: int, line_id: LineIdentifier) -> None:
         label_scope = LabelScopeType.get_label_scope(label)
         if label_scope.value < self.type.value:
-            self.parent.set_label_value(label, value, line_num)
+            self.parent.set_label_value(label, value, line_id)
         elif label_scope == self.type:
             if label not in self._labels:
-                self._labels[label] = LabelScope.LabelInfo(label, value, line_num)
+                self._labels[label] = LabelScope.LabelInfo(label, value, line_id)
             else:
-                sys.exit(f"ERROR: line {line_num} - Label '{label}' is defined multiple times.")
+                sys.exit(f"ERROR: {line_id} - Label '{label}' is defined multiple times at scope {self}")
         else:
             # we are only here if the label is too low level for this scope
             # example: local label defined before any global labels
-            sys.exit(f"ERROR: line {line_num} - Label '{label}' is to low of scope for available scopes at this line.")
+            sys.exit(f"ERROR: {line_id} - Label '{label}' is to low of scope for available scopes at this line.")
 
     _global_scope = None
     @classmethod
@@ -124,9 +134,9 @@ class GlobalLabelScope(LabelScope):
         super().__init__(LabelScopeType.GLOBAL, None, '--GLOBAL--')
         self._register_labels = register_labels
 
-    def get_label_value(self, label: str, line_num: int) -> int:
+    def get_label_value(self, label: str, line_id: LineIdentifier) -> int:
         '''Global scope version first checks whether passed label is actually a register'''
         # check to see if label is a register
         if label in self._register_labels:
-            sys.exit(f'ERROR: line {line_num} - register label "{label}" used in numeric expression')
-        return super().get_label_value(label, line_num)
+            sys.exit(f'ERROR: {line_id} - register label "{label}" used in numeric expression')
+        return super().get_label_value(label, line_id)

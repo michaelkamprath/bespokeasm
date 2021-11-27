@@ -1,5 +1,6 @@
 import sys
 
+from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.byte_code.assembled import AssembledInstruction
 from bespokeasm.assembler.model.operand_parser import OperandParser
 from bespokeasm.assembler.model.operand_set import OperandSetCollection
@@ -43,10 +44,10 @@ class Instruction:
     def base_bytecode_value(self) -> int:
         return self._config['byte_code']['value']
 
-    def generate_bytecode_parts(self, line_num: int, mnemonic: str, operands: str, default_endian: str) -> AssembledInstruction:
+    def generate_bytecode_parts(self, line_id: LineIdentifier, mnemonic: str, operands: str, default_endian: str) -> AssembledInstruction:
         if mnemonic != self.mnemonic:
             # this shouldn't happen
-            sys.exit(f'ERROR: line {line_num} - INTERNAL - Asked instruction {self} to parse mnemonic "{mnemonic}"')
+            sys.exit(f'ERROR: {line_id} - INTERNAL - Asked instruction {self} to parse mnemonic "{mnemonic}"')
         if operands is not None and operands != '':
             operand_list = operands.strip().split(',')
         else:
@@ -57,13 +58,13 @@ class Instruction:
         machine_code = [NumericByteCodePart(self.base_bytecode_value, self.base_bytecode_size, True, instruction_endian)]
 
 
-        operand_bytecode, operand_arguments = self._operand_parser.generate_machine_code(line_num, operand_list)
+        operand_bytecode, operand_arguments = self._operand_parser.generate_machine_code(line_id, operand_list)
         if operand_bytecode is not None:
             machine_code.extend(operand_bytecode)
         if operand_arguments is not None:
             machine_code.extend(operand_arguments)
 
-        return AssembledInstruction(line_num, machine_code)
+        return AssembledInstruction(line_id, machine_code)
 
 
 

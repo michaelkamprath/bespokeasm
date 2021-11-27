@@ -11,13 +11,14 @@ Changes that are planned but not implemented yet:
 * Enable instruction aliases that allow alternative mnemonics for an instruction. For example, allowing `call` and `jsr` to mean the same thing.
 * Allow a specific operand configuration for an instruction to optionally overide the instruction's byte code
 * Allow a label to exist on the same line as an instruction or directive
-* Enable the ability to include other `asm` source files when compiling a given source file
 * add ability for source code to indicate what ISA version it needs to be compiled to.
+* Improve error checking, notably with diallowed operands or unknown labels.
 
 ## [Unreleased]
 * added some error checking on the configuration file
 * added support for local and file scoped labels. Local labels start with a `.` and are only valid between two non-local labels. File scope labels start with a `_` and are only valid within the same file they are defined.
 * added error that detects when register labels are used in numeric expresions.
+* added the ability to `#include` other `asm` source files when compiling a given source file.
 
 ## 0.1.4
 First tracked released

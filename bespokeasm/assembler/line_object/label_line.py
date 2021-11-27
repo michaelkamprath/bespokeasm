@@ -1,6 +1,7 @@
 import re
 import sys
 
+from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.utilities import is_string_numeric, parse_numeric_string
 
@@ -24,7 +25,7 @@ class LabelLine(LineObject):
         flags=re.IGNORECASE|re.MULTILINE
     )
 
-    def factory(line_num: int, line_str: str, comment: str, registers: set[str]):
+    def factory(line_id: LineIdentifier, line_str: str, comment: str, registers: set[str]):
         """Tries to match the passed line string to the Label or Constant directive patterns.
         If succcessful, returns a constructed LabelLine object. If not, None is
         returned.
@@ -36,22 +37,22 @@ class LabelLine(LineObject):
             label_val = label_match.group(1).strip()
             if is_valid_label(label_val):
                 if label_val in registers:
-                    sys.exit(f'ERROR: line {line_num} - used the register label "{label_val}" as a non-register label')
-                return LabelLine(line_num, label_val, None, line_str, comment)
+                    sys.exit(f'ERROR: {line_id} - used the register label "{label_val}" as a non-register label')
+                return LabelLine(line_id, label_val, None, line_str, comment)
 
         # Now determine is the line is a constant
         constant_match = re.search(LabelLine.PATTERN_CONSTANT, line_str)
         if constant_match is not None and len(constant_match.groups()) == 2:
             numeric_str = constant_match.group(2).strip()
             if not is_string_numeric(numeric_str):
-                sys.exit(f'ERROR: line {line_num} - constant assigned nonnumeric value')
+                sys.exit(f'ERROR: {line_id} - constant assigned nonnumeric value')
             constant_label = constant_match.group(1).strip()
             if not is_valid_label(constant_label):
-                sys.exit(f'ERROR: line {line_num} - invalid format for constant label: {constant_label}')
+                sys.exit(f'ERROR: {line_id} - invalid format for constant label: {constant_label}')
             if constant_label in registers:
-                sys.exit(f'ERROR: line {line_num} - used the register label "{constant_label}" as a non-register label')
+                sys.exit(f'ERROR: {line_id} - used the register label "{constant_label}" as a non-register label')
             return LabelLine(
-                line_num,
+                line_id,
                 constant_label,
                 parse_numeric_string(numeric_str),
                 line_str,
@@ -60,8 +61,8 @@ class LabelLine(LineObject):
         #if we got here it was neither a Label or a Constant
         return None
 
-    def __init__(self, line_num: int, label: str, value: int, instruction: str, comment: str):
-        super().__init__(line_num, instruction, comment)
+    def __init__(self, line_id: LineIdentifier, label: str, value: int, instruction: str, comment: str):
+        super().__init__(line_id, instruction, comment)
         self._label = label
         self._value = value
     def __str__(self):

@@ -1,8 +1,9 @@
+from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.label_scope import LabelScope
 
 class LineObject:
-    def __init__(self, line_num: int, instruction: str, comment: str):
-        self._line_num = line_num
+    def __init__(self, line_id: LineIdentifier, instruction: str, comment: str):
+        self._line_id = line_id
         self._instruction = instruction.strip()
         self._comment = comment.strip()
         self._address = None
@@ -14,9 +15,9 @@ class LineObject:
         return f'LineObject<{self.instruction}>'
 
     @property
-    def line_number(self):
-        """Returns the line number that his object was parsed from"""
-        return self._line_num
+    def line_id(self) -> LineIdentifier:
+        """Returns the line identifier that his object was parsed from"""
+        return self._line_id
 
     def set_start_address(self, address: int):
         """Sets the address for this line object.
@@ -56,8 +57,8 @@ class LineObject:
         self._label_scope = value
 
 class LineWithBytes(LineObject):
-    def __init__(self, line_num: int, instruction: str, comment: str):
-        super().__init__(line_num, instruction, comment)
+    def __init__(self, line_id: LineIdentifier, instruction: str, comment: str):
+        super().__init__(line_id, instruction, comment)
         self._bytes = bytearray()
 
 

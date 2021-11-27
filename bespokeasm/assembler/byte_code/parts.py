@@ -1,5 +1,6 @@
 import sys
 
+from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.expression import parse_expression
 
@@ -27,7 +28,7 @@ class ByteCodePart:
             self._value_size == other._value_size \
             and self._byte_align == other._byte_align \
             and self._endian == other._endian
-    def get_value(self, line_num: int, label_dict: dict[str, int]) -> int:
+    def get_value(self, line_id: LineIdentifier, label_dict: dict[str, int]) -> int:
         # this should be overridden
         return None
 
@@ -38,7 +39,7 @@ class NumericByteCodePart(ByteCodePart):
     def __str__(self):
         return f'NumericByteCodePart<value={self._value},size={self.value_size}>'
 
-    def get_value(self, line_num: int, label_dict: dict[str, int]) -> int:
+    def get_value(self, line_id: LineIdentifier, label_dict: dict[str, int]) -> int:
         return self._value
 
 class ExpressionByteCodePart(ByteCodePart):
@@ -48,10 +49,10 @@ class ExpressionByteCodePart(ByteCodePart):
     def __str__(self):
         return f'ExpressionByteCodePart<expression="{self._expression}",size={self.value_size}>'
 
-    def get_value(self, line_num: int, label_scope: LabelScope) -> int:
-        e = parse_expression(line_num, self._expression)
-        value = e.get_value(label_scope, line_num)
+    def get_value(self, line_id: LineIdentifier, label_scope: LabelScope) -> int:
+        e = parse_expression(line_id, self._expression)
+        value = e.get_value(label_scope, line_id)
         if  isinstance( value, str):
-            print(f'ERROR - expression "{self._expression}" did not resolve to an int, got: {value}')
+            print(f'ERROR: {line_id} - expression "{self._expression}" did not resolve to an int, got: {value}')
             return 0
         return value
