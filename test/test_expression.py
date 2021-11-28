@@ -53,7 +53,7 @@ class TestExpression(unittest.TestCase):
 
         e3 = parse_expression(1212, 'label1*3 + sp + 5')
         self.assertTrue(e3.contains_register_labels(registers), 'does contain registers')
-       
+
 
 
 if __name__ == '__main__':

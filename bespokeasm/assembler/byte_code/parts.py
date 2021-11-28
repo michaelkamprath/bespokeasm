@@ -62,6 +62,6 @@ class ExpressionByteCodePart(ByteCodePart):
             print(f'ERROR: {self.line_id} - expression "{self._expression}" did not resolve to an int, got: {value}')
             return 0
         return value
-    
+
     def contains_register_labels(self, register_labels: set[str]) -> bool:
         return self._parsed_expression.contains_register_labels(register_labels)

@@ -9,7 +9,6 @@ Changes that are planned but not implemented yet:
 
 * Add ability for an instruction to have order agnostic operands. That is, `instr a, b` is the same as `instr b, a`. This allows `swap` to occupy less instruction space.
 * Enable instruction aliases that allow alternative mnemonics for an instruction. For example, allowing `call` and `jsr` to mean the same thing.
-* Allow a specific operand configuration for an instruction to optionally overide the instruction's byte code
 * Allow a label to exist on the same line as an instruction or directive
 * add ability for source code to indicate what ISA version it needs to be compiled to.
 * Improve error checking, notably with diallowed operands or unknown labels.
@@ -19,6 +18,7 @@ Changes that are planned but not implemented yet:
 * added support for local and file scoped labels. Local labels start with a `.` and are only valid between two non-local labels. File scope labels start with a `_` and are only valid within the same file they are defined.
 * added error that detects when register labels are used in numeric expresions.
 * added the ability to `#include` other `asm` source files when compiling a given source file.
+* Added the concept of instruction variants to the ISA model configuration. Instruction variants allow a specific operand configuration for an instruction to generate wholely different byte code, such as a different prefix value.
 
 ## 0.1.4
 First tracked released
