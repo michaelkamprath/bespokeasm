@@ -42,5 +42,19 @@ class TestExpression(unittest.TestCase):
         # tests precendence order. + is of higher precednce than &
         self.assertEqual(parse_expression(111, 'b0000111&$01+$10').get_value(TestExpression.label_values, 4), 0x01, 'test precedence order')
 
+    def test_register_detection(self):
+        registers = set(['a', 'sp', 'mar'])
+
+        e1 = parse_expression(1212, '(label1+3)*5')
+        self.assertFalse(e1.contains_register_labels(registers), 'does not contain registers')
+
+        e2 = parse_expression(1212, 'sp+5')
+        self.assertTrue(e2.contains_register_labels(registers), 'does contain registers')
+
+        e3 = parse_expression(1212, 'label1*3 + sp + 5')
+        self.assertTrue(e3.contains_register_labels(registers), 'does contain registers')
+       
+
+
 if __name__ == '__main__':
     unittest.main()

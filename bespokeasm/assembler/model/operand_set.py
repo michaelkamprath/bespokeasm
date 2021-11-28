@@ -31,14 +31,19 @@ class OperandSet:
     def default_bytecode_size(self) -> int:
         return self._config.get('bytecode_size', None)
 
-    def parse_operand(self, line_id: LineIdentifier, operand_str: str) -> tuple[str, ByteCodePart, ByteCodePart]:
+    def parse_operand(
+        self,
+        line_id: LineIdentifier,
+        operand_str: str,
+        register_labels: set[str]
+    ) -> tuple[str, ByteCodePart, ByteCodePart]:
         for operand in self._ordered_operand_list:
-            bytecode_part, argument_part = operand.parse_operand(line_id, operand_str)
+            bytecode_part, argument_part = operand.parse_operand(line_id, operand_str, register_labels)
             if bytecode_part is not None or argument_part is not None:
                 # if some part was returned, then this is a valid match. Matching
                 # precedence order is important here!
                 return operand.id, bytecode_part, argument_part
-        return None, None
+        return None, None, None
 
 class OperandSetCollection(dict):
     def __init__(self, config_dict: dict, default_endian: str):

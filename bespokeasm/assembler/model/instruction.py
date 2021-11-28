@@ -44,7 +44,14 @@ class Instruction:
     def base_bytecode_value(self) -> int:
         return self._config['byte_code']['value']
 
-    def generate_bytecode_parts(self, line_id: LineIdentifier, mnemonic: str, operands: str, default_endian: str) -> AssembledInstruction:
+    def generate_bytecode_parts(
+        self,
+        line_id: LineIdentifier,
+        mnemonic: str,
+        operands: str,
+        default_endian: str,
+        register_labels: set[str],
+    ) -> AssembledInstruction:
         if mnemonic != self.mnemonic:
             # this shouldn't happen
             sys.exit(f'ERROR: {line_id} - INTERNAL - Asked instruction {self} to parse mnemonic "{mnemonic}"')
@@ -55,10 +62,10 @@ class Instruction:
 
         # generate the machine code parts
         instruction_endian = self._config['byte_code'].get('endian', default_endian)
-        machine_code = [NumericByteCodePart(self.base_bytecode_value, self.base_bytecode_size, True, instruction_endian)]
+        machine_code = [NumericByteCodePart(self.base_bytecode_value, self.base_bytecode_size, True, instruction_endian, line_id)]
 
 
-        operand_bytecode, operand_arguments = self._operand_parser.generate_machine_code(line_id, operand_list)
+        operand_bytecode, operand_arguments = self._operand_parser.generate_machine_code(line_id, operand_list, register_labels)
         if operand_bytecode is not None:
             machine_code.extend(operand_bytecode)
         if operand_arguments is not None:

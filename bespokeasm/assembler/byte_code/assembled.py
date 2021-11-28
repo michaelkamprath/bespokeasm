@@ -34,7 +34,7 @@ class AssembledInstruction:
     def get_bytes(self, label_scope: LabelScope) -> bytearray:
         packed_bits = PackedBits()
         for p in self._parts:
-            value = p.get_value(self.line_id, label_scope)
+            value = p.get_value(label_scope)
             if  isinstance( value, str):
                 sys.exit(f'ERROR - assembled instruction "{self}" had a part {p} that did not resolve to an int, got: {value}')
             packed_bits.append_bits(

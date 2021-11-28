@@ -191,17 +191,13 @@ class TestLineObject(unittest.TestCase):
         # this instruction should fail because register A is not configured to be an
         # indirect register, so the parser assumes this is a indirect numeric expression
         # and then sees a register used there.
-        il1 = InstructionLine.factory(22, '  mov [a+2],5', 'move it', isa_model)
-        il1.label_scope = label_values
         with self.assertRaises(SystemExit, msg='this instruction should fail'):
-            il1.generate_bytes()
+            InstructionLine.factory(22, '  mov [a+2],5', 'move it', isa_model)
 
         # this instruction should fail because register i is being used in a numeric
         # expression
-        il2 = InstructionLine.factory(22, '  add i+5', 'add it', isa_model)
-        il2.label_scope = label_values
         with self.assertRaises(SystemExit, msg='this instruction should fail'):
-            il2.generate_bytes()
+            InstructionLine.factory(22, '  add i+5', 'add it', isa_model)
 
     def test_instruction_line_creation_little_endian(self):
         with pkg_resources.path(config_files, 'test_instruction_line_creation_little_endian.yaml') as fp:

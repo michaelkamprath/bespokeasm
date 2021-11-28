@@ -47,7 +47,12 @@ class OperandSetsModel:
     def operand_count(self) -> int:
         return len(self._operand_sets)
 
-    def find_operands_from_operand_sets(self, line_id: LineIdentifier, operands: list[str]) -> tuple[list[ByteCodePart], list[ByteCodePart]]:
+    def find_operands_from_operand_sets(
+        self,
+        line_id: LineIdentifier,
+        operands: list[str],
+        register_labels: set[str],
+    ) -> tuple[list[ByteCodePart], list[ByteCodePart]]:
         bytecode_list = []
         argument_values = []
         operand_ids = []
@@ -56,7 +61,7 @@ class OperandSetsModel:
         if len(operands) != self.operand_count:
             return [], []
         for i in range(self.operand_count):
-            operand_id, bytecode_part, argument_part = self._operand_sets[i].parse_operand(line_id, operands[i])
+            operand_id, bytecode_part, argument_part = self._operand_sets[i].parse_operand(line_id, operands[i], register_labels)
             if bytecode_part is not None:
                 bytecode_list.append(bytecode_part)
             if argument_part is not None:
@@ -126,6 +131,7 @@ class SpecificOperandsModel:
         line_id: LineIdentifier,
         operands: list[str],
         target_operand_count: int,
+        register_labels: set[str],
     ) -> tuple[list[ByteCodePart], list[ByteCodePart]]:
         bytecode_list = []
         argument_values = []
@@ -135,11 +141,13 @@ class SpecificOperandsModel:
             operand_index = 0
             for i in range(configured_operands.operand_count):
                 if configured_operands[i].null_operand:
-                    bytecode_part, argument_part = configured_operands[i].parse_operand(line_id, '')
+                    bytecode_part, argument_part = \
+                        configured_operands[i].parse_operand(line_id, '', register_labels)
                 else:
                     if operand_index >= len(operands):
                         sys.exit(f'ERROR: {line_id} - Too few operands found for instruction')
-                    bytecode_part, argument_part = configured_operands[i].parse_operand(line_id, operands[operand_index])
+                    bytecode_part, argument_part = \
+                        configured_operands[i].parse_operand(line_id, operands[operand_index], register_labels)
                     operand_index += 1
 
                 if bytecode_part is not None:
@@ -199,19 +207,26 @@ class OperandParser:
     def _has_operand_sets(self):
         return self._operand_sets_model is not None
 
-    def generate_machine_code(self, line_id: LineIdentifier, operands: list[str]) -> tuple[list[ByteCodePart], list[ByteCodePart]]:
+    def generate_machine_code(self, line_id: LineIdentifier, operands: list[str], register_labels: set[str]) -> tuple[list[ByteCodePart], list[ByteCodePart]]:
         bytecode_list = []
         argument_values = []
 
         # Step 1 - Look for specific operand matches
         if self._specific_operands_model is not None:
-            bytecode_list, argument_values = self._specific_operands_model.find_operands_from_specific_operands(line_id, operands, self.operand_count)
+            bytecode_list, argument_values = \
+                self._specific_operands_model.find_operands_from_specific_operands(
+                        line_id,
+                        operands,
+                        self.operand_count,
+                        register_labels
+                    )
             if len(bytecode_list) > 0 or len(argument_values) > 0:
                 return (bytecode_list, argument_values)
 
         # Step 2 - Find an allowed combination match from an operand set
         if self._has_operand_sets:
-            bytecode_list, argument_values = self._operand_sets_model.find_operands_from_operand_sets(line_id, operands)
+            bytecode_list, argument_values = \
+                self._operand_sets_model.find_operands_from_operand_sets(line_id, operands, register_labels)
             if len(bytecode_list) > 0 or len(argument_values) > 0:
                 return (bytecode_list, argument_values)
 

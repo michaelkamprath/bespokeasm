@@ -80,6 +80,15 @@ class ExpressionNode:
     def get_value(self, label_scope: LabelScope, line_id: LineIdentifier) -> int:
         return int(self._compute(label_scope, line_id))
 
+    def contains_register_labels(self, register_labels: set[str]) -> bool:
+        if self.token_type == TokenType.T_LABEL:
+            return self.value in register_labels
+        elif self.token_type in [TokenType.T_NUM]:
+            return False
+        left_result = self.left_child.contains_register_labels(register_labels)
+        right_result = self.right_child.contains_register_labels(register_labels)
+        return left_result or right_result
+
 ExpresionType = ExpressionNode
 
 def parse_expression(line_id: LineIdentifier, expression: str) -> ExpresionType:

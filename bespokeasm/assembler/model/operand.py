@@ -91,7 +91,7 @@ class Operand:
     def argument_endian(self) -> str:
         return None
 
-    def parse_operand(self, line_id: LineIdentifier, operand: str) -> tuple[ByteCodePart, ByteCodePart]:
+    def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> tuple[ByteCodePart, ByteCodePart]:
         # this should be overridden
         return None, None
 
@@ -108,8 +108,8 @@ class EmptyOperand(Operand):
         '''This operand type does not parse any thing from teh instruction'''
         return True
 
-    def parse_operand(self, line_id: LineIdentifier, operand: str) -> tuple[ByteCodePart, ByteCodePart]:
-        bytecode_part = NumericByteCodePart(self.bytecode_value, self.bytecode_size, False, 'big') if self.bytecode_value is not None else None
+    def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> tuple[ByteCodePart, ByteCodePart]:
+        bytecode_part = NumericByteCodePart(self.bytecode_value, self.bytecode_size, False, 'big', line_id) if self.bytecode_value is not None else None
         return bytecode_part, None
 
 class NumericExpressionOperand(Operand):
@@ -139,12 +139,14 @@ class NumericExpressionOperand(Operand):
         return self._config['argument'].get('endian', self._default_endian)
 
 
-    def parse_operand(self, line_id: LineIdentifier, operand: str) -> tuple[ByteCodePart, ByteCodePart]:
+    def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> tuple[ByteCodePart, ByteCodePart]:
         # do not match if expression contains square bracks
         if "[" in operand or "]" in operand:
             return None, None
-        bytecode_part = NumericByteCodePart(self.bytecode_value, self.bytecode_size, False, 'big') if self.bytecode_value is not None else None
-        arg_part = ExpressionByteCodePart(operand, self.argument_size, self.argument_byte_align, self.argument_endian)
+        bytecode_part = NumericByteCodePart(self.bytecode_value, self.bytecode_size, False, 'big', line_id) if self.bytecode_value is not None else None
+        arg_part = ExpressionByteCodePart(operand, self.argument_size, self.argument_byte_align, self.argument_endian, line_id)
+        if arg_part.contains_register_labels(register_labels):
+            return None,None
         return bytecode_part, arg_part
 
 class RegisterOperand(Operand):
@@ -160,11 +162,11 @@ class RegisterOperand(Operand):
     def register(self) -> str:
         return self._config['register']
 
-    def parse_operand(self, line_id: LineIdentifier, operand: str) -> tuple[ByteCodePart, ByteCodePart]:
+    def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> tuple[ByteCodePart, ByteCodePart]:
         # first check that operand is what we expect
         if operand.strip() != self.register:
             return None, None
-        bytecode_part = NumericByteCodePart(self.bytecode_value, self.bytecode_size, False, 'big') if self.bytecode_value is not None else None
+        bytecode_part = NumericByteCodePart(self.bytecode_value, self.bytecode_size, False, 'big', line_id) if self.bytecode_value is not None else None
         arg_part = None
         return bytecode_part, arg_part
 
@@ -195,20 +197,21 @@ class IndirectRegisterOperand(RegisterOperand):
     @property
     def offset_endian(self) -> str:
         return self._config['offset'].get('endian', self._default_endian)
-    def parse_operand(self, line_id: LineIdentifier, operand: str) -> tuple[ByteCodePart, ByteCodePart]:
+    def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> tuple[ByteCodePart, ByteCodePart]:
         # first check that operand is what we expect
         match = re.match(self._match_pattern, operand.strip())
         if match is not None and len(match.groups()) > 0:
-            bytecode_part = NumericByteCodePart(self.bytecode_value, self.bytecode_size, False, 'big') if self.bytecode_value is not None else None
+            bytecode_part = NumericByteCodePart(self.bytecode_value, self.bytecode_size, False, 'big', line_id) \
+                if self.bytecode_value is not None else None
             if self.has_offset:
                 if len(match.groups()) == 3 and match.group(2) is not None and match.group(3) is not None:
                     # we have an offset argument. construct the offset expression. Group 2 is the + or - sign, and our expression
                     # parser expects 2 operands for the + or - sign
                     argument_str = f'0 {match.group(2).strip()} {match.group(3).strip()}'
-                    arg_part = ExpressionByteCodePart(argument_str, self.offset_size, self.offset_byte_align, self.offset_endian)
+                    arg_part = ExpressionByteCodePart(argument_str, self.offset_size, self.offset_byte_align, self.offset_endian, line_id)
                 else:
                     # must have and offset value of 0
-                    arg_part = NumericByteCodePart(0, self.offset_size, self.offset_byte_align, self.offset_endian)
+                    arg_part = NumericByteCodePart(0, self.offset_size, self.offset_byte_align, self.offset_endian, line_id)
             else:
                 if len(match.groups()) == 3 and match.group(2) is not None and match.group(3) is not None:
                     # and offset was added for an operand that wasn't configured to have one. Error.
@@ -232,12 +235,15 @@ class IndirectNumericOperand(NumericExpressionOperand):
     def type(self) -> OperandType:
         return OperandType.REGISTER
 
-    def parse_operand(self, line_id: LineIdentifier, operand: str) -> tuple[ByteCodePart, ByteCodePart]:
+    def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> tuple[ByteCodePart, ByteCodePart]:
         # first check that operand is what we expect
         match = re.match(IndirectNumericOperand.OPERAND_PATTERN, operand.strip())
         if match is not None and len(match.groups()) > 0:
-            bytecode_part = NumericByteCodePart(self.bytecode_value, self.bytecode_size, False, 'big') if self.bytecode_value is not None else None
-            arg_part = ExpressionByteCodePart(match.group(1).strip(), self.argument_size, self.argument_byte_align, self.argument_endian)
+            bytecode_part = NumericByteCodePart(self.bytecode_value, self.bytecode_size, False, 'big', line_id) \
+                if self.bytecode_value is not None else None
+            arg_part = ExpressionByteCodePart(match.group(1).strip(), self.argument_size, self.argument_byte_align, self.argument_endian, line_id)
+            if arg_part.contains_register_labels(register_labels):
+                return None,None
             return bytecode_part, arg_part
         else:
             return None, None

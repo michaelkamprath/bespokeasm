@@ -79,4 +79,4 @@ class AssemblerModel:
         instr_obj = self._instructions.get(mnemonic)
         if instr_obj is None:
             sys.exit(f'ERROR: {line_id} - Unrecognized mnemonic "{mnemonic}"')
-        return instr_obj.generate_bytecode_parts(line_id, mnemonic, operands, self.endian)
+        return instr_obj.generate_bytecode_parts(line_id, mnemonic, operands, self.endian, self.registers)
