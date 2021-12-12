@@ -16,7 +16,7 @@ class TestInstructionParsing(unittest.TestCase):
         cls.label_values.set_label_value('my_val', 8, 2)
         cls.label_values.set_label_value('the_two', 2, 3)
 
-    def test_instruciton_variant_matching(self):
+    def test_instruction_variant_matching(self):
         with pkg_resources.path(config_files, 'test_instructions_with_variants.yaml') as fp:
             isa_model = AssemblerModel(str(fp), 0)
 
