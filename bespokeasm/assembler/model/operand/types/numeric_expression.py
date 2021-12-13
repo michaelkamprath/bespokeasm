@@ -31,6 +31,9 @@ class NumericExpressionOperand(Operand):
     def argument_endian(self) -> str:
         return self._config['argument'].get('endian', self._default_endian)
 
+    @property
+    def match_pattern(self) -> str:
+        return r'(?:[\$\%\w\(\)\+\-\s]*[\w\)])'
 
     def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> tuple[ByteCodePart, ByteCodePart]:
         # do not match if expression contains square bracks

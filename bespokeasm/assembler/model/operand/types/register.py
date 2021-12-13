@@ -15,6 +15,10 @@ class RegisterOperand(Operand):
     def register(self) -> str:
         return self._config['register']
 
+    @property
+    def match_pattern(self) -> str:
+        return r'{0}'.format(self.register)
+
     def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> tuple[ByteCodePart, ByteCodePart]:
         # first check that operand is what we expect
         if operand.strip() != self.register:

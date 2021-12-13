@@ -48,30 +48,10 @@ class Operand:
             return self._config['bytecode']['size']
         else:
             return None
+
     @property
-    def has_offset(self) -> bool:
-        return False
-    @property
-    def offset_size(self) -> int:
-        return None
-    @property
-    def offset_byte_align(self) -> bool:
-        return None
-    @property
-    def offset_endian(self) -> str:
-        return None
-    @property
-    def has_argument(self) -> bool:
-        return False
-    @property
-    def argument_size(self) -> int:
-        return None
-    @property
-    def argument_byte_align(self) -> bool:
-        return None
-    @property
-    def argument_endian(self) -> str:
-        return None
+    def match_pattern(self) -> str:
+        return ''
 
     def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> tuple[ByteCodePart, ByteCodePart]:
         # this should be overridden

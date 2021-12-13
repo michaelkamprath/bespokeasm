@@ -21,6 +21,10 @@ class IndirectNumericOperand(NumericExpressionOperand):
     def type(self) -> OperandType:
         return OperandType.REGISTER
 
+    @property
+    def match_pattern(self) -> str:
+        return r'\[\s*(?:{0})\s*\]'.format(super().match_pattern)
+
     def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> tuple[ByteCodePart, ByteCodePart]:
         # first check that operand is what we expect
         match = re.match(IndirectNumericOperand.OPERAND_PATTERN, operand.strip())

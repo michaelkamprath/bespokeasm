@@ -13,7 +13,7 @@ class IndirectRegisterOperand(RegisterOperand):
 
     def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str):
         super().__init__(operand_id, arg_config_dict, default_endian)
-        self._match_pattern = re.compile(
+        self._parse_pattern = re.compile(
             self.OPERAND_PATTERN_TEMPLATE.format(self.register),
             flags=re.IGNORECASE|re.MULTILINE
         )
@@ -35,9 +35,13 @@ class IndirectRegisterOperand(RegisterOperand):
     @property
     def offset_endian(self) -> str:
         return self._config['offset'].get('endian', self._default_endian)
+    @property
+    def match_pattern(self) -> str:
+        return r'\[\s*{0}\s*(?:(?:\+|\-)\s*(?:[\w()\+\-\s]+\b)\s*)?\]'.format(self.register)
+
     def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> tuple[ByteCodePart, ByteCodePart]:
         # first check that operand is what we expect
-        match = re.match(self._match_pattern, operand.strip())
+        match = re.match(self._parse_pattern, operand.strip())
         if match is not None and len(match.groups()) > 0:
             bytecode_part = NumericByteCodePart(self.bytecode_value, self.bytecode_size, False, 'big', line_id) \
                 if self.bytecode_value is not None else None

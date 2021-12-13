@@ -14,6 +14,7 @@ Changes that are planned but not implemented yet:
 * Improve error checking, notably with diallowed operands or unknown labels.
 
 ## [Unreleased]
+* Added `indirect index register` addressing mode. 
 
 ## [0.1.5]
 * added some error checking on the configuration file
