@@ -2,8 +2,9 @@ import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.byte_code.parts import ByteCodePart
-from bespokeasm.assembler.model.operand_set import OperandSet, OperandSetCollection
+from bespokeasm.assembler.model.operand_set import OperandSetCollection
 from bespokeasm.assembler.model.operand import Operand
+from bespokeasm.assembler.model.operand.factory import OperandFactory
 
 # Operand Parser
 #
@@ -91,7 +92,7 @@ class SpecificOperandsModel:
         def __init__(self, config: dict, default_endian: str):
             self._config = config
             self._operands = [
-                Operand.factory(arg_type_id, arg_type_conf, default_endian)
+                OperandFactory.factory(arg_type_id, arg_type_conf, default_endian)
                 for arg_type_id, arg_type_conf in self._config.get('list', {}).items()
             ]
 
