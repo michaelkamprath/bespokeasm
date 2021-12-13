@@ -1,8 +1,11 @@
+from functools import reduce
 import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.expression import parse_expression, ExpresionType
+
+from .packed_bits import PackedBits
 
 class ByteCodePart:
     def __init__(self, value_size: int, byte_align: bool, endian: str, line_id: LineIdentifier):
@@ -36,6 +39,8 @@ class ByteCodePart:
     def get_value(self, label_scope: LabelScope) -> int:
         # this should be overridden
         return None
+    def contains_register_labels(self, register_labels: set[str]) -> bool:
+        return False
 
 class NumericByteCodePart(ByteCodePart):
     def __init__(self, value: int, value_size: int, byte_align: bool, endian: str, line_id: LineIdentifier):
@@ -65,3 +70,23 @@ class ExpressionByteCodePart(ByteCodePart):
 
     def contains_register_labels(self, register_labels: set[str]) -> bool:
         return self._parsed_expression.contains_register_labels(register_labels)
+
+class CompositeByteCodePart(ByteCodePart):
+    _parts_list: list[ByteCodePart]
+
+    def __init__(self, byte_code_parts: list[ByteCodePart], byte_align: bool, endian: str, line_id: LineIdentifier) -> None:
+        total_size = reduce(lambda a, b: a+b.value_size, byte_code_parts, 0)
+        super().__init__(total_size, byte_align, endian, line_id)
+        self._parts_list = byte_code_parts
+
+    def get_value(self, label_scope: LabelScope) -> int:
+        bits = PackedBits()
+        for p in self._parts_list:
+            bits.append_bits(p.get_value(label_scope),p.value_size,False,self.endian)
+        value = int.from_bytes(bits.get_bytes(),self.endian)
+        if self.value_size%8 != 0:
+            shift_count = 8 - self.value_size%8
+            value = value >> shift_count
+        return value
+
+
