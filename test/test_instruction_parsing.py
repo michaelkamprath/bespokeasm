@@ -98,7 +98,7 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertEqual(ins2.byte_size, 4, 'has 4 bytes')
         ins2.label_scope = TestInstructionParsing.label_values
         ins2.generate_bytes()
-        self.assertEqual(list(ins2.get_bytes()), [0xFE, 0x20, 0x80, 0x44], 'instruction byte should match')
+        self.assertEqual(list(ins2.get_bytes()), [0xFE, 0x20, 0x80, 0x44], 'instruction byte should match, operands reversed')
 
         with self.assertRaises(SystemExit, msg='no instruction  should match here'):
             bad1 = InstructionLine.factory(22, '  mov a, [sp+i]', 'some comment!', isa_model)
