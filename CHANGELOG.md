@@ -28,6 +28,6 @@ First tracked released
 * Enabled the `reverse_argument_order` instruction option be applied to a specific operand configuration. This slightly changed the configuration file format.
 * Added ability for instructions with operands to have a single "empty operand" variant, e.g., `pop`
 
-[Unreleased]: https://github.com/michaelkamprath/bespokeasm/v0.1.5...HEAD
-[0.1.6]: https://github.com/michaelkamprath/bespokeasm/v0.1.6...v0.1.5
-[0.1.5]: https://github.com/michaelkamprath/bespokeasm/v0.1.5...v0.1.4
+[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.5...HEAD
+[0.1.6]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.6...v0.1.5
+[0.1.5]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.5...v0.1.4
