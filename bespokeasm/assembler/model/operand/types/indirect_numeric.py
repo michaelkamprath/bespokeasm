@@ -19,7 +19,7 @@ class IndirectNumericOperand(NumericExpressionOperand):
 
     @property
     def type(self) -> OperandType:
-        return OperandType.REGISTER
+        return OperandType.INDIRECT_NUMERIC
 
     @property
     def match_pattern(self) -> str:

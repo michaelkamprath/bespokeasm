@@ -7,10 +7,11 @@ class OperandType(enum.Enum):
     # these values double as sort order for processing in an operand set
     UNKNOWN = -1
     EMPTY = 1
-    NUMERIC = 5
-    REGISTER = 4
+    NUMERIC = 6
+    REGISTER = 5
     INDIRECT_REGISTER = 2
-    INDIRECT_NUMERIC = 3
+    INDIRECT_INDEXED_REGISTER = 3
+    INDIRECT_NUMERIC = 4
 
 class Operand:
     def __init__(self, operand_id, arg_config_dict, default_endian):

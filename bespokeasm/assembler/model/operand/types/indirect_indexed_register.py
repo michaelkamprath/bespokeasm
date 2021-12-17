@@ -3,7 +3,7 @@ import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.byte_code.parts import ByteCodePart, NumericByteCodePart, CompositeByteCodePart
-from bespokeasm.assembler.model.operand import Operand
+from bespokeasm.assembler.model.operand import Operand, OperandType
 from .register import RegisterOperand
 
 import bespokeasm.assembler.model.operand.factory as OF
@@ -42,6 +42,9 @@ class IndirectIndexedRegisterOperand(RegisterOperand):
     def __str__(self):
         return f'IndirectIndexedRegisterOperand<{self.id}, register={self.register}, match_pattern={self.match_pattern}>'
 
+    @property
+    def type(self) -> OperandType:
+        return OperandType.INDIRECT_INDEXED_REGISTER
     @property
     def match_pattern(self) -> str:
         return self.OPERAND_PATTERN_TEMPLATE.format(self.register, self._index_parse_pattern)
