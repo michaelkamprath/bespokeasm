@@ -4,8 +4,13 @@ import importlib.resources as pkg_resources
 from test import config_files
 
 from bespokeasm.assembler.label_scope import GlobalLabelScope
+from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.line_object import LineObject
+from bespokeasm.assembler.line_object.factory import LineOjectFactory
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
+from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.model import AssemblerModel
+
 
 class TestInstructionParsing(unittest.TestCase):
     label_values = None
@@ -105,3 +110,12 @@ class TestInstructionParsing(unittest.TestCase):
             bad1.set_start_address(666)
             bad1.label_scope = TestInstructionParsing.label_values
             bad1.generate_bytes()
+
+    def test_label_parsing(self):
+        with pkg_resources.path(config_files, 'test_instructions_with_variants.yaml') as fp:
+            isa_model = AssemblerModel(str(fp), 0)
+        lineid = LineIdentifier(42, 'test_label_parsing')
+        l1: LineObject = LineOjectFactory.parse_line(lineid, "LABEL = %00001111", isa_model)
+        self.assertIsInstance(l1, LabelLine)
+        self.assertTrue(l1.is_constant, )
+        self.assertEqual(l1.get_value(), 0x0F, 'value should be right')

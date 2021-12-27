@@ -21,7 +21,7 @@ class LabelLine(LineObject):
         flags=re.IGNORECASE|re.MULTILINE
     )
     PATTERN_CONSTANT = re.compile(
-        r'^\s*(\w*)(?:\s*)?\=(?:\s*)?(\$[0-9a-f]*|0x[0-9a-f]*|b[01]*|\w*)',
+        r'^\s*(\w*)(?:\s*)?\=(?:\s*)?(\$[0-9a-f]*|0x[0-9a-f]*|(?:b|%)[01]*|\w*)',
         flags=re.IGNORECASE|re.MULTILINE
     )
 

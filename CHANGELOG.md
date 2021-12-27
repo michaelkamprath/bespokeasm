@@ -15,6 +15,7 @@ Changes that are planned but not implemented yet:
 
 ## [Unreleased]
 * Added `indirect index register` addressing mode.
+* Fixed a bug in parsing binary numbers assigned to constants
 
 ## [0.1.5]
 * added some error checking on the configuration file
