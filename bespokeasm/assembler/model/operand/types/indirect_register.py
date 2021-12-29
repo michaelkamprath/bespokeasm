@@ -17,6 +17,12 @@ class IndirectRegisterOperand(RegisterOperand):
             self.OPERAND_PATTERN_TEMPLATE.format(self.register),
             flags=re.IGNORECASE|re.MULTILINE
         )
+        if self.has_offset:
+            if 'size' not in self._config['offset']:
+                sys.exit(f'ERROR - configuration for indirect register operand "{self.register}" is is missing "size" setting.')
+            if 'byte_align' not in self._config['offset']:
+                sys.exit(f'ERROR - configuration for indirect register operand "{self.register}" is is missing "byte_align" setting.')
+
     def __str__(self):
         return f'IndirectRegisterOperand<{self.id},register={self.register}>'
     @property

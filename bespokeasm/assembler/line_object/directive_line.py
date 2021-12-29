@@ -75,6 +75,8 @@ class DirectiveLine:
         line_match = re.search(DirectiveLine.PATTERN_ZERO_DIRECTIVE, cleaned_line_str)
         if line_match is not None and len(line_match.groups()) == 1:
             count_str = line_match.group(1)
+            if len(count_str) == 0:
+                sys.exit(f'ERROR: {line_id} - .zero directive missing length argument')
             if is_string_numeric(count_str):
                 return FillDataLine(
                     line_id, line_str, comment,

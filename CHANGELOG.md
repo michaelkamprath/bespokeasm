@@ -11,11 +11,17 @@ Changes that are planned but not implemented yet:
 * Enable instruction aliases that allow alternative mnemonics for an instruction. For example, allowing `call` and `jsr` to mean the same thing.
 * Allow a label to exist on the same line as an instruction or directive
 * add ability for source code to indicate what ISA version it needs to be compiled to.
-* Improve error checking, notably with diallowed operands or unknown labels.
+* allow directives arguments to be expressions
+* Improve error checking:
+  * Disallowed operands
+  * missing `:` after labels
+  * unknown labels
 
 ## [Unreleased]
 * Added `indirect index register` addressing mode.
 * Fixed a bug in parsing binary numbers assigned to constants
+* Added improved error checking:
+  * Ensures indirect register operands with an offset are properly configured.
 
 ## [0.1.5]
 * added some error checking on the configuration file
