@@ -34,6 +34,9 @@ class DataLine(LineWithBytes):
         if data_match is not None and len(data_match.groups()) == 4:
             directive_str = data_match.group(1).strip()
             if data_match.group(4) is None and data_match.group(2) is not None:
+                # check to ensure this isn't a cstr
+                if directive_str == '.cstr':
+                    sys.exit(f'ERROR: {line_id} - .cstr data directive used with non-string value')
                 # it's numeric
                 values_list = [x.strip() for x in data_match.group(2).strip().split(',') if x.strip() != '']
             elif data_match.group(4) is not None:

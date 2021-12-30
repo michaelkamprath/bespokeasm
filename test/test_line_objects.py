@@ -100,6 +100,9 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(d10.byte_size, 7, 'byte string has 7 bytes')
         self.assertEqual(d10.get_bytes(), bytearray(d10_values), 'character string matches')
 
+        with self.assertRaises(SystemExit, msg='this instruction should fail'):
+            DataLine.factory(42, ' .cstr 0x42', 'bad cstr usage', 'big')
+
     def test_label_line_creation(self):
         register_set = set(['a', 'b', 'sp', 'mar'])
         l1 = LabelLine.factory(13, 'my_label:', 'cool comment', register_set)
