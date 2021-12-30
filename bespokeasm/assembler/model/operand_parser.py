@@ -35,7 +35,10 @@ class OperandSetsModel:
                 self._operand_sets.append(opset)
             else:
                 sys.exit(f'ERROR: instuction set configuration file makes reference to unknow operand set "{k}"')
-
+    def __repr__(self) -> str:
+        return str(self)
+    def __str__(self) -> str:
+        return f'OperandSetsModel<{str(self._operand_sets)}>'
     @property
     def reverse_argument_order(self) -> bool:
         '''Determines whether the order that the instruction's argument values
@@ -204,7 +207,7 @@ class OperandParser:
     def __repr__(self) -> str:
         return str(self)
     def __str__(self) -> str:
-        return f'OperandParser<>'
+        return f'OperandParser<{self._operand_sets_model}, {self._specific_operands_model}>'
 
     def validate(self, instruction: str):
         # check to make sure we as many operands configured as count.

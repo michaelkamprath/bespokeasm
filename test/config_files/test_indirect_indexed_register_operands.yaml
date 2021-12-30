@@ -5,6 +5,7 @@ general:
   endian: little
   registers:
     - a
+    - i
     - h
     - l
     - hl
@@ -18,6 +19,12 @@ operand_sets:
         register: a
         bytecode:
           value: 0
+          size: 3
+      register_i:
+        type: register
+        register: i
+        bytecode:
+          value: 1
           size: 3
       indirect_sp:
         type: indirect_register
@@ -53,6 +60,12 @@ operand_sets:
         register: a
         bytecode:
           value: 0
+          size: 3
+      register_i:
+        type: register
+        register: i
+        bytecode:
+          value: 1
           size: 3
       indirect_sp:
         type: indirect_register
@@ -229,7 +242,7 @@ instructions:
             list:
               - hl_subregisters
               - 8_bit_source
-      # sourced from indrect hl regdsiter with regsiter offsets
+      # sourced from indrect hl register with register offsets
       - byte_code:
           value: 2
           size: 2

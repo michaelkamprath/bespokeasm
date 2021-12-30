@@ -81,6 +81,14 @@ class TestInstructionParsing(unittest.TestCase):
         with pkg_resources.path(config_files, 'test_indirect_indexed_register_operands.yaml') as fp:
             isa_model = AssemblerModel(str(fp), 0)
 
+        ins0 = InstructionLine.factory(22, 'mov a, [hl+i]', 'some comment!', isa_model)
+        ins0.set_start_address(1212)
+        self.assertIsInstance(ins0, InstructionLine)
+        self.assertEqual(ins0.byte_size, 1, 'has 1 bytes')
+        ins0.label_scope = TestInstructionParsing.label_values
+        ins0.generate_bytes()
+        self.assertEqual(list(ins0.get_bytes()), [0x81], 'instruction byte should match')
+
         ins1 = InstructionLine.factory(22, 'mov [$2000], [hl+i]', 'some comment!', isa_model)
         ins1.set_start_address(1212)
         self.assertIsInstance(ins1, InstructionLine)

@@ -57,6 +57,9 @@ class IndirectRegisterOperand(RegisterOperand):
                     # parser expects 2 operands for the + or - sign
                     argument_str = f'0 {match.group(2).strip()} {match.group(3).strip()}'
                     arg_part = ExpressionByteCodePart(argument_str, self.offset_size, self.offset_byte_align, self.offset_endian, line_id)
+                    # now test that is is a numeric expression. If not, return nothing
+                    if arg_part.contains_register_labels(register_labels):
+                        return None, None
                 else:
                     # must have and offset value of 0
                     arg_part = NumericByteCodePart(0, self.offset_size, self.offset_byte_align, self.offset_endian, line_id)
