@@ -44,14 +44,23 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(d4.byte_size, 1, 'data line has 1 bytes')
         self.assertEqual(d4.get_bytes(), bytearray([0x0E]), 'onsie')
 
-        d5_values = [ord(c) for c in 'that\'s a test']
-        d5_values.extend([0])
-        d5 = DataLine.factory(42, ' .byte "that\'s a test"', 'string of bytes', 'big')
+        test_str = 'that\'s a test'
+        d5_values = [ord(c) for c in test_str]
+        d5 = DataLine.factory(42, f' .byte "{test_str}"', 'string of bytes', 'big')
         d5.label_scope = label_values
         d5.generate_bytes()
         self.assertIsInstance(d5, DataLine)
-        self.assertEqual(d5.byte_size, 14, 'character string has 14 bytes')
+        self.assertEqual(d5.byte_size, 13, 'byte string has 13 bytes')
         self.assertEqual(d5.get_bytes(), bytearray(d5_values), 'character string matches')
+
+        d5a_values = [ord(c) for c in test_str]
+        d5a_values.extend([0])
+        d5a = DataLine.factory(42, f' .cstr "{test_str}"', 'string of bytes', 'big')
+        d5a.label_scope = label_values
+        d5a.generate_bytes()
+        self.assertIsInstance(d5a, DataLine)
+        self.assertEqual(d5a.byte_size, 14, 'character string has 14 bytes')
+        self.assertEqual(d5a.get_bytes(), bytearray(d5a_values), 'character string matches')
 
         d6 = DataLine.factory(38, ' .2byte test1, 12', '2 byte label mania', 'little')
         d6.label_scope = label_values
