@@ -90,6 +90,16 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(d9.byte_size, 4, 'data line has 4 bytes')
         self.assertEqual(d9.get_bytes(), bytearray([0xef, 0xcd, 0xab, 0x89]), 'should slice first four bytes')
 
+        #ensure spaces in strings aren't truncated
+        test_str2 = ' space '
+        d10_values = [ord(c) for c in test_str2]
+        d10 = DataLine.factory(42, f' .byte "{test_str2}"', 'string of bytes', 'big')
+        d10.label_scope = label_values
+        d10.generate_bytes()
+        self.assertIsInstance(d10, DataLine)
+        self.assertEqual(d10.byte_size, 7, 'byte string has 7 bytes')
+        self.assertEqual(d10.get_bytes(), bytearray(d10_values), 'character string matches')
+
     def test_label_line_creation(self):
         register_set = set(['a', 'b', 'sp', 'mar'])
         l1 = LabelLine.factory(13, 'my_label:', 'cool comment', register_set)

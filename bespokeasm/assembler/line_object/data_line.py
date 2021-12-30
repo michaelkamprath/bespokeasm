@@ -38,7 +38,7 @@ class DataLine(LineWithBytes):
                 values_list = [x.strip() for x in data_match.group(2).strip().split(',') if x.strip() != '']
             elif data_match.group(4) is not None:
                 # its a string.
-                values_list = [ord(x) for x in data_match.group(4).strip()]
+                values_list = [ord(x) for x in data_match.group(4)]
                 if directive_str == '.cstr':
                     # Add a 0-value at the end of the string values.
                     values_list.extend([0])
