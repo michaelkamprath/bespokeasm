@@ -100,6 +100,16 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(d10.byte_size, 7, 'byte string has 7 bytes')
         self.assertEqual(d10.get_bytes(), bytearray(d10_values), 'character string matches')
 
+        #test escapes in strings
+        d11_values = [0x20, 0x01, 0x20, 0x09, 0x20, 0x0A, 0x00]
+        # must double escape escape sequences here because this is in python
+        d11 = DataLine.factory(38, '.cstr " \\x01 \\t \\n"', 'escape reality', 'big')
+        d11.label_scope = label_values
+        d11.generate_bytes()
+        self.assertIsInstance(d11, DataLine)
+        self.assertEqual(d11.byte_size, 7, 'byte string has 7 bytes')
+        self.assertEqual(d11.get_bytes(), bytearray(d11_values), 'character string matches')
+
         with self.assertRaises(SystemExit, msg='this instruction should fail'):
             DataLine.factory(42, ' .cstr 0x42', 'bad cstr usage', 'big')
 
