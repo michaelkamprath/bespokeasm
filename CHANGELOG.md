@@ -12,7 +12,7 @@ Changes that are planned but not implemented yet:
 * Allow a label to exist on the same line as an instruction or directive
 * add ability for source code to indicate what ISA version it needs to be compiled to.
 * allow directives arguments to be expressions
-* Create a memory block macro that allows the definition of memory blocks at specific addresses without altering the current address for compilation. This would be used for creatin RAM variables from ROM area code. Also used to place a specific block of code at a specific address. Different from `.org` in that there is an end of the block and at that point the address contniues on from what it was before the start of the block. 
+* Create a memory block macro that allows the definition of memory blocks at specific addresses without altering the current address for compilation. This would be used for creatin RAM variables from ROM area code. Also used to place a specific block of code at a specific address. Different from `.org` in that there is an end of the block and at that point the address contniues on from what it was before the start of the block.
 * Improve error checking:
   * Disallowed operands
   * missing `:` after labels
@@ -25,6 +25,7 @@ Changes that are planned but not implemented yet:
 * Made `.byte` and `.cstr` data created by strings honor python-style escape sequences in the strings.
 * Added improved error checking:
   * Ensures indirect register operands with an offset are properly configured.
+  * Ensure that labels do not use directives or key words
 
 ## [0.1.5]
 * added some error checking on the configuration file

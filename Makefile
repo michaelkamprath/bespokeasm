@@ -4,3 +4,5 @@ tests:
 
 clean:
 	find . -name '*.pyc' -delete
+	rm -Rf ./build
+	rm -Rf ./bespokeasm.egg-info

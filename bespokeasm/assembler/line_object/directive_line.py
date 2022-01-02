@@ -16,13 +16,6 @@ from bespokeasm.utilities import parse_numeric_string, is_string_numeric
 
 
 class DirectiveLine:
-    DIRECTIVE_SET = set([
-        '.org', 'org', '.fill', 'fill',
-        '.zero', 'zero', '.zerountil', 'zerountil',
-        '.byte', 'byte', '.2byte', '2byte',
-        '.4byte', '4byte',
-        '#include', 'include',
-    ])
     PATTERN_ORG_DIRECTIVE = re.compile(
         r'^(?:\.org)\s+(\$[0-9a-f]*|0x[0-9a-f]*|b[01]*|\w*)',
         flags=re.IGNORECASE|re.MULTILINE

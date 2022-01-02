@@ -2,6 +2,7 @@ import unittest
 import importlib.resources as pkg_resources
 
 from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType, GlobalLabelScope
+from bespokeasm.assembler.line_identifier import LineIdentifier
 
 class TestLabelScope(unittest.TestCase):
 
@@ -49,13 +50,28 @@ class TestLabelScope(unittest.TestCase):
         self.assertEqual(ls4.get_label_value('_file1', 12), 24, 'file value vailable at other locals')
         self.assertEqual(ls3.get_label_value('_file2', 13), 14, 'file value vailable at other locals')
 
-    def test_register_label_identification(self):
+    def test_illegal_labels(self):
         global_scope = GlobalLabelScope(set(['a', 'b']))
         file_scope = LabelScope(LabelScopeType.FILE, global_scope, 'mycode.py')
         local_scope = LabelScope(LabelScopeType.LOCAL, file_scope, 'my_label')
+        lineid = LineIdentifier(42, 'test_illegal_labels')
 
-        local_scope.set_label_value('var1', 12, 1)
+        local_scope.set_label_value('var1', 12, lineid)
+        self.assertEqual(local_scope.get_label_value('var1', lineid), 12)
 
-        self.assertEqual(local_scope.get_label_value('var1', 100), 12)
+        # keywords as substrings are OK
+        local_scope.set_label_value('zerountilnow', 13, lineid)
+        self.assertEqual(local_scope.get_label_value('zerountilnow', lineid), 13)
+
         with self.assertRaises(SystemExit, msg='register labels cannot have values'):
             local_scope.get_label_value('a', 101)
+
+        with self.assertRaises(SystemExit, msg='labels cannot be system keywords - local'):
+            local_scope.set_label_value('.cstr', 666, lineid)
+        with self.assertRaises(SystemExit, msg='labels cannot be system keywords - file'):
+            file_scope.set_label_value('_cstr', 666, lineid)
+        with self.assertRaises(SystemExit, msg='labels cannot be system keywords - file with local label'):
+            file_scope.set_label_value('.cstr', 666, lineid)
+        with self.assertRaises(SystemExit, msg='labels cannot be system keywords - file with local label'):
+            local_scope.set_label_value('zero', 666, lineid)
+
