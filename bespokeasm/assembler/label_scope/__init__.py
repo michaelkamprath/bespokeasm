@@ -45,6 +45,7 @@ import sys
 import inspect
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.keywords import ASSEMBLER_KEYWORD_SET
 
 class LabelScopeType(enum.Enum):
     GLOBAL = 0
@@ -59,6 +60,15 @@ class LabelScopeType(enum.Enum):
             return LabelScopeType.FILE
         else:
             return LabelScopeType.GLOBAL
+
+    @property
+    def label_prefix(self) -> str:
+        if self == LabelScopeType.LOCAL:
+            return '.'
+        elif self == LabelScopeType.FILE:
+            return '_'
+        else:
+            return ''
 
 class LabelScope:
     class LabelInfo:
@@ -109,6 +119,11 @@ class LabelScope:
 
     def set_label_value(self, label: str, value: int, line_id: LineIdentifier) -> None:
         label_scope = LabelScopeType.get_label_scope(label)
+        # first check to see if label name is a keyword
+        # remove label prefix for checking
+        base_label = label[len(label_scope.label_prefix):]
+        if base_label in ASSEMBLER_KEYWORD_SET:
+            sys.exit(f"ERROR: {line_id} - Label '{label}' is unallowed because it used an assembler keyword '{base_label}'")
         if label_scope.value < self.type.value:
             self.parent.set_label_value(label, value, line_id)
         elif label_scope == self.type:

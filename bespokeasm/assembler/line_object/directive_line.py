@@ -16,13 +16,6 @@ from bespokeasm.utilities import parse_numeric_string, is_string_numeric
 
 
 class DirectiveLine:
-    DIRECTIVE_SET = set([
-        '.org', 'org', '.fill', 'fill',
-        '.zero', 'zero', '.zerountil', 'zerountil',
-        '.byte', 'byte', '.2byte', '2byte',
-        '.4byte', '4byte',
-        '#include', 'include',
-    ])
     PATTERN_ORG_DIRECTIVE = re.compile(
         r'^(?:\.org)\s+(\$[0-9a-f]*|0x[0-9a-f]*|b[01]*|\w*)',
         flags=re.IGNORECASE|re.MULTILINE
@@ -75,6 +68,8 @@ class DirectiveLine:
         line_match = re.search(DirectiveLine.PATTERN_ZERO_DIRECTIVE, cleaned_line_str)
         if line_match is not None and len(line_match.groups()) == 1:
             count_str = line_match.group(1)
+            if len(count_str) == 0:
+                sys.exit(f'ERROR: {line_id} - .zero directive missing length argument')
             if is_string_numeric(count_str):
                 return FillDataLine(
                     line_id, line_str, comment,

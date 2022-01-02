@@ -44,14 +44,23 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(d4.byte_size, 1, 'data line has 1 bytes')
         self.assertEqual(d4.get_bytes(), bytearray([0x0E]), 'onsie')
 
-        d5_values = [ord(c) for c in 'that\'s a test']
-        d5_values.extend([0])
-        d5 = DataLine.factory(42, ' .byte "that\'s a test"', 'string of bytes', 'big')
+        test_str = 'that\'s a test'
+        d5_values = [ord(c) for c in test_str]
+        d5 = DataLine.factory(42, f' .byte "{test_str}"', 'string of bytes', 'big')
         d5.label_scope = label_values
         d5.generate_bytes()
         self.assertIsInstance(d5, DataLine)
-        self.assertEqual(d5.byte_size, 14, 'character string has 14 bytes')
+        self.assertEqual(d5.byte_size, 13, 'byte string has 13 bytes')
         self.assertEqual(d5.get_bytes(), bytearray(d5_values), 'character string matches')
+
+        d5a_values = [ord(c) for c in test_str]
+        d5a_values.extend([0])
+        d5a = DataLine.factory(42, f' .cstr "{test_str}"', 'string of bytes', 'big')
+        d5a.label_scope = label_values
+        d5a.generate_bytes()
+        self.assertIsInstance(d5a, DataLine)
+        self.assertEqual(d5a.byte_size, 14, 'character string has 14 bytes')
+        self.assertEqual(d5a.get_bytes(), bytearray(d5a_values), 'character string matches')
 
         d6 = DataLine.factory(38, ' .2byte test1, 12', '2 byte label mania', 'little')
         d6.label_scope = label_values
@@ -80,6 +89,29 @@ class TestLineObject(unittest.TestCase):
         self.assertIsInstance(d9, DataLine)
         self.assertEqual(d9.byte_size, 4, 'data line has 4 bytes')
         self.assertEqual(d9.get_bytes(), bytearray([0xef, 0xcd, 0xab, 0x89]), 'should slice first four bytes')
+
+        #ensure spaces in strings aren't truncated
+        test_str2 = ' space '
+        d10_values = [ord(c) for c in test_str2]
+        d10 = DataLine.factory(42, f' .byte "{test_str2}"', 'string of bytes', 'big')
+        d10.label_scope = label_values
+        d10.generate_bytes()
+        self.assertIsInstance(d10, DataLine)
+        self.assertEqual(d10.byte_size, 7, 'byte string has 7 bytes')
+        self.assertEqual(d10.get_bytes(), bytearray(d10_values), 'character string matches')
+
+        #test escapes in strings
+        d11_values = [0x20, 0x01, 0x20, 0x09, 0x20, 0x0A, 0x00]
+        # must double escape escape sequences here because this is in python
+        d11 = DataLine.factory(38, '.cstr " \\x01 \\t \\n"', 'escape reality', 'big')
+        d11.label_scope = label_values
+        d11.generate_bytes()
+        self.assertIsInstance(d11, DataLine)
+        self.assertEqual(d11.byte_size, 7, 'byte string has 7 bytes')
+        self.assertEqual(d11.get_bytes(), bytearray(d11_values), 'character string matches')
+
+        with self.assertRaises(SystemExit, msg='this instruction should fail'):
+            DataLine.factory(42, ' .cstr 0x42', 'bad cstr usage', 'big')
 
     def test_label_line_creation(self):
         register_set = set(['a', 'b', 'sp', 'mar'])
