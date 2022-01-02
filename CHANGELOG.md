@@ -18,7 +18,7 @@ Changes that are planned but not implemented yet:
   * missing `:` after labels
   * unknown labels
 
-## [Unreleased]
+## [0.1.6]
 * Added `indirect index register` addressing mode.
 * Fixed a bug in parsing binary numbers assigned to constants
 * Added `.cstr` data type to be a null-terminated `.byte` blob, or a C-style string.
