@@ -1,7 +1,7 @@
 import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.model.operand import Operand
+from bespokeasm.assembler.model.operand.factory import OperandFactory
 from bespokeasm.assembler.byte_code.parts import ByteCodePart
 
 class OperandSet:
@@ -10,7 +10,7 @@ class OperandSet:
         self._config = config_dict
         self._ordered_operand_list = []
         for arg_type_id, arg_type_conf in self._config['operand_values'].items():
-            operand = Operand.factory(arg_type_id, arg_type_conf, default_endian)
+            operand = OperandFactory.factory(arg_type_id, arg_type_conf, default_endian)
             if operand.null_operand:
                 # null operands not supported in operand sets. must use specific operand configuration.
                 sys.exit(f'ERROR: The configuration for operand set "{name}" contains unallowed null operand type named "{arg_type_id}".')

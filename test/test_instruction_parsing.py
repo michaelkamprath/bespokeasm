@@ -4,8 +4,13 @@ import importlib.resources as pkg_resources
 from test import config_files
 
 from bespokeasm.assembler.label_scope import GlobalLabelScope
+from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.line_object import LineObject
+from bespokeasm.assembler.line_object.factory import LineOjectFactory
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
+from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.model import AssemblerModel
+
 
 class TestInstructionParsing(unittest.TestCase):
     label_values = None
@@ -71,3 +76,54 @@ class TestInstructionParsing(unittest.TestCase):
 
         with self.assertRaises(SystemExit, msg='no instruction variant should match here'):
             InstructionLine.factory(22, '  mov 27', 'some comment!', isa_model)
+
+    def test_indirect_indexed_regsiter_operands(self):
+        with pkg_resources.path(config_files, 'test_indirect_indexed_register_operands.yaml') as fp:
+            isa_model = AssemblerModel(str(fp), 0)
+
+        ins0 = InstructionLine.factory(22, 'mov a, [hl+i]', 'some comment!', isa_model)
+        ins0.set_start_address(1212)
+        self.assertIsInstance(ins0, InstructionLine)
+        self.assertEqual(ins0.byte_size, 1, 'has 1 bytes')
+        ins0.label_scope = TestInstructionParsing.label_values
+        ins0.generate_bytes()
+        self.assertEqual(list(ins0.get_bytes()), [0x81], 'instruction byte should match')
+
+        ins1 = InstructionLine.factory(22, 'mov [$2000], [hl+i]', 'some comment!', isa_model)
+        ins1.set_start_address(1212)
+        self.assertIsInstance(ins1, InstructionLine)
+        self.assertEqual(ins1.byte_size, 3, 'has 3 bytes')
+        ins1.label_scope = TestInstructionParsing.label_values
+        ins1.generate_bytes()
+        self.assertEqual(list(ins1.get_bytes()), [0xB1, 0x00, 0x20], 'instruction byte should match')
+
+        ins2 = InstructionLine.factory(22, 'mov [$2000], [hl+[sp+2]]', 'some comment!', isa_model)
+        ins2.set_start_address(1212)
+        self.assertIsInstance(ins2, InstructionLine)
+        self.assertEqual(ins2.byte_size, 4, 'has 4 bytes')
+        ins2.label_scope = TestInstructionParsing.label_values
+        ins2.generate_bytes()
+        self.assertEqual(list(ins2.get_bytes()), [0xB3, 0x00, 0x20, 0x02], 'instruction byte should match')
+
+        ins2 = InstructionLine.factory(22, 'mov [mar + $44], [$8020]', 'some comment!', isa_model)
+        ins2.set_start_address(1212)
+        self.assertIsInstance(ins2, InstructionLine)
+        self.assertEqual(ins2.byte_size, 4, 'has 4 bytes')
+        ins2.label_scope = TestInstructionParsing.label_values
+        ins2.generate_bytes()
+        self.assertEqual(list(ins2.get_bytes()), [0xFE, 0x20, 0x80, 0x44], 'instruction byte should match, operands reversed')
+
+        with self.assertRaises(SystemExit, msg='no instruction  should match here'):
+            bad1 = InstructionLine.factory(22, '  mov a, [sp+i]', 'some comment!', isa_model)
+            bad1.set_start_address(666)
+            bad1.label_scope = TestInstructionParsing.label_values
+            bad1.generate_bytes()
+
+    def test_label_parsing(self):
+        with pkg_resources.path(config_files, 'test_instructions_with_variants.yaml') as fp:
+            isa_model = AssemblerModel(str(fp), 0)
+        lineid = LineIdentifier(42, 'test_label_parsing')
+        l1: LineObject = LineOjectFactory.parse_line(lineid, "LABEL = %00001111", isa_model)
+        self.assertIsInstance(l1, LabelLine)
+        self.assertTrue(l1.is_constant, )
+        self.assertEqual(l1.get_value(), 0x0F, 'value should be right')

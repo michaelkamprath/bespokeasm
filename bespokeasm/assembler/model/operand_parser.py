@@ -2,8 +2,9 @@ import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.byte_code.parts import ByteCodePart
-from bespokeasm.assembler.model.operand_set import OperandSet, OperandSetCollection
+from bespokeasm.assembler.model.operand_set import OperandSetCollection
 from bespokeasm.assembler.model.operand import Operand
+from bespokeasm.assembler.model.operand.factory import OperandFactory
 
 # Operand Parser
 #
@@ -34,7 +35,10 @@ class OperandSetsModel:
                 self._operand_sets.append(opset)
             else:
                 sys.exit(f'ERROR: instuction set configuration file makes reference to unknow operand set "{k}"')
-
+    def __repr__(self) -> str:
+        return str(self)
+    def __str__(self) -> str:
+        return f'OperandSetsModel<{str(self._operand_sets)}>'
     @property
     def reverse_argument_order(self) -> bool:
         '''Determines whether the order that the instruction's argument values
@@ -91,7 +95,7 @@ class SpecificOperandsModel:
         def __init__(self, config: dict, default_endian: str):
             self._config = config
             self._operands = [
-                Operand.factory(arg_type_id, arg_type_conf, default_endian)
+                OperandFactory.factory(arg_type_id, arg_type_conf, default_endian)
                 for arg_type_id, arg_type_conf in self._config.get('list', {}).items()
             ]
 
@@ -203,7 +207,7 @@ class OperandParser:
     def __repr__(self) -> str:
         return str(self)
     def __str__(self) -> str:
-        return f'OperandParser<>'
+        return f'OperandParser<{self._operand_sets_model}, {self._specific_operands_model}>'
 
     def validate(self, instruction: str):
         # check to make sure we as many operands configured as count.

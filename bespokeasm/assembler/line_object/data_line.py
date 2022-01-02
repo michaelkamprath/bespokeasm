@@ -7,7 +7,7 @@ from bespokeasm.utilities import parse_numeric_string, is_string_numeric
 
 class DataLine(LineWithBytes):
     PATTERN_DATA_DIRECTIVE = re.compile(
-        r'^(\.byte|\.2byte|\.4byte)\s*(?:([\w,$\%\s]+)|(?P<quote>[\"\']{1})((?:\\(?P=quote)|.)*)(?P=quote))',
+        r'^(\.byte|\.2byte|\.4byte|\.cstr)\s*(?:([\w,$\%\s]+)|(?P<quote>[\"\']{1})((?:\\(?P=quote)|.)*)(?P=quote))',
         flags=re.IGNORECASE|re.MULTILINE
     )
 
@@ -15,12 +15,14 @@ class DataLine(LineWithBytes):
         '.byte': 1,
         '.2byte': 2,
         '.4byte': 4,
+        '.cstr': 1,
     }
 
     DIRECTIVE_VALUE_MASK = {
         '.byte': 0xFF,
         '.2byte': 0xFFFF,
         '.4byte': 0xFFFFFFFF,
+        '.cstr': 0xFF,
     }
     def factory(line_id: LineIdentifier, line_str: str, comment: str, endian: str) -> LineWithBytes:
         """Tries to match the passed line string to the data directive pattern.
@@ -30,21 +32,28 @@ class DataLine(LineWithBytes):
         data_match = re.search(DataLine.PATTERN_DATA_DIRECTIVE, line_str.strip())
         # deterine if this is a string or numeric list
         if data_match is not None and len(data_match.groups()) == 4:
+            directive_str = data_match.group(1).strip()
             if data_match.group(4) is None and data_match.group(2) is not None:
+                # check to ensure this isn't a cstr
+                if directive_str == '.cstr':
+                    sys.exit(f'ERROR: {line_id} - .cstr data directive used with non-string value')
                 # it's numeric
                 values_list = [x.strip() for x in data_match.group(2).strip().split(',') if x.strip() != '']
             elif data_match.group(4) is not None:
                 # its a string.
-                values_list = [ord(x) for x in data_match.group(4).strip()]
-                # Add a 0-value at the end of the string values.
-                values_list.extend([0])
+                # first, convert escapes
+                converted_str = bytes(data_match.group(4), "utf-8").decode("unicode_escape")
+                values_list = [ord(x) for x in list(converted_str)]
+                if directive_str == '.cstr':
+                    # Add a 0-value at the end of the string values.
+                    values_list.extend([0])
             else:
                 # don't know what this is
                 return None
 
             return DataLine(
                 line_id,
-                data_match.group(1).strip(),
+                directive_str,
                 values_list,
                 line_str,
                 comment,

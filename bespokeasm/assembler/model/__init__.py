@@ -5,9 +5,10 @@ import yaml
 from bespokeasm import BESPOKEASM_VERSION_STR, BESPOKEASM_MIN_REQUIRED_STR
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.byte_code.assembled import AssembledInstruction
+from bespokeasm.assembler.keywords import ASSEMBLER_KEYWORD_SET
 from bespokeasm.assembler.model.instruction_set import InstructionSet
 from bespokeasm.assembler.model.operand_set import OperandSet, OperandSetCollection
-from bespokeasm.assembler.line_object.directive_line import DirectiveLine
+
 class AssemblerModel:
     def __init__(self, config_file_path: str, is_verbose: int):
         if config_file_path.endswith('.json'):
@@ -35,8 +36,10 @@ class AssemblerModel:
 
         registers = self._config['general'].get('registers', [])
         self._registers = set(registers if registers is not None else [])
-        if len(self._registers.intersection(DirectiveLine.DIRECTIVE_SET)) > 0:
-            sys.exit(f'ERROR: the instruction set configuration file specified unallowed register names: {self._registers.intersection(DirectiveLine.DIRECTIVE_SET)}')
+        # check to see if any registers named with a keyword
+        for reg in self._registers:
+            if reg in ASSEMBLER_KEYWORD_SET:
+                sys.exit(f'ERROR: the instruction set configuration file specified an unallowed register name: {reg}')
         self._operand_sets = OperandSetCollection(self._config['operand_sets'], self.endian)
         self._instructions = InstructionSet(self._config['instructions'], self._operand_sets, self.endian)
 

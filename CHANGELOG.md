@@ -11,9 +11,21 @@ Changes that are planned but not implemented yet:
 * Enable instruction aliases that allow alternative mnemonics for an instruction. For example, allowing `call` and `jsr` to mean the same thing.
 * Allow a label to exist on the same line as an instruction or directive
 * add ability for source code to indicate what ISA version it needs to be compiled to.
-* Improve error checking, notably with diallowed operands or unknown labels.
+* allow directives arguments to be expressions
+* Create a memory block macro that allows the definition of memory blocks at specific addresses without altering the current address for compilation. This would be used for creatin RAM variables from ROM area code. Also used to place a specific block of code at a specific address. Different from `.org` in that there is an end of the block and at that point the address contniues on from what it was before the start of the block.
+* Improve error checking:
+  * Disallowed operands
+  * missing `:` after labels
+  * unknown labels
 
 ## [Unreleased]
+* Added `indirect index register` addressing mode.
+* Fixed a bug in parsing binary numbers assigned to constants
+* Added `.cstr` data type to be a null-terminated `.byte` blob, or a C-style string.
+* Made `.byte` and `.cstr` data created by strings honor python-style escape sequences in the strings.
+* Added improved error checking:
+  * Ensures indirect register operands with an offset are properly configured.
+  * Ensure that labels do not use directives or key words
 
 ## [0.1.5]
 * added some error checking on the configuration file
@@ -27,6 +39,6 @@ First tracked released
 * Enabled the `reverse_argument_order` instruction option be applied to a specific operand configuration. This slightly changed the configuration file format.
 * Added ability for instructions with operands to have a single "empty operand" variant, e.g., `pop`
 
-[Unreleased]: https://github.com/michaelkamprath/bespokeasm/v0.1.5...HEAD
-[0.1.6]: https://github.com/michaelkamprath/bespokeasm/v0.1.6...v0.1.5
-[0.1.5]: https://github.com/michaelkamprath/bespokeasm/v0.1.5...v0.1.4
+[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.5...HEAD
+[0.1.6]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.6...v0.1.5
+[0.1.5]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.5...v0.1.4
