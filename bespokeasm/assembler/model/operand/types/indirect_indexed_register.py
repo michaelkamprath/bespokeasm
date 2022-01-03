@@ -27,7 +27,7 @@ class IndirectIndexedRegisterOperand(RegisterOperand):
         op_bytecode_size = self._index_operand_list[0].bytecode_size
         for op in self._index_operand_list[1:]:
             if op.bytecode_size != op_bytecode_size:
-                sys.exit(f'ERROR - note all index operands confirded with same byte code size for operand "{operand_id}"')
+                sys.exit(f'ERROR - not all index operands confirded with same byte code size for operand "{operand_id}"')
 
         # Operands are sorted according to matching precedence order, which is set
         # by the enum value of the types. This allows matching to consider an operand
