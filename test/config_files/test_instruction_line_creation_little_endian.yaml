@@ -2,6 +2,9 @@
 general :
   address_size: 16
   endian: little
+  identifier:
+    name: bespokeasm-test
+    version: "0.3.0"
 registers:
 operand_sets:
   2byte_value:

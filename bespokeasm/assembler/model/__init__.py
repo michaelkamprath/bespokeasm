@@ -1,4 +1,6 @@
 import json
+import os
+import re
 import sys
 import yaml
 
@@ -33,7 +35,25 @@ class AssemblerModel:
                 sys.exit(f'ERROR: the instruction set configuration file requires at least BespokeASM version {required_version}')
             if required_version < BESPOKEASM_MIN_REQUIRED_STR:
                 sys.exit(f'ERROR: this version of BespokeASM requires a configuration file that minimally requires BespokeASM version {BESPOKEASM_MIN_REQUIRED_STR}')
-
+        # load ISA version information
+        config_file_name = os.path.splitext(os.path.basename(config_file_path))[0]
+        if 'identifier' in self._config['general']:
+            self._isa_name = self._config['general']['identifier'].get('name', config_file_name)
+            self._isa_version = str(self._config['general']['identifier'].get('version', '0.0.1')).strip()
+            # enforce semantic versioning
+            version_match = re.match(
+                r'^([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+)?$',
+                self._isa_version,
+                flags=re.IGNORECASE,
+            )
+            if version_match is None:
+                sys.exit(f'ERROR - provide ISA version "{self._isa_version}" is not in semantic versioning format. See https://semver.org for details.')
+        else:
+            self._isa_name = config_file_name
+            self._isa_version = '0.0.1'
+        self._isa_name = self._isa_name.strip().replace(' ', '_')
+        self._isa_version = self._isa_version.strip()
+        # set up registers
         registers = self._config['general'].get('registers', [])
         self._registers = set(registers if registers is not None else [])
         # check to see if any registers named with a keyword
@@ -52,6 +72,12 @@ class AssemblerModel:
         else:
             return 'AssemblerModel(*Undefined*)'
 
+    @property
+    def isa_name(self) -> str:
+        return self._isa_name
+    @property
+    def isa_version(self) -> str:
+        return self._isa_version
     @property
     def endian(self) -> str:
         if 'endian' in self._config['general']:

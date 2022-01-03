@@ -1,0 +1,25 @@
+{
+    "name": "putey-assembly",
+    "version": "0.0.1",
+    "engines": {
+        "vscode": ">=0.9.0-pre.1"
+    },
+    "publisher": "bespokeasm",
+    "contributes": {
+        "languages": [{
+            "id": "putey1-assembly",
+            "extensions": [".asm"],
+            "configuration": "./language-configuration.json"
+        }],
+        "grammars": [{
+            "language": "putey1-assembly",
+            "scopeName": "source.asm",
+            "path": "./syntaxes/tmGrammar.json"
+        }],
+        "snippets": [{
+            "language": "putey1-assembly",
+            "path": "./snippets.json"
+        }]
+    },
+    "categories": ["Snippets"]
+}

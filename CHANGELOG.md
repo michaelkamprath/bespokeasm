@@ -18,6 +18,9 @@ Changes that are planned but not implemented yet:
   * missing `:` after labels
   * unknown labels
 
+## [0.1.7]
+* Added ability to generate a language extension with syntax highlighting for Visual Code Studio
+
 ## [0.1.6]
 * Added `indirect index register` addressing mode.
 * Fixed a bug in parsing binary numbers assigned to constants
@@ -39,6 +42,7 @@ First tracked released
 * Enabled the `reverse_argument_order` instruction option be applied to a specific operand configuration. This slightly changed the configuration file format.
 * Added ability for instructions with operands to have a single "empty operand" variant, e.g., `pop`
 
-[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.5...HEAD
+[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.7...HEAD
+[0.1.7]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.7...v0.1.6
 [0.1.6]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.6...v0.1.5
 [0.1.5]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.5...v0.1.4

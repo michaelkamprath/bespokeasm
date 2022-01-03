@@ -4,6 +4,7 @@ import sys
 
 from bespokeasm import BESPOKEASM_VERSION_STR
 from bespokeasm.assembler import Assembler
+from bespokeasm.configgen.vscode import VSCodeConfigGenerator
 
 @click.group()
 @click.version_option(BESPOKEASM_VERSION_STR)
@@ -11,7 +12,7 @@ def main():
     """A Bespoke ISA Assembler"""
     pass
 
-@main.command()
+@main.command(short_help='compile an assembly file into bytecode')
 @click.argument('asm_file')
 @click.option('--config-file', '-c', required=True, help='The filepath to the instruction set configuration file,')
 @click.option('--output-file', '-o', help='The filepath to where the binary image will be written. Defaults to the input file name with a *.bin extension.')
@@ -41,6 +42,24 @@ def compile(asm_file, config_file, output_file, binary_min_address, binary_max_a
         include_path,
     )
     asm.assemble_bytecode()
+
+@main.group(short_help='generate a language syntax highlighting extension')
+def generate_extension():
+    pass
+
+
+@generate_extension.command(short_help='generate for VisualStudio Code')
+@click.option('--config-file', '-c', required=True, help='The filepath to the instruction set configuration file,')
+@click.option('--verbose', '-v', count=True, help='Verbosity of logging')
+@click.option('--vscode-config-dir', '-d', default='~/.vscode/', help="The file path the Visual Studo Code configuration directory containing the extensions directory.")
+@click.option('--language-name', '-l', help="The name of the language in the Visual Studio Code configuration file. Defaults to value provide in instruction set configuration file.")
+@click.option('--language-version', '-k', help="The version of the language in the Visual Studio Code configuration file. Defaults to value provide in instruction set configuration file.")
+@click.option('--code-extension', '-x', default='asm', help="The file extension for aassembly code files for this languuage configuraton.")
+def vscode(config_file, verbose, vscode_config_dir, language_name, language_version, code_extension):
+    config_file = os.path.abspath(os.path.expanduser(config_file))
+    vscode_config_dir = os.path.abspath(os.path.expanduser(vscode_config_dir))
+    generator = VSCodeConfigGenerator(config_file, verbose, vscode_config_dir, language_name, language_version, code_extension)
+    generator.generate()
 
 if __name__ == '__main__':
     args = sys.argv

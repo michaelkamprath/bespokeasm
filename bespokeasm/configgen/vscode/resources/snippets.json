@@ -1,0 +1,7 @@
+{
+    "cstr": {
+        "prefix": [".cstr", "cstr"],
+        "body": [".cstr \"$1\""],
+        "description": "A null-terminated string"
+    }
+}
