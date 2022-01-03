@@ -2,6 +2,9 @@ description: Eater SAP-1 ISA
 general:
   min_version: 0.1.4
   address_size: 4
+  identifier:
+    name: eater-sap1
+    version: "1.0.0"
 operand_sets:
   integer:
     operand_values:
