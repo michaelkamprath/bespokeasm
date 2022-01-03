@@ -11,6 +11,9 @@ general:
     - hl
     - sp
     - mar
+  identifier:
+    name: tester-assembly
+    version: "0.3.0"
 operand_sets:
   8_bit_source:
     operand_values:
