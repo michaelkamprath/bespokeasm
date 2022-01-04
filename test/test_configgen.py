@@ -40,6 +40,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         with open(package_fp, 'r') as json_file:
             package_json = json.load(json_file)
         self.assertEqual(package_json['name'], 'bespokeasm-test', 'package name should be modified ISA name')
+        self.assertEqual(package_json['displayName'], 'Little Endian Line Creation', 'display name should be correct')
         self.assertEqual(package_json['contributes']['languages'][0]['id'], 'bespokeasm-test-assembly', 'language ID should be modified ISA name')
         self.assertEqual(package_json['contributes']['languages'][0]['extensions'], ['.asmtest'], 'file extension list should match')
         self.assertEqual(package_json['contributes']['grammars'][0]['language'], 'bespokeasm-test-assembly', 'language ID should be modified ISA name')

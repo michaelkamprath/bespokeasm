@@ -12,6 +12,8 @@ from bespokeasm.assembler.model.instruction_set import InstructionSet
 from bespokeasm.assembler.model.operand_set import OperandSet, OperandSetCollection
 
 class AssemblerModel:
+    _config: dict
+
     def __init__(self, config_file_path: str, is_verbose: int):
         if config_file_path.endswith('.json'):
             with open(config_file_path, 'r') as json_file:
@@ -72,6 +74,9 @@ class AssemblerModel:
         else:
             return 'AssemblerModel(*Undefined*)'
 
+    @property
+    def description(self) -> str:
+        return self._config.get('description', 'BespokeASM Assembly')
     @property
     def isa_name(self) -> str:
         return self._isa_name

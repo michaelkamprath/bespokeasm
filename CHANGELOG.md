@@ -18,6 +18,9 @@ Changes that are planned but not implemented yet:
   * missing `:` after labels
   * unknown labels
 
+## [Unreleased]
+* Minor improvements to Visual Studio Code language extension generation
+
 ## [0.1.7]
 * Added ability to generate a language extension with syntax highlighting for Visual Code Studio
 

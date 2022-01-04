@@ -20,8 +20,8 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
         ) -> None:
         super().__init__(config_file_path, is_verbose)
         self._vscode_config_dir = vscode_config_dir
-        self._language_name = self.model.isa_name
-        self._language_version = self.model.isa_version
+        self._language_name = self.model.isa_name if language_name is None else language_name
+        self._language_version = self.model.isa_version if language_version is None else language_version
         self._code_extension = code_extension
 
     @property
@@ -54,6 +54,7 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
                 package_json = json.load(json_file)
 
         package_json['name'] = self.language_name
+        package_json['displayName'] = self.model.description
         package_json['version'] = self.language_version
         package_json['contributes']['languages'][0]['id'] = language_id
         package_json['contributes']['languages'][0]['extensions'] = ['.'+self.code_extension]

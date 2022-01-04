@@ -1,4 +1,5 @@
 
+description: Little Endian Line Creation
 general :
   address_size: 16
   endian: little
