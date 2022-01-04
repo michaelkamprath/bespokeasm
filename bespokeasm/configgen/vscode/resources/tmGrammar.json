@@ -29,7 +29,7 @@
             "match": "((?:\\.|_|\\w){1}[\\w\\d_]*)(\\:)",
             "captures": {
                 "1": { "name": "variable.other.label" },
-                "2": { "name": "punctuation.separator" }
+                "2": { "name": "punctuation.separator.colon.label" }
             }
         },
         "constants": {
