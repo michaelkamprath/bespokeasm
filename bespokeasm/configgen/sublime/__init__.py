@@ -108,14 +108,14 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         updated_file_txt = '%YAML 1.2\n---\n' + file_txt
         with open(syntax_fp, "w") as f:
             f.write(updated_file_txt)
-            if self.verbose > 2:
+            if self.verbose > 1:
                 print(f'  generated {os.path.basename(syntax_fp)}')
 
         # copy color files over
         color_scheme_fp = os.path.join(destination_dir, self.language_name + '.sublime-color-scheme')
         with pkg_resources.path(resources, 'sublime-color-scheme.json') as fp:
             shutil.copy(str(fp), color_scheme_fp)
-            if self.verbose > 2:
+            if self.verbose > 1:
                 print(f'  generated {os.path.basename(color_scheme_fp)}')
 
         # copy all snippet files
@@ -126,5 +126,5 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
                     snippet_name = filename.partition('.')[0]
                     snippet_fp = os.path.join(destination_dir, self.language_name + '__' + snippet_name + '.sublime-snippet')
                     shutil.copy(fp, snippet_fp)
-                    if self.verbose > 2:
+                    if self.verbose > 1:
                         print(f'  generated {os.path.basename(snippet_fp)}')
