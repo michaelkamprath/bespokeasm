@@ -1,0 +1,126 @@
+%YAML 1.2
+---
+file_extensions:
+  - ##FILEEXTENSION##
+scope: source.bespokeasm
+verson: 2
+
+contexts:
+  main:
+    - include: indirect_addressing
+    - include: strings
+    - include: directives
+    - include: instructions
+    - include: registers
+    - match: ^\s*(\w*)(?:\s*)?(\=)
+      captures:
+        1: variable.other.constant
+        2: keyword.operator.assignment
+    - match: ((?:\.|_|\w){1}[\w\d_]*)(\:)
+      captures:
+        1: variable.other.label
+        2: punctuation.definition.variable.colon.label
+    - match: \;
+      scope: punctuation.definition.comment
+      push: line_comment
+    - include: numerical_expressions
+
+  instructions:
+    - match: \b(?:##INSTRUCTIONS##)\b
+      scope: variable.function.instruction
+      push:
+        - meta_scope: meta.function
+        - include: registers
+        - include: indirect_addressing
+        - include: numerical_expressions
+        - include: operands_variables
+        - match: \,
+          scope: punctuation.separator
+        - match: (?=(?:\s*\;|\s*$))
+          pop: true
+
+  operands_variables:
+    - match: (?<!\w)((?:\.|_|\w){1}[\w\d_]*)\b
+      scope: variable.parameter.instruction
+
+  registers:
+    - match: \b(?:##REGISTERS##)\b
+      scope: variable.language.register
+
+  strings:
+    - match: "(\"|')"
+      scope: punctuation.definition.string.begin
+      push:
+        - meta_scope: string.quoted
+        - match: \1
+          scope: punctuation.definition.string.end
+          pop: true
+
+  numbers:
+    - match: (?<!\w)(?:\$[0-9a-fA-F]+|0x[0-9a-fA-F]+)\b
+      scope: constant.numeric.integer.hexadecimal
+    - match: (?<!\w)(?:(?:b|%)[01]+)\b
+      scope: constant.numeric.integer.binary
+    - match: (?<!\w)(?:\d+)\b
+      scope: constant.numeric.integer.decimal
+
+  numerical_expressions:
+    - include: numbers
+    - include: operands_variables
+    - match: "[\\+\\-\\*\\/]{1}"
+      scope: keyword.operator.arithmetic
+    - match: "[\\&\\|\\^]{1}"
+      scope: keyword.operator.logical
+    - match: \(
+      scope: punctuation.section.parens.begin
+      push:
+        - meta_scope: expression.group
+        - include: numerical_expressions
+        - match: \)
+          scope: punctuation.section.parens.end
+          pop: true
+
+  indirect_addressing:
+    - match: '\['
+      scope: punctuation.section.brackets.begin
+      push:
+        - meta_scope: expression.indirect_addressing
+        - include: indirect_addressing
+        - include: registers
+        - include: numerical_expressions
+        - include: operands_variables
+        - match: '\]'
+          scope: punctuation.section.brackets.end
+          pop: true
+
+  line_comment:
+      - meta_scope: comment.line.semicolon
+      - match: $
+        pop: true
+
+  compiler_directives:
+    - match: (?<!\w)(?:##DIRECTIVES##)\b
+      scope: keyword.other.directive
+
+  data_types_directives:
+    - match: (?<!\w)(?:##DATATYPES##)\b
+      scope: storage.type
+
+  preprocessor_directives:
+    - match: '^\#'
+      scope: punctuation.definition.preprocessor
+      push:
+        - meta_scope: meta.preprocessor
+        - include: strings
+        - match: (?<=\#)(?:##PREPROCESSOR##)
+          scope: keyword.control.import.include
+        - match: (?=(?:\s*\;|\s*$))
+          pop: true
+
+  directives:
+    - include: compiler_directives
+    - include: data_types_directives
+    - include: preprocessor_directives
+
+
+

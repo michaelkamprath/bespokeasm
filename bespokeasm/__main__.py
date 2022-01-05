@@ -5,6 +5,7 @@ import sys
 from bespokeasm import BESPOKEASM_VERSION_STR
 from bespokeasm.assembler import Assembler
 from bespokeasm.configgen.vscode import VSCodeConfigGenerator
+from bespokeasm.configgen.sublime import SublimeConfigGenerator
 
 @click.group()
 @click.version_option(BESPOKEASM_VERSION_STR)
@@ -54,11 +55,24 @@ def generate_extension():
 @click.option('--vscode-config-dir', '-d', default='~/.vscode/', help="The file path the Visual Studo Code configuration directory containing the extensions directory.")
 @click.option('--language-name', '-l', help="The name of the language in the Visual Studio Code configuration file. Defaults to value provide in instruction set configuration file.")
 @click.option('--language-version', '-k', help="The version of the language in the Visual Studio Code configuration file. Defaults to value provide in instruction set configuration file.")
-@click.option('--code-extension', '-x', default='asm', help="The file extension for aassembly code files for this languuage configuraton.")
+@click.option('--code-extension', '-x', default='asm', help="The file extension for asssembly code files for this language configuraton.")
 def vscode(config_file, verbose, vscode_config_dir, language_name, language_version, code_extension):
     config_file = os.path.abspath(os.path.expanduser(config_file))
     vscode_config_dir = os.path.abspath(os.path.expanduser(vscode_config_dir))
     generator = VSCodeConfigGenerator(config_file, verbose, vscode_config_dir, language_name, language_version, code_extension)
+    generator.generate()
+
+@generate_extension.command(short_help='generate for Sublime text editor')
+@click.option('--config-file', '-c', required=True, help='The filepath to the instruction set configuration file,')
+@click.option('--verbose', '-v', count=True, help='Verbosity of logging')
+@click.option('--save-config-dir', '-d', default='~/', help="The directory into which the generated configuration file should be saved.")
+@click.option('--language-name', '-l', help="The name of the language in the Sublime configuration file. Defaults to value provide in instruction set configuration file.")
+@click.option('--language-version', '-k', help="The version of the language in the Sublime configuration file. Defaults to value provide in instruction set configuration file.")
+@click.option('--code-extension', '-x', default='asm', help="The file extension for asssembly code files for this language configuraton.")
+def sublime(config_file, verbose, save_config_dir, language_name, language_version, code_extension):
+    config_file = os.path.abspath(os.path.expanduser(config_file))
+    save_config_dir = os.path.abspath(os.path.expanduser(save_config_dir))
+    generator = SublimeConfigGenerator(config_file, verbose, save_config_dir, language_name, language_version, code_extension)
     generator.generate()
 
 if __name__ == '__main__':

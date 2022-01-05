@@ -1,0 +1,6 @@
+<snippet>
+    <content><![CDATA[#include "$1"]]></content>
+    <tabTrigger>&#35;include</tabTrigger>
+    <scope>source.bespokeasm</scope>
+    <description>Include another source file</description>
+</snippet>

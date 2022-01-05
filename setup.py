@@ -24,7 +24,7 @@ setup (
     description = 'A customizable byte code assembler that allows for the definition of custom instruction set architecture',
     version = BESPOKEASM_VERSION_STR,
     packages = find_packages(), # list of all packages
-    package_data={'': ['*.json']},
+    package_data={'': ['*.json', '*.yaml', '*.xml']},
     install_requires = install_requires,
     python_requires='>=3.9',
     entry_points='''
