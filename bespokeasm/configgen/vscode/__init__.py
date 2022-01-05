@@ -7,6 +7,7 @@ import shutil
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.configgen import LanguageConfigGenerator
 import bespokeasm.configgen.vscode.resources as resources
+from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET, BYTECODE_DIRECTIVES_SET, PREPROCESSOR_DIRECTIVES_SET
 
 class VSCodeConfigGenerator(LanguageConfigGenerator):
     def __init__(
@@ -63,17 +64,17 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
         package_fp = os.path.join(extension_dir_path, 'package.json')
         with open(package_fp, 'w', encoding='utf-8') as f:
             json.dump(package_json, f, ensure_ascii=False, indent=4)
-        if self.verbose > 2:
-            print(f'package.json = {json.dumps(package_json, indent=4)}')
+            if self.verbose > 1:
+                print(f'  generated package.json')
 
         # generate tmGrammar.json
         with pkg_resources.path(resources, 'tmGrammar.json') as fp:
             with open(fp, 'r') as json_file:
                 grammar_json = json.load(json_file)
 
-        instructions_str: str = grammar_json['repository']['instructions']['match']
+        instructions_str: str = grammar_json['repository']['instructions']['begin']
         instructions_regex = '|'.join(self.model.instruction_mnemonics)
-        grammar_json['repository']['instructions']['match'] = instructions_str.replace('##INSTRUCTIONS##', instructions_regex)
+        grammar_json['repository']['instructions']['begin'] = instructions_str.replace('##INSTRUCTIONS##', instructions_regex)
         if len(self.model.registers) > 0:
             # update the registers syntax
             registers_str: str = grammar_json['repository']['registers']['match']
@@ -82,25 +83,37 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
         else:
             # remove the registers syntax
             del grammar_json['repository']['registers']
+        for item in grammar_json['repository']['directives']['patterns']:
+            if 'keyword.other.directive' == item['name']:
+                directives_regex = '|'.join(['\.'+d for d in COMPILER_DIRECTIVES_SET])
+                directives_str = item['match']
+                item['match'] =  directives_str.replace('##DIRECTIVES##', directives_regex)
+            elif 'storage.type' == item['name']:
+                datatypes_regex = '|'.join(['\.'+d for d in BYTECODE_DIRECTIVES_SET])
+                datatypes_str = item['match']
+                item['match'] =  datatypes_str.replace('##DATATYPES##', datatypes_regex)
+            elif 'meta.preprocessor' == item['name']:
+                for pattern in item['patterns']:
+                    if 'name' in pattern and 'keyword.control.import.include' == pattern['name']:
+                        preprocessor_regex = '|'.join(PREPROCESSOR_DIRECTIVES_SET)
+                        preprocesspr_str = pattern['match']
+                        pattern['match'] = preprocesspr_str.replace('##PREPROCESSOR##', preprocessor_regex)
+
         tmGrammar_fp = os.path.join(extension_dir_path, 'syntaxes', 'tmGrammar.json')
         with open(tmGrammar_fp, 'w', encoding='utf-8') as f:
             json.dump(grammar_json, f, ensure_ascii=False, indent=4)
-        if self.verbose > 2:
-            print(f'\ntmGrammar.json = {json.dumps(grammar_json, indent=4)}')
+            if self.verbose > 1:
+                print(f'  generated {os.path.basename(tmGrammar_fp)}')
 
         # copy snippets.json and lanaguage-configuration.json, nothing to modify
         with pkg_resources.path(resources, 'snippets.json') as fp:
             shutil.copy(str(fp), extension_dir_path)
-            if self.verbose > 2:
-                with open(fp, 'r') as json_file:
-                    json_obj = json.load(json_file)
-                    print(f'\nsnippets.json = {json.dumps(json_obj, indent=4)}')
+            if self.verbose > 1:
+                print(f'  generated {os.path.basename(str(fp))}')
 
         with pkg_resources.path(resources, 'language-configuration.json') as fp:
             shutil.copy(str(fp), extension_dir_path)
-            if self.verbose > 2:
-                with open(fp, 'r') as json_file:
-                    json_obj = json.load(json_file)
-                    print(f'\nlanguage-configuration.json = {json.dumps(json_obj, indent=4)}')
+            if self.verbose > 1:
+                print(f'  generated {os.path.basename(str(fp))}')
 
 

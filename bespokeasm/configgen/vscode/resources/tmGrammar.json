@@ -1,8 +1,8 @@
 {
     "scopeName": "source.asm",
-    "patterns": [{ "include": "#expression" }],
+    "patterns": [{ "include": "#main" }],
     "repository": {
-        "expression": {
+        "main": {
             "patterns": [
                 { "include": "#instructions" },
                 { "include": "#registers" },
@@ -18,8 +18,26 @@
             ]
         },
         "instructions": {
-            "name": "entity.name.function.instruction",
-            "match": "\\b(?:##INSTRUCTIONS##)\\b"
+            "name": "meta.function",
+            "patterns": [
+                { "include": "#registers" },
+                { "include": "#expressions" },
+                { "include": "#indirect-addressing" },
+                { "include": "#operands_variables" },
+                {
+                    "name": "punctuation.separator",
+                    "match": "\\,"
+                }
+            ],
+            "begin": "\\b(##INSTRUCTIONS##)\\b",
+            "end": "(?=(?:\\s*\\;|\\s*$))",
+            "beginCaptures": {
+                "0": { "name": "variable.function.instruction" }
+            }
+        },
+        "operands_variables": {
+            "name": "variable.parameter.instruction",
+            "match": "(?<!\\w)((?:\\.|_|\\w){1}[\\w\\d_]*)\\b"
         },
         "registers": {
             "name": "variable.language.register",
@@ -29,7 +47,7 @@
             "match": "((?:\\.|_|\\w){1}[\\w\\d_]*)(\\:)",
             "captures": {
                 "1": { "name": "variable.other.label" },
-                "2": { "name": "punctuation.separator.colon.label" }
+                "2": { "name": "punctuation.definition.variable.colon.label" }
             }
         },
         "constants": {
@@ -61,11 +79,11 @@
             "patterns": [
                 {
                     "name": "keyword.operator.arithmetic",
-                    "match": "\\b[\\+\\-\\*\\/]{1}\\b"
+                    "match": "[\\+\\-\\*\\/]{1}"
                 },
                 {
                     "name": "keyword.operator.logical",
-                    "match": "\\b[\\&\\|\\^]{1}\\b"
+                    "match": "[\\&\\|\\^]{1}"
                 }
             ]
         },
@@ -73,6 +91,7 @@
             "name": "meta.parens",
              "patterns": [
                 { "include": "#numeric-values" },
+                { "include": "operands_variables" },
                 { "include": "#operators" }
             ],
             "begin": "\\(",
@@ -108,31 +127,25 @@
             "patterns": [
                 {
                     "name": "keyword.other.directive",
-                    "match": "\\.org|\\.fill|\\.zero|\\.zerountil"
+                    "match": "(?<!\\w)(?:##DIRECTIVES##)\\b"
                 },
                 {
                     "name": "storage.type",
-                    "match": "\\.byte|\\.2byte|\\.4byte|\\.cstr"
+                    "match": "(?<!\\w)(?:##DATATYPES##)\\b"
                 },
                 {
-                    "begin": "^\\s*[#]\\s*(include)\\b\\s+",
+                    "begin": "^(\\#)",
                     "beginCaptures": {
-                        "1": { "name": "keyword.control.import.include" }
+                        "1": { "name": "punctuation.definition.preprocessor" }
                     },
-                    "end": "(?=(?://|/\\*))|$",
+                    "end": "(?=(?:\\s*\\;|\\s*$))",
                     "name": "meta.preprocessor",
                     "patterns": [
                         {
-                            "name": "string.quoted.double.include",
-                            "begin": "\\\"",
-                            "beginCaptures": {
-                                "0": { "name": "punctuation.definition.string.begin" }
-                            },
-                            "end": "\\\"",
-                            "endCaptures": {
-                                "0": { "name": "punctuation.definition.string.end" }
-                            }
-                        }
+                            "name": "keyword.control.import.include",
+                            "match": "(?<=\\#)(?:##PREPROCESSOR##)"
+                        },
+                        { "include": "#strings" }
                     ]
                 }
             ]

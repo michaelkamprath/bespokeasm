@@ -20,7 +20,7 @@ class TestConfigurationGeneration(unittest.TestCase):
             raise AssertionError("File does not exist: %s" % str(path))
 
     def _assert_grouped_item_list(self, item_str: str, target_list: list[str], test_name: str) -> None:
-        match = re.search(r'\(\?\:(.*)\)', item_str, re.IGNORECASE)
+        match = re.search(r'^.*(?<=[\w\)])\((?:\?\:)?(.*)\)', item_str, re.IGNORECASE)
         self.assertIsNotNone(match, f'{test_name} match should be found')
         match_list = set(match.group(1).split('|'))
         self.assertSetEqual(match_list, set(target_list), f'all items fop {test_name} should be found')
@@ -60,7 +60,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         with open(grammar_fp, 'r') as json_file:
             grammar_json = json.load(json_file)
         self._assert_grouped_item_list(
-            grammar_json['repository']['instructions']['match'],
+            grammar_json['repository']['instructions']['begin'],
             ['lda', 'add', 'set', 'big', 'hlt'],
             'instructions'
         )
@@ -105,7 +105,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         with open(grammar_fp, 'r') as json_file:
             grammar_json = json.load(json_file)
         self._assert_grouped_item_list(
-            grammar_json['repository']['instructions']['match'],
+            grammar_json['repository']['instructions']['begin'],
             ['nop', 'mov'],
             'instructions'
         )
