@@ -4,7 +4,9 @@
     {
         "background": "rgb(34, 34, 34)",
         "foreground": "#EEEEEE",
-        "caret": "white"
+        "caret": "#BBBBBB",
+        "selection": "#294f7a",
+        "gutter_foreground_highlight": "#452d74"
     },
     "rules":
     [
