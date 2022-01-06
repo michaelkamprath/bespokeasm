@@ -6,7 +6,7 @@
         "foreground": "#EEEEEE",
         "caret": "#BBBBBB",
         "selection": "#294f7a",
-        "gutter_foreground_highlight": "#452d74"
+        "line_highlight": "rgb(68, 68, 68)"
     },
     "rules":
     [

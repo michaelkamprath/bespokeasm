@@ -118,6 +118,13 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             if self.verbose > 1:
                 print(f'  generated {os.path.basename(color_scheme_fp)}')
 
+        # copy keymap files over
+        keymap_fp = os.path.join(destination_dir, 'Default.sublime-keymap')
+        with pkg_resources.path(resources, 'sublime-keymap.json') as fp:
+            shutil.copy(str(fp), keymap_fp)
+            if self.verbose > 1:
+                print(f'  generated {os.path.basename(keymap_fp)}')
+
         # copy all snippet files
         for filename in pkg_resources.contents(resources):
             if filename.endswith('.sublime-snippet.xml'):
