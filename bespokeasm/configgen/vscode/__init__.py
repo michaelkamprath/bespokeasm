@@ -19,32 +19,14 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             language_version: str,
             code_extension: str,
         ) -> None:
-        super().__init__(config_file_path, is_verbose)
-        self._vscode_config_dir = vscode_config_dir
-        self._language_name = self.model.isa_name if language_name is None else language_name
-        self._language_version = self.model.isa_version if language_version is None else language_version
-        self._code_extension = code_extension
-
-    @property
-    def vscode_config_dir(self) -> str:
-        return self._vscode_config_dir
-    @property
-    def language_name(self) -> str:
-        return self._language_name
-    @property
-    def language_version(self) -> str:
-        return self._language_version
-    @property
-    def code_extension(self) -> str:
-        return self._code_extension
+        super().__init__(config_file_path, is_verbose, vscode_config_dir, language_name,  language_version, code_extension)
 
     def generate(self) -> None:
         extension_name = self.language_name
-        extension_dir_path = os.path.join(self.vscode_config_dir, 'extensions', extension_name)
-        language_id = self.language_name + '-assembly'
+        extension_dir_path = os.path.join(self.export_dir, 'extensions', extension_name)
 
         if self.verbose >= 1:
-            print(f'Generating Visual Studio Code extension for language "{language_id}" at: {extension_dir_path}')
+            print(f'Generating Visual Studio Code extension for language "{self.language_id}" at: {extension_dir_path}')
 
         # create the extensions directory if it doesn't exist
         Path(extension_dir_path).mkdir(parents=True, exist_ok=True)
@@ -57,10 +39,10 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
         package_json['name'] = self.language_name
         package_json['displayName'] = self.model.description
         package_json['version'] = self.language_version
-        package_json['contributes']['languages'][0]['id'] = language_id
+        package_json['contributes']['languages'][0]['id'] = self.language_id
         package_json['contributes']['languages'][0]['extensions'] = ['.'+self.code_extension]
-        package_json['contributes']['grammars'][0]['language'] = language_id
-        package_json['contributes']['snippets'][0]['language'] = language_id
+        package_json['contributes']['grammars'][0]['language'] = self.language_id
+        package_json['contributes']['snippets'][0]['language'] = self.language_id
         package_fp = os.path.join(extension_dir_path, 'package.json')
         with open(package_fp, 'w', encoding='utf-8') as f:
             json.dump(package_json, f, ensure_ascii=False, indent=4)

@@ -24,33 +24,16 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             language_version: str,
             code_extension: str,
         ) -> None:
-        super().__init__(config_file_path, is_verbose)
-        self._save_config_dir = save_config_dir
-        self._language_name = self.model.isa_name if language_name is None else language_name
-        self._language_version = self.model.isa_version if language_version is None else language_version
-        self._code_extension = code_extension
-
-    @property
-    def save_config_dir(self) -> str:
-        return self._save_config_dir
-    @property
-    def language_name(self) -> str:
-        return self._language_name
-    @property
-    def language_version(self) -> str:
-        return self._language_version
-    @property
-    def code_extension(self) -> str:
-        return self._code_extension
+        super().__init__(config_file_path, is_verbose, save_config_dir, language_name, language_version, code_extension)
 
     def generate(self) -> None:
         if self.verbose >= 1:
-            print(f'Generating Sublime text editor package for language "{self.language_name}" into: {self.save_config_dir}')
+            print(f'Generating Sublime text editor package for language "{self.language_name}" into: {self.export_dir}')
         #create a temp directory to building things in
         tmp_dir = tempfile.mkdtemp()
         self._generate_files_in_dir(tmp_dir)
 
-        archive_fp = os.path.join(self.save_config_dir, self.language_name + '.sublime-package')
+        archive_fp = os.path.join(self.export_dir, self.language_name + '.sublime-package')
         archive_file = ZipFile(archive_fp, 'w')
         for f in os.listdir(tmp_dir):
             archive_file.write(os.path.join(tmp_dir, f), f)

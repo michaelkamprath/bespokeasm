@@ -42,6 +42,7 @@ class AssemblerModel:
         if 'identifier' in self._config['general']:
             self._isa_name = self._config['general']['identifier'].get('name', config_file_name)
             self._isa_version = str(self._config['general']['identifier'].get('version', '0.0.1')).strip()
+            self._file_extension = self._config['general']['identifier'].get('extension', 'asm')
             # enforce semantic versioning
             version_match = re.match(
                 r'^([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+)?$',
@@ -53,6 +54,7 @@ class AssemblerModel:
         else:
             self._isa_name = config_file_name
             self._isa_version = '0.0.1'
+            self._file_extension = 'asm'
         self._isa_name = self._isa_name.strip().replace(' ', '_')
         self._isa_version = self._isa_version.strip()
         # set up registers
@@ -83,6 +85,9 @@ class AssemblerModel:
     @property
     def isa_version(self) -> str:
         return self._isa_version
+    @property
+    def assembly_file_extenions(self) -> str:
+        return self._file_extension
     @property
     def endian(self) -> str:
         if 'endian' in self._config['general']:

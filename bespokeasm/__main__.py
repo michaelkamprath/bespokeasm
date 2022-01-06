@@ -55,7 +55,7 @@ def generate_extension():
 @click.option('--editor-config-dir', '-d', default='~/.vscode/', help="The file path the Visual Studo Code configuration directory containing the extensions directory.")
 @click.option('--language-name', '-l', help="The name of the language in the Visual Studio Code configuration file. Defaults to value provide in instruction set configuration file.")
 @click.option('--language-version', '-k', help="The version of the language in the Visual Studio Code configuration file. Defaults to value provide in instruction set configuration file.")
-@click.option('--code-extension', '-x', default='asm', help="The file extension for asssembly code files for this language configuraton.")
+@click.option('--code-extension', '-x', help="The file extension for asssembly code files for this language configuraton.")
 def vscode(config_file, verbose, editor_config_dir, language_name, language_version, code_extension):
     config_file = os.path.abspath(os.path.expanduser(config_file))
     vscode_config_dir = os.path.abspath(os.path.expanduser(editor_config_dir))
@@ -68,7 +68,7 @@ def vscode(config_file, verbose, editor_config_dir, language_name, language_vers
 @click.option('--editor-config-dir', '-d', default='~/', help="The directory into which the generated configuration file should be saved.")
 @click.option('--language-name', '-l', help="The name of the language in the Sublime configuration file. Defaults to value provide in instruction set configuration file.")
 @click.option('--language-version', '-k', help="The version of the language in the Sublime configuration file. Defaults to value provide in instruction set configuration file.")
-@click.option('--code-extension', '-x', default='asm', help="The file extension for asssembly code files for this language configuraton.")
+@click.option('--code-extension', '-x', help="The file extension for asssembly code files for this language configuraton.")
 def sublime(config_file, verbose, editor_config_dir, language_name, language_version, code_extension):
     config_file = os.path.abspath(os.path.expanduser(config_file))
     save_config_dir = os.path.abspath(os.path.expanduser(editor_config_dir))
