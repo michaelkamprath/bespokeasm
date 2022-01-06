@@ -1,0 +1,33 @@
+; Multiplication
+; Runs on vanilla Ben Eater SAP1 Breadboard Computer
+;
+; Multiplies the 8-bit values found at addresses 0xE (14) and 0xF (15)
+;
+
+; RAM variables
+.org 0xC
+one:                    ; since the SAP-1 doesn't have a "subtract immediate"
+    .byte 1             ; instruction, we need to encode a 1 value in RAM
+result:
+    .byte 0             ; this is where results will be stoired
+x_value:
+    .byte 0             ; place one of the multiplicands here
+y_value:
+    .byte 0             ; place the other multiplicand here
+
+; Code
+.org 0x0
+start_loop:
+    lda result          ; Load product value
+    add y_value         ; Add Y value
+    sta result          ; Store product value
+    lda x_value         ; Load X value
+    sub one             ; subtract 1
+    jz done             ; Jump out of loop if X is 0
+    sta x_value         ; Store updated X value
+    jmp start_loop      ; Jump to start of loop
+done:
+    lda result          ; Load final product value
+    out                 ; Display product value
+    hlt                 ; Halt
+

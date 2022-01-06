@@ -1,0 +1,34 @@
+; Counting Loop
+;
+;   Counts from 0 to 255, first by 1, then by 2, then by 3, and so on
+;
+
+.org 14
+; Variables
+one:
+    .byte 1
+increment_value:
+    .byte 0
+
+.org 0
+; Code
+start:
+    ldi 0
+    out
+.sum_loop:
+    add increment_value
+    jc adjust_increment
+    out
+    jmp .sum_loop
+
+adjust_increment:
+    lda increment_value
+    add one
+    jc reset_increment
+    sta increment_value
+    jmp start
+
+reset_increment:
+    ldi 1
+    sta increment_value
+    jmp start

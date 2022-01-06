@@ -5,6 +5,7 @@ general:
   identifier:
     name: eater-sap1
     version: "1.0.0"
+    extension: sap1
 operand_sets:
   integer:
     operand_values:
