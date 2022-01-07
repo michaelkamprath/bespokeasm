@@ -108,7 +108,7 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             if self.verbose > 1:
                 print(f'  generated {os.path.basename(keymap_fp)}')
 
-        # copy all snippet files
+        # copy all snippet, macro, and preference files
         for filename in pkg_resources.contents(resources):
             if filename.endswith('.sublime-snippet.xml'):
                 file_obj = pkg_resources.files(resources).joinpath(filename)
@@ -118,3 +118,20 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
                     shutil.copy(fp, snippet_fp)
                     if self.verbose > 1:
                         print(f'  generated {os.path.basename(snippet_fp)}')
+            elif filename.endswith('.sublime-macro.json'):
+                file_obj = pkg_resources.files(resources).joinpath(filename)
+                with pkg_resources.as_file(file_obj) as fp:
+                    macro_filename =  filename.partition('.')[0] + '.sublime-macro'
+                    macro_fp = os.path.join(destination_dir, macro_filename)
+                    shutil.copy(fp, macro_fp)
+                    if self.verbose > 1:
+                        print(f'  generated {os.path.basename(macro_fp)}')
+            elif filename.endswith('.tmPreferences.xml'):
+                file_obj = pkg_resources.files(resources).joinpath(filename)
+                with pkg_resources.as_file(file_obj) as fp:
+                    pref_filename =  filename.partition('.')[0] + '.tmPreferences'
+                    pref_fp = os.path.join(destination_dir, pref_filename)
+                    shutil.copy(fp, pref_fp)
+                    if self.verbose > 1:
+                        print(f'  generated {os.path.basename(pref_fp)}')
+

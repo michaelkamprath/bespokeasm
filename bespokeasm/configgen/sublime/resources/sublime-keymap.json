@@ -1,5 +1,5 @@
 [
-    {
+	{
         "keys": ["enter"],
         "context": [
             { "key": "selector", "operator": "equal", "operand": "source.bespokeasm" },
