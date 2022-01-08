@@ -56,7 +56,7 @@ class Assembler:
         for l in line_obs:
             l.set_start_address(cur_address)
             cur_address = l.address + l.byte_size
-            if isinstance(l, LabelLine):
+            if isinstance(l, LabelLine) and not l.is_constant:
                 l.label_scope.set_label_value(l.get_label(), l.get_value(), l.line_id)
 
         # Sort lines according to their assigned address. This allows for .org directives

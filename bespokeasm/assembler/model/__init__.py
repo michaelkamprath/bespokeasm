@@ -1,5 +1,6 @@
 import json
 import os
+from packaging import version
 import re
 import sys
 import yaml
@@ -45,9 +46,9 @@ class AssemblerModel:
             self._file_extension = self._config['general']['identifier'].get('extension', 'asm')
             # enforce semantic versioning
             version_match = re.match(
-                r'^([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+)?$',
+                r"^\s*" + version.VERSION_PATTERN + r"\s*$",
                 self._isa_version,
-                flags=re.IGNORECASE,
+                flags=re.IGNORECASE|re.VERBOSE,
             )
             if version_match is None:
                 sys.exit(f'ERROR - provide ISA version "{self._isa_version}" is not in semantic versioning format. See https://semver.org for details.')
@@ -81,9 +82,11 @@ class AssemblerModel:
         return self._config.get('description', 'BespokeASM Assembly')
     @property
     def isa_name(self) -> str:
+        '''Name of language defined by this ISA model. Defaults to configuration file basename.'''
         return self._isa_name
     @property
     def isa_version(self) -> str:
+        '''Version number of this ISA model. Must be in semantic version format, e.g. "0.2.4"'''
         return self._isa_version
     @property
     def assembly_file_extenions(self) -> str:

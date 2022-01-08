@@ -72,8 +72,8 @@
             "foreground": "#abd7ed"
         },
         {
-            "name": "Keyword - Import",
-            "scope": "keyword.control.import",
+            "name": "Keyword - Preprocessor",
+            "scope": "keyword.control.preprocessor",
             "foreground": "#c080ff"
         },
         {

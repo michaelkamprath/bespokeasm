@@ -2,6 +2,7 @@
 ;
 ;   Counts from 0 to 255, first by 1, then by 2, then by 3, and so on
 ;
+#require "eater-sap1 >= 1.0"
 
 .org 14
 ; Variables

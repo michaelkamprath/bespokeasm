@@ -8,5 +8,10 @@
         "prefix": ["#include"],
         "body": ["#include \"$1\""],
         "description": "Include another source file"
+    },
+    "require": {
+        "prefix": ["#require"],
+        "body": ["#require \"$1 >= $2\""],
+        "description": "Require certain language version"
     }
 }

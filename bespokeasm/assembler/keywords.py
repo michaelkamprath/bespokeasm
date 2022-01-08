@@ -8,7 +8,7 @@ BYTECODE_DIRECTIVES_SET = set([
 ])
 
 PREPROCESSOR_DIRECTIVES_SET = set([
-    'include'
+    'include', 'require',
 ])
 
 ASSEMBLER_KEYWORD_SET = (

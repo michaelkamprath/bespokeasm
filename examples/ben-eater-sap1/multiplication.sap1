@@ -3,6 +3,7 @@
 ;
 ; Multiplies the 8-bit values found at addresses 0xE (14) and 0xF (15)
 ;
+#require "eater-sap1 >= 1.0"
 
 ; RAM variables
 .org 0xC

@@ -113,7 +113,7 @@ contexts:
         - meta_scope: meta.preprocessor
         - include: strings
         - match: (?<=\#)(?:##PREPROCESSOR##)
-          scope: keyword.control.import.include
+          scope: keyword.control.preprocessor
         - match: (?=(?:\s*\;|\s*$))
           pop: true
 

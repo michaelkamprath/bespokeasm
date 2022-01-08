@@ -8,6 +8,7 @@
 from __future__ import annotations
 import click
 import os
+from packaging import version
 import re
 import sys
 
@@ -53,6 +54,9 @@ class AssemblyFile:
                         additional_line_objects = self._handle_include_file(line_str, line_id, isa_model, include_paths, log_verbosity, assembly_files_used)
                         line_objects.extend(additional_line_objects)
                         continue
+                    if line_str.startswith('#require'):
+                        self._handle_require_language(line_str, line_id, isa_model, log_verbosity)
+                        continue
 
                     l = LineOjectFactory.parse_line(line_id, line_str, isa_model)
                     if isinstance(l, LabelLine):
@@ -61,6 +65,9 @@ class AssemblyFile:
                     elif isinstance(l, AddressOrgLine):
                         current_scope = self.label_scope
                     l.label_scope = current_scope
+                    # setting constants now so they can be used when evluating lines later.
+                    if isinstance(l, LabelLine) and l.is_constant:
+                        l.label_scope.set_label_value(l.get_label(), l.get_value(), l.line_id)
                     line_objects.append(l)
 
         if log_verbosity > 1:
@@ -72,7 +79,10 @@ class AssemblyFile:
         r'^\#include\s+(?:\'|\")([\w\.]+)(?:\'|\")',
         flags=re.IGNORECASE|re.MULTILINE
     )
-
+    PATTERN_REQUIRE_LANGUAGE = re.compile(
+        f'\#require\s+\"([\w\-\_\.]*)(?:\s*(==|>=|<=|>|<)\s*({version.VERSION_PATTERN}))?\"',
+        flags=re.IGNORECASE|re.VERBOSE
+    )
     def _handle_include_file(self, line_str: int, line_id: LineIdentifier, isa_model: AssemblerModel, include_paths: set[str], log_verbosity: int, assembly_files_used: set) -> list[LineObject]:
         label_match = re.search(AssemblyFile.PATTERN_INCLUDE_FILE, line_str)
         if label_match is not None:
@@ -87,6 +97,39 @@ class AssemblyFile:
             return file_obj.load_line_objects(isa_model, include_paths, log_verbosity, assembly_files_used = assembly_files_used)
         else:
             sys.exit(f'ERROR: {line_id} - Improperly formatted include directive')
+
+    def _handle_require_language(self, line_str: int, line_id: LineIdentifier, isa_model: AssemblerModel, log_verbosity: int) -> None:
+        require_match = re.search(AssemblyFile.PATTERN_REQUIRE_LANGUAGE, line_str)
+        if require_match is not None:
+            required_language = require_match.group(1).strip()
+            if required_language != isa_model.isa_name:
+                sys.exit(f'ERROR: {line_id} - language "{required_language}" is required but ISA configuration file declares language "{isa_model.isa_name}"')
+            if len(require_match.groups()) >= 3 and require_match.group(2) is not None and require_match.group(3) is not None:
+                operator_str = require_match.group(2).strip()
+                version_str = require_match.group(3).strip()
+                version_obj = version.parse(version_str)
+                model_version_obj = version.parse(isa_model.isa_version)
+                if operator_str == '>=':
+                    if not version_obj >= model_version_obj:
+                        sys.exit(f'ERROR: {line_id} - at least language version "{version_str}" is required but ISA configuration file declares language version "{isa_model.isa_version}"')
+                elif operator_str == '<=':
+                    if not version_obj <= model_version_obj:
+                        sys.exit(f'ERROR: {line_id} - up to language version "{version_str}" is required but ISA configuration file declares language version "{isa_model.isa_version}"')
+                elif operator_str == '>':
+                    if not version_obj > model_version_obj:
+                        sys.exit(f'ERROR: {line_id} - greater than language version "{version_str}" is required but ISA configuration file declares language version "{isa_model.isa_version}"')
+                elif operator_str == '<':
+                    if not version_obj < model_version_obj:
+                        sys.exit(f'ERROR: {line_id} - less than language version "{version_str}" is required but ISA configuration file declares language version "{isa_model.isa_version}"')
+                elif operator_str == '==':
+                    if version_obj != model_version_obj:
+                       sys.exit(f'ERROR: {line_id} - exactly language version "{version_str}" is required but ISA configuration file declares language version "{isa_model.isa_version}"')
+                else:
+                    sys.exit(f'ERROR: {line_id} - got a language requirement comparison that is not understood.')
+                if log_verbosity > 1:
+                    print(f'Code file requires language "{require_match.group(1)} {require_match.group(2)} {require_match.group(3)}". Configurate file declares language "{isa_model.isa_name} {isa_model.isa_version}"')
+            elif log_verbosity > 1:
+                print(f'Code file requires language "{require_match.group(1)}". Configurate file declares language "{isa_model.isa_name} v{isa_model.isa_version}"')
 
     def _locate_filename(self, filename:str, include_paths: set[str], line_id: LineIdentifier) -> str:
         '''locates the filename in the include paths, and returns the full file path. Errors if file name is ambiguous.'''

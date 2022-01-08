@@ -1,11 +1,16 @@
 import sys
 import unittest
+from bespokeasm.assembler import label_scope
 
+from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType
 from bespokeasm.assembler.line_object.directive_line import DirectiveLine, AddressOrgLine, FillDataLine, FillUntilDataLine
 
 class TestDirectiveLines(unittest.TestCase):
     def test_org_directive(self):
+        label_values = GlobalLabelScope(['a','b','sp','mar'])
+        label_values.set_label_value('a_const', 40, 1)
+
         o1 = DirectiveLine.factory(1234, '.org $100', 'set address to 0=x100', 'big')
         self.assertIsInstance(o1, AddressOrgLine)
         self.assertEqual(o1.address, 256)
@@ -25,24 +30,72 @@ class TestDirectiveLines(unittest.TestCase):
         self.assertIsInstance(o4, AddressOrgLine)
         self.assertEqual(o4.address, 65535)
 
-        with self.assertRaises(SystemExit, msg='non-numeric address should fail'):
-            o5 = DirectiveLine.factory(1357, '.org a_label', 'set address to a label', 'big')
+        o5 = DirectiveLine.factory(1357, '.org a_const', 'set address to a label', 'big')
+        o5.label_scope = label_values
+        self.assertIsInstance(o5, AddressOrgLine)
+        self.assertEqual(o5.address, 40)
+
+        with self.assertRaises(SystemExit, msg='register address should fail'):
+            e1 = DirectiveLine.factory(1357, '.org sp', 'set address to a register', 'big')
+            e1.label_scope = label_values
+            test = e1.address
 
     def test_fill_directive(self):
+
+        label_values = GlobalLabelScope(['a','b','sp','mar'])
+        label_values.set_label_value('forty', 40, 1)
+        label_values.set_label_value('eff', 0x0F, 1)
+        label_values.set_label_value('high_de', 0xde00, 1)
+
         o1 = DirectiveLine.factory(1234, ' .fill 32, $77', 'fill with luck sevens', 'big')
         self.assertIsInstance(o1, FillDataLine)
+        o1.label_scope = label_values
         self.assertEqual(o1.byte_size, 32, 'has 32 bytes')
+        o1.generate_bytes()
         self.assertEqual(o1.get_bytes(), bytearray([0x77]*32), '32 double 7s')
 
         o2 = DirectiveLine.factory(1234, ' .fill 0xFF, 0x2211', 'snake eyes', 'big')
         self.assertIsInstance(o2, FillDataLine)
+        o2.label_scope = label_values
         self.assertEqual(o2.byte_size, 255, 'has 255 bytes')
+        o2.generate_bytes()
         self.assertEqual(o2.get_bytes(), bytearray([0x11]*255), 'truncated values')
 
         o3 = DirectiveLine.factory(1234, '.zero b100000000', 'zipity doo dah', 'big')
         self.assertIsInstance(o3, FillDataLine)
+        o3.label_scope = label_values
         self.assertEqual(o3.byte_size, 256, 'has 256 bytes')
+        o3.generate_bytes()
         self.assertEqual(o3.get_bytes(), bytearray([0]*256), 'truncated values')
+
+        # test with constants
+        o4 = DirectiveLine.factory(1234, '.zero forty', 'constants in directives', 'big')
+        self.assertIsInstance(o4, FillDataLine)
+        o4.label_scope = label_values
+        self.assertEqual(o4.byte_size, 40, 'has 40 bytes')
+        o4.generate_bytes()
+        self.assertEqual(list(o4.get_bytes()), [0]*40, 'truncated values')
+
+        o5 = DirectiveLine.factory(1234, '.fill eff, forty', 'constants in directives', 'big')
+        self.assertIsInstance(o5, FillDataLine)
+        o5.label_scope = label_values
+        self.assertEqual(o5.byte_size, 15, 'has 15 bytes')
+        o5.generate_bytes()
+        self.assertEqual(list(o5.get_bytes()), [40]*15, 'truncated values')
+
+        o6 = DirectiveLine.factory(1234, '.fill eff+eff, forty+2', 'constants in directives', 'big')
+        self.assertIsInstance(o6, FillDataLine)
+        o6.label_scope = label_values
+        self.assertEqual(o6.byte_size, 30, 'has 30 bytes')
+        o6.generate_bytes()
+        self.assertEqual(list(o6.get_bytes()), [42]*30, 'truncated values')
+
+        o6 = DirectiveLine.factory(1234, '.zero forty+2', 'constants in directives', 'big')
+        self.assertIsInstance(o6, FillDataLine)
+        o6.label_scope = label_values
+        self.assertEqual(o6.byte_size, 42, 'has 42 bytes')
+        o6.generate_bytes()
+        self.assertEqual(list(o6.get_bytes()), [0]*42, 'truncated values')
 
     def test_filluntil_directive(self):
         label_values = LabelScope(LabelScopeType.GLOBAL, None, 'global')
@@ -64,6 +117,14 @@ class TestDirectiveLines(unittest.TestCase):
         self.assertEqual(o2.byte_size, 1, 'must have the right number of bytes')
         o2.generate_bytes()
         self.assertEqual(o2.get_bytes(), bytearray([0]*1), 'must have all the bytes')
+
+        o3 = DirectiveLine.factory(1234, '.zerountil my_label+$f', 'them zeros', 'big')
+        self.assertIsInstance(o3, FillUntilDataLine)
+        o3.set_start_address(0xF)
+        o3.label_scope = label_values
+        self.assertEqual(o3.byte_size, 0x81, 'must have the right number of bytes')
+        o3.generate_bytes()
+        self.assertEqual(list(o3.get_bytes()), [0]*0x81, 'must have all the bytes')
 
 if __name__ == '__main__':
     unittest.main()
