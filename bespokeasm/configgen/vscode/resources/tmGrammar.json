@@ -161,7 +161,13 @@
             "endCaptures": {
                 "0": { "name": "punctuation.definition.string.end" }
             },
-            "contentName": "string.quoted"
+            "contentName": "string.quoted",
+            "patterns": [
+                {
+                    "name": "constant.character.escape",
+                    "match": "\\\\(?:[\\\\\\'\\\"abfnrtv]|o[0-8]{2}|x[\\da-fA-F]{2})"
+                }
+            ]
         }
     }
 }

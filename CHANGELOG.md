@@ -16,6 +16,10 @@ Changes that are planned but not implemented yet:
   * missing `:` after labels
   * unknown labels
 
+## [0.1.9]
+* Fixed language version checking
+* Added syntax highlighting for escape characters in strings.
+
 ## [0.1.8]
 * Improvements to Visual Studio Code language extension generation
 * Added ability to generate a language package for Sublime Text editor

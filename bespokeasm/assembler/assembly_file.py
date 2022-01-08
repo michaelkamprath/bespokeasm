@@ -110,19 +110,19 @@ class AssemblyFile:
                 version_obj = version.parse(version_str)
                 model_version_obj = version.parse(isa_model.isa_version)
                 if operator_str == '>=':
-                    if not version_obj >= model_version_obj:
+                    if not model_version_obj >= version_obj:
                         sys.exit(f'ERROR: {line_id} - at least language version "{version_str}" is required but ISA configuration file declares language version "{isa_model.isa_version}"')
                 elif operator_str == '<=':
-                    if not version_obj <= model_version_obj:
+                    if not model_version_obj <= version_obj:
                         sys.exit(f'ERROR: {line_id} - up to language version "{version_str}" is required but ISA configuration file declares language version "{isa_model.isa_version}"')
                 elif operator_str == '>':
-                    if not version_obj > model_version_obj:
+                    if not model_version_obj > version_obj:
                         sys.exit(f'ERROR: {line_id} - greater than language version "{version_str}" is required but ISA configuration file declares language version "{isa_model.isa_version}"')
                 elif operator_str == '<':
-                    if not version_obj < model_version_obj:
+                    if not model_version_obj < version_obj:
                         sys.exit(f'ERROR: {line_id} - less than language version "{version_str}" is required but ISA configuration file declares language version "{isa_model.isa_version}"')
                 elif operator_str == '==':
-                    if version_obj != model_version_obj:
+                    if model_version_obj != version_obj:
                        sys.exit(f'ERROR: {line_id} - exactly language version "{version_str}" is required but ISA configuration file declares language version "{isa_model.isa_version}"')
                 else:
                     sys.exit(f'ERROR: {line_id} - got a language requirement comparison that is not understood.')
