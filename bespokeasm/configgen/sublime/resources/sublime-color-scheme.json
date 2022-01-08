@@ -43,6 +43,11 @@
 
         },
         {
+            "name": "Strings - Escaped Charaters",
+            "scope": "constant.character.escape",
+            "foreground": "#7ab736"
+        },
+        {
             "name": "Comments",
             "scope": "comment.line",
             "foreground": "#568c3b"

@@ -52,6 +52,8 @@ contexts:
       scope: punctuation.definition.string.begin
       push:
         - meta_scope: string.quoted
+        - match: \\(?:[\\\'\"abfnrtv]|o[0-8]{2}|x[\da-fA-F]{2})
+          scope: constant.character.escape
         - match: \1
           scope: punctuation.definition.string.end
           pop: true
