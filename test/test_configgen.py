@@ -151,12 +151,12 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertFalse(('registers' in syntax_dict['contexts']), 'no registers should be found')
         self._assert_grouped_item_list(
             syntax_dict['contexts']['compiler_directives'][0]['match'],
-            ['\.org'],
+            ['\\.org'],
             'compiler directives'
         )
         self._assert_grouped_item_list(
             syntax_dict['contexts']['data_types_directives'][0]['match'],
-            ['\.fill', '\.zero', '\.zerountil', '\.byte', '\.2byte', '\.4byte', '\.cstr'],
+            ['\\.fill', '\\.zero', '\\.zerountil', '\\.byte', '\\.2byte', '\\.4byte', '\\.cstr'],
             'data type directives'
         )
         item_match_str = 'fail'
@@ -216,12 +216,12 @@ class TestConfigurationGeneration(unittest.TestCase):
         )
         self._assert_grouped_item_list(
             syntax_dict['contexts']['compiler_directives'][0]['match'],
-            ['\.org'],
+            ['\\.org'],
             'compiler directives'
         )
         self._assert_grouped_item_list(
             syntax_dict['contexts']['data_types_directives'][0]['match'],
-            ['\.fill', '\.zero', '\.zerountil', '\.byte', '\.2byte', '\.4byte', '\.cstr'],
+            ['\\.fill', '\\.zero', '\\.zerountil', '\\.byte', '\\.2byte', '\\.4byte', '\\.cstr'],
             'data type directives'
         )
         item_match_str = 'fail'
