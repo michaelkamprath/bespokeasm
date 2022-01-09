@@ -1,14 +1,13 @@
-import sys
 import unittest
-from bespokeasm.assembler import label_scope
 
 from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType
 from bespokeasm.assembler.line_object.directive_line import DirectiveLine, AddressOrgLine, FillDataLine, FillUntilDataLine
 
+
 class TestDirectiveLines(unittest.TestCase):
     def test_org_directive(self):
-        label_values = GlobalLabelScope(['a','b','sp','mar'])
+        label_values = GlobalLabelScope(['a', 'b', 'sp', 'mar'])
         label_values.set_label_value('a_const', 40, 1)
 
         o1 = DirectiveLine.factory(1234, '.org $100', 'set address to 0=x100', 'big')
@@ -38,11 +37,11 @@ class TestDirectiveLines(unittest.TestCase):
         with self.assertRaises(SystemExit, msg='register address should fail'):
             e1 = DirectiveLine.factory(1357, '.org sp', 'set address to a register', 'big')
             e1.label_scope = label_values
-            test = e1.address
+            e1.address
 
     def test_fill_directive(self):
 
-        label_values = GlobalLabelScope(['a','b','sp','mar'])
+        label_values = GlobalLabelScope(['a', 'b', 'sp', 'mar'])
         label_values.set_label_value('forty', 40, 1)
         label_values.set_label_value('eff', 0x0F, 1)
         label_values.set_label_value('high_de', 0xde00, 1)
@@ -125,6 +124,7 @@ class TestDirectiveLines(unittest.TestCase):
         self.assertEqual(o3.byte_size, 0x81, 'must have the right number of bytes')
         o3.generate_bytes()
         self.assertEqual(list(o3.get_bytes()), [0]*0x81, 'must have all the bytes')
+
 
 if __name__ == '__main__':
     unittest.main()

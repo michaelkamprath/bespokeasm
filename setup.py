@@ -17,15 +17,17 @@ with open(path.join(HERE, 'requirements.txt'), encoding='utf-8') as f:
 
 install_requires = [x.strip() for x in all_reqs if ('git+' not in x) and (
     not x.startswith('#')) and (not x.startswith('-'))]
-dependency_links = [x.strip().replace('git+', '') for x in all_reqs \
-                    if 'git+' not in x]
-setup (
-    name = 'bespokeasm',
-    description = 'A customizable byte code assembler that allows for the definition of custom instruction set architecture',
-    version = BESPOKEASM_VERSION_STR,
-    packages = find_packages(), # list of all packages
+dependency_links = [
+        x.strip().replace('git+', '') for x in all_reqs
+        if 'git+' not in x
+    ]
+setup(
+    name='bespokeasm',
+    description='A customizable byte code assembler that allows for the definition of custom instruction set architecture',
+    version=BESPOKEASM_VERSION_STR,
+    packages=find_packages(),  # list of all packages
     package_data={'': ['*.json', '*.yaml', '*.xml']},
-    install_requires = install_requires,
+    install_requires=install_requires,
     python_requires='>=3.9',
     entry_points='''
         [console_scripts]

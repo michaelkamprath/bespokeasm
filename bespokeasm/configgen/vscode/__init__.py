@@ -67,11 +67,11 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             del grammar_json['repository']['registers']
         for item in grammar_json['repository']['directives']['patterns']:
             if 'keyword.other.directive' == item['name']:
-                directives_regex = '|'.join(['\.'+d for d in COMPILER_DIRECTIVES_SET])
+                directives_regex = '|'.join(['\\.'+d for d in COMPILER_DIRECTIVES_SET])
                 directives_str = item['match']
                 item['match'] =  directives_str.replace('##DIRECTIVES##', directives_regex)
             elif 'storage.type' == item['name']:
-                datatypes_regex = '|'.join(['\.'+d for d in BYTECODE_DIRECTIVES_SET])
+                datatypes_regex = '|'.join(['\\.'+d for d in BYTECODE_DIRECTIVES_SET])
                 datatypes_str = item['match']
                 item['match'] =  datatypes_str.replace('##DATATYPES##', datatypes_regex)
             elif 'meta.preprocessor' == item['name']:

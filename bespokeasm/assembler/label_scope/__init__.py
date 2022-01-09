@@ -42,10 +42,10 @@ from __future__ import annotations
 
 import enum
 import sys
-import inspect
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.keywords import ASSEMBLER_KEYWORD_SET
+
 
 class LabelScopeType(enum.Enum):
     GLOBAL = 0
@@ -70,23 +70,28 @@ class LabelScopeType(enum.Enum):
         else:
             return ''
 
+
 class LabelScope:
     class LabelInfo:
         def __init__(self, label: str, value: int, line_id: LineIdentifier) -> None:
             self._label = label
             self._value = value
             self._line_id = line_id
+
         def __repr__(self) -> str:
             return str(self)
+
         def __str__(self) -> str:
             return f'LabelInfo< {self.label} = {self.value} >'
 
         @property
         def label(self) -> str:
             return self._label
+
         @property
         def value(self) -> int:
             return self._value
+
         @property
         def line_id(self) -> int:
             return self._line_id
@@ -99,8 +104,10 @@ class LabelScope:
 
     def __repr__(self) -> str:
         return str(self)
+
     def __str__(self) -> str:
         return f'LabelScope< {self.type}, {self._reference} >'
+
     @property
     def parent(self) -> LabelScope:
         return self._parent
@@ -113,7 +120,7 @@ class LabelScope:
         if label in self._labels:
             return self._labels[label].value
         elif self.parent is not None:
-             return self.parent.get_label_value(label, line_id)
+            return self.parent.get_label_value(label, line_id)
         else:
             return None
 
@@ -137,6 +144,7 @@ class LabelScope:
             sys.exit(f"ERROR: {line_id} - Label '{label}' is to low of scope for available scopes at this line.")
 
     _global_scope = None
+
     @classmethod
     def global_scope(cls, register_labels: set[str]) -> LabelScope:
         if cls._global_scope is None:

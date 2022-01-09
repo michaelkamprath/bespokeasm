@@ -64,10 +64,10 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         else:
             # remove the registers syntax
             del syntax_dict['contexts']['registers']
-        directives_regex = '|'.join(['\.'+d for d in COMPILER_DIRECTIVES_SET])
+        directives_regex = '|'.join(['\\.'+d for d in COMPILER_DIRECTIVES_SET])
         directives_str = syntax_dict['contexts']['compiler_directives'][0]['match']
         syntax_dict['contexts']['compiler_directives'][0]['match'] =  directives_str.replace('##DIRECTIVES##', directives_regex)
-        datatypes_regex = '|'.join(['\.'+d for d in BYTECODE_DIRECTIVES_SET])
+        datatypes_regex = '|'.join(['\\.'+d for d in BYTECODE_DIRECTIVES_SET])
         datatypes_str = syntax_dict['contexts']['data_types_directives'][0]['match']
         syntax_dict['contexts']['data_types_directives'][0]['match'] =  datatypes_str.replace('##DATATYPES##', datatypes_regex)
         preprocessor_regex = '|'.join(PREPROCESSOR_DIRECTIVES_SET)
