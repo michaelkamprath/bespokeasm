@@ -161,11 +161,11 @@ class TestConfigurationGeneration(unittest.TestCase):
         )
         item_match_str = 'fail'
         for item in syntax_dict['contexts']['preprocessor_directives'][0]['push']:
-            if 'scope' in item and item['scope'] == 'keyword.control.import.include':
+            if 'scope' in item and item['scope'] == 'keyword.control.preprocessor':
                 item_match_str = item['match']
         self._assert_grouped_item_list(
             item_match_str,
-            ['include'],
+            ['include', 'require'],
             'data type directives'
         )
         self.assertIsFile(os.path.join(test_tmp_dir, 'bespokeasm-test.sublime-color-scheme'))
@@ -226,11 +226,11 @@ class TestConfigurationGeneration(unittest.TestCase):
         )
         item_match_str = 'fail'
         for item in syntax_dict['contexts']['preprocessor_directives'][0]['push']:
-            if 'scope' in item and item['scope'] == 'keyword.control.import.include':
+            if 'scope' in item and item['scope'] == 'keyword.control.preprocessor':
                 item_match_str = item['match']
         self._assert_grouped_item_list(
             item_match_str,
-            ['include'],
+            ['include', 'require'],
             'data type directives'
         )
         self.assertIsFile(os.path.join(test_tmp_dir, 'tester-assembly.sublime-color-scheme'))
