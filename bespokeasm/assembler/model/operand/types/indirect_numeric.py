@@ -20,7 +20,7 @@ class IndirectNumericOperand(NumericExpressionOperand):
 
     @property
     def match_pattern(self) -> str:
-        return r'\[\s*({0})\s*\]'.format(super().match_pattern)
+        return r'^\[\s*({0})\s*\]$'.format(super().match_pattern)
 
     def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> ParsedOperand:
         # first check that operand is what we expect

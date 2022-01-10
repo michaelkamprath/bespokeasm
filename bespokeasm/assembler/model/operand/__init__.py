@@ -9,11 +9,12 @@ class OperandType(enum.Enum):
     # these values double as sort order for processing in an operand set
     UNKNOWN = -1
     EMPTY = 1
-    NUMERIC = 6
-    REGISTER = 5
+    NUMERIC = 7
+    REGISTER = 6
     INDIRECT_REGISTER = 2
     INDIRECT_INDEXED_REGISTER = 3
     INDIRECT_NUMERIC = 4
+    DEFERRED_NUMERIC = 5
 
 class OperandBytecodePositionType(enum.Enum):
     PREFIX = 1
