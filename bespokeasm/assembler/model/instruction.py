@@ -2,7 +2,8 @@ import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.byte_code.assembled import AssembledInstruction
-from bespokeasm.assembler.model.operand_parser import OperandParser
+from bespokeasm.assembler.model.operand import ParsedOperand, OperandBytecodePositionType
+from bespokeasm.assembler.model.operand_parser import OperandParser, MatchedOperandSet
 from bespokeasm.assembler.model.operand_set import OperandSetCollection
 from bespokeasm.assembler.byte_code.parts import NumericByteCodePart
 
@@ -71,19 +72,19 @@ class InstructionVariant:
 
         # generate the machine code parts
         instruction_endian = self._variant_config['byte_code'].get('endian', default_endian)
-        machine_code = [NumericByteCodePart(self.base_bytecode_value, self.base_bytecode_size, True, instruction_endian, line_id)]
+        base_bytecode = NumericByteCodePart(self.base_bytecode_value, self.base_bytecode_size, True, instruction_endian, line_id)
 
         if self._operand_parser is not None:
-            match_found, operand_bytecode, operand_arguments = self._operand_parser.generate_machine_code(line_id, operand_list, register_labels)
-            if not match_found:
+            matched_operands: MatchedOperandSet
+            matched_operands = self._operand_parser.generate_machine_code(line_id, operand_list, register_labels)
+            if matched_operands is None:
                 return None
-            if operand_bytecode is not None:
-                machine_code.extend(operand_bytecode)
-            if operand_arguments is not None:
-                machine_code.extend(operand_arguments)
+            machine_code = matched_operands.generate_byte_code(base_bytecode)
         elif len(operand_list) > 0:
             # This variant was expecting no operands but some were found. No match.
             return None
+        else:
+            machine_code = [base_bytecode]
 
         return AssembledInstruction(line_id, machine_code)
 

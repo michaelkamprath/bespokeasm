@@ -62,9 +62,9 @@ class TestConfigObject(unittest.TestCase):
         with pkg_resources.path(config_files, 'register_argument_exmaple_config.yaml') as fp:
             model2 = AssemblerModel(str(fp), 0)
 
-        piA = model2.parse_instruction(test_line_id, 'mov a, i')
+        piA = model2.parse_instruction(LineIdentifier(1,'test_mov_a_i'), 'mov a, i')
         self.assertEqual(piA.byte_size, 1, 'assembled instruciton is 1 byte')
-        self.assertEqual(piA.get_bytes(TestConfigObject.label_values), bytearray([0b01000010]), 'assembled instruction')
+        self.assertEqual(list(piA.get_bytes(TestConfigObject.label_values)), [0b01000010], 'assembled instruction')
 
         piB = model2.parse_instruction(test_line_id, 'mov a,[$1120 + label1]')
         self.assertEqual(piB.byte_size, 3, 'assembled instruciton is 3 byte')
@@ -108,9 +108,9 @@ class TestConfigObject(unittest.TestCase):
 
         piL = model2.parse_instruction(test_line_id, 'pop i')
         self.assertEqual(piL.byte_size, 1, 'assembled instruciton is 1 byte')
-        self.assertEqual(piL.get_bytes(TestConfigObject.label_values), bytearray([0b00001010]), 'pop to i')
+        self.assertEqual(list(piL.get_bytes(TestConfigObject.label_values)), [0b00001010], 'pop to i')
 
-        piM = model2.parse_instruction(test_line_id, 'pop')
+        piM = model2.parse_instruction(LineIdentifier(158,'test_pop_empty_arg'), 'pop')
         self.assertEqual(piM.byte_size, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(piM.get_bytes(TestConfigObject.label_values), bytearray([0b00001111]), 'just pop')
 

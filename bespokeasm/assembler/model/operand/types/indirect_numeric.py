@@ -1,11 +1,10 @@
 import re
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.byte_code.parts import ByteCodePart, NumericByteCodePart, ExpressionByteCodePart
-from bespokeasm.assembler.model.operand import Operand, OperandType
+from bespokeasm.assembler.byte_code.parts import NumericByteCodePart, ExpressionByteCodePart
+from bespokeasm.assembler.model.operand import OperandType, ParsedOperand
 
 from .numeric_expression import NumericExpressionOperand
-
 
 
 class IndirectNumericOperand(NumericExpressionOperand):
@@ -25,7 +24,7 @@ class IndirectNumericOperand(NumericExpressionOperand):
     def match_pattern(self) -> str:
         return r'\[\s*(?:{0})\s*\]'.format(super().match_pattern)
 
-    def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> tuple[ByteCodePart, ByteCodePart]:
+    def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> ParsedOperand:
         # first check that operand is what we expect
         match = re.match(IndirectNumericOperand.OPERAND_PATTERN, operand.strip())
         if match is not None and len(match.groups()) > 0:
@@ -33,7 +32,7 @@ class IndirectNumericOperand(NumericExpressionOperand):
                 if self.bytecode_value is not None else None
             arg_part = ExpressionByteCodePart(match.group(1).strip(), self.argument_size, self.argument_byte_align, self.argument_endian, line_id)
             if arg_part.contains_register_labels(register_labels):
-                return None,None
-            return bytecode_part, arg_part
+                return None
+            return ParsedOperand(self, bytecode_part, arg_part)
         else:
-            return None, None
+            return None

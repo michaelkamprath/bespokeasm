@@ -2,8 +2,8 @@ import re
 import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.byte_code.parts import ByteCodePart, NumericByteCodePart, ExpressionByteCodePart
-from bespokeasm.assembler.model.operand import Operand, OperandType
+from bespokeasm.assembler.byte_code.parts import NumericByteCodePart, ExpressionByteCodePart
+from bespokeasm.assembler.model.operand import OperandType, ParsedOperand
 
 from .register import RegisterOperand
 
@@ -45,7 +45,7 @@ class IndirectRegisterOperand(RegisterOperand):
     def match_pattern(self) -> str:
         return r'\[\s*{0}\s*(?:(?:\+|\-)\s*(?:[\w()\+\-\s]+\b)\s*)?\]'.format(self.register)
 
-    def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> tuple[ByteCodePart, ByteCodePart]:
+    def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> ParsedOperand:
         # first check that operand is what we expect
         match = re.match(self._parse_pattern, operand.strip())
         if match is not None and len(match.groups()) > 0:
@@ -59,7 +59,7 @@ class IndirectRegisterOperand(RegisterOperand):
                     arg_part = ExpressionByteCodePart(argument_str, self.offset_size, self.offset_byte_align, self.offset_endian, line_id)
                     # now test that is is a numeric expression. If not, return nothing
                     if arg_part.contains_register_labels(register_labels):
-                        return None, None
+                        return None
                 else:
                     # must have and offset value of 0
                     arg_part = NumericByteCodePart(0, self.offset_size, self.offset_byte_align, self.offset_endian, line_id)
@@ -68,6 +68,6 @@ class IndirectRegisterOperand(RegisterOperand):
                     # and offset was added for an operand that wasn't configured to have one. Error.
                     sys.exit(f'ERROR: {line_id} - An offset was provided for indirect register operand "{operand}" when none was expected.')
                 arg_part = None
-            return bytecode_part, arg_part
+            return ParsedOperand(self, bytecode_part, arg_part)
         else:
-            return None, None
+            return None

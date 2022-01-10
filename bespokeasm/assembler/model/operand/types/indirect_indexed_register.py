@@ -2,11 +2,12 @@ import re
 import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.byte_code.parts import ByteCodePart, NumericByteCodePart, CompositeByteCodePart
-from bespokeasm.assembler.model.operand import Operand, OperandType
+from bespokeasm.assembler.byte_code.parts import NumericByteCodePart, CompositeByteCodePart
+from bespokeasm.assembler.model.operand import Operand, OperandType, ParsedOperand
 from .register import RegisterOperand
 
 import bespokeasm.assembler.model.operand.factory as OF
+
 
 class IndirectIndexedRegisterOperand(RegisterOperand):
     _index_operand_list: list[Operand]
@@ -50,25 +51,26 @@ class IndirectIndexedRegisterOperand(RegisterOperand):
         return self.OPERAND_PATTERN_TEMPLATE.format(self.register, self._index_parse_pattern)
 
 
-    def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> tuple[ByteCodePart, ByteCodePart]:
+    def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> ParsedOperand:
         # first check that operand is what we expect
         match = re.match(self._parse_pattern, operand.strip())
         if match is not None and len(match.groups()) >= 3:
             matched_register = match.group(1)
             if matched_register != self.register:
-                return None, None
+                return None
             index_operation = match.group(2)
             if index_operation != '+':
                 # for now, we only support addition when indexing
-                return None,None
+                return None
             index_operand_str = match.group(3)
             bytecode_part = NumericByteCodePart(self.bytecode_value, self.bytecode_size, False, 'big', line_id) \
                 if self.bytecode_value is not None else NumericByteCodePart(0, 0, False, 'big', line_id)
              # find an index operand match
             for index_op in self._index_operand_list:
-                index_bytecode, index_argument = index_op.parse_operand(line_id, index_operand_str, register_labels)
-                if index_bytecode is not None or index_argument is not None:
-                    if index_bytecode is not None:
-                        return CompositeByteCodePart([bytecode_part, index_bytecode], bytecode_part.byte_align, bytecode_part.endian, line_id), index_argument
-                    return bytecode_part, index_argument
-        return None, None
+                parsed_index = index_op.parse_operand(line_id, index_operand_str, register_labels)
+                if parsed_index is not None:
+                    if parsed_index.byte_code is not None:
+                        composit_byte_code = CompositeByteCodePart([bytecode_part, parsed_index.byte_code], bytecode_part.byte_align, bytecode_part.endian, line_id)
+                        return ParsedOperand(self, composit_byte_code, parsed_index.argument)
+                    return ParsedOperand(self, bytecode_part, parsed_index.argument)
+        return None

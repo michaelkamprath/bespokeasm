@@ -1,10 +1,13 @@
 import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.model.operand import Operand, ParsedOperand
 from bespokeasm.assembler.model.operand.factory import OperandFactory
-from bespokeasm.assembler.byte_code.parts import ByteCodePart
+
 
 class OperandSet:
+    _ordered_operand_list: list[Operand]
+
     def __init__(self, name: str, config_dict: dict, default_endian: str):
         self._name = name
         self._config = config_dict
@@ -36,14 +39,25 @@ class OperandSet:
         line_id: LineIdentifier,
         operand_str: str,
         register_labels: set[str]
-    ) -> tuple[str, ByteCodePart, ByteCodePart]:
+    ) -> ParsedOperand:
         for operand in self._ordered_operand_list:
-            bytecode_part, argument_part = operand.parse_operand(line_id, operand_str, register_labels)
-            if bytecode_part is not None or argument_part is not None:
+            op: ParsedOperand = operand.parse_operand(line_id, operand_str, register_labels)
+            if op is not None:
                 # if some part was returned, then this is a valid match. Matching
                 # precedence order is important here!
-                return operand.id, bytecode_part, argument_part
-        return None, None, None
+                return op
+        return None
+
+    def match_operand(
+        self,
+        line_id: LineIdentifier,
+        operand_str: str,
+        register_labels: set[str]
+    ) -> Operand:
+        for operand in self._ordered_operand_list:
+            if operand.match_operand(line_id, operand_str, register_labels):
+                return operand
+        return None
 
 class OperandSetCollection(dict):
     def __init__(self, config_dict: dict, default_endian: str):
