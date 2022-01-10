@@ -127,3 +127,24 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertIsInstance(l1, LabelLine)
         self.assertTrue(l1.is_constant, )
         self.assertEqual(l1.get_value(), 0x0F, 'value should be right')
+
+    def test_operand_bytecode_ordering(self):
+        with pkg_resources.path(config_files, 'test_operand_features.yaml') as fp:
+            isa_model = AssemblerModel(str(fp), 0)
+        lineid = LineIdentifier(13, 'test_operand_bytecode_ordering')
+
+        t1 = InstructionLine.factory(lineid, '  ld a, $F0', 'comment', isa_model)
+        t1.set_start_address(1)
+        t1.label_scope = TestInstructionParsing.label_values
+        self.assertIsInstance(t1, InstructionLine)
+        self.assertEqual(t1.byte_size, 2, 'has 2 bytes')
+        t1.generate_bytes()
+        self.assertEqual(list(t1.get_bytes()), [0b00010011, 0xF0], 'instruction byte should match')
+
+        t2 = InstructionLine.factory(lineid, '  ld [$20], x', 'comment', isa_model)
+        t2.set_start_address(1)
+        t2.label_scope = TestInstructionParsing.label_values
+        self.assertIsInstance(t2, InstructionLine)
+        self.assertEqual(t2.byte_size, 2, 'has 2 bytes')
+        t2.generate_bytes()
+        self.assertEqual(list(t2.get_bytes()), [0b10011100, 0x20], 'instruction byte should match')

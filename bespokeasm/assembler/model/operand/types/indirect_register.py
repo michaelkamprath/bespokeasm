@@ -11,8 +11,8 @@ from .register import RegisterOperand
 class IndirectRegisterOperand(RegisterOperand):
     OPERAND_PATTERN_TEMPLATE = '^\[\s*({0})\s*(?:(\+|\-)\s*([\s\w\+\-\*\/\&\|\^\(\)\$\%]+)\s*)?\]$'
 
-    def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str):
-        super().__init__(operand_id, arg_config_dict, default_endian)
+    def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str, regsiters: set[str]) -> None:
+        super().__init__(operand_id, arg_config_dict, default_endian, regsiters)
         self._parse_pattern = re.compile(
             self.OPERAND_PATTERN_TEMPLATE.format(self.register),
             flags=re.IGNORECASE|re.MULTILINE

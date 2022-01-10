@@ -111,7 +111,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         )
         self._assert_grouped_item_list(
             grammar_json['repository']['registers']['match'],
-            ['a', 'i', 'h', 'l', 'hl', 'sp', 'mar'],
+            ['a', 'j', 'i', 'h', 'l', 'hl', 'sp', 'mar'],
             'registers'
         )
 
@@ -211,7 +211,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         )
         self._assert_grouped_item_list(
             syntax_dict['contexts']['registers'][0]['match'],
-            ['a', 'i', 'h', 'l', 'hl', 'sp', 'mar'],
+            ['a', 'j', 'i', 'h', 'l', 'hl', 'sp', 'mar'],
             'registers'
         )
         self._assert_grouped_item_list(

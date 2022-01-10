@@ -85,10 +85,10 @@ class OperandSetsModel:
 
 class SpecificOperandsModel:
     class SpecificOperandConfig:
-        def __init__(self, config: dict, default_endian: str):
+        def __init__(self, config: dict, default_endian: str, registers: set[str]):
             self._config = config
             self._operands = [
-                OperandFactory.factory(arg_type_id, arg_type_conf, default_endian)
+                OperandFactory.factory(arg_type_id, arg_type_conf, default_endian, registers)
                 for arg_type_id, arg_type_conf in self._config.get('list', {}).items()
             ]
 
@@ -114,9 +114,9 @@ class SpecificOperandsModel:
             return len(self._operands)
 
     _specific_operands: list[SpecificOperandsModel.SpecificOperandConfig]
-    def __init__(self, config: dict, default_endian: str):
+    def __init__(self, config: dict, default_endian: str, registers: set[str]):
         self._specific_operands = [
-            SpecificOperandsModel.SpecificOperandConfig(arg_confing_dict, default_endian)
+            SpecificOperandsModel.SpecificOperandConfig(arg_confing_dict, default_endian, registers)
                 for arg_confing_dict in config.values()
         ]
     def __repr__(self) -> str:
@@ -171,14 +171,14 @@ class SpecificOperandsModel:
 
 
 class OperandParser:
-    def __init__(self, instruction_operands_config: dict, operand_set_collection: OperandSetCollection, default_endian: str):
+    def __init__(self, instruction_operands_config: dict, operand_set_collection: OperandSetCollection, default_endian: str, registers: set[str]):
         if instruction_operands_config is not None:
             self._config = instruction_operands_config
         else:
             self._config = {'count': 0}
         # Set up Specific Operand
         if 'specific_operands' in self._config:
-            self._specific_operands_model = SpecificOperandsModel(self._config['specific_operands'], default_endian)
+            self._specific_operands_model = SpecificOperandsModel(self._config['specific_operands'], default_endian, registers)
         else:
             self._specific_operands_model = None
         # Sey Up Operant Sets

@@ -28,13 +28,13 @@ class TestConfigObject(unittest.TestCase):
 
     def test_argument_set_construction(self):
         conf1 = yaml.safe_load(self._eater_sap1_config_str)
-        arg_collection1 = AS.OperandSetCollection(conf1['operand_sets'], 'big')
+        arg_collection1 = AS.OperandSetCollection(conf1['operand_sets'], 'big', set([]))
         self.assertEqual(len(arg_collection1),2, 'there are 2 argument sets')
         self.assertTrue('integer' in arg_collection1)
         self.assertTrue('address' in arg_collection1)
 
         conf2 = yaml.safe_load(self._register_argument_config_str)
-        arg_collection2 = AS.OperandSetCollection(conf2['operand_sets'], 'little')
+        arg_collection2 = AS.OperandSetCollection(conf2['operand_sets'], 'little', set([ 'a', 'i', 'j', 'sp', 'ij',  'mar']))
         self.assertEqual(len(arg_collection2),4, 'there are 4 argument sets')
         self.assertTrue('8_bit_source' in arg_collection2)
         self.assertTrue('8_bit_destination' in arg_collection2)

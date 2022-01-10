@@ -1,3 +1,4 @@
+import click
 import json
 import os
 from packaging import version
@@ -33,7 +34,7 @@ class AssemblerModel:
         if 'min_version' in self._config['general']:
             required_version = self._config['general']['min_version']
             if is_verbose > 0:
-                print(f'The ISA configuration file requires BespokeASM version {required_version}. This version of BespokeASM is {BESPOKEASM_VERSION_STR}.')
+                click.echo(f'The ISA configuration file requires BespokeASM version {required_version}. This version of BespokeASM is {BESPOKEASM_VERSION_STR}.')
             if required_version > BESPOKEASM_VERSION_STR:
                 sys.exit(f'ERROR: the instruction set configuration file requires at least BespokeASM version {required_version}')
             if required_version < BESPOKEASM_MIN_REQUIRED_STR:
@@ -65,8 +66,8 @@ class AssemblerModel:
         for reg in self._registers:
             if reg in ASSEMBLER_KEYWORD_SET:
                 sys.exit(f'ERROR: the instruction set configuration file specified an unallowed register name: {reg}')
-        self._operand_sets = OperandSetCollection(self._config['operand_sets'], self.endian)
-        self._instructions = InstructionSet(self._config['instructions'], self._operand_sets, self.endian)
+        self._operand_sets = OperandSetCollection(self._config['operand_sets'], self.endian, self.registers)
+        self._instructions = InstructionSet(self._config['instructions'], self._operand_sets, self.endian, self.registers)
 
     def __repr__(self) -> str:
         return str(self)

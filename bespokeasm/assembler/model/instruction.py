@@ -20,7 +20,7 @@ from bespokeasm.assembler.byte_code.parts import NumericByteCodePart
 # from the mnemonic.
 #
 class InstructionVariant:
-    def __init__(self, mnemonic: str, instruction_variant_config: dict, operand_set_collection: OperandSetCollection, default_endian: str, variant_num: int):
+    def __init__(self, mnemonic: str, instruction_variant_config: dict, operand_set_collection: OperandSetCollection, default_endian: str, registers: set[str], variant_num: int):
         self._mnemonic = mnemonic
         self._variant_config = instruction_variant_config
         #validate config
@@ -30,7 +30,7 @@ class InstructionVariant:
             else:
                 sys.exit(f'ERROR: configuration for instruction "{mnemonic}" does not have a byte code configuration in variant {variant_num}.')
         if 'operands' in self._variant_config:
-            self._operand_parser = OperandParser(self._variant_config.get('operands', None), operand_set_collection, default_endian)
+            self._operand_parser = OperandParser(self._variant_config.get('operands', None), operand_set_collection, default_endian, registers)
             self._operand_parser.validate(mnemonic)
         else:
             self._operand_parser = None
@@ -72,7 +72,7 @@ class InstructionVariant:
 
         # generate the machine code parts
         instruction_endian = self._variant_config['byte_code'].get('endian', default_endian)
-        base_bytecode = NumericByteCodePart(self.base_bytecode_value, self.base_bytecode_size, True, instruction_endian, line_id)
+        base_bytecode = NumericByteCodePart(self.base_bytecode_value, self.base_bytecode_size, False, instruction_endian, line_id)
 
         if self._operand_parser is not None:
             matched_operands: MatchedOperandSet
@@ -91,18 +91,18 @@ class InstructionVariant:
 
 
 class Instruction:
-    def __init__(self, mnemonic: str, instruction_config: dict, operand_set_collection: OperandSetCollection, default_endian: str):
+    def __init__(self, mnemonic: str, instruction_config: dict, operand_set_collection: OperandSetCollection, default_endian: str, registers: set[str]):
         self._mnemonic = mnemonic
         self._config = instruction_config
 
         variant_num = 0
         self._variants: list[InstructionVariant] = []
-        self._variants.append(InstructionVariant(mnemonic, instruction_config, operand_set_collection, default_endian, variant_num))
+        self._variants.append(InstructionVariant(mnemonic, instruction_config, operand_set_collection, default_endian, registers, variant_num))
 
         if 'variants' in self._config:
             for variant_config in self._config['variants']:
                 variant_num += 1
-                self._variants.append(InstructionVariant(mnemonic, variant_config, operand_set_collection, default_endian, variant_num))
+                self._variants.append(InstructionVariant(mnemonic, variant_config, operand_set_collection, default_endian, registers, variant_num))
 
 
     def __repr__(self) -> str:

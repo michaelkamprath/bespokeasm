@@ -1,10 +1,15 @@
+import sys
+
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.byte_code.parts import NumericByteCodePart
 from bespokeasm.assembler.model.operand import Operand, OperandType, ParsedOperand
 
 class RegisterOperand(Operand):
-    def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str):
+    def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str, regsiters: set[str]):
         super().__init__(operand_id, arg_config_dict, default_endian)
+        if self.register not in regsiters:
+            sys.exit(f'ERROR - ISA configation declares register based operand {self} but the register label "{self.register}" is not a declared register.')
+
 
     def __str__(self):
         return f'RegisterOperand<{self.id},register={self.register}>'

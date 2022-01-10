@@ -14,12 +14,12 @@ class IndirectIndexedRegisterOperand(RegisterOperand):
 
     OPERAND_PATTERN_TEMPLATE = r'^\[\s*({0})\s*(\+|\-)\s*({1})\s*\]$'
 
-    def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str) -> None:
-        super().__init__(operand_id, arg_config_dict, default_endian)
+    def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str, regsiters: set[str]) -> None:
+        super().__init__(operand_id, arg_config_dict, default_endian, regsiters)
         self._index_operand_list = []
         op_match_patterns = []
         for op_id, op_config in self._config['index_operands'].items():
-            op = OF.OperandFactory.factory(op_id, op_config, default_endian)
+            op = OF.OperandFactory.factory(op_id, op_config, default_endian, regsiters)
             if op.null_operand:
                 sys.exit(f'ERROR: indirect indexed register operand "{operand_id}" configured with a empty index "{op_id}".')
             self._index_operand_list.append(op)
