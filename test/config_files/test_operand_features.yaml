@@ -1,5 +1,6 @@
 # Config fileis used for testing:
 #   - operand sourced bytecode ordering
+#   - deferred numeric operand type
 #
 ---
 description: Test Instructions Bytecode Ordering
