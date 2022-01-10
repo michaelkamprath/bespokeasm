@@ -9,7 +9,8 @@ general:
   identifier:
     name: kenbak-1
     version: "1.0.0"
-    extension: kb1  
+    extension: kb1
+  min_version: 0.2.0
 operand_sets:
   register_operands:
     operand_values:
@@ -60,7 +61,32 @@ operand_sets:
         argument:
           size: 8
           byte_align: true
+  direct_memory_no_bc:
+    operand_values:
+      immediate:
+        type: numeric
+        argument:
+          size: 8
+          byte_align: true
+  deferred_memory_no_bc:
+    operand_values:
+      deferred_addr:
+        type: deferred_numeric
+        bytecode:
+          value: 5
+          size: 3
+        argument:
+          size: 8
+          byte_align: true
 instructions:
+  noop:
+    byte_code:
+      value: 128
+      size: 8
+  halt:
+    byte_code:
+      value: 0
+      size: 8
   ld:
     byte_code:
       value: 2
@@ -129,34 +155,240 @@ instructions:
       operand_sets:
         list:
           - memory_operands
-  jmp:
+  jp:
     byte_code:
       value: 231
       size: 8
     operands:
       count: 1
-      specific_operands:
-        direct:
-          list:
-            immediate_addr:
-              type: numeric
-              argument:
-                size: 8
-                byte_align: true
+      operand_sets:
+        list:
+          - direct_memory_no_bc
     variants:
       - byte_code:
           value: 239
           size: 8
         operands:
           count: 1
-          specific_operands:
-            deferred:
-              list:
-                deferred_addr:
-                  type: deferred_numeric
-                  bytecode:
-                    value: 5
-                    size: 3
-                  argument:
-                    size: 8
-                    byte_align: true
+          operand_sets:
+            list:
+              - deferred_memory_no_bc
+  jm:
+    byte_code:
+      value: 247
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - direct_memory_no_bc
+    variants:
+      - byte_code:
+          value: 255
+          size: 8
+        operands:
+          count: 1
+          operand_sets:
+            list:
+              - deferred_memory_no_bc
+  jpnz:
+    byte_code:
+      value: 35
+      size: 6
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - register_operands
+          - direct_memory_no_bc
+    variants:
+      - byte_code:
+          value: 43
+          size: 6
+        operands:
+          count: 2
+          operand_sets:
+            list:
+              - register_operands
+              - deferred_memory_no_bc
+  jpz:
+    byte_code:
+      value: 36
+      size: 6
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - register_operands
+          - direct_memory_no_bc
+    variants:
+      - byte_code:
+          value: 44
+          size: 6
+        operands:
+          count: 2
+          operand_sets:
+            list:
+              - register_operands
+              - deferred_memory_no_bc
+  jpn:
+    byte_code:
+      value: 37
+      size: 6
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - register_operands
+          - direct_memory_no_bc
+    variants:
+      - byte_code:
+          value: 45
+          size: 6
+        operands:
+          count: 2
+          operand_sets:
+            list:
+              - register_operands
+              - deferred_memory_no_bc
+  jpp:
+    byte_code:
+      value: 38
+      size: 6
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - register_operands
+          - direct_memory_no_bc
+    variants:
+      - byte_code:
+          value: 46
+          size: 6
+        operands:
+          count: 2
+          operand_sets:
+            list:
+              - register_operands
+              - deferred_memory_no_bc
+  jppnz:
+    byte_code:
+      value: 39
+      size: 6
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - register_operands
+          - direct_memory_no_bc
+    variants:
+      - byte_code:
+          value: 47
+          size: 6
+        operands:
+          count: 2
+          operand_sets:
+            list:
+              - register_operands
+              - deferred_memory_no_bc
+  jmnz:
+    byte_code:
+      value: 51
+      size: 6
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - register_operands
+          - direct_memory_no_bc
+    variants:
+      - byte_code:
+          value: 59
+          size: 6
+        operands:
+          count: 2
+          operand_sets:
+            list:
+              - register_operands
+              - deferred_memory_no_bc
+  jmz:
+    byte_code:
+      value: 52
+      size: 6
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - register_operands
+          - direct_memory_no_bc
+    variants:
+      - byte_code:
+          value: 60
+          size: 6
+        operands:
+          count: 2
+          operand_sets:
+            list:
+              - register_operands
+              - deferred_memory_no_bc
+  jmn:
+    byte_code:
+      value: 53
+      size: 6
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - register_operands
+          - direct_memory_no_bc
+    variants:
+      - byte_code:
+          value: 61
+          size: 6
+        operands:
+          count: 2
+          operand_sets:
+            list:
+              - register_operands
+              - deferred_memory_no_bc
+  jmp:
+    byte_code:
+      value: 54
+      size: 6
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - register_operands
+          - direct_memory_no_bc
+    variants:
+      - byte_code:
+          value: 62
+          size: 6
+        operands:
+          count: 2
+          operand_sets:
+            list:
+              - register_operands
+              - deferred_memory_no_bc
+  jmpnz:
+    byte_code:
+      value: 55
+      size: 6
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - register_operands
+          - direct_memory_no_bc
+    variants:
+      - byte_code:
+          value: 63
+          size: 6
+        operands:
+          count: 2
+          operand_sets:
+            list:
+              - register_operands
+              - deferred_memory_no_bc
+
