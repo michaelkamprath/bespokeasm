@@ -90,6 +90,11 @@ class Operand:
         return None
 
 class OperandWithArgument(Operand):
+    def __init__(self, operand_id, arg_config_dict, default_endian, require_arg: bool = True) -> None:
+        super().__init__(operand_id, arg_config_dict, default_endian)
+        if require_arg and 'argument' not in self._config:
+            sys.exit(f'ERROR: configuration for numeric operand {self} does not have an arument configuration')
+
     @property
     def has_argument(self) -> bool:
         return 'argument' in self._config

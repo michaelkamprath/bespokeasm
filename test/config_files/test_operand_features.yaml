@@ -139,5 +139,21 @@ instructions:
         list:
           - register_operands
           - bit_indexes
-
+  num:
+    byte_code:
+      value: 0b10101
+      size: 5
+    operands:
+      count: 1
+      specific_operands:
+        num_enumeration:
+          list:
+            num_enum:
+              type: numeric_enumeration
+              bytecode:
+                value_dict:
+                  0: 0b111
+                  1: 0b101
+                  15: 0b000
+                size: 3
 

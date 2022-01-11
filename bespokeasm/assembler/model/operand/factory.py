@@ -7,7 +7,8 @@ import sys
 from bespokeasm.assembler.model.operand import Operand
 from bespokeasm.assembler.model.operand.types import empty, numeric_expression, indirect_register, \
                                                      indirect_numeric, register, indirect_indexed_register, \
-                                                     deferred_numeric, numeric_bytecode, enumeration_operand
+                                                     deferred_numeric, numeric_bytecode, enumeration_operand, \
+                                                     numeric_enumeration
 
 class OperandFactory:
 
@@ -28,6 +29,8 @@ class OperandFactory:
             return deferred_numeric.DeferredNumericOperand(operand_id, arg_config_dict, default_endian)
         elif type_str == 'enumeration':
             return enumeration_operand.EnumerationOperand(operand_id, arg_config_dict, default_endian, registers)
+        elif type_str == 'numeric_enumeration':
+            return numeric_enumeration.NumericEnumerationOperand(operand_id, arg_config_dict, default_endian, registers)
         elif type_str == 'numeric_bytecode':
             return numeric_bytecode.NumericBytecode(operand_id, arg_config_dict, default_endian)
         elif type_str == 'empty':

@@ -25,7 +25,7 @@ KENBAK-1 TODO:
 
 ## [0.2.0]
 * Added `deferred_numeric` operand type. Its intended to be used as a "double derefence" type operand (the value is at the address value contained at the address numeric value given)
-* Added `enumeration` operand type that creates byte code and argument values based on a key/value pairs
+* Added `enumeration` and `numeric_enumeration` operand type that creates byte code and argument values based on a key/value pairs. `enumeration` uses string keys, and `numeric_enumeration` uses integer key values reesolved from a numeric expression.
 * Added `numeric_bytecode` operand type that converts the operand numeric value into byte code subject to a bounds check. Useful for bit index type operands that are really different instructions based on value.
 * Added the ability for operand byte code contributions to prefix the instruction byte code as opposed to suffixing it.
 * Added instruction byte code suffix that suffixes the byte code after the operand byte code is added

@@ -221,3 +221,21 @@ class TestInstructionParsing(unittest.TestCase):
             e1 = InstructionLine.factory(lineid, '  tstb b, 14', 'second argument is too large', isa_model)
             e1.label_scope = TestInstructionParsing.label_values
             e1.generate_bytes()
+
+    def test_numeric_enumeration_operand(self):
+        with pkg_resources.path(config_files, 'test_operand_features.yaml') as fp:
+            isa_model = AssemblerModel(str(fp), 0)
+        lineid = LineIdentifier(33, 'test_numeric_enumeration_operand')
+
+        t1 = InstructionLine.factory(lineid, 'num my_val+7', 'comment', isa_model)
+        t1.set_start_address(1)
+        t1.label_scope = TestInstructionParsing.label_values
+        self.assertIsInstance(t1, InstructionLine)
+        self.assertEqual(t1.byte_size, 1, 'has 1 bytes')
+        t1.generate_bytes()
+        self.assertEqual(list(t1.get_bytes()), [0b10101000], 'instruction byte should match')
+
+        with self.assertRaises(SystemExit, msg='test invalid enumeration values'):
+            e1 = InstructionLine.factory(lineid, 'num 7', 'number 7 is not allowed', isa_model)
+            e1.label_scope = TestInstructionParsing.label_values
+            e1.generate_bytes()

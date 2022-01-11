@@ -88,6 +88,21 @@ class ExpressionByteCodePartWithValidation(ExpressionByteCodePart):
         return value
 
 
+class ExpressionEnumerationByteCodePart(ExpressionByteCodePart):
+    def __init__(self, value_dict: dict[int,int], value_expression: str, value_size: int, byte_align: bool, endian: str, line_id: LineIdentifier):
+        super().__init__(value_expression, value_size, byte_align, endian, line_id)
+        self._value_dict = value_dict
+
+    def __str__(self):
+        return f'ExpressionEnumerationByteCodePart<expression="{self._expression}",value_dict={self._value_dict}>'
+
+    def get_value(self, label_scope: LabelScope) -> int:
+        value = super().get_value(label_scope)
+        if value not in self._value_dict:
+            sys.exit(f'ERROR: {self.line_id} - numeric expression value of {value} is not an allowed value for numeric enumeration.')
+        return self._value_dict[value]
+
+
 class CompositeByteCodePart(ByteCodePart):
     _parts_list: list[ByteCodePart]
 
