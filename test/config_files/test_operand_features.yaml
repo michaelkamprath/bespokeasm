@@ -83,3 +83,16 @@ instructions:
             list:
               - memory_operands
               - register_operands
+  foo:
+    byte_code:
+      value: 6
+      size: 3
+      suffix:
+        value: 1
+        size: 2
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - memory_operands
+

@@ -61,6 +61,29 @@ operand_sets:
         argument:
           size: 8
           byte_align: true
+      indexed_x:
+        type: indirect_register
+        register: x
+        bytecode:
+          value: 6
+          size: 3
+        offset:
+          max: 255
+          min: 0
+          size: 8
+          byte_align: true
+      defered_indexed_x:
+        type: indirect_indexed_register
+        register: x
+        bytecode:
+          value: 7
+          size: 3
+        index_operands:
+          indirect_addr:
+            type: indirect_numeric
+            argument:
+              size: 8
+              byte_align: true
   direct_memory_no_bc:
     operand_values:
       immediate:

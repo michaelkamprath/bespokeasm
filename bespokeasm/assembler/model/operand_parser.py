@@ -28,8 +28,10 @@ from bespokeasm.assembler.model.operand.factory import OperandFactory
 class OperandSetsModel:
     _operand_sets: list[OperandSet]
 
-    def __init__(self, config: dict, operand_set_collection: OperandSetCollection):
+    def __init__(self, instruction: str, config: dict, operand_set_collection: OperandSetCollection):
         self._config = config
+        if 'list' not in self._config:
+            sys.exit(f'ERROR - Operand Set configuration dictionary is missting "list" key for instruction "{instruction}"')
         operand_sets = self._config['list']
         self._operand_sets = []
         for k in operand_sets:
@@ -171,7 +173,7 @@ class SpecificOperandsModel:
 
 
 class OperandParser:
-    def __init__(self, instruction_operands_config: dict, operand_set_collection: OperandSetCollection, default_endian: str, registers: set[str]):
+    def __init__(self, instruction: str, instruction_operands_config: dict, operand_set_collection: OperandSetCollection, default_endian: str, registers: set[str]):
         if instruction_operands_config is not None:
             self._config = instruction_operands_config
         else:
@@ -183,7 +185,7 @@ class OperandParser:
             self._specific_operands_model = None
         # Sey Up Operant Sets
         if 'operand_sets' in self._config:
-            self._operand_sets_model = OperandSetsModel( self._config['operand_sets'], operand_set_collection)
+            self._operand_sets_model = OperandSetsModel(instruction, self._config['operand_sets'], operand_set_collection)
         else:
             self._operand_sets_model = None
 
@@ -206,7 +208,7 @@ class OperandParser:
     def _has_operand_sets(self):
         return self._operand_sets_model is not None
 
-    def generate_machine_code(
+    def find_matching_operands(
         self, line_id: LineIdentifier,
         operands: list[str],
         register_labels: set[str]
@@ -250,7 +252,7 @@ class MatchedOperandSet:
     def __str__(self) -> str:
         return f'MatchedOperandSet<{self._operands}>'
 
-    def generate_byte_code(self, base_bytecode: ByteCodePart) -> list[ByteCodePart]:
+    def generate_byte_code(self, base_bytecode: ByteCodePart, base_bytecode_suffix: ByteCodePart) -> list[ByteCodePart]:
         machine_code: list[ByteCodePart] = [base_bytecode]
         # first add bytecode
         for op in self._operands:
@@ -259,6 +261,8 @@ class MatchedOperandSet:
                     machine_code.append(op.byte_code)
                 elif op.operand.bytecode_position == OperandBytecodePositionType.PREFIX:
                     machine_code.insert(0, op.byte_code)
+        if base_bytecode_suffix is not None:
+            machine_code.append(base_bytecode_suffix)
         # now add arguments
         arguments = [op.argument for op in self._operands if op.argument is not None]
         if self._reverse_arg_order:
