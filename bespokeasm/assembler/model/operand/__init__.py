@@ -9,8 +9,10 @@ class OperandType(enum.Enum):
     # these values double as sort order for processing in an operand set
     UNKNOWN = -1
     EMPTY = 1
-    NUMERIC = 7
-    REGISTER = 6
+    NUMERIC = 8
+    NUMERIC_BYTECODE = 9
+    REGISTER = 7
+    DICTIONARY_KEY = 6
     INDIRECT_REGISTER = 2
     INDIRECT_INDEXED_REGISTER = 3
     INDIRECT_NUMERIC = 4
@@ -86,6 +88,20 @@ class Operand:
     def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> ParsedOperand:
         # this should be overridden
         return None
+
+class OperandWithArgument(Operand):
+    @property
+    def has_argument(self) -> bool:
+        return 'argument' in self._config
+    @property
+    def argument_size(self) -> int:
+        return self._config['argument']['size']
+    @property
+    def argument_byte_align(self) -> bool:
+        return self._config['argument']['byte_align']
+    @property
+    def argument_endian(self) -> str:
+        return self._config['argument'].get('endian', self._default_endian)
 
 class ParsedOperand:
     '''A structure class to contain the results of a operand parsing.'''

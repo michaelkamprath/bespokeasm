@@ -2,9 +2,12 @@
 
 
 
+import sys
 
 from bespokeasm.assembler.model.operand import Operand
-from bespokeasm.assembler.model.operand.types import empty, numeric_expression, indirect_register, indirect_numeric, register, indirect_indexed_register, deferred_numeric
+from bespokeasm.assembler.model.operand.types import empty, numeric_expression, indirect_register, \
+                                                     indirect_numeric, register, indirect_indexed_register, \
+                                                     deferred_numeric, numeric_bytecode, enumeration_operand
 
 class OperandFactory:
 
@@ -23,7 +26,11 @@ class OperandFactory:
             return indirect_numeric.IndirectNumericOperand(operand_id, arg_config_dict, default_endian)
         elif type_str == 'deferred_numeric':
             return deferred_numeric.DeferredNumericOperand(operand_id, arg_config_dict, default_endian)
+        elif type_str == 'enumeration':
+            return enumeration_operand.EnumerationOperand(operand_id, arg_config_dict, default_endian, registers)
+        elif type_str == 'numeric_bytecode':
+            return numeric_bytecode.NumericBytecode(operand_id, arg_config_dict, default_endian)
         elif type_str == 'empty':
             return empty.EmptyOperand(operand_id, arg_config_dict, default_endian)
         else:
-            return None
+            sys.exit(f'ERROR - Operand {operand_id} was configured with unknown type "{type_str}"')

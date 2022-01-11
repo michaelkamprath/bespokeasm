@@ -2,10 +2,10 @@ import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.byte_code.parts import NumericByteCodePart, ExpressionByteCodePart
-from bespokeasm.assembler.model.operand import Operand, OperandType, ParsedOperand
+from bespokeasm.assembler.model.operand import OperandWithArgument, OperandType, ParsedOperand
 
 
-class NumericExpressionOperand(Operand):
+class NumericExpressionOperand(OperandWithArgument):
     def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str):
         super().__init__(operand_id, arg_config_dict, default_endian)
         # validate config
@@ -21,15 +21,6 @@ class NumericExpressionOperand(Operand):
     @property
     def has_argument(self) -> bool:
         return True
-    @property
-    def argument_size(self) -> int:
-        return self._config['argument']['size']
-    @property
-    def argument_byte_align(self) -> bool:
-        return self._config['argument']['byte_align']
-    @property
-    def argument_endian(self) -> str:
-        return self._config['argument'].get('endian', self._default_endian)
 
     @property
     def match_pattern(self) -> str:

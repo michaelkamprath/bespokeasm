@@ -176,6 +176,8 @@ class OperandParser:
     def __init__(self, instruction: str, instruction_operands_config: dict, operand_set_collection: OperandSetCollection, default_endian: str, registers: set[str]):
         if instruction_operands_config is not None:
             self._config = instruction_operands_config
+            if 'count' not in self._config:
+                sys.exit(f'ERROR - configuration for instruction "{instruction}" does not have a "count" element')
         else:
             self._config = {'count': 0}
         # Set up Specific Operand

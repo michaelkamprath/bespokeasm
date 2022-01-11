@@ -11,10 +11,26 @@ Changes that are planned but not implemented yet:
 * Enable instruction aliases that allow alternative mnemonics for an instruction. For example, allowing `call` and `jsr` to mean the same thing.
 * Allow a label to exist on the same line as an instruction or directive
 * Create a memory block macro that allows the definition of memory blocks at specific addresses without altering the current address for compilation. This would be used for creatin RAM variables from ROM area code. Also used to place a specific block of code at a specific address. Different from `.org` in that there is an end of the block and at that point the address contniues on from what it was before the start of the block.
+* Converge on `byte_code` or `bytecode` in instruction set configuration file
 * Improve error checking:
   * Disallowed operands
   * missing `:` after labels
   * unknown labels
+
+KENBAK-1 TODO:
+* add compiler defined constants
+* Finish ISA
+* Add good examples
+* Write documentation for KENBAK-1 and Eater SAP-1
+
+## [0.2.0]
+* Added `deferred_numeric` operand type. Its intended to be used as a "double derefence" type operand (the value is at the address value contained at the address numeric value given)
+* Added `enumeration` operand type that creates byte code and argument values based on a key/value pairs
+* Added `numeric_bytecode` operand type that converts the operand numeric value into byte code subject to a bounds check. Useful for bit index type operands that are really different instructions based on value.
+* Added the ability for operand byte code contributions to prefix the instruction byte code as opposed to suffixing it.
+* Added instruction byte code suffix that suffixes the byte code after the operand byte code is added
+* Added examples for the KENBAK-1 retro-computer.
+
 
 ## [0.1.9]
 * Fixed language version checking

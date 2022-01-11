@@ -61,6 +61,14 @@ operand_sets:
         argument:
           size: 8
           byte_align: true
+  bit_indexes:
+    operand_values:
+      bit_index:
+        type: numeric_bytecode
+        bytecode:
+          size: 3
+          max: 7
+          min: 0
 instructions:
   ld:
     byte_code:
@@ -95,4 +103,41 @@ instructions:
       operand_sets:
         list:
           - memory_operands
+  tst:
+    byte_code:
+      value: 7
+      size: 5
+    operands:
+      count: 1
+      specific_operands:
+        name_dict:
+          list:
+            name_dict:
+              type: enumeration
+              bytecode:
+                value_dict:
+                  aye: 0b000
+                  bee: 0b001
+                  cee: 0b010
+                  dee: 0b011
+                size: 3
+              argument:
+                value_dict:
+                  aye: 0xAA
+                  bee: 0xBB
+                  cee: 0xCC
+                  dee: 0xDD
+                size: 8
+                byte_align: true
+  tstb:
+    byte_code:
+      value: 3
+      size: 3
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - register_operands
+          - bit_indexes
+
 

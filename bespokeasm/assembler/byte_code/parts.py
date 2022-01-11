@@ -64,12 +64,29 @@ class ExpressionByteCodePart(ByteCodePart):
     def get_value(self, label_scope: LabelScope) -> int:
         value = self._parsed_expression.get_value(label_scope, self.line_id)
         if  isinstance( value, str):
-            print(f'ERROR: {self.line_id} - expression "{self._expression}" did not resolve to an int, got: {value}')
-            return 0
+            sys.exit(f'ERROR: {self.line_id} - expression "{self._expression}" did not resolve to an int, got: {value}')
         return value
 
     def contains_register_labels(self, register_labels: set[str]) -> bool:
         return self._parsed_expression.contains_register_labels(register_labels)
+
+class ExpressionByteCodePartWithValidation(ExpressionByteCodePart):
+    def __init__(self, max_value: int, min_value: int, value_expression: str, value_size: int, byte_align: bool, endian: str, line_id: LineIdentifier):
+        super().__init__(value_expression, value_size, byte_align, endian, line_id)
+        self._max = max_value
+        self._min = min_value
+
+    def __str__(self):
+        return f'ExpressionByteCodePartWithValidation<expression="{self._expression}",max={self._max},min={self._min}>'
+
+    def get_value(self, label_scope: LabelScope) -> int:
+        value = super().get_value(label_scope)
+        if self._max is not None and value > self._max:
+            sys.exit(f'ERROR: {self.line_id} - operand value of {value} exceeds maximun allowed of {self._max}')
+        if self._min is not None and value < self._min:
+            sys.exit(f'ERROR: {self.line_id} - operand value of {value} is less than minimum allowed of {self._min}')
+        return value
+
 
 class CompositeByteCodePart(ByteCodePart):
     _parts_list: list[ByteCodePart]
