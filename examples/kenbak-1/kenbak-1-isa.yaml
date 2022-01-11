@@ -101,6 +101,39 @@ operand_sets:
         argument:
           size: 8
           byte_align: true
+  bit_indexes:
+    operand_values:
+      bit_index:
+        type: numeric_bytecode
+        bytecode:
+          size: 3
+          max: 7
+          min: 0
+  shift_enums:
+    operand_values:
+      shift_enums:
+        type: numeric_enumeration
+        bytecode:
+          size: 2
+          value_dict:
+            1: 0b01
+            2: 0b10
+            3: 0b11
+            4: 0b00
+  shift_registers:
+    operand_values:
+      register_a:
+        type: register
+        register: a
+        bytecode:
+          value: 0
+          size: 1
+      register_b:
+        type: register
+        register: b
+        bytecode:
+          value: 1
+          size: 1
 instructions:
   noop:
     byte_code:
@@ -414,4 +447,107 @@ instructions:
             list:
               - register_operands
               - deferred_memory_no_bc
-
+  skip0:
+    byte_code:
+      value: 2
+      size: 2
+      suffix:
+        value: 2
+        size: 3
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - bit_indexes
+          - direct_memory_no_bc
+  skip1:
+    byte_code:
+      value: 3
+      size: 2
+      suffix:
+        value: 2
+        size: 3
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - bit_indexes
+          - direct_memory_no_bc
+  set0:
+    byte_code:
+      value: 0
+      size: 2
+      suffix:
+        value: 2
+        size: 3
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - bit_indexes
+          - direct_memory_no_bc
+  set1:
+    byte_code:
+      value: 1
+      size: 2
+      suffix:
+        value: 2
+        size: 3
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - bit_indexes
+          - direct_memory_no_bc
+  sftl:
+    byte_code:
+      value: 0b10
+      size: 2
+      suffix:
+        value: 1
+        size: 3
+      operands:
+        count: 2
+        operand_sets:
+          list:
+            - shift_registers
+            - shift_enums
+  sftr:
+    byte_code:
+      value: 0b00
+      size: 2
+      suffix:
+        value: 1
+        size: 3
+      operands:
+        count: 2
+        operand_sets:
+          list:
+            - shift_registers
+            - shift_enums
+  rotl:
+    byte_code:
+      value: 0b11
+      size: 2
+      suffix:
+        value: 1
+        size: 3
+      operands:
+        count: 2
+        operand_sets:
+          list:
+            - shift_registers
+            - shift_enums
+  sftr:
+    byte_code:
+      value: 0b01
+      size: 2
+      suffix:
+        value: 1
+        size: 3
+      operands:
+        count: 2
+        operand_sets:
+          list:
+            - shift_registers
+            - shift_enums
