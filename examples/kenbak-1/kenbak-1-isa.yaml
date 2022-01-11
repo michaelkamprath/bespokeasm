@@ -91,6 +91,13 @@ operand_sets:
         argument:
           size: 8
           byte_align: true
+  indirect_memory_no_bc:
+    operand_values:
+      immediate:
+        type: indirect_numeric
+        argument:
+          size: 8
+          byte_align: true
   deferred_memory_no_bc:
     operand_values:
       deferred_addr:
@@ -459,7 +466,7 @@ instructions:
       operand_sets:
         list:
           - bit_indexes
-          - direct_memory_no_bc
+          - indirect_memory_no_bc
   skip1:
     byte_code:
       value: 3
@@ -472,7 +479,7 @@ instructions:
       operand_sets:
         list:
           - bit_indexes
-          - direct_memory_no_bc
+          - indirect_memory_no_bc
   set0:
     byte_code:
       value: 0
@@ -485,7 +492,7 @@ instructions:
       operand_sets:
         list:
           - bit_indexes
-          - direct_memory_no_bc
+          - indirect_memory_no_bc
   set1:
     byte_code:
       value: 1
@@ -498,7 +505,7 @@ instructions:
       operand_sets:
         list:
           - bit_indexes
-          - direct_memory_no_bc
+          - indirect_memory_no_bc
   sftl:
     byte_code:
       value: 0b10
@@ -538,7 +545,7 @@ instructions:
           list:
             - shift_registers
             - shift_enums
-  sftr:
+  rotr:
     byte_code:
       value: 0b01
       size: 2
