@@ -58,4 +58,5 @@ delay:
 .loop:
 	sub b, 1					; subtract one from B
 	jpnz b, .loop 				; if B is not zero, continue with loop
+.end:
 	jp [[delay]]				; return to caller
