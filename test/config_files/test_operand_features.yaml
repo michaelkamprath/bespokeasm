@@ -69,6 +69,31 @@ operand_sets:
           size: 3
           max: 7
           min: 0
+  shift_enums:
+    operand_values:
+      shift_enums:
+        type: numeric_enumeration
+        bytecode:
+          size: 2
+          value_dict:
+            1: 0b01
+            2: 0b10
+            3: 0b11
+            4: 0b00
+  shift_registers:
+    operand_values:
+      register_a:
+        type: register
+        register: a
+        bytecode:
+          value: 0
+          size: 1
+      register_b:
+        type: register
+        register: b
+        bytecode:
+          value: 1
+          size: 1
 instructions:
   ld:
     byte_code:
@@ -156,4 +181,16 @@ instructions:
                   1: 0b101
                   15: 0b000
                 size: 3
-
+  sftl:
+    byte_code:
+      value: 0b10
+      size: 2
+      suffix:
+        value: 1
+        size: 3
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - shift_registers
+          - shift_enums

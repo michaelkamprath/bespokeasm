@@ -102,9 +102,6 @@ operand_sets:
     operand_values:
       deferred_addr:
         type: deferred_numeric
-        bytecode:
-          value: 5
-          size: 3
         argument:
           size: 8
           byte_align: true
@@ -513,12 +510,12 @@ instructions:
       suffix:
         value: 1
         size: 3
-      operands:
-        count: 2
-        operand_sets:
-          list:
-            - shift_registers
-            - shift_enums
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - shift_registers
+          - shift_enums
   sftr:
     byte_code:
       value: 0b00
@@ -526,12 +523,12 @@ instructions:
       suffix:
         value: 1
         size: 3
-      operands:
-        count: 2
-        operand_sets:
-          list:
-            - shift_registers
-            - shift_enums
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - shift_registers
+          - shift_enums
   rotl:
     byte_code:
       value: 0b11
@@ -539,12 +536,12 @@ instructions:
       suffix:
         value: 1
         size: 3
-      operands:
-        count: 2
-        operand_sets:
-          list:
-            - shift_registers
-            - shift_enums
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - shift_registers
+          - shift_enums
   rotr:
     byte_code:
       value: 0b01
@@ -552,9 +549,9 @@ instructions:
       suffix:
         value: 1
         size: 3
-      operands:
-        count: 2
-        operand_sets:
-          list:
-            - shift_registers
-            - shift_enums
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - shift_registers
+          - shift_enums

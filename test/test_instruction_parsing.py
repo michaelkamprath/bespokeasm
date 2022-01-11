@@ -235,6 +235,14 @@ class TestInstructionParsing(unittest.TestCase):
         t1.generate_bytes()
         self.assertEqual(list(t1.get_bytes()), [0b10101000], 'instruction byte should match')
 
+        t2 = InstructionLine.factory(lineid, 'sftl a, 1', 'comment', isa_model)
+        t2.set_start_address(1)
+        t2.label_scope = TestInstructionParsing.label_values
+        self.assertIsInstance(t2, InstructionLine)
+        self.assertEqual(t2.byte_size, 1, 'has 1 bytes')
+        t2.generate_bytes()
+        self.assertEqual(list(t2.get_bytes()), [0b10001001], 'instruction byte should match')
+
         with self.assertRaises(SystemExit, msg='test invalid enumeration values'):
             e1 = InstructionLine.factory(lineid, 'num 7', 'number 7 is not allowed', isa_model)
             e1.label_scope = TestInstructionParsing.label_values
