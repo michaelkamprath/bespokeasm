@@ -21,10 +21,10 @@ The KENBAK-1 programming reference describes fie addressing modes to be used as 
 ### Instructions
 All instructions are expressed by the following notation:
 ```asm
-mnemonic operand1, operand2 
+mnemonic operand1, operand2
 ```
 
-The number of operands required depends on the instruction mnemonic. All operands use BespokeASM notation. 
+The number of operands required depends on the instruction mnemonic. All operands use BespokeASM notation.
 
 | Instruction Mnemonic | Operand 1 | Operand 2 | Description |
 |:-:|:-:|:-:|:--|
@@ -81,14 +81,14 @@ The KENBAK-1 configuration for BespokeASM automatically sets the origin for code
 BespokeASM will issue a warning if the generate code or data addresses should ever overlap with the builtin address values for the defined memory locations described above.
 
 ## Examples
-Examples programs that use the syntax defined here can be found in [this directory](./). 
+Examples programs that use the syntax defined here can be found in [this directory](./).
 
 ## Compiling Code
 To compile the code, follow the BespokeASM instructions using the `kenbak-1-isa.yaml` BespokeASM configuration file found in this directory. Note that this configuration file defines the file extension for KENBAK-1 assembly code to be `.kb1`. The typical compilation command will look like:
 
 ```sh
-bespokeasm compile -p -c kenbak-1-isa.yaml my_code.kb`
+bespokeasm compile -p -c kenbak-1-isa.yaml my_code.kb
 ```
 
 ### Syntax Highlighting
-BespokeASM has the ability to generate for various popular text editors a syntax highlighting language extension specific to this KENBAK-1 instruction set. [See the documentation](https://github.com/michaelkamprath/bespokeasm/wiki/Installation-and-Usage#installing-language-extensions) for information for on how to install and use the language extensions. 
+BespokeASM has the ability to generate for various popular text editors a syntax highlighting language extension specific to this KENBAK-1 instruction set. [See the documentation](https://github.com/michaelkamprath/bespokeasm/wiki/Installation-and-Usage#installing-language-extensions) for information for on how to install and use the language extensions.
