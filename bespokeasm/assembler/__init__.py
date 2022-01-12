@@ -84,6 +84,9 @@ class Assembler:
         # now merge prefined line objects and parsed line objects
         line_obs.extend(predefined_line_obs)
 
+        # now merge prefined line objects and parsed line objects
+        line_obs.extend(predefined_line_obs)
+
         # Sort lines according to their assigned address. This allows for .org directives
         line_obs.sort(key=lambda x: x.address)
         max_generated_address = line_obs[-1].address
