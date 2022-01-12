@@ -111,6 +111,36 @@ class AssemblerModel:
     def get_operand_set(self, operand_set_name: str) -> OperandSet:
         return self._operand_sets.get_operand_set(operand_set_name)
 
+    @property
+    def default_origin(self) -> int:
+        return self._config['general'].get('origin', 0)
+
+    @property
+    def predefined_constants(self) -> list[dict[str,int]]:
+        if 'predefined' in self._config and 'constants' in self._config['predefined']:
+            return self._config['predefined']['constants']
+        else:
+            return []
+
+    @property
+    def predefined_memory_blocks(self) -> list[dict]:
+        if 'predefined' in self._config and 'memory' in self._config['predefined']:
+            return self._config['predefined']['memory']
+        else:
+            return []
+
+    @property
+    def predefined_labels(self) -> list[str]:
+        '''Provides a list of labels that were created by entities defined in the ISA model.
+           Intend use is for creating syntax highlighting rules.
+        '''
+        results: list[str] = []
+        for item in self.predefined_constants:
+            results.append(item['name'])
+        for item in self.predefined_memory_blocks:
+            results.append(item['name'])
+        return results
+
     def parse_instruction(self, line_id: LineIdentifier, instruction: str) -> AssembledInstruction:
         instr_parts = instruction.strip().split(' ', 1)
         mnemonic = instr_parts[0].lower()

@@ -62,10 +62,11 @@ class LineWithBytes(LineObject):
         self._bytes = bytearray()
 
 
-    def generate_bytes(self):
+    def generate_bytes(self) -> None:
         """Finalize the bytes for this line with the label assignemnts
 
-        Must be overriden by subclass
+        Must be overriden by subclass to extend the self._bytes instance variable or
+        use the self._append_byte() method.
         """
         pass
 

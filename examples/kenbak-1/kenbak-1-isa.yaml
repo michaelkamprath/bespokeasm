@@ -6,11 +6,50 @@ general:
     - a
     - b
     - x
+  origin: 4
   identifier:
     name: kenbak-1
     version: "1.0.0"
     extension: kb1
   min_version: 0.2.0
+predefined:
+  memory:
+    - name: A_REG
+      address: 0
+      value: 0
+      size: 1
+    - name: B_REG
+      address: 1
+      value: 0
+      size: 1
+    - name: X_REG
+      address: 2
+      value: 0
+      size: 1
+    - name: P_REG
+      address: 3
+      value: 4
+      size: 1
+    - name: OUTPUT
+      address: 128
+      value: 0
+      size: 1
+    - name: A_REG_F
+      address: 129
+      value: 0
+      size: 1
+    - name: B_REG_F
+      address: 130
+      value: 0
+      size: 1
+    - name: X_REG_F
+      address: 131
+      value: 0
+      size: 1
+    - name: INPUT
+      address: 255
+      value: 0
+      size: 1
 operand_sets:
   register_operands:
     operand_values:

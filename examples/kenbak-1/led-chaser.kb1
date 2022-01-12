@@ -4,18 +4,16 @@
 ; It is written in a possibly "over done" manner to demonstrate some of
 ; the more unique programming techniques of the KENBAK-1, such as jump
 ; and mark.
-; 
+;
 #require "kenbak-1 >= 1.0.0"
 
-OUT = 128
 DELAY_COUNT = 255
 
-.org 4
 ; CODE
 
 init:
 	ld a, 1
-	ld [OUT], a					; init the screen display
+	ld [OUTPUT], a				; init the screen display
 .loop:
 	jm left_loop				; call left_loop function
 	jm right_loop				; call right_loop
@@ -25,13 +23,13 @@ left_loop:
 	.byte 0						; storage location for return address
 .start:
 	ld a, 2
-	ld [OUT], a					; load OUT with starting value
+	ld [OUTPUT], a				; load OUT with starting value
 .loop:
 	jm delay					; jump to the delay fuction
-	ld a, [OUT]					; grab the current display value
+	ld a, [OUTPUT]				; grab the current display value
 	sftl a, 1					; left shift A by 1
 	jpz a, .end				    ; if A is zero, end this direction
-	ld [OUT], a 				; update display
+	ld [OUTPUT], a 				; update display
 	jp .loop					; restart loop
 .end:
 	jp [[left_loop]]
@@ -40,13 +38,13 @@ right_loop:
 	.byte 0						; storage location for return address
 .start:
 	ld a, 64
-	ld [OUT], a					; load OUT with starting value
+	ld [OUTPUT], a				; load OUT with starting value
 .loop:
 	jm delay					; jump to the delay fuction
-	ld a, [OUT]					; grab the current display value
+	ld a, [OUTPUT]				; grab the current display value
 	sftr a, 1					; left right it by 1
 	jpz a, .end				    ; if A is zero, end this direction
-	ld [OUT], a 				; update display
+	ld [OUTPUT], a 				; update display
 	jp .loop					; restart loop
 .end:
 	jp [[right_loop]]

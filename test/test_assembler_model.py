@@ -138,5 +138,12 @@ class TestConfigObject(unittest.TestCase):
         with pkg_resources.path(config_files, 'test_min_required_version_config.yaml') as fp:
             with self.assertRaises(SystemExit, msg='the min version check should fail'):
                 model = AssemblerModel(str(fp), 0)
+
+    def test_predefined_entities(self):
+        with pkg_resources.path(config_files, 'test_compiler_features.yaml') as fp:
+            model = AssemblerModel(str(fp), 0)
+
+        self.assertSetEqual(set(model.predefined_labels), set(['CONST1', 'CONST2', 'buffer']), 'label set should equal')
+
 if __name__ == '__main__':
     unittest.main()

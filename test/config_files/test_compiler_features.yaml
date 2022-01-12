@@ -1,0 +1,100 @@
+# Config fileis used for testing:
+#   - compiler constants
+#   - predefined memory blocks
+#   - origin
+#
+---
+description: Test Instructions Bytecode Ordering
+general:
+  address_size: 8
+  endian: big
+  registers:
+    - a
+    - b
+    - x
+  origin: 4
+predefined:
+  constants:
+    - name: CONST1
+      value: 44
+    - name: CONST2
+      value: 0xBEEF
+  memory:
+    - name: buffer
+      address: 0xf200
+      value: 0
+      size: 0xff
+operand_sets:
+  register_operands:
+    operand_values:
+      register_a:
+        type: register
+        register: a
+        bytecode:
+          value: 0
+          size: 2
+          position: prefix
+      register_b:
+        type: register
+        register: b
+        bytecode:
+          value: 1
+          size: 2
+          position: prefix
+      register_x:
+        type: register
+        register: x
+        bytecode:
+          value: 2
+          size: 2
+          position: prefix
+  memory_operands:
+    operand_values:
+      immediate:
+        type: numeric
+        bytecode:
+          value: 3
+          size: 3
+        argument:
+          size: 8
+          byte_align: true
+      indirect_addr:
+        type: indirect_numeric
+        bytecode:
+          value: 4
+          size: 3
+        argument:
+          size: 8
+          byte_align: true
+      deferred_addr:
+        type: deferred_numeric
+        bytecode:
+          value: 5
+          size: 3
+        argument:
+          size: 8
+          byte_align: true
+instructions:
+  ld:
+    byte_code:
+      value: 2
+      size: 3
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - register_operands
+          - memory_operands
+    variants:
+      # "store" variant
+      - byte_code:
+          value: 3
+          size: 3
+        operands:
+          count: 2
+          operand_sets:
+            list:
+              - memory_operands
+              - register_operands
+
+
