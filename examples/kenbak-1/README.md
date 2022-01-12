@@ -53,13 +53,42 @@ The number of operands required depends on the instruction mnemonic. All operand
 | `and` | ***addressing mode*** | - | Performs a logical `AND` operation between the value indicated by the operand's addressing mode and the value in the `a` register, replacing the value in the `a` register. |
 | `or` | ***addressing mode*** | - | Performs a logical `OR` operation between the value indicated by the operand's addressing mode and the value in the `a` register, replacing the value in the `a` register. |
 | `lneg` | ***addressing mode*** | - | The `a` register is loaded with the arithmetic complement of of the value indicated by the operand's addressing mode. |
-| `sftl` | ***regsiter `a`*** or ***register `b`***| `1`, `2`, `3`, or `4` | Left shifts the bit value in the indicated register (only `a` or `b`) by the number of bits indicated by the second operand. Note that only certain values are allowed of the second operand, but it can be expressed by a numerical expression. |
-| `sftr` | ***regsiter `a`*** or ***register `b`***| `1`, `2`, `3`, or `4` | Right shifts the bit value in the indicated register (only `a` or `b`) by the number of bits indicated by the second operand. Note that only certain values are allowed of the second operand, but it can be expressed by a numerical expression. |
-| `rotl` | ***regsiter `a`*** or ***register `b`***| `1`, `2`, `3`, or `4` | Left rotates the bit value in the indicated register (only `a` or `b`) by the number of bits indicated by the second operand. Note that only certain values are allowed of the second operand, but it can be expressed by a numerical expression. |
-| `rotr` | ***regsiter `a`*** or ***register `b`***| `1`, `2`, `3`, or `4` | Left rotates the bit value in the indicated register (only `a` or `b`) by the number of bits indicated by the second operand. Note that only certain values are allowed of the second operand, but it can be expressed by a numerical expression. |
+| `sftl` | ***register `a`*** or ***register `b`***| `1`, `2`, `3`, or `4` | Left shifts the bit value in the indicated register (only `a` or `b`) by the number of bits indicated by the second operand. Note that only certain values are allowed of the second operand, but it can be expressed by a numerical expression. |
+| `sftr` | ***register `a`*** or ***register `b`***| `1`, `2`, `3`, or `4` | Right shifts the bit value in the indicated register (only `a` or `b`) by the number of bits indicated by the second operand. Note that only certain values are allowed of the second operand, but it can be expressed by a numerical expression. |
+| `rotl` | ***register `a`*** or ***register `b`***| `1`, `2`, `3`, or `4` | Left rotates the bit value in the indicated register (only `a` or `b`) by the number of bits indicated by the second operand. Note that only certain values are allowed of the second operand, but it can be expressed by a numerical expression. |
+| `rotr` | ***register `a`*** or ***register `b`***| `1`, `2`, `3`, or `4` | Left rotates the bit value in the indicated register (only `a` or `b`) by the number of bits indicated by the second operand. Note that only certain values are allowed of the second operand, but it can be expressed by a numerical expression. |
 
-### Compiler Constants
+### Defined Memory Symbols
+The KENBAK-1 configuration file for BespokeASM defines some memory addresses that can be used in code being compiled for the KENBAK-1. All of these predefined memory address symbols may be used in operands anywhere that a memory address can be used. The predefined symbols are:
+
+| Symbol | Memory Address For | Notes |
+|:-:|:-:|:-|
+|`A_REG`| `a` register | This memory address backs the `a` register |
+|`B_REG `| `b` register | This memory address backs the `b` register |
+|`X_REG `| `x` register | This memory address backs the `x` register |
+|`A_REG_F`| `a` register flags| Overflow and Carry flags for the `a` register.|
+|`B_REG_F`| `b` register flags| Overflow and Carry flags for the `b` register.|
+|`X_REG_F`| `x` register flags| Overflow and Carry flags for the `x` register.|
+|`P_REG `| program counter | Typically the program counter would not be accessed directly. |
+|`OUTPUT`|output register| Place data here to be displayed on the KENBAK-1 LEDs.|
+|`INPUT`|input register| Where to read data from for user input.|
+
+Note that these symbols are case sensitive.
+
+### Other
+The KENBAK-1 configuration for BespokeASM automatically sets the origin for code generation to address value `4`, which is typically where the start of KENBAK-1 programs reside in memory. Use the `.org` directive if you wish you change this.
+
+BespokeASM will issue a warning if the generate code or data addresses should ever overlap with the builtin address values for the defined memory locations described above.
 
 ## Examples
+Examples programs that use the syntax defined here can be found in [this directory](./). 
 
-## Compiling and Running Code
+## Compiling Code
+To compile the code, follow the BespokeASM instructions using the `kenbak-1-isa.yaml` BespokeASM configuration file found in this directory. Note that this configuration file defines the file extension for KENBAK-1 assembly code to be `.kb1`. The typical compilation command will look like:
+
+```sh
+bespokeasm compile -p -c kenbak-1-isa.yaml my_code.kb`
+```
+
+### Syntax Highlighting
+BespokeASM has the ability to generate for various popular text editors a syntax highlighting language extension specific to this KENBAK-1 instruction set. [See the documentation](https://github.com/michaelkamprath/bespokeasm/wiki/Installation-and-Usage#installing-language-extensions) for information for on how to install and use the language extensions. 
