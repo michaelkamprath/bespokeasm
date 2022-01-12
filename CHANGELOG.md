@@ -17,16 +17,12 @@ Changes that are planned but not implemented yet:
   * missing `:` after labels
   * unknown labels
 
-KENBAK-1 TODO:
-* Add good examples
-* Write documentation for KENBAK-1 and Eater SAP-1
-
 ## [0.2.0]
 * Added `deferred_numeric` operand type. Its intended to be used as a "double derefence" type operand (the value is at the address value contained at the address numeric value given)
 * Added `enumeration` and `numeric_enumeration` operand type that creates byte code and argument values based on a key/value pairs. `enumeration` uses string keys, and `numeric_enumeration` uses integer key values reesolved from a numeric expression.
 * Added `numeric_bytecode` operand type that converts the operand numeric value into byte code subject to a bounds check. Useful for bit index type operands that are really different instructions based on value.
 * Added the ability for operand byte code contributions to prefix the instruction byte code as opposed to suffixing it.
-* Added instruction byte code suffix that suffixes the byte code after the operand byte code is added
+* Added instruction byte code suffix that appends the byte code after the operand byte code is added to the base byte code.
 * Added `origin` option to `general` section of configuration that sets the initial origin address for compilation. Defaults to zero.
 * Added support for predefined constants and memory blocks with labels that can be used at compile time.
 * Added examples for the KENBAK-1 retro-computer.
@@ -66,7 +62,8 @@ First tracked released
 * Enabled the `reverse_argument_order` instruction option be applied to a specific operand configuration. This slightly changed the configuration file format.
 * Added ability for instructions with operands to have a single "empty operand" variant, e.g., `pop`
 
-[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.8...HEAD
+[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.0...v0.1.8
 [0.1.8]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.8...v0.1.7
 [0.1.7]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.7...v0.1.6
 [0.1.6]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.6...v0.1.5
