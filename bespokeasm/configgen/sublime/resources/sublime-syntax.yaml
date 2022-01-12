@@ -7,11 +7,11 @@ verson: 2
 
 contexts:
   main:
-    - include: indirect_addressing
-    - include: strings
     - include: directives
     - include: instructions
-    - include: registers
+    - include: numbers
+    - include: strings
+    - include: compiler_labels
     - match: ^\s*(\w*)(?:\s*)?(\=)
       captures:
         1: variable.other.constant
@@ -31,7 +31,9 @@ contexts:
       push:
         - meta_scope: meta.function
         - include: registers
+        - include: compiler_labels
         - include: indirect_addressing
+        - include: deferred_addressing
         - include: numerical_expressions
         - include: operands_variables
         - match: \,
@@ -46,6 +48,10 @@ contexts:
   registers:
     - match: \b(?:##REGISTERS##)\b
       scope: variable.language.register
+
+  compiler_labels:
+    - match: (?<!\w)(?:##COMPILERCONSTANTS##)\b
+      scope: constant.language
 
   strings:
     - match: "(\"|')"
@@ -68,7 +74,8 @@ contexts:
 
   numerical_expressions:
     - include: numbers
-    - include: operands_variables
+    - include: registers
+    - include: compiler_labels
     - match: "[\\+\\-\\*\\/]{1}"
       scope: keyword.operator.arithmetic
     - match: "[\\&\\|\\^]{1}"
@@ -83,16 +90,33 @@ contexts:
           pop: true
 
   indirect_addressing:
-    - match: '\['
+    - match: '(?<!\[)\[(?!\[)'
       scope: punctuation.section.brackets.begin
       push:
         - meta_scope: expression.indirect_addressing
         - include: indirect_addressing
+        - include: deferred_addressing
         - include: registers
+        - include: compiler_labels
         - include: numerical_expressions
         - include: operands_variables
         - match: '\]'
           scope: punctuation.section.brackets.end
+          pop: true
+
+  deferred_addressing:
+    - match: '[\[]{2}'
+      scope: punctuation.section.double_brackets.begin
+      push:
+        - meta_scope: expression.deferred_addressing
+        - include: indirect_addressing
+        - include: deferred_addressing
+        - include: registers
+        - include: compiler_labels
+        - include: numerical_expressions
+        - include: operands_variables
+        - match: '[\]]{2}'
+          scope: punctuation.section.double_brackets.end
           pop: true
 
   line_comment:

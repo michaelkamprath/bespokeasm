@@ -37,6 +37,9 @@ class AssembledInstruction:
             value = p.get_value(label_scope)
             if  isinstance( value, str):
                 sys.exit(f'ERROR - assembled instruction "{self}" had a part {p} that did not resolve to an int, got: {value}')
+            elif value is None:
+                sys.exit(f'ERROR - assembled instruction "{self}" had a part {p} that produced None for a value')
+
             packed_bits.append_bits(
                 value,
                 p.value_size,

@@ -52,10 +52,14 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
                     syntax_dict = yaml.safe_load(syntax_file)
                 except yaml.YAMLError as exc:
                     sys.exit(f'ERROR: {exc}')
+
+        # handle instructions
         syntax_dict['file_extensions'] = [self.code_extension]
         instructions_str: str = syntax_dict['contexts']['instructions'][0]['match']
         instructions_regex = '|'.join(self.model.instruction_mnemonics)
         syntax_dict['contexts']['instructions'][0]['match'] = instructions_str.replace('##INSTRUCTIONS##', instructions_regex)
+
+        # handle registers
         if len(self.model.registers) > 0:
             # update the registers syntax
             registers_str: str = syntax_dict['contexts']['registers'][0]['match']
@@ -64,12 +68,29 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         else:
             # remove the registers syntax
             del syntax_dict['contexts']['registers']
+
+        # handle compiler predefined labels
+        predefined_labels = self.model.predefined_labels
+        if len(predefined_labels) > 0:
+            # update the registers syntax
+            labels_str: str = syntax_dict['contexts']['compiler_labels'][0]['match']
+            labels_regex = '|'.join(predefined_labels)
+            syntax_dict['contexts']['compiler_labels'][0]['match'] = labels_str.replace('##COMPILERCONSTANTS##', labels_regex)
+        else:
+            # remove the registers syntax
+            del syntax_dict['contexts']['compiler_labels']
+
+        # compiler directives
         directives_regex = '|'.join(['\\.'+d for d in COMPILER_DIRECTIVES_SET])
         directives_str = syntax_dict['contexts']['compiler_directives'][0]['match']
         syntax_dict['contexts']['compiler_directives'][0]['match'] =  directives_str.replace('##DIRECTIVES##', directives_regex)
+
+        # data types
         datatypes_regex = '|'.join(['\\.'+d for d in BYTECODE_DIRECTIVES_SET])
         datatypes_str = syntax_dict['contexts']['data_types_directives'][0]['match']
         syntax_dict['contexts']['data_types_directives'][0]['match'] =  datatypes_str.replace('##DATATYPES##', datatypes_regex)
+
+        # preprocessor directives
         preprocessor_regex = '|'.join(PREPROCESSOR_DIRECTIVES_SET)
         updated = False
         for rule in syntax_dict['contexts']['preprocessor_directives'][0]['push']:
@@ -81,6 +102,7 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         if not updated:
             sys.exit('ERROR - INTERNAL - did not find correct preprocessor rule for Sublime systax file.')
 
+        # save syntax file
         syntax_fp = os.path.join(destination_dir, self.language_name + '.sublime-syntax')
         with open(syntax_fp, 'w', encoding='utf-8') as f:
             yaml.dump(syntax_dict, f)

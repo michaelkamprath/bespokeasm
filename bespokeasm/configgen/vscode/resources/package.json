@@ -20,6 +20,11 @@
         "snippets": [{
             "language": "putey1-assembly",
             "path": "./snippets.json"
+        }],
+        "themes": [{
+            "label": "BespokeASM Theme",
+            "uiTheme": "vs-dark",
+            "path": "./bespokeasm.tmTheme"
         }]
     },
     "categories": [

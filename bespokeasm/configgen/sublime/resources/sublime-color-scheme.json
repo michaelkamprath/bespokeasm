@@ -77,12 +77,17 @@
             "foreground": "#abd7ed"
         },
         {
+            "name": "Variables - Language Defined",
+            "scope": "constant.language",
+            "foreground": "#abedc1"
+        },
+        {
             "name": "Keyword - Preprocessor",
             "scope": "keyword.control.preprocessor",
             "foreground": "#c080ff"
         },
         {
-            "name": "Date Types",
+            "name": "Data Types",
             "scope": "storage.type",
             "foreground": "#d6adff"
 
@@ -117,6 +122,12 @@
             "scope": "punctuation.section.brackets",
             "font_style": "bold",
             "foreground": "#b72dd2"
+        },
+        {
+            "name": "Punctuation - Addressing Double Brackets",
+            "scope": "punctuation.section.double_brackets",
+            "font_style": "bold",
+            "foreground": "#d22d9b"
         },
         {
             "name": "Punctuation - Parenthesis",

@@ -7,10 +7,10 @@ import sys
 from bespokeasm.assembler import label_scope
 
 from bespokeasm.assembler.assembly_file import AssemblyFile
+from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithBytes, LineObject
-from bespokeasm.assembler.line_object.directive_line import AddressOrgLine
 from bespokeasm.assembler.line_object.label_line import LabelLine
-from bespokeasm.assembler.line_object.factory import LineOjectFactory
+from bespokeasm.assembler.line_object.predefined_data import PredefinedDataLine
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType
 
@@ -42,22 +42,47 @@ class Assembler:
 
     def assemble_bytecode(self):
         global_label_scope = LabelScope.global_scope(self._model.registers)
+        # add predefined constants to global scope
+        predefines_lineid = LineIdentifier(0, os.path.basename(self._config_file))
+        for predefined_constant in self._model.predefined_constants:
+            label: str = predefined_constant['name']
+            value: int = predefined_constant['value']
+            global_label_scope.set_label_value(label, value, predefines_lineid)
+
+        # create the predefined memory blocks
+        predefined_line_obs: list[LineObject] = []
+        for predefined_memory in self._model.predefined_memory_blocks:
+            label: str = predefined_memory['name']
+            address: int = predefined_memory['address']
+            value: int = predefined_memory['value']
+            byte_length: int = predefined_memory['size']
+            # create data object
+            data_obj = PredefinedDataLine(predefines_lineid, byte_length, value, label)
+            data_obj.set_start_address(address)
+            predefined_line_obs.append(data_obj)
+            # set data object's label
+            global_label_scope.set_label_value(label, address, predefines_lineid)
+
+            # add its label to the global scope
         # find base file containing directory
         include_dirs = set([os.path.dirname(self.source_file)]+list(self._include_paths))
 
         asm_file = AssemblyFile(self.source_file, global_label_scope)
-        line_obs = asm_file.load_line_objects(self._model, include_dirs, self._verbose)
+        line_obs: list[LineObject] = asm_file.load_line_objects(self._model, include_dirs, self._verbose)
 
         if self._verbose > 2:
             click.echo(f'Found {len(line_obs)} lines across all source files')
 
         # First pass: assign addresses to labels
-        cur_address = 0
+        cur_address = self._model.default_origin
         for l in line_obs:
             l.set_start_address(cur_address)
             cur_address = l.address + l.byte_size
             if isinstance(l, LabelLine) and not l.is_constant:
                 l.label_scope.set_label_value(l.get_label(), l.get_value(), l.line_id)
+
+        # now merge prefined line objects and parsed line objects
+        line_obs.extend(predefined_line_obs)
 
         # Sort lines according to their assigned address. This allows for .org directives
         line_obs.sort(key=lambda x: x.address)

@@ -1,0 +1,196 @@
+# Config fileis used for testing:
+#   - operand sourced bytecode ordering
+#   - deferred numeric operand type
+#
+---
+description: Test Instructions Bytecode Ordering
+general:
+  address_size: 8
+  endian: big
+  registers:
+    - a
+    - b
+    - x
+operand_sets:
+  register_operands:
+    operand_values:
+      register_a:
+        type: register
+        register: a
+        bytecode:
+          value: 0
+          size: 2
+          position: prefix
+      register_b:
+        type: register
+        register: b
+        bytecode:
+          value: 1
+          size: 2
+          position: prefix
+      register_x:
+        type: register
+        register: x
+        bytecode:
+          value: 2
+          size: 2
+          position: prefix
+  memory_operands:
+    operand_values:
+      immediate:
+        type: numeric
+        bytecode:
+          value: 3
+          size: 3
+        argument:
+          size: 8
+          byte_align: true
+      indirect_addr:
+        type: indirect_numeric
+        bytecode:
+          value: 4
+          size: 3
+        argument:
+          size: 8
+          byte_align: true
+      deferred_addr:
+        type: deferred_numeric
+        bytecode:
+          value: 5
+          size: 3
+        argument:
+          size: 8
+          byte_align: true
+  bit_indexes:
+    operand_values:
+      bit_index:
+        type: numeric_bytecode
+        bytecode:
+          size: 3
+          max: 7
+          min: 0
+  shift_enums:
+    operand_values:
+      shift_enums:
+        type: numeric_enumeration
+        bytecode:
+          size: 2
+          value_dict:
+            1: 0b01
+            2: 0b10
+            3: 0b11
+            4: 0b00
+  shift_registers:
+    operand_values:
+      register_a:
+        type: register
+        register: a
+        bytecode:
+          value: 0
+          size: 1
+      register_b:
+        type: register
+        register: b
+        bytecode:
+          value: 1
+          size: 1
+instructions:
+  ld:
+    byte_code:
+      value: 2
+      size: 3
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - register_operands
+          - memory_operands
+    variants:
+      # "store" variant
+      - byte_code:
+          value: 3
+          size: 3
+        operands:
+          count: 2
+          operand_sets:
+            list:
+              - memory_operands
+              - register_operands
+  foo:
+    byte_code:
+      value: 6
+      size: 3
+      suffix:
+        value: 1
+        size: 2
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - memory_operands
+  tst:
+    byte_code:
+      value: 7
+      size: 5
+    operands:
+      count: 1
+      specific_operands:
+        name_dict:
+          list:
+            name_dict:
+              type: enumeration
+              bytecode:
+                value_dict:
+                  aye: 0b000
+                  bee: 0b001
+                  cee: 0b010
+                  dee: 0b011
+                size: 3
+              argument:
+                value_dict:
+                  aye: 0xAA
+                  bee: 0xBB
+                  cee: 0xCC
+                  dee: 0xDD
+                size: 8
+                byte_align: true
+  tstb:
+    byte_code:
+      value: 3
+      size: 3
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - register_operands
+          - bit_indexes
+  num:
+    byte_code:
+      value: 0b10101
+      size: 5
+    operands:
+      count: 1
+      specific_operands:
+        num_enumeration:
+          list:
+            num_enum:
+              type: numeric_enumeration
+              bytecode:
+                value_dict:
+                  0: 0b111
+                  1: 0b101
+                  15: 0b000
+                size: 3
+  sftl:
+    byte_code:
+      value: 0b10
+      size: 2
+      suffix:
+        value: 1
+        size: 3
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - shift_registers
+          - shift_enums

@@ -6,6 +6,7 @@ general:
   registers:
     - a
     - i
+    - j
     - h
     - l
     - hl

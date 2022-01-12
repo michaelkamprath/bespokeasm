@@ -28,13 +28,13 @@ class TestConfigObject(unittest.TestCase):
 
     def test_argument_set_construction(self):
         conf1 = yaml.safe_load(self._eater_sap1_config_str)
-        arg_collection1 = AS.OperandSetCollection(conf1['operand_sets'], 'big')
+        arg_collection1 = AS.OperandSetCollection(conf1['operand_sets'], 'big', set([]))
         self.assertEqual(len(arg_collection1),2, 'there are 2 argument sets')
         self.assertTrue('integer' in arg_collection1)
         self.assertTrue('address' in arg_collection1)
 
         conf2 = yaml.safe_load(self._register_argument_config_str)
-        arg_collection2 = AS.OperandSetCollection(conf2['operand_sets'], 'little')
+        arg_collection2 = AS.OperandSetCollection(conf2['operand_sets'], 'little', set([ 'a', 'i', 'j', 'sp', 'ij',  'mar']))
         self.assertEqual(len(arg_collection2),4, 'there are 4 argument sets')
         self.assertTrue('8_bit_source' in arg_collection2)
         self.assertTrue('8_bit_destination' in arg_collection2)
@@ -62,9 +62,9 @@ class TestConfigObject(unittest.TestCase):
         with pkg_resources.path(config_files, 'register_argument_exmaple_config.yaml') as fp:
             model2 = AssemblerModel(str(fp), 0)
 
-        piA = model2.parse_instruction(test_line_id, 'mov a, i')
+        piA = model2.parse_instruction(LineIdentifier(1,'test_mov_a_i'), 'mov a, i')
         self.assertEqual(piA.byte_size, 1, 'assembled instruciton is 1 byte')
-        self.assertEqual(piA.get_bytes(TestConfigObject.label_values), bytearray([0b01000010]), 'assembled instruction')
+        self.assertEqual(list(piA.get_bytes(TestConfigObject.label_values)), [0b01000010], 'assembled instruction')
 
         piB = model2.parse_instruction(test_line_id, 'mov a,[$1120 + label1]')
         self.assertEqual(piB.byte_size, 3, 'assembled instruciton is 3 byte')
@@ -108,9 +108,9 @@ class TestConfigObject(unittest.TestCase):
 
         piL = model2.parse_instruction(test_line_id, 'pop i')
         self.assertEqual(piL.byte_size, 1, 'assembled instruciton is 1 byte')
-        self.assertEqual(piL.get_bytes(TestConfigObject.label_values), bytearray([0b00001010]), 'pop to i')
+        self.assertEqual(list(piL.get_bytes(TestConfigObject.label_values)), [0b00001010], 'pop to i')
 
-        piM = model2.parse_instruction(test_line_id, 'pop')
+        piM = model2.parse_instruction(LineIdentifier(158,'test_pop_empty_arg'), 'pop')
         self.assertEqual(piM.byte_size, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(piM.get_bytes(TestConfigObject.label_values), bytearray([0b00001111]), 'just pop')
 
@@ -138,5 +138,12 @@ class TestConfigObject(unittest.TestCase):
         with pkg_resources.path(config_files, 'test_min_required_version_config.yaml') as fp:
             with self.assertRaises(SystemExit, msg='the min version check should fail'):
                 model = AssemblerModel(str(fp), 0)
+
+    def test_predefined_entities(self):
+        with pkg_resources.path(config_files, 'test_compiler_features.yaml') as fp:
+            model = AssemblerModel(str(fp), 0)
+
+        self.assertSetEqual(set(model.predefined_labels), set(['CONST1', 'CONST2', 'buffer']), 'label set should equal')
+
 if __name__ == '__main__':
     unittest.main()

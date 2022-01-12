@@ -1,16 +1,19 @@
 import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.model.operand import Operand, ParsedOperand
 from bespokeasm.assembler.model.operand.factory import OperandFactory
-from bespokeasm.assembler.byte_code.parts import ByteCodePart
+
 
 class OperandSet:
-    def __init__(self, name: str, config_dict: dict, default_endian: str):
+    _ordered_operand_list: list[Operand]
+
+    def __init__(self, name: str, config_dict: dict, default_endian: str, regsiters: set[str]):
         self._name = name
         self._config = config_dict
         self._ordered_operand_list = []
         for arg_type_id, arg_type_conf in self._config['operand_values'].items():
-            operand = OperandFactory.factory(arg_type_id, arg_type_conf, default_endian)
+            operand = OperandFactory.factory(arg_type_id, arg_type_conf, default_endian, regsiters)
             if operand.null_operand:
                 # null operands not supported in operand sets. must use specific operand configuration.
                 sys.exit(f'ERROR: The configuration for operand set "{name}" contains unallowed null operand type named "{arg_type_id}".')
@@ -36,20 +39,31 @@ class OperandSet:
         line_id: LineIdentifier,
         operand_str: str,
         register_labels: set[str]
-    ) -> tuple[str, ByteCodePart, ByteCodePart]:
+    ) -> ParsedOperand:
         for operand in self._ordered_operand_list:
-            bytecode_part, argument_part = operand.parse_operand(line_id, operand_str, register_labels)
-            if bytecode_part is not None or argument_part is not None:
+            op: ParsedOperand = operand.parse_operand(line_id, operand_str, register_labels)
+            if op is not None:
                 # if some part was returned, then this is a valid match. Matching
                 # precedence order is important here!
-                return operand.id, bytecode_part, argument_part
-        return None, None, None
+                return op
+        return None
+
+    def match_operand(
+        self,
+        line_id: LineIdentifier,
+        operand_str: str,
+        register_labels: set[str]
+    ) -> Operand:
+        for operand in self._ordered_operand_list:
+            if operand.match_operand(line_id, operand_str, register_labels):
+                return operand
+        return None
 
 class OperandSetCollection(dict):
-    def __init__(self, config_dict: dict, default_endian: str):
+    def __init__(self, config_dict: dict, default_endian: str, registers: set[str]):
         super().__init__(self)
         for set_name, set_config in config_dict.items():
-            self[set_name] = OperandSet(set_name, set_config, default_endian)
+            self[set_name] = OperandSet(set_name, set_config, default_endian, registers)
     def __repr__(self) -> str:
         return str(self)
     def __str__(self) -> str:
