@@ -16,7 +16,10 @@ class OperandSet:
             operand = OperandFactory.factory(arg_type_id, arg_type_conf, default_endian, regsiters)
             if operand.null_operand:
                 # null operands not supported in operand sets. must use specific operand configuration.
-                sys.exit(f'ERROR: The configuration for operand set "{name}" contains unallowed null operand type named "{arg_type_id}".')
+                sys.exit(
+                    f'ERROR: The configuration for operand set "{name}" contains unallowed null '
+                    f'operand type named "{arg_type_id}".'
+                )
             self._ordered_operand_list.append(operand)
 
         # Operands are sorted according to matching precedence order, which is set
@@ -26,6 +29,7 @@ class OperandSet:
 
     def __repr__(self) -> str:
         return str(self)
+
     def __str__(self) -> str:
         arg_type_ids = ','.join([str(id) for id in self._ordered_operand_list])
         return f'OperandSet<{self._name},[{arg_type_ids}]>'
@@ -59,18 +63,19 @@ class OperandSet:
                 return operand
         return None
 
+
 class OperandSetCollection(dict):
     def __init__(self, config_dict: dict, default_endian: str, registers: set[str]):
         super().__init__(self)
         for set_name, set_config in config_dict.items():
             self[set_name] = OperandSet(set_name, set_config, default_endian, registers)
+
     def __repr__(self) -> str:
         return str(self)
+
     def __str__(self) -> str:
         set_names = ','.join([str(v) for v in self.values()])
         return f'OperandSetCollection[{set_names}]'
 
-
     def get_operand_set(self, key) -> OperandSet:
         return self.get(key, None)
-

@@ -4,7 +4,6 @@ import io
 import math
 import os
 import sys
-from bespokeasm.assembler import label_scope
 
 from bespokeasm.assembler.assembly_file import AssemblyFile
 from bespokeasm.assembler.line_identifier import LineIdentifier
@@ -12,28 +11,29 @@ from bespokeasm.assembler.line_object import LineWithBytes, LineObject
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.line_object.predefined_data import PredefinedDataLine
 from bespokeasm.assembler.model import AssemblerModel
-from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType
+from bespokeasm.assembler.label_scope import LabelScope
+
 
 class Assembler:
     def __init__(
-            self,
-            source_file: str,
-            config_file: str,
-            output_file: str,
-            binary_start: int,
-            binary_end: int,
-            binary_fill_value: int,
-            enable_pretty_print: bool,
-            pretty_print_output: str,
-            is_verbose: int,
-            include_paths: list[str],
-        ):
+                self,
+                source_file: str,
+                config_file: str,
+                output_file: str,
+                binary_start: int,
+                binary_end: int,
+                binary_fill_value: int,
+                enable_pretty_print: bool,
+                pretty_print_output: str,
+                is_verbose: int,
+                include_paths: list[str],
+            ):
         self.source_file = source_file
         self._output_file = output_file
         self._config_file = config_file
         self._enable_pretty_print = enable_pretty_print
         self._pretty_print_output = pretty_print_output
-        self._binary_fill_value = binary_fill_value&0xff
+        self._binary_fill_value = binary_fill_value & 0xff
         self._verbose = is_verbose
         self._binary_start = binary_start
         self._binary_end = binary_end
@@ -75,11 +75,11 @@ class Assembler:
 
         # First pass: assign addresses to labels
         cur_address = self._model.default_origin
-        for l in line_obs:
-            l.set_start_address(cur_address)
-            cur_address = l.address + l.byte_size
-            if isinstance(l, LabelLine) and not l.is_constant:
-                l.label_scope.set_label_value(l.get_label(), l.get_value(), l.line_id)
+        for lobj in line_obs:
+            lobj.set_start_address(cur_address)
+            cur_address = lobj.address + lobj.byte_size
+            if isinstance(lobj, LabelLine) and not lobj.is_constant:
+                lobj.label_scope.set_label_value(lobj.get_label(), lobj.get_value(), lobj.line_id)
 
         # now merge prefined line objects and parsed line objects
         line_obs.extend(predefined_line_obs)
@@ -87,7 +87,7 @@ class Assembler:
         # Sort lines according to their assigned address. This allows for .org directives
         line_obs.sort(key=lambda x: x.address)
         max_generated_address = line_obs[-1].address
-        line_dict = { l.address: l for l in line_obs if isinstance(l, LineWithBytes)}
+        line_dict = {lobj.address: lobj for lobj in line_obs if isinstance(lobj, LineWithBytes)}
 
         # second pass: build the machine code and check for overlaps
         if self._verbose > 2:
@@ -95,17 +95,20 @@ class Assembler:
         max_instruction_text_size = 0
         byte_code = bytearray()
         last_line = None
-        for l in line_obs:
-            if isinstance(l, LineWithBytes):
-                l.generate_bytes()
+        for lobj in line_obs:
+            if isinstance(lobj, LineWithBytes):
+                lobj.generate_bytes()
             if self._verbose > 2:
-                click.echo(f'Processing {l.line_id} = {l} at address ${l.address:x}')
-            if len(l.instruction) > max_instruction_text_size:
-                max_instruction_text_size = len(l.instruction)
-            if isinstance(l, LineWithBytes):
-                if last_line is not None and (last_line.address + last_line.byte_size) > l.address:
-                    sys.exit(f'ERROR: {l.line_id} - Address of byte code overlaps with bytecode from line {last_line.line_id}')
-                last_line = l
+                click.echo(f'Processing {lobj.line_id} = {lobj} at address ${lobj.address:x}')
+            if len(lobj.instruction) > max_instruction_text_size:
+                max_instruction_text_size = len(lobj.instruction)
+            if isinstance(lobj, LineWithBytes):
+                if last_line is not None and (last_line.address + last_line.byte_size) > lobj.address:
+                    sys.exit(
+                        f'ERROR: {lobj.line_id} - Address of byte code overlaps with bytecode from '
+                        f'line {last_line.line_id}'
+                    )
+                last_line = lobj
 
         # Finally generate the binaey image
         fill_bytes = bytearray([self._binary_fill_value])
@@ -114,15 +117,15 @@ class Assembler:
         if self._verbose > 2:
             print("\nGenerating byte code:")
         while addr <= (max_generated_address if self._binary_end is None else self._binary_end):
-            l = line_dict.get(addr, None)
+            lobj = line_dict.get(addr, None)
             insertion_bytes = fill_bytes
-            if l is not None:
-                line_bytes = l.get_bytes()
+            if lobj is not None:
+                line_bytes = lobj.get_bytes()
                 if line_bytes is not None:
                     insertion_bytes = line_bytes
                     if self._verbose > 2:
                         line_bytes_str = binascii.hexlify(line_bytes, sep=' ').decode("utf-8")
-                        click.echo(f'Address ${addr:x} : {l} bytes = {line_bytes_str}')
+                        click.echo(f'Address ${addr:x} : {lobj} bytes = {line_bytes_str}')
             byte_code.extend(insertion_bytes)
             addr += len(insertion_bytes)
 
@@ -137,8 +140,6 @@ class Assembler:
             else:
                 with open(self._pretty_print_output, 'w') as f:
                     f.write(pretty_str)
-
-
 
     def _pretty_print_results(self, line_obs, max_instruction_text_size):
         output = io.StringIO()
@@ -170,13 +171,13 @@ class Assembler:
             ''.join('-'*(COL_WIDTH_BINARY)),
         )
         output.write(f'\n{header_text}\n{header_line_text}\n')
-        for l in line_obs:
-            line_str = f'{l.line_id.line_num}'.rjust(7)
-            address_value = l.address
+        for lobj in line_obs:
+            line_str = f'{lobj.line_id.line_num}'.rjust(7)
+            address_value = lobj.address
             address_str = address_format_str.format(address_value).center(COL_WIDTH_ADDRESS)
-            instruction_str = l.instruction.ljust(max_instruction_text_size)
-            if isinstance(l, LineWithBytes):
-                line_bytes = l.get_bytes()
+            instruction_str = lobj.instruction.ljust(max_instruction_text_size)
+            if isinstance(lobj, LineWithBytes):
+                line_bytes = lobj.get_bytes()
             else:
                 line_bytes = None
             if line_bytes is not None:
@@ -184,7 +185,7 @@ class Assembler:
                 # print first line
                 output.write(
                     f' {line_str} | {instruction_str} | {address_str} | 0x{bytes_list[0]:02x} | '
-                    f'{bytes_list[0]:08b} | {l.comment}\n'
+                    f'{bytes_list[0]:08b} | {lobj.comment}\n'
                 )
                 for b in bytes_list[1:]:
                     address_value += 1
@@ -195,6 +196,6 @@ class Assembler:
             else:
                 output.write(
                     f' {line_str} | {instruction_str} | {blank_address_text} | {blank_byte_text} | '
-                    f'{blank_binary_text} | {l.comment}\n'
+                    f'{blank_binary_text} | {lobj.comment}\n'
                 )
         return output.getvalue()
