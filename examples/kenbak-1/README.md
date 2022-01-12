@@ -87,7 +87,7 @@ Examples programs that use the syntax defined here can be found in [this directo
 To compile the code, follow the BespokeASM instructions using the `kenbak-1-isa.yaml` BespokeASM configuration file found in this directory. Note that this configuration file defines the file extension for KENBAK-1 assembly code to be `.kb1`. The typical compilation command will look like:
 
 ```sh
-bespokeasm compile -p -c kenbak-1-isa.yaml my_code.kb
+bespokeasm compile -p -c kenbak-1-isa.yaml my_code.kb1
 ```
 
 ### Syntax Highlighting
