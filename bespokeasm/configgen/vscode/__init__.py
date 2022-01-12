@@ -36,13 +36,18 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             with open(fp, 'r') as json_file:
                 package_json = json.load(json_file)
 
+        scope_name = 'source.' + self.language_id
+        theme_filename = self.language_id + '.tmTheme'
         package_json['name'] = self.language_name
         package_json['displayName'] = self.model.description
         package_json['version'] = self.language_version
         package_json['contributes']['languages'][0]['id'] = self.language_id
         package_json['contributes']['languages'][0]['extensions'] = ['.'+self.code_extension]
         package_json['contributes']['grammars'][0]['language'] = self.language_id
+        package_json['contributes']['grammars'][0]['scopeName'] = scope_name
         package_json['contributes']['snippets'][0]['language'] = self.language_id
+        package_json['contributes']['themes'][0]['path'] = './' + theme_filename
+
         package_fp = os.path.join(extension_dir_path, 'package.json')
         with open(package_fp, 'w', encoding='utf-8') as f:
             json.dump(package_json, f, ensure_ascii=False, indent=4)
@@ -54,9 +59,13 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             with open(fp, 'r') as json_file:
                 grammar_json = json.load(json_file)
 
+        grammar_json['scopeName'] = scope_name
+        # handle instructions
         instructions_str: str = grammar_json['repository']['instructions']['begin']
         instructions_regex = '|'.join(self.model.instruction_mnemonics)
         grammar_json['repository']['instructions']['begin'] = instructions_str.replace('##INSTRUCTIONS##', instructions_regex)
+
+        # handle registers
         if len(self.model.registers) > 0:
             # update the registers syntax
             registers_str: str = grammar_json['repository']['registers']['match']
@@ -65,6 +74,19 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
         else:
             # remove the registers syntax
             del grammar_json['repository']['registers']
+
+        # handled predefined labels
+        predefined_labels = self.model.predefined_labels
+        if len(predefined_labels) > 0:
+            # update the registers syntax
+            labels_str: str = grammar_json['repository']['compiler_labels']['match']
+            labels_regex = '|'.join(predefined_labels)
+            grammar_json['repository']['compiler_labels']['match'] = labels_str.replace('##COMPILERCONSTANTS##', labels_regex)
+        else:
+            # remove the registers syntax
+            del grammar_json['repository']['compiler_labels']
+
+        # handle bespokeasm diectives
         for item in grammar_json['repository']['directives']['patterns']:
             if 'keyword.other.directive' == item['name']:
                 directives_regex = '|'.join(['\\.'+d for d in COMPILER_DIRECTIVES_SET])
@@ -76,7 +98,7 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
                 item['match'] =  datatypes_str.replace('##DATATYPES##', datatypes_regex)
             elif 'meta.preprocessor' == item['name']:
                 for pattern in item['patterns']:
-                    if 'name' in pattern and 'keyword.control.import.include' == pattern['name']:
+                    if 'name' in pattern and 'keyword.control.preprocessor' == pattern['name']:
                         preprocessor_regex = '|'.join(PREPROCESSOR_DIRECTIVES_SET)
                         preprocesspr_str = pattern['match']
                         pattern['match'] = preprocesspr_str.replace('##PREPROCESSOR##', preprocessor_regex)
@@ -97,5 +119,10 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             shutil.copy(str(fp), extension_dir_path)
             if self.verbose > 1:
                 print(f'  generated {os.path.basename(str(fp))}')
+
+        with pkg_resources.path(resources, 'tmTheme.xml') as fp:
+            shutil.copy(str(fp), os.path.join(extension_dir_path,theme_filename))
+            if self.verbose > 1:
+                print(f'  generated {theme_filename}')
 
 
