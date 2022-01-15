@@ -10,7 +10,7 @@ from .packed_bits import PackedBits
 
 
 class ByteCodePart:
-    def __init__(self, value_size: int, byte_align: bool, endian: str, line_id: LineIdentifier):
+    def __init__(self, value_size: int, byte_align: bool, endian: str, line_id: LineIdentifier) -> None:
         self._value_size = value_size
         self._byte_align = byte_align
         self._endian = endian
@@ -32,13 +32,13 @@ class ByteCodePart:
     def line_id(self) -> LineIdentifier:
         return self._line_id
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return str(self)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return 'You really should override ByteCodePart.__str__'
 
-    def __eq__(self, other: ByteCodePart):
+    def __eq__(self, other: ByteCodePart) -> bool:
         return \
             self._value_size == other._value_size \
             and self._byte_align == other._byte_align \
@@ -53,11 +53,11 @@ class ByteCodePart:
 
 
 class NumericByteCodePart(ByteCodePart):
-    def __init__(self, value: int, value_size: int, byte_align: bool, endian: str, line_id: LineIdentifier):
+    def __init__(self, value: int, value_size: int, byte_align: bool, endian: str, line_id: LineIdentifier) -> None:
         super().__init__(value_size, byte_align, endian, line_id)
         self._value = value
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'NumericByteCodePart<value={self._value},size={self.value_size}>'
 
     def get_value(self, label_scope: LabelScope) -> int:
@@ -65,12 +65,12 @@ class NumericByteCodePart(ByteCodePart):
 
 
 class ExpressionByteCodePart(ByteCodePart):
-    def __init__(self, value_expression: str, value_size: int, byte_align: bool, endian: str, line_id: LineIdentifier):
+    def __init__(self, value_expression: str, value_size: int, byte_align: bool, endian: str, line_id: LineIdentifier) -> None:
         super().__init__(value_size, byte_align, endian, line_id)
         self._expression = value_expression
         self._parsed_expression = parse_expression(self.line_id, self._expression)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'ExpressionByteCodePart<expression="{self._expression}",size={self.value_size}>'
 
     def get_value(self, label_scope: LabelScope) -> int:
@@ -93,12 +93,12 @@ class ExpressionByteCodePartWithValidation(ExpressionByteCodePart):
                 byte_align: bool,
                 endian: str,
                 line_id: LineIdentifier
-            ):
+            ) -> None:
         super().__init__(value_expression, value_size, byte_align, endian, line_id)
         self._max = max_value
         self._min = min_value
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'ExpressionByteCodePartWithValidation<expression="{self._expression}",max={self._max},min={self._min}>'
 
     def get_value(self, label_scope: LabelScope) -> int:
@@ -119,11 +119,11 @@ class ExpressionEnumerationByteCodePart(ExpressionByteCodePart):
                 byte_align: bool,
                 endian: str,
                 line_id: LineIdentifier
-            ):
+            ) -> None:
         super().__init__(value_expression, value_size, byte_align, endian, line_id)
         self._value_dict = value_dict
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'ExpressionEnumerationByteCodePart<expression="{self._expression}",value_dict={self._value_dict}>'
 
     def get_value(self, label_scope: LabelScope) -> int:

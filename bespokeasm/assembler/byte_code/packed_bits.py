@@ -2,13 +2,13 @@ import math
 
 
 class PackedBits:
-    def __init__(self):
+    def __init__(self) -> None:
         self._bytes = bytearray(1)
         self._cur_byte_idx = 0
         self._cur_bit_idx = 7
         self._bytes[0] = 0
 
-    def append_bits(self, value, bit_size, byte_aligned, endian='big'):
+    def append_bits(self, value, bit_size, byte_aligned, endian='big') -> None:
         value_bytes = value.to_bytes(math.ceil(bit_size/8), byteorder=endian, signed=(value < 0))
         # there is probably a more efficient way to do this, but for now this works
         if byte_aligned and self._cur_bit_idx < 7:
@@ -31,5 +31,5 @@ class PackedBits:
                 self._bytes[self._cur_byte_idx] |= (bit_value << self._cur_bit_idx)
                 self._cur_bit_idx -= 1
 
-    def get_bytes(self):
+    def get_bytes(self) -> bytearray:
         return self._bytes
