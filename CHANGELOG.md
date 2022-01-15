@@ -17,6 +17,10 @@ Changes that are planned but not implemented yet:
   * missing `:` after labels
   * unknown labels
 
+## [Unreleased]
+* Fixed a bug in how compiler defined constants were handled
+* Added KENBAK-1 example
+
 ## [0.2.0]
 * Added `deferred_numeric` operand type. Its intended to be used as a "double derefence" type operand (the value is at the address value contained at the address numeric value given)
 * Added `enumeration` and `numeric_enumeration` operand type that creates byte code and argument values based on a key/value pairs. `enumeration` uses string keys, and `numeric_enumeration` uses integer key values reesolved from a numeric expression.
