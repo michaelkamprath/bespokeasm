@@ -76,6 +76,7 @@ contexts:
     - include: numbers
     - include: registers
     - include: compiler_labels
+    - include: operands_variables
     - match: "[\\+\\-\\*\\/]{1}"
       scope: keyword.operator.arithmetic
     - match: "[\\&\\|\\^]{1}"

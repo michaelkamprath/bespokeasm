@@ -12,6 +12,19 @@
         "command": "insert",
         "args": {"characters": "\n; "}
     },
+	{
+        "keys": ["enter"],
+        "context": [
+            { "key": "selector", "operator": "equal", "operand": "source.bespokeasm" },
+            {
+                "key": "preceding_text",
+                "operator": "regex_match",
+                "operand": "^\\; $"
+            }
+        ],
+        "command": "insert",
+        "args": {"characters": "\n"}
+    },
     {
         "keys": ["enter"],
         "context": [
