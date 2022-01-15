@@ -90,7 +90,7 @@ contexts:
           pop: true
 
   indirect_addressing:
-    - match: '(?<!\[)\[(?!\[)'
+    - match: (?<!\[)\[(?!\[)
       scope: punctuation.section.brackets.begin
       push:
         - meta_scope: expression.indirect_addressing
@@ -100,12 +100,12 @@ contexts:
         - include: compiler_labels
         - include: numerical_expressions
         - include: operands_variables
-        - match: '\]'
+        - match: \]
           scope: punctuation.section.brackets.end
           pop: true
 
   deferred_addressing:
-    - match: '[\[]{2}'
+    - match: (?<!\[)([\[]{2})\b
       scope: punctuation.section.double_brackets.begin
       push:
         - meta_scope: expression.deferred_addressing
