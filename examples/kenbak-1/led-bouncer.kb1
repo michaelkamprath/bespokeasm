@@ -1,0 +1,116 @@
+; LED Chaser
+;
+; This program causes the LEDs on the KENBAK-1 display to "bounce" between the 
+; edges or between positions corresponding to pressed input buttons. The
+; bouncing algorithm doesn't handle being too tightly contaied and so 
+; the boucing will "tunnel" through the barrier in those cases ;-)
+; 
+
+start:
+    ld a, 1
+    ld [ball_position], a       ; init the ball position
+    ld [loop_counter], a        ; init the loop counter
+    ld [left_right], a          ; init the left/right indicator to left (1).
+
+main_loop:
+    jm update_display           ; update display
+    ld b, [loop_counter]
+    add b, 1
+    ld [loop_counter], b
+    jpnz b, main_loop           ; if delay counter is not zero, restart main loop
+    ld a, [ball_position]
+    ld b, [left_right]          ; load left/right indicator
+    jpz b, .move_right          ; if 0, move right
+.move_left:
+    sftl a, 1                   ; left shift A by 1
+    jp .detect_bounce
+.move_right:
+    sftr a, 1                   ; right shift A by 1
+.detect_bounce:
+    ld [ball_position], a       ; save the shifted ball position
+    ; a bounce occurs when ball position is 0 or overlaps a button press
+    ; first detect wall bounce
+    jpz a, wall_bounce          ; ball bounced off wall
+    ; if no wall bounce, detect button bounce
+    and [INPUT]                 ; see if the new ball position is where a button press is
+    jpz a, main_loop            ; the ball is not where a button is, restart main loop.
+button_bounce:
+    jm toggle_direction         ; toggle the ball direction
+    ld b, [ball_position]       ; reload ball position into B
+    jpz a, .bounce_right        ; determine if ball direction is to the right
+.bounce_left:
+    sftl b, 2                   ; bounce off battier by shifting twice
+    jp .detect_wall
+.bounce_right:
+    sftr b, 2                   ; bounce off battier by shifting twice
+.detect_wall:
+    jpz b, .undo_bounce         ; ball went into wall from button, undo it
+    ld [ball_position], b       ; bounce is B value, update ball position
+    jp main_loop                ; restart main loop
+.undo_bounce:
+    jpz a, .right_wall          ; determine bounce direction (its still in A)
+.left_wall:
+    ld b, %10000000             ; load B with new ball position
+    ld [ball_position], b       ; update ball position variable
+    jp main_loop
+.right_wall:
+    ld b, %00000001             ; load B with new ball position
+    ld [ball_position], b       ; update ball position variable
+    jp main_loop
+
+wall_bounce:
+    jm toggle_direction         ; toggle direction. A will be the updated left_right value
+    jpz a, .bounce_right        ; determine bounce direction
+.bounce_left:
+    ld a, %00000010             ; load A with new ball position
+    ld [ball_position], a       ; update ball position variable
+    jp main_loop
+.bounce_right:
+    ld a, %01000000             ; load A with new ball position
+    ld [ball_position], a       ; update ball position variable
+    jp main_loop 
+
+
+; toggle_direction
+;   toggles the ball direction
+toggle_direction:
+    .byte 0                     ; return address storage
+.start:
+    ld a, [left_right]          ; load direction into A
+    jpnz a, .go_right           ; if currently going left, now go right
+.go_left:
+    ld a, 1                     ; set direction value
+    jp .end
+.go_right:
+    ld a, 0                     ; set direction value
+.end:
+    ld [left_right], a          ; update direction variable
+    jp [[toggle_direction]]
+
+; update_display
+;   Updates the display register to have a combination of the ball poisiton
+;   and the buttons pressed based on PWM status.
+; 
+PWM_MASK = %00000111
+update_display:
+	.byte 0					   ; return address storage
+.start:
+	ld a, [loop_counter]       ; place loop counter in A
+	and PWM_MASK			   ; apply PWM mask to counter
+	ld [B_REG], a			   ; copy value in A to B
+	ld a, [ball_position]      ; place ball position in A
+	jpnz b, .show_display      ; if masked PWM counter is not zero, don't show buttons
+.show_buttons:
+	or [INPUT]                 ; or input value to A register
+.show_display:
+	ld [OUTPUT], a             ; copy A to output
+.end:
+	jp [[update_display]]
+
+; Variables
+loop_counter:
+	.byte 0
+ball_position:
+    .byte 0
+left_right:
+    .byte 0
