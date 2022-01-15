@@ -84,9 +84,6 @@ class Assembler:
         # now merge prefined line objects and parsed line objects
         line_obs.extend(predefined_line_obs)
 
-        # now merge prefined line objects and parsed line objects
-        line_obs.extend(predefined_line_obs)
-
         # Sort lines according to their assigned address. This allows for .org directives
         line_obs.sort(key=lambda x: x.address)
         max_generated_address = line_obs[-1].address
@@ -107,9 +104,10 @@ class Assembler:
                 max_instruction_text_size = len(lobj.instruction)
             if isinstance(lobj, LineWithBytes):
                 if last_line is not None and (last_line.address + last_line.byte_size) > lobj.address:
+                    print(line_obs)
                     sys.exit(
-                        f'ERROR: {lobj.line_id} - Address of byte code overlaps with bytecode from '
-                        f'line {last_line.line_id}'
+                        f'ERROR: {lobj.line_id} - Address of byte code at this line overlaps with bytecode from '
+                        f'line {last_line.line_id} at address {hex(lobj.address)}'
                     )
                 last_line = lobj
 
