@@ -128,10 +128,22 @@ contexts:
   compiler_directives:
     - match: (?<!\w)(?:##DIRECTIVES##)\b
       scope: keyword.other.directive
+      push:
+        - meta_scope: meta.directive
+        - include: strings
+        - include: numerical_expressions
+        - match: (?=(?:\s*\;|\s*$))
+          pop: true
 
   data_types_directives:
     - match: (?<!\w)(?:##DATATYPES##)\b
       scope: storage.type
+      push:
+        - meta_scope: meta.directive
+        - include: strings
+        - include: numerical_expressions
+        - match: (?=(?:\s*\;|\s*$))
+          pop: true
 
   preprocessor_directives:
     - match: '^\#'

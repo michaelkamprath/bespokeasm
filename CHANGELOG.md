@@ -19,6 +19,7 @@ Changes that are planned but not implemented yet:
 
 ## [Unreleased]
 * Fixed a bug in how compiler defined constants were handled
+* Fixed and improved syntax highlighting for language extensions
 * Added KENBAK-1 example
 
 ## [0.2.0]
