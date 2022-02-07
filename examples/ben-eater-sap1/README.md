@@ -1,4 +1,4 @@
-# KENBAK-1 Assembler
+# Ben Eater SAP-1 Assembler
 This example configuration for BespokeASM creates a full featured assembler for [the Ben Easter SAP-1 breadboard CPU](https://eater.net/8bit).
 
 ## Instruction Set
@@ -11,7 +11,7 @@ The Ben Eater SAP-1 does not use explicit registers in its instruction syntax. I
 ### Addressing Modes
 The Ben Eater SAP-1 supports only the immediate addressing mode. However, in some cases the immediate value is a memory address at which the value being operated on resides. In this sense, the immediate value operand can behave like [BespokeASM's indirect addressing mode](https://github.com/michaelkamprath/bespokeasm/wiki/Assembly-Language-Syntax#addressing-modes).
 
-
+It's important to note that the SAP-1 uses a 4-bit memory address and thus has only 16 bytes of memory.
 ### Instructions
 
 All instructions are expressed by the following notation:
