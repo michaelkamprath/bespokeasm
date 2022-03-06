@@ -13,6 +13,11 @@ class TestUtilities(unittest.TestCase):
         self.assertEqual(parse_numeric_string('-1212'), -1212, 'signed interger: -1212')
         self.assertEqual(parse_numeric_string('%10011001'), 0x99, 'binary interger: 0x99')
 
+        with self.assertRaises(ValueError, msg='only integer numeric values are supported'):
+            value = parse_numeric_string('nan')
+        with self.assertRaises(ValueError, msg='only integer numeric values are supported'):
+            value = parse_numeric_string('')
+
     def test_is_string_numeric(self):
         self.assertTrue(is_string_numeric('8675309'), 'string is numeric')
         self.assertTrue(is_string_numeric('0x845FED'), 'string is numeric')

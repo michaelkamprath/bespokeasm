@@ -11,10 +11,8 @@ def parse_numeric_string(numeric_str: str) -> int:
         return int(numeric_str[2:], 16)
     elif numeric_str.startswith('b') or numeric_str.startswith('%'):
         return int(numeric_str[1:], 2)
-    elif numeric_str.isnumeric() and len(numeric_str) > 0:
-        return int(numeric_str)
     else:
-        raise ValueError(f'could not parse non-numeric string: {numeric_str}')
+        return int(numeric_str)
 
 
 PATTERN_NUMERIC = r'^(\$[0-9a-f]*|0x[0-9a-f]*|(?:b|%)[01]*|\d*)$'
