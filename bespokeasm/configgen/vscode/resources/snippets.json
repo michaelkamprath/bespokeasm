@@ -4,6 +4,11 @@
         "body": [".cstr \"$1\""],
         "description": "A null-terminated string"
     },
+    "fill": {
+        "prefix": [".fill", "fill"],
+        "body": [".fill $1, $2"],
+        "description": "Fill n-bytes with given value"
+    },
     "include": {
         "prefix": ["#include"],
         "body": ["#include \"$1\""],

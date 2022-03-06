@@ -1,0 +1,6 @@
+<snippet>
+    <content><![CDATA[.fill $1, $2]]></content>
+    <tabTrigger>&#46;fill</tabTrigger>
+    <scope>source.bespokeasm</scope>
+    <description>Fill n-bytes with given value</description>
+</snippet>
