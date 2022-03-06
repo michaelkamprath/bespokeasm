@@ -51,13 +51,17 @@ class LabelLine(LineObject):
                 sys.exit(f'ERROR: {line_id} - invalid format for constant label: {constant_label}')
             if constant_label in registers:
                 sys.exit(f'ERROR: {line_id} - used the register label "{constant_label}" as a non-register label')
-            return LabelLine(
-                line_id,
-                constant_label,
-                parse_numeric_string(numeric_str),
-                line_str,
-                comment,
-            )
+            try:
+                line_obj = LabelLine(
+                    line_id,
+                    constant_label,
+                    parse_numeric_string(numeric_str),
+                    line_str,
+                    comment,
+                )
+            except ValueError as e:
+                sys.exit(f'ERROR: {line_id} - Constant assigned nonnumeric value because {e}')
+            return line_obj
         #if we got here it was neither a Label or a Constant
         return None
 
