@@ -4,6 +4,7 @@ import sys
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithBytes, LineObject
 from bespokeasm.assembler.line_object.data_line import DataLine
+from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.expression import parse_expression, ExpresionType
 from bespokeasm.utilities import parse_numeric_string, is_string_numeric
 
@@ -37,7 +38,8 @@ class DirectiveLine:
         flags=re.IGNORECASE|re.MULTILINE
     )
 
-    def factory(line_id: LineIdentifier, line_str: str, comment: str, endian: str) -> LineObject:
+    def factory(line_id: LineIdentifier, line_str: str, comment: str, isa_model: AssemblerModel) -> LineObject:
+        endian = isa_model.endian
         # for efficiency, if it doesn't start with a period, it is not a directive
         cleaned_line_str = line_str.strip()
         if not cleaned_line_str.startswith('.'):

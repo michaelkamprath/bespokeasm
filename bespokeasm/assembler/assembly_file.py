@@ -72,17 +72,18 @@ class AssemblyFile:
                         self._handle_require_language(line_str, line_id, isa_model, log_verbosity)
                         continue
 
-                    lobj = LineOjectFactory.parse_line(line_id, line_str, isa_model)
-                    if isinstance(lobj, LabelLine):
-                        if not lobj.is_constant and LabelScopeType.get_label_scope(lobj.get_label()) != LabelScopeType.LOCAL:
-                            current_scope = LabelScope(LabelScopeType.LOCAL, self.label_scope, lobj.get_label())
-                    elif isinstance(lobj, AddressOrgLine):
-                        current_scope = self.label_scope
-                    lobj.label_scope = current_scope
-                    # setting constants now so they can be used when evluating lines later.
-                    if isinstance(lobj, LabelLine) and lobj.is_constant:
-                        lobj.label_scope.set_label_value(lobj.get_label(), lobj.get_value(), lobj.line_id)
-                    line_objects.append(lobj)
+                    lobj_list = LineOjectFactory.parse_line(line_id, line_str, isa_model)
+                    for lobj in lobj_list:
+                        if isinstance(lobj, LabelLine):
+                            if not lobj.is_constant and LabelScopeType.get_label_scope(lobj.get_label()) != LabelScopeType.LOCAL:
+                                current_scope = LabelScope(LabelScopeType.LOCAL, self.label_scope, lobj.get_label())
+                        elif isinstance(lobj, AddressOrgLine):
+                            current_scope = self.label_scope
+                        lobj.label_scope = current_scope
+                        # setting constants now so they can be used when evluating lines later.
+                        if isinstance(lobj, LabelLine) and lobj.is_constant:
+                            lobj.label_scope.set_label_value(lobj.get_label(), lobj.get_value(), lobj.line_id)
+                        line_objects.append(lobj)
 
         if log_verbosity > 1:
             click.echo(f'Found {len(line_objects)} lines in source file {self.filename}')

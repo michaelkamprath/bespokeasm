@@ -17,7 +17,7 @@ def is_valid_label(s: str):
 
 class LabelLine(LineObject):
     PATTERN_LABEL = re.compile(
-        r'^\s*(\.?\w*):',
+        r'^\s*((\.?\w*):)(?:\s*([^;]*))?\;?',
         flags=re.IGNORECASE|re.MULTILINE
     )
     PATTERN_CONSTANT = re.compile(
@@ -25,7 +25,8 @@ class LabelLine(LineObject):
         flags=re.IGNORECASE|re.MULTILINE
     )
 
-    def factory(line_id: LineIdentifier, line_str: str, comment: str, registers: set[str]):
+    @classmethod
+    def factory(cls, line_id: LineIdentifier, line_str: str, comment: str, registers: set[str]) -> LineObject:
         """Tries to match the passed line string to the Label or Constant directive patterns.
         If succcessful, returns a constructed LabelLine object. If not, None is
         returned.
@@ -34,11 +35,11 @@ class LabelLine(LineObject):
         label_match = re.search(LabelLine.PATTERN_LABEL, line_str)
         if label_match is not None:
             # set this line up as a label
-            label_val = label_match.group(1).strip()
+            label_val = label_match.group(2).strip()
             if is_valid_label(label_val):
                 if label_val in registers:
                     sys.exit(f'ERROR: {line_id} - used the register label "{label_val}" as a non-register label')
-                return LabelLine(line_id, label_val, None, line_str, comment)
+                return LabelLine(line_id, label_val, None, label_match.group(1).strip(), comment)
 
         # Now determine is the line is a constant
         constant_match = re.search(LabelLine.PATTERN_CONSTANT, line_str)
@@ -63,6 +64,18 @@ class LabelLine(LineObject):
                 sys.exit(f'ERROR: {line_id} - Constant assigned nonnumeric value because {e}')
             return line_obj
         #if we got here it was neither a Label or a Constant
+        return None
+
+    @classmethod
+    def parse_same_line_instruction(cls, line_id: LineIdentifier, line_str: str) -> str:
+        '''Parses a instruction string that has already been identified as a label line to see
+           if there is a second instruction on the line. If so, return that string, otherwise None.
+        '''
+        label_match = re.search(LabelLine.PATTERN_LABEL, line_str)
+        if label_match is not None:
+            instr_str = label_match.group(3)
+            if instr_str is not None and len(instr_str.strip()) > 0:
+                return instr_str.strip()
         return None
 
     def __init__(self, line_id: LineIdentifier, label: str, value: int, instruction: str, comment: str):

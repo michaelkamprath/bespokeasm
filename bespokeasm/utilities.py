@@ -3,7 +3,8 @@ import re
 
 def parse_numeric_string(numeric_str: str) -> int:
     """returns an integer value for the passed numeric string. Supports decimal,
-    hexadecimal, and binary numbers
+    hexadecimal, and binary numbers. Throws `ValueError` for strings that are not
+    parsable.
     """
     if numeric_str.startswith('$'):
         return int(numeric_str[1:], 16)

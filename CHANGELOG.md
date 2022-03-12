@@ -9,7 +9,6 @@ Changes that are planned but not implemented yet:
 
 * Add ability for an instruction to have order agnostic operands. That is, `instr a, b` is the same as `instr b, a`. This allows `swap` to occupy less instruction space.
 * Enable instruction aliases that allow alternative mnemonics for an instruction. For example, allowing `call` and `jsr` to mean the same thing.
-* Allow a label to exist on the same line as an instruction or directive
 * Create a memory block macro that allows the definition of memory blocks at specific addresses without altering the current address for compilation. This would be used for creatin RAM variables from ROM area code. Also used to place a specific block of code at a specific address. Different from `.org` in that there is an end of the block and at that point the address contniues on from what it was before the start of the block.
 * Normalize use of `byte_code` or `bytecode` in instruction set configuration file
 * Improve error checking:
@@ -18,6 +17,9 @@ Changes that are planned but not implemented yet:
   * unknown labels
 
 ## [Unreleased]
+
+## [0.2.1]
+* Allow a label to exist on the same line as an instruction or directive
 * Fixed a bug in how compiler defined constants were handled
 * Fixed and improved syntax highlighting for language extensions
 * Added some snippets
@@ -69,7 +71,8 @@ First tracked released
 * Enabled the `reverse_argument_order` instruction option be applied to a specific operand configuration. This slightly changed the configuration file format.
 * Added ability for instructions with operands to have a single "empty operand" variant, e.g., `pop`
 
-[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.1...v0.2.0
 [0.2.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.0...v0.1.8
 [0.1.8]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.8...v0.1.7
 [0.1.7]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.7...v0.1.6

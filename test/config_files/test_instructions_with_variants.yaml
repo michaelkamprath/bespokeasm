@@ -9,6 +9,9 @@ general:
     - l
     - hl
     - sp
+  identifier:
+    name: test_instructions_with_cariants
+    version: "0.1.0"
 operand_sets:
   8_bit_source:
     operand_values:

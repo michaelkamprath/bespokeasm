@@ -18,7 +18,7 @@ class LineOjectFactory:
     )
 
     @classmethod
-    def parse_line(cls, line_id: LineIdentifier, line_str: str, model: AssemblerModel) -> LineObject:
+    def parse_line(cls, line_id: LineIdentifier, line_str: str, model: AssemblerModel) -> list[LineObject]:
         # find comments
         comment_str = ''
         comment_match = re.search(LineOjectFactory.PATTERN_COMMENTS, line_str)
@@ -34,20 +34,32 @@ class LineOjectFactory:
         # parse instruction
         if len(instruction_str) > 0:
             # try label
-            line_obj = LabelLine.factory(line_id, instruction_str, comment_str, model.registers)
+            line_obj= LabelLine.factory(line_id, instruction_str, comment_str, model.registers)
             if line_obj is not None:
-                return line_obj
-
+                line_obj_list = [line_obj]
+                # check to see for same line instruction
+                same_line_instr = LabelLine.parse_same_line_instruction(line_id, instruction_str)
+                if same_line_instr is not None:
+                    # try directives
+                    line_obj = DirectiveLine.factory(line_id, same_line_instr, '', model)
+                    if line_obj is not None:
+                        line_obj_list.append(line_obj)
+                    else:
+                        # try instruction
+                        line_obj = InstructionLine.factory(line_id, same_line_instr, '', model)
+                        if line_obj is not None:
+                            line_obj_list.append(line_obj)
+                return line_obj_list
             # try directives
-            line_obj = DirectiveLine.factory(line_id, instruction_str, comment_str, model.endian)
+            line_obj = DirectiveLine.factory(line_id, instruction_str, comment_str, model)
             if line_obj is not None:
-                return line_obj
+                return [line_obj]
 
             # try instruction
             line_obj = InstructionLine.factory(line_id, instruction_str, comment_str, model)
             if line_obj is not None:
-                return line_obj
+                return [line_obj]
 
         # if we got here, the line is only a comment
         line_obj = LineObject(line_id, instruction_str, comment_str)
-        return line_obj
+        return [line_obj]

@@ -2,8 +2,10 @@ import unittest
 import importlib.resources as pkg_resources
 
 from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType, GlobalLabelScope
+from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject, LineWithBytes
 from bespokeasm.assembler.line_object.data_line import DataLine
+from bespokeasm.assembler.line_object.factory import LineOjectFactory
 from bespokeasm.assembler.line_object.label_line import LabelLine, is_valid_label
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.model import AssemblerModel
@@ -147,6 +149,55 @@ class TestLineObject(unittest.TestCase):
             l_fail = LabelLine.factory(13, 'mar = $1234', 'bad label', register_set)
         with self.assertRaises(SystemExit, msg='labels should not be registers'):
             l_fail = LabelLine.factory(13, 'sp:', 'bad label', register_set)
+
+    def test_label_line_with_instruction(self):
+        with pkg_resources.path(config_files, 'test_instructions_with_variants.yaml') as fp:
+            isa_model = AssemblerModel(str(fp), 0)
+
+        label_values = GlobalLabelScope(isa_model.registers)
+        label_values.set_label_value('a_const', 40, 1)
+
+        lineid = LineIdentifier(123, 'test_label_line_with_instruction')
+
+        # test data line on label line
+        objs1: list[LineObject] = LineOjectFactory.parse_line(
+            lineid,
+            'the_byte: .byte 0x88 ; label and instruction',
+            isa_model
+        )
+        self.assertEqual(len(objs1), 2, 'there should be two instructions')
+        self.assertIsInstance(objs1[0], LabelLine, 'the first line object should be a label')
+        self.assertIsInstance(objs1[1], DataLine, 'the first line object should be a data line')
+        self.assertEqual(objs1[0].get_label(), 'the_byte', 'the label string should match')
+        objs1[1].label_scope = label_values
+        objs1[1].generate_bytes()
+        self.assertEqual(objs1[1].byte_size, 1, 'the data value should have 1 byte')
+        self.assertEqual(list(objs1[1].get_bytes()), [0x88], 'the data value should be [0x88]')
+
+        # test instruction on label line
+        objs2: list[LineObject] = LineOjectFactory.parse_line(
+            lineid,
+            'the_instr: mov a, a_const ; label and instruction',
+            isa_model
+        )
+        self.assertEqual(len(objs2), 2, 'there should be two instructions')
+        self.assertIsInstance(objs2[0], LabelLine, 'the first line object should be a label')
+        self.assertIsInstance(objs2[1], InstructionLine, 'the first line object should be an Instruction line')
+        self.assertEqual(objs2[0].get_label(), 'the_instr', 'the label string should match')
+        objs2[1].label_scope = label_values
+        objs2[1].generate_bytes()
+        self.assertEqual(objs2[1].byte_size, 2, 'the instruction value should have 2 bytes')
+        self.assertEqual(list(objs2[1].get_bytes()), [0b01000111, 40], 'the instruction bytes should match')
+
+        # labels with no inline instruction should also work
+        objs3: list[LineObject] = LineOjectFactory.parse_line(
+            lineid,
+            'the_label: ;just a label',
+            isa_model
+        )
+        self.assertEqual(len(objs3), 1, 'there should be two instructions')
+        self.assertIsInstance(objs3[0], LabelLine, 'the first line object should be a label')
+        self.assertEqual(objs3[0].get_label(), 'the_label', 'the label string should match')
 
     def test_valid_labels(self):
         self.assertTrue(is_valid_label('a_str'),'valid label')
