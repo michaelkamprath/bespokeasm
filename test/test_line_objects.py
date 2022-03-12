@@ -199,6 +199,21 @@ class TestLineObject(unittest.TestCase):
         self.assertIsInstance(objs3[0], LabelLine, 'the first line object should be a label')
         self.assertEqual(objs3[0].get_label(), 'the_label', 'the label string should match')
 
+        # labels with constants should not work
+        with self.assertRaises(SystemExit, msg='this instruction should fail'):
+            LineOjectFactory.parse_line(
+                lineid,
+                'the_label: const = 3 ; label with constant',
+                isa_model
+            )
+        # labels with other labels should not work
+        with self.assertRaises(SystemExit, msg='this instruction should fail'):
+            LineOjectFactory.parse_line(
+                lineid,
+                'the_label: the_second_label: ; label with another label',
+                isa_model
+            )
+
     def test_valid_labels(self):
         self.assertTrue(is_valid_label('a_str'),'valid label')
         self.assertTrue(is_valid_label('a_str_with_123'),'valid label')

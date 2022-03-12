@@ -1,4 +1,5 @@
 import re
+import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.model import AssemblerModel
@@ -44,11 +45,17 @@ class LineOjectFactory:
                     line_obj = DirectiveLine.factory(line_id, same_line_instr, '', model)
                     if line_obj is not None:
                         line_obj_list.append(line_obj)
-                    else:
-                        # try instruction
-                        line_obj = InstructionLine.factory(line_id, same_line_instr, '', model)
-                        if line_obj is not None:
-                            line_obj_list.append(line_obj)
+                        return line_obj_list
+
+                    # try instruction
+                    line_obj = InstructionLine.factory(line_id, same_line_instr, '', model)
+                    if line_obj is not None:
+                        line_obj_list.append(line_obj)
+                        return line_obj_list
+
+                    # if we got here, it is because there is somethign following a label punctuation colon
+                    # that shouldn't be there.
+                    sys.exit(f'ERROR: {line_id} - Improperly formatted label')
                 return line_obj_list
             # try directives
             line_obj = DirectiveLine.factory(line_id, instruction_str, comment_str, model)
