@@ -5,10 +5,11 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.byte_code.parts import NumericByteCodePart
 from bespokeasm.assembler.model.operand import OperandWithArgument, OperandType, ParsedOperand
 
+
 # TODO: Validate that the passed key is not a label of any sort
 class EnumerationOperand(OperandWithArgument):
-    _bytecode_dictionary: dict[str,int]
-    _argument_dictionary: dict[str,int]
+    _bytecode_dictionary: dict[str, int]
+    _argument_dictionary: dict[str, int]
 
     def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str, registers: set[str]):
         super().__init__(operand_id, arg_config_dict, default_endian)
@@ -21,10 +22,12 @@ class EnumerationOperand(OperandWithArgument):
         # validate
         if self.has_bytecode_value_dict:
             if registers.intersection(set(self.bytecode_value_dict.keys())):
-                sys.exit(f'ERROR - Dictionary key operand "{operand_id}" uses a register label as a key in the byte code dictionary')
+                sys.exit(f'ERROR - Dictionary key operand "{operand_id}" uses a '
+                         f'register label as a key in the byte code dictionary')
         if self.has_argument_value_dict:
             if registers.intersection(set(self.argument_value_dict.keys())):
-                sys.exit(f'ERROR - Dictionary key operand "{operand_id}" uses a register label as a key in the argument dictionary')
+                sys.exit(f'ERROR - Dictionary key operand "{operand_id}" uses a '
+                         f'register label as a key in the argument dictionary')
 
     def __str__(self):
         return f'DictionaryKey<{self.id}>'
@@ -38,7 +41,7 @@ class EnumerationOperand(OperandWithArgument):
         return self._bytecode_dictionary is not None
 
     @property
-    def bytecode_value_dict(self) -> dict[str,int]:
+    def bytecode_value_dict(self) -> dict[str, int]:
         return self._bytecode_dictionary
 
     @property
@@ -46,9 +49,8 @@ class EnumerationOperand(OperandWithArgument):
         return self._argument_dictionary is not None
 
     @property
-    def argument_value_dict(self) -> dict[str,int]:
+    def argument_value_dict(self) -> dict[str, int]:
         return self._argument_dictionary
-
 
     @property
     def bytecode_value(self) -> int:
@@ -76,7 +78,13 @@ class EnumerationOperand(OperandWithArgument):
             if self.has_argument_value_dict:
                 arg_value = self.argument_value_dict.get(matched_key, None)
                 if arg_value is not None:
-                    arg_part = NumericByteCodePart(arg_value, self.argument_size, self.argument_byte_align, self.argument_endian, line_id)
+                    arg_part = NumericByteCodePart(
+                        arg_value,
+                        self.argument_size,
+                        self.argument_byte_align,
+                        self.argument_endian,
+                        line_id
+                    )
             if bytecode_part is None and arg_part is None:
                 return None
             return ParsedOperand(self, bytecode_part, arg_part)

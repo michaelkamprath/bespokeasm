@@ -5,6 +5,7 @@ import sys
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.byte_code.parts import ByteCodePart
 
+
 class OperandType(enum.Enum):
     # these values double as sort order for processing in an operand set
     UNKNOWN = -1
@@ -18,9 +19,11 @@ class OperandType(enum.Enum):
     INDIRECT_NUMERIC = 4
     DEFERRED_NUMERIC = 5
 
+
 class OperandBytecodePositionType(enum.Enum):
     PREFIX = 1
     SUFFIX = 2
+
 
 class Operand:
     def __init__(self, operand_id, arg_config_dict, default_endian):
@@ -30,6 +33,7 @@ class Operand:
 
     def __repr__(self):
         return str(self)
+
     def __str__(self):
         return f'Operand<{self.id}>'
 
@@ -81,13 +85,10 @@ class Operand:
     def match_pattern(self) -> str:
         return ''
 
-    # def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> tuple[ByteCodePart, ByteCodePart]:
-    #     # this should be overridden
-    #     return None, None
-
     def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> ParsedOperand:
         # this should be overridden
         return None
+
 
 class OperandWithArgument(Operand):
     def __init__(self, operand_id, arg_config_dict, default_endian, require_arg: bool = True) -> None:
@@ -98,15 +99,19 @@ class OperandWithArgument(Operand):
     @property
     def has_argument(self) -> bool:
         return 'argument' in self._config
+
     @property
     def argument_size(self) -> int:
         return self._config['argument']['size']
+
     @property
     def argument_byte_align(self) -> bool:
         return self._config['argument']['byte_align']
+
     @property
     def argument_endian(self) -> str:
         return self._config['argument'].get('endian', self._default_endian)
+
 
 class ParsedOperand:
     '''A structure class to contain the results of a operand parsing.'''

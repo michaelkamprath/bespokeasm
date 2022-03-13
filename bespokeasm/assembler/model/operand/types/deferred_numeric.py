@@ -1,6 +1,7 @@
 from bespokeasm.assembler.model.operand.types.indirect_numeric import IndirectNumericOperand
 from bespokeasm.assembler.model.operand import OperandType
 
+
 class DeferredNumericOperand(IndirectNumericOperand):
 
     def __str__(self):

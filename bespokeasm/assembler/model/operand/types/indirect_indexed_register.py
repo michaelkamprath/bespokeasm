@@ -38,18 +38,19 @@ class IndirectIndexedRegisterOperand(RegisterOperand):
         self._index_parse_pattern = '|'.join(op_match_patterns)
         self._parse_pattern = re.compile(
             self.match_pattern,
-            flags=re.IGNORECASE|re.MULTILINE
+            flags=(re.IGNORECASE | re.MULTILINE),
         )
+
     def __str__(self):
         return f'IndirectIndexedRegisterOperand<{self.id}, register={self.register}, match_pattern={self.match_pattern}>'
 
     @property
     def type(self) -> OperandType:
         return OperandType.INDIRECT_INDEXED_REGISTER
+
     @property
     def match_pattern(self) -> str:
         return self.OPERAND_PATTERN_TEMPLATE.format(self.register, self._index_parse_pattern)
-
 
     def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> ParsedOperand:
         # first check that operand is what we expect
@@ -65,12 +66,17 @@ class IndirectIndexedRegisterOperand(RegisterOperand):
             index_operand_str = match.group(3)
             bytecode_part = NumericByteCodePart(self.bytecode_value, self.bytecode_size, False, 'big', line_id) \
                 if self.bytecode_value is not None else NumericByteCodePart(0, 0, False, 'big', line_id)
-             # find an index operand match
+            # find an index operand match
             for index_op in self._index_operand_list:
                 parsed_index = index_op.parse_operand(line_id, index_operand_str, register_labels)
                 if parsed_index is not None:
                     if parsed_index.byte_code is not None:
-                        composit_byte_code = CompositeByteCodePart([bytecode_part, parsed_index.byte_code], bytecode_part.byte_align, bytecode_part.endian, line_id)
+                        composit_byte_code = CompositeByteCodePart(
+                            [bytecode_part, parsed_index.byte_code],
+                            bytecode_part.byte_align,
+                            bytecode_part.endian,
+                            line_id
+                        )
                         return ParsedOperand(self, composit_byte_code, parsed_index.argument)
                     return ParsedOperand(self, bytecode_part, parsed_index.argument)
         return None

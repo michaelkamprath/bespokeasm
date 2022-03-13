@@ -28,7 +28,13 @@ class IndirectNumericOperand(NumericExpressionOperand):
         if match is not None and len(match.groups()) > 0:
             bytecode_part = NumericByteCodePart(self.bytecode_value, self.bytecode_size, False, 'big', line_id) \
                 if self.bytecode_value is not None else None
-            arg_part = ExpressionByteCodePart(match.group(1).strip(), self.argument_size, self.argument_byte_align, self.argument_endian, line_id)
+            arg_part = ExpressionByteCodePart(
+                match.group(1).strip(),
+                self.argument_size,
+                self.argument_byte_align,
+                self.argument_endian,
+                line_id,
+            )
             if arg_part.contains_register_labels(register_labels):
                 return None
             return ParsedOperand(self, bytecode_part, arg_part)

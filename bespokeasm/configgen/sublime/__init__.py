@@ -1,35 +1,32 @@
-from importlib.abc import Loader
 import importlib.resources as pkg_resources
-import json
 import os
-from pathlib import Path
 import shutil
 import sys
 import tempfile
 import yaml
 from zipfile import ZipFile
 
-from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.configgen import LanguageConfigGenerator
 import bespokeasm.configgen.sublime.resources as resources
 from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET, BYTECODE_DIRECTIVES_SET, PREPROCESSOR_DIRECTIVES_SET
 
+
 class SublimeConfigGenerator(LanguageConfigGenerator):
     def __init__(
-            self,
-            config_file_path: str,
-            is_verbose: int,
-            save_config_dir: str,
-            language_name: str,
-            language_version: str,
-            code_extension: str,
-        ) -> None:
+                self,
+                config_file_path: str,
+                is_verbose: int,
+                save_config_dir: str,
+                language_name: str,
+                language_version: str,
+                code_extension: str,
+            ) -> None:
         super().__init__(config_file_path, is_verbose, save_config_dir, language_name, language_version, code_extension)
 
     def generate(self) -> None:
         if self.verbose >= 1:
             print(f'Generating Sublime text editor package for language "{self.language_name}" into: {self.export_dir}')
-        #create a temp directory to building things in
+        # create a temp directory to building things in
         tmp_dir = tempfile.mkdtemp()
         self._generate_files_in_dir(tmp_dir)
 
@@ -45,7 +42,7 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         if self.verbose >= 3:
             print(f'  Constructing files into temp dir: {destination_dir}')
 
-        #generate syntax file
+        # generate syntax file
         with pkg_resources.path(resources, 'sublime-syntax.yaml') as fp:
             with open(fp, 'r') as syntax_file:
                 try:
@@ -55,16 +52,20 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
 
         # handle instructions
         syntax_dict['file_extensions'] = [self.code_extension]
-        instructions_str: str = syntax_dict['contexts']['instructions'][0]['match']
-        instructions_regex = '|'.join(self.model.instruction_mnemonics)
-        syntax_dict['contexts']['instructions'][0]['match'] = instructions_str.replace('##INSTRUCTIONS##', instructions_regex)
+        syntax_dict['contexts']['instructions'][0]['match'] = self._replace_token_with_regex_list(
+            syntax_dict['contexts']['instructions'][0]['match'],
+            '##INSTRUCTIONS##',
+            self.model.instruction_mnemonics
+        )
 
         # handle registers
         if len(self.model.registers) > 0:
             # update the registers syntax
-            registers_str: str = syntax_dict['contexts']['registers'][0]['match']
-            registers_regex = '|'.join(self.model.registers)
-            syntax_dict['contexts']['registers'][0]['match'] = registers_str.replace('##REGISTERS##', registers_regex)
+            syntax_dict['contexts']['registers'][0]['match'] = self._replace_token_with_regex_list(
+                syntax_dict['contexts']['registers'][0]['match'],
+                '##REGISTERS##',
+                self.model.registers
+            )
         else:
             # remove the registers syntax
             del syntax_dict['contexts']['registers']
@@ -73,9 +74,11 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         predefined_labels = self.model.predefined_labels
         if len(predefined_labels) > 0:
             # update the registers syntax
-            labels_str: str = syntax_dict['contexts']['compiler_labels'][0]['match']
-            labels_regex = '|'.join(predefined_labels)
-            syntax_dict['contexts']['compiler_labels'][0]['match'] = labels_str.replace('##COMPILERCONSTANTS##', labels_regex)
+            syntax_dict['contexts']['compiler_labels'][0]['match'] = self._replace_token_with_regex_list(
+                syntax_dict['contexts']['compiler_labels'][0]['match'],
+                '##COMPILERCONSTANTS##',
+                predefined_labels,
+            )
         else:
             # remove the registers syntax
             del syntax_dict['contexts']['compiler_labels']
@@ -83,12 +86,13 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         # compiler directives
         directives_regex = '|'.join(['\\.'+d for d in COMPILER_DIRECTIVES_SET])
         directives_str = syntax_dict['contexts']['compiler_directives'][0]['match']
-        syntax_dict['contexts']['compiler_directives'][0]['match'] =  directives_str.replace('##DIRECTIVES##', directives_regex)
+        syntax_dict['contexts']['compiler_directives'][0]['match'] = \
+            directives_str.replace('##DIRECTIVES##', directives_regex)
 
         # data types
         datatypes_regex = '|'.join(['\\.'+d for d in BYTECODE_DIRECTIVES_SET])
         datatypes_str = syntax_dict['contexts']['data_types_directives'][0]['match']
-        syntax_dict['contexts']['data_types_directives'][0]['match'] =  datatypes_str.replace('##DATATYPES##', datatypes_regex)
+        syntax_dict['contexts']['data_types_directives'][0]['match'] = datatypes_str.replace('##DATATYPES##', datatypes_regex)
 
         # preprocessor directives
         preprocessor_regex = '|'.join(PREPROCESSOR_DIRECTIVES_SET)
@@ -143,7 +147,7 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             elif filename.endswith('.sublime-macro.json'):
                 file_obj = pkg_resources.files(resources).joinpath(filename)
                 with pkg_resources.as_file(file_obj) as fp:
-                    macro_filename =  filename.partition('.')[0] + '.sublime-macro'
+                    macro_filename = filename.partition('.')[0] + '.sublime-macro'
                     macro_fp = os.path.join(destination_dir, macro_filename)
                     shutil.copy(fp, macro_fp)
                     if self.verbose > 1:
@@ -151,9 +155,8 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             elif filename.endswith('.tmPreferences.xml'):
                 file_obj = pkg_resources.files(resources).joinpath(filename)
                 with pkg_resources.as_file(file_obj) as fp:
-                    pref_filename =  filename.partition('.')[0] + '.tmPreferences'
+                    pref_filename = filename.partition('.')[0] + '.tmPreferences'
                     pref_fp = os.path.join(destination_dir, pref_filename)
                     shutil.copy(fp, pref_fp)
                     if self.verbose > 1:
                         print(f'  generated {os.path.basename(pref_fp)}')
-

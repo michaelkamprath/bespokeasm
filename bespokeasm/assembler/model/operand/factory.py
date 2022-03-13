@@ -1,7 +1,3 @@
-
-
-
-
 import sys
 
 from bespokeasm.assembler.model.operand import Operand
@@ -9,6 +5,7 @@ from bespokeasm.assembler.model.operand.types import empty, numeric_expression, 
                                                      indirect_numeric, register, indirect_indexed_register, \
                                                      deferred_numeric, numeric_bytecode, enumeration_operand, \
                                                      numeric_enumeration
+
 
 class OperandFactory:
 
@@ -22,7 +19,12 @@ class OperandFactory:
         elif type_str == 'indirect_register':
             return indirect_register.IndirectRegisterOperand(operand_id, arg_config_dict, default_endian, registers)
         elif type_str == 'indirect_indexed_register':
-            return indirect_indexed_register.IndirectIndexedRegisterOperand(operand_id, arg_config_dict, default_endian, registers)
+            return indirect_indexed_register.IndirectIndexedRegisterOperand(
+                operand_id,
+                arg_config_dict,
+                default_endian,
+                registers
+            )
         elif type_str == 'indirect_numeric':
             return indirect_numeric.IndirectNumericOperand(operand_id, arg_config_dict, default_endian)
         elif type_str == 'deferred_numeric':
