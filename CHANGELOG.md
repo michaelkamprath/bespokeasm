@@ -17,6 +17,8 @@ Changes that are planned but not implemented yet:
   * unknown labels
 
 ## [Unreleased]
+* Started using `pipenv` for dependency management.
+
 
 ## [0.2.1]
 * Allow a label to exist on the same line as an instruction or directive
