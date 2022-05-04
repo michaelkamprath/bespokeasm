@@ -64,7 +64,7 @@ class NumericEnumerationOperand(NumericExpressionOperand):
             arg_part = None
             if self.has_argument_value_dict:
                 arg_part = ExpressionEnumerationByteCodePart(
-                    self.has_argument_value_dict,
+                    self.argument_value_dict,
                     operand,
                     self.argument_size,
                     self.argument_byte_align,

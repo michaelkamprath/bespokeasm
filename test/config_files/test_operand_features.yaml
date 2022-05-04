@@ -80,6 +80,22 @@ operand_sets:
             2: 0b10
             3: 0b11
             4: 0b00
+  enumerated_arguments:
+    operand_values:
+      num_args:
+        type: numeric_enumeration
+        argument:
+          size: 8
+          byte_align: true
+          value_dict:
+            0: 0
+            1: 2
+            2: 4
+            3: 8
+            4: 16
+            5: 32
+            6: 64
+            7: 128
   shift_registers:
     operand_values:
       register_a:
@@ -194,3 +210,12 @@ instructions:
         list:
           - shift_registers
           - shift_enums
+  enumarg:
+    byte_code:
+      value: 254
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - enumerated_arguments

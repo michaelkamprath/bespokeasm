@@ -217,10 +217,23 @@ class TestInstructionParsing(unittest.TestCase):
         t2.generate_bytes()
         self.assertEqual(list(t2.get_bytes()), [0b00011111], 'instruction byte should match')
 
+        t3 = InstructionLine.factory(lineid, '  enumarg 6', 'comment', isa_model)
+        t3.set_start_address(1)
+        t3.label_scope = TestInstructionParsing.label_values
+        self.assertIsInstance(t3, InstructionLine)
+        self.assertEqual(t3.byte_size, 2, 'has 2 bytes')
+        t3.generate_bytes()
+        self.assertEqual(list(t3.get_bytes()), [254, 64], 'instruction byte should match')
+
         with self.assertRaises(SystemExit, msg='test bounds'):
             e1 = InstructionLine.factory(lineid, '  tstb b, 14', 'second argument is too large', isa_model)
             e1.label_scope = TestInstructionParsing.label_values
             e1.generate_bytes()
+
+        with self.assertRaises(SystemExit, msg='test invalid enumerations'):
+            e2 = InstructionLine.factory(lineid, '  enumarg 12', 'comment', isa_model)
+            e2.label_scope = TestInstructionParsing.label_values
+            e2.generate_bytes()
 
     def test_numeric_enumeration_operand(self):
         with pkg_resources.path(config_files, 'test_operand_features.yaml') as fp:
