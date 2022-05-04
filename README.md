@@ -1,3 +1,5 @@
+[![Python package](https://github.com/michaelkamprath/bespokeasm/actions/workflows/python-package.yml/badge.svg?branch=main)](https://github.com/michaelkamprath/bespokeasm/actions/workflows/python-package.yml)
+
 # Bespoke ASM
 This is a customizable byte code assembler that allows for the definition of custom instruction set architecture.
 
