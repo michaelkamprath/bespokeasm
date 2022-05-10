@@ -113,6 +113,14 @@ class TestInstructionParsing(unittest.TestCase):
         ins2.generate_bytes()
         self.assertEqual(list(ins2.get_bytes()), [0xFE, 0x20, 0x80, 0x44], 'instruction byte should match, operands reversed')
 
+        ins4 = InstructionLine.factory(22, 'cmp [hl+i],0', 'some comment!', isa_model)
+        ins4.set_start_address(1212)
+        self.assertIsInstance(ins4, InstructionLine)
+#        self.assertEqual(ins4.byte_size, 3, 'has 3 bytes')
+        ins4.label_scope = TestInstructionParsing.label_values
+        ins4.generate_bytes()
+        self.assertEqual(list(ins4.get_bytes()), [0xFF, 0x8F, 0], 'instruction byte should match')
+
         with self.assertRaises(SystemExit, msg='no instruction  should match here'):
             bad1 = InstructionLine.factory(22, '  mov a, [sp+i]', 'some comment!', isa_model)
             bad1.set_start_address(666)

@@ -18,7 +18,7 @@ Changes that are planned but not implemented yet:
 
 ## [Unreleased]
 * Started using `pipenv` for dependency management.
-* Fixed bug for numeric enumeration operads that emit a argument value.
+* Fixed bug for numeric enumeration operands that emit an argument value.
 
 
 ## [0.2.1]
