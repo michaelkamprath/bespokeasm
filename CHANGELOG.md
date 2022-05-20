@@ -19,6 +19,7 @@ Changes that are planned but not implemented yet:
 ## [Unreleased]
 * Started using `pipenv` for dependency management.
 * Fixed bug for numeric enumeration operads that emit a argument value.
+* Added `.8byte` data type directive
 
 
 ## [0.2.1]

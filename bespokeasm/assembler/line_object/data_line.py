@@ -7,7 +7,7 @@ from bespokeasm.utilities import parse_numeric_string, is_string_numeric
 
 class DataLine(LineWithBytes):
     PATTERN_DATA_DIRECTIVE = re.compile(
-        r'^(\.byte|\.2byte|\.4byte|\.cstr)\s*(?:([\w,$\%\s]+)|(?P<quote>[\"\']{1})((?:\\(?P=quote)|.)*)(?P=quote))',
+        r'^(\.byte|\.2byte|\.4byte|\.8byte|\.cstr)\s*(?:([\w,$\%\s]+)|(?P<quote>[\"\']{1})((?:\\(?P=quote)|.)*)(?P=quote))',
         flags=re.IGNORECASE|re.MULTILINE
     )
 
@@ -15,6 +15,7 @@ class DataLine(LineWithBytes):
         '.byte': 1,
         '.2byte': 2,
         '.4byte': 4,
+        '.8byte': 8,
         '.cstr': 1,
     }
 
@@ -22,6 +23,7 @@ class DataLine(LineWithBytes):
         '.byte': 0xFF,
         '.2byte': 0xFFFF,
         '.4byte': 0xFFFFFFFF,
+        '.8byte': 0xFFFFFFFFFFFFFFFF,
         '.cstr': 0xFF,
     }
     def factory(line_id: LineIdentifier, line_str: str, comment: str, endian: str) -> LineWithBytes:
