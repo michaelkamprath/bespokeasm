@@ -1,6 +1,8 @@
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.label_scope import LabelScope
 
+INSTRUCTION_EXPRESSION_PATTERN = '(?:(?:\%|\$|b|0x|\.)?[\w]+|[\+\-\*\/\&\|\^\(\)]|(?:[ \t]*)(?!(?:[ \t]*\;|[ \t]*\v)))+'
+
 class LineObject:
     def __init__(self, line_id: LineIdentifier, instruction: str, comment: str):
         self._line_id = line_id
