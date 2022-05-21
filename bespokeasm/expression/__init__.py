@@ -21,16 +21,18 @@ from bespokeasm.assembler.line_object.label_line import is_valid_label
 class TokenType(enum.Enum):
     T_NUM = 0
     T_LABEL = 1
-    T_PLUS = 2
-    T_MINUS = 3
-    T_MULT = 4
-    T_DIV = 5
-    T_AND = 6
-    T_OR = 7
-    T_XOR = 8
-    T_LPAR = 9
-    T_RPAR = 10
-    T_END = 11
+    T_RIGHT_SHIFT = 2
+    T_LEFT_SHIFT = 3
+    T_PLUS = 4
+    T_MINUS = 5
+    T_MULT = 6
+    T_DIV = 7
+    T_AND = 8
+    T_OR = 9
+    T_XOR = 10
+    T_LPAR = 11
+    T_RPAR = 12
+    T_END = 13
 
 
 class ExpressionNode:
@@ -42,6 +44,8 @@ class ExpressionNode:
         TokenType.T_AND: operator.and_,
         TokenType.T_OR: operator.or_,
         TokenType.T_XOR: operator.xor,
+        TokenType.T_RIGHT_SHIFT: operator.rshift,
+        TokenType.T_LEFT_SHIFT: operator.lshift,
     }
 
     def __init__(self, token_type: TokenType, value=None):
@@ -75,7 +79,7 @@ class ExpressionNode:
         left_result = self.left_child._compute(label_scope, line_id)
         right_result = self.right_child._compute(label_scope, line_id)
         operation = ExpressionNode._operations[self.token_type]
-        if self.token_type in [TokenType.T_AND, TokenType.T_OR, TokenType.T_XOR]:
+        if self.token_type in [TokenType.T_AND, TokenType.T_OR, TokenType.T_XOR, TokenType.T_LEFT_SHIFT, TokenType.T_RIGHT_SHIFT]:
             left_result = int(left_result)
             right_result = int(right_result)
         return operation(left_result, right_result)
@@ -105,6 +109,8 @@ def parse_expression(line_id: LineIdentifier, expression: str) -> ExpresionType:
 
 def _lexical_analysis(line_id: LineIdentifier, s: str) -> list[ExpressionNode]:
     mappings = {
+        '<<': TokenType.T_LEFT_SHIFT,
+        '>>': TokenType.T_RIGHT_SHIFT,
         '+': TokenType.T_PLUS,
         '-': TokenType.T_MINUS,
         '*': TokenType.T_MULT,
@@ -117,9 +123,9 @@ def _lexical_analysis(line_id: LineIdentifier, s: str) -> list[ExpressionNode]:
     }
 
     tokens = []
-    expression_parts = re.findall(r'(?:\%|\$|b|0x|\.)?[\w]+|[\+\-\*\/\&\|\^\(\)]', s)
+    expression_parts = re.findall(r'(?:\%|\$|b|0x|\.)?[\w]+|[\+\-\*\/\&\|\^\(\)]|\>\>|\<\<', s)
     for part in expression_parts:
-        if len(part) == 1 and part in mappings:
+        if part in mappings:
             token_type = mappings[part]
             token = ExpressionNode(token_type, value=part)
         elif is_string_numeric(part):
@@ -142,20 +148,18 @@ def _parse_e(line_id: LineIdentifier, tokens: list[ExpressionNode]) -> Expressio
         left_node = node
     return left_node
 
-
 def _parse_e1(line_id: LineIdentifier, tokens: list[ExpressionNode]) -> ExpressionNode:
     left_node = _parse_e2(line_id, tokens)
-    while tokens[0].token_type in [TokenType.T_PLUS, TokenType.T_MINUS]:
+    while tokens[0].token_type in [TokenType.T_LEFT_SHIFT, TokenType.T_RIGHT_SHIFT]:
         node = tokens.pop(0)
         node.left_child = left_node
         node.right_child = _parse_e2(line_id, tokens)
         left_node = node
     return left_node
 
-
 def _parse_e2(line_id: LineIdentifier, tokens: list[ExpressionNode]) -> ExpressionNode:
     left_node = _parse_e3(line_id, tokens)
-    while tokens[0].token_type in [TokenType.T_MULT, TokenType.T_DIV]:
+    while tokens[0].token_type in [TokenType.T_PLUS, TokenType.T_MINUS]:
         node = tokens.pop(0)
         node.left_child = left_node
         node.right_child = _parse_e3(line_id, tokens)
@@ -164,6 +168,15 @@ def _parse_e2(line_id: LineIdentifier, tokens: list[ExpressionNode]) -> Expressi
 
 
 def _parse_e3(line_id: LineIdentifier, tokens: list[ExpressionNode]) -> ExpressionNode:
+    left_node = _parse_e4(line_id, tokens)
+    while tokens[0].token_type in [TokenType.T_MULT, TokenType.T_DIV]:
+        node = tokens.pop(0)
+        node.left_child = left_node
+        node.right_child = _parse_e4(line_id, tokens)
+        left_node = node
+    return left_node
+
+def _parse_e4(line_id: LineIdentifier, tokens: list[ExpressionNode]) -> ExpressionNode:
     if tokens[0].token_type in [TokenType.T_NUM, TokenType.T_LABEL]:
         return tokens.pop(0)
 

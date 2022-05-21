@@ -56,7 +56,22 @@ class TestExpression(unittest.TestCase):
         e3 = parse_expression(1212, 'label1*3 + sp + 5')
         self.assertTrue(e3.contains_register_labels(registers), 'does contain registers')
 
+    def test_bit_shifting(self):
+        self.assertEqual(parse_expression(111, '1 << 3').get_value(TestExpression.label_values, 1), 8, '1 << 3 = 8')
+        self.assertEqual(parse_expression(111, '1 << MixedCase').get_value(TestExpression.label_values, 1), 4, '1 << MixedCase = 4')
+        self.assertEqual(parse_expression(111, '(MAX_N + 2) >> 1').get_value(TestExpression.label_values, 1), 11, '(MAX_N + 2) >> 1 = 11')
 
+        # test operation precedence
+        self.assertEqual(
+            parse_expression(111, '1 << 2 + 1').get_value(TestExpression.label_values, 1),
+            8,
+            '1 << 2 + 1 = 8 (+ takes precedence over <<)'
+        )
+        self.assertEqual(
+            parse_expression(111, '(1 << 2) + 1').get_value(TestExpression.label_values, 1),
+            5,
+            '(1 << 2) + 1 = 5 (+ takes precedence over <<)'
+        )
 
 if __name__ == '__main__':
     unittest.main()
