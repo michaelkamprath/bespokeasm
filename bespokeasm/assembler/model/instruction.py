@@ -5,6 +5,7 @@ from bespokeasm.assembler.byte_code.assembled import AssembledInstruction
 from bespokeasm.assembler.model.operand_parser import OperandParser, MatchedOperandSet
 from bespokeasm.assembler.model.operand_set import OperandSetCollection
 from bespokeasm.assembler.byte_code.parts import NumericByteCodePart
+from bespokeasm.assembler.model.instruction_base import InstructionBase
 
 # Instruction
 #
@@ -144,7 +145,7 @@ class InstructionVariant:
         return AssembledInstruction(line_id, machine_code)
 
 
-class Instruction:
+class Instruction(InstructionBase):
     def __init__(
                 self,
                 mnemonic: str,
@@ -153,7 +154,7 @@ class Instruction:
                 default_endian: str,
                 registers: set[str]
             ) -> None:
-        self._mnemonic = mnemonic
+        super().__init__(mnemonic, default_endian, registers)
         self._config = instruction_config
 
         variant_num = 0
@@ -183,15 +184,8 @@ class Instruction:
                     )
                 )
 
-    def __repr__(self) -> str:
-        return str(self)
-
     def __str__(self) -> str:
         return f'Instruction<{self._mnemonic}>'
-
-    @property
-    def mnemonic(self) -> str:
-        return self._mnemonic
 
     def generate_bytecode_parts(
         self,
