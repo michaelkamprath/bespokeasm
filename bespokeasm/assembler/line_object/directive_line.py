@@ -2,11 +2,11 @@ import re
 import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.line_object import LineWithBytes, LineObject
+from bespokeasm.assembler.line_object import LineWithBytes, LineObject, INSTRUCTION_EXPRESSION_PATTERN
 from bespokeasm.assembler.line_object.data_line import DataLine
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.expression import parse_expression, ExpresionType
-from bespokeasm.utilities import parse_numeric_string, is_string_numeric
+
 
 # Directives are lines that tell the assembler to do something. Supported directives are:
 #
@@ -18,23 +18,24 @@ from bespokeasm.utilities import parse_numeric_string, is_string_numeric
 
 
 class DirectiveLine:
+
     PATTERN_ORG_DIRECTIVE = re.compile(
-        r'^(?:\.org)\s+([\$\%\w\(\)\+\-\s]*[\w\)])',
+        f'^(?:\.org)\s+({INSTRUCTION_EXPRESSION_PATTERN})',
         flags=re.IGNORECASE|re.MULTILINE
     )
 
     PATTERN_FILL_DIRECTIVE = re.compile(
-        r'^(?:\.fill)\s+([\$\%\w\(\)\+\-\s]*[\w\)])\s*\,\s*([\$\%\w\(\)\+\-\s]*[\w\)])',
+        f'^(?:\.fill)\s+({INSTRUCTION_EXPRESSION_PATTERN})\s*\,\s*({INSTRUCTION_EXPRESSION_PATTERN})',
         flags=re.IGNORECASE|re.MULTILINE
     )
 
     PATTERN_ZERO_DIRECTIVE = re.compile(
-        r'^(?:\.zero)\s+([\$\%\w\(\)\+\-\s]*[\w\)])',
+        f'^(?:\.zero)\s+({INSTRUCTION_EXPRESSION_PATTERN})',
         flags=re.IGNORECASE|re.MULTILINE
     )
 
     PATTERN_ZEROUNTIL_DIRECTIVE = re.compile(
-        r'^(?:\.zerountil)\s+([\$\%\w\(\)\+\-\s]*[\w\)])',
+        f'^(?:\.zerountil)\s+({INSTRUCTION_EXPRESSION_PATTERN})',
         flags=re.IGNORECASE|re.MULTILINE
     )
 

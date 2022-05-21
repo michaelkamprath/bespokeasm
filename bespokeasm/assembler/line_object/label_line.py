@@ -3,7 +3,7 @@ import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
-from bespokeasm.utilities import is_string_numeric, parse_numeric_string
+from bespokeasm.utilities import is_string_numeric, parse_numeric_string, PATTERN_NUMERIC
 
 PATTERN_ALLOWED_LABELS = re.compile(
         r'^(?!__|\.\.)(?:(?:\.|_|[a-zA-Z])[a-zA-Z0-9_]*)$',
@@ -21,7 +21,7 @@ class LabelLine(LineObject):
         flags=re.IGNORECASE|re.MULTILINE
     )
     PATTERN_CONSTANT = re.compile(
-        r'^\s*(\w*)(?:\s*)?\=(?:\s*)?(\$[0-9a-f]*|0x[0-9a-f]*|(?:b|%)[01]*|\w*)',
+        f'^\s*(\w*)(?:\s*)?\=(?:\s*)?({PATTERN_NUMERIC})',
         flags=re.IGNORECASE|re.MULTILINE
     )
 

@@ -12,6 +12,7 @@ class TestExpression(unittest.TestCase):
         cls.label_values.set_label_value('value_1', 12, 1)
         cls.label_values.set_label_value('the_8_ball', 8, 2)
         cls.label_values.set_label_value('MixedCase', 2, 3)
+        cls.label_values.set_label_value('MAX_N', 20, 1)
 
     def test_expression_parsing(self):
         self.assertEqual(parse_expression(1212, '1 + 2').get_value(TestExpression.label_values, 1), 3, 'simple expression: 1+2')
@@ -21,6 +22,7 @@ class TestExpression(unittest.TestCase):
         self.assertEqual(parse_expression(1212, 'value_1-2').get_value(TestExpression.label_values, 5), 10, 'numeric expression: value_1-2')
         self.assertEqual(parse_expression(1212, '3+12/3').get_value(TestExpression.label_values, 6), 7, 'test precedence order: 3+12/3 = 7')
         self.assertEqual(parse_expression(1212, '0-(3+7)').get_value(TestExpression.label_values, 7), -10, 'test handling of leading sign: -(3+7) = -10')
+        self.assertEqual(parse_expression(1212, '8*( MAX_N + 1 )  ').get_value(TestExpression.label_values, 8), 168, 'test handling of leading sign: 8*(MAX_N+1) = 168')
 
         with self.assertRaises(SystemExit, msg='only integer numeric values are supported'):
             value = parse_expression(1212, '(value_1/5)/2.4').get_value(TestExpression.label_values, 100)

@@ -92,6 +92,13 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(d9.byte_size, 4, 'data line has 4 bytes')
         self.assertEqual(d9.get_bytes(), bytearray([0xef, 0xcd, 0xab, 0x89]), 'should slice first four bytes')
 
+        d9a = DataLine.factory(38, '.8byte 0x0123456789abcdef', 'data masked!', 'little')
+        d9a.label_scope = label_values
+        d9a.generate_bytes()
+        self.assertIsInstance(d9a, DataLine)
+        self.assertEqual(d9a.byte_size, 8, 'data line has 8 bytes')
+        self.assertEqual(d9a.get_bytes(), bytearray([0xef, 0xcd, 0xab, 0x89, 0x67, 0x45, 0x23, 1]), 'should slice all 8 bytes')
+
         #ensure spaces in strings aren't truncated
         test_str2 = ' space '
         d10_values = [ord(c) for c in test_str2]

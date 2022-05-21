@@ -16,7 +16,7 @@ def parse_numeric_string(numeric_str: str) -> int:
         return int(numeric_str)
 
 
-PATTERN_NUMERIC = r'^(\$[0-9a-f]*|0x[0-9a-f]*|(?:b|%)[01]*|\d*)$'
+PATTERN_NUMERIC = r'(?:\$[0-9a-f]*|0x[0-9a-f]*|(?:b|%)[01]*|\d*)'
 PATTERN_NUMERIC_COMPILED = re.compile(r'^(\$[0-9a-f]*|0x[0-9a-f]*|(?:b|%)[01]*|\d*)$', flags=re.IGNORECASE | re.MULTILINE)
 
 
