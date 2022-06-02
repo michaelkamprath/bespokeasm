@@ -15,7 +15,7 @@ import sys
 from bespokeasm.utilities import is_string_numeric, parse_numeric_string
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.label_scope import LabelScope
-from bespokeasm.assembler.line_object.label_line import is_valid_label
+from bespokeasm.assembler.line_object import is_valid_label
 
 
 class TokenType(enum.Enum):
@@ -117,7 +117,7 @@ def _lexical_analysis(line_id: LineIdentifier, s: str) -> list[ExpressionNode]:
     }
 
     tokens = []
-    expression_parts = re.findall(r'(?:\%|\$|b|0x|\.)?[\w]+|[\+\-\*\/\&\|\^\(\)]', s)
+    expression_parts = re.findall(r'(?:(?:\%|b)[01]+|(?:\$|0x)[0-9a-fA-F]+|\d+|[\+\-\*\/\&\|\^\(\)]|\w+)', s)
     for part in expression_parts:
         if len(part) == 1 and part in mappings:
             token_type = mappings[part]

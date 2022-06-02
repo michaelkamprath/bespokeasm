@@ -1,6 +1,7 @@
 import re
 import sys
 
+from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.line_object import LineObject
@@ -19,7 +20,13 @@ class LineOjectFactory:
     )
 
     @classmethod
-    def parse_line(cls, line_id: LineIdentifier, line_str: str, model: AssemblerModel) -> list[LineObject]:
+    def parse_line(
+                cls,
+                line_id: LineIdentifier,
+                line_str: str,
+                model: AssemblerModel,
+                label_scope: LabelScope,
+            ) -> list[LineObject]:
         # find comments
         comment_str = ''
         comment_match = re.search(LineOjectFactory.PATTERN_COMMENTS, line_str)
@@ -35,7 +42,13 @@ class LineOjectFactory:
         # parse instruction
         if len(instruction_str) > 0:
             # try label
-            line_obj= LabelLine.factory(line_id, instruction_str, comment_str, model.registers)
+            line_obj = LabelLine.factory(
+                line_id,
+                instruction_str,
+                comment_str,
+                model.registers,
+                label_scope
+            )
             if line_obj is not None:
                 line_obj_list = [line_obj]
                 # check to see for same line instruction

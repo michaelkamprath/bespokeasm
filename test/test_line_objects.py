@@ -123,8 +123,11 @@ class TestLineObject(unittest.TestCase):
             DataLine.factory(42, ' .cstr 0x42', 'bad cstr usage', 'big')
 
     def test_label_line_creation(self):
+        label_values = GlobalLabelScope(set())
+        label_values.set_label_value('test1', 0x1234, 1)
         register_set = set(['a', 'b', 'sp', 'mar'])
-        l1 = LabelLine.factory(13, 'my_label:', 'cool comment', register_set)
+
+        l1 = LabelLine.factory(13, 'my_label:', 'cool comment', register_set, label_values)
         l1.set_start_address(1212)
         self.assertIsInstance(l1, LabelLine)
         self.assertEqual(l1.byte_size, 0, 'has no bytes')
@@ -132,7 +135,7 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(l1.address, 1212, 'address value is address')
         self.assertEqual(l1.get_label(),'my_label', 'label string')
 
-        l2 = LabelLine.factory(13, 'my_constant = 1945', 'cool comment', register_set)
+        l2 = LabelLine.factory(13, 'my_constant = 1945', 'cool comment', register_set, label_values)
         l2.set_start_address(1212)
         self.assertIsInstance(l2, LabelLine)
         self.assertEqual(l2.byte_size, 0, 'has no bytes')
@@ -140,7 +143,7 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(l2.address, 1212, 'address value is address')
         self.assertEqual(l2.get_label(),'my_constant', 'label string')
 
-        l3 = LabelLine.factory(13, 'myLabelIsCool:', 'cool comment', register_set)
+        l3 = LabelLine.factory(13, 'myLabelIsCool:', 'cool comment', register_set, label_values)
         l3.set_start_address(2001)
         self.assertIsInstance(l3, LabelLine)
         self.assertEqual(l3.byte_size, 0, 'has no bytes')
@@ -148,14 +151,22 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(l3.address, 2001, 'address value is address')
         self.assertEqual(l3.get_label(),'myLabelIsCool', 'label string')
 
+        l4: LabelLine = LabelLine.factory(13, 'test_bit = (5 + 3)', 'numeric expression constants', register_set, label_values)
+        l4.set_start_address(678)
+        self.assertIsInstance(l4, LabelLine)
+        self.assertEqual(l4.byte_size, 0, 'has no bytes')
+        self.assertEqual(l4.get_value(), 8, 'label value is constant')
+        self.assertEqual(l4.address, 678, 'address value is address')
+        self.assertEqual(l4.get_label(),'test_bit', 'label string')
+
         # this should fail
-        with self.assertRaises(SystemExit, msg='non-numeric constant assignments should fail'):
-            l_fail= LabelLine.factory(13, 'my_constant = some_string', 'bad constant', register_set)
+        with self.assertRaises(SystemExit, msg='unresolvable expression constant assignments should fail'):
+            l_fail= LabelLine.factory(13, 'my_constant = some_var1 + 7', 'bad constant', register_set, label_values)
 
         with self.assertRaises(SystemExit, msg='labels should not be registers'):
-            l_fail = LabelLine.factory(13, 'mar = $1234', 'bad label', register_set)
+            l_fail = LabelLine.factory(13, 'mar = $1234', 'bad label', register_set, label_values)
         with self.assertRaises(SystemExit, msg='labels should not be registers'):
-            l_fail = LabelLine.factory(13, 'sp:', 'bad label', register_set)
+            l_fail = LabelLine.factory(13, 'sp:', 'bad label', register_set, label_values)
 
     def test_label_line_with_instruction(self):
         with pkg_resources.path(config_files, 'test_instructions_with_variants.yaml') as fp:
@@ -170,7 +181,8 @@ class TestLineObject(unittest.TestCase):
         objs1: list[LineObject] = LineOjectFactory.parse_line(
             lineid,
             'the_byte: .byte 0x88 ; label and instruction',
-            isa_model
+            isa_model,
+            label_values,
         )
         self.assertEqual(len(objs1), 2, 'there should be two instructions')
         self.assertIsInstance(objs1[0], LabelLine, 'the first line object should be a label')
@@ -185,7 +197,8 @@ class TestLineObject(unittest.TestCase):
         objs2: list[LineObject] = LineOjectFactory.parse_line(
             lineid,
             'the_instr: mov a, a_const ; label and instruction',
-            isa_model
+            isa_model,
+            label_values,
         )
         self.assertEqual(len(objs2), 2, 'there should be two instructions')
         self.assertIsInstance(objs2[0], LabelLine, 'the first line object should be a label')
@@ -200,7 +213,8 @@ class TestLineObject(unittest.TestCase):
         objs3: list[LineObject] = LineOjectFactory.parse_line(
             lineid,
             'the_label: ;just a label',
-            isa_model
+            isa_model,
+            label_values,
         )
         self.assertEqual(len(objs3), 1, 'there should be two instructions')
         self.assertIsInstance(objs3[0], LabelLine, 'the first line object should be a label')
@@ -211,14 +225,16 @@ class TestLineObject(unittest.TestCase):
             LineOjectFactory.parse_line(
                 lineid,
                 'the_label: const = 3 ; label with constant',
-                isa_model
+                isa_model,
+                label_values,
             )
         # labels with other labels should not work
         with self.assertRaises(SystemExit, msg='this instruction should fail'):
             LineOjectFactory.parse_line(
                 lineid,
                 'the_label: the_second_label: ; label with another label',
-                isa_model
+                isa_model,
+                label_values,
             )
 
     def test_valid_labels(self):

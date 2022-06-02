@@ -131,7 +131,12 @@ class TestInstructionParsing(unittest.TestCase):
         with pkg_resources.path(config_files, 'test_instructions_with_variants.yaml') as fp:
             isa_model = AssemblerModel(str(fp), 0)
         lineid = LineIdentifier(42, 'test_label_parsing')
-        l1: LineObject = LineOjectFactory.parse_line(lineid, "LABEL = %00001111", isa_model)[0]
+        l1: LineObject = LineOjectFactory.parse_line(
+            lineid,
+            "LABEL = %00001111",
+            isa_model,
+            TestInstructionParsing.label_values
+        )[0]
         self.assertIsInstance(l1, LabelLine)
         self.assertTrue(l1.is_constant, )
         self.assertEqual(l1.get_value(), 0x0F, 'value should be right')

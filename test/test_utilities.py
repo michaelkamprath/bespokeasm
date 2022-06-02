@@ -27,6 +27,8 @@ class TestUtilities(unittest.TestCase):
         self.assertFalse(is_string_numeric('test1'), 'string is not numeric')
         self.assertFalse(is_string_numeric(' '), 'string is not numeric')
         self.assertFalse(is_string_numeric('%01234567'), 'binary integers can only have 1s and 0s')
+        self.assertFalse(is_string_numeric('b'),'the prefix b alone is not numeric')
+        self.assertFalse(is_string_numeric('$'),'the prefix alon is not numeric')
 
     def test_PackedBits(self):
         ib1 = PackedBits()

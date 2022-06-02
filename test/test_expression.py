@@ -45,7 +45,7 @@ class TestExpression(unittest.TestCase):
         self.assertEqual(parse_expression(111, 'b0000111&$01+$10').get_value(TestExpression.label_values, 4), 0x01, 'test precedence order')
 
     def test_register_detection(self):
-        registers = set(['a', 'sp', 'mar'])
+        registers = set(['a', 'b', 'sp', 'mar'])
 
         e1 = parse_expression(1212, '(label1+3)*5')
         self.assertFalse(e1.contains_register_labels(registers), 'does not contain registers')
@@ -56,6 +56,8 @@ class TestExpression(unittest.TestCase):
         e3 = parse_expression(1212, 'label1*3 + sp + 5')
         self.assertTrue(e3.contains_register_labels(registers), 'does contain registers')
 
+        e4 = parse_expression(1212, 'b')
+        self.assertTrue(e4.contains_register_labels(registers), 'does contain registers, not binary prefix')
 
 
 if __name__ == '__main__':
