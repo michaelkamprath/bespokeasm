@@ -117,7 +117,7 @@ def _lexical_analysis(line_id: LineIdentifier, s: str) -> list[ExpressionNode]:
     }
 
     tokens = []
-    expression_parts = re.findall(r'(?:(?:\%|b)[01]+|(?:\$|0x)[0-9a-fA-F]+|\d+|[\+\-\*\/\&\|\^\(\)]|\w+)', s)
+    expression_parts = re.findall(r'(?:(?:\%|b)[01]+|(?:\$|0x)[0-9a-fA-F]+|\d+|[\+\-\*\/\&\|\^\(\)]|(?:\.|_)?\w+)', s)
     for part in expression_parts:
         if len(part) == 1 and part in mappings:
             token_type = mappings[part]

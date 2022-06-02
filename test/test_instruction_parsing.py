@@ -3,7 +3,7 @@ import importlib.resources as pkg_resources
 
 from test import config_files
 
-from bespokeasm.assembler.label_scope import GlobalLabelScope
+from bespokeasm.assembler.label_scope import GlobalLabelScope, LabelScope, LabelScopeType
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object.factory import LineOjectFactory
@@ -16,10 +16,13 @@ class TestInstructionParsing(unittest.TestCase):
     label_values = None
     @classmethod
     def setUpClass(cls):
-        cls.label_values = GlobalLabelScope(set())
-        cls.label_values.set_label_value('var1', 12, 1)
-        cls.label_values.set_label_value('my_val', 8, 2)
-        cls.label_values.set_label_value('the_two', 2, 3)
+        global_scope = GlobalLabelScope(set())
+        global_scope.set_label_value('var1', 12, 1)
+        global_scope.set_label_value('my_val', 8, 2)
+        global_scope.set_label_value('the_two', 2, 3)
+        local_scope = LabelScope(LabelScopeType.LOCAL, global_scope, 'TestInstructionParsing')
+        local_scope.set_label_value('.local_var', 10, 3)
+        cls.label_values = local_scope
 
     def test_instruction_variant_matching(self):
         with pkg_resources.path(config_files, 'test_instructions_with_variants.yaml') as fp:
@@ -140,6 +143,18 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertIsInstance(l1, LabelLine)
         self.assertTrue(l1.is_constant, )
         self.assertEqual(l1.get_value(), 0x0F, 'value should be right')
+
+        l2: LineObject = LineOjectFactory.parse_line(
+            lineid,
+            ".local_label:",
+            isa_model,
+            TestInstructionParsing.label_values
+        )[0]
+        l2.set_start_address(42)
+        l2.label_scope = TestInstructionParsing.label_values
+        self.assertIsInstance(l2, LabelLine)
+        self.assertFalse(l2.is_constant, )
+        self.assertEqual(l2.get_value(), 42, 'value should be right')
 
     def test_operand_bytecode_ordering(self):
         with pkg_resources.path(config_files, 'test_operand_features.yaml') as fp:
@@ -273,3 +288,16 @@ class TestInstructionParsing(unittest.TestCase):
             e1 = InstructionLine.factory(lineid, 'num 7', 'number 7 is not allowed', isa_model)
             e1.label_scope = TestInstructionParsing.label_values
             e1.generate_bytes()
+
+    def test_expressions_in_operations(self):
+        with pkg_resources.path(config_files, 'test_operand_features.yaml') as fp:
+            isa_model = AssemblerModel(str(fp), 0)
+        lineid = LineIdentifier(42, 'test_expressions_in_operations')
+
+        t1 = InstructionLine.factory(lineid, 'add .local_var+7', 'comment', isa_model)
+        t1.set_start_address(1)
+        t1.label_scope = TestInstructionParsing.label_values
+        self.assertIsInstance(t1, InstructionLine)
+        self.assertEqual(t1.byte_size, 2, 'has 2 bytes')
+        t1.generate_bytes()
+        self.assertEqual(list(t1.get_bytes()), [0b11010101, 17], 'instruction byte should match')
