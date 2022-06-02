@@ -22,6 +22,7 @@ Changes that are planned but not implemented yet:
 * Added `.8byte` data type directive
 * Fixed bug in how complext expressions are parsed in certain directive arguments
 * Added bit shifting operations to expressions
+* Fixed a bug in handling registers named `b`, which is also the binary number prefix
 
 
 ## [0.2.1]

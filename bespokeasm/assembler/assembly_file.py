@@ -72,7 +72,7 @@ class AssemblyFile:
                         self._handle_require_language(line_str, line_id, isa_model, log_verbosity)
                         continue
 
-                    lobj_list = LineOjectFactory.parse_line(line_id, line_str, isa_model)
+                    lobj_list = LineOjectFactory.parse_line(line_id, line_str, isa_model, current_scope)
                     for lobj in lobj_list:
                         if isinstance(lobj, LabelLine):
                             if not lobj.is_constant and LabelScopeType.get_label_scope(lobj.get_label()) != LabelScopeType.LOCAL:

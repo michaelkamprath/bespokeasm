@@ -219,3 +219,20 @@ instructions:
       operand_sets:
         list:
           - enumerated_arguments
+  add:
+    byte_code:
+      value: 0b11010
+      size: 5
+    operands:
+      count: 1
+      specific_operands:
+        numbric_expression:
+          list:
+            numeric_expression:
+              type: numeric
+              bytecode:
+                value: 5
+                size: 3
+              argument:
+                size: 8
+                byte_align: true

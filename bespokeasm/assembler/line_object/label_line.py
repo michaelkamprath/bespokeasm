@@ -1,32 +1,31 @@
 import re
 import sys
 
+from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.line_object import LineObject
+from bespokeasm.assembler.line_object import LineObject, INSTRUCTION_EXPRESSION_PATTERN, is_valid_label
 from bespokeasm.utilities import is_string_numeric, parse_numeric_string, PATTERN_NUMERIC
-
-PATTERN_ALLOWED_LABELS = re.compile(
-        r'^(?!__|\.\.)(?:(?:\.|_|[a-zA-Z])[a-zA-Z0-9_]*)$',
-        flags=re.IGNORECASE|re.MULTILINE
-    )
-
-def is_valid_label(s: str):
-    res = re.search(PATTERN_ALLOWED_LABELS, s)
-    return (res is not None)
-
+from bespokeasm.expression import parse_expression, ExpresionType
 
 class LabelLine(LineObject):
     PATTERN_LABEL = re.compile(
-        r'^\s*((\.?\w*):)(?:\s*([^;]*))?\;?',
+        r'^\s*((\.?\w+):)(?:\s*([^;]*))?\;?',
         flags=re.IGNORECASE|re.MULTILINE
     )
     PATTERN_CONSTANT = re.compile(
-        f'^\s*(\w*)(?:\s*)?\=(?:\s*)?({PATTERN_NUMERIC})',
+        f'^\s*(\w+)(?:\s*)?\=(?:\s*)?({INSTRUCTION_EXPRESSION_PATTERN}|)',
         flags=re.IGNORECASE|re.MULTILINE
     )
 
     @classmethod
-    def factory(cls, line_id: LineIdentifier, line_str: str, comment: str, registers: set[str]) -> LineObject:
+    def factory(
+                cls,
+                line_id: LineIdentifier,
+                line_str: str,
+                comment: str,
+                registers: set[str],
+                label_scope: LabelScope,
+            ) -> LineObject:
         """Tries to match the passed line string to the Label or Constant directive patterns.
         If succcessful, returns a constructed LabelLine object. If not, None is
         returned.
@@ -44,9 +43,9 @@ class LabelLine(LineObject):
         # Now determine is the line is a constant
         constant_match = re.search(LabelLine.PATTERN_CONSTANT, line_str)
         if constant_match is not None and len(constant_match.groups()) == 2:
-            numeric_str = constant_match.group(2).strip()
-            if not is_string_numeric(numeric_str):
-                sys.exit(f'ERROR: {line_id} - constant assigned nonnumeric value')
+            value_expr = parse_expression(line_id, constant_match.group(2).strip())
+            if value_expr.contains_register_labels(registers):
+                sys.exit(f'ERROR: {line_id} - Expression contains register label')
             constant_label = constant_match.group(1).strip()
             if not is_valid_label(constant_label):
                 sys.exit(f'ERROR: {line_id} - invalid format for constant label: {constant_label}')
@@ -56,7 +55,7 @@ class LabelLine(LineObject):
                 line_obj = LabelLine(
                     line_id,
                     constant_label,
-                    parse_numeric_string(numeric_str),
+                    value_expr.get_value(label_scope, line_id),
                     line_str,
                     comment,
                 )
