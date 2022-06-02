@@ -3,7 +3,7 @@ import re
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.label_scope import LabelScope
 
-INSTRUCTION_EXPRESSION_PATTERN = '(?:(?:\%|\$|b|0x|\.)?[\w]+|[\+\-\*\/\&\|\^\(\)]|(?:[ \t]*)(?!(?:[ \t]*\;|[ \t]*\v)))+'
+INSTRUCTION_EXPRESSION_PATTERN = r'(?:(?:\%|\$|b|0x|\.)?[\w]+|[\+\-\*\/\&\|\^\(\)]|(?:[ \t]*)(?!(?:[ \t]*\;|[ \t]*\v)))+'
 
 PATTERN_ALLOWED_LABELS = re.compile(
         r'^(?!__|\.\.)(?:(?:\.|_|[a-zA-Z])[a-zA-Z0-9_]*)$',
