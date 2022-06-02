@@ -159,6 +159,15 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(l4.address, 678, 'address value is address')
         self.assertEqual(l4.get_label(),'test_bit', 'label string')
 
+        l5: LabelLine = LabelLine.factory(27, 'test_bit = (1 << 3)', 'numeric expression constants', register_set, label_values)
+        l5.set_start_address(678)
+        self.assertIsInstance(l5, LabelLine)
+        self.assertEqual(l5.byte_size, 0, 'has no bytes')
+        self.assertEqual(l5.get_value(), 8, 'label value is constant')
+        self.assertEqual(l5.address, 678, 'address value is address')
+        self.assertEqual(l5.get_label(),'test_bit', 'label string')
+
+
         # this should fail
         with self.assertRaises(SystemExit, msg='unresolvable expression constant assignments should fail'):
             l_fail= LabelLine.factory(13, 'my_constant = some_var1 + 7', 'bad constant', register_set, label_values)
