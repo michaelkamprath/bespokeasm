@@ -77,6 +77,6 @@ class IndirectIndexedRegisterOperand(RegisterOperand):
                             bytecode_part.endian,
                             line_id
                         )
-                        return ParsedOperand(self, composit_byte_code, parsed_index.argument)
-                    return ParsedOperand(self, bytecode_part, parsed_index.argument)
+                        return ParsedOperand(self, composit_byte_code, parsed_index.argument, operand)
+                    return ParsedOperand(self, bytecode_part, parsed_index.argument, operand)
         return None

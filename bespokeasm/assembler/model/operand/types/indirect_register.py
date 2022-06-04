@@ -88,6 +88,6 @@ class IndirectRegisterOperand(RegisterOperand):
                         f'when none was expected.'
                     )
                 arg_part = None
-            return ParsedOperand(self, bytecode_part, arg_part)
+            return ParsedOperand(self, bytecode_part, arg_part, operand)
         else:
             return None

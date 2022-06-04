@@ -39,4 +39,4 @@ class RegisterOperand(Operand):
             line_id
         ) if self.bytecode_value is not None else None
         arg_part = None
-        return ParsedOperand(self, bytecode_part, arg_part)
+        return ParsedOperand(self, bytecode_part, arg_part, operand)

@@ -1,10 +1,7 @@
 import sys
 
-from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.byte_code.assembled import AssembledInstruction
-from bespokeasm.assembler.model.operand_parser import OperandParser, MatchedOperandSet
+from bespokeasm.assembler.model.operand_parser import OperandParser
 from bespokeasm.assembler.model.operand_set import OperandSetCollection
-from bespokeasm.assembler.byte_code.parts import NumericByteCodePart
 from bespokeasm.assembler.model.instruction_base import InstructionBase
 
 # Instruction
@@ -21,7 +18,7 @@ from bespokeasm.assembler.model.instruction_base import InstructionBase
 #
 
 
-class InstructionVariant:
+class InstructionVariant(InstructionBase):
     def __init__(
                 self,
                 mnemonic: str,
@@ -31,7 +28,7 @@ class InstructionVariant:
                 registers: set[str],
                 variant_num: int,
             ) -> None:
-        self._mnemonic = mnemonic
+        super().__init__(mnemonic, default_endian, registers)
         self._variant_config = instruction_variant_config
         # validate config
         if 'byte_code' not in self._variant_config:
@@ -53,10 +50,6 @@ class InstructionVariant:
             self._operand_parser.validate(mnemonic)
         else:
             self._operand_parser = None
-
-    @property
-    def mnemonic(self) -> str:
-        return self._mnemonic
 
     @property
     def operand_count(self) -> int:
@@ -88,61 +81,9 @@ class InstructionVariant:
         else:
             return 0
 
-    def __repr__(self) -> str:
-        return str(self)
-
     def __str__(self) -> str:
         operand_str = str(self._operand_parser) if self._operand_parser is not None else "NO_OPERANDS"
         return f'InstructionVariant<{self._mnemonic, operand_str}>'
-
-    def generate_bytecode_parts(
-        self,
-        line_id: LineIdentifier,
-        mnemonic: str,
-        operands: str,
-        default_endian: str,
-        register_labels: set[str],
-    ) -> AssembledInstruction:
-        if mnemonic != self.mnemonic:
-            # this shouldn't happen
-            sys.exit(f'ERROR: {line_id} - INTERNAL - Asked instruction {self} to parse mnemonic "{mnemonic}"')
-        if operands is not None and operands != '':
-            operand_list = operands.strip().split(',')
-        else:
-            operand_list = []
-
-        # generate the machine code parts
-        instruction_endian = self._variant_config['byte_code'].get('endian', default_endian)
-        base_bytecode = NumericByteCodePart(
-            self.base_bytecode_value,
-            self.base_bytecode_size,
-            False,
-            instruction_endian,
-            line_id,
-        )
-        base_bytecode_suffix = None
-        if self.has_bytecode_suffix:
-            base_bytecode_suffix = NumericByteCodePart(
-                self.suffix_bytecode_value,
-                self.suffix_bytecode_size,
-                False,
-                instruction_endian,
-                line_id,
-            )
-
-        if self._operand_parser is not None:
-            matched_operands: MatchedOperandSet
-            matched_operands = self._operand_parser.find_matching_operands(line_id, operand_list, register_labels)
-            if matched_operands is None:
-                return None
-            machine_code = matched_operands.generate_byte_code(base_bytecode, base_bytecode_suffix)
-        elif len(operand_list) > 0:
-            # This variant was expecting no operands but some were found. No match.
-            return None
-        else:
-            machine_code = [base_bytecode]
-
-        return AssembledInstruction(line_id, machine_code)
 
 
 class Instruction(InstructionBase):
@@ -184,30 +125,9 @@ class Instruction(InstructionBase):
                     )
                 )
 
+    @property
+    def variants(self) -> list[InstructionVariant]:
+        return self._variants
+
     def __str__(self) -> str:
         return f'Instruction<{self._mnemonic}>'
-
-    def generate_bytecode_parts(
-        self,
-        line_id: LineIdentifier,
-        mnemonic: str,
-        operands: str,
-        default_endian: str,
-        register_labels: set[str],
-    ) -> AssembledInstruction:
-        if mnemonic != self.mnemonic:
-            # this shouldn't happen
-            sys.exit(f'ERROR: {line_id} - INTERNAL - Asked instruction {self} to parse mnemonic "{mnemonic}"')
-
-        for variant in self._variants:
-            assembled_instruction = variant.generate_bytecode_parts(
-                line_id,
-                mnemonic,
-                operands,
-                default_endian,
-                register_labels,
-            )
-            if assembled_instruction is not None:
-                return assembled_instruction
-
-        sys.exit(f'ERROR: {line_id} - Instruction "{mnemonic}" has no valid operands configured.')

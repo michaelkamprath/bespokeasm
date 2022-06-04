@@ -115,10 +115,11 @@ class OperandWithArgument(Operand):
 
 class ParsedOperand:
     '''A structure class to contain the results of a operand parsing.'''
-    def __init__(self, operand: Operand, byte_code: ByteCodePart, argument: ByteCodePart):
+    def __init__(self, operand: Operand, byte_code: ByteCodePart, argument: ByteCodePart, operand_str: str):
         self._operand = operand
         self._byte_code = byte_code
         self._argument = argument
+        self._operand_str = operand_str
 
     def __repr__(self):
         return str(self)
@@ -131,9 +132,17 @@ class ParsedOperand:
         return self._operand
 
     @property
+    def operand_id(self) -> str:
+        return self.operand.id
+
+    @property
     def byte_code(self) -> ByteCodePart:
         return self._byte_code
 
     @property
     def argument(self) -> ByteCodePart:
         return self._argument
+
+    @property
+    def operand_string(self) -> str:
+        return self._operand_str

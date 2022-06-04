@@ -54,4 +54,4 @@ class NumericBytecode(Operand):
         )
         if bytecode_part.contains_register_labels(register_labels):
             return None
-        return ParsedOperand(self, bytecode_part, None)
+        return ParsedOperand(self, bytecode_part, None, operand)

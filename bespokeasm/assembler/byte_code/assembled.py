@@ -34,6 +34,10 @@ class AssembledInstruction:
     def line_id(self):
         return self._line_id
 
+    @property
+    def parts(self):
+        return self._parts
+
     def get_bytes(self, label_scope: LabelScope) -> bytearray:
         packed_bits = PackedBits()
         for p in self._parts:
@@ -54,3 +58,16 @@ class AssembledInstruction:
             # ERROR
             return None
         return bytes
+
+class CompositeAssembledInstruction(AssembledInstruction):
+    def __init__(self, line_id: LineIdentifier, instructions: list[AssembledInstruction]):
+        # turn instruction list into byte code parts list
+        parts: list[ByteCodePart] = [
+            p  for instr in instructions for p in instr.parts
+        ]
+        super().__init__(line_id, parts)
+        self._instructions = instructions
+
+    @property
+    def instructions(self):
+        return self._instructions

@@ -7,7 +7,7 @@ from bespokeasm.utilities import parse_numeric_string, is_string_numeric
 
 class DataLine(LineWithBytes):
     PATTERN_DATA_DIRECTIVE = re.compile(
-        r'^(\.byte|\.2byte|\.4byte|\.8byte|\.cstr)\s*(?:([\w,$\%\s]+)|(?P<quote>[\"\']{1})((?:\\(?P=quote)|.)*)(?P=quote))',
+        r'^(\.byte|\.2byte|\.4byte|\.8byte|\.cstr)\b\s*(?:([\w,$\%\s]+)|(?P<quote>[\"\']{1})((?:\\(?P=quote)|.)*)(?P=quote))',
         flags=re.IGNORECASE|re.MULTILINE
     )
 

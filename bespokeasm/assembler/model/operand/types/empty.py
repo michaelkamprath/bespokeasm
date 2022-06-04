@@ -26,4 +26,4 @@ class EmptyOperand(Operand):
             'big',
             line_id
         ) if self.bytecode_value is not None else None
-        return ParsedOperand(self, bytecode_part, None)
+        return ParsedOperand(self, bytecode_part, None, operand)

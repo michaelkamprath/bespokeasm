@@ -15,7 +15,7 @@ import sys
 from bespokeasm.utilities import is_string_numeric, parse_numeric_string
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.label_scope import LabelScope
-from bespokeasm.assembler.line_object.utility import is_valid_label
+from bespokeasm.utilities import is_valid_label
 
 EXPRESSION_PARTS_PATTERN = r'(?:(?:\%|b)[01]+|(?:\$|0x)[0-9a-fA-F]+|\d+|[\+\-\*\/\&\|\^\(\)]|>>|<<|(?:\.|_)?\w+)'
 

@@ -55,7 +55,7 @@ class LineOjectFactory:
                 same_line_instr = LabelLine.parse_same_line_instruction(line_id, instruction_str)
                 if same_line_instr is not None:
                     # try directives
-                    line_obj = DirectiveLine.factory(line_id, same_line_instr, '', model)
+                    line_obj = DirectiveLine.factory(line_id, same_line_instr, '', model.endian)
                     if line_obj is not None:
                         line_obj_list.append(line_obj)
                         return line_obj_list
@@ -71,7 +71,7 @@ class LineOjectFactory:
                     sys.exit(f'ERROR: {line_id} - Improperly formatted label')
                 return line_obj_list
             # try directives
-            line_obj = DirectiveLine.factory(line_id, instruction_str, comment_str, model)
+            line_obj = DirectiveLine.factory(line_id, instruction_str, comment_str, model.endian)
             if line_obj is not None:
                 return [line_obj]
 

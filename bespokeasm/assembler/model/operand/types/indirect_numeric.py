@@ -37,6 +37,6 @@ class IndirectNumericOperand(NumericExpressionOperand):
             )
             if arg_part.contains_register_labels(register_labels):
                 return None
-            return ParsedOperand(self, bytecode_part, arg_part)
+            return ParsedOperand(self, bytecode_part, arg_part, operand)
         else:
             return None

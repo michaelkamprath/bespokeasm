@@ -3,9 +3,9 @@ import importlib.resources as pkg_resources
 
 from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType, GlobalLabelScope
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.line_object import LineObject, LineWithBytes
-from bespokeasm.assembler.line_object.data_line import DataLine
+from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object.factory import LineOjectFactory
+from bespokeasm.assembler.line_object.data_line import DataLine
 from bespokeasm.assembler.line_object.label_line import LabelLine, is_valid_label
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.model import AssemblerModel
@@ -391,6 +391,21 @@ class TestLineObject(unittest.TestCase):
         ins3.label_scope = label_values
         ins3.generate_bytes()
         self.assertEqual(ins3.get_bytes(), bytearray([0x45, 0x08]), 'instruction should match')
+
+    def test_test_line_object_factory(self):
+        label_values = GlobalLabelScope(set())
+        label_values.set_label_value('test1', 0x1234, 1)
+        line_id = LineIdentifier(33, 'test_test_line_object_factory')
+        with pkg_resources.path(config_files, 'test_instruction_line_creation_little_endian.yaml') as fp:
+            isa_model = AssemblerModel(str(fp), 0)
+
+        lo1: list[LineObject] = LineOjectFactory.parse_line(line_id, '    .2byte $1234', isa_model, label_values)
+        self.assertEqual(len(lo1), 1, 'only one instruction to parse')
+        print(lo1[0])
+        self.assertIsInstance(lo1[0], DataLine, 'instruction is a DataLine')
+        dl1: DataLine = lo1[0]
+        dl1.generate_bytes()
+        self.assertEqual(list(dl1.get_bytes()), [0x34, 0x12])
 
 
 if __name__ == '__main__':

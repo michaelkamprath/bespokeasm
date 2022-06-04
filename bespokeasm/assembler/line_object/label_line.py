@@ -4,9 +4,8 @@ import sys
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject, INSTRUCTION_EXPRESSION_PATTERN
-from bespokeasm.assembler.line_object.utility import is_valid_label
-from bespokeasm.utilities import is_string_numeric, parse_numeric_string, PATTERN_NUMERIC
-from bespokeasm.expression import parse_expression, ExpresionType
+from bespokeasm.utilities import is_valid_label
+from bespokeasm.expression import parse_expression
 
 class LabelLine(LineObject):
     PATTERN_LABEL = re.compile(
