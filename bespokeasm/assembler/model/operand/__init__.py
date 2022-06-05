@@ -85,6 +85,10 @@ class Operand:
     def match_pattern(self) -> str:
         return ''
 
+    @property
+    def operand_argument_string(self) -> str:
+        sys.exit(f'ERROR: INTERNAL - tried to fetch operand argument string for an unsupported operand type: {self}')
+
     def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> ParsedOperand:
         # this should be overridden
         return None
@@ -94,7 +98,7 @@ class OperandWithArgument(Operand):
     def __init__(self, operand_id, arg_config_dict, default_endian, require_arg: bool = True) -> None:
         super().__init__(operand_id, arg_config_dict, default_endian)
         if require_arg and 'argument' not in self._config:
-            sys.exit(f'ERROR: configuration for numeric operand {self} does not have an arument configuration')
+            sys.exit(f'ERROR: configuration for numeric operand {self} does not have an argument configuration')
 
     @property
     def has_argument(self) -> bool:
@@ -146,3 +150,7 @@ class ParsedOperand:
     @property
     def operand_string(self) -> str:
         return self._operand_str
+
+    @property
+    def operand_argument_string(self) -> str:
+        return self._argument.instruction_string

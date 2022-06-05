@@ -44,6 +44,10 @@ class ByteCodePart:
             and self._byte_align == other._byte_align \
             and self._endian == other._endian
 
+    @property
+    def instruction_string(self) -> str:
+        sys.exit(f'ERROR: INTERNAL - fetching ByteCodePart instruction string unimplemented for: {self}')
+
     def get_value(self, label_scope: LabelScope) -> int:
         # this should be overridden
         return None
@@ -57,6 +61,10 @@ class NumericByteCodePart(ByteCodePart):
         super().__init__(value_size, byte_align, endian, line_id)
         self._value = value
 
+    @property
+    def instruction_string(self) -> str:
+        return str(self._value)
+
     def __str__(self) -> str:
         return f'NumericByteCodePart<value={self._value},size={self.value_size}>'
 
@@ -69,6 +77,10 @@ class ExpressionByteCodePart(ByteCodePart):
         super().__init__(value_size, byte_align, endian, line_id)
         self._expression = value_expression
         self._parsed_expression = parse_expression(self.line_id, self._expression)
+
+    @property
+    def instruction_string(self) -> str:
+        return self._expression.strip()
 
     def __str__(self) -> str:
         return f'ExpressionByteCodePart<expression="{self._expression}",size={self.value_size}>'

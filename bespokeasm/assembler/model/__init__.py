@@ -77,7 +77,11 @@ class AssemblerModel:
             if reg in ASSEMBLER_KEYWORD_SET:
                 sys.exit(f'ERROR: the instruction set configuration file specified an unallowed register name: {reg}')
         self._operand_sets = OperandSetCollection(self._config['operand_sets'], self.endian, self.registers)
-        self._instructions = InstructionSet(self._config['instructions'], self._operand_sets, self.endian, self.registers)
+        self._instructions = InstructionSet(
+                self._config['instructions'], 
+                self._config.get('macros', None),
+                self._operand_sets, self.endian, self.registers
+            )
 
     def __repr__(self) -> str:
         return str(self)
