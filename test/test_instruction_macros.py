@@ -14,14 +14,14 @@ class TestInstructionMacros(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         global_scope = GlobalLabelScope(set())
-        global_scope.set_label_value('var1', 12, 1)
+        global_scope.set_label_value('var1', 0x4589, 1)
         global_scope.set_label_value('my_val', 8, 2)
         global_scope.set_label_value('the_two', 2, 3)
         local_scope = LabelScope(LabelScopeType.LOCAL, global_scope, 'TestInstructionParsing')
         local_scope.set_label_value('.local_var', 10, 3)
         cls.label_values = local_scope
 
-    def test_macro_parsing(self):
+    def test_macro_parsing_numeric_args(self):
         with pkg_resources.path(config_files, 'test_instruction_macros.yaml') as fp:
             isa_model = AssemblerModel(str(fp), 0)
 
@@ -43,6 +43,44 @@ class TestInstructionMacros(unittest.TestCase):
         ins1.generate_bytes()
         self.assertEqual(
             list(ins1.get_bytes()),
-            [0b01110110, 0, 0x20, 0x34, 0x12, 0b01110110, 1, 0x20, 0x35, 0x12], 
+            [0b01110110, 0, 0x20, 0x34, 0x12, 0b01110110, 1, 0x20, 0x35, 0x12],
+            'instruction bytes should match'
+        )
+
+        ins2 = InstructionLine.factory(line_id, 'add16 [$1234], $5678', 'some comment!', isa_model)
+        ins2.set_start_address(1212)
+        self.assertIsInstance(ins2, InstructionLine)
+        self.assertEqual(ins2.byte_size, 16, 'has 16 bytes')
+        ins2.label_scope = TestInstructionMacros.label_values
+        ins2.generate_bytes()
+        self.assertEqual(
+            list(ins2.get_bytes()),
+            [
+                0b01000110, 0x34, 0x12,
+                0b00010111, 0x78,
+                0b01110000, 0x34, 0x12,
+                0b01000110, 0x35, 0x12,
+                0b00011111, 0x56,
+                0b01110000, 0x35, 0x12,
+            ],
+            'instruction bytes should match'
+        )
+
+        ins3 = InstructionLine.factory(line_id, 'add16 [$1234], [var1+7]', 'some comment!', isa_model)
+        ins3.set_start_address(1212)
+        self.assertIsInstance(ins3, InstructionLine)
+        self.assertEqual(ins3.byte_size, 18, 'has 18 bytes')
+        ins3.label_scope = TestInstructionMacros.label_values
+        ins3.generate_bytes()
+        self.assertEqual(
+            list(ins3.get_bytes()),
+            [
+                0b01000110, 0x34, 0x12,
+                0b00010110, 0x90, 0x45,
+                0b01110000, 0x34, 0x12,
+                0b01000110, 0x35, 0x12,
+                0b00011110, 0x91, 0x45,
+                0b01110000, 0x35, 0x12,
+            ],
             'instruction bytes should match'
         )

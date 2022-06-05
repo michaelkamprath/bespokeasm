@@ -17,7 +17,6 @@ class InstructioParser(InstructioParserBase):
             operands = ''
 
         instr_obj = isa_model.instructions.get(mnemonic)
-        print(f'parsing instruction "{instruction}" with {instr_obj}')
         if instr_obj is None:
             sys.exit(f'ERROR: {line_id} - Unrecognized mnemonic "{mnemonic}"')
         return BytecodeGenerator.generate_bytecode_parts(instr_obj, line_id, mnemonic, operands, isa_model, InstructioParser)

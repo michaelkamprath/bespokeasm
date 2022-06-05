@@ -60,51 +60,6 @@ class InstructionMacro(InstructionBase):
     '''
     An object that consists of a composable sequence of instruction objects.
     '''
-
-    # config dict schema:
-    #
-    # macro_menomic: [
-    #  # list of variants
-    #  - {
-    #   operands: [
-    #       op_name : {
-    #           # normal operand config
-    #       },
-    #       op2_name : {
-    #           # normal operand config
-    #       }
-    #   ],
-    #   instructions: [
-    #       # instructions are simply their text representation with special labels
-    #       # for the passed operands
-    #       #      @ARG(op_name) - emits the string of the operand argument. The operand type
-    #       #                      determins what its argument is. Expressions are not resolvbed yet,
-    #       #                      the original string is what is passed.
-    #       #      @OP(op_name)  - emits the string of the entire operand, as is.  Expressions are not resolved yet.
-    #       #
-    #       # these strings will be iterpreted as is. For example, they could be inserted into an express:
-    #       #     macro = "push4 12955"
-    #       #
-    #       #  could be composed of the individual intructions of
-    #       #       push2 ((@ARG(immediate)) >> 16)
-    #       #       push2 ((@ARG(immediate) & $0000FFFF)
-    #       #
-    #               "instruction 1",
-    #               "instruction 2",
-    #                   ...
-    #   ]
-    # }
-    # - { variant }
-    #
-    # operand supported modifications
-    #
-    #   * NumericExpressionOperand:
-    #       - augment expression. original expression is treated as an atomic entity.
-    #   * IndirectNumericOperand:
-    #       - augment numeric expression.  original expression is treated as an atomic entity.
-    #   * IndirectRegisterOperand:
-    #       - augment numeric expression of offset.  original expression is treated as an atomic entity.
-    #
     def __init__(
                 self,
                 mnemonic: str,

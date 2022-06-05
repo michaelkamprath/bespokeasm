@@ -25,9 +25,7 @@ class MacroBytecodeGenerator:
             # this shouldn't happen
             sys.exit(f'ERROR: {line_id} - INTERNAL - Asked macro {macro} to parse mnemonic "{mnemonic}"')
 
-        print(f'Generating byte code for macro {mnemonic}')
         for variant in macro.variants:
-            print(f'    attempting match with macro variant {variant}')
             assembled_instruction = MacroBytecodeGenerator.generate_variant_bytecode_parts(
                 variant,
                 line_id,
@@ -80,7 +78,6 @@ class MacroBytecodeGenerator:
             # handle @ARG
             for op in matched_operands.operands:
                 arg_str = f'@ARG({op.operand_id})'
-                print(f'   replacing {arg_str} in "{instruction_str}"')
                 instruction_str = instruction_str.replace(arg_str, op.operand_argument_string)
             # ensure all @ARGs
             if '@ARG' in instruction_str:
@@ -88,7 +85,6 @@ class MacroBytecodeGenerator:
             instruction_lines.append(instruction_str)
 
         # third get assembled instruction for each generated line
-        print(f'    constructed macro instructions: {instruction_lines}')
         assembled_instructions: list[AssembledInstruction] = []
         for step_num, instruction_str in enumerate(instruction_lines):
             macro_line_id = MacroLineIdentifier(variant.mnemonic, step_num, line_id)
@@ -96,7 +92,5 @@ class MacroBytecodeGenerator:
             assembled_instructions.append(instruction)
 
         # finally, pack it all together into one assembled instruction
-        print(f'    Assembled macro instructions: {assembled_instructions}')
         composite_instruction = CompositeAssembledInstruction(line_id, assembled_instructions)
-        print(f'    cpmpositted instructions = {composite_instruction   }')
         return composite_instruction

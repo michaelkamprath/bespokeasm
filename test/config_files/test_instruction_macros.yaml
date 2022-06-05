@@ -127,6 +127,24 @@ instructions:
     byte_code:
       value: 1
       size: 2
+  add:
+    byte_code:
+      value: 2
+      size: 5
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - 8_bit_source
+  addc:
+    byte_code:
+      value: 3
+      size: 5
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - 8_bit_source
 macros:
   push2:
     - operands:
@@ -161,3 +179,48 @@ macros:
       instructions:
         - "mov [@ARG(iaddr1)],[@ARG(iaddr2)]"
         - "mov [@ARG(iaddr1) + 1],[@ARG(iaddr2) + 1]"
+  add16:
+    - operands:
+        count: 2
+        specific_operands:
+          iaddr1_immediate:
+            list:
+              iaddr_x:
+                type: indirect_numeric
+                argument:
+                  size: 16
+                  byte_align: true
+              immediate_y:
+                type: numeric
+                argument:
+                  size: 16
+                  byte_align: true
+      instructions:
+        - "mov a,[@ARG(iaddr_x)]"
+        - "add (@ARG(immediate_y) & $00FF)"
+        - "mov [@ARG(iaddr_x)],a"
+        - "mov a,[@ARG(iaddr_x)+1]"
+        - "addc ((@ARG(immediate_y) & $FF00) >> 8)"
+        - "mov [@ARG(iaddr_x)+1],a"
+    - operands:
+        count: 2
+        specific_operands:
+          iaddr1_iaddr2:
+            list:
+              iaddr_x:
+                type: indirect_numeric
+                argument:
+                  size: 16
+                  byte_align: true
+              iaddr_y:
+                type: indirect_numeric
+                argument:
+                  size: 16
+                  byte_align: true
+      instructions:
+        - "mov a,[@ARG(iaddr_x)]"
+        - "add [@ARG(iaddr_y)]"
+        - "mov [@ARG(iaddr_x)],a"
+        - "mov a,[@ARG(iaddr_x)+1]"
+        - "addc [@ARG(iaddr_y)+1]"
+        - "mov [@ARG(iaddr_x)+1],a"
