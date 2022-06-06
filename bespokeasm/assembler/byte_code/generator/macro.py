@@ -76,19 +76,19 @@ class MacroBytecodeGenerator:
         for step_num, instruction_format in enumerate(variant._variant_config['instructions']):
             instruction_str: str = instruction_format
 
-            for op in matched_operands.operands:
+            for op_num, op in enumerate(matched_operands.operands):
                 # handle @ARG
-                arg_str = f'@ARG({op.operand_id})'
+                arg_str = f'@ARG({op_num})'
                 if arg_str in instruction_str:
                     # gate the replace so that not called on unspported operand types
                     instruction_str = instruction_str.replace(arg_str, op.operand_argument_string)
                 # handle @REG
-                reg_str = f'@REG({op.operand_id})'
+                reg_str = f'@REG({op_num})'
                 if reg_str in instruction_str:
                     # gate the replace so that not called on unspported operand types
                     instruction_str = instruction_str.replace(reg_str, op.operand_register_string)
                 # handle @OP
-                op_str = f'@OP({op.operand_id})'
+                op_str = f'@OP({op_num})'
                 if op_str in instruction_str:
                     # gate the replace so that not called on unspported operand types
                     instruction_str = instruction_str.replace(op_str, op.operand_string)

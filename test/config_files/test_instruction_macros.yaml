@@ -136,6 +136,19 @@ operand_sets:
         argument:
           size: 16
           byte_align: true
+  stack_pointer:
+    operand_values:
+      sp:
+        type: indirect_register
+        register: sp
+        bytecode:
+          value: 5
+          size: 3
+        offset:
+          max: 127
+          min: -128
+          size: 8
+          byte_align: true
 instructions:
   push:
     operands:
@@ -196,8 +209,8 @@ macros:
                   size: 16
                   byte_align: true
       instructions:
-        - "push ((@ARG(uint16)) >> 8)"
-        - "push ((@ARG(uint16)) & 0x00FF)"
+        - "push ((@ARG(0)) >> 8)"
+        - "push ((@ARG(0)) & 0x00FF)"
     - operands:
         count: 1
         specific_operands:
@@ -212,8 +225,8 @@ macros:
                   size: 8
                   byte_align: true
       instructions:
-        - "push [@REG(ij) + (@ARG(ij)+1)]"
-        - "push [@REG(ij) + (@ARG(ij))]"
+        - "push [@REG(0) + (@ARG(0)+1)]"
+        - "push [@REG(0) + (@ARG(0))]"
     - operands:
         count: 1
         specific_operands:
@@ -228,8 +241,8 @@ macros:
                   size: 8
                   byte_align: true
       instructions:
-        - "push [@REG(sp) + (@ARG(sp)+1)]"
-        - "push [@REG(sp) + (@ARG(sp)+1)]"
+        - "push [@REG(0) + (@ARG(0)+1)]"
+        - "push [@REG(0) + (@ARG(0)+1)]"
   mov2:
     - operands:
         count: 2
@@ -247,8 +260,8 @@ macros:
                   size: 16
                   byte_align: true
       instructions:
-        - "mov [@ARG(iaddr1)],[@ARG(iaddr2)]"
-        - "mov [@ARG(iaddr1) + 1],[@ARG(iaddr2) + 1]"
+        - "mov [@ARG(0)],[@ARG(1)]"
+        - "mov [@ARG(0) + 1],[@ARG(1) + 1]"
   add16:
     - operands:
         count: 2
@@ -266,12 +279,12 @@ macros:
                   size: 16
                   byte_align: true
       instructions:
-        - "mov a,[@ARG(iaddr_x)]"
-        - "add (@ARG(immediate_y) & $00FF)"
-        - "mov [@ARG(iaddr_x)],a"
-        - "mov a,[@ARG(iaddr_x)+1]"
-        - "addc ((@ARG(immediate_y) & $FF00) >> 8)"
-        - "mov [@ARG(iaddr_x)+1],a"
+        - "mov a,[@ARG(0)]"
+        - "add (@ARG(1) & $00FF)"
+        - "mov [@ARG(0)],a"
+        - "mov a,[@ARG(0)+1]"
+        - "addc ((@ARG(1) & $FF00) >> 8)"
+        - "mov [@ARG(0)+1],a"
     - operands:
         count: 2
         specific_operands:
@@ -288,41 +301,66 @@ macros:
                   size: 16
                   byte_align: true
       instructions:
-        - "mov a,[@ARG(iaddr_x)]"
-        - "add [@ARG(iaddr_y)]"
-        - "mov [@ARG(iaddr_x)],a"
-        - "mov a,[@ARG(iaddr_x)+1]"
-        - "addc [@ARG(iaddr_y)+1]"
-        - "mov [@ARG(iaddr_x)+1],a"
+        - "mov a,[@ARG(0)]"
+        - "add [@ARG(1)]"
+        - "mov [@ARG(0)],a"
+        - "mov a,[@ARG(0)+1]"
+        - "addc [@ARG(1)+1]"
+        - "mov [@ARG(0)+1],a"
   swap:
     - operands:
         count: 2
-        specific_operands:
-          a_i:
-            list:
-              reg1:
-                type: register
-                register: a
-              reg2:
-                type: register
-                register: i
-          a_j:
-            list:
-              reg1:
-                type: register
-                register: a
-              reg2:
-                type: register
-                register: j
-          i_j:
-            list:
-              reg1:
-                type: register
-                register: i
-              reg2:
-                type: register
-                register: j
+        operand_sets:
+          list:
+            - 8_bit_destination
+            - 8_bit_destination
+          disallowed_pairs:
+            - [a, sp]
+            - [i, sp]
+            - [j, sp]
+            - [ij, sp]
+            - [sp, sp]
+            - [indirect_addr, sp]
+            - [sp, a]
+            - [sp, i]
+            - [sp, j]
+            - [sp, ij]
+            - [sp, indirect_addr]
       instructions:
-        - "push @REG(reg1)"
-        - "mov @REG(reg1),@REG(reg2)"
-        - "pop @REG(reg2)"
+        - "push @OP(0)"
+        - "mov @OP(0),@OP(1)"
+        - "pop @OP(1)"
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - 8_bit_destination
+            - stack_pointer
+          disallowed_pairs:
+            - [sp, sp]
+      instructions:
+        - "push @OP(0)"
+        - "mov @OP(0),[@REG(1) + (@ARG(1)+1)]"
+        - "pop [@REG(1) + (@ARG(1)+1)]"
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - stack_pointer
+            - 8_bit_destination
+          disallowed_pairs:
+            - [sp, sp]
+      instructions:
+        - "push @OP(0)"
+        - "mov [@REG(0) + (@ARG(0)+1)],@OP(1)"
+        - "pop @OP(1)"
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - stack_pointer
+            - stack_pointer
+      instructions:
+        - "push @OP(0)"
+        - "mov [@REG(0) + (@ARG(0)+1)],[@REG(1) + (@ARG(1)+1)]"
+        - "pop [@REG(1) + (@ARG(1)+1)]"
