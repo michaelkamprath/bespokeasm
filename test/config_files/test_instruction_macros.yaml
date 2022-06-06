@@ -12,6 +12,7 @@ general :
     - sp
     - ij
     - mar
+  min_version: "0.2.2"
 operand_sets:
   8_bit_source:
     operand_values:
@@ -27,6 +28,23 @@ operand_sets:
         bytecode:
           value: 2
           size: 3
+      j:
+        type: register
+        register: j
+        bytecode:
+          value: 3
+          size: 3
+      ij:
+        type: indirect_register
+        register: ij
+        bytecode:
+          value: 4
+          size: 3
+        offset:
+          max: 127
+          min: -128
+          size: 8
+          byte_align: true
       sp:
         type: indirect_register
         register: sp
@@ -68,12 +86,23 @@ operand_sets:
         bytecode:
           value: 2
           size: 3
-      mar:
+      j:
+        type: register
+        register: j
+        bytecode:
+          value: 3
+          size: 3
+      ij:
         type: indirect_register
-        register: mar
+        register: ij
         bytecode:
           value: 4
           size: 3
+        offset:
+          max: 127
+          min: -128
+          size: 8
+          byte_align: true
       sp:
         type: indirect_register
         register: sp
@@ -116,6 +145,15 @@ instructions:
           - 8_bit_source
     byte_code:
       value: 1
+      size: 5
+  pop:
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - 8_bit_destination
+    byte_code:
+      value: 0
       size: 5
   mov:
     operands:
@@ -160,6 +198,38 @@ macros:
       instructions:
         - "push ((@ARG(uint16)) >> 8)"
         - "push ((@ARG(uint16)) & 0x00FF)"
+    - operands:
+        count: 1
+        specific_operands:
+          ij_reg:
+            list:
+              ij:
+                type: indirect_register
+                register: ij
+                offset:
+                  max: 127
+                  min: -128
+                  size: 8
+                  byte_align: true
+      instructions:
+        - "push [@REG(ij) + (@ARG(ij)+1)]"
+        - "push [@REG(ij) + (@ARG(ij))]"
+    - operands:
+        count: 1
+        specific_operands:
+          stack_pointer:
+            list:
+              sp:
+                type: indirect_register
+                register: sp
+                offset:
+                  max: 127
+                  min: -128
+                  size: 8
+                  byte_align: true
+      instructions:
+        - "push [@REG(sp) + (@ARG(sp)+1)]"
+        - "push [@REG(sp) + (@ARG(sp)+1)]"
   mov2:
     - operands:
         count: 2
@@ -224,3 +294,35 @@ macros:
         - "mov a,[@ARG(iaddr_x)+1]"
         - "addc [@ARG(iaddr_y)+1]"
         - "mov [@ARG(iaddr_x)+1],a"
+  swap:
+    - operands:
+        count: 2
+        specific_operands:
+          a_i:
+            list:
+              reg1:
+                type: register
+                register: a
+              reg2:
+                type: register
+                register: i
+          a_j:
+            list:
+              reg1:
+                type: register
+                register: a
+              reg2:
+                type: register
+                register: j
+          i_j:
+            list:
+              reg1:
+                type: register
+                register: i
+              reg2:
+                type: register
+                register: j
+      instructions:
+        - "push @REG(reg1)"
+        - "mov @REG(reg1),@REG(reg2)"
+        - "pop @REG(reg2)"

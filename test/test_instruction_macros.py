@@ -25,7 +25,7 @@ class TestInstructionMacros(unittest.TestCase):
         with pkg_resources.path(config_files, 'test_instruction_macros.yaml') as fp:
             isa_model = AssemblerModel(str(fp), 0)
 
-        line_id = LineIdentifier(1, 'test_macro_parsing')
+        line_id = LineIdentifier(1, 'test_macro_parsing_numeric_args')
 
         ins0 = InstructionLine.factory(line_id, 'push2 $1234', 'some comment!', isa_model)
         ins0.set_start_address(1212)
@@ -81,6 +81,74 @@ class TestInstructionMacros(unittest.TestCase):
                 0b01000110, 0x35, 0x12,
                 0b00011110, 0x91, 0x45,
                 0b01110000, 0x35, 0x12,
+            ],
+            'instruction bytes should match'
+        )
+
+    def test_macro_parsing_registers(self):
+        with pkg_resources.path(config_files, 'test_instruction_macros.yaml') as fp:
+            isa_model = AssemblerModel(str(fp), 0)
+
+        line_id = LineIdentifier(1, 'test_macro_parsing_registers')
+
+        ins1 = InstructionLine.factory(line_id, 'swap a,j', 'some comment!', isa_model)
+        ins1.set_start_address(1212)
+        self.assertIsInstance(ins1, InstructionLine)
+        self.assertEqual(ins1.byte_size, 3, 'has 3 bytes')
+        ins1.label_scope = TestInstructionMacros.label_values
+        ins1.generate_bytes()
+        self.assertEqual(
+            list(ins1.get_bytes()),
+            [
+                0b00001000,
+                0b01000011,
+                0b00000011,
+            ],
+            'instruction bytes should match'
+        )
+
+        ins2 = InstructionLine.factory(line_id, 'swap i,j', 'some comment!', isa_model)
+        ins2.set_start_address(1212)
+        self.assertIsInstance(ins2, InstructionLine)
+        self.assertEqual(ins2.byte_size, 3, 'has 3 bytes')
+        ins2.label_scope = TestInstructionMacros.label_values
+        ins2.generate_bytes()
+        self.assertEqual(
+            list(ins2.get_bytes()),
+            [
+                0b00001010,
+                0b01010011,
+                0b00000011,
+            ],
+            'instruction bytes should match'
+        )
+
+        ins4 = InstructionLine.factory(line_id, 'push2 [ij + 4]', 'some comment!', isa_model)
+        ins4.set_start_address(1212)
+        self.assertIsInstance(ins4, InstructionLine)
+        self.assertEqual(ins4.byte_size, 4, 'has 4 bytes')
+        ins4.label_scope = TestInstructionMacros.label_values
+        ins4.generate_bytes()
+        self.assertEqual(
+            list(ins4.get_bytes()),
+            [
+                0b00001100, 5,
+                0b00001100, 4,
+            ],
+            'instruction bytes should match'
+        )
+
+        ins5 = InstructionLine.factory(line_id, 'push2 [sp + 8]', 'some comment!', isa_model)
+        ins5.set_start_address(1212)
+        self.assertIsInstance(ins5, InstructionLine)
+        self.assertEqual(ins5.byte_size, 4, 'has 4 bytes')
+        ins5.label_scope = TestInstructionMacros.label_values
+        ins5.generate_bytes()
+        self.assertEqual(
+            list(ins5.get_bytes()),
+            [
+                0b00001101, 9,
+                0b00001101, 9,
             ],
             'instruction bytes should match'
         )

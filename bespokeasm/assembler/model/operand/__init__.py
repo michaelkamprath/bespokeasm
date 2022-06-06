@@ -89,6 +89,10 @@ class Operand:
     def operand_argument_string(self) -> str:
         sys.exit(f'ERROR: INTERNAL - tried to fetch operand argument string for an unsupported operand type: {self}')
 
+    @property
+    def operand_register_string(self) -> str:
+        sys.exit(f'ERROR: INTERNAL - tried to fetch operand regist string for an unsupported operand type: {self}')
+
     def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> ParsedOperand:
         # this should be overridden
         return None
@@ -153,4 +157,8 @@ class ParsedOperand:
 
     @property
     def operand_argument_string(self) -> str:
-        return self._argument.instruction_string
+        return self.argument.instruction_string
+
+    @property
+    def operand_register_string(self) -> str:
+        return self.operand.operand_register_string

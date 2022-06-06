@@ -75,13 +75,34 @@ class MacroBytecodeGenerator:
         instruction_lines: list[str] = []
         for step_num, instruction_format in enumerate(variant._variant_config['instructions']):
             instruction_str: str = instruction_format
-            # handle @ARG
+
             for op in matched_operands.operands:
+                # handle @ARG
                 arg_str = f'@ARG({op.operand_id})'
-                instruction_str = instruction_str.replace(arg_str, op.operand_argument_string)
-            # ensure all @ARGs
+                if arg_str in instruction_str:
+                    # gate the replace so that not called on unspported operand types
+                    instruction_str = instruction_str.replace(arg_str, op.operand_argument_string)
+                # handle @REG
+                reg_str = f'@REG({op.operand_id})'
+                if reg_str in instruction_str:
+                    # gate the replace so that not called on unspported operand types
+                    instruction_str = instruction_str.replace(reg_str, op.operand_register_string)
+                # handle @OP
+                op_str = f'@OP({op.operand_id})'
+                if op_str in instruction_str:
+                    # gate the replace so that not called on unspported operand types
+                    instruction_str = instruction_str.replace(op_str, op.operand_string)
+
             if '@ARG' in instruction_str:
+                # ensure all @ARGs ar handled
                 sys.exit(f'ERROR: {line_id} - Macro "{variant.mnemonic}" has unrecognized @ARG on step {step_num}')
+            if '@REG' in instruction_str:
+                # ensure all @REGs ar handled
+                sys.exit(f'ERROR: {line_id} - Macro "{variant.mnemonic}" has unrecognized @REG on step {step_num}')
+            if '@OP' in instruction_str:
+                # ensure all @OPs ar handled
+                sys.exit(f'ERROR: {line_id} - Macro "{variant.mnemonic}" has unrecognized @OP on step {step_num}')
+
             instruction_lines.append(instruction_str)
 
         # third get assembled instruction for each generated line
