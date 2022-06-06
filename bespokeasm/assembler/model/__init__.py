@@ -10,11 +10,16 @@ from bespokeasm import BESPOKEASM_VERSION_STR, BESPOKEASM_MIN_REQUIRED_STR
 from bespokeasm.assembler.keywords import ASSEMBLER_KEYWORD_SET
 from bespokeasm.assembler.model.instruction_set import InstructionSet
 from bespokeasm.assembler.model.operand_set import OperandSet, OperandSetCollection
+from bespokeasm.assembler.label_scope import LabelScope
+from bespokeasm.assembler.line_identifier import LineIdentifier
 
 class AssemblerModel:
     _config: dict
 
     def __init__(self, config_file_path: str, is_verbose: int):
+        self._config_file = config_file_path
+        self._global_label_scope = None
+
         if config_file_path.endswith('.json'):
             with open(config_file_path, 'r') as json_file:
                 config_dict = json.load(json_file)
@@ -166,3 +171,15 @@ class AssemblerModel:
         for item in self.predefined_memory_blocks:
             results.append(item['name'])
         return results
+
+    @property
+    def global_label_scope(self) -> LabelScope:
+        if self._global_label_scope is None:
+            self._global_label_scope = LabelScope.global_scope(self.registers)
+            # add predefined constants to global scope
+            predefines_lineid = LineIdentifier(0, os.path.basename(self._config_file))
+            for predefined_constant in self.predefined_constants:
+                label: str = predefined_constant['name']
+                value: int = predefined_constant['value']
+                self._global_label_scope.set_label_value(label, value, predefines_lineid)
+        return self._global_label_scope

@@ -13,6 +13,10 @@ general :
     - ij
     - mar
   min_version: "0.2.2"
+predefined:
+  constants:
+    - name: predefined_value1
+      value: 20
 operand_sets:
   8_bit_source:
     operand_values:

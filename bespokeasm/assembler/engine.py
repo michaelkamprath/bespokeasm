@@ -41,13 +41,7 @@ class Assembler:
         self._include_paths = include_paths
 
     def assemble_bytecode(self):
-        global_label_scope = LabelScope.global_scope(self._model.registers)
-        # add predefined constants to global scope
-        predefines_lineid = LineIdentifier(0, os.path.basename(self._config_file))
-        for predefined_constant in self._model.predefined_constants:
-            label: str = predefined_constant['name']
-            value: int = predefined_constant['value']
-            global_label_scope.set_label_value(label, value, predefines_lineid)
+        global_label_scope = self._model.global_label_scope
 
         # create the predefined memory blocks
         predefined_line_obs: list[LineObject] = []

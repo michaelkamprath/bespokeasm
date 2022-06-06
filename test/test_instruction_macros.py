@@ -10,10 +10,14 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 
 class TestInstructionMacros(unittest.TestCase):
     label_values = None
+    isa_model = None
 
     @classmethod
     def setUpClass(cls):
-        global_scope = GlobalLabelScope(set())
+        with pkg_resources.path(config_files, 'test_instruction_macros.yaml') as fp:
+            cls.isa_model = AssemblerModel(str(fp), 0)
+
+        global_scope = cls.isa_model.global_label_scope
         global_scope.set_label_value('var1', 0x4589, 1)
         global_scope.set_label_value('my_val', 8, 2)
         global_scope.set_label_value('the_two', 2, 3)
@@ -22,8 +26,7 @@ class TestInstructionMacros(unittest.TestCase):
         cls.label_values = local_scope
 
     def test_macro_parsing_numeric_args(self):
-        with pkg_resources.path(config_files, 'test_instruction_macros.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
+        isa_model = self.isa_model
 
         line_id = LineIdentifier(1, 'test_macro_parsing_numeric_args')
 
@@ -86,8 +89,7 @@ class TestInstructionMacros(unittest.TestCase):
         )
 
     def test_macro_parsing_registers(self):
-        with pkg_resources.path(config_files, 'test_instruction_macros.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
+        isa_model = self.isa_model
 
         line_id = LineIdentifier(1, 'test_macro_parsing_registers')
 
@@ -122,8 +124,7 @@ class TestInstructionMacros(unittest.TestCase):
         )
 
     def test_macro_parsing_operands(self):
-        with pkg_resources.path(config_files, 'test_instruction_macros.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
+        isa_model = self.isa_model
 
         line_id = LineIdentifier(1, 'test_macro_parsing_operands')
 
@@ -191,7 +192,7 @@ class TestInstructionMacros(unittest.TestCase):
             'instruction bytes should match'
         )
 
-        ins5 = InstructionLine.factory(line_id, 'swap [sp+10],[sp+20]', 'some comment!', isa_model)
+        ins5 = InstructionLine.factory(line_id, 'swap [sp+10],[sp+predefined_value1]', 'some comment!', isa_model)
         ins5.set_start_address(1212)
         self.assertIsInstance(ins5, InstructionLine)
         self.assertEqual(ins5.byte_size, 7, 'has 7 bytes')
