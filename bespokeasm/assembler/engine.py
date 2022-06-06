@@ -44,6 +44,7 @@ class Assembler:
         global_label_scope = self._model.global_label_scope
 
         # create the predefined memory blocks
+        predefines_lineid = LineIdentifier(0, os.path.basename(self._config_file))
         predefined_line_obs: list[LineObject] = []
         for predefined_memory in self._model.predefined_memory_blocks:
             label: str = predefined_memory['name']
