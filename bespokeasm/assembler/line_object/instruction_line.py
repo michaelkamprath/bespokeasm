@@ -4,7 +4,7 @@ import sys
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithBytes
 from bespokeasm.assembler.model import AssemblerModel
-
+from bespokeasm.assembler.model.instruction_parser import InstructioParser
 
 class InstructionLine(LineWithBytes):
     COMMAND_EXTRACT_PATTERN = re.compile(r'^\s*(\w+)', flags=re.IGNORECASE|re.MULTILINE)
@@ -34,7 +34,7 @@ class InstructionLine(LineWithBytes):
         self._command = command_str
         self._argument_str = argument_str
         self._isa_model = isa_model
-        self._assembled_instruction = self._isa_model.parse_instruction(line_id, instruction)
+        self._assembled_instruction = InstructioParser.parse_instruction(self._isa_model, line_id, instruction)
     def __str__(self):
         return f'InstructionLine<{self.instruction.strip()} -> {self._assembled_instruction}>'
 

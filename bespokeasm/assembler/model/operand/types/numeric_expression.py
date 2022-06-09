@@ -32,4 +32,4 @@ class NumericExpressionOperand(OperandWithArgument):
         arg_part = ExpressionByteCodePart(operand, self.argument_size, self.argument_byte_align, self.argument_endian, line_id)
         if arg_part.contains_register_labels(register_labels):
             return None
-        return ParsedOperand(self, bytecode_part, arg_part)
+        return ParsedOperand(self, bytecode_part, arg_part, operand)

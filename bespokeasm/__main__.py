@@ -3,7 +3,7 @@ import os
 import sys
 
 from bespokeasm import BESPOKEASM_VERSION_STR
-from bespokeasm.assembler import Assembler
+from bespokeasm.assembler.engine import Assembler
 from bespokeasm.configgen.vscode import VSCodeConfigGenerator
 from bespokeasm.configgen.sublime import SublimeConfigGenerator
 

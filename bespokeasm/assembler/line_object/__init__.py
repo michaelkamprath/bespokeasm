@@ -2,17 +2,9 @@ import re
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.label_scope import LabelScope
+from bespokeasm.expression import EXPRESSION_PARTS_PATTERN
 
-INSTRUCTION_EXPRESSION_PATTERN = r'(?:(?:\%|\$|b|0x|\.)?[\w]+|[\+\-\*\/\&\|\^\(\)]|(?:[ \t]*)(?!(?:[ \t]*\;|[ \t]*\v)))+'
-
-PATTERN_ALLOWED_LABELS = re.compile(
-        r'^(?!__|\.\.)(?:(?:\.|_|[a-zA-Z])[a-zA-Z0-9_]*)$',
-        flags=re.IGNORECASE|re.MULTILINE
-    )
-
-def is_valid_label(s: str):
-    res = re.search(PATTERN_ALLOWED_LABELS, s)
-    return (res is not None)
+INSTRUCTION_EXPRESSION_PATTERN = r'(?:{0}|(?:[ \t]*)(?!(?:[ \t]*\;|[ \t]*\v)))+'.format(EXPRESSION_PARTS_PATTERN)
 
 class LineObject:
     def __init__(self, line_id: LineIdentifier, instruction: str, comment: str):

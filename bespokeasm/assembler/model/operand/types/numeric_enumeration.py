@@ -73,5 +73,5 @@ class NumericEnumerationOperand(NumericExpressionOperand):
                 )
             if bytecode_part is None and arg_part is None:
                 return None
-            return ParsedOperand(self, bytecode_part, arg_part)
+            return ParsedOperand(self, bytecode_part, arg_part, operand)
         return None

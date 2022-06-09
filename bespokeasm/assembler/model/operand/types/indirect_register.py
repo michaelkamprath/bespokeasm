@@ -66,7 +66,10 @@ class IndirectRegisterOperand(RegisterOperand):
                 if len(match.groups()) == 3 and match.group(2) is not None and match.group(3) is not None:
                     # we have an offset argument. construct the offset expression. Group 2 is the + or -
                     # sign, and our expression parser expects 2 operands for the + or - sign
-                    argument_str = f'0 {match.group(2).strip()} {match.group(3).strip()}'
+                    if match.group(2).strip() == '-':
+                        argument_str = f'0 {match.group(2).strip()} {match.group(3).strip()}'
+                    else:
+                        argument_str = match.group(3).strip()
                     arg_part = ExpressionByteCodePart(
                         argument_str,
                         self.offset_size,
@@ -88,6 +91,6 @@ class IndirectRegisterOperand(RegisterOperand):
                         f'when none was expected.'
                     )
                 arg_part = None
-            return ParsedOperand(self, bytecode_part, arg_part)
+            return ParsedOperand(self, bytecode_part, arg_part, operand)
         else:
             return None

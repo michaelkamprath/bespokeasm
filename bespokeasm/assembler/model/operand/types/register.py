@@ -27,6 +27,10 @@ class RegisterOperand(Operand):
     def match_pattern(self) -> str:
         return r'{0}'.format(self.register)
 
+    @property
+    def operand_register_string(self) -> str:
+        return self.register
+
     def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> ParsedOperand:
         # first check that operand is what we expect
         if operand.strip() != self.register:
@@ -39,4 +43,4 @@ class RegisterOperand(Operand):
             line_id
         ) if self.bytecode_value is not None else None
         arg_part = None
-        return ParsedOperand(self, bytecode_part, arg_part)
+        return ParsedOperand(self, bytecode_part, arg_part, operand)

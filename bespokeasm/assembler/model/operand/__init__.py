@@ -85,6 +85,14 @@ class Operand:
     def match_pattern(self) -> str:
         return ''
 
+    @property
+    def operand_argument_string(self) -> str:
+        sys.exit(f'ERROR: INTERNAL - tried to fetch operand argument string for an unsupported operand type: {self}')
+
+    @property
+    def operand_register_string(self) -> str:
+        sys.exit(f'ERROR: INTERNAL - tried to fetch operand regist string for an unsupported operand type: {self}')
+
     def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> ParsedOperand:
         # this should be overridden
         return None
@@ -94,7 +102,7 @@ class OperandWithArgument(Operand):
     def __init__(self, operand_id, arg_config_dict, default_endian, require_arg: bool = True) -> None:
         super().__init__(operand_id, arg_config_dict, default_endian)
         if require_arg and 'argument' not in self._config:
-            sys.exit(f'ERROR: configuration for numeric operand {self} does not have an arument configuration')
+            sys.exit(f'ERROR: configuration for numeric operand {self} does not have an argument configuration')
 
     @property
     def has_argument(self) -> bool:
@@ -115,10 +123,11 @@ class OperandWithArgument(Operand):
 
 class ParsedOperand:
     '''A structure class to contain the results of a operand parsing.'''
-    def __init__(self, operand: Operand, byte_code: ByteCodePart, argument: ByteCodePart):
+    def __init__(self, operand: Operand, byte_code: ByteCodePart, argument: ByteCodePart, operand_str: str):
         self._operand = operand
         self._byte_code = byte_code
         self._argument = argument
+        self._operand_str = operand_str
 
     def __repr__(self):
         return str(self)
@@ -131,9 +140,25 @@ class ParsedOperand:
         return self._operand
 
     @property
+    def operand_id(self) -> str:
+        return self.operand.id
+
+    @property
     def byte_code(self) -> ByteCodePart:
         return self._byte_code
 
     @property
     def argument(self) -> ByteCodePart:
         return self._argument
+
+    @property
+    def operand_string(self) -> str:
+        return self._operand_str
+
+    @property
+    def operand_argument_string(self) -> str:
+        return self.argument.instruction_string
+
+    @property
+    def operand_register_string(self) -> str:
+        return self.operand.operand_register_string

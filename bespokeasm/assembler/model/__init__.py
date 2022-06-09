@@ -7,17 +7,19 @@ import sys
 import yaml
 
 from bespokeasm import BESPOKEASM_VERSION_STR, BESPOKEASM_MIN_REQUIRED_STR
-from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.byte_code.assembled import AssembledInstruction
 from bespokeasm.assembler.keywords import ASSEMBLER_KEYWORD_SET
 from bespokeasm.assembler.model.instruction_set import InstructionSet
 from bespokeasm.assembler.model.operand_set import OperandSet, OperandSetCollection
-
+from bespokeasm.assembler.label_scope import LabelScope
+from bespokeasm.assembler.line_identifier import LineIdentifier
 
 class AssemblerModel:
     _config: dict
 
     def __init__(self, config_file_path: str, is_verbose: int):
+        self._config_file = config_file_path
+        self._global_label_scope = None
+
         if config_file_path.endswith('.json'):
             with open(config_file_path, 'r') as json_file:
                 config_dict = json.load(json_file)
@@ -80,7 +82,11 @@ class AssemblerModel:
             if reg in ASSEMBLER_KEYWORD_SET:
                 sys.exit(f'ERROR: the instruction set configuration file specified an unallowed register name: {reg}')
         self._operand_sets = OperandSetCollection(self._config['operand_sets'], self.endian, self.registers)
-        self._instructions = InstructionSet(self._config['instructions'], self._operand_sets, self.endian, self.registers)
+        self._instructions = InstructionSet(
+                self._config['instructions'],
+                self._config.get('macros', None),
+                self._operand_sets, self.endian, self.registers
+            )
 
     def __repr__(self) -> str:
         return str(self)
@@ -129,6 +135,10 @@ class AssemblerModel:
     def instruction_mnemonics(self) -> list[str]:
         return list(self._instructions.keys())
 
+    @property
+    def instructions(self) -> InstructionSet:
+        return self._instructions
+
     def get_operand_set(self, operand_set_name: str) -> OperandSet:
         return self._operand_sets.get_operand_set(operand_set_name)
 
@@ -162,15 +172,14 @@ class AssemblerModel:
             results.append(item['name'])
         return results
 
-    def parse_instruction(self, line_id: LineIdentifier, instruction: str) -> AssembledInstruction:
-        instr_parts = instruction.strip().split(' ', 1)
-        mnemonic = instr_parts[0].lower()
-        if len(instr_parts) > 1:
-            operands = instr_parts[1]
-        else:
-            operands = ''
-
-        instr_obj = self._instructions.get(mnemonic)
-        if instr_obj is None:
-            sys.exit(f'ERROR: {line_id} - Unrecognized mnemonic "{mnemonic}"')
-        return instr_obj.generate_bytecode_parts(line_id, mnemonic, operands, self.endian, self.registers)
+    @property
+    def global_label_scope(self) -> LabelScope:
+        if self._global_label_scope is None:
+            self._global_label_scope = LabelScope.global_scope(self.registers)
+            # add predefined constants to global scope
+            predefines_lineid = LineIdentifier(0, os.path.basename(self._config_file))
+            for predefined_constant in self.predefined_constants:
+                label: str = predefined_constant['name']
+                value: int = predefined_constant['value']
+                self._global_label_scope.set_label_value(label, value, predefines_lineid)
+        return self._global_label_scope

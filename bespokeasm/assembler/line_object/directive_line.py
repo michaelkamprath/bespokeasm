@@ -4,7 +4,6 @@ import sys
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithBytes, LineObject, INSTRUCTION_EXPRESSION_PATTERN
 from bespokeasm.assembler.line_object.data_line import DataLine
-from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.expression import parse_expression, ExpresionType
 
 
@@ -20,27 +19,28 @@ from bespokeasm.expression import parse_expression, ExpresionType
 class DirectiveLine:
 
     PATTERN_ORG_DIRECTIVE = re.compile(
-        f'^(?:\.org)\s+({INSTRUCTION_EXPRESSION_PATTERN})',
+        r'^(?:\.org)\s+({0})'.format(INSTRUCTION_EXPRESSION_PATTERN),
         flags=re.IGNORECASE|re.MULTILINE
     )
 
     PATTERN_FILL_DIRECTIVE = re.compile(
-        f'^(?:\.fill)\s+({INSTRUCTION_EXPRESSION_PATTERN})\s*\,\s*({INSTRUCTION_EXPRESSION_PATTERN})',
+        r'^(?:\.fill)\s+({0})\s*\,\s*({1})'.format(
+            INSTRUCTION_EXPRESSION_PATTERN, INSTRUCTION_EXPRESSION_PATTERN
+        ),
         flags=re.IGNORECASE|re.MULTILINE
     )
 
     PATTERN_ZERO_DIRECTIVE = re.compile(
-        f'^(?:\.zero)\s+({INSTRUCTION_EXPRESSION_PATTERN})',
+        r'^(?:\.zero)\s+({0})'.format(INSTRUCTION_EXPRESSION_PATTERN),
         flags=re.IGNORECASE|re.MULTILINE
     )
 
     PATTERN_ZEROUNTIL_DIRECTIVE = re.compile(
-        f'^(?:\.zerountil)\s+({INSTRUCTION_EXPRESSION_PATTERN})',
+        r'^(?:\.zerountil)\s+({0})'.format(INSTRUCTION_EXPRESSION_PATTERN),
         flags=re.IGNORECASE|re.MULTILINE
     )
 
-    def factory(line_id: LineIdentifier, line_str: str, comment: str, isa_model: AssemblerModel) -> LineObject:
-        endian = isa_model.endian
+    def factory(line_id: LineIdentifier, line_str: str, comment: str, endian: str) -> LineObject:
         # for efficiency, if it doesn't start with a period, it is not a directive
         cleaned_line_str = line_str.strip()
         if not cleaned_line_str.startswith('.'):

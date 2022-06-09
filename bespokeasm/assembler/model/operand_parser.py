@@ -254,6 +254,10 @@ class MatchedOperandSet:
     def __str__(self) -> str:
         return f'MatchedOperandSet<{self._operands}>'
 
+    @property
+    def operands(self) -> list[ParsedOperand]:
+        return self._operands
+
     def generate_byte_code(self, base_bytecode: ByteCodePart, base_bytecode_suffix: ByteCodePart) -> list[ByteCodePart]:
         machine_code: list[ByteCodePart] = [base_bytecode]
         # first add bytecode
