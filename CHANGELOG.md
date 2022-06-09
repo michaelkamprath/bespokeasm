@@ -17,13 +17,15 @@ Changes that are planned but not implemented yet:
   * unknown labels
 
 ## [Unreleased]
+
+## [0.2.2]
+* Added instruction macros feature
 * Started using `pipenv` for dependency management.
 * Fixed bug for numeric enumeration operads that emit a argument value.
 * Added `.8byte` data type directive
 * Fixed bug in how complext expressions are parsed in certain directive arguments
 * Added bit shifting operations to expressions
 * Fixed a bug in handling registers named `b`, which is also the binary number prefix
-
 
 ## [0.2.1]
 * Allow a label to exist on the same line as an instruction or directive
@@ -78,7 +80,8 @@ First tracked released
 * Enabled the `reverse_argument_order` instruction option be applied to a specific operand configuration. This slightly changed the configuration file format.
 * Added ability for instructions with operands to have a single "empty operand" variant, e.g., `pop`
 
-[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.2...v0.2.1
 [0.2.1]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.1...v0.2.0
 [0.2.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.0...v0.1.8
 [0.1.8]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.8...v0.1.7
