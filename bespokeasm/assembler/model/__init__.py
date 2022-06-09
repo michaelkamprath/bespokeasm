@@ -182,4 +182,4 @@ class AssemblerModel:
                 label: str = predefined_constant['name']
                 value: int = predefined_constant['value']
                 self._global_label_scope.set_label_value(label, value, predefines_lineid)
-        return self._global_label_scopepyttes
+        return self._global_label_scope
