@@ -19,22 +19,24 @@ from bespokeasm.expression import parse_expression, ExpresionType
 class DirectiveLine:
 
     PATTERN_ORG_DIRECTIVE = re.compile(
-        f'^(?:\.org)\s+({INSTRUCTION_EXPRESSION_PATTERN})',
+        r'^(?:\.org)\s+({0})'.format(INSTRUCTION_EXPRESSION_PATTERN),
         flags=re.IGNORECASE|re.MULTILINE
     )
 
     PATTERN_FILL_DIRECTIVE = re.compile(
-        f'^(?:\.fill)\s+({INSTRUCTION_EXPRESSION_PATTERN})\s*\,\s*({INSTRUCTION_EXPRESSION_PATTERN})',
+        r'^(?:\.fill)\s+({0})\s*\,\s*({1})'.format(
+            INSTRUCTION_EXPRESSION_PATTERN, INSTRUCTION_EXPRESSION_PATTERN
+        ),
         flags=re.IGNORECASE|re.MULTILINE
     )
 
     PATTERN_ZERO_DIRECTIVE = re.compile(
-        f'^(?:\.zero)\s+({INSTRUCTION_EXPRESSION_PATTERN})',
+        r'^(?:\.zero)\s+({0})'.format(INSTRUCTION_EXPRESSION_PATTERN),
         flags=re.IGNORECASE|re.MULTILINE
     )
 
     PATTERN_ZEROUNTIL_DIRECTIVE = re.compile(
-        f'^(?:\.zerountil)\s+({INSTRUCTION_EXPRESSION_PATTERN})',
+        r'^(?:\.zerountil)\s+({0})'.format(INSTRUCTION_EXPRESSION_PATTERN),
         flags=re.IGNORECASE|re.MULTILINE
     )
 
