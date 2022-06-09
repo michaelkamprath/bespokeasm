@@ -83,7 +83,7 @@ class AssemblerModel:
                 sys.exit(f'ERROR: the instruction set configuration file specified an unallowed register name: {reg}')
         self._operand_sets = OperandSetCollection(self._config['operand_sets'], self.endian, self.registers)
         self._instructions = InstructionSet(
-                self._config['instructions'], 
+                self._config['instructions'],
                 self._config.get('macros', None),
                 self._operand_sets, self.endian, self.registers
             )
@@ -182,4 +182,4 @@ class AssemblerModel:
                 label: str = predefined_constant['name']
                 value: int = predefined_constant['value']
                 self._global_label_scope.set_label_value(label, value, predefines_lineid)
-        return self._global_label_scope
+        return self._global_label_scopepyttes
