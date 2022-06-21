@@ -91,7 +91,7 @@ class Operand:
 
     @property
     def operand_register_string(self) -> str:
-        sys.exit(f'ERROR: INTERNAL - tried to fetch operand regist string for an unsupported operand type: {self}')
+        sys.exit(f'ERROR: INTERNAL - tried to fetch operand register string for an unsupported operand type: {self}')
 
     def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> ParsedOperand:
         # this should be overridden

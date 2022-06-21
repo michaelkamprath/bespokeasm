@@ -73,7 +73,7 @@ class LineWithBytes(LineObject):
         Must be overriden by subclass to extend the self._bytes instance variable or
         use the self._append_byte() method.
         """
-        pass
+        raise NotImplementedError
 
     def get_bytes(self) -> bytearray:
         """Returns current state of constructed bytes"""

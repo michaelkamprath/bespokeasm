@@ -36,7 +36,7 @@ class ByteCodePart:
         return str(self)
 
     def __str__(self) -> str:
-        return 'You really should override ByteCodePart.__str__'
+        raise NotImplementedError
 
     def __eq__(self, other: ByteCodePart) -> bool:
         return \
