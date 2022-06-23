@@ -81,10 +81,10 @@ First tracked released
 * Added ability for instructions with operands to have a single "empty operand" variant, e.g., `pop`
 
 [Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.2...HEAD
-[0.2.2]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.2...v0.2.1
-[0.2.1]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.1...v0.2.0
-[0.2.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.0...v0.1.8
-[0.1.8]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.8...v0.1.7
-[0.1.7]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.7...v0.1.6
-[0.1.6]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.6...v0.1.5
-[0.1.5]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.5...v0.1.4
+[0.2.2]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.8...v0.2.0
+[0.1.8]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.7...v0.1.8
+[0.1.7]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.6...v0.1.7
+[0.1.6]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.5...v0.1.6
+[0.1.5]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.4...v0.1.5
