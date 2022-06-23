@@ -1,0 +1,526 @@
+description: slu4 Minimal UART CPU
+general:
+  address_size: 8
+  endian: little
+  registers:
+    - a
+  origin: 4
+  identifier:
+    name: slu4-mincpu
+    version: "1.5.0"
+    extension: slu4
+  min_version: 0.2.2
+operand_sets:
+  immediate:
+    operand_values:
+      uint8:
+        type: numeric
+        argument:
+          size: 8
+          byte_align: true
+  absolute_address:
+    operand_values:
+      a_address:
+        type: numeric
+        argument:
+          size: 16
+          byte_align: true
+  relative_address:
+    operand_values:
+      r_address:
+        type: numeric
+        argument:
+          size: 16
+          byte_align: true
+instructions:
+  nop:
+    byte_code:
+      value: 0
+      size: 8
+  bnk:
+    byte_code:
+      value: 1
+      size: 8
+  out:
+    byte_code:
+      value: 2
+      size: 8
+  clc:
+    byte_code:
+      value: 3
+      size: 8
+  sec:
+    byte_code:
+      value: 4
+      size: 8
+  lsl:
+    byte_code:
+      value: 5
+      size: 8
+  rol:
+    byte_code:
+      value: 6
+      size: 8
+  lsr:
+    byte_code:
+      value: 7
+      size: 8
+  ror:
+    byte_code:
+      value: 8
+      size: 8
+  asr:
+    byte_code:
+      value: 9
+      size: 8
+  inp:
+    byte_code:
+      value: 10
+      size: 8
+  neg:
+    byte_code:
+      value: 11
+      size: 8
+  inc:
+    byte_code:
+      value: 12
+      size: 8
+  dec:
+    byte_code:
+      value: 13
+      size: 8
+  ldi:
+    byte_code:
+      value: 14
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate
+  adi:
+    byte_code:
+      value: 15
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate
+  sbi:
+    byte_code:
+      value: 16
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate
+  cpi:
+    byte_code:
+      value: 17
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate
+  aci:
+    byte_code:
+      value: 18
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate
+  sci:
+    byte_code:
+      value: 19
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate
+  jpa:
+    byte_code:
+      value: 20
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  lda:
+    byte_code:
+      value: 21
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  sta:
+    byte_code:
+      value: 22
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  ada:
+    byte_code:
+      value: 23
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  sba:
+    byte_code:
+      value: 24
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  cpa:
+    byte_code:
+      value: 25
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  aca:
+    byte_code:
+      value: 26
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  sca:
+    byte_code:
+      value: 27
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  jpr:
+    byte_code:
+      value: 28
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  ldr:
+    byte_code:
+      value: 29
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  str:
+    byte_code:
+      value: 30
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  adr:
+    byte_code:
+      value: 31
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  sbr:
+    byte_code:
+      value: 32
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  cpr:
+    byte_code:
+      value: 33
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  acr:
+    byte_code:
+      value: 34
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  scr:
+    byte_code:
+      value: 35
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  clb:
+    byte_code:
+      value: 36
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  neb:
+    byte_code:
+      value: 37
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  inb:
+    byte_code:
+      value: 38
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  deb:
+    byte_code:
+      value: 39
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  adb:
+    byte_code:
+      value: 40
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  sbb:
+    byte_code:
+      value: 41
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  acb:
+    byte_code:
+      value: 42
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  scb:
+    byte_code:
+      value: 43
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  clw:
+    byte_code:
+      value: 44
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  new:
+    byte_code:
+      value: 45
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  inw:
+    byte_code:
+      value: 46
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  dew:
+    byte_code:
+      value: 47
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  adw:
+    byte_code:
+      value: 48
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  sbw:
+    byte_code:
+      value: 49
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  acw:
+    byte_code:
+      value: 50
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  scw:
+    byte_code:
+      value: 51
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  lds:
+    byte_code:
+      value: 52
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate
+  sts:
+    byte_code:
+      value: 53
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate
+  phs:
+    byte_code:
+      value: 54
+      size: 8
+  pls:
+    byte_code:
+      value: 55
+      size: 8
+  jps:
+    byte_code:
+      value: 56
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  rts:
+    byte_code:
+      value: 57
+      size: 8
+  bne:
+    byte_code:
+      value: 58
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  beq:
+    byte_code:
+      value: 59
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  bcc:
+    byte_code:
+      value: 60
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  bcs:
+    byte_code:
+      value: 61
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  bpl:
+    byte_code:
+      value: 62
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  bmi:
+    byte_code:
+      value: 63
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
