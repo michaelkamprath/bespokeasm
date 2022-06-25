@@ -25,6 +25,7 @@ class Assembler:
                 binary_end: int,
                 binary_fill_value: int,
                 enable_pretty_print: bool,
+                pretty_print_format: str,
                 pretty_print_output: str,
                 is_verbose: int,
                 include_paths: list[str],
@@ -33,6 +34,7 @@ class Assembler:
         self._output_file = output_file
         self._config_file = config_file
         self._enable_pretty_print = enable_pretty_print
+        self._pretty_print_format = pretty_print_format
         self._pretty_print_output = pretty_print_output
         self._binary_fill_value = binary_fill_value & 0xff
         self._verbose = is_verbose
@@ -131,7 +133,7 @@ class Assembler:
             f.write(byte_code)
 
         if self._enable_pretty_print:
-            pprinter = PrettyPrinterFactory.getPrettyPrinter('source_details', line_obs, self._model)
+            pprinter = PrettyPrinterFactory.getPrettyPrinter(self._pretty_print_format, line_obs, self._model)
             pretty_str = pprinter.pretty_print(max_instruction_text_size)
             if self._pretty_print_output == 'stdout':
                 print(pretty_str)

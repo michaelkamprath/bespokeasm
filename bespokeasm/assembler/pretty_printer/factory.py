@@ -9,5 +9,4 @@ class PrettyPrinterFactory:
     def getPrettyPrinter(cls, pretty_printer_type: str, line_objs:  list[LineObject], model: AssemblerModel) -> PrettyPrinterBase:
         if pretty_printer_type == 'source_details':
             return SourceDetailsPrettyPrinter(line_objs, model)
-
-        return None
+        raise NotImplementedError

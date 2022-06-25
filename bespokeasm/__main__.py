@@ -39,9 +39,16 @@ def main():
              'a specific size.'
     )
 @click.option(
-        '--pretty-print', '-p', is_flag=True, default=False,
+        '--pretty-print', '-p',
+        is_flag=True, default=False,
         help='if true, a pretty print version of the compilation will be produced.'
     )
+@click.option(
+        '--pretty-print-format', '-t',
+        type=click.Choice(['source_details', 'minhex'], case_sensitive=False),
+        default='source_details',
+        help='The format that should be used when pretty printing.',
+)
 @click.option(
         '--pretty-print-output',  default='stdout',
         help='if pretty-print is enabled, this specifies the output file. Defaults to stdout.'
@@ -59,6 +66,7 @@ def compile(
             binary_max_address,
             binary_fill,
             pretty_print,
+            pretty_print_format,
             pretty_print_output,
             verbose,
             include_path
@@ -77,7 +85,7 @@ def compile(
         asm_file, config_file, output_file,
         int(binary_min_address), int(binary_max_address) if int(binary_max_address) >= 0 else None,
         binary_fill,
-        pretty_print, pretty_print_output, verbose,
+        pretty_print, pretty_print_format, pretty_print_output, verbose,
         include_path,
     )
     asm.assemble_bytecode()
