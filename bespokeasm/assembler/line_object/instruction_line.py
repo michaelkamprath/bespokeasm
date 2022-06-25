@@ -15,7 +15,7 @@ class InstructionLine(LineWithBytes):
         command_match = re.search(InstructionLine.COMMAND_EXTRACT_PATTERN, line_str)
         if command_match is None or len(command_match.groups()) != 1:
             sys.exit(f'ERROR: {line_id} - Wrongly formatted instruction: {line_str}')
-        command_str = command_match.group(1).strip()
+        command_str = command_match.group(1).strip().lower()
         if command_str not in isa_model.instruction_mnemonics:
             sys.exit(f'ERROR: {line_id} - Unreconized instruction: {line_str}')
         argument_str = line_str.strip()[len(command_str):]

@@ -200,7 +200,10 @@ class OperandParser:
     def validate(self, instruction: str):
         # check to make sure we as many operands configured as count.
         if self._operand_sets_model is not None and self.operand_count != self._operand_sets_model.operand_count:
-            sys.exit(f'ERROR: CONFIGURATION - the number of properly configured operands ({len(self._operand_sets)}) does not match prescribed number ({self.operand_count}) for instruction "{instruction}"')
+            sys.exit(
+                f'ERROR: CONFIGURATION - the number of properly configured operands ({self._operand_sets_model.operand_count}) '
+                f'does not match prescribed number ({self.operand_count}) for instruction "{instruction}"'
+            )
 
     @property
     def operand_count(self) -> int:

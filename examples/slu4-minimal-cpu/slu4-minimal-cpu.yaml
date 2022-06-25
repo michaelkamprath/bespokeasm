@@ -130,7 +130,7 @@ instructions:
       value: 18
       size: 8
     operands:
-      count: 2
+      count: 1
       operand_sets:
         list:
           - immediate

@@ -1,5 +1,4 @@
 import io
-import math
 
 from bespokeasm.assembler.line_object import LineWithBytes, LineObject
 from bespokeasm.assembler.model import AssemblerModel

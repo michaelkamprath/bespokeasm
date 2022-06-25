@@ -20,6 +20,7 @@ class Assembler:
                 self,
                 source_file: str,
                 config_file: str,
+                generate_binary: bool,
                 output_file: str,
                 binary_start: int,
                 binary_end: int,
@@ -33,6 +34,7 @@ class Assembler:
         self.source_file = source_file
         self._output_file = output_file
         self._config_file = config_file
+        self._generate_binary = generate_binary
         self._enable_pretty_print = enable_pretty_print
         self._pretty_print_format = pretty_print_format
         self._pretty_print_output = pretty_print_output
@@ -113,24 +115,27 @@ class Assembler:
         fill_bytes = bytearray([self._binary_fill_value])
         addr = self._binary_start
 
-        if self._verbose > 2:
-            print("\nGenerating byte code:")
-        while addr <= (max_generated_address if self._binary_end is None else self._binary_end):
-            lobj = line_dict.get(addr, None)
-            insertion_bytes = fill_bytes
-            if lobj is not None:
-                line_bytes = lobj.get_bytes()
-                if line_bytes is not None:
-                    insertion_bytes = line_bytes
-                    if self._verbose > 2:
-                        line_bytes_str = binascii.hexlify(line_bytes, sep=' ').decode("utf-8")
-                        click.echo(f'Address ${addr:x} : {lobj} bytes = {line_bytes_str}')
-            byte_code.extend(insertion_bytes)
-            addr += len(insertion_bytes)
+        if self._generate_binary:
+            if self._verbose > 2:
+                print("\nGenerating byte code:")
+            while addr <= (max_generated_address if self._binary_end is None else self._binary_end):
+                lobj = line_dict.get(addr, None)
+                insertion_bytes = fill_bytes
+                if lobj is not None:
+                    line_bytes = lobj.get_bytes()
+                    if line_bytes is not None:
+                        insertion_bytes = line_bytes
+                        if self._verbose > 2:
+                            line_bytes_str = binascii.hexlify(line_bytes, sep=' ').decode("utf-8")
+                            click.echo(f'Address ${addr:x} : {lobj} bytes = {line_bytes_str}')
+                byte_code.extend(insertion_bytes)
+                addr += len(insertion_bytes)
 
-        click.echo(f'Writing {len(byte_code)} bytes of byte code to {self._output_file}')
-        with open(self._output_file, 'wb') as f:
-            f.write(byte_code)
+            click.echo(f'Writing {len(byte_code)} bytes of byte code to {self._output_file}')
+            with open(self._output_file, 'wb') as f:
+                f.write(byte_code)
+        elif self._verbose > 1:
+            print('NOT writing byte code to binary image.')
 
         if self._enable_pretty_print:
             pprinter = PrettyPrinterFactory.getPrettyPrinter(self._pretty_print_format, line_obs, self._model)
