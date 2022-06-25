@@ -34,7 +34,7 @@
                     "match": "\\,"
                 }
             ],
-            "begin": "\\b(##INSTRUCTIONS##)\\b",
+            "begin": "(?i)\\b(##INSTRUCTIONS##)\\b",
             "end": "(?=(?:\\s*\\;|\\s*$))",
             "beginCaptures": {
                 "0": { "name": "variable.function.instruction" }
