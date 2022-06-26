@@ -83,8 +83,3 @@ class LineWithBytes(LineObject):
     def _append_byte(self, byte_value: int):
         """appends the passed byte value to this objects bytes"""
         self._bytes.append(byte_value&0xFF)
-
-    # @property
-    # def instruction(self) -> str:
-    #     """returns the original instruction text that generated this line object"""
-    #     return '   ' + super().instruction

@@ -2,6 +2,7 @@ import io
 import math
 
 from bespokeasm.assembler.line_object import LineWithBytes, LineObject
+from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.pretty_printer import PrettyPrinterBase
 
@@ -18,6 +19,8 @@ class SourceDetailsPrettyPrinter(PrettyPrinterBase):
         COL_WIDTH_ADDRESS = max(address_size + 3, 7)
         COL_WIDTH_BYTE = 4
         COL_WIDTH_BINARY = 8
+        INSTRUCTION_INDENT = 4
+        max_instruction_text_size = max_instruction_text_size + INSTRUCTION_INDENT
         blank_line_num = ''.join([' '*COL_WIDTH_LINE])
         blank_instruction_text = ''.join([' '*max_instruction_text_size])
         blank_address_text = ''.join([' '*COL_WIDTH_ADDRESS])
@@ -43,7 +46,11 @@ class SourceDetailsPrettyPrinter(PrettyPrinterBase):
             line_str = f'{lobj.line_id.line_num}'.rjust(7)
             address_value = lobj.address
             address_str = address_format_str.format(address_value).center(COL_WIDTH_ADDRESS)
-            instruction_str = lobj.instruction.ljust(max_instruction_text_size)
+            instruction_str = lobj.instruction
+            if not isinstance(lobj, LabelLine):
+                instruction_str = ' '*INSTRUCTION_INDENT + instruction_str
+            instruction_str = instruction_str.ljust(max_instruction_text_size)
+
             if isinstance(lobj, LineWithBytes):
                 line_bytes = lobj.get_bytes()
             else:
