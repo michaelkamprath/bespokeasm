@@ -6,10 +6,10 @@ general:
     - a
   origin: 4
   identifier:
-    name: slu4-mincpu
+    name: slu4-mincpu-asm
     version: "1.5.0"
-    extension: slu4
-  min_version: 0.2.2
+    extension: min-asm
+  min_version: 0.2.3
 operand_sets:
   immediate:
     operand_values:
