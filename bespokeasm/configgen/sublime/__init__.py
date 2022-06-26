@@ -57,6 +57,18 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             '##INSTRUCTIONS##',
             self.model.instruction_mnemonics
         )
+        index = None
+        for idx, config_dict in enumerate(syntax_dict['contexts']['pop_instruction_end']):
+            if config_dict['name'] == 'instructions':
+                index = idx
+                break
+        if index is None:
+            sys.exit('ERROR - INTERNAL - Could not find "instruction" configuration in pop_instruction_end for Sulime syntax')
+        syntax_dict['contexts']['pop_instruction_end'][index]['match'] = self._replace_token_with_regex_list(
+            syntax_dict['contexts']['pop_instruction_end'][index]['match'],
+            '##INSTRUCTIONS##',
+            self.model.instruction_mnemonics
+        )
 
         # handle registers
         if len(self.model.registers) > 0:

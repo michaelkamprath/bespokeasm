@@ -66,6 +66,11 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             '##INSTRUCTIONS##',
             self.model.instruction_mnemonics
         )
+        grammar_json['repository']['instructions']['end'] = self._replace_token_with_regex_list(
+            grammar_json['repository']['instructions']['end'],
+            '##INSTRUCTIONS##',
+            self.model.instruction_mnemonics
+        )
 
         # handle registers
         if len(self.model.registers) > 0:

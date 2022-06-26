@@ -1,5 +1,6 @@
 import unittest
 import importlib.resources as pkg_resources
+from importlib import reload
 
 from test import config_files
 
@@ -23,6 +24,9 @@ class TestInstructionParsing(unittest.TestCase):
         local_scope = LabelScope(LabelScopeType.LOCAL, global_scope, 'TestInstructionParsing')
         local_scope.set_label_value('.local_var', 10, 3)
         cls.label_values = local_scope
+
+    def setUp(self):
+        InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN = None
 
     def test_instruction_variant_matching(self):
         with pkg_resources.path(config_files, 'test_instructions_with_variants.yaml') as fp:

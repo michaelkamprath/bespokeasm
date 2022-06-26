@@ -61,7 +61,7 @@ class TestConfigurationGeneration(unittest.TestCase):
             grammar_json = json.load(json_file)
         self._assert_grouped_item_list(
             grammar_json['repository']['instructions']['begin'],
-            ['lda', 'add', 'set', 'big', 'hlt'],
+            ['\\blda\\b', '\\badd\\b', '\\bset\\b', '\\bbig\\b', '\\bhlt\\b'],
             'instructions'
         )
         self.assertFalse(('registers' in grammar_json['repository']), 'no registers should be found')
@@ -106,12 +106,12 @@ class TestConfigurationGeneration(unittest.TestCase):
             grammar_json = json.load(json_file)
         self._assert_grouped_item_list(
             grammar_json['repository']['instructions']['begin'],
-            ['nop', 'mov', 'cmp'],
+            ['\\bnop\\b', '\\bmov\\b', '\\bcmp\\b'],
             'instructions'
         )
         self._assert_grouped_item_list(
             grammar_json['repository']['registers']['match'],
-            ['a', 'j', 'i', 'h', 'l', 'hl', 'sp', 'mar'],
+            ['\\ba\\b', '\\bj\\b', '\\bi\\b', '\\bh\\b', '\\bl\\b', '\\bhl\\b', '\\bsp\\b', '\\bmar\\b'],
             'registers'
         )
 
@@ -145,7 +145,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertListEqual(syntax_dict['file_extensions'], ['asmtest'], 'file extension should be as assigned')
         self._assert_grouped_item_list(
             syntax_dict['contexts']['instructions'][0]['match'],
-            ['lda', 'add', 'set', 'big', 'hlt'],
+            ['\\blda\\b', '\\badd\\b', '\\bset\\b', '\\bbig\\b', '\\bhlt\\b'],
             'instructions'
         )
         self.assertFalse(('registers' in syntax_dict['contexts']), 'no registers should be found')
@@ -206,12 +206,12 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertListEqual(syntax_dict['file_extensions'], ['asmtest'], 'file extension should be as assigned')
         self._assert_grouped_item_list(
             syntax_dict['contexts']['instructions'][0]['match'],
-            ['nop', 'mov', 'cmp'],
+            ['\\bnop\\b', '\\bmov\\b', '\\bcmp\\b'],
             'instructions'
         )
         self._assert_grouped_item_list(
             syntax_dict['contexts']['registers'][0]['match'],
-            ['a', 'j', 'i', 'h', 'l', 'hl', 'sp', 'mar'],
+            ['\\ba\\b', '\\bj\\b', '\\bi\\b', '\\bh\\b', '\\bl\\b', '\\bhl\\b', '\\bsp\\b', '\\bmar\\b'],
             'registers'
         )
         self._assert_grouped_item_list(

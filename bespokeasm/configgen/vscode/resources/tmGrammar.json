@@ -24,8 +24,9 @@
             "patterns": [
                 { "include": "#registers" },
                 { "include": "#compiler_labels" },
-                { "include": "#expressions" },
                 { "include": "#numeric-values" },
+                { "include": "#operators" },
+                { "include": "#expressions" },
                 { "include": "#indirect-addressing" },
                 { "include": "#deferred-addressing"},
                 { "include": "#operands_variables" },
@@ -35,7 +36,7 @@
                 }
             ],
             "begin": "(?i)\\b(##INSTRUCTIONS##)\\b",
-            "end": "(?=(?:\\s*\\;|\\s*$))",
+            "end": "(?i)(?=(?:\\s*\\;|\\s*$|##INSTRUCTIONS##))",
             "beginCaptures": {
                 "0": { "name": "variable.function.instruction" }
             }
@@ -93,6 +94,10 @@
                 {
                     "name": "keyword.operator.logical",
                     "match": "[\\&\\|\\^]{1}"
+                },
+                {
+                    "name": "keyword.operator.bitwise",
+                    "match": "(?:<<|>>)"
                 }
             ]
         },

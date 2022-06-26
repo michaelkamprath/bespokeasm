@@ -30,6 +30,7 @@ contexts:
       scope: variable.function.instruction
       push:
         - meta_scope: meta.function
+        - include: pop_instruction_end
         - include: registers
         - include: compiler_labels
         - include: indirect_addressing
@@ -38,8 +39,6 @@ contexts:
         - include: operands_variables
         - match: \,
           scope: punctuation.separator
-        - match: (?=(?:\s*\;|\s*$))
-          pop: true
 
   operands_variables:
     - match: (?<!\w)((?:\.|_|\w){1}[\w\d_]*)\b
@@ -81,6 +80,8 @@ contexts:
       scope: keyword.operator.arithmetic
     - match: "[\\&\\|\\^]{1}"
       scope: keyword.operator.logical
+    - match: (?:>>|<<)
+      scope: keyword.operator.bitwise
     - match: \(
       scope: punctuation.section.parens.begin
       push:
@@ -130,6 +131,7 @@ contexts:
       scope: keyword.other.directive
       push:
         - meta_scope: meta.directive
+        - include: pop_instruction_end
         - include: strings
         - include: numerical_expressions
         - match: (?=(?:\s*\;|\s*$))
@@ -140,6 +142,7 @@ contexts:
       scope: storage.type
       push:
         - meta_scope: meta.directive
+        - include: pop_instruction_end
         - include: strings
         - include: numerical_expressions
         - match: (?=(?:\s*\;|\s*$))
@@ -162,4 +165,11 @@ contexts:
     - include: preprocessor_directives
 
 
+  pop_instruction_end:
+    - match: (?i)(?=(?:\s*\;|\s*$|##INSTRUCTIONS##))
+      pop: true
+      name: instructions
+    - match: (?=(?:\.|_|\w){1}[\w\d_]*:)
+      pop: true
+      name: label
 

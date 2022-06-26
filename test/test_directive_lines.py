@@ -121,7 +121,7 @@ class TestDirectiveLines(unittest.TestCase):
         self.assertEqual(o7.byte_size, 168, 'has 168 bytes')
         o7.generate_bytes()
         self.assertEqual(list(o7.get_bytes()), [0]*168, 'truncated values')
-    
+
     def test_filluntil_directive(self):
         label_values = LabelScope(LabelScopeType.GLOBAL, None, 'global')
         label_values.set_label_value('my_label', 0x80, 1)
