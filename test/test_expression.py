@@ -1,6 +1,7 @@
 import sys
 import unittest
 
+from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.label_scope import GlobalLabelScope, LabelScope, LabelScopeType
 from bespokeasm.expression import parse_expression, ExpresionType
 
@@ -15,14 +16,19 @@ class TestExpression(unittest.TestCase):
         cls.label_values.set_label_value('MAX_N', 20, 1)
 
     def test_expression_parsing(self):
-        self.assertEqual(parse_expression(1212, '1 + 2').get_value(TestExpression.label_values, 1), 3, 'simple expression: 1+2')
-        self.assertEqual(parse_expression(1212, '(value_1 - MixedCase)/5').get_value(TestExpression.label_values, 2), 2, 'label expression: (value_1 - two)/5')
-        self.assertEqual(parse_expression(1212, 'the_8_ball').get_value(TestExpression.label_values, 3), 8, 'label expression: 8_ball')
-        self.assertEqual(parse_expression(1212, '8675309').get_value(TestExpression.label_values, 4), 8675309, 'numeric expression: 8675309')
-        self.assertEqual(parse_expression(1212, 'value_1-2').get_value(TestExpression.label_values, 5), 10, 'numeric expression: value_1-2')
-        self.assertEqual(parse_expression(1212, '3+12/3').get_value(TestExpression.label_values, 6), 7, 'test precedence order: 3+12/3 = 7')
-        self.assertEqual(parse_expression(1212, '0-(3+7)').get_value(TestExpression.label_values, 7), -10, 'test handling of leading sign: -(3+7) = -10')
-        self.assertEqual(parse_expression(1212, '8*( MAX_N + 1 )  ').get_value(TestExpression.label_values, 8), 168, 'test handling of leading sign: 8*(MAX_N+1) = 168')
+        line_id = LineIdentifier(1212, 'test_expression_parsing')
+
+        self.assertEqual(parse_expression(line_id, '1 + 2').get_value(TestExpression.label_values, 1), 3, 'simple expression: 1+2')
+        self.assertEqual(parse_expression(line_id, '(value_1 - MixedCase)/5').get_value(TestExpression.label_values, 2), 2, 'label expression: (value_1 - two)/5')
+        self.assertEqual(parse_expression(line_id, 'the_8_ball').get_value(TestExpression.label_values, 3), 8, 'label expression: 8_ball')
+        self.assertEqual(parse_expression(line_id, '8675309').get_value(TestExpression.label_values, 4), 8675309, 'numeric expression: 8675309')
+        self.assertEqual(parse_expression(line_id, 'value_1-2').get_value(TestExpression.label_values, 5), 10, 'numeric expression: value_1-2')
+        self.assertEqual(parse_expression(line_id, '3+12/3').get_value(TestExpression.label_values, 6), 7, 'test precedence order: 3+12/3 = 7')
+        self.assertEqual(parse_expression(line_id, '0-(3+7)').get_value(TestExpression.label_values, 7), -10, 'test handling of leading sign: -(3+7) = -10')
+        self.assertEqual(parse_expression(line_id, '8*( MAX_N + 1 )  ').get_value(TestExpression.label_values, 8), 168, 'test handling of leading sign: 8*(MAX_N+1) = 168')
+        self.assertEqual(parse_expression(line_id, '(MAX_N + 3)%5').get_value(TestExpression.label_values, line_id), 3, 'test handling of modulo: (MAX_N + 3)%5 = 3')
+        self.assertEqual(parse_expression(line_id, '(MAX_N + 3) % %101').get_value(TestExpression.label_values, line_id), 3, 'test handling of modulo: (MAX_N + 3) % %101 = 3')
+
 
         with self.assertRaises(SystemExit, msg='only integer numeric values are supported'):
             value = parse_expression(1212, '(value_1/5)/2.4').get_value(TestExpression.label_values, 100)

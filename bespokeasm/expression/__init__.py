@@ -17,7 +17,7 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.utilities import is_valid_label
 
-EXPRESSION_PARTS_PATTERN = r'(?:(?:\%|b)[01]+|(?:\$|0x)[0-9a-fA-F]+|\d+|[\+\-\*\/\&\|\^\(\)]|>>|<<|(?:\.|_)?\w+)'
+EXPRESSION_PARTS_PATTERN = r'(?:(?:\%|b)[01]+|(?:\$|0x)[0-9a-fA-F]+|\d+|[\+\-\*\/\&\|\^\(\)]|>>|<<|%|(?:\.|_)?\w+)'
 
 class TokenType(enum.Enum):
     T_NUM = 0
@@ -28,12 +28,13 @@ class TokenType(enum.Enum):
     T_MINUS = 5
     T_MULT = 6
     T_DIV = 7
-    T_AND = 8
-    T_OR = 9
-    T_XOR = 10
-    T_LPAR = 11
-    T_RPAR = 12
-    T_END = 13
+    T_MOD = 8
+    T_AND = 9
+    T_OR = 10
+    T_XOR = 11
+    T_LPAR = 12
+    T_RPAR = 13
+    T_END = 14
 
 
 class ExpressionNode:
@@ -42,6 +43,7 @@ class ExpressionNode:
         TokenType.T_MINUS: operator.sub,
         TokenType.T_MULT: operator.mul,
         TokenType.T_DIV: operator.truediv,
+        TokenType.T_MOD: operator.mod,
         TokenType.T_AND: operator.and_,
         TokenType.T_OR: operator.or_,
         TokenType.T_XOR: operator.xor,
@@ -116,6 +118,7 @@ def _lexical_analysis(line_id: LineIdentifier, s: str) -> list[ExpressionNode]:
         '-': TokenType.T_MINUS,
         '*': TokenType.T_MULT,
         '/': TokenType.T_DIV,
+        '%': TokenType.T_MOD,
         '&': TokenType.T_AND,
         '|': TokenType.T_OR,
         '^': TokenType.T_XOR,
@@ -170,7 +173,7 @@ def _parse_e2(line_id: LineIdentifier, tokens: list[ExpressionNode]) -> Expressi
 
 def _parse_e3(line_id: LineIdentifier, tokens: list[ExpressionNode]) -> ExpressionNode:
     left_node = _parse_e4(line_id, tokens)
-    while tokens[0].token_type in [TokenType.T_MULT, TokenType.T_DIV]:
+    while tokens[0].token_type in [TokenType.T_MULT, TokenType.T_DIV, TokenType.T_MOD]:
         node = tokens.pop(0)
         node.left_child = left_node
         node.right_child = _parse_e4(line_id, tokens)
