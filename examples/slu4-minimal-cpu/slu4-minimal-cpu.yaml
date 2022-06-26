@@ -4,7 +4,7 @@ general:
   endian: little
   registers:
     - a
-  origin: 4
+  origin: 0
   identifier:
     name: slu4-mincpu-asm
     version: "1.5.0"
