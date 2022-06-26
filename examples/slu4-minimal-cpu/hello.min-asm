@@ -4,7 +4,7 @@
 ;   Code based on slu4's original example at:
 ;       https://github.com/slu4coder/Minimal-UART-CPU-System/blob/main/Python%20Assembler/hello.txt
 ;
-#require "slu4-mincpu >= 1.5.0"
+#require "slu4-mincpu-asm >= 1.5.0"
 
 .org $8000                      ; set the start
 
