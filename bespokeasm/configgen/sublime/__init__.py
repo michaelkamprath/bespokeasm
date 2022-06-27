@@ -8,7 +8,7 @@ from zipfile import ZipFile
 
 from bespokeasm.configgen import LanguageConfigGenerator
 import bespokeasm.configgen.sublime.resources as resources
-from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET, BYTECODE_DIRECTIVES_SET, PREPROCESSOR_DIRECTIVES_SET
+from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET, BYTECODE_DIRECTIVES_SET, PREPROCESSOR_DIRECTIVES_SET, EXPRESSION_FUNCTIONS_SET
 
 
 class SublimeConfigGenerator(LanguageConfigGenerator):
@@ -117,6 +117,18 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
                 break
         if not updated:
             sys.exit('ERROR - INTERNAL - did not find correct preprocessor rule for Sublime systax file.')
+
+        # expression functions
+        func_regex = '|'.join([d for d in EXPRESSION_FUNCTIONS_SET])
+        updated = False
+        for rule in syntax_dict['contexts']['numerical_expressions']:
+            if 'scope' in rule and rule['scope'] == 'keyword.operator.word':
+                func_str = rule['match']
+                rule['match'] = func_str.replace('##EXPRESSION_FUNCTIONS##', func_regex)
+                updated = True
+                break
+        if not updated:
+            sys.exit('ERROR - INTERNAL - did not find correct expression function rule for Sublime systax file.')
 
         # save syntax file
         syntax_fp = os.path.join(destination_dir, self.language_name + '.sublime-syntax')

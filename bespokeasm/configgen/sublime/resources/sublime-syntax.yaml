@@ -26,7 +26,7 @@ contexts:
     - include: numerical_expressions
 
   instructions:
-    - match: (?i)\b(?:##INSTRUCTIONS##)\b
+    - match: (?i)(?:##INSTRUCTIONS##)
       scope: variable.function.instruction
       push:
         - meta_scope: meta.function
@@ -45,7 +45,7 @@ contexts:
       scope: variable.parameter.instruction
 
   registers:
-    - match: \b(?:##REGISTERS##)\b
+    - match: (?:##REGISTERS##)
       scope: variable.language.register
 
   compiler_labels:
@@ -75,13 +75,15 @@ contexts:
     - include: numbers
     - include: registers
     - include: compiler_labels
-    - include: operands_variables
     - match: "[\\+\\-\\*\\/]{1}"
       scope: keyword.operator.arithmetic
     - match: "[\\&\\|\\^]{1}"
       scope: keyword.operator.logical
     - match: (?:>>|<<)
       scope: keyword.operator.bitwise
+    - match: \b(?:##EXPRESSION_FUNCTIONS##)\b
+      scope: keyword.operator.word
+    - include: operands_variables
     - match: \(
       scope: punctuation.section.parens.begin
       push:

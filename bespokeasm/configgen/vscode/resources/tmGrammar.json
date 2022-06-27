@@ -35,7 +35,7 @@
                     "match": "\\,"
                 }
             ],
-            "begin": "(?i)\\b(##INSTRUCTIONS##)\\b",
+            "begin": "(?i)(##INSTRUCTIONS##)",
             "end": "(?i)(?=(?:\\s*\\;|\\s*$|##INSTRUCTIONS##))",
             "beginCaptures": {
                 "0": { "name": "variable.function.instruction" }
@@ -47,7 +47,7 @@
         },
         "registers": {
             "name": "variable.language.register",
-            "match": "\\b(?:##REGISTERS##)\\b"
+            "match": "(?:##REGISTERS##)"
         },
         "compiler_labels": {
             "name": "constant.language",
@@ -98,6 +98,10 @@
                 {
                     "name": "keyword.operator.bitwise",
                     "match": "(?:<<|>>)"
+                },
+                {
+                    "name": "keyword.operator.word",
+                    "match": "\\b(?:##EXPRESSION_FUNCTIONS##)\\b"
                 }
             ]
         },

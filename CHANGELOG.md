@@ -21,6 +21,7 @@ Changes that are planned but not implemented yet:
 * Added example for the slu4 Minimal UART CPU System
 * Added more pretty print formats and the ability to select them
 * Added support for more than one instruction per line in the assembly source. There are some limitations. See documentation.
+* Added support for `MSB` and `LSB` unary functions in expressions
 
 ## [0.2.2]
 * Added instruction macros feature

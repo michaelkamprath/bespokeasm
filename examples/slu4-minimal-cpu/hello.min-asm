@@ -11,8 +11,8 @@
     LDI 0xfe
     STA 0xffff                  ; init stack
 start:
-    LDI string&$00FF            PHS     ; put LSB on stack
-    LDI (string&$FF00) >> 8     PHS     ; put MSB on stack
+    LDI LSB(string)     PHS     ; put LSB on stack
+    LDI MSB(string)     PHS     ; put MSB on stack
     JPS PrintText
     PLS
     PLS                         ; clean up stack

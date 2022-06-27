@@ -6,7 +6,7 @@ import shutil
 
 from bespokeasm.configgen import LanguageConfigGenerator
 import bespokeasm.configgen.vscode.resources as resources
-from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET, BYTECODE_DIRECTIVES_SET, PREPROCESSOR_DIRECTIVES_SET
+from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET, BYTECODE_DIRECTIVES_SET, PREPROCESSOR_DIRECTIVES_SET, EXPRESSION_FUNCTIONS_SET
 
 
 class VSCodeConfigGenerator(LanguageConfigGenerator):
@@ -97,7 +97,7 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             # remove the registers syntax
             del grammar_json['repository']['compiler_labels']
 
-        # handle bespokeasm diectives
+        # handle bespokeasm directives
         for item in grammar_json['repository']['directives']['patterns']:
             if 'keyword.other.directive' == item['name']:
                 directives_regex = '|'.join(['\\.'+d for d in COMPILER_DIRECTIVES_SET])
@@ -113,6 +113,13 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
                         preprocessor_regex = '|'.join(PREPROCESSOR_DIRECTIVES_SET)
                         preprocesspr_str = pattern['match']
                         pattern['match'] = preprocesspr_str.replace('##PREPROCESSOR##', preprocessor_regex)
+
+        # handle expresion functions
+        for item in grammar_json['repository']['operators']['patterns']:
+            if 'keyword.operator.word' == item['name']:
+                func_regex = '|'.join([d for d in EXPRESSION_FUNCTIONS_SET])
+                func_str = item['match']
+                item['match'] = func_str.replace('##EXPRESSION_FUNCTIONS##', func_regex)
 
         tmGrammar_fp = os.path.join(extension_dir_path, 'syntaxes', 'tmGrammar.json')
         with open(tmGrammar_fp, 'w', encoding='utf-8') as f:

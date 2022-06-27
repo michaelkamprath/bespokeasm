@@ -20,7 +20,7 @@ class TestConfigurationGeneration(unittest.TestCase):
             raise AssertionError("File does not exist: %s" % str(path))
 
     def _assert_grouped_item_list(self, item_str: str, target_list: list[str], test_name: str) -> None:
-        match = re.search(r'^.*(?<=[\w\)])\((?:\?\:)?(.*)\)', item_str, re.IGNORECASE)
+        match = re.search(r'^.*(?<=[\w\)])?\((?:\?\:)?(.*)\)', item_str, re.IGNORECASE)
         self.assertIsNotNone(match, f'{test_name} match should be found')
         match_list = set(match.group(1).split('|'))
         self.assertSetEqual(match_list, set(target_list), f'all items from "{test_name}" should be found')

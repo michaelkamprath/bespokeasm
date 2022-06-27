@@ -82,5 +82,25 @@ class TestExpression(unittest.TestCase):
             '(1 << 2) + 1 = 5 (+ takes precedence over <<)'
         )
 
+    def test_unary_byte_value_extractor(self):
+        line_id = LineIdentifier(777, 'test_unary_byte_value_extractor')
+
+        self.assertEqual(
+            parse_expression(line_id, 'LSB( $1234 )').get_value(TestExpression.label_values, 1),
+            0x34, 'LSB( $1234 ) = $34'
+        )
+        self.assertEqual(
+            parse_expression(line_id, 'MSB( $1234 )').get_value(TestExpression.label_values, 1),
+            0x12, 'MSB( $1234 ) = $12'
+        )
+        self.assertEqual(
+            parse_expression(line_id, 'MSB( (MAX_N + 50)*value_1 )').get_value(TestExpression.label_values, 1),
+            0x03, 'MSB( (MAX_N + 50)*value_1 ) = MSB( $0348 ) = $03'
+        )
+        self.assertEqual(
+            parse_expression(line_id, '4*LSB( (MAX_N + 50)*value_1 )').get_value(TestExpression.label_values, 1),
+            0x0120, '4*LSB( (MAX_N + 50)*value_1 ) = 4*MSB( $0348 ) = 4*$48 = $0120'
+        )
+
 if __name__ == '__main__':
     unittest.main()
