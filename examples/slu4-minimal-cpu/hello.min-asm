@@ -12,7 +12,7 @@
     STA 0xffff                  ; init stack
 start:
     LDI LSB(string)     PHS     ; put LSB on stack
-    LDI MSB(string)     PHS     ; put MSB on stack
+    LDI BYTE1(string)   PHS     ; put MSB on stack
     JPS PrintText
     PLS
     PLS                         ; clean up stack

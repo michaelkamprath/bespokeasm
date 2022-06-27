@@ -12,7 +12,9 @@ PREPROCESSOR_DIRECTIVES_SET = set([
 ])
 
 EXPRESSION_FUNCTIONS_SET = set([
-    'LSB', 'MSB',
+    'LSB', 
+] + [
+    f'BYTE{i}' for i in range(10)
 ])
 
 ASSEMBLER_KEYWORD_SET = (

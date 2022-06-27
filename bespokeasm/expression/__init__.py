@@ -17,7 +17,7 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.utilities import is_valid_label
 
-EXPRESSION_PARTS_PATTERN = r'(?:(?:\%|b)[01]+|(?:\$|0x)[0-9a-fA-F]+|\d+|[\+\-\*\/\&\|\^\(\)]|>>|<<|%|MSB\(|LSB\(|(?:\.|_)?\w+)'
+EXPRESSION_PARTS_PATTERN = r'(?:(?:\%|b)[01]+|(?:\$|0x)[0-9a-fA-F]+|\d+|[\+\-\*\/\&\|\^\(\)]|>>|<<|%|LSB\(|BYTE\d\(|(?:\.|_)?\w+)'
 
 class TokenType(enum.Enum):
     T_NUM = 0
@@ -32,11 +32,11 @@ class TokenType(enum.Enum):
     T_AND = 9
     T_OR = 10
     T_XOR = 11
-    T_MSB = 12
     T_LSB = 13
-    T_LPAR = 14
-    T_RPAR = 15
-    T_END = 14
+    T_BYTE = 14
+    T_LPAR = 15
+    T_RPAR = 16
+    T_END = 17
 
 
 class ExpressionNode:
@@ -58,7 +58,7 @@ class ExpressionNode:
         self.value = value
         self.left_child = None
         self.right_child = None
-        self._is_unary = token_type in [TokenType.T_MSB, TokenType.T_LSB]
+        self._is_unary = token_type in [TokenType.T_BYTE, TokenType.T_LSB]
 
     def __repr__(self):
         return str(self)
@@ -86,16 +86,14 @@ class ExpressionNode:
     def _compute(self, label_scope: LabelScope, line_id: LineIdentifier) -> float:
         if self.token_type in [TokenType.T_NUM, TokenType.T_LABEL]:
             return float(self._numeric_value(label_scope, line_id))
-        if self.token_type in [TokenType.T_MSB, TokenType.T_LSB]:
+        if self.token_type in [TokenType.T_LSB, TokenType.T_BYTE]:
+            byte_idx = 0
+            if self.token_type == TokenType.T_BYTE:
+                byte_idx = int(self.value[4])
             arg_value = int(self.left_child._compute(label_scope, line_id))
-            byte_count = (arg_value.bit_length() + 7) // 8
-            arg_value_bytes = arg_value.to_bytes(byte_count, 'big')
-            if self.token_type == TokenType.T_MSB:
-                return arg_value_bytes[0]
-            elif self.token_type == TokenType.T_LSB:
-                return arg_value_bytes[-1]
-            else:
-                raise NotImplementedError
+            byte_count = max(((arg_value.bit_length() + 7) // 8), byte_idx+1)
+            arg_value_bytes = arg_value.to_bytes(byte_count, 'little')
+            return arg_value_bytes[byte_idx]
         else:
             left_result = self.left_child._compute(label_scope, line_id)
             right_result = self.right_child._compute(label_scope, line_id)
@@ -145,7 +143,6 @@ def _lexical_analysis(line_id: LineIdentifier, s: str) -> list[ExpressionNode]:
         '(': TokenType.T_LPAR,
         ')': TokenType.T_RPAR,
         'LSB(': TokenType.T_LSB,
-        'MSB(': TokenType.T_MSB,
     }
 
     tokens = []
@@ -154,6 +151,8 @@ def _lexical_analysis(line_id: LineIdentifier, s: str) -> list[ExpressionNode]:
         if part in mappings:
             token_type = mappings[part]
             token = ExpressionNode(token_type, value=part)
+        elif part.startswith('BYTE'):
+            token = ExpressionNode(TokenType.T_BYTE, value=part)
         elif is_string_numeric(part):
             token = ExpressionNode(TokenType.T_NUM, value=parse_numeric_string(part))
         elif is_valid_label(part):
@@ -206,7 +205,7 @@ def _parse_e4(line_id: LineIdentifier, tokens: list[ExpressionNode]) -> Expressi
     if tokens[0].token_type in [TokenType.T_NUM, TokenType.T_LABEL]:
         return tokens.pop(0)
 
-    if tokens[0].token_type in [TokenType.T_MSB, TokenType.T_LSB]:
+    if tokens[0].token_type in [TokenType.T_LSB, TokenType.T_BYTE]:
         node = tokens.pop(0)
         node.left_child = _parse_e(line_id, tokens)
         _match(line_id, tokens, TokenType.T_RPAR)
