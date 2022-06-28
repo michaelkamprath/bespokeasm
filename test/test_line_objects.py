@@ -8,11 +8,25 @@ from bespokeasm.assembler.line_object.factory import LineOjectFactory
 from bespokeasm.assembler.line_object.data_line import DataLine
 from bespokeasm.assembler.line_object.label_line import LabelLine, is_valid_label
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
+from bespokeasm.assembler.line_object.directive_line import AddressOrgLine
 from bespokeasm.assembler.model import AssemblerModel
 
 from test import config_files
 
 class TestLineObject(unittest.TestCase):
+    label_values = None
+    @classmethod
+    def setUpClass(cls):
+        global_scope = GlobalLabelScope(set())
+        global_scope.set_label_value('var1', 12, 1)
+        global_scope.set_label_value('my_val', 8, 2)
+        global_scope.set_label_value('the_two', 2, 3)
+        local_scope = LabelScope(LabelScopeType.LOCAL, global_scope, 'TestInstructionParsing')
+        local_scope.set_label_value('.local_var', 10, 3)
+        cls.label_values = local_scope
+
+    def setUp(self):
+        InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN = None
 
     def test_data_line_creation(self):
         label_values = GlobalLabelScope(set())
@@ -229,22 +243,23 @@ class TestLineObject(unittest.TestCase):
         self.assertIsInstance(objs3[0], LabelLine, 'the first line object should be a label')
         self.assertEqual(objs3[0].get_label(), 'the_label', 'the label string should match')
 
-        # labels with constants should not work
-        with self.assertRaises(SystemExit, msg='this instruction should fail'):
-            LineOjectFactory.parse_line(
-                lineid,
-                'the_label: const = 3 ; label with constant',
-                isa_model,
-                label_values,
-            )
-        # labels with other labels should not work
-        with self.assertRaises(SystemExit, msg='this instruction should fail'):
-            LineOjectFactory.parse_line(
-                lineid,
-                'the_label: the_second_label: ; label with another label',
-                isa_model,
-                label_values,
-            )
+        
+        # # labels with constants should not work
+        # with self.assertRaises(SystemExit, msg='this instruction should fail'):
+        #     LineOjectFactory.parse_line(
+        #         lineid,
+        #         'the_label: const = 3 ; label with constant',
+        #         isa_model,
+        #         label_values,
+        #     )
+        # # labels with other labels should not work
+        # with self.assertRaises(SystemExit, msg='this instruction should fail'):
+        #     LineOjectFactory.parse_line(
+        #         lineid,
+        #         'the_label: the_second_label: ; label with another label',
+        #         isa_model,
+        #         label_values,
+        #     )
 
     def test_valid_labels(self):
         self.assertTrue(is_valid_label('a_str'),'valid label')
@@ -406,6 +421,64 @@ class TestLineObject(unittest.TestCase):
         dl1: DataLine = lo1[0]
         dl1.generate_bytes()
         self.assertEqual(list(dl1.get_bytes()), [0x34, 0x12])
+
+    def test_compound_instruction_line(self):
+        with pkg_resources.path(config_files, 'test_operand_features.yaml') as fp:
+            isa_model = AssemblerModel(str(fp), 0)
+        lineid = LineIdentifier(55, 'test_compound_instruction_line')
+
+        lol1 = LineOjectFactory.parse_line(lineid, 'start: ADD .local_var+7', isa_model, TestLineObject.label_values)
+        self.assertEqual(len(lol1), 2, 'There should be two parsed instructions')
+        self.assertIsInstance(lol1[0], LabelLine)
+        self.assertIsInstance(lol1[1], InstructionLine)
+        lol1[0].set_start_address(1)
+        lol1[1].set_start_address(lol1[0].address + lol1[0].byte_size)
+        self.assertEqual(lol1[1].address, 1, 'first instruction part is a label and has no byte size')
+
+        lol2 = LineOjectFactory.parse_line(lineid, '.org $2000 prog_start: ld x, [var1]', isa_model, TestLineObject.label_values)
+        self.assertEqual(len(lol2), 3, 'There should be 3 parsed instructions')
+        self.assertIsInstance(lol2[0], AddressOrgLine)
+        self.assertIsInstance(lol2[1], LabelLine)
+        self.assertIsInstance(lol2[2], InstructionLine)
+        self.assertEqual(lol2[0].address, 0x2000, 'first instruction is .org')
+        lol2[1].set_start_address(lol2[0].address + lol2[0].byte_size)
+        lol2[2].set_start_address(lol2[1].address + lol2[1].byte_size)
+        self.assertEqual(lol2[2].address, 0x2000, 'third instruiction still same adress')
+
+        # test instruction following an instruction
+        lol3 = LineOjectFactory.parse_line(lineid, 'ld x, [var1] add 47', isa_model, TestLineObject.label_values)
+        self.assertEqual(len(lol3), 2, 'There should be 2 parsed instructions')
+        self.assertIsInstance(lol3[0], InstructionLine)
+        self.assertIsInstance(lol3[1], InstructionLine)
+        lol3[0].set_start_address(1)
+
+        # use a label in the operand that starts with an instruction mnemonic
+        lol4 = LineOjectFactory.parse_line(lineid, 'ADD nope_str&$00FF            NOP', isa_model, TestLineObject.label_values)
+        self.assertEqual(len(lol4), 2, 'There should be 2 parsed instructions')
+        self.assertIsInstance(lol4[0], InstructionLine)
+        self.assertIsInstance(lol4[1], InstructionLine)
+        lol4[0].set_start_address(1)
+        lol4[1].set_start_address(lol4[0].address + lol4[0].byte_size)
+        self.assertEqual(lol4[1].address, 3, 'instruction address should be 3')
+
+        # use a label in the operand that ends with an instruction mnemonic
+        lol4 = LineOjectFactory.parse_line(lineid, 'ADD 5+something_to_add', isa_model, TestLineObject.label_values)
+        self.assertEqual(len(lol4), 1, 'There should be 2 parsed instructions')
+        self.assertIsInstance(lol4[0], InstructionLine)
+
+        lol5 = LineOjectFactory.parse_line(lineid, 'the_label: const = 3 ; label with constant', isa_model, TestLineObject.label_values)
+        self.assertEqual(len(lol5), 2, 'There should be 2 parsed instructions')
+        self.assertIsInstance(lol5[0], LabelLine)
+        self.assertIsInstance(lol5[1], LabelLine)
+
+        # anythin after an instruction other than an instruction os not supported (yet)
+        with self.assertRaises(SystemExit, msg='this instruction should fail'):
+            LineOjectFactory.parse_line(
+                    lineid,
+                    'ADD nope_str&$00FF       newLabel:',
+                    isa_model,
+                    TestLineObject.label_values
+                )
 
 
 if __name__ == '__main__':

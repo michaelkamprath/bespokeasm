@@ -49,7 +49,7 @@ class DirectiveLine:
         line_match = re.search(DirectiveLine.PATTERN_ORG_DIRECTIVE, cleaned_line_str)
         if line_match is not None and len(line_match.groups()) == 1:
             value_str = line_match.group(1)
-            return AddressOrgLine(line_id, line_str, comment, value_str)
+            return AddressOrgLine(line_id, line_match.group(0), comment, value_str)
 
         # .fill
         line_match = re.search(DirectiveLine.PATTERN_FILL_DIRECTIVE, cleaned_line_str)
@@ -57,7 +57,9 @@ class DirectiveLine:
             count_str = line_match.group(1)
             value_str = line_match.group(2)
             return FillDataLine(
-                line_id, line_str, comment,
+                line_id,
+                line_match.group(0),
+                comment,
                 count_str,
                 value_str,
             )
@@ -69,7 +71,9 @@ class DirectiveLine:
             if len(count_str) == 0:
                 sys.exit(f'ERROR: {line_id} - .zero directive missing length argument')
             return FillDataLine(
-                line_id, line_str, comment,
+                line_id,
+                line_match.group(0),
+                comment,
                 count_str,
                 '0',
             )
@@ -79,7 +83,9 @@ class DirectiveLine:
         if line_match is not None and len(line_match.groups()) == 1:
             address_str = line_match.group(1)
             return FillUntilDataLine(
-                line_id, line_str, comment,
+                line_id,
+                line_match.group(0),
+                comment,
                 address_str,
                 '0',
             )

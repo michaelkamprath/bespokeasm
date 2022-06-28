@@ -1,5 +1,6 @@
 import unittest
 import importlib.resources as pkg_resources
+from importlib import reload
 
 from test import config_files
 
@@ -23,6 +24,9 @@ class TestInstructionParsing(unittest.TestCase):
         local_scope = LabelScope(LabelScopeType.LOCAL, global_scope, 'TestInstructionParsing')
         local_scope.set_label_value('.local_var', 10, 3)
         cls.label_values = local_scope
+
+    def setUp(self):
+        InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN = None
 
     def test_instruction_variant_matching(self):
         with pkg_resources.path(config_files, 'test_instructions_with_variants.yaml') as fp:
@@ -295,6 +299,19 @@ class TestInstructionParsing(unittest.TestCase):
         lineid = LineIdentifier(42, 'test_expressions_in_operations')
 
         t1 = InstructionLine.factory(lineid, 'add .local_var+7', 'comment', isa_model)
+        t1.set_start_address(1)
+        t1.label_scope = TestInstructionParsing.label_values
+        self.assertIsInstance(t1, InstructionLine)
+        self.assertEqual(t1.byte_size, 2, 'has 2 bytes')
+        t1.generate_bytes()
+        self.assertEqual(list(t1.get_bytes()), [0b11010101, 17], 'instruction byte should match')
+
+    def test_case_insentive_instructions(self):
+        with pkg_resources.path(config_files, 'test_operand_features.yaml') as fp:
+            isa_model = AssemblerModel(str(fp), 0)
+        lineid = LineIdentifier(42, 'test_case_insentive_instructions')
+
+        t1 = InstructionLine.factory(lineid, 'ADD .local_var+7', 'comment', isa_model)
         t1.set_start_address(1)
         t1.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)

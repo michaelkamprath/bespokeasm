@@ -24,8 +24,9 @@
             "patterns": [
                 { "include": "#registers" },
                 { "include": "#compiler_labels" },
-                { "include": "#expressions" },
                 { "include": "#numeric-values" },
+                { "include": "#operators" },
+                { "include": "#expressions" },
                 { "include": "#indirect-addressing" },
                 { "include": "#deferred-addressing"},
                 { "include": "#operands_variables" },
@@ -34,8 +35,8 @@
                     "match": "\\,"
                 }
             ],
-            "begin": "\\b(##INSTRUCTIONS##)\\b",
-            "end": "(?=(?:\\s*\\;|\\s*$))",
+            "begin": "(?i)(##INSTRUCTIONS##)",
+            "end": "(?i)(?=(?:\\s*\\;|\\s*$|##INSTRUCTIONS##))",
             "beginCaptures": {
                 "0": { "name": "variable.function.instruction" }
             }
@@ -46,7 +47,7 @@
         },
         "registers": {
             "name": "variable.language.register",
-            "match": "\\b(?:##REGISTERS##)\\b"
+            "match": "(?:##REGISTERS##)"
         },
         "compiler_labels": {
             "name": "constant.language",
@@ -93,6 +94,14 @@
                 {
                     "name": "keyword.operator.logical",
                     "match": "[\\&\\|\\^]{1}"
+                },
+                {
+                    "name": "keyword.operator.bitwise",
+                    "match": "(?:<<|>>)"
+                },
+                {
+                    "name": "keyword.operator.word",
+                    "match": "\\b(?:##EXPRESSION_FUNCTIONS##)\\b"
                 }
             ]
         },

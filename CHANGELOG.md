@@ -17,13 +17,18 @@ Changes that are planned but not implemented yet:
   * unknown labels
 
 ## [Unreleased]
+* Made instructions case insensitive
+* Added example for the slu4 Minimal UART CPU System
+* Added more pretty print formats and the ability to select them
+* Added support for more than one instruction per line in the assembly source. There are some limitations. See documentation.
+* Added support for `MSB` and `LSB` unary functions in expressions
 
 ## [0.2.2]
 * Added instruction macros feature
 * Started using `pipenv` for dependency management.
 * Fixed bug for numeric enumeration operads that emit a argument value.
 * Added `.8byte` data type directive
-* Fixed bug in how complext expressions are parsed in certain directive arguments
+* Fixed bug in how complex expressions are parsed in certain directive arguments
 * Added bit shifting operations to expressions
 * Fixed a bug in handling registers named `b`, which is also the binary number prefix
 

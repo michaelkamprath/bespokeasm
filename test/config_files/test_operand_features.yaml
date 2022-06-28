@@ -111,6 +111,10 @@ operand_sets:
           value: 1
           size: 1
 instructions:
+  nop:
+    byte_code:
+      value: 0
+      size: 8
   ld:
     byte_code:
       value: 2

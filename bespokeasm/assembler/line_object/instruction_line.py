@@ -9,17 +9,34 @@ from bespokeasm.assembler.model.instruction_parser import InstructioParser
 class InstructionLine(LineWithBytes):
     COMMAND_EXTRACT_PATTERN = re.compile(r'^\s*(\w+)', flags=re.IGNORECASE|re.MULTILINE)
 
+    _INSTRUCTUION_EXTRACTION_PATTERN = None
+
     def factory(line_id: LineIdentifier, line_str: str, comment: str, isa_model: AssemblerModel):
         """Tries to contruct a instruction line object from the passed instruction line"""
-        #extract the instruction command
-        command_match = re.search(InstructionLine.COMMAND_EXTRACT_PATTERN, line_str)
-        if command_match is None or len(command_match.groups()) != 1:
-            sys.exit(f'ERROR: {line_id} - Wrongly formatted instruction: {line_str}')
-        command_str = command_match.group(1).strip()
-        if command_str not in isa_model.instruction_mnemonics:
-            sys.exit(f'ERROR: {line_id} - Unreconized instruction: {line_str}')
-        argument_str = line_str.strip()[len(command_str):]
-        return InstructionLine(line_id, command_str, argument_str, isa_model, line_str, comment)
+        # first, extract evertything up to the next extruction
+        if InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN is None:
+            instructions_regex = '\\b' + '\\b|\\b'.join(isa_model.instruction_mnemonics) + '\\b'
+            InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN = re.compile(
+                r'(?i)(?:((?:{0})\b.*?)(?:(?={1})|\;|$))'.format(instructions_regex,instructions_regex),
+                flags=re.IGNORECASE|re.MULTILINE,
+            )
+        instruction_match = re.search(InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN, line_str)
+        if instruction_match is not None:
+            instruction_str = instruction_match.group(0)
+
+            #extract the instruction command
+            command_match = re.search(InstructionLine.COMMAND_EXTRACT_PATTERN, instruction_str)
+            if command_match is None or len(command_match.groups()) != 1:
+                sys.exit(f'ERROR: {line_id} - Wrongly formatted instruction: {instruction_str}')
+            command_str = command_match.group(1).strip().lower()
+            if command_str not in isa_model.instruction_mnemonics:
+                sys.exit(f'ERROR: {line_id} - Unreconized instruction: {instruction_str}')
+
+            argument_str = instruction_str.strip()[len(command_str):]
+
+            return InstructionLine(line_id, command_str, argument_str, isa_model, instruction_str, comment)
+        else:
+            return None
 
     def __init__(
             self,

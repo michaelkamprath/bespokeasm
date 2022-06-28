@@ -1,0 +1,36 @@
+; Hello World!
+;   Example code for the Minimal UART CPU System by Carsten Herting (slu4)
+;
+;   Code based on slu4's original example at:
+;       https://github.com/slu4coder/Minimal-UART-CPU-System/blob/main/Python%20Assembler/hello.txt
+;
+#require "slu4-mincpu-asm >= 1.5.0"
+
+.org $8000                      ; set the start
+
+    LDI 0xfe
+    STA 0xffff                  ; init stack
+start:
+    LDI LSB(string)     PHS     ; put LSB on stack
+    LDI BYTE1(string)   PHS     ; put MSB on stack
+    JPS PrintText
+    PLS
+    PLS                         ; clean up stack
+    JPA start
+string: .cstr 'Hello, World!\n'
+ptr:    .2byte $0000            ; 16-bit pointer
+
+PrintText:
+    LDS 3   STA ptr+1           ; find MSB on stack
+    LDS 4   STA ptr+0           ; find LSB on stack
+loop:
+    LDR ptr
+    CPI 0
+    BEQ exit
+    OUT                         ; send char to UART
+    NOP NOP NOP NOP
+    NOP NOP NOP NOP
+    INW ptr
+    JPA loop
+exit:
+    RTS

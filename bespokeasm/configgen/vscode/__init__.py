@@ -6,7 +6,7 @@ import shutil
 
 from bespokeasm.configgen import LanguageConfigGenerator
 import bespokeasm.configgen.vscode.resources as resources
-from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET, BYTECODE_DIRECTIVES_SET, PREPROCESSOR_DIRECTIVES_SET
+from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET, BYTECODE_DIRECTIVES_SET, PREPROCESSOR_DIRECTIVES_SET, EXPRESSION_FUNCTIONS_SET
 
 
 class VSCodeConfigGenerator(LanguageConfigGenerator):
@@ -66,9 +66,16 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             '##INSTRUCTIONS##',
             self.model.instruction_mnemonics
         )
+        grammar_json['repository']['instructions']['end'] = self._replace_token_with_regex_list(
+            grammar_json['repository']['instructions']['end'],
+            '##INSTRUCTIONS##',
+            self.model.instruction_mnemonics
+        )
 
         # handle registers
         if len(self.model.registers) > 0:
+            if self.verbose > 2:
+                print(f'  adding syntax for a total of {len(self.model.registers)} registers')
             # update the registers syntax
             grammar_json['repository']['registers']['match'] = self._replace_token_with_regex_list(
                 grammar_json['repository']['registers']['match'],
@@ -82,9 +89,11 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
         # handled predefined labels
         predefined_labels = self.model.predefined_labels
         if len(predefined_labels) > 0:
+            if self.verbose > 2:
+                print(f'  adding syntax for a total of {len(predefined_labels)} predefined labels')
             # update the registers syntax
             grammar_json['repository']['compiler_labels']['match'] = self._replace_token_with_regex_list(
-                grammar_json['repository']['registers']['match'],
+                grammar_json['repository']['compiler_labels']['match'],
                 '##COMPILERCONSTANTS##',
                 predefined_labels
             )
@@ -92,7 +101,7 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             # remove the registers syntax
             del grammar_json['repository']['compiler_labels']
 
-        # handle bespokeasm diectives
+        # handle bespokeasm directives
         for item in grammar_json['repository']['directives']['patterns']:
             if 'keyword.other.directive' == item['name']:
                 directives_regex = '|'.join(['\\.'+d for d in COMPILER_DIRECTIVES_SET])
@@ -108,6 +117,13 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
                         preprocessor_regex = '|'.join(PREPROCESSOR_DIRECTIVES_SET)
                         preprocesspr_str = pattern['match']
                         pattern['match'] = preprocesspr_str.replace('##PREPROCESSOR##', preprocessor_regex)
+
+        # handle expresion functions
+        for item in grammar_json['repository']['operators']['patterns']:
+            if 'keyword.operator.word' == item['name']:
+                func_regex = '|'.join([d for d in EXPRESSION_FUNCTIONS_SET])
+                func_str = item['match']
+                item['match'] = func_str.replace('##EXPRESSION_FUNCTIONS##', func_regex)
 
         tmGrammar_fp = os.path.join(extension_dir_path, 'syntaxes', 'tmGrammar.json')
         with open(tmGrammar_fp, 'w', encoding='utf-8') as f:

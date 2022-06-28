@@ -8,7 +8,7 @@ from zipfile import ZipFile
 
 from bespokeasm.configgen import LanguageConfigGenerator
 import bespokeasm.configgen.sublime.resources as resources
-from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET, BYTECODE_DIRECTIVES_SET, PREPROCESSOR_DIRECTIVES_SET
+from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET, BYTECODE_DIRECTIVES_SET, PREPROCESSOR_DIRECTIVES_SET, EXPRESSION_FUNCTIONS_SET
 
 
 class SublimeConfigGenerator(LanguageConfigGenerator):
@@ -57,9 +57,23 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             '##INSTRUCTIONS##',
             self.model.instruction_mnemonics
         )
+        index = None
+        for idx, config_dict in enumerate(syntax_dict['contexts']['pop_instruction_end']):
+            if config_dict['name'] == 'instructions':
+                index = idx
+                break
+        if index is None:
+            sys.exit('ERROR - INTERNAL - Could not find "instruction" configuration in pop_instruction_end for Sulime syntax')
+        syntax_dict['contexts']['pop_instruction_end'][index]['match'] = self._replace_token_with_regex_list(
+            syntax_dict['contexts']['pop_instruction_end'][index]['match'],
+            '##INSTRUCTIONS##',
+            self.model.instruction_mnemonics
+        )
 
         # handle registers
         if len(self.model.registers) > 0:
+            if self.verbose > 2:
+                print(f'  adding syntax for a total of {len(self.model.registers)} registers')
             # update the registers syntax
             syntax_dict['contexts']['registers'][0]['match'] = self._replace_token_with_regex_list(
                 syntax_dict['contexts']['registers'][0]['match'],
@@ -73,6 +87,8 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         # handle compiler predefined labels
         predefined_labels = self.model.predefined_labels
         if len(predefined_labels) > 0:
+            if self.verbose > 2:
+                print(f'  adding syntax for a total of {len(predefined_labels)} predefined labels')
             # update the registers syntax
             syntax_dict['contexts']['compiler_labels'][0]['match'] = self._replace_token_with_regex_list(
                 syntax_dict['contexts']['compiler_labels'][0]['match'],
@@ -105,6 +121,18 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
                 break
         if not updated:
             sys.exit('ERROR - INTERNAL - did not find correct preprocessor rule for Sublime systax file.')
+
+        # expression functions
+        func_regex = '|'.join([d for d in EXPRESSION_FUNCTIONS_SET])
+        updated = False
+        for rule in syntax_dict['contexts']['numerical_expressions']:
+            if 'scope' in rule and rule['scope'] == 'keyword.operator.word':
+                func_str = rule['match']
+                rule['match'] = func_str.replace('##EXPRESSION_FUNCTIONS##', func_regex)
+                updated = True
+                break
+        if not updated:
+            sys.exit('ERROR - INTERNAL - did not find correct expression function rule for Sublime systax file.')
 
         # save syntax file
         syntax_fp = os.path.join(destination_dir, self.language_name + '.sublime-syntax')

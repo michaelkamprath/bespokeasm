@@ -52,5 +52,5 @@ class LanguageConfigGenerator:
         token: str,
         regex_list: list[str]
     ) -> str:
-        regex_str = '|'.join(regex_list)
+        regex_str = '\\b' + '\\b|\\b'.join(regex_list) + '\\b'
         return template_str.replace(token, regex_str)

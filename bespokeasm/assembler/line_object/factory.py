@@ -40,7 +40,9 @@ class LineOjectFactory:
             instruction_str = instruction_match.group(1).strip()
 
         # parse instruction
-        if len(instruction_str) > 0:
+        line_obj_list: list[LineObject] = []
+        while len(instruction_str) > 0:
+            #print(f'Parsing instruction string = "{instruction_str}"')
             # try label
             line_obj = LabelLine.factory(
                 line_id,
@@ -50,36 +52,30 @@ class LineOjectFactory:
                 label_scope
             )
             if line_obj is not None:
-                line_obj_list = [line_obj]
-                # check to see for same line instruction
-                same_line_instr = LabelLine.parse_same_line_instruction(line_id, instruction_str)
-                if same_line_instr is not None:
-                    # try directives
-                    line_obj = DirectiveLine.factory(line_id, same_line_instr, '', model.endian)
-                    if line_obj is not None:
-                        line_obj_list.append(line_obj)
-                        return line_obj_list
+                line_obj_list.append(line_obj)
+                instruction_str = instruction_str.replace(line_obj.instruction, '', 1).strip()
+                continue
 
-                    # try instruction
-                    line_obj = InstructionLine.factory(line_id, same_line_instr, '', model)
-                    if line_obj is not None:
-                        line_obj_list.append(line_obj)
-                        return line_obj_list
-
-                    # if we got here, it is because there is somethign following a label punctuation colon
-                    # that shouldn't be there.
-                    sys.exit(f'ERROR: {line_id} - Improperly formatted label')
-                return line_obj_list
             # try directives
             line_obj = DirectiveLine.factory(line_id, instruction_str, comment_str, model.endian)
             if line_obj is not None:
-                return [line_obj]
+                line_obj_list.append(line_obj)
+                instruction_str = instruction_str.replace(line_obj.instruction, '', 1).strip()
+                continue
 
             # try instruction
             line_obj = InstructionLine.factory(line_id, instruction_str, comment_str, model)
             if line_obj is not None:
-                return [line_obj]
+                line_obj_list.append(line_obj)
+                #print(f'    found instruction with text = "{line_obj.instruction}"')
+                instruction_str = instruction_str.replace(line_obj.instruction, '', 1).strip()
+                continue
 
-        # if we got here, the line is only a comment
-        line_obj = LineObject(line_id, instruction_str, comment_str)
-        return [line_obj]
+            # if we are here, that means nothing was matched. Shouldn't happen, but we will break none the less
+            break
+
+        if len(line_obj_list) == 0:
+            # if we got here, the line is only a comment
+            line_obj = LineObject(line_id, instruction_str, comment_str)
+            return [line_obj]
+        return line_obj_list

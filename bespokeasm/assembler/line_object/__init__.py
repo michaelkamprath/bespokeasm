@@ -4,7 +4,8 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.expression import EXPRESSION_PARTS_PATTERN
 
-INSTRUCTION_EXPRESSION_PATTERN = r'(?:{0}|(?:[ \t]*)(?!(?:[ \t]*\;|[ \t]*\v)))+'.format(EXPRESSION_PARTS_PATTERN)
+PATTERN_LABEL_DEFINITION = r'\s*(?:\.?\w+:)'
+INSTRUCTION_EXPRESSION_PATTERN = r'(?:{0}|(?:[ \t]*)(?!(?:[ \t]*\;|[ \t]*\v)|{1}))+'.format(EXPRESSION_PARTS_PATTERN, PATTERN_LABEL_DEFINITION)
 
 class LineObject:
     def __init__(self, line_id: LineIdentifier, instruction: str, comment: str):
@@ -82,8 +83,3 @@ class LineWithBytes(LineObject):
     def _append_byte(self, byte_value: int):
         """appends the passed byte value to this objects bytes"""
         self._bytes.append(byte_value&0xFF)
-
-    @property
-    def instruction(self) -> str:
-        """returns the original instruction text that generated this line object"""
-        return '   ' + super().instruction
