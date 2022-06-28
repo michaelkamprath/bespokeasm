@@ -17,6 +17,8 @@ Changes that are planned but not implemented yet:
   * unknown labels
 
 ## [Unreleased]
+
+## [0.2.3]
 * Made instructions case insensitive
 * Added example for the slu4 Minimal UART CPU System
 * Added more pretty print formats and the ability to select them
@@ -85,7 +87,8 @@ First tracked released
 * Enabled the `reverse_argument_order` instruction option be applied to a specific operand configuration. This slightly changed the configuration file format.
 * Added ability for instructions with operands to have a single "empty operand" variant, e.g., `pop`
 
-[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.8...v0.2.0
