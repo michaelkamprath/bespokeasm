@@ -32,6 +32,53 @@ operand_sets:
         argument:
           size: 16
           byte_align: true
+predefined:
+  constants:
+    - name: os_Start
+      value: 0xf000
+    - name: os_Prompt
+      value: 0xf003
+    - name: os_Print
+      value: 0xf006
+    - name: os_PrintHex
+      value: 0xf009
+    - name: os_WaitUART
+      value: 0xf00c
+    - name: os_LoadFile
+      value: 0xf00f
+    - name: os_SaveFile
+      value: 0xf012
+    - name: os_MemMove
+      value: 0xf015
+    - name: os_FindFile
+      value: 0xf018
+    - name: os_Mnemonics
+      value: 0xf01b
+    - name: os_HexToWord
+      value: 0xf01f
+    - name: os_CursorX
+      value: 0xf022
+    - name: os_CursorY
+      value: 0xf025
+    - name: os_Random
+      value: 0xf028
+    - name: os_XOR
+      value: 0xf02b
+    - name: os_MemAddr
+      value: 0xfeb0
+    - name: os_ParsePtr
+      value: 0xfeb2
+    - name: os_RandomX
+      value: 0xfec2
+    - name: os_RandomA
+      value: 0xfec3
+    - name: os_RandomB
+      value: 0xfec4
+    - name: os_RandomC
+      value: 0xfec5
+    - name: os_InpBuf
+      value: 0xfec9
+
 instructions:
   nop:
     byte_code:

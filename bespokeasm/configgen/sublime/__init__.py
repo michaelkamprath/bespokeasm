@@ -72,6 +72,8 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
 
         # handle registers
         if len(self.model.registers) > 0:
+            if self.verbose > 2:
+                print(f'  adding syntax for a total of {len(self.model.registers)} registers')
             # update the registers syntax
             syntax_dict['contexts']['registers'][0]['match'] = self._replace_token_with_regex_list(
                 syntax_dict['contexts']['registers'][0]['match'],
@@ -85,6 +87,8 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         # handle compiler predefined labels
         predefined_labels = self.model.predefined_labels
         if len(predefined_labels) > 0:
+            if self.verbose > 2:
+                print(f'  adding syntax for a total of {len(predefined_labels)} predefined labels')
             # update the registers syntax
             syntax_dict['contexts']['compiler_labels'][0]['match'] = self._replace_token_with_regex_list(
                 syntax_dict['contexts']['compiler_labels'][0]['match'],

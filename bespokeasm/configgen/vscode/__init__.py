@@ -74,6 +74,8 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
 
         # handle registers
         if len(self.model.registers) > 0:
+            if self.verbose > 2:
+                print(f'  adding syntax for a total of {len(self.model.registers)} registers')
             # update the registers syntax
             grammar_json['repository']['registers']['match'] = self._replace_token_with_regex_list(
                 grammar_json['repository']['registers']['match'],
@@ -87,9 +89,11 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
         # handled predefined labels
         predefined_labels = self.model.predefined_labels
         if len(predefined_labels) > 0:
+            if self.verbose > 2:
+                print(f'  adding syntax for a total of {len(predefined_labels)} predefined labels')
             # update the registers syntax
             grammar_json['repository']['compiler_labels']['match'] = self._replace_token_with_regex_list(
-                grammar_json['repository']['registers']['match'],
+                grammar_json['repository']['compiler_labels']['match'],
                 '##COMPILERCONSTANTS##',
                 predefined_labels
             )

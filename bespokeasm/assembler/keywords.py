@@ -12,7 +12,7 @@ PREPROCESSOR_DIRECTIVES_SET = set([
 ])
 
 EXPRESSION_FUNCTIONS_SET = set([
-    'LSB', 
+    'LSB',
 ] + [
     f'BYTE{i}' for i in range(10)
 ])
