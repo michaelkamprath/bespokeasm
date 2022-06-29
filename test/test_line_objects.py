@@ -480,6 +480,17 @@ class TestLineObject(unittest.TestCase):
                     TestLineObject.label_values
                 )
 
+    def test_unknown_instruction(self):
+        with pkg_resources.path(config_files, 'test_operand_features.yaml') as fp:
+            isa_model = AssemblerModel(str(fp), 0)
+        lineid = LineIdentifier(66, 'test_unknown_instruction')
 
+        with self.assertRaises(SystemExit, msg='unknown instruction mnmonic'):
+            LineOjectFactory.parse_line(
+                    lineid,
+                    '  madeup my_val ; my_comment',
+                    isa_model,
+                    TestLineObject.label_values
+                )
 if __name__ == '__main__':
     unittest.main()

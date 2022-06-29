@@ -17,6 +17,9 @@ Changes that are planned but not implemented yet:
   * unknown labels
 
 ## [Unreleased]
+* Fixed bug where unknown instructions did not produce an error.
+* Fixed bug where `#include` directives did not recognize otherwise valid file names
+* Fixed bug where zero operand macros did not get recognized correctly
 
 ## [0.2.3]
 * Made instructions case insensitive

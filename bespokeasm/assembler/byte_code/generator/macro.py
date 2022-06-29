@@ -76,22 +76,23 @@ class MacroBytecodeGenerator:
         for step_num, instruction_format in enumerate(variant._variant_config['instructions']):
             instruction_str: str = instruction_format
 
-            for op_num, op in enumerate(matched_operands.operands):
-                # handle @ARG
-                arg_str = f'@ARG({op_num})'
-                if arg_str in instruction_str:
-                    # gate the replace so that not called on unspported operand types
-                    instruction_str = instruction_str.replace(arg_str, op.operand_argument_string)
-                # handle @REG
-                reg_str = f'@REG({op_num})'
-                if reg_str in instruction_str:
-                    # gate the replace so that not called on unspported operand types
-                    instruction_str = instruction_str.replace(reg_str, op.operand_register_string)
-                # handle @OP
-                op_str = f'@OP({op_num})'
-                if op_str in instruction_str:
-                    # gate the replace so that not called on unspported operand types
-                    instruction_str = instruction_str.replace(op_str, op.operand_string)
+            if matched_operands is not None:
+                for op_num, op in enumerate(matched_operands.operands):
+                    # handle @ARG
+                    arg_str = f'@ARG({op_num})'
+                    if arg_str in instruction_str:
+                        # gate the replace so that not called on unspported operand types
+                        instruction_str = instruction_str.replace(arg_str, op.operand_argument_string)
+                    # handle @REG
+                    reg_str = f'@REG({op_num})'
+                    if reg_str in instruction_str:
+                        # gate the replace so that not called on unspported operand types
+                        instruction_str = instruction_str.replace(reg_str, op.operand_register_string)
+                    # handle @OP
+                    op_str = f'@OP({op_num})'
+                    if op_str in instruction_str:
+                        # gate the replace so that not called on unspported operand types
+                        instruction_str = instruction_str.replace(op_str, op.operand_string)
 
             if '@ARG' in instruction_str:
                 # ensure all @ARGs ar handled

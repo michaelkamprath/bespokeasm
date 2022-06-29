@@ -75,6 +75,8 @@ class LineOjectFactory:
             break
 
         if len(line_obj_list) == 0:
+            if instruction_str != '':
+                sys.exit(f'ERROR: {line_id} - unknown instruction "{instruction_str.strip()}"')
             # if we got here, the line is only a comment
             line_obj = LineObject(line_id, instruction_str, comment_str)
             return [line_obj]

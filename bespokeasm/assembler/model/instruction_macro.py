@@ -44,7 +44,10 @@ class InstructionMacroVariant(InstructionBase):
 
     @property
     def operand_count(self) -> int:
-        return self._operand_parser.operand_count
+        if self._operand_parser is not None:
+            return self._operand_parser.operand_count
+        else:
+            return 0
 
     @property
     def base_bytecode_size(self) -> int:

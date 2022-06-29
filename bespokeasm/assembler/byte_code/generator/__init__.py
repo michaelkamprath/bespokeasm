@@ -22,7 +22,7 @@ class BytecodeGenerator:
         mnemonic: str,
         operands: str,
         isa_model: AssemblerModel,
-        parser_class: Type[InstructioParserBase], 
+        parser_class: Type[InstructioParserBase],
     ) -> AssembledInstruction:
         if isinstance(instruction, Instruction):
             return InstructionBytecodeGenerator.generate_bytecode_parts(

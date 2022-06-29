@@ -91,7 +91,7 @@ class AssemblyFile:
         return line_objects
 
     PATTERN_INCLUDE_FILE = re.compile(
-        r'^\#include\s+(?:\'|\")([\w\.]+)(?:\'|\")',
+        r'^\#include\s+(?:\'|\")([\w\.\-\_]+)(?:\'|\")',
         flags=re.IGNORECASE | re.MULTILINE
     )
     PATTERN_REQUIRE_LANGUAGE = re.compile(
