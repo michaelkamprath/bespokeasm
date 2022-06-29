@@ -17,6 +17,9 @@ The following instruction macros have been added in this port:
 
 ***TBC***
 
+
+One important note here is that the calling convention that was designed for the Minimal CPU has multibyte values in the stack using big endian, and values stored in RAM are in little endian. The above macros account for this endian difference when moving data from RAM to the stack and vice versa.
+
 ### Assembly Syntax
 **BespokeASM**'s syntax is close to the syntax that Carsten used for the Minimal CPU's assembly language. However, there are some differences:
 

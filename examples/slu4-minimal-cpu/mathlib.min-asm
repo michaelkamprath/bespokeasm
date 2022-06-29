@@ -1,0 +1,225 @@
+
+
+; compare32
+;   Compares two 32-bit values to determine equality
+;
+;   Arguments
+;       sp+3 : left X value (4 bytes)
+;       sp+7 : right Y value (4 bytes)
+;       sp+11 : results flags placeholder
+; 
+;   Returns
+;       sp+11 : results flags:
+;                   bit 0 - Zero Flag (values are equal)
+;                   bit 1 - Carry Flag (X > Y)
+; 
+compare32:
+    ; init results
+    ldi 0 sta .flags    ; has to be RAM variable since stack ops alter flags
+    ; first check high bytes, then others in sequence
+    ; values on stack are stored big endian
+    lds (7+0) sta .rval lds (3+0) cpa .rval bne .done
+    lds (7+1) sta .rval lds (3+1) cpa .rval bne .done
+    lds (7+2) sta .rval lds (3+2) cpa .rval bne .done
+    lds (7+3) sta .rval lds (3+3) cpa .rval
+    ; check zero flag. flags still OK because no stack operatrion since CPA
+    bne .done   ldi %00000001 adb .flags    ; note this clears the flags
+.done:
+    ; check carry flag
+    bcc .return ldi %00000010 adb .flags
+.return:
+    lda .flags sts 11
+    rts
+.rval: .byte 0
+.flags: .byte 0
+
+
+; divide32
+;   Divides X by Y
+; 
+;   Arguments:
+;       sp+3 : value X dividend (4 bytes)
+;       sp+7 : value Y divisor (4 bytes)
+; 
+;   Return Value:
+;       sp+3 : the quotient (replaces X)
+;       sp+7 : the remainder (replaces Y)
+; 
+;   Flags Set
+;       flags are internal to function
+; 
+divide32:
+    ; first check values for 0
+    pushi 0
+    push4i 0
+    push4s (7+5)
+    jps compare32
+    pull4
+    lds 5 cpi 1 beq .divide_by_zero
+    push4s (3+5)
+    jps compare32
+    pull4
+    pull4
+    lds 1 pls cpi 1 beq .return_zero
+    ; check if divisor > dividend
+    pushi 0
+    push4s (3+1)
+    push4s (7+5)
+    jps compare32
+    pull4
+    pull4
+    lds 1 pls cpi 2 beq .divisor_too_large
+.start_division:
+    ; set up working stack:
+    ;   little endian
+    ;   0 : low word (4 bytes)  --> becomes quotient
+    ;   4 : high word (4 bytes) --> becomes remainder
+    ldi 0 sta .carry_bit        ; init carry bit
+    cpy4ai .working_mem+4, 0    ; init high word
+    cpy4as .working_mem+0, 3    ; init low word with dividend
+    ldi 32 sta .counter         ; init loop counter
+.div_loop:
+    ; shift working memory and add carry bit to the right side
+    jps .div_lsl64
+    lda .working_mem+0
+    ada .carry_bit
+    sta .working_mem+0
+    ldi 0 sta .carry_bit
+    ; determine if we can do subtraction
+    pushi 0                 ; compare results
+    push4s 7+1              ; divisor
+    push4a .working_mem+4   ; working value high word
+    jps compare32
+    lds 9 cpi 0 beq .div_loop_continue
+.div_loop_subtraction:
+    ; working value is equal to or larger than divsior
+    ; do the subtraction
+    jps subtract32
+    ; save subtraction results to high word and set carry bit
+    cpy4as .working_mem+4, 1
+    ldi 1 sta .carry_bit
+.div_loop_continue:
+    ; clear stack
+    pull4
+    pull4
+    pls
+    ; decrement counter and check for 0
+    deb .counter
+    lda .counter cpi 0 bne .div_loop
+.division_done:
+    ; at this point we have the remainder in the high word, save it
+    cpy4sa 7,.working_mem+4
+    ; and then we let shift one more time to get the quotient    
+    jps .div_lsl64
+    lda .working_mem+0
+    ada .carry_bit
+    sta .working_mem+0
+    cpy4sa 3,.working_mem+0
+    rts
+.divisor_too_large:
+    ; quotient = 0, remander = dividend
+    cpy4ss 7, 3
+    cpy4si 3, 0
+    rts
+.divide_by_zero:
+    ; for now, just return 0
+    pull4
+    pls
+    cpy4si 7, 0
+.return_zero:
+    cpy4si 3, 0
+    rts
+.working_mem: .zero 8
+.carry_bit: .byte 0
+.counter: .byte 0
+; .div_lsl64
+; 
+;   local method for shifting .working_mem left 1 bit
+.div_lsl64:
+    ldi BYTE1(.working_mem) sta .current_byte+1
+    ldi BYTE0(.working_mem) sta .current_byte
+    ldi 0 sta .shift_counter sta .last_shift_carry
+.loop:
+    ldi 0 sta .this_shift_carry
+    ldr .current_byte lsl str .current_byte
+    bcc .no_carry ldi 1 sta .this_shift_carry
+.no_carry:
+    lda .last_shift_carry adr .current_byte str .current_byte
+    lda .this_shift_carry sta .last_shift_carry
+    inw .current_byte inb .shift_counter
+    ldi 8 cpa .shift_counter bne .loop
+.done:
+    rts
+.last_shift_carry: .byte 0
+.this_shift_carry: .byte 0
+.current_byte: .2byte 0
+.shift_counter: .byte 0
+
+
+
+; add32
+;   adds Y value to X (X+Y)
+;
+;   Arguments
+;       sp+3 - value X, 4 byte value
+;       sp+7 - value Y, 4 byte value
+;
+;   Return Value
+;       sp+2 - replace the original 4 byte value with the sum
+;
+; 
+;   Flags Set
+;       Z : Not enough information
+;       N : Not enough information
+;       C : if carry to 33rd bit
+; 
+add32:
+    ; since interacting with the stack has an undefined impact
+    ; on the carry flags, we need to copy the values to local
+    ; variables first.
+    ; stack is big endian, save locally little endian
+    cpy4as .xval, 3
+    cpy4as .yval, 7
+    ; star subtractiosn with LSB
+    lda .xval+0 ada .yval+0 sta .xval+0
+    lda .xval+1 aca .yval+1 sta .xval+1
+    lda .xval+2 aca .yval+2 sta .xval+2
+    lda .xval+3 aca .yval+3 sta .xval+3
+    ; save results back to stack
+    cpy4sa 3, .xval
+    ; end return
+    rts
+.xval: .4byte 0
+.yval: .4byte 0
+
+
+; subtract32
+;   subtracts Y value from X (X-Y)
+;
+;   Arguments
+;       sp+3 - value X, 4 byte value
+;       sp+7 - value Y, 4 byte value
+;
+;   Return Value
+;       sp+3 - replace the original 4 byte value with the difference
+;
+; 
+subtract32:
+    ; since interacting with the stack has an undefined impact
+    ; on the carry flags, we need to copy the values to local
+    ; variables first.
+    ; stack is big endian, save locally little endian
+    cpy4as .xval, 3
+    cpy4as .yval, 7
+    ; star subtractiosn with LSB
+    lda .xval+0 sba .yval+0 sta .xval+0
+    lda .xval+1 sca .yval+1 sta .xval+1
+    lda .xval+2 sca .yval+2 sta .xval+2
+    lda .xval+3 sca .yval+3 sta .xval+3
+    ; save results back to stack
+    cpy4sa 3, .xval
+    ; end return
+    rts
+.xval: .4byte 0
+.yval: .4byte 0
+
