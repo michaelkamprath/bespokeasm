@@ -1,0 +1,161 @@
+
+
+; Prime Numbers for the Minimal UART CPU System
+; 
+;   Calculates and prints out all 32-bit prime numbers.
+;
+#require "slu4-mincpu-asm >= 1.5.0"
+
+BUFFER_SIZE = 32
+
+.org $8000
+
+init:
+    ldi 0xfe sta 0xffff         ; initialize stack pointer
+start:
+    cpy4ai _n_value,1
+.n_loop:
+    pushi 0
+    push4a _n_value
+    jps is_prime32
+    pull4
+    pls cpi 1 beq .print_is_prime
+    jpa .increment_n
+.print_is_prime:
+    push4a _n_value jps print_value32 pull4
+    push2i is_prime_str jps os_Print pull2
+.increment_n:
+    push4a _n_value
+    push4i 1
+    jps add32
+    cpy4as _n_value,1
+    pull4
+    pull4
+    jpa .n_loop
+
+_n_value: .4byte 0
+is_prime_str: .cstr " is prime!\n"
+is_not_prime_str: .cstr " is not prime\n"
+
+; print_value32
+;   prints the passed 4 byte value in decimal format
+; 
+;   Arguments:
+;       sp + 3 : 32-bit value to print (4 bytes) big endian
+; 
+print_value32:
+    pushi BUFFER_SIZE
+    push2i .buffer
+    push4s (3+3)
+    jps uint32_to_decimal_cstr
+    pull4
+    pull2
+    pls
+    push2i .buffer jps os_Print pull2
+    rts
+.buffer: .zero BUFFER_SIZE
+
+; is_prime32
+;   determines wither the passed uint32 is a prime
+; 
+;   Arguments
+;       sp+3 : the value to determine if prime (4 bytes)
+;       sp+7 : a place holder for return boolean
+; 
+;   returns
+;       sp+7 : 0 or 1 depending on whether N  is prime
+is_prime32:
+    ; first check for 2 or 3
+    lds 3 cpi 0 bne .modulo_two        ; check top byte of N for 0
+    lds 4 cpi 0 bne .modulo_two        ; check top byte of N for 0
+    lds 5 cpi 0 bne .modulo_two        ; check top byte of N for 0
+    lds 6 cpi 3 beq .is_prime          ; check N==3
+    cpi 2 beq .is_prime                ; check N==2
+    cpi 1 beq .is_not_prime            ; check N==1
+    cpi 0 beq .is_not_prime            ; check N==0
+.modulo_two:
+    lds 6 lsr bcc .is_not_prime        ; see if N's least signficant bit is even or odd
+.modulo_three:
+    pushi 0                            ; results placeholder for compare later
+    push4i 3                           ; place divisor on stack
+    push4s (3+5)                       ; place dividend on stack (from stack)
+    jps divide32
+    pull4
+    ; check if remainder is 0
+    push4i 0 jps compare32 pull4
+    pull4
+    pls cpi 1 beq .is_not_prime
+.loop_init:
+    cpy4ai .current_i_val,5
+.loop:
+    pushi 0         ; push placeholder on stack for later compare
+    push4a .current_i_val
+    push4a .current_i_val
+    jps multiply32
+    ; high 4 bytes of result should be 0 since we are only doing 32 bit N
+    lds 1 cpi 0 bne .iteration_loop_done
+    lds 2 cpi 0 bne .iteration_loop_done
+    lds 3 cpi 0 bne .iteration_loop_done
+    lds 4 cpi 0 bne .iteration_loop_done
+    pull4
+    ; now compare low 4 bytes of I*I result to N
+    push4s (3+5) jps compare32 pull4
+    pull4
+    ; if N < I*I, we are done
+    pls cpi 0 beq .loop_done_is_prime
+    ; now check various modulos. 
+    ; check N % I == 0
+    pushi 0         ; push placeholder on stack for later compare
+    push4a .current_i_val   ; I
+    push4s (3+5)            ; N
+    jps divide32
+    pull4                   ; quotient
+    push4i 0
+    jps compare32
+    pull4
+    pull4
+    pls cpi 1 beq .loop_done_is_not_prime
+    ; check N % (I+2) == 0
+    push4a .current_i_val   ; I
+    push4i 2
+    jps add32
+    cpy4as .temp_val, 1
+    pull4
+    pull4
+    pushi 0
+    push4a .temp_val
+    push4s (3+5)
+    jps divide32
+    pull4                   ; quotient
+    push4i 0
+    jps compare32
+    pull4                   ; zero
+    pull4                   ; remainder
+    pls cpi 1 beq .loop_done_is_not_prime
+    ; add 6 to I and loop
+    push4a .current_i_val
+    push4i 6
+    jps add32
+    cpy4as .current_i_val,1
+    pull4
+    pull4
+    jpa .loop
+.iteration_loop_done:
+    ; get rid of I*I stack
+    pull4
+    pull4
+    pls
+.loop_done_is_prime:
+.is_prime:
+    ldi 1 sts 7
+    rts
+.loop_done_is_not_prime:
+.is_not_prime:
+    ldi 0 sts 7
+    rts  
+.current_i_val: .4byte 0
+.temp_val: .4byte 0
+
+
+#include "mathlib.min-asm"
+#include "stringlib.min-asm"

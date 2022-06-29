@@ -78,7 +78,6 @@ predefined:
       value: 0xfec5
     - name: os_InpBuf
       value: 0xfec9
-
 instructions:
   nop:
     byte_code:
@@ -572,8 +571,9 @@ instructions:
         list:
           - absolute_address
 macros:
-  # All Push macros push LSB first to keep with Monimal CPU OS calling convention.
-  # This means multibyte numbers will be in big enfian arrangement on the stack
+  # All Push macros push LSB first to keep with Minimal CPU OS calling convention.
+  # This means multibyte numbers will be in big endian arrangement on the stack.
+  # RAM values are little endian.
   pushi:
     - operands:
         count: 1
@@ -716,6 +716,19 @@ macros:
         - "sta @ARG(0)+0"
         - "lds @ARG(1)+0"
         - "sta @ARG(0)+1"
+  cpy2sa:
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - immediate
+            - absolute_address
+      instructions:
+        # stack is big endian, memory is little endian
+        - "lda @ARG(1)+0"
+        - "sts @ARG(0)+1"
+        - "lda @ARG(1)+1"
+        - "sts @ARG(0)+0"
   cpy4as:
     - operands:
         count: 2

@@ -13,12 +13,32 @@ So the goal of this port to **BespokeASM** is to first support the basic instruc
 Carsten Heating thorough documents [the instruction set for the Minimal CPU in his user guide](https://docs.google.com/document/d/1c2ZHtLd1BBAwcBAjBZZJmCA3AXpbpv80dlAtsMYpuF4/edit?usp=sharing). All of the documented instructions in their original syntax are implemented in in this **BespokeASM** port. However, **BespokeASM** will be case insensitive when matching instruction mnemonics.
 
 ### Instruction Macros
-The following instruction macros have been added in this port:
+The following instruction macros have been added in the ISA confutation file for the Minimal CPU:
 
-***TBC***
+| Macros Instruction | Operand 1 | Operand 2 | Description|
+|:-:|:-:|:-:|:--|
+| `pushi` | immediate | - | Push onto stack immediate 1 byte value |
+| `pusha` | absolute address | - | Push onto stack 1 byte value at absolute address |
+| `pushr` | relative address | - | Push onto stack 1 byte value at relative address |
+| `push2i` | immediate | - | Push onto stack immediate 2 byte value |
+| `push2a` | absolute address | - | Push onto stack 2 byte value at absolute address |
+| `push2s` | stack offset | - | Push onto stack 2 byte value currently found at indicated stack offset |
+| `push4i` | immediate | - | Push onto stack immediate 4 byte value |
+| `push4a` | absolute address | - | Push onto stack 4 byte value at absolute address |
+| `push4s` | stack offset | - | Push onto stack 4 byte value currently found at indicated stack offset |
+| `pull2` | - | - | Pull 2 bytes off the stack |
+| `pull4` | - | - | Pull 4 bytes off the stack |
+| `cpy2as` | absolute address | stack offset | Copy 2 bytes of data sourced from indicated stack offset to memory starting at indicated absolute address. Convert from stack big endian ordering to RAM little endian ordering. |
+| `cpy2sa` | stack offset | absolute address | Copy 2 bytes of data sourced from absolute address to stack at indicated offset. Convert from RAM little endian to stack big endian ordering ordering. |
+| `cpy4as` | absolute address | stack offset | Copy 4 bytes of data sourced from indicated stack offset to memory starting at indicated absolute address. Convert from stack big endian ordering to RAM little endian ordering. |
+| `cpy4sa` | stack offset | absolute address | Copy 4 bytes of data sourced from absolute address to stack at indicated offset. Convert from RAM little endian to stack big endian ordering ordering. |
+| `cpy4ai` | absolute address | immediate | Copy 4 bytes of immediate value to memory starting at indicated absolute address. Preserves endian ordering. |
+| `cpy4si` | stack offset | immediate | Copy 4 bytes of immediate value to stack at indicated offset. Convert from RAM little endian to stack big endian ordering ordering. |
+| `cpy4ss` | stack offset | stack offset | Copy 4 bytes of data from stack starting at indicated offset (2nd operand) to another location in stack starting at indicated offset (1rst operand). Byte ordering is preserved. |
 
+The operand descriptions use the definitions provided by documentation for Minimal CPU.
 
-One important note here is that the calling convention that was designed for the Minimal CPU has multibyte values in the stack using big endian, and values stored in RAM are in little endian. The above macros account for this endian difference when moving data from RAM to the stack and vice versa.
+One important note here is that the calling convention that was designed for the Minimal CPU places multibyte values in the stack using big endian, and values stored in RAM are in little endian. This was defined in the way the operating system API functions are called. The above macros account for this endian difference when moving data from RAM to the stack and vice versa.
 
 ### Assembly Syntax
 **BespokeASM**'s syntax is close to the syntax that Carsten used for the Minimal CPU's assembly language. However, there are some differences:

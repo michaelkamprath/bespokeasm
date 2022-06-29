@@ -1,4 +1,4 @@
-
+#require "slu4-mincpu-asm >= 1.5.0"
 
 ; compare32
 ;   Compares two 32-bit values to determine equality
@@ -34,6 +34,69 @@ compare32:
 .flags: .byte 0
 
 
+; multiply32
+;   multiply 4 byte values X*Y, producing in a 8 byte results
+;
+; Arguments
+;   sp+3 - value X (multiplier) (4 bytes)
+;   sp+7 - value Y (multiplicand) (4 bytes)
+;
+; Return Value
+;   sp+3 - results (8 bytes)
+; 
+
+multiply32:
+    ; set counter for 32 bits
+    ldi 32 sta .counter
+    ; set up 8 byte results memory block
+    cpy4ai .working_mem+4,0     ; high word inialized to 0
+    cpy4as .working_mem,3       ; multiplier in low word
+.mult_loop:
+    ; check to see if LSb of working memory is 1
+    lda .working_mem+0 lsr bcc .continue
+    ; add high word of results to multiplicand
+    push4s 7
+    push4a .working_mem+4
+    jps add32
+    cpy4as .working_mem+4,1
+    pull4
+    pull4
+.continue:
+    ; shift results right one.
+    jps .div_lsl64
+    ; decrement counter and stop if 0
+    deb .counter ldi 0 cpa .counter bne .mult_loop
+.end:
+    cpy4sa 3,.working_mem+4
+    cpy4sa 7,.working_mem+0
+    rts
+.counter: .byte 0
+.working_mem: .zero 8
+; .mult_lsr64
+; 
+;   local method for shifting .working_mem right 1 bit
+.div_lsl64:
+    ldi BYTE1(.working_mem+7) sta .current_byte+1
+    ldi BYTE0(.working_mem+7) sta .current_byte
+    ldi 0 sta .shift_counter sta .last_shift_carry
+.loop:
+    ldi 0 sta .this_shift_carry
+    ldr .current_byte lsr str .current_byte
+    bcc .no_carry ldi %10000000 sta .this_shift_carry
+.no_carry:
+    lda .last_shift_carry adr .current_byte str .current_byte
+    lda .this_shift_carry sta .last_shift_carry
+    dew .current_byte inb .shift_counter
+    ldi 8 cpa .shift_counter bne .loop
+.done:
+    rts
+.last_shift_carry: .byte 0
+.this_shift_carry: .byte 0
+.current_byte: .2byte 0
+.shift_counter: .byte 0
+
+
+
 ; divide32
 ;   Divides X by Y
 ; 
@@ -44,9 +107,6 @@ compare32:
 ;   Return Value:
 ;       sp+3 : the quotient (replaces X)
 ;       sp+7 : the remainder (replaces Y)
-; 
-;   Flags Set
-;       flags are internal to function
 ; 
 divide32:
     ; first check values for 0
@@ -109,7 +169,7 @@ divide32:
 .division_done:
     ; at this point we have the remainder in the high word, save it
     cpy4sa 7,.working_mem+4
-    ; and then we let shift one more time to get the quotient    
+    ; and then we left shift one more time to get the quotient    
     jps .div_lsl64
     lda .working_mem+0
     ada .carry_bit
@@ -166,12 +226,6 @@ divide32:
 ;
 ;   Return Value
 ;       sp+2 - replace the original 4 byte value with the sum
-;
-; 
-;   Flags Set
-;       Z : Not enough information
-;       N : Not enough information
-;       C : if carry to 33rd bit
 ; 
 add32:
     ; since interacting with the stack has an undefined impact
