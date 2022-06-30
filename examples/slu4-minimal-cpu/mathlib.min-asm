@@ -63,7 +63,7 @@ multiply32:
     pull4
 .continue:
     ; shift results right one.
-    jps .div_lsl64
+    jps .mult_lsr64
     ; decrement counter and stop if 0
     deb .counter ldi 0 cpa .counter bne .mult_loop
 .end:
@@ -75,7 +75,7 @@ multiply32:
 ; .mult_lsr64
 ; 
 ;   local method for shifting .working_mem right 1 bit
-.div_lsl64:
+.mult_lsr64:
     ldi BYTE1(.working_mem+7) sta .current_byte+1
     ldi BYTE0(.working_mem+7) sta .current_byte
     ldi 0 sta .shift_counter sta .last_shift_carry
