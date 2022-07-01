@@ -36,7 +36,7 @@ The following instruction macros have been added in the ISA confutation file for
 | `cpy4si` | stack offset | immediate | Copy 4 bytes of immediate value to stack at indicated offset. Convert from RAM little endian to stack big endian ordering ordering. |
 | `cpy4ss` | stack offset | stack offset | Copy 4 bytes of data from stack starting at indicated offset (2nd operand) to another location in stack starting at indicated offset (1rst operand). Byte ordering is preserved. |
 
-The operand descriptions use the definitions provided by documentation for Minimal CPU.
+The operand descriptions use the definitions provided by documentation for Minimal CPU. You should assume the accumulator (register `A`) is not preserved across any of these macros.
 
 One important note here is that the calling convention that was designed for the Minimal CPU places multibyte values in the stack using big endian, and values stored in RAM are in little endian. This was defined in the way the operating system API functions are called. The above macros account for this endian difference when moving data from RAM to the stack and vice versa.
 
