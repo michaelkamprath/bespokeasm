@@ -1,7 +1,7 @@
 
 
 ; Prime Numbers for the Minimal UART CPU System
-; 
+;
 ;   Calculates and prints out all 32-bit prime numbers.
 ;
 #require "slu4-mincpu-asm >= 1.5.0"
@@ -39,10 +39,10 @@ is_not_prime_str: .cstr " is not prime\n"
 
 ; print_value32
 ;   prints the passed 4 byte value in decimal format
-; 
+;
 ;   Arguments:
 ;       sp + 3 : 32-bit value to print (4 bytes) big endian
-; 
+;
 print_value32:
     pushi BUFFER_SIZE
     push2i .buffer
@@ -57,11 +57,11 @@ print_value32:
 
 ; is_prime32
 ;   determines wither the passed uint32 is a prime
-; 
+;
 ;   Arguments
 ;       sp+3 : the value to determine if prime (4 bytes)
 ;       sp+7 : a place holder for return boolean
-; 
+;
 ;   returns
 ;       sp+7 : 0 or 1 depending on whether N  is prime
 is_prime32:
@@ -103,7 +103,7 @@ is_prime32:
     pull4
     ; if N < I*I, we are done
     pls cpi 0 beq .loop_done_is_prime
-    ; now check various modulos. 
+    ; now check various modulos.
     ; check N % I == 0
     pushi 0         ; push placeholder on stack for later compare
     push4a .current_i_val   ; I
@@ -152,7 +152,7 @@ is_prime32:
 .loop_done_is_not_prime:
 .is_not_prime:
     ldi 0 sts 7
-    rts  
+    rts
 .current_i_val: .4byte 0
 .temp_val: .4byte 0
 

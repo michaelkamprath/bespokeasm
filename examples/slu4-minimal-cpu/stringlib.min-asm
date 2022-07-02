@@ -1,20 +1,20 @@
 #require "slu4-mincpu-asm >= 1.5.0"
 
 ; cstr_reverse
-;   Reverses the ordering of all characters in the cstr. 
-; 
+;   Reverses the ordering of all characters in the cstr.
+;
 ;   Arguments
 ;       sp+3 : buffer address to cstr. Should be mutable, and less than 255 characters.
-; 
+;
 ;   Returns
 ;       sp+3 : The contents of the buffer are reverse.
-; 
-; 
+;
+;
 cstr_reverse:
     lds 3+0 sta .buffer_ptr1+1
     lds 3+1 sta .buffer_ptr1+0
     lda .buffer_ptr1+0 sta .buffer_ptr2+0
-    lda .buffer_ptr1+1 sta .buffer_ptr2+1   
+    lda .buffer_ptr1+1 sta .buffer_ptr2+1
     ldi 0 sta .counter
 .push_loop:
     ldr .buffer_ptr1
@@ -23,7 +23,7 @@ cstr_reverse:
     inb .counter
     inw .buffer_ptr1
     jpa .push_loop
-.init_pop_loop: 
+.init_pop_loop:
 .pop_loop:
     lda .counter cpi 0 beq .end
     pls str .buffer_ptr2
@@ -37,7 +37,7 @@ cstr_reverse:
 .counter: .byte 0
 
 ; uint32_to_decimal_cstr
-; 
+;
 ;   converts the passed uint64 value to a decimal formatted cstr.
 ;
 ;   Arguments
@@ -49,7 +49,7 @@ cstr_reverse:
 ;       writes binary string to buffer. Will reset all other values in buffer to null (0)
 ;       updates sp+9 top the character length of the decimal string
 ;       resets sp+7 to the buffer address that the null char was written to
-; 
+;
 
 uint32_to_decimal_cstr:
     ; set up working stack:
@@ -57,7 +57,7 @@ uint32_to_decimal_cstr:
     ;   0 : low word (4 bytes)  --> value
     ;   4 : high word (4 bytes) --> becomes remainder
     ; init carry bit
-    ldi 0 sta .carry_bit        
+    ldi 0 sta .carry_bit
     ; init working memory
     cpy4as .working_mem,3
     ldi 0 sta .working_mem+4
@@ -115,7 +115,7 @@ uint32_to_decimal_cstr:
     lds 9 cpa .digit_counter beq .err_buffer_size
     inw .buffer_ptr
     ; set the null terminating character
-    ldi 0 str .buffer_ptr 
+    ldi 0 str .buffer_ptr
     ; finally need to reverse digits
     push2s 7        ; push buffer address on stack
     jps cstr_reverse
@@ -131,7 +131,7 @@ uint32_to_decimal_cstr:
 .digit_counter: .byte 0
 .buffer_ptr: .2byte 0
 ; .div_lsl40
-; 
+;
 ;   local method for shifting .working_mem left 1 bit
 .div_lsl40:
     ldi BYTE1(.working_mem) sta .current_byte+1
