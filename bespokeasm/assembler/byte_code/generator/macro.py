@@ -70,7 +70,7 @@ class MacroBytecodeGenerator:
 
         # second, generate list of instruction strings and comments
         if 'instructions' not in variant._variant_config:
-            return None
+            sys.exit(f'ERROR - macro "{mnemonic}" does not have any instructions configured.')
 
         instruction_lines: list[str] = []
         for step_num, instruction_format in enumerate(variant._variant_config['instructions']):
@@ -95,13 +95,13 @@ class MacroBytecodeGenerator:
                         instruction_str = instruction_str.replace(op_str, op.operand_string)
 
             if '@ARG' in instruction_str:
-                # ensure all @ARGs ar handled
+                # ensure all @ARGs are handled
                 sys.exit(f'ERROR: {line_id} - Macro "{variant.mnemonic}" has unrecognized @ARG on step {step_num}')
             if '@REG' in instruction_str:
-                # ensure all @REGs ar handled
+                # ensure all @REGs are handled
                 sys.exit(f'ERROR: {line_id} - Macro "{variant.mnemonic}" has unrecognized @REG on step {step_num}')
             if '@OP' in instruction_str:
-                # ensure all @OPs ar handled
+                # ensure all @OPs are handled
                 sys.exit(f'ERROR: {line_id} - Macro "{variant.mnemonic}" has unrecognized @OP on step {step_num}')
 
             instruction_lines.append(instruction_str)

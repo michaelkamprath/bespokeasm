@@ -266,6 +266,24 @@ macros:
       instructions:
         - "mov [@ARG(0)],[@ARG(1)]"
         - "mov [@ARG(0) + 1],[@ARG(1) + 1]"
+    - operands:
+        count: 2
+        specific_operands:
+          iaddr1_iaddr2:
+            list:
+              iaddr1:
+                type: indirect_numeric
+                argument:
+                  size: 16
+                  byte_align: true
+              iaddr2:
+                type: numeric
+                argument:
+                  size: 16
+                  byte_align: true
+      instructions:
+        - "mov [@ARG(0)],BYTE0(@ARG(1))"
+        - "mov [@ARG(0) + 1],BYTE1(@ARG(1))"
   add16:
     - operands:
         count: 2

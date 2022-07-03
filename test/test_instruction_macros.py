@@ -207,3 +207,18 @@ class TestInstructionMacros(unittest.TestCase):
             ],
             'instruction bytes should match'
         )
+
+        ins6 = InstructionLine.factory(line_id, 'mov2 [$8008],$1234', 'some comment!', isa_model)
+        ins6.set_start_address(1212)
+        self.assertIsInstance(ins6, InstructionLine)
+        self.assertEqual(ins6.byte_size, 8, 'has 8 bytes')
+        ins6.label_scope = TestInstructionMacros.label_values
+        ins6.generate_bytes()
+        self.assertEqual(
+            list(ins6.get_bytes()),
+            [
+                0b01110111, 0x08, 0x80, 0x34,
+                0b01110111, 0x09, 0x80, 0x12,
+            ],
+            'instruction bytes should match'
+        )
