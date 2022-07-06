@@ -76,25 +76,15 @@ multiply32:
 ;
 ;   local method for shifting .working_mem right 1 bit
 .mult_lsr64:
-    ldi BYTE1(.working_mem+7) sta .current_byte+1
-    ldi BYTE0(.working_mem+7) sta .current_byte
-    ldi 0 sta .shift_counter sta .last_shift_carry
-.loop:
-    ldi 0 sta .this_shift_carry
-    ldr .current_byte lsr str .current_byte
-    bcc .no_carry ldi %10000000 sta .this_shift_carry
-.no_carry:
-    lda .last_shift_carry adr .current_byte str .current_byte
-    lda .this_shift_carry sta .last_shift_carry
-    dew .current_byte inb .shift_counter
-    ldi 8 cpa .shift_counter bne .loop
-.done:
+    lda .working_mem+7 lsr sta .working_mem+7
+    lda .working_mem+6 ror sta .working_mem+6
+    lda .working_mem+5 ror sta .working_mem+5
+    lda .working_mem+4 ror sta .working_mem+4
+    lda .working_mem+3 ror sta .working_mem+3
+    lda .working_mem+2 ror sta .working_mem+2
+    lda .working_mem+1 ror sta .working_mem+1
+    lda .working_mem+0 ror sta .working_mem+0
     rts
-.last_shift_carry: .byte 0
-.this_shift_carry: .byte 0
-.current_byte: .2byte 0
-.shift_counter: .byte 0
-
 
 
 ; divide32
@@ -196,24 +186,15 @@ divide32:
 ;
 ;   local method for shifting .working_mem left 1 bit
 .div_lsl64:
-    ldi BYTE1(.working_mem) sta .current_byte+1
-    ldi BYTE0(.working_mem) sta .current_byte
-    ldi 0 sta .shift_counter sta .last_shift_carry
-.loop:
-    ldi 0 sta .this_shift_carry
-    ldr .current_byte lsl str .current_byte
-    bcc .no_carry ldi 1 sta .this_shift_carry
-.no_carry:
-    lda .last_shift_carry adr .current_byte str .current_byte
-    lda .this_shift_carry sta .last_shift_carry
-    inw .current_byte inb .shift_counter
-    ldi 8 cpa .shift_counter bne .loop
-.done:
+    lda .working_mem+0 lsl sta .working_mem+0
+    lda .working_mem+1 rol sta .working_mem+1
+    lda .working_mem+2 rol sta .working_mem+2
+    lda .working_mem+3 rol sta .working_mem+3
+    lda .working_mem+4 rol sta .working_mem+4
+    lda .working_mem+5 rol sta .working_mem+5
+    lda .working_mem+6 rol sta .working_mem+6
+    lda .working_mem+7 rol sta .working_mem+7
     rts
-.last_shift_carry: .byte 0
-.this_shift_carry: .byte 0
-.current_byte: .2byte 0
-.shift_counter: .byte 0
 
 
 
