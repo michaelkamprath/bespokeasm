@@ -318,3 +318,24 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertEqual(t1.byte_size, 2, 'has 2 bytes')
         t1.generate_bytes()
         self.assertEqual(list(t1.get_bytes()), [0b11010101, 17], 'instruction byte should match')
+
+    def test_operand_order(self):
+        with pkg_resources.path(config_files, 'test_instruction_operands.yaml') as fp:
+            isa_model = AssemblerModel(str(fp), 0)
+        lineid = LineIdentifier(42, 'test_operand_order')
+
+        t1 = InstructionLine.factory(lineid, 'ld a,b,c', 'comment', isa_model)
+        t1.set_start_address(1)
+        t1.label_scope = TestInstructionParsing.label_values
+        self.assertIsInstance(t1, InstructionLine)
+        self.assertEqual(t1.byte_size,3, 'has 3 bytes')
+        t1.generate_bytes()
+        self.assertEqual(list(t1.get_bytes()), [0x80, 0x12, 0x30], 'instruction byte should match')
+
+        t2 = InstructionLine.factory(lineid, 'ed aa,bb,cc', 'comment', isa_model)
+        t2.set_start_address(1)
+        t2.label_scope = TestInstructionParsing.label_values
+        self.assertIsInstance(t2, InstructionLine)
+        self.assertEqual(t2.byte_size,3, 'has 3 bytes')
+        t2.generate_bytes()
+        self.assertEqual(list(t2.get_bytes()), [0x88, 0x32, 0x10], 'instruction byte should match')

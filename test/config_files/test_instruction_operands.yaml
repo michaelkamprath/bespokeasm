@@ -1,0 +1,68 @@
+description: Test Multiple Instruction Operands
+general :
+  address_size: 16
+  endian: little
+  identifier:
+    name: bespokeasm-test
+    version: "0.2.0"
+  registers:
+    - a
+    - b
+    - c
+  min_version: "0.2.3"
+operand_sets:
+  register:
+    operand_values:
+      register_a:
+        type: register
+        register: a
+        bytecode:
+          value: 1
+          size: 4
+      register_b:
+        type: register
+        register: b
+        bytecode:
+          value: 2
+          size: 4
+      register_c:
+        type: register
+        register: c
+        bytecode:
+          value: 3
+          size: 4
+  enums:
+    operand_values:
+      register_enum:
+        type: enumeration
+        argument:
+          size: 4
+          byte_align: false
+          value_dict:
+            aa: 1
+            bb: 2
+            cc: 3
+instructions:
+  ld:
+    byte_code:
+      value: 128
+      size: 8
+    operands:
+      count: 3
+      operand_sets:
+        list:
+          - register
+          - register
+          - register
+  ed:
+    byte_code:
+      value: 136
+      size: 8
+    operands:
+      count: 3
+      operand_sets:
+        reverse_argument_order: true
+        list:
+          - enums
+          - enums
+          - enums
