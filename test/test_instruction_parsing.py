@@ -339,3 +339,11 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertEqual(t2.byte_size,3, 'has 3 bytes')
         t2.generate_bytes()
         self.assertEqual(list(t2.get_bytes()), [0x88, 0x32, 0x10], 'instruction byte should match')
+
+        t3 = InstructionLine.factory(lineid, 'mv a,b,c', 'comment', isa_model)
+        t3.set_start_address(1)
+        t3.label_scope = TestInstructionParsing.label_values
+        self.assertIsInstance(t3, InstructionLine)
+        self.assertEqual(t3.byte_size,3, 'has 3 bytes')
+        t3.generate_bytes()
+        self.assertEqual(list(t3.get_bytes()), [0x81, 0x32, 0x10], 'instruction byte should match')

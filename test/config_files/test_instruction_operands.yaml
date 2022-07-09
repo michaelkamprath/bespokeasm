@@ -54,6 +54,18 @@ instructions:
           - register
           - register
           - register
+  mv:
+    byte_code:
+      value: 129
+      size: 8
+    operands:
+      count: 3
+      operand_sets:
+        reverse_bytecode_order: true
+        list:
+          - register
+          - register
+          - register
   ed:
     byte_code:
       value: 136

@@ -40,10 +40,13 @@ class OperandSetsModel:
                 self._operand_sets.append(opset)
             else:
                 sys.exit(f'ERROR: instuction set configuration file makes reference to unknow operand set "{k}"')
+
     def __repr__(self) -> str:
         return str(self)
+
     def __str__(self) -> str:
         return f'OperandSetsModel<{str(self._operand_sets)}>'
+
     @property
     def reverse_argument_order(self) -> bool:
         '''Determines whether the order that the instruction's argument values
@@ -51,6 +54,14 @@ class OperandSetsModel:
         (false) or reversed (true)
         '''
         return self._config.get('reverse_argument_order', False)
+
+    @property
+    def reverse_bytecode_order(self) -> bool:
+        '''Determines whether the order that the instruction operand's byte code values
+        emitted in machine code should be in the same order as the operands
+        (false) or reversed (true)
+        '''
+        return self._config.get('reverse_bytecode_order', False)
 
     @property
     def operand_count(self) -> int:
@@ -83,7 +94,7 @@ class OperandSetsModel:
                 # matched a disallowed pair, so no match reported
                 return None
 
-        return MatchedOperandSet(matched_operands, self.reverse_argument_order)
+        return MatchedOperandSet(matched_operands, self.reverse_argument_order, self.reverse_bytecode_order)
 
 class SpecificOperandsModel:
     class SpecificOperandConfig:
@@ -96,9 +107,11 @@ class SpecificOperandsModel:
 
         def __repr__(self) -> str:
             return str(self)
+
         def __str__(self) -> str:
             operand_str = ','.join([str(op) for op in self._operands])
             return f'SpecificOperandConfig<{operand_str}>'
+
         def __getitem__(self, key: int) -> Operand:
             '''Returns the i-th operand in this specific configuration'''
             return self._operands[key]
@@ -112,6 +125,14 @@ class SpecificOperandsModel:
             return self._config.get('reverse_argument_order', False)
 
         @property
+        def reverse_bytecode_order(self) -> bool:
+            '''Determines whether the order that the instruction operand's byte code values
+            emitted in machine code should be in the same order as the operands
+            (false) or reversed (true)
+            '''
+            return self._config.get('reverse_bytecode_order', False)
+
+        @property
         def operand_count(self) -> int:
             return len(self._operands)
 
@@ -123,6 +144,7 @@ class SpecificOperandsModel:
         ]
     def __repr__(self) -> str:
         return str(self)
+
     def __str__(self) -> str:
         names = []
         for opconfig in self._specific_operands:
@@ -167,7 +189,11 @@ class SpecificOperandsModel:
             if (len(operands) + null_operand_count !=  target_operand_count) or (target_operand_count != len(matched_operands)):
                 matched_operands = []
                 continue
-            matched_set = MatchedOperandSet(matched_operands, configured_operands.reverse_argument_order)
+            matched_set = MatchedOperandSet(
+                                matched_operands,
+                                configured_operands.reverse_argument_order,
+                                configured_operands.reverse_bytecode_order
+                            )
             return matched_set
         return None
 
@@ -247,9 +273,10 @@ class OperandParser:
         return None
 
 class MatchedOperandSet:
-    def __init__(self, operands: list[ParsedOperand], reverse_arg_order: bool) -> None:
+    def __init__(self, operands: list[ParsedOperand], reverse_arg_order: bool, reverse_op_bytecode_order: bool) -> None:
         self._operands = operands
         self._reverse_arg_order = reverse_arg_order
+        self._reverse_op_bytecode_order = reverse_op_bytecode_order
 
     def __repr__(self) -> str:
         return str(self)
@@ -263,13 +290,21 @@ class MatchedOperandSet:
 
     def generate_byte_code(self, base_bytecode: ByteCodePart, base_bytecode_suffix: ByteCodePart) -> list[ByteCodePart]:
         machine_code: list[ByteCodePart] = [base_bytecode]
+        suffix_op_bytecode: list[ByteCodePart] = []
+        prefix_op_bytecode: list[ByteCodePart] = []
         # first add bytecode
         for op in self._operands:
             if op.byte_code is not None:
                 if op.operand.bytecode_position == OperandBytecodePositionType.SUFFIX:
-                    machine_code.append(op.byte_code)
+                    suffix_op_bytecode.append(op.byte_code)
                 elif op.operand.bytecode_position == OperandBytecodePositionType.PREFIX:
-                    machine_code.insert(0, op.byte_code)
+                    prefix_op_bytecode.insert(0, op.byte_code)
+
+        if self._reverse_op_bytecode_order:
+            suffix_op_bytecode.reverse()
+            prefix_op_bytecode.reverse()
+        machine_code = prefix_op_bytecode + machine_code + suffix_op_bytecode
+
         if base_bytecode_suffix is not None:
             machine_code.append(base_bytecode_suffix)
         # now add arguments
