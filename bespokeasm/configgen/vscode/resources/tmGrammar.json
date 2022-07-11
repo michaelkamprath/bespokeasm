@@ -27,8 +27,8 @@
                 { "include": "#numeric-values" },
                 { "include": "#operators" },
                 { "include": "#expressions" },
-                { "include": "#indirect-addressing" },
                 { "include": "#deferred-addressing"},
+                { "include": "#indirect-addressing" },
                 { "include": "#operands_variables" },
                 {
                     "name": "punctuation.separator",
@@ -130,8 +130,8 @@
                 { "include": "#compiler_labels" },
                 { "include": "#numeric-values" },
                 { "include": "#expressions" },
-                { "include": "#indirect-addressing" },
                 { "include": "#deferred-addressing" },
+                { "include": "#indirect-addressing" },
                 { "include": "#operators" },
                 { "include": "#operands_variables" }
             ],
@@ -152,8 +152,8 @@
                 { "include": "#compiler_labels" },
                 { "include": "#numeric-values" },
                 { "include": "#expressions" },
-                { "include": "#indirect-addressing" },
                 { "include": "#deferred-addressing" },
+                { "include": "#indirect-addressing" },
                 { "include": "#operators" },
                 { "include": "#operands_variables" }
             ],
