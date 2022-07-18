@@ -38,10 +38,10 @@ class AssembledInstruction:
     def parts(self):
         return self._parts
 
-    def get_bytes(self, label_scope: LabelScope) -> bytearray:
+    def get_bytes(self, label_scope: LabelScope, instruction_address: int, instruction_size: int) -> bytearray:
         packed_bits = PackedBits()
         for p in self._parts:
-            value = p.get_value(label_scope)
+            value = p.get_value(label_scope, instruction_address, instruction_size)
             if isinstance(value, str):
                 sys.exit(f'ERROR - assembled instruction "{self}" had a part {p} that did not resolve to an int, got: {value}')
             elif value is None:

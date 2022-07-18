@@ -48,9 +48,9 @@ class ByteCodePart:
     def instruction_string(self) -> str:
         sys.exit(f'ERROR: INTERNAL - fetching ByteCodePart instruction string unimplemented for: {self}')
 
-    def get_value(self, label_scope: LabelScope) -> int:
+    def get_value(self, label_scope: LabelScope, instruction_address: int, instruction_size: int) -> int:
         # this should be overridden
-        return None
+        raise NotImplementedError
 
     def contains_register_labels(self, register_labels: set[str]) -> bool:
         return False
@@ -68,7 +68,7 @@ class NumericByteCodePart(ByteCodePart):
     def __str__(self) -> str:
         return f'NumericByteCodePart<value={self._value},size={self.value_size}>'
 
-    def get_value(self, label_scope: LabelScope) -> int:
+    def get_value(self, label_scope: LabelScope, instruction_address: int, instruction_size: int) -> int:
         return self._value
 
 
@@ -85,7 +85,7 @@ class ExpressionByteCodePart(ByteCodePart):
     def __str__(self) -> str:
         return f'ExpressionByteCodePart<expression="{self._expression}",size={self.value_size}>'
 
-    def get_value(self, label_scope: LabelScope) -> int:
+    def get_value(self, label_scope: LabelScope, instruction_address: int, instruction_size: int) -> int:
         value = self._parsed_expression.get_value(label_scope, self.line_id)
         if isinstance(value, str):
             sys.exit(f'ERROR: {self.line_id} - expression "{self._expression}" did not resolve to an int, got: {value}')
@@ -113,8 +113,8 @@ class ExpressionByteCodePartWithValidation(ExpressionByteCodePart):
     def __str__(self) -> str:
         return f'ExpressionByteCodePartWithValidation<expression="{self._expression}",max={self._max},min={self._min}>'
 
-    def get_value(self, label_scope: LabelScope) -> int:
-        value = super().get_value(label_scope)
+    def get_value(self, label_scope: LabelScope, instruction_address: int, instruction_size: int) -> int:
+        value = super().get_value(label_scope, instruction_address, instruction_size)
         if self._max is not None and value > self._max:
             sys.exit(f'ERROR: {self.line_id} - operand value of {value} exceeds maximun allowed of {self._max}')
         if self._min is not None and value < self._min:
@@ -138,8 +138,8 @@ class ExpressionEnumerationByteCodePart(ExpressionByteCodePart):
     def __str__(self) -> str:
         return f'ExpressionEnumerationByteCodePart<expression="{self._expression}",value_dict={self._value_dict}>'
 
-    def get_value(self, label_scope: LabelScope) -> int:
-        value = super().get_value(label_scope)
+    def get_value(self, label_scope: LabelScope, instruction_address: int, instruction_size: int) -> int:
+        value = super().get_value(label_scope, instruction_address, instruction_size)
         if value not in self._value_dict:
             sys.exit(
                 f'ERROR: {self.line_id} - numeric expression value of {value} is '
@@ -156,10 +156,19 @@ class CompositeByteCodePart(ByteCodePart):
         super().__init__(total_size, byte_align, endian, line_id)
         self._parts_list = byte_code_parts
 
-    def get_value(self, label_scope: LabelScope) -> int:
+    def get_value(self, label_scope: LabelScope, instruction_address: int, instruction_size: int) -> int:
         bits = PackedBits()
         for p in self._parts_list:
-            bits.append_bits(p.get_value(label_scope), p.value_size, False, self.endian)
+            bits.append_bits(
+                p.get_value(
+                    label_scope,
+                    instruction_address,
+                    instruction_size,
+                ),
+                p.value_size,
+                False,
+                self.endian,
+            )
         value = int.from_bytes(bits.get_bytes(), self.endian)
         if self.value_size % 8 != 0:
             shift_count = 8 - (self.value_size % 8)

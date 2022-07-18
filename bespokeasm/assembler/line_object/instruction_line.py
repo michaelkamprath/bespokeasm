@@ -62,4 +62,4 @@ class InstructionLine(LineWithBytes):
 
     def generate_bytes(self) -> bytearray:
         """Finalize the bytes for this line with the label assignemnts"""
-        self._bytes.extend(self._assembled_instruction.get_bytes(self.label_scope))
+        self._bytes.extend(self._assembled_instruction.get_bytes(self.label_scope, self.address, self.byte_size))

@@ -11,13 +11,14 @@ class OperandType(enum.Enum):
     UNKNOWN = -1
     EMPTY = 1
     NUMERIC = 8
-    NUMERIC_BYTECODE = 9
+    NUMERIC_BYTECODE = 10
     REGISTER = 7
     DICTIONARY_KEY = 6
     INDIRECT_REGISTER = 2
     INDIRECT_INDEXED_REGISTER = 3
     INDIRECT_NUMERIC = 4
     DEFERRED_NUMERIC = 5
+    RELATIVE_ADDRESS = 9
 
 
 class OperandBytecodePositionType(enum.Enum):
@@ -36,6 +37,10 @@ class Operand:
 
     def __str__(self):
         return f'Operand<{self.id}>'
+
+    @property
+    def config(self) -> dict:
+        return self._config
 
     @property
     def id(self) -> str:

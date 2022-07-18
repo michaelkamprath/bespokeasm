@@ -23,6 +23,7 @@ class TestInstructionParsing(unittest.TestCase):
         global_scope.set_label_value('the_two', 2, 3)
         local_scope = LabelScope(LabelScopeType.LOCAL, global_scope, 'TestInstructionParsing')
         local_scope.set_label_value('.local_var', 10, 3)
+        local_scope.set_label_value('.loop', 0x8020, 3)
         cls.label_values = local_scope
 
     def setUp(self):
@@ -306,6 +307,12 @@ class TestInstructionParsing(unittest.TestCase):
         t1.generate_bytes()
         self.assertEqual(list(t1.get_bytes()), [0b11010101, 17], 'instruction byte should match')
 
+        # no addressing punction for numeric expression operands
+        with self.assertRaises(SystemExit, msg='there should be no addressing punctuation in numeric expression operands'):
+            t2 = InstructionLine.factory(lineid, 'add [.local_var+7]', 'comment', isa_model)
+        with self.assertRaises(SystemExit, msg='there should be no addressing punctuation in numeric expression operands'):
+            t3 = InstructionLine.factory(lineid, 'add {.local_var+7}', 'comment', isa_model)
+
     def test_case_insentive_instructions(self):
         with pkg_resources.path(config_files, 'test_operand_features.yaml') as fp:
             isa_model = AssemblerModel(str(fp), 0)
@@ -347,3 +354,53 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertEqual(t3.byte_size,3, 'has 3 bytes')
         t3.generate_bytes()
         self.assertEqual(list(t3.get_bytes()), [0x81, 0x32, 0x10], 'instruction byte should match')
+
+    def test_relative_address_operand(self):
+        with pkg_resources.path(config_files, 'test_instruction_operands.yaml') as fp:
+            isa_model = AssemblerModel(str(fp), 0)
+        lineid = LineIdentifier(66, 'test_relative_address_operand')
+
+        t1 = InstructionLine.factory(lineid, 'jmp .loop', 'comment', isa_model)
+        t1.set_start_address(0x8000)
+        t1.label_scope = TestInstructionParsing.label_values
+        self.assertIsInstance(t1, InstructionLine)
+        self.assertEqual(t1.byte_size,3, 'has 3 bytes')
+        t1.generate_bytes()
+        self.assertEqual(list(t1.get_bytes()), [0xE5, 0x20, 0x80], 'instruction byte should match')
+
+        t2 = InstructionLine.factory(lineid, 'jmp {.loop}', 'comment', isa_model)
+        t2.set_start_address(0x8000)
+        t2.label_scope = TestInstructionParsing.label_values
+        self.assertIsInstance(t2, InstructionLine)
+        self.assertEqual(t2.byte_size,2, 'has 2 bytes')
+        t2.generate_bytes()
+        self.assertEqual(list(t2.get_bytes()), [0xE6, 0x20], 'instruction byte should match')
+
+        t3 = InstructionLine.factory(lineid, 'jmpr .loop', 'comment', isa_model)
+        t3.set_start_address(0x8000)
+        t3.label_scope = TestInstructionParsing.label_values
+        self.assertIsInstance(t3, InstructionLine)
+        self.assertEqual(t3.byte_size,2, 'has 2 bytes')
+        t3.generate_bytes()
+        self.assertEqual(list(t3.get_bytes()), [0xEE, 0x20], 'instruction byte should match')
+
+        t4 = InstructionLine.factory(lineid, 'jmpre .loop', 'comment', isa_model)
+        t4.set_start_address(0x8000)
+        t4.label_scope = TestInstructionParsing.label_values
+        self.assertIsInstance(t4, InstructionLine)
+        self.assertEqual(t4.byte_size,2, 'has 2 bytes')
+        t4.generate_bytes()
+        self.assertEqual(list(t4.get_bytes()), [0xEF, 0x1E], 'instruction byte should match')
+
+        # test offsets that are too large or too small
+        with self.assertRaises(SystemExit, msg='offset out of range'):
+            bt1 = InstructionLine.factory(lineid, 'jmp {.loop}', 'comment', isa_model)
+            bt1.set_start_address(0x7000)
+            bt1.label_scope = TestInstructionParsing.label_values
+            bt1.generate_bytes()
+
+        with self.assertRaises(SystemExit, msg='offset out of range'):
+            bt2 = InstructionLine.factory(lineid, 'jmp {.loop}', 'comment', isa_model)
+            bt2.set_start_address(0x9000)
+            bt2.label_scope = TestInstructionParsing.label_values
+            bt2.generate_bytes()

@@ -1,3 +1,5 @@
+import re
+
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.byte_code.parts import NumericByteCodePart, ExpressionByteCodePart
 from bespokeasm.assembler.model.operand import OperandWithArgument, OperandType, ParsedOperand
@@ -19,8 +21,9 @@ class NumericExpressionOperand(OperandWithArgument):
         return r'(?:[\$\%\w\(\)\+\-\s]*[\w\)])'
 
     def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> ParsedOperand:
-        # do not match if expression contains square bracks
-        if "[" in operand or "]" in operand:
+        # do not match if expression contains square brack or curly braces
+        punctuation_match = re.search(r'[\[\]\{\}]+', operand)
+        if punctuation_match is not None:
             return None
         bytecode_part = NumericByteCodePart(
             self.bytecode_value,
