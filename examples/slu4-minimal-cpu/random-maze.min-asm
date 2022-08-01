@@ -1,0 +1,47 @@
+; Random Maze
+;   Generates a random sequence of \ and / charcters, creating the
+;   appearance of a maze in the terminal. Reminiscent of the 
+;   "10 PRINT" random maze BASIC program from the 1980's. See:
+;       
+;       https://10print.org
+; 
+;   Depending on the font used by your terminal program, this may or may not
+;   look cool.
+; 
+#require "slu4-mincpu-asm >= 1.5.0"
+
+
+LEFT_WALL_CHAR = $5c
+RIGHT_WALL_CHAR = $2f
+
+.org $8000
+
+init:
+    ldi 0xfe sta 0xffff         ; initialize stack pointer
+    ldi 0 sta _char_buffer+1    ; initialize char buffer terminator
+    ; Initialize the random number generator
+    pushi $42
+    pushi 42
+    pushi 2
+    jps init_random8
+    pls pls pls
+    push2i _start_maze_str jps os_Print pull2
+start:
+    ; get a random 8-bit number, place in register A
+    pushi 0 jps random8 pls
+    ; see if random value in A LSB is 1
+    lsr bcs .right_wall
+.left_wall:
+    ldi LEFT_WALL_CHAR sta _char_buffer
+    jpa .loop_continue
+.right_wall:
+   ldi RIGHT_WALL_CHAR sta _char_buffer
+.loop_continue:
+    push2i _char_buffer jps os_Print pull2
+.end_loop:
+    jpa start
+
+_char_buffer: .zero 2
+_start_maze_str: .cstr 'Random Maze!\n'
+
+#include "mathlib.min-asm"

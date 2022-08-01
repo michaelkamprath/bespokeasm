@@ -21,7 +21,8 @@ Changes that are planned but not implemented yet:
 * Fixed bug where `#include` directives did not recognize otherwise valid file names
 * Fixed bug where zero operand macros did not get recognized correctly
 * Added ability to reverse the order of the byte code that an instruction's operands emit.
-* Added the `relative_address` operand type. 
+* Added the `relative_address` operand type.
+* Added more examples 
 
 ## [0.2.3]
 * Made instructions case insensitive

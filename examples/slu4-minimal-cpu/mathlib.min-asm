@@ -258,3 +258,74 @@ subtract32:
 .xval: .4byte 0
 .yval: .4byte 0
 
+
+;
+; 8-bit Random Number Generator
+; 
+;   Based on algorithm listed here:
+;       https://www.electro-tech-online.com/threads/ultra-fast-pseudorandom-number-generator-for-8-bit.124249/
+; 
+
+; init_random8:
+; 
+;   Arguments
+;       sp+3 : A value (1 byte)
+;       sp+4 : B value (1 byte)
+;       sp+5 : C value (1 byte)
+; 
+;   Returns
+;       nothing
+; 
+init_random8:
+    pushs 3
+    pusha _random_seed_a
+    jps os_XOR
+    pls pls sta _random_seed_a
+    pushs 4
+    pusha _random_seed_b
+    jps os_XOR
+    pls pls sta _random_seed_b
+    pushs 5
+    pusha _random_seed_c
+    jps os_XOR
+    pls pls sta _random_seed_c
+    pushi 0                     ; dummy value
+    jps random8
+    pls
+    rts
+
+; random8
+; 
+;   Arguments
+;       sp+3 - Place holder for return value
+; 
+;   Returns
+;       sp+3 - 8 bit random value
+; 
+random8:
+    ; x++
+    ldi 1 adb _random_seed_x
+    ; a = (a^c^x)
+    pusha _random_seed_a
+    pusha _random_seed_c
+    jps os_XOR
+    pls
+    pusha _random_seed_x
+    jps os_XOR
+    pls pls sta _random_seed_a
+    ; b = (b+a)
+    adb _random_seed_b                      ; register A is still new A value
+    ; c = (c+(b>>1)^a)
+    lda _random_seed_b
+    lsr phs                                 ; register A is new B value
+    pusha _random_seed_a
+    jps os_XOR
+    pls pls                                 ; last pls is XOR value
+    adb _random_seed_c lda _random_seed_c
+    sts 3
+    rts
+
+_random_seed_a: .byte 0
+_random_seed_b: .byte 0
+_random_seed_c: .byte 0
+_random_seed_x: .byte 0
