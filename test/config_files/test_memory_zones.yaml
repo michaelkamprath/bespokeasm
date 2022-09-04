@@ -1,0 +1,392 @@
+description: Test Memory Zones
+general :
+  address_size: 16
+  endian: little
+  identifier:
+    name: bespokeasm-test
+    version: "0.2.0"
+  registers:
+    - a
+    - i
+    - j
+    - sp
+    - ij
+    - mar
+  min_version: "0.2.4"
+predefined:
+  constants:
+    - name: predefined_value1
+      value: 20
+  memory_zones:
+    - name: predefined_zone
+      start: 0x2000
+      end: 0x2fff
+operand_sets:
+  8_bit_source:
+    operand_values:
+      a:
+        type: register
+        register: a
+        bytecode:
+          value: 0
+          size: 3
+      i:
+        type: register
+        register: i
+        bytecode:
+          value: 2
+          size: 3
+      j:
+        type: register
+        register: j
+        bytecode:
+          value: 3
+          size: 3
+      ij:
+        type: indirect_register
+        register: ij
+        bytecode:
+          value: 4
+          size: 3
+        offset:
+          max: 127
+          min: -128
+          size: 8
+          byte_align: true
+      sp:
+        type: indirect_register
+        register: sp
+        bytecode:
+          value: 5
+          size: 3
+        offset:
+          max: 127
+          min: -128
+          size: 8
+          byte_align: true
+      indirect_addr:
+        type: indirect_numeric
+        bytecode:
+          value: 6
+          size: 3
+        argument:
+          size: 16
+          byte_align: true
+      direct_value:
+        type: numeric
+        bytecode:
+          value: 7
+          size: 3
+        argument:
+          size: 8
+          byte_align: true
+  8_bit_destination:
+    operand_values:
+      a:
+        type: register
+        register: a
+        bytecode:
+          value: 0
+          size: 3
+      i:
+        type: register
+        register: i
+        bytecode:
+          value: 2
+          size: 3
+      j:
+        type: register
+        register: j
+        bytecode:
+          value: 3
+          size: 3
+      ij:
+        type: indirect_register
+        register: ij
+        bytecode:
+          value: 4
+          size: 3
+        offset:
+          max: 127
+          min: -128
+          size: 8
+          byte_align: true
+      sp:
+        type: indirect_register
+        register: sp
+        bytecode:
+          value: 5
+          size: 3
+        offset:
+          max: 127
+          min: -128
+          size: 8
+          byte_align: true
+      indirect_addr:
+        type: indirect_numeric
+        bytecode:
+          value: 6
+          size: 3
+        argument:
+          size: 16
+          byte_align: true
+  int8:
+    operand_values:
+      int8:
+        type: numeric
+        argument:
+          size: 8
+          byte_align: true
+  int16:
+    operand_values:
+      int16:
+        type: numeric
+        argument:
+          size: 16
+          byte_align: true
+  stack_pointer:
+    operand_values:
+      sp:
+        type: indirect_register
+        register: sp
+        bytecode:
+          value: 5
+          size: 3
+        offset:
+          max: 127
+          min: -128
+          size: 8
+          byte_align: true
+instructions:
+  push:
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - 8_bit_source
+    byte_code:
+      value: 1
+      size: 5
+  pop:
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - 8_bit_destination
+    byte_code:
+      value: 0
+      size: 5
+  mov:
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - 8_bit_destination
+          - 8_bit_source
+    byte_code:
+      value: 1
+      size: 2
+  add:
+    byte_code:
+      value: 2
+      size: 5
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - 8_bit_source
+  addc:
+    byte_code:
+      value: 3
+      size: 5
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - 8_bit_source
+macros:
+  push2:
+    - operands:
+        count: 1
+        specific_operands:
+          immediate:
+            list:
+              uint16:
+                type: numeric
+                argument:
+                  size: 16
+                  byte_align: true
+      instructions:
+        - "push ((@ARG(0)) >> 8)"
+        - "push ((@ARG(0)) & 0x00FF)"
+    - operands:
+        count: 1
+        specific_operands:
+          ij_reg:
+            list:
+              ij:
+                type: indirect_register
+                register: ij
+                offset:
+                  max: 127
+                  min: -128
+                  size: 8
+                  byte_align: true
+      instructions:
+        - "push [@REG(0) + (@ARG(0)+1)]"
+        - "push [@REG(0) + (@ARG(0))]"
+    - operands:
+        count: 1
+        specific_operands:
+          stack_pointer:
+            list:
+              sp:
+                type: indirect_register
+                register: sp
+                offset:
+                  max: 127
+                  min: -128
+                  size: 8
+                  byte_align: true
+      instructions:
+        - "push [@REG(0) + (@ARG(0)+1)]"
+        - "push [@REG(0) + (@ARG(0)+1)]"
+  mov2:
+    - operands:
+        count: 2
+        specific_operands:
+          iaddr1_iaddr2:
+            list:
+              iaddr1:
+                type: indirect_numeric
+                argument:
+                  size: 16
+                  byte_align: true
+              iaddr2:
+                type: indirect_numeric
+                argument:
+                  size: 16
+                  byte_align: true
+      instructions:
+        - "mov [@ARG(0)],[@ARG(1)]"
+        - "mov [@ARG(0) + 1],[@ARG(1) + 1]"
+    - operands:
+        count: 2
+        specific_operands:
+          iaddr1_iaddr2:
+            list:
+              iaddr1:
+                type: indirect_numeric
+                argument:
+                  size: 16
+                  byte_align: true
+              iaddr2:
+                type: numeric
+                argument:
+                  size: 16
+                  byte_align: true
+      instructions:
+        - "mov [@ARG(0)],BYTE0(@ARG(1))"
+        - "mov [@ARG(0) + 1],BYTE1(@ARG(1))"
+  add16:
+    - operands:
+        count: 2
+        specific_operands:
+          iaddr1_immediate:
+            list:
+              iaddr_x:
+                type: indirect_numeric
+                argument:
+                  size: 16
+                  byte_align: true
+              immediate_y:
+                type: numeric
+                argument:
+                  size: 16
+                  byte_align: true
+      instructions:
+        - "mov a,[@ARG(0)]"
+        - "add (@ARG(1) & $00FF)"
+        - "mov [@ARG(0)],a"
+        - "mov a,[@ARG(0)+1]"
+        - "addc ((@ARG(1) & $FF00) >> 8)"
+        - "mov [@ARG(0)+1],a"
+    - operands:
+        count: 2
+        specific_operands:
+          iaddr1_iaddr2:
+            list:
+              iaddr_x:
+                type: indirect_numeric
+                argument:
+                  size: 16
+                  byte_align: true
+              iaddr_y:
+                type: indirect_numeric
+                argument:
+                  size: 16
+                  byte_align: true
+      instructions:
+        - "mov a,[@ARG(0)]"
+        - "add [@ARG(1)]"
+        - "mov [@ARG(0)],a"
+        - "mov a,[@ARG(0)+1]"
+        - "addc [@ARG(1)+1]"
+        - "mov [@ARG(0)+1],a"
+  swap:
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - 8_bit_destination
+            - 8_bit_destination
+          disallowed_pairs:
+            - [a, sp]
+            - [i, sp]
+            - [j, sp]
+            - [ij, sp]
+            - [sp, sp]
+            - [indirect_addr, sp]
+            - [sp, a]
+            - [sp, i]
+            - [sp, j]
+            - [sp, ij]
+            - [sp, indirect_addr]
+      instructions:
+        - "push @OP(0)"
+        - "mov @OP(0),@OP(1)"
+        - "pop @OP(1)"
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - 8_bit_destination
+            - stack_pointer
+          disallowed_pairs:
+            - [sp, sp]
+      instructions:
+        - "push @OP(0)"
+        - "mov @OP(0),[@REG(1) + (@ARG(1)+1)]"
+        - "pop [@REG(1) + (@ARG(1)+1)]"
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - stack_pointer
+            - 8_bit_destination
+          disallowed_pairs:
+            - [sp, sp]
+      instructions:
+        - "push @OP(0)"
+        - "mov [@REG(0) + (@ARG(0)+1)],@OP(1)"
+        - "pop @OP(1)"
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - stack_pointer
+            - stack_pointer
+      instructions:
+        - "push @OP(0)"
+        - "mov [@REG(0) + (@ARG(0)+1)],[@REG(1) + (@ARG(1)+1)]"
+        - "pop [@REG(1) + (@ARG(1)+1)]"

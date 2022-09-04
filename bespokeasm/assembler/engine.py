@@ -52,6 +52,7 @@ class Assembler:
         memzone_manager = MemoryZoneManager(
             self._model.address_size,
             self._model.default_origin,
+            self._model.predefined_memory_zones,
         )
         # create the predefined memory blocks
         predefines_lineid = LineIdentifier(0, os.path.basename(self._config_file))

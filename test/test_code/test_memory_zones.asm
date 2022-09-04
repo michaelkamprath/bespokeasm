@@ -1,5 +1,6 @@
 #create_memzone variables $3000 0x47FF
 
+.memzone predefined_zone
 start:
     push $32
 

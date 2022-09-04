@@ -37,7 +37,15 @@ Where `<memory zone name>` is an alphanumeric string with no spaces which will s
 Any defined memory zone must be fully contained in the `GLOBAL` memory zone. 
 
 ##### ISA Configuration
-A predefined memory zone can be defined in the instruction set configuration file. See the configuration file schema specification.
+A predefined memory zone can be defined in the instruction set configuration file. In the `predefined` section, a subsection named `memory_zones` can be defined. That second contains a list of dictionaries with the following keys:
+
+| Option Key | Value Type | Description |
+|:-:|:-:|:--|
+|`name`| string | The name of the memory zone |
+|`start`| integer | The start address of the memory zone. |
+|`end`| integer | The end address of the memory zone. |
+
+See the configuration file schema specification.
 
 ### Address Origin Setting
 

@@ -174,6 +174,13 @@ class AssemblerModel:
         return results
 
     @property
+    def predefined_memory_zones(self) -> list[dict]:
+        if 'predefined' in self._config and 'memory_zones' in self._config['predefined']:
+            return self._config['predefined']['memory_zones']
+        else:
+            return []
+
+    @property
     def global_label_scope(self) -> LabelScope:
         if self._global_label_scope is None:
             self._global_label_scope = LabelScope.global_scope(self.registers)
