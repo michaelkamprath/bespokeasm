@@ -243,7 +243,7 @@ class AssemblyFile:
         memzone_manager: MemoryZoneManager,
         log_verbosity: int
     ) -> None:
-        '''Creates a new memory zone based on the #create_memzone line'''
+        '''Cre  ates a new memory zone based on the #create_memzone line'''
         memzone_match = re.search(AssemblyFile.PATTERN_CREATE_MEMORY_ZONE, line_str)
         if memzone_match is not None and len(memzone_match.groups()) == 3:
             name = memzone_match.group(1).strip()

@@ -103,10 +103,10 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
 
         # handle bespokeasm directives
         for item in grammar_json['repository']['directives']['patterns']:
-            if 'keyword.other.directive' == item['name']:
+            if 'meta.directive' == item['name']:
                 directives_regex = '|'.join(['\\.'+d for d in COMPILER_DIRECTIVES_SET])
-                directives_str = item['match']
-                item['match'] = directives_str.replace('##DIRECTIVES##', directives_regex)
+                directives_str = item['begin']
+                item['begin'] = directives_str.replace('##DIRECTIVES##', directives_regex)
             elif 'storage.type' == item['name']:
                 datatypes_regex = '|'.join(['\\.'+d for d in BYTECODE_DIRECTIVES_SET])
                 datatypes_str = item['match']

@@ -1,5 +1,5 @@
 COMPILER_DIRECTIVES_SET = set([
-    'org'
+    'org', 'memzone',
 ])
 
 BYTECODE_DIRECTIVES_SET = set([
@@ -8,7 +8,7 @@ BYTECODE_DIRECTIVES_SET = set([
 ])
 
 PREPROCESSOR_DIRECTIVES_SET = set([
-    'include', 'require',
+    'include', 'require', 'create_memzone'
 ])
 
 EXPRESSION_FUNCTIONS_SET = set([

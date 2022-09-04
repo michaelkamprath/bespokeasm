@@ -170,8 +170,17 @@
         "directives": {
             "patterns": [
                 {
-                    "name": "keyword.other.directive",
-                    "match": "(?<!\\w)(?:##DIRECTIVES##)\\b"
+                    "begin": "(?<!\\w)(?:##DIRECTIVES##)\\b",
+                    "beginCaptures": {
+                        "0": { "name": "keyword.other.directive" }
+                    },
+                    "end": "(?=(?:\\s*\\;|\\s*$))",
+                    "name": "meta.directive",
+                    "patterns": [
+                        { "include": "#numeric-values" },
+                        { "include": "#compiler_labels" },
+                        { "include": "#operands_variables" }
+                    ]
                 },
                 {
                     "name": "storage.type",
@@ -189,7 +198,10 @@
                             "name": "keyword.control.preprocessor",
                             "match": "(?<=\\#)(?:##PREPROCESSOR##)"
                         },
-                        { "include": "#strings" }
+                        { "include": "#strings" },
+                        { "include": "#numeric-values" },
+                        { "include": "#compiler_labels" },
+                        { "include": "#operands_variables" }
                     ]
                 }
             ]

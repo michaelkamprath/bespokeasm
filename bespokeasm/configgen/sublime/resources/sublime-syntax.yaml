@@ -155,9 +155,10 @@ contexts:
       scope: punctuation.definition.preprocessor
       push:
         - meta_scope: meta.preprocessor
-        - include: strings
         - match: (?<=\#)(?:##PREPROCESSOR##)
           scope: keyword.control.preprocessor
+        - include: strings
+        - include: numerical_expressions
         - match: (?=(?:\s*\;|\s*$))
           pop: true
 
