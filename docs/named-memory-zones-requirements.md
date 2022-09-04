@@ -58,13 +58,13 @@ If a source file that is currently using a non-`GLOBAL` memory zone includes ano
 A relative origin within a memory zone can be set with the `.org` directive:
 
 ```asm
-.org <address offset value> <memory zone name>
+.org <address offset value> "<memory zone name>"
 ```
 
-Where `<address offset value>` is the positive offset from the start of the specific memory zone, and `<memory zone name>` is the name of the specified memory zone (which is optional, see below). So, if a memory zone named "variables" is defined to be the range of `0x2000` through `0x2FFF`, then:
+Where `<address offset value>` is the positive offset from the start of the specific memory zone, and `<memory zone name>` is the name of the specified memory zone (which is optional, see below). The `<memory zone name>` value is denoted by quotes so as to offset it from the `<address offset value>` if that was set as an expression. So, if a memory zone named "variables" is defined to be the range of `0x2000` through `0x2FFF`, then:
 
 ```asm
-.org 0x0100 variables
+.org 0x0100 "variables"
 ```
 
 Would be the same as setting the current origin to `0x2100` in the `GLOBAL` scope. 

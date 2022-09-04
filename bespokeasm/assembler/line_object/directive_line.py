@@ -20,7 +20,10 @@ from bespokeasm.assembler.memory_zone import MEMORY_ZONE_NAME_PATTERN, MemoryZon
 class DirectiveLine:
 
     PATTERN_ORG_DIRECTIVE = re.compile(
-        r'^(?:\.org)\s+({0})'.format(INSTRUCTION_EXPRESSION_PATTERN),
+        r'^(?:\.org)\s+({0})(?:\s*\"({1})\")?'.format(
+            INSTRUCTION_EXPRESSION_PATTERN,
+            MEMORY_ZONE_NAME_PATTERN,
+        ),
         flags=re.IGNORECASE|re.MULTILINE
     )
 
@@ -60,9 +63,10 @@ class DirectiveLine:
             return None
         # first, the .org
         line_match = re.search(DirectiveLine.PATTERN_ORG_DIRECTIVE, cleaned_line_str)
-        if line_match is not None and len(line_match.groups()) == 1:
+        if line_match is not None and len(line_match.groups()) >= 1:
             value_str = line_match.group(1)
-            return AddressOrgLine(line_id, line_match.group(0), comment, value_str, current_memzone)
+            memzone_name = line_match.group(2)
+            return AddressOrgLine(line_id, line_match.group(0), comment, value_str, memzone_name, memzone_manager)
 
         # .memzone
         line_match = re.search(DirectiveLine.PATTERN_SET_MEMZONE_DIRECTIVE, cleaned_line_str)
@@ -142,7 +146,7 @@ class SetMemoryZoneLine(LineObject):
 
 
 
-class AddressOrgLine(LineObject):
+class AddressOrgLine(SetMemoryZoneLine):
     def __init__(
             self,
             line_id:
@@ -150,16 +154,23 @@ class AddressOrgLine(LineObject):
             instruction: str,
             comment: str,
             address_expression: str,
-            current_memzone: MemoryZone,
+            memzone_name: str,
+            memzone_manager: MemoryZoneManager,
         ) -> None:
-        super().__init__(line_id, instruction, comment, current_memzone)
+        super().__init__(line_id, instruction, comment, memzone_name, memzone_manager)
+        self._parsed_memzone_name = memzone_name
         self._address_expr = parse_expression(line_id, address_expression)
 
     @property
     def address(self) -> int:
         """Returns the adjusted address value set by the .org directive.
         """
-        return self._address_expr.get_value(self.label_scope, self.line_id)
+        offset_value = self._address_expr.get_value(self.label_scope, self.line_id)
+        if self._parsed_memzone_name is None:
+            return offset_value
+        else:
+            return self.memory_zone.start + offset_value
+
 
     def set_start_address(self, address: int):
         """A no-op for the .org directive

@@ -22,6 +22,8 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model.default_origin,
         )
         cls.memzone = cls.memory_zone_manager.global_zone
+        cls.memory_zone_manager.create_zone(16, 2000, 4000, 'zone1')
+        cls.memory_zone_manager.create_zone(16, 5000, 5500, 'zone2')
 
     def test_org_directive(self):
         label_values = GlobalLabelScope(['a', 'b', 'sp', 'mar'])
@@ -96,6 +98,31 @@ class TestDirectiveLines(unittest.TestCase):
             )
             e1.label_scope = label_values
             e1.address
+
+        # test with memory zones
+        o6 = DirectiveLine.factory(
+            1357,
+            '.org a_const "zone1"',
+            'set address to a label',
+            TestDirectiveLines.isa_model,
+            TestDirectiveLines.memzone,
+            TestDirectiveLines.memory_zone_manager,
+        )
+        o6.label_scope = label_values
+        self.assertIsInstance(o6, AddressOrgLine)
+        self.assertEqual(o6.address, 2040)
+
+        o7 = DirectiveLine.factory(
+            1357,
+            '.org a_const*2 + 5 "zone2"',
+            'set address to a label',
+            TestDirectiveLines.isa_model,
+            TestDirectiveLines.memzone,
+            TestDirectiveLines.memory_zone_manager,
+        )
+        o7.label_scope = label_values
+        self.assertIsInstance(o7, AddressOrgLine)
+        self.assertEqual(o7.address, 5085)
 
     def test_fill_directive(self):
 
