@@ -151,7 +151,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertFalse(('registers' in syntax_dict['contexts']), 'no registers should be found')
         self._assert_grouped_item_list(
             syntax_dict['contexts']['compiler_directives'][0]['match'],
-            ['\\.org'],
+            ['\\.org', '\\.memzone'],
             'compiler directives'
         )
         self._assert_grouped_item_list(
@@ -165,7 +165,7 @@ class TestConfigurationGeneration(unittest.TestCase):
                 item_match_str = item['match']
         self._assert_grouped_item_list(
             item_match_str,
-            ['include', 'require'],
+            ['include', 'require', 'create_memzone'],
             'data type directives'
         )
         self.assertIsFile(os.path.join(test_tmp_dir, 'bespokeasm-test.sublime-color-scheme'))
@@ -216,7 +216,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         )
         self._assert_grouped_item_list(
             syntax_dict['contexts']['compiler_directives'][0]['match'],
-            ['\\.org'],
+            ['\\.org', '\\.memzone'],
             'compiler directives'
         )
         self._assert_grouped_item_list(
@@ -234,7 +234,7 @@ class TestConfigurationGeneration(unittest.TestCase):
                 item_match_str = item['match']
         self._assert_grouped_item_list(
             item_match_str,
-            ['include', 'require'],
+            ['include', 'require', 'create_memzone'],
             'data type directives'
         )
         self.assertIsFile(os.path.join(test_tmp_dir, 'tester-assembly.sublime-color-scheme'))
