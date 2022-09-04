@@ -5,13 +5,20 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithBytes
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.model.instruction_parser import InstructioParser
+from bespokeasm.assembler.memory_zone import MemoryZone
 
 class InstructionLine(LineWithBytes):
     COMMAND_EXTRACT_PATTERN = re.compile(r'^\s*(\w+)', flags=re.IGNORECASE|re.MULTILINE)
 
     _INSTRUCTUION_EXTRACTION_PATTERN = None
 
-    def factory(line_id: LineIdentifier, line_str: str, comment: str, isa_model: AssemblerModel):
+    def factory(
+            line_id: LineIdentifier,
+            line_str: str,
+            comment: str,
+            isa_model: AssemblerModel,
+            current_memzone: MemoryZone,
+        ) -> LineWithBytes:
         """Tries to contruct a instruction line object from the passed instruction line"""
         # first, extract evertything up to the next extruction
         if InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN is None:
@@ -34,7 +41,7 @@ class InstructionLine(LineWithBytes):
 
             argument_str = instruction_str.strip()[len(command_str):]
 
-            return InstructionLine(line_id, command_str, argument_str, isa_model, instruction_str, comment)
+            return InstructionLine(line_id, command_str, argument_str, isa_model, instruction_str, comment, current_memzone)
         else:
             return None
 
@@ -45,9 +52,10 @@ class InstructionLine(LineWithBytes):
             argument_str: str,
             isa_model: AssemblerModel,
             instruction: str,
-            comment: str
+            comment: str,
+            current_memzone: MemoryZone,
         ):
-        super().__init__(line_id, instruction, comment)
+        super().__init__(line_id, instruction, comment, current_memzone)
         self._command = command_str
         self._argument_str = argument_str
         self._isa_model = isa_model

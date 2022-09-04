@@ -1,6 +1,6 @@
 description: slu4 Minimal UART CPU
 general:
-  address_size: 8
+  address_size: 16
   endian: little
   registers:
     - a

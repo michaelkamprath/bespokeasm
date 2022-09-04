@@ -10,6 +10,8 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithBytes, LineObject
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.line_object.predefined_data import PredefinedDataLine
+from bespokeasm.assembler.memory_zone import MemoryZone
+from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.pretty_printer import PrettyPrinterBase
@@ -47,7 +49,10 @@ class Assembler:
 
     def assemble_bytecode(self):
         global_label_scope = self._model.global_label_scope
-
+        memzone_manager = MemoryZoneManager(
+            self._model.address_size,
+            self._model.default_origin,
+        )
         # create the predefined memory blocks
         predefines_lineid = LineIdentifier(0, os.path.basename(self._config_file))
         predefined_line_obs: list[LineObject] = []
@@ -57,7 +62,13 @@ class Assembler:
             value: int = predefined_memory['value']
             byte_length: int = predefined_memory['size']
             # create data object
-            data_obj = PredefinedDataLine(predefines_lineid, byte_length, value, label)
+            data_obj = PredefinedDataLine(
+                predefines_lineid,
+                byte_length,
+                value,
+                label,
+                memzone_manager.global_zone,
+            )
             data_obj.set_start_address(address)
             predefined_line_obs.append(data_obj)
             # set data object's label
@@ -68,16 +79,22 @@ class Assembler:
         include_dirs = set([os.path.dirname(self.source_file)]+list(self._include_paths))
 
         asm_file = AssemblyFile(self.source_file, global_label_scope)
-        line_obs: list[LineObject] = asm_file.load_line_objects(self._model, include_dirs, self._verbose)
+        line_obs: list[LineObject] = asm_file.load_line_objects(
+            self._model,
+            include_dirs,
+            memzone_manager,
+            self._verbose
+        )
 
         if self._verbose > 2:
             click.echo(f'Found {len(line_obs)} lines across all source files')
 
         # First pass: assign addresses to labels
-        cur_address = self._model.default_origin
         for lobj in line_obs:
-            lobj.set_start_address(cur_address)
-            cur_address = lobj.address + lobj.byte_size
+            lobj.set_start_address(lobj.memory_zone.current_address)
+            if lobj.address is None:
+                sys.exit(f'ERROR: {lobj.line_id} - INTERNAL line object address is None. Memory zone = {lobj.memory_zone}')
+            lobj.memory_zone.current_address = lobj.address + lobj.byte_size
             if isinstance(lobj, LabelLine) and not lobj.is_constant:
                 lobj.label_scope.set_label_value(lobj.get_label(), lobj.get_value(), lobj.line_id)
 

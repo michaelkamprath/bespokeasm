@@ -4,6 +4,7 @@ import sys
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithBytes
 from bespokeasm.utilities import parse_numeric_string, is_string_numeric
+from bespokeasm.assembler.memory_zone import MemoryZone
 
 class DataLine(LineWithBytes):
     PATTERN_DATA_DIRECTIVE = re.compile(
@@ -26,7 +27,13 @@ class DataLine(LineWithBytes):
         '.8byte': 0xFFFFFFFFFFFFFFFF,
         '.cstr': 0xFF,
     }
-    def factory(line_id: LineIdentifier, line_str: str, comment: str, endian: str) -> LineWithBytes:
+    def factory(
+            line_id: LineIdentifier,
+            line_str: str,
+            comment: str,
+            endian: str,
+            current_memzone: MemoryZone,
+        ) -> LineWithBytes:
         """Tries to match the passed line string to the data directive pattern.
         If succcessful, returns a constructed DataLine object. If not, None is
         returned.
@@ -60,12 +67,22 @@ class DataLine(LineWithBytes):
                 line_str,
                 comment,
                 endian,
+                current_memzone,
             )
         else:
             return None
 
-    def __init__(self, line_id: LineIdentifier, directive_str: str, value_list: list, instruction: str, comment: str, endian: str):
-        super().__init__(line_id, instruction, comment)
+    def __init__(
+            self,
+            line_id: LineIdentifier,
+            directive_str: str,
+            value_list: list,
+            instruction: str,
+            comment: str,
+            endian: str,
+            current_memzone: MemoryZone,
+        ) -> None:
+        super().__init__(line_id, instruction, comment, current_memzone)
         self._arg_value_list = value_list
         self._directive = directive_str
         self._endian = endian

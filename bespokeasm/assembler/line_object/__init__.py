@@ -2,18 +2,20 @@ import re
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.label_scope import LabelScope
+from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.expression import EXPRESSION_PARTS_PATTERN
 
 PATTERN_LABEL_DEFINITION = r'\s*(?:\.?\w+:)'
 INSTRUCTION_EXPRESSION_PATTERN = r'(?:{0}|(?:[ \t]*)(?!(?:[ \t]*\;|[ \t]*\v)|{1}))+'.format(EXPRESSION_PARTS_PATTERN, PATTERN_LABEL_DEFINITION)
 
 class LineObject:
-    def __init__(self, line_id: LineIdentifier, instruction: str, comment: str):
+    def __init__(self, line_id: LineIdentifier, instruction: str, comment: str, memzone: MemoryZone):
         self._line_id = line_id
         self._instruction = instruction.strip()
         self._comment = comment.strip()
         self._address = None
         self._label_scope = None
+        self._memzone = memzone
 
     def __repr__(self):
         return str(self)
@@ -58,13 +60,18 @@ class LineObject:
     @property
     def label_scope(self) -> LabelScope:
         return self._label_scope
+
     @label_scope.setter
     def label_scope(self, value):
         self._label_scope = value
 
+    @property
+    def memory_zone(self) -> MemoryZone:
+        return self._memzone
+
 class LineWithBytes(LineObject):
-    def __init__(self, line_id: LineIdentifier, instruction: str, comment: str):
-        super().__init__(line_id, instruction, comment)
+    def __init__(self, line_id: LineIdentifier, instruction: str, comment: str, memzone: MemoryZone):
+        super().__init__(line_id, instruction, comment, memzone)
         self._bytes = bytearray()
 
 

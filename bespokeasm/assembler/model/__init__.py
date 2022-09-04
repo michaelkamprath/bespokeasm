@@ -125,6 +125,7 @@ class AssemblerModel:
 
     @property
     def address_size(self) -> int:
+        '''The number of bits used to rerpesent a memory address'''
         return self._config['general']['address_size']
 
     @property

@@ -4,8 +4,9 @@ import sys
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithBytes, LineObject, INSTRUCTION_EXPRESSION_PATTERN
 from bespokeasm.assembler.line_object.data_line import DataLine
+from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager, GLOBAL_ZONE_NAME
 from bespokeasm.expression import parse_expression, ExpresionType
-
+from bespokeasm.assembler.memory_zone import MEMORY_ZONE_NAME_PATTERN, MemoryZone
 
 # Directives are lines that tell the assembler to do something. Supported directives are:
 #
@@ -20,6 +21,11 @@ class DirectiveLine:
 
     PATTERN_ORG_DIRECTIVE = re.compile(
         r'^(?:\.org)\s+({0})'.format(INSTRUCTION_EXPRESSION_PATTERN),
+        flags=re.IGNORECASE|re.MULTILINE
+    )
+
+    PATTERN_SET_MEMZONE_DIRECTIVE = re.compile(
+        r'^(?:\.memzone)\s+({0})'.format(MEMORY_ZONE_NAME_PATTERN),
         flags=re.IGNORECASE|re.MULTILINE
     )
 
@@ -40,7 +46,14 @@ class DirectiveLine:
         flags=re.IGNORECASE|re.MULTILINE
     )
 
-    def factory(line_id: LineIdentifier, line_str: str, comment: str, endian: str) -> LineObject:
+    def factory(
+        line_id: LineIdentifier,
+        line_str: str,
+        comment: str,
+        endian: str,
+        current_memzone: MemoryZone,
+        memzone_manager: MemoryZoneManager,
+    ) -> LineObject:
         # for efficiency, if it doesn't start with a period, it is not a directive
         cleaned_line_str = line_str.strip()
         if not cleaned_line_str.startswith('.'):
@@ -49,7 +62,13 @@ class DirectiveLine:
         line_match = re.search(DirectiveLine.PATTERN_ORG_DIRECTIVE, cleaned_line_str)
         if line_match is not None and len(line_match.groups()) == 1:
             value_str = line_match.group(1)
-            return AddressOrgLine(line_id, line_match.group(0), comment, value_str)
+            return AddressOrgLine(line_id, line_match.group(0), comment, value_str, current_memzone)
+
+        # .memzone
+        line_match = re.search(DirectiveLine.PATTERN_SET_MEMZONE_DIRECTIVE, cleaned_line_str)
+        if line_match is not None and len(line_match.groups()) == 1:
+            name_str = line_match.group(1)
+            return SetMemoryZoneLine(line_id, line_match.group(0), comment, name_str, memzone_manager)
 
         # .fill
         line_match = re.search(DirectiveLine.PATTERN_FILL_DIRECTIVE, cleaned_line_str)
@@ -62,6 +81,7 @@ class DirectiveLine:
                 comment,
                 count_str,
                 value_str,
+                current_memzone,
             )
 
         # .zero
@@ -76,6 +96,7 @@ class DirectiveLine:
                 comment,
                 count_str,
                 '0',
+                current_memzone,
             )
 
         # .zerountil
@@ -88,15 +109,50 @@ class DirectiveLine:
                 comment,
                 address_str,
                 '0',
+                current_memzone,
             )
 
         # nothing was matched here. pass to data directive
-        return DataLine.factory(line_id, line_str, comment, endian)
+        return DataLine.factory(line_id, line_str, comment, endian, current_memzone)
+
+class SetMemoryZoneLine(LineObject):
+    def __init__(
+            self,
+            line_id: LineIdentifier,
+            instruction: str,
+            comment: str,
+            name_str: str,
+            memzone_manager: MemoryZoneManager,
+        ) -> None:
+        if name_str is None:
+            self._name = GLOBAL_ZONE_NAME
+        else:
+            self._name = name_str
+        memzone = memzone_manager.zone(self._name)
+        if memzone is None:
+            sys.exit(f'ERROR: {line_id} - unknown memory zone "{name_str}"')
+        super().__init__(line_id, instruction, comment, memzone)
+
+
+    @property
+    def memory_zone_name(self) -> int:
+        """Returns the name of the memory zone set by .memzone.
+        """
+        return self._name
+
 
 
 class AddressOrgLine(LineObject):
-    def __init__(self, line_id: LineIdentifier, instruction: str, comment: str, address_expression: str):
-        super().__init__(line_id, instruction, comment)
+    def __init__(
+            self,
+            line_id:
+            LineIdentifier,
+            instruction: str,
+            comment: str,
+            address_expression: str,
+            current_memzone: MemoryZone,
+        ) -> None:
+        super().__init__(line_id, instruction, comment, current_memzone)
         self._address_expr = parse_expression(line_id, address_expression)
 
     @property
@@ -111,12 +167,21 @@ class AddressOrgLine(LineObject):
         return
 
 
+
 class FillDataLine(LineWithBytes):
     _count_expr: ExpresionType
     _value_expr: ExpresionType
 
-    def __init__(self, line_id: LineIdentifier, instruction: str, comment: str, fill_count_expression: str, fill_value_expression: str):
-        super().__init__(line_id, instruction, comment)
+    def __init__(
+            self,
+            line_id: LineIdentifier,
+            instruction: str,
+            comment: str,
+            fill_count_expression: str,
+            fill_value_expression: str,
+            current_memzone: MemoryZone,
+        ) -> None:
+        super().__init__(line_id, instruction, comment, current_memzone)
         self._count_expr = parse_expression(line_id, fill_count_expression)
         self._value_expr = parse_expression(line_id, fill_value_expression)
         self._count = None
@@ -141,8 +206,16 @@ class FillUntilDataLine(LineWithBytes):
     _fill_until_addr: int
     _fill_value: int
 
-    def __init__(self, line_id: LineIdentifier, instruction: str, comment: str, fill_until_address_expresion: str, fill_value_expression: str):
-        super().__init__(line_id, instruction, comment)
+    def __init__(
+            self,
+            line_id: LineIdentifier,
+            instruction: str,
+            comment: str,
+            fill_until_address_expresion: str,
+            fill_value_expression: str,
+            current_memzone: MemoryZone,
+        ) -> None:
+        super().__init__(line_id, instruction, comment, current_memzone)
         self._fill_until_addr_expr = parse_expression(line_id, fill_until_address_expresion)
         self._fill_value_expr = parse_expression(line_id, fill_value_expression)
         self._fill_until_addr = None

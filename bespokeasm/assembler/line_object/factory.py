@@ -8,6 +8,8 @@ from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.line_object.directive_line import DirectiveLine
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
+from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.memory_zone import MemoryZone
 
 class LineOjectFactory:
     PATTERN_COMMENTS = re.compile(
@@ -26,6 +28,8 @@ class LineOjectFactory:
                 line_str: str,
                 model: AssemblerModel,
                 label_scope: LabelScope,
+                current_memzone: MemoryZone,
+                memzone_manager: MemoryZoneManager,
             ) -> list[LineObject]:
         # find comments
         comment_str = ''
@@ -49,7 +53,8 @@ class LineOjectFactory:
                 instruction_str,
                 comment_str,
                 model.registers,
-                label_scope
+                label_scope,
+                current_memzone,
             )
             if line_obj is not None:
                 line_obj_list.append(line_obj)
@@ -57,14 +62,21 @@ class LineOjectFactory:
                 continue
 
             # try directives
-            line_obj = DirectiveLine.factory(line_id, instruction_str, comment_str, model.endian)
+            line_obj = DirectiveLine.factory(
+                line_id,
+                instruction_str,
+                comment_str,
+                model.endian,
+                current_memzone,
+                memzone_manager,
+            )
             if line_obj is not None:
                 line_obj_list.append(line_obj)
                 instruction_str = instruction_str.replace(line_obj.instruction, '', 1).strip()
                 continue
 
             # try instruction
-            line_obj = InstructionLine.factory(line_id, instruction_str, comment_str, model)
+            line_obj = InstructionLine.factory(line_id, instruction_str, comment_str, model, current_memzone)
             if line_obj is not None:
                 line_obj_list.append(line_obj)
                 #print(f'    found instruction with text = "{line_obj.instruction}"')
@@ -78,6 +90,6 @@ class LineOjectFactory:
             if instruction_str != '':
                 sys.exit(f'ERROR: {line_id} - unknown instruction "{instruction_str.strip()}"')
             # if we got here, the line is only a comment
-            line_obj = LineObject(line_id, instruction_str, comment_str)
+            line_obj = LineObject(line_id, instruction_str, comment_str, current_memzone)
             return [line_obj]
         return line_obj_list
