@@ -1,7 +1,7 @@
-
 from __future__ import annotations
 
 MEMORY_ZONE_NAME_PATTERN = r'[\w_]+'
+
 
 class MemoryZone:
     def __init__(self, address_bits: int, start: int, end: int, name: str) -> None:
@@ -12,7 +12,9 @@ class MemoryZone:
         self._current_address = start
         # validate passed values
         if end > ((2**address_bits)-1):
-            raise ValueError(f'End value {end} for memory zone "{self.name}" larger than allowed by {address_bits}-bit address space.')
+            raise ValueError(
+                f'End value {end} for memory zone "{self.name}" larger than allowed by {address_bits}-bit address space.'
+            )
         if start > end:
             raise ValueError(f'Start value {start} for memory zone "{self.name}" larger than end value {end}.')
 
@@ -41,6 +43,7 @@ class MemoryZone:
     @current_address.setter
     def current_address(self, value: int):
         if value > self.end:
-            raise ValueError(f'Setting current address of memory zone "{self.name}" to {value} exceed maximum zone address {self.end}.')
+            raise ValueError(
+                f'Setting current address of memory zone "{self.name}" to {value} exceed maximum zone address {self.end}.'
+            )
         self._current_address = value
-

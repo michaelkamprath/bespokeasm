@@ -12,11 +12,11 @@ from bespokeasm.assembler.memory_zone import MemoryZone
 class LabelLine(LineObject):
     PATTERN_LABEL = re.compile(
         r'^\s*((\.?\w+):)(?:\s*([^;]*))?\;?',
-        flags=re.IGNORECASE|re.MULTILINE
+        flags=re.IGNORECASE | re.MULTILINE
     )
     PATTERN_CONSTANT = re.compile(
         r'^\s*(\w+)(?:\s*)?\=(?:\s*)?({0}|)'.format(INSTRUCTION_EXPRESSION_PATTERN),
-        flags=re.IGNORECASE|re.MULTILINE
+        flags=re.IGNORECASE | re.MULTILINE
     )
 
     @classmethod
@@ -66,7 +66,7 @@ class LabelLine(LineObject):
             except ValueError as e:
                 sys.exit(f'ERROR: {line_id} - Constant assigned nonnumeric value because {e}')
             return line_obj
-        #if we got here it was neither a Label or a Constant
+        # if we got here it was neither a Label or a Constant
         return None
 
     @classmethod
@@ -89,7 +89,7 @@ class LabelLine(LineObject):
             instruction: str,
             comment: str,
             current_memzone: MemoryZone,
-        ) -> None:
+    ) -> None:
         super().__init__(line_id, instruction, comment, current_memzone)
         self._label = label
         self._value = value

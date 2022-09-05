@@ -59,11 +59,12 @@ class AssembledInstruction:
             return None
         return bytes
 
+
 class CompositeAssembledInstruction(AssembledInstruction):
     def __init__(self, line_id: LineIdentifier, instructions: list[AssembledInstruction]):
         # turn instruction list into byte code parts list
         parts: list[ByteCodePart] = [
-            p  for instr in instructions for p in instr.parts
+            p for instr in instructions for p in instr.parts
         ]
         super().__init__(line_id, parts)
         self._instructions = instructions

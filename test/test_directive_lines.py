@@ -9,10 +9,12 @@ from bespokeasm.assembler.line_object.directive_line import DirectiveLine, Addre
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 
+
 class TestDirectiveLines(unittest.TestCase):
     memory_zone_manager = None
     memzone = None
     isa_model = None
+
     @classmethod
     def setUpClass(cls):
         with pkg_resources.path(config_files, 'test_instruction_list_creation_isa.json') as fp:
@@ -65,7 +67,8 @@ class TestDirectiveLines(unittest.TestCase):
         self.assertIsInstance(o3, AddressOrgLine)
         self.assertEqual(o3.address, 2048)
 
-        o4 = DirectiveLine.factory(1357,
+        o4 = DirectiveLine.factory(
+            1357,
             '.org 0xFFFF',
             'set address to 54K',
             TestDirectiveLines.isa_model,
@@ -173,7 +176,6 @@ class TestDirectiveLines(unittest.TestCase):
         self.assertEqual(o2b.byte_size, 161, 'has 161 bytes')
         o2b.generate_bytes()
         self.assertEqual(o2b.get_bytes(), bytearray([0xAF]*161), 'complex expression in directive arguments')
-
 
         o3 = DirectiveLine.factory(
             1234,

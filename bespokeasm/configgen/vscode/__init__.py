@@ -6,7 +6,8 @@ import shutil
 
 from bespokeasm.configgen import LanguageConfigGenerator
 import bespokeasm.configgen.vscode.resources as resources
-from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET, BYTECODE_DIRECTIVES_SET, PREPROCESSOR_DIRECTIVES_SET, EXPRESSION_FUNCTIONS_SET
+from bespokeasm.assembler.keywords import \
+    COMPILER_DIRECTIVES_SET, BYTECODE_DIRECTIVES_SET, PREPROCESSOR_DIRECTIVES_SET, EXPRESSION_FUNCTIONS_SET
 
 
 class VSCodeConfigGenerator(LanguageConfigGenerator):

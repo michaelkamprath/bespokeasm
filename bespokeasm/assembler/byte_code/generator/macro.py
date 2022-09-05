@@ -39,7 +39,6 @@ class MacroBytecodeGenerator:
 
         sys.exit(f'ERROR: {line_id} - Instruction "{mnemonic}" has no valid operands configured.')
 
-
     @classmethod
     def generate_variant_bytecode_parts(
         cls,
@@ -110,7 +109,7 @@ class MacroBytecodeGenerator:
         assembled_instructions: list[AssembledInstruction] = []
         for step_num, instruction_str in enumerate(instruction_lines):
             macro_line_id = MacroLineIdentifier(variant.mnemonic, step_num, line_id)
-            instruction = parser_class.parse_instruction(isa_model,macro_line_id, instruction_str)
+            instruction = parser_class.parse_instruction(isa_model, macro_line_id, instruction_str)
             assembled_instructions.append(instruction)
 
         # finally, pack it all together into one assembled instruction

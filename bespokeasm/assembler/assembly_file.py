@@ -19,9 +19,10 @@ from bespokeasm.assembler.line_object.directive_line import AddressOrgLine, SetM
 from bespokeasm.assembler.line_object.factory import LineOjectFactory
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.model import AssemblerModel
-from bespokeasm.assembler.memory_zone import MemoryZone, MEMORY_ZONE_NAME_PATTERN
+from bespokeasm.assembler.memory_zone import MEMORY_ZONE_NAME_PATTERN
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.utilities import PATTERN_NUMERIC, parse_numeric_string
+
 
 class AssemblyFile:
     def __init__(self, filename: str, parent_label_scope: LabelScope) -> None:
@@ -81,7 +82,6 @@ class AssemblyFile:
                         self._handle_create_memzone(line_str, line_id, isa_model, memzone_manager, log_verbosity)
                         continue
 
-
                     lobj_list = LineOjectFactory.parse_line(
                         line_id,
                         line_str,
@@ -92,7 +92,8 @@ class AssemblyFile:
                     )
                     for lobj in lobj_list:
                         if isinstance(lobj, LabelLine):
-                            if not lobj.is_constant and LabelScopeType.get_label_scope(lobj.get_label()) != LabelScopeType.LOCAL:
+                            if not lobj.is_constant \
+                                    and LabelScopeType.get_label_scope(lobj.get_label()) != LabelScopeType.LOCAL:
                                 current_scope = LabelScope(LabelScopeType.LOCAL, self.label_scope, lobj.get_label())
                         elif isinstance(lobj, AddressOrgLine):
                             current_scope = self.label_scope

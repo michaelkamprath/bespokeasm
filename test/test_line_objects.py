@@ -14,10 +14,12 @@ from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 
 from test import config_files
 
+
 class TestLineObject(unittest.TestCase):
     label_values = None
     memory_zone_manager = None
     memzone = None
+
     @classmethod
     def setUpClass(cls):
         global_scope = GlobalLabelScope(set())
@@ -29,7 +31,6 @@ class TestLineObject(unittest.TestCase):
         cls.label_values = local_scope
         cls.memory_zone_manager = MemoryZoneManager(16, 0)
         cls.memzone = cls.memory_zone_manager.global_zone
-
 
     def setUp(self):
         InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN = None
@@ -91,19 +92,33 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(d6.byte_size, 4, 'data line has 4 bytes')
         self.assertEqual(d6.get_bytes(), bytearray([0x34, 0x12, 12, 0]), 'should slice first two bytes')
 
-        d7 = DataLine.factory(38, '.4byte %11110111011001010100001100100001, $1945', '4 byte label mania', 'little', TestLineObject.memzone)
+        d7 = DataLine.factory(
+            38, '.4byte %11110111011001010100001100100001, $1945', '4 byte label mania',
+            'little', TestLineObject.memzone
+        )
         d7.label_scope = label_values
         d7.generate_bytes()
         self.assertIsInstance(d7, DataLine)
         self.assertEqual(d7.byte_size, 8, 'data line has 8 bytes')
-        self.assertEqual(d7.get_bytes(), bytearray([0x21, 0x43, 0x65, 0xf7, 0x45, 0x19, 0, 0]), 'should have each 4 byte numbe in litle endian')
+        self.assertEqual(
+            d7.get_bytes(),
+            bytearray([0x21, 0x43, 0x65, 0xf7, 0x45, 0x19, 0, 0]),
+            'should have each 4 byte numbe in litle endian'
+        )
 
-        d8 = DataLine.factory(38, '.4byte %11110111011001010100001100100001, $1945', '4 byte label mania', 'big', TestLineObject.memzone)
+        d8 = DataLine.factory(
+            38, '.4byte %11110111011001010100001100100001, $1945', '4 byte label mania',
+            'big', TestLineObject.memzone
+        )
         d8.label_scope = label_values
         d8.generate_bytes()
         self.assertIsInstance(d8, DataLine)
         self.assertEqual(d8.byte_size, 8, 'data line has 8 bytes')
-        self.assertEqual(d8.get_bytes(), bytearray([0xf7, 0x65, 0x43, 0x21, 0, 0, 0x19, 0x45]), 'should have each 4 byte numbe in big endian')
+        self.assertEqual(
+            d8.get_bytes(),
+            bytearray([0xf7, 0x65, 0x43, 0x21, 0, 0, 0x19, 0x45]),
+            'should have each 4 byte numbe in big endian'
+        )
 
         d9 = DataLine.factory(38, '.4byte 0x0123456789abcdef', 'data masked!', 'little', TestLineObject.memzone)
         d9.label_scope = label_values
@@ -119,7 +134,7 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(d9a.byte_size, 8, 'data line has 8 bytes')
         self.assertEqual(d9a.get_bytes(), bytearray([0xef, 0xcd, 0xab, 0x89, 0x67, 0x45, 0x23, 1]), 'should slice all 8 bytes')
 
-        #ensure spaces in strings aren't truncated
+        # ensure spaces in strings aren't truncated
         test_str2 = ' space '
         d10_values = [ord(c) for c in test_str2]
         d10 = DataLine.factory(42, f' .byte "{test_str2}"', 'string of bytes', 'big', TestLineObject.memzone)
@@ -129,7 +144,7 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(d10.byte_size, 7, 'byte string has 7 bytes')
         self.assertEqual(d10.get_bytes(), bytearray(d10_values), 'character string matches')
 
-        #test escapes in strings
+        # test escapes in strings
         d11_values = [0x20, 0x01, 0x20, 0x09, 0x20, 0x0A, 0x00]
         # must double escape escape sequences here because this is in python
         d11 = DataLine.factory(38, '.cstr " \\x01 \\t \\n"', 'escape reality', 'big', TestLineObject.memzone)
@@ -153,7 +168,7 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(l1.byte_size, 0, 'has no bytes')
         self.assertEqual(l1.get_value(), 1212, 'label value is address')
         self.assertEqual(l1.address, 1212, 'address value is address')
-        self.assertEqual(l1.get_label(),'my_label', 'label string')
+        self.assertEqual(l1.get_label(), 'my_label', 'label string')
 
         l2 = LabelLine.factory(13, 'my_constant = 1945', 'cool comment', register_set, label_values, TestLineObject.memzone)
         l2.set_start_address(1212)
@@ -161,7 +176,7 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(l2.byte_size, 0, 'has no bytes')
         self.assertEqual(l2.get_value(), 1945, 'constant value is assigned')
         self.assertEqual(l2.address, 1212, 'address value is address')
-        self.assertEqual(l2.get_label(),'my_constant', 'label string')
+        self.assertEqual(l2.get_label(), 'my_constant', 'label string')
 
         l3 = LabelLine.factory(13, 'myLabelIsCool:', 'cool comment', register_set, label_values, TestLineObject.memzone)
         l3.set_start_address(2001)
@@ -169,33 +184,46 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(l3.byte_size, 0, 'has no bytes')
         self.assertEqual(l3.get_value(), 2001, 'label value is address')
         self.assertEqual(l3.address, 2001, 'address value is address')
-        self.assertEqual(l3.get_label(),'myLabelIsCool', 'label string')
+        self.assertEqual(l3.get_label(), 'myLabelIsCool', 'label string')
 
-        l4: LabelLine = LabelLine.factory(13, 'test_bit = (5 + 3)', 'numeric expression constants', register_set, label_values, TestLineObject.memzone)
+        l4: LabelLine = LabelLine.factory(
+            13, 'test_bit = (5 + 3)', 'numeric expression constants',
+            register_set, label_values, TestLineObject.memzone
+        )
         l4.set_start_address(678)
         self.assertIsInstance(l4, LabelLine)
         self.assertEqual(l4.byte_size, 0, 'has no bytes')
         self.assertEqual(l4.get_value(), 8, 'label value is constant')
         self.assertEqual(l4.address, 678, 'address value is address')
-        self.assertEqual(l4.get_label(),'test_bit', 'label string')
+        self.assertEqual(l4.get_label(), 'test_bit', 'label string')
 
-        l5: LabelLine = LabelLine.factory(27, 'test_bit = (1 << 3)', 'numeric expression constants', register_set, label_values, TestLineObject.memzone)
+        l5: LabelLine = LabelLine.factory(
+            27, 'test_bit = (1 << 3)', 'numeric expression constants',
+            register_set, label_values, TestLineObject.memzone
+        )
         l5.set_start_address(678)
         self.assertIsInstance(l5, LabelLine)
         self.assertEqual(l5.byte_size, 0, 'has no bytes')
         self.assertEqual(l5.get_value(), 8, 'label value is constant')
         self.assertEqual(l5.address, 678, 'address value is address')
-        self.assertEqual(l5.get_label(),'test_bit', 'label string')
-
+        self.assertEqual(l5.get_label(), 'test_bit', 'label string')
 
         # this should fail
         with self.assertRaises(SystemExit, msg='unresolvable expression constant assignments should fail'):
-            l_fail= LabelLine.factory(13, 'my_constant = some_var1 + 7', 'bad constant', register_set, label_values, TestLineObject.memzone)
-
+            LabelLine.factory(
+                13, 'my_constant = some_var1 + 7', 'bad constant',
+                register_set, label_values, TestLineObject.memzone
+            )
         with self.assertRaises(SystemExit, msg='labels should not be registers'):
-            l_fail = LabelLine.factory(13, 'mar = $1234', 'bad label', register_set, label_values, TestLineObject.memzone)
+            LabelLine.factory(
+                13, 'mar = $1234', 'bad label', register_set,
+                label_values, TestLineObject.memzone
+            )
         with self.assertRaises(SystemExit, msg='labels should not be registers'):
-            l_fail = LabelLine.factory(13, 'sp:', 'bad label', register_set, label_values, TestLineObject.memzone)
+            LabelLine.factory(
+                13, 'sp:', 'bad label', register_set, label_values,
+                TestLineObject.memzone
+            )
 
     def test_label_line_with_instruction(self):
         with pkg_resources.path(config_files, 'test_instructions_with_variants.yaml') as fp:
@@ -273,15 +301,15 @@ class TestLineObject(unittest.TestCase):
         #     )
 
     def test_valid_labels(self):
-        self.assertTrue(is_valid_label('a_str'),'valid label')
-        self.assertTrue(is_valid_label('a_str_with_123'),'valid label')
-        self.assertTrue(is_valid_label('.start_with_dot'),'valid label')
-        self.assertTrue(is_valid_label('_start_with_line'),'valid label')
+        self.assertTrue(is_valid_label('a_str'), 'valid label')
+        self.assertTrue(is_valid_label('a_str_with_123'), 'valid label')
+        self.assertTrue(is_valid_label('.start_with_dot'), 'valid label')
+        self.assertTrue(is_valid_label('_start_with_line'), 'valid label')
 
-        self.assertFalse(is_valid_label('12_monkeys'),'valid label')
-        self.assertFalse(is_valid_label('8675309'),'invalid label: only numbers')
-        self.assertFalse(is_valid_label('m+g'),'invalid label: operators')
-        self.assertFalse(is_valid_label('final frontier'),'invalid label: contains space')
+        self.assertFalse(is_valid_label('12_monkeys'), 'valid label')
+        self.assertFalse(is_valid_label('8675309'), 'invalid label: only numbers')
+        self.assertFalse(is_valid_label('m+g'), 'invalid label: operators')
+        self.assertFalse(is_valid_label('final frontier'), 'invalid label: contains space')
 
     def test_instruction_line_creation(self):
         with pkg_resources.path(config_files, 'test_instruction_list_creation_isa.json') as fp:
@@ -342,7 +370,6 @@ class TestLineObject(unittest.TestCase):
     def test_bad_instruction_lines(self):
         with pkg_resources.path(config_files, 'register_argument_exmaple_config.yaml') as fp:
             isa_model = AssemblerModel(str(fp), 0)
-        label_values = GlobalLabelScope(isa_model.registers)
 
         # this instruction should fail because register A is not configured to be an
         # indirect register, so the parser assumes this is a indirect numeric expression
@@ -556,5 +583,7 @@ class TestLineObject(unittest.TestCase):
                     TestLineObject.memzone,
                     TestLineObject.memory_zone_manager,
                 )
+
+
 if __name__ == '__main__':
     unittest.main()

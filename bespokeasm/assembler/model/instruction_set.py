@@ -6,7 +6,8 @@ from bespokeasm.assembler.model.instruction_base import InstructionBase
 from bespokeasm.assembler.model.operand_set import OperandSetCollection
 from bespokeasm.assembler.keywords import ASSEMBLER_KEYWORD_SET
 
-class InstructionSet(dict[str,InstructionBase]):
+
+class InstructionSet(dict[str, InstructionBase]):
     def __init__(
                 self,
                 instructions_config: dict,
@@ -18,7 +19,7 @@ class InstructionSet(dict[str,InstructionBase]):
         self._instructions_config = instructions_config
         self._macros_config = macros_config
 
-        lower_leywords = {kw.lower():kw for kw in ASSEMBLER_KEYWORD_SET}
+        lower_leywords = {kw.lower(): kw for kw in ASSEMBLER_KEYWORD_SET}
 
         for mnemonic, instr_config in self._instructions_config.items():
             mnemonic = mnemonic.lower()
@@ -42,5 +43,5 @@ class InstructionSet(dict[str,InstructionBase]):
             for macro in macro_list:
                 self[macro.mnemonic] = macro
 
-    def get(self, mnemonic:str) -> InstructionBase:
+    def get(self, mnemonic: str) -> InstructionBase:
         return super().get(mnemonic, None)

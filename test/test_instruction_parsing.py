@@ -1,6 +1,5 @@
 import unittest
 import importlib.resources as pkg_resources
-from importlib import reload
 
 from test import config_files
 
@@ -13,8 +12,10 @@ from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 
+
 class TestInstructionParsing(unittest.TestCase):
     label_values = None
+
     @classmethod
     def setUpClass(cls):
         global_scope = GlobalLabelScope(set())
@@ -132,7 +133,6 @@ class TestInstructionParsing(unittest.TestCase):
         with pkg_resources.path(config_files, 'test_indirect_indexed_register_operands.yaml') as fp:
             isa_model = AssemblerModel(str(fp), 0)
             memzone_mngr = MemoryZoneManager(isa_model.address_size, isa_model.default_origin)
-
 
         ins0 = InstructionLine.factory(22, 'mov a, [hl+i]', 'some comment!', isa_model, memzone_mngr.global_zone)
         ins0.set_start_address(1212)
@@ -320,7 +320,10 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertEqual(list(t3.get_bytes()), [254, 64], 'instruction byte should match')
 
         with self.assertRaises(SystemExit, msg='test bounds'):
-            e1 = InstructionLine.factory(lineid, '  tstb b, 14', 'second argument is too large', isa_model, memzone_mngr.global_zone)
+            e1 = InstructionLine.factory(
+                lineid, '  tstb b, 14', 'second argument is too large',
+                isa_model, memzone_mngr.global_zone
+            )
             e1.label_scope = TestInstructionParsing.label_values
             e1.generate_bytes()
 
@@ -374,9 +377,9 @@ class TestInstructionParsing(unittest.TestCase):
 
         # no addressing punction for numeric expression operands
         with self.assertRaises(SystemExit, msg='there should be no addressing punctuation in numeric expression operands'):
-            t2 = InstructionLine.factory(lineid, 'add [.local_var+7]', 'comment', isa_model, memzone_mngr.global_zone)
+            InstructionLine.factory(lineid, 'add [.local_var+7]', 'comment', isa_model, memzone_mngr.global_zone)
         with self.assertRaises(SystemExit, msg='there should be no addressing punctuation in numeric expression operands'):
-            t3 = InstructionLine.factory(lineid, 'add {.local_var+7}', 'comment', isa_model, memzone_mngr.global_zone)
+            InstructionLine.factory(lineid, 'add {.local_var+7}', 'comment', isa_model, memzone_mngr.global_zone)
 
     def test_case_insentive_instructions(self):
         with pkg_resources.path(config_files, 'test_operand_features.yaml') as fp:
@@ -404,7 +407,7 @@ class TestInstructionParsing(unittest.TestCase):
         t1.set_start_address(1)
         t1.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
-        self.assertEqual(t1.byte_size,3, 'has 3 bytes')
+        self.assertEqual(t1.byte_size, 3, 'has 3 bytes')
         t1.generate_bytes()
         self.assertEqual(list(t1.get_bytes()), [0x80, 0x12, 0x30], 'instruction byte should match')
 
@@ -412,7 +415,7 @@ class TestInstructionParsing(unittest.TestCase):
         t2.set_start_address(1)
         t2.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t2, InstructionLine)
-        self.assertEqual(t2.byte_size,3, 'has 3 bytes')
+        self.assertEqual(t2.byte_size, 3, 'has 3 bytes')
         t2.generate_bytes()
         self.assertEqual(list(t2.get_bytes()), [0x88, 0x32, 0x10], 'instruction byte should match')
 
@@ -420,7 +423,7 @@ class TestInstructionParsing(unittest.TestCase):
         t3.set_start_address(1)
         t3.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t3, InstructionLine)
-        self.assertEqual(t3.byte_size,3, 'has 3 bytes')
+        self.assertEqual(t3.byte_size, 3, 'has 3 bytes')
         t3.generate_bytes()
         self.assertEqual(list(t3.get_bytes()), [0x81, 0x32, 0x10], 'instruction byte should match')
 
@@ -435,7 +438,7 @@ class TestInstructionParsing(unittest.TestCase):
         t1.set_start_address(0x8000)
         t1.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
-        self.assertEqual(t1.byte_size,3, 'has 3 bytes')
+        self.assertEqual(t1.byte_size, 3, 'has 3 bytes')
         t1.generate_bytes()
         self.assertEqual(list(t1.get_bytes()), [0xE5, 0x20, 0x80], 'instruction byte should match')
 
@@ -443,7 +446,7 @@ class TestInstructionParsing(unittest.TestCase):
         t2.set_start_address(0x8000)
         t2.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t2, InstructionLine)
-        self.assertEqual(t2.byte_size,2, 'has 2 bytes')
+        self.assertEqual(t2.byte_size, 2, 'has 2 bytes')
         t2.generate_bytes()
         self.assertEqual(list(t2.get_bytes()), [0xE6, 0x20], 'instruction byte should match')
 
@@ -451,7 +454,7 @@ class TestInstructionParsing(unittest.TestCase):
         t3.set_start_address(0x8000)
         t3.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t3, InstructionLine)
-        self.assertEqual(t3.byte_size,2, 'has 2 bytes')
+        self.assertEqual(t3.byte_size, 2, 'has 2 bytes')
         t3.generate_bytes()
         self.assertEqual(list(t3.get_bytes()), [0xEE, 0x20], 'instruction byte should match')
 
@@ -459,7 +462,7 @@ class TestInstructionParsing(unittest.TestCase):
         t4.set_start_address(0x8000)
         t4.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t4, InstructionLine)
-        self.assertEqual(t4.byte_size,2, 'has 2 bytes')
+        self.assertEqual(t4.byte_size, 2, 'has 2 bytes')
         t4.generate_bytes()
         self.assertEqual(list(t4.get_bytes()), [0xEF, 0x1E], 'instruction byte should match')
 

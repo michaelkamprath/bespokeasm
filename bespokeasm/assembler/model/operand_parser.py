@@ -96,6 +96,7 @@ class OperandSetsModel:
 
         return MatchedOperandSet(matched_operands, self.reverse_argument_order, self.reverse_bytecode_order)
 
+
 class SpecificOperandsModel:
     class SpecificOperandConfig:
         def __init__(self, config: dict, default_endian: str, registers: set[str]):
@@ -137,11 +138,13 @@ class SpecificOperandsModel:
             return len(self._operands)
 
     _specific_operands: list[SpecificOperandsModel.SpecificOperandConfig]
+
     def __init__(self, config: dict, default_endian: str, registers: set[str]):
         self._specific_operands = [
             SpecificOperandsModel.SpecificOperandConfig(arg_confing_dict, default_endian, registers)
-                for arg_confing_dict in config.values()
+            for arg_confing_dict in config.values()
         ]
+
     def __repr__(self) -> str:
         return str(self)
 
@@ -186,7 +189,8 @@ class SpecificOperandsModel:
                     break
                 matched_operands.append(operand)
 
-            if (len(operands) + null_operand_count !=  target_operand_count) or (target_operand_count != len(matched_operands)):
+            if (len(operands) + null_operand_count != target_operand_count) \
+                    or (target_operand_count != len(matched_operands)):
                 matched_operands = []
                 continue
             matched_set = MatchedOperandSet(
@@ -199,7 +203,14 @@ class SpecificOperandsModel:
 
 
 class OperandParser:
-    def __init__(self, instruction: str, instruction_operands_config: dict, operand_set_collection: OperandSetCollection, default_endian: str, registers: set[str]):
+    def __init__(
+                self,
+                instruction: str,
+                instruction_operands_config: dict,
+                operand_set_collection: OperandSetCollection,
+                default_endian: str,
+                registers: set[str]
+            ):
         if instruction_operands_config is not None:
             self._config = instruction_operands_config
             if 'count' not in self._config:
@@ -227,8 +238,9 @@ class OperandParser:
         # check to make sure we as many operands configured as count.
         if self._operand_sets_model is not None and self.operand_count != self._operand_sets_model.operand_count:
             sys.exit(
-                f'ERROR: CONFIGURATION - the number of properly configured operands ({self._operand_sets_model.operand_count}) '
-                f'does not match prescribed number ({self.operand_count}) for instruction "{instruction}"'
+                f'ERROR: CONFIGURATION - the number of properly configured operands '
+                f'({self._operand_sets_model.operand_count}) does not match prescribed '
+                f'number ({self.operand_count}) for instruction "{instruction}"'
             )
 
     @property
@@ -271,6 +283,7 @@ class OperandParser:
 
         # if we are here, it's because no operands were parsed
         return None
+
 
 class MatchedOperandSet:
     def __init__(self, operands: list[ParsedOperand], reverse_arg_order: bool, reverse_op_bytecode_order: bool) -> None:
