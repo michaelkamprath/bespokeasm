@@ -6,10 +6,11 @@ from bespokeasm.assembler.line_object import LineWithBytes
 from bespokeasm.utilities import parse_numeric_string, is_string_numeric
 from bespokeasm.assembler.memory_zone import MemoryZone
 
+
 class DataLine(LineWithBytes):
     PATTERN_DATA_DIRECTIVE = re.compile(
         r'^(\.byte|\.2byte|\.4byte|\.8byte|\.cstr)\b\s*(?:([\w,$\%\s]+)|(?P<quote>[\"\']{1})((?:\\(?P=quote)|.)*)(?P=quote))',
-        flags=re.IGNORECASE|re.MULTILINE
+        flags=re.IGNORECASE | re.MULTILINE
     )
 
     DIRECTIVE_VALUE_BYTE_SIZE = {
@@ -27,13 +28,14 @@ class DataLine(LineWithBytes):
         '.8byte': 0xFFFFFFFFFFFFFFFF,
         '.cstr': 0xFF,
     }
+
     def factory(
             line_id: LineIdentifier,
             line_str: str,
             comment: str,
             endian: str,
             current_memzone: MemoryZone,
-        ) -> LineWithBytes:
+    ) -> LineWithBytes:
         """Tries to match the passed line string to the data directive pattern.
         If succcessful, returns a constructed DataLine object. If not, None is
         returned.
@@ -81,7 +83,7 @@ class DataLine(LineWithBytes):
             comment: str,
             endian: str,
             current_memzone: MemoryZone,
-        ) -> None:
+    ) -> None:
         super().__init__(line_id, instruction, comment, current_memzone)
         self._arg_value_list = value_list
         self._directive = directive_str
@@ -108,14 +110,15 @@ class DataLine(LineWithBytes):
                     if label_val is not None:
                         arg_val = label_val
                     else:
-                        sys.exit(f'ERROR: line {self.line_id} - unknown label "{arg_item}" in current scope "{self.label_scope}"')
+                        sys.exit(
+                            f'ERROR: line {self.line_id} - unknown label "{arg_item}" in current scope "{self.label_scope}"'
+                        )
             else:
                 sys.exit(f'ERROR: line {self.line_id} - unknown data item "{arg_item}"')
-            value_bytes = (arg_val&DataLine.DIRECTIVE_VALUE_MASK[self._directive]).to_bytes(
+            value_bytes = (arg_val & DataLine.DIRECTIVE_VALUE_MASK[self._directive]).to_bytes(
                 DataLine.DIRECTIVE_VALUE_BYTE_SIZE[self._directive],
                 byteorder=self._endian,
                 signed=(arg_val < 0)
             )
             for b in value_bytes:
                 self._append_byte(b)
-

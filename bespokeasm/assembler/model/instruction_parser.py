@@ -6,6 +6,7 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.byte_code.assembled import AssembledInstruction
 from bespokeasm.assembler.byte_code.generator import BytecodeGenerator
 
+
 class InstructioParser(InstructioParserBase):
     @classmethod
     def parse_instruction(cls, isa_model: AssemblerModel, line_id: LineIdentifier, instruction: str) -> AssembledInstruction:

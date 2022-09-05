@@ -13,6 +13,7 @@ from bespokeasm.assembler.model.operand_set import OperandSet, OperandSetCollect
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.line_identifier import LineIdentifier
 
+
 class AssemblerModel:
     _config: dict
 
@@ -77,8 +78,8 @@ class AssemblerModel:
         # check to see if old-style "memory block" is defined
         if 'predefined' in self._config and 'memory' in self._config['predefined']:
             sys.exit(
-                f'ERROR - ISA configuration file defines a predefined "memory" block. '
-                f'Memory blocks have been deprecated and replaced with "data" blocks.'
+                'ERROR - ISA configuration file defines a predefined "memory" block. '
+                'Memory blocks have been deprecated and replaced with "data" blocks.'
             )
 
         # check for min required BespokeASM version

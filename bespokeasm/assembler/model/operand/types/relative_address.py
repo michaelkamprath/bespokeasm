@@ -7,6 +7,7 @@ from bespokeasm.assembler.model.operand import OperandWithArgument, OperandType,
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.expression import EXPRESSION_PARTS_PATTERN
 
+
 class RelativeAddressByteCodePart(ExpressionByteCodePart):
     def __init__(
                 self,
@@ -32,9 +33,15 @@ class RelativeAddressByteCodePart(ExpressionByteCodePart):
         if self._offset_from_instruction_end:
             relative_value -= instruction_size
         if self._max_relative_value is not None and relative_value > self._max_relative_value:
-             sys.exit(f'ERROR: {self.line_id} - Relative address offset is larger than configured maximum value of {self._max_relative_value}')
+            sys.exit(
+                f'ERROR: {self.line_id} - Relative address offset is larger than configured '
+                f'maximum value of {self._max_relative_value}'
+            )
         if self._min_relative_value is not None and relative_value < self._min_relative_value:
-             sys.exit(f'ERROR: {self.line_id} - Relative address offset is smaller than configured minimum value of {self._min_relative_value}')
+            sys.exit(
+                f'ERROR: {self.line_id} - Relative address offset is smaller than configured '
+                f'minimum value of {self._min_relative_value}'
+            )
         return relative_value
 
 
@@ -101,5 +108,3 @@ class RelativeAddressOperand(OperandWithArgument):
         if arg_part.contains_register_labels(register_labels):
             return None
         return ParsedOperand(self, bytecode_part, arg_part, operand)
-
-

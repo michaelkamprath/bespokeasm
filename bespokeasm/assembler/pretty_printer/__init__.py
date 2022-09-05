@@ -1,7 +1,6 @@
-
-
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.model import AssemblerModel
+
 
 class PrettyPrinterBase:
     def __init__(self, line_objs:  list[LineObject], model: AssemblerModel) -> None:

@@ -17,7 +17,9 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.utilities import is_valid_label
 
-EXPRESSION_PARTS_PATTERN = r'(?:(?:\%|b)[01]+|(?:\$|0x)[0-9a-fA-F]+|\d+|[\+\-\*\/\&\|\^\(\)]|>>|<<|%|LSB\(|BYTE\d\(|(?:\.|_)?\w+)'
+EXPRESSION_PARTS_PATTERN = \
+    r'(?:(?:\%|b)[01]+|(?:\$|0x)[0-9a-fA-F]+|\d+|[\+\-\*\/\&\|\^\(\)]|>>|<<|%|LSB\(|BYTE\d\(|(?:\.|_)?\w+)'
+
 
 class TokenType(enum.Enum):
     T_NUM = 0
@@ -98,7 +100,13 @@ class ExpressionNode:
             left_result = self.left_child._compute(label_scope, line_id)
             right_result = self.right_child._compute(label_scope, line_id)
             operation = ExpressionNode._operations[self.token_type]
-            if self.token_type in [TokenType.T_AND, TokenType.T_OR, TokenType.T_XOR, TokenType.T_LEFT_SHIFT, TokenType.T_RIGHT_SHIFT]:
+            if self.token_type in [
+                        TokenType.T_AND,
+                        TokenType.T_OR,
+                        TokenType.T_XOR,
+                        TokenType.T_LEFT_SHIFT,
+                        TokenType.T_RIGHT_SHIFT
+                    ]:
                 left_result = int(left_result)
                 right_result = int(right_result)
             return operation(left_result, right_result)
@@ -173,6 +181,7 @@ def _parse_e(line_id: LineIdentifier, tokens: list[ExpressionNode]) -> Expressio
         left_node = node
     return left_node
 
+
 def _parse_e1(line_id: LineIdentifier, tokens: list[ExpressionNode]) -> ExpressionNode:
     left_node = _parse_e2(line_id, tokens)
     while tokens[0].token_type in [TokenType.T_LEFT_SHIFT, TokenType.T_RIGHT_SHIFT]:
@@ -181,6 +190,7 @@ def _parse_e1(line_id: LineIdentifier, tokens: list[ExpressionNode]) -> Expressi
         node.right_child = _parse_e2(line_id, tokens)
         left_node = node
     return left_node
+
 
 def _parse_e2(line_id: LineIdentifier, tokens: list[ExpressionNode]) -> ExpressionNode:
     left_node = _parse_e3(line_id, tokens)
@@ -200,6 +210,7 @@ def _parse_e3(line_id: LineIdentifier, tokens: list[ExpressionNode]) -> Expressi
         node.right_child = _parse_e4(line_id, tokens)
         left_node = node
     return left_node
+
 
 def _parse_e4(line_id: LineIdentifier, tokens: list[ExpressionNode]) -> ExpressionNode:
     if tokens[0].token_type in [TokenType.T_NUM, TokenType.T_LABEL]:

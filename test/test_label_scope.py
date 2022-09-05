@@ -1,8 +1,8 @@
 import unittest
-import importlib.resources as pkg_resources
 
 from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType, GlobalLabelScope
 from bespokeasm.assembler.line_identifier import LineIdentifier
+
 
 class TestLabelScope(unittest.TestCase):
 
@@ -74,4 +74,3 @@ class TestLabelScope(unittest.TestCase):
             file_scope.set_label_value('.cstr', 666, lineid)
         with self.assertRaises(SystemExit, msg='labels cannot be system keywords - file with local label'):
             local_scope.set_label_value('zero', 666, lineid)
-
