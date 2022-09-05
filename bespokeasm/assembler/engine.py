@@ -57,7 +57,7 @@ class Assembler:
         # create the predefined memory blocks
         predefines_lineid = LineIdentifier(0, os.path.basename(self._config_file))
         predefined_line_obs: list[LineObject] = []
-        for predefined_memory in self._model.predefined_memory_blocks:
+        for predefined_memory in self._model.predefined_data_blocks:
             label: str = predefined_memory['name']
             address: int = predefined_memory['address']
             value: int = predefined_memory['value']

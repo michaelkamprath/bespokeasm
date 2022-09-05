@@ -59,7 +59,7 @@ The number of operands required depends on the instruction mnemonic. All operand
 | `rotr` | ***register `a`*** or ***register `b`***| `1`, `2`, `3`, or `4` | Left rotates the bit value in the indicated register (only `a` or `b`) by the number of bits indicated by the second operand. Note that only certain values are allowed of the second operand, but it can be expressed by a numerical expression. |
 
 ### Defined Memory Symbols
-The KENBAK-1 configuration file for BespokeASM defines some memory addresses that can be used in code being compiled for the KENBAK-1. All of these predefined memory address symbols may be used in operands anywhere that a memory address can be used. The predefined symbols are:
+The KENBAK-1 configuration file for BespokeASM defines some memory addresses that can be used in code being compiled for the KENBAK-1. All of these predefined data symbols may be used in operands anywhere that a memory address can be used. The predefined symbols are:
 
 | Symbol | Memory Address For | Notes |
 |:-:|:-:|:-|
