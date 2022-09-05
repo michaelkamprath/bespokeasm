@@ -7,8 +7,9 @@ from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.model.instruction_parser import InstructioParser
 from bespokeasm.assembler.memory_zone import MemoryZone
 
+
 class InstructionLine(LineWithBytes):
-    COMMAND_EXTRACT_PATTERN = re.compile(r'^\s*(\w+)', flags=re.IGNORECASE|re.MULTILINE)
+    COMMAND_EXTRACT_PATTERN = re.compile(r'^\s*(\w+)', flags=re.IGNORECASE | re.MULTILINE)
 
     _INSTRUCTUION_EXTRACTION_PATTERN = None
 
@@ -18,20 +19,20 @@ class InstructionLine(LineWithBytes):
             comment: str,
             isa_model: AssemblerModel,
             current_memzone: MemoryZone,
-        ) -> LineWithBytes:
+    ) -> LineWithBytes:
         """Tries to contruct a instruction line object from the passed instruction line"""
         # first, extract evertything up to the next extruction
         if InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN is None:
             instructions_regex = '\\b' + '\\b|\\b'.join(isa_model.instruction_mnemonics) + '\\b'
             InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN = re.compile(
-                r'(?i)(?:((?:{0})\b.*?)(?:(?={1})|\;|$))'.format(instructions_regex,instructions_regex),
-                flags=re.IGNORECASE|re.MULTILINE,
+                r'(?i)(?:((?:{0})\b.*?)(?:(?={1})|\;|$))'.format(instructions_regex, instructions_regex),
+                flags=re.IGNORECASE | re.MULTILINE,
             )
         instruction_match = re.search(InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN, line_str)
         if instruction_match is not None:
             instruction_str = instruction_match.group(0)
 
-            #extract the instruction command
+            # extract the instruction command
             command_match = re.search(InstructionLine.COMMAND_EXTRACT_PATTERN, instruction_str)
             if command_match is None or len(command_match.groups()) != 1:
                 sys.exit(f'ERROR: {line_id} - Wrongly formatted instruction: {instruction_str}')
@@ -54,12 +55,13 @@ class InstructionLine(LineWithBytes):
             instruction: str,
             comment: str,
             current_memzone: MemoryZone,
-        ):
+    ):
         super().__init__(line_id, instruction, comment, current_memzone)
         self._command = command_str
         self._argument_str = argument_str
         self._isa_model = isa_model
         self._assembled_instruction = InstructioParser.parse_instruction(self._isa_model, line_id, instruction)
+
     def __str__(self):
         return f'InstructionLine<{self.instruction.strip()} -> {self._assembled_instruction}>'
 

@@ -1,5 +1,3 @@
-import sys
-
 class InstructionBase:
     def __init__(
                 self,

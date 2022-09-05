@@ -1,7 +1,5 @@
 import binascii
 import click
-import io
-import math
 import os
 import sys
 
@@ -10,12 +8,10 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithBytes, LineObject
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.line_object.predefined_data import PredefinedDataLine
-from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
-from bespokeasm.assembler.label_scope import LabelScope
-from bespokeasm.assembler.pretty_printer import PrettyPrinterBase
 from bespokeasm.assembler.pretty_printer.factory import PrettyPrinterFactory
+
 
 class Assembler:
     def __init__(
@@ -57,7 +53,7 @@ class Assembler:
         # create the predefined memory blocks
         predefines_lineid = LineIdentifier(0, os.path.basename(self._config_file))
         predefined_line_obs: list[LineObject] = []
-        for predefined_memory in self._model.predefined_memory_blocks:
+        for predefined_memory in self._model.predefined_data_blocks:
             label: str = predefined_memory['name']
             address: int = predefined_memory['address']
             value: int = predefined_memory['value']
@@ -163,5 +159,3 @@ class Assembler:
             else:
                 with open(self._pretty_print_output, 'w') as f:
                     f.write(pretty_str)
-
-

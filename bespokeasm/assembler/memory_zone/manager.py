@@ -1,7 +1,7 @@
-
 from bespokeasm.assembler.memory_zone import MemoryZone
 
 GLOBAL_ZONE_NAME = 'GLOBAL'
+
 
 class MemoryZoneManager:
     def __init__(self, address_bits: int, default_origin: int, predefined_zones: list[dict] = []) -> None:

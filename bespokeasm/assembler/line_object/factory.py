@@ -11,14 +11,15 @@ from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.memory_zone import MemoryZone
 
+
 class LineOjectFactory:
     PATTERN_COMMENTS = re.compile(
         r'((?<=\;).*)$',
-        flags=re.IGNORECASE|re.MULTILINE
+        flags=re.IGNORECASE | re.MULTILINE
     )
     PATTERN_INSTRUCTION_CONTENT = re.compile(
         r'^([^\;\n]*)',
-        flags=re.IGNORECASE|re.MULTILINE
+        flags=re.IGNORECASE | re.MULTILINE
     )
 
     @classmethod
@@ -46,7 +47,6 @@ class LineOjectFactory:
         # parse instruction
         line_obj_list: list[LineObject] = []
         while len(instruction_str) > 0:
-            #print(f'Parsing instruction string = "{instruction_str}"')
             # try label
             line_obj = LabelLine.factory(
                 line_id,
@@ -79,7 +79,6 @@ class LineOjectFactory:
             line_obj = InstructionLine.factory(line_id, instruction_str, comment_str, model, current_memzone)
             if line_obj is not None:
                 line_obj_list.append(line_obj)
-                #print(f'    found instruction with text = "{line_obj.instruction}"')
                 instruction_str = instruction_str.replace(line_obj.instruction, '', 1).strip()
                 continue
 

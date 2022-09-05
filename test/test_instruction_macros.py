@@ -3,11 +3,12 @@ import importlib.resources as pkg_resources
 
 from test import config_files
 
-from bespokeasm.assembler.label_scope import GlobalLabelScope, LabelScope, LabelScopeType
+from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+
 
 class TestInstructionMacros(unittest.TestCase):
     label_values = None

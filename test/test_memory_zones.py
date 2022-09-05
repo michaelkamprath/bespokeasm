@@ -24,7 +24,11 @@ class TestMemoryZones(unittest.TestCase):
         with pkg_resources.path(config_files, 'test_memory_zones.yaml') as fp:
             isa_model = AssemblerModel(str(fp), 0)
         label_scope = GlobalLabelScope(isa_model.registers)
-        memzone_manager = MemoryZoneManager(isa_model.address_size, isa_model.default_origin, isa_model.predefined_memory_zones)
+        memzone_manager = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones
+        )
 
         with pkg_resources.path(test_code, 'test_memory_zones.asm') as asm_fp:
             asm_obj = AssemblyFile(asm_fp, label_scope)

@@ -1,12 +1,14 @@
-import re
-
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.expression import EXPRESSION_PARTS_PATTERN
 
 PATTERN_LABEL_DEFINITION = r'\s*(?:\.?\w+:)'
-INSTRUCTION_EXPRESSION_PATTERN = r'(?:{0}|(?:[ \t]*)(?!(?:[ \t]*\;|[ \t]*\v)|{1}))+'.format(EXPRESSION_PARTS_PATTERN, PATTERN_LABEL_DEFINITION)
+INSTRUCTION_EXPRESSION_PATTERN = r'(?:{0}|(?:[ \t]*)(?!(?:[ \t]*\;|[ \t]*\v)|{1}))+'.format(
+    EXPRESSION_PARTS_PATTERN,
+    PATTERN_LABEL_DEFINITION,
+)
+
 
 class LineObject:
     def __init__(self, line_id: LineIdentifier, instruction: str, comment: str, memzone: MemoryZone):
@@ -19,6 +21,7 @@ class LineObject:
 
     def __repr__(self):
         return str(self)
+
     def __str__(self):
         return f'LineObject<{self.instruction}>'
 
@@ -69,11 +72,11 @@ class LineObject:
     def memory_zone(self) -> MemoryZone:
         return self._memzone
 
+
 class LineWithBytes(LineObject):
     def __init__(self, line_id: LineIdentifier, instruction: str, comment: str, memzone: MemoryZone):
         super().__init__(line_id, instruction, comment, memzone)
         self._bytes = bytearray()
-
 
     def generate_bytes(self) -> None:
         """Finalize the bytes for this line with the label assignemnts
@@ -89,4 +92,4 @@ class LineWithBytes(LineObject):
 
     def _append_byte(self, byte_value: int):
         """appends the passed byte value to this objects bytes"""
-        self._bytes.append(byte_value&0xFF)
+        self._bytes.append(byte_value & 0xFF)
