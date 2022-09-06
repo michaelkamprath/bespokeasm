@@ -1,3 +1,4 @@
 click
 packaging
 pyyaml
+pre-commit

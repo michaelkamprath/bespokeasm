@@ -15,10 +15,13 @@ import sys
 from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
-from bespokeasm.assembler.line_object.directive_line import AddressOrgLine
+from bespokeasm.assembler.line_object.directive_line import AddressOrgLine, SetMemoryZoneLine
 from bespokeasm.assembler.line_object.factory import LineOjectFactory
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.assembler.memory_zone import MEMORY_ZONE_NAME_PATTERN
+from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.utilities import PATTERN_NUMERIC, parse_numeric_string
 
 
 class AssemblyFile:
@@ -42,6 +45,7 @@ class AssemblyFile:
                 self,
                 isa_model: AssemblerModel,
                 include_paths: set[str],
+                memzone_manager: MemoryZoneManager,
                 log_verbosity: int,
                 assembly_files_used: set = set()
             ) -> list[LineObject]:
@@ -51,6 +55,7 @@ class AssemblyFile:
             assembly_files_used.add(self.filename)
             line_num = 0
             current_scope = self.label_scope
+            current_memzone = memzone_manager.global_zone
             for line in f:
                 line_num += 1
                 line_id = LineIdentifier(line_num, filename=self.filename)
@@ -62,6 +67,7 @@ class AssemblyFile:
                             line_str,
                             line_id,
                             isa_model,
+                            memzone_manager,
                             include_paths,
                             log_verbosity,
                             assembly_files_used
@@ -72,13 +78,27 @@ class AssemblyFile:
                         self._handle_require_language(line_str, line_id, isa_model, log_verbosity)
                         continue
 
-                    lobj_list = LineOjectFactory.parse_line(line_id, line_str, isa_model, current_scope)
+                    if line_str.startswith('#create_memzone'):
+                        self._handle_create_memzone(line_str, line_id, isa_model, memzone_manager, log_verbosity)
+                        continue
+
+                    lobj_list = LineOjectFactory.parse_line(
+                        line_id,
+                        line_str,
+                        isa_model,
+                        current_scope,
+                        current_memzone,
+                        memzone_manager,
+                    )
                     for lobj in lobj_list:
                         if isinstance(lobj, LabelLine):
-                            if not lobj.is_constant and LabelScopeType.get_label_scope(lobj.get_label()) != LabelScopeType.LOCAL:
+                            if not lobj.is_constant \
+                                    and LabelScopeType.get_label_scope(lobj.get_label()) != LabelScopeType.LOCAL:
                                 current_scope = LabelScope(LabelScopeType.LOCAL, self.label_scope, lobj.get_label())
                         elif isinstance(lobj, AddressOrgLine):
                             current_scope = self.label_scope
+                        if isinstance(lobj, SetMemoryZoneLine):
+                            current_memzone = lobj.memory_zone
                         lobj.label_scope = current_scope
                         # setting constants now so they can be used when evluating lines later.
                         if isinstance(lobj, LabelLine) and lobj.is_constant:
@@ -99,11 +119,20 @@ class AssemblyFile:
         flags=re.IGNORECASE | re.VERBOSE
     )
 
+    PATTERN_CREATE_MEMORY_ZONE = re.compile(
+        r'#create_memzone\s+({0})\s+({1})\s+({2})'.format(
+            MEMORY_ZONE_NAME_PATTERN,
+            PATTERN_NUMERIC,
+            PATTERN_NUMERIC,
+        )
+    )
+
     def _handle_include_file(
                 self,
                 line_str: int,
                 line_id: LineIdentifier,
                 isa_model: AssemblerModel,
+                memzone_manager: MemoryZoneManager,
                 include_paths: set[str],
                 log_verbosity: int,
                 assembly_files_used: set
@@ -121,6 +150,7 @@ class AssemblyFile:
             return file_obj.load_line_objects(
                 isa_model,
                 include_paths,
+                memzone_manager,
                 log_verbosity,
                 assembly_files_used=assembly_files_used
             )
@@ -205,3 +235,34 @@ class AssemblyFile:
         if filepath is None:
             sys.exit(f'ERROR: {line_id} - could not find file "{filename}" to include')
         return filepath
+
+    def _handle_create_memzone(
+        self,
+        line_str: str,
+        line_id: LineIdentifier,
+        isa_model: AssemblerModel,
+        memzone_manager: MemoryZoneManager,
+        log_verbosity: int
+    ) -> None:
+        '''Cre  ates a new memory zone based on the #create_memzone line'''
+        memzone_match = re.search(AssemblyFile.PATTERN_CREATE_MEMORY_ZONE, line_str)
+        if memzone_match is not None and len(memzone_match.groups()) == 3:
+            name = memzone_match.group(1).strip()
+            start_addr = parse_numeric_string(memzone_match.group(2))
+            end_addr = parse_numeric_string(memzone_match.group(3))
+            if log_verbosity > 2:
+                print(
+                    f'Creating memory zone "{name}" with start address {start_addr} '
+                    f'and end address {end_addr}'
+                )
+            try:
+                memzone_manager.create_zone(
+                    isa_model.address_size,
+                    start_addr,
+                    end_addr,
+                    name,
+                )
+            except KeyError:
+                sys.exit(f'ERROR: {line_id} - Memory zone "{name}" defined multiple times')
+        else:
+            sys.exit(f'ERROR: {line_id} - Syntax error when creating memory zone')

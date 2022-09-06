@@ -13,6 +13,7 @@ from test import config_files
 from bespokeasm.configgen.vscode import VSCodeConfigGenerator
 from bespokeasm.configgen.sublime import SublimeConfigGenerator
 
+
 class TestConfigurationGeneration(unittest.TestCase):
 
     def assertIsFile(self, path):
@@ -47,13 +48,41 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIsFile(package_fp)
         with open(package_fp, 'r') as json_file:
             package_json = json.load(json_file)
-        self.assertEqual(package_json['name'], 'bespokeasm-test', 'package name should be modified ISA name')
-        self.assertEqual(package_json['displayName'], 'Little Endian Line Creation', 'display name should be correct')
-        self.assertEqual(package_json['contributes']['languages'][0]['id'], 'bespokeasm-test-assembly', 'language ID should be modified ISA name')
-        self.assertEqual(package_json['contributes']['languages'][0]['extensions'], ['.asmtest'], 'file extension list should match')
-        self.assertEqual(package_json['contributes']['grammars'][0]['language'], 'bespokeasm-test-assembly', 'language ID should be modified ISA name')
-        self.assertEqual(package_json['contributes']['snippets'][0]['language'], 'bespokeasm-test-assembly', 'language ID should be modified ISA name')
-        self.assertEqual(package_json['contributes']['snippets'][0]['language'], 'bespokeasm-test-assembly', 'language ID should be modified ISA name')
+        self.assertEqual(
+            package_json['name'],
+            'bespokeasm-test',
+            'package name should be modified ISA name'
+        )
+        self.assertEqual(
+            package_json['displayName'],
+            'Little Endian Line Creation',
+            'display name should be correct'
+        )
+        self.assertEqual(
+            package_json['contributes']['languages'][0]['id'],
+            'bespokeasm-test-assembly',
+            'language ID should be modified ISA name'
+        )
+        self.assertEqual(
+            package_json['contributes']['languages'][0]['extensions'],
+            ['.asmtest'],
+            'file extension list should match'
+        )
+        self.assertEqual(
+            package_json['contributes']['grammars'][0]['language'],
+            'bespokeasm-test-assembly',
+            'language ID should be modified ISA name'
+        )
+        self.assertEqual(
+            package_json['contributes']['snippets'][0]['language'],
+            'bespokeasm-test-assembly',
+            'language ID should be modified ISA name'
+        )
+        self.assertEqual(
+            package_json['contributes']['snippets'][0]['language'],
+            'bespokeasm-test-assembly',
+            'language ID should be modified ISA name'
+        )
 
         grammar_fp = os.path.join(extension_dirpath, 'bespokeasm-test', 'syntaxes', 'tmGrammar.json')
         self.assertIsFile(grammar_fp)
@@ -93,12 +122,36 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIsFile(package_fp)
         with open(package_fp, 'r') as json_file:
             package_json = json.load(json_file)
-        self.assertEqual(package_json['name'], 'tester-assembly', 'package name should be modified ISA name')
-        self.assertEqual(package_json['contributes']['languages'][0]['id'], 'tester-assembly-assembly', 'language ID should be modified ISA name')
-        self.assertEqual(package_json['contributes']['languages'][0]['extensions'], ['.asmtest'], 'file extension list should match')
-        self.assertEqual(package_json['contributes']['grammars'][0]['language'], 'tester-assembly-assembly', 'language ID should be modified ISA name')
-        self.assertEqual(package_json['contributes']['snippets'][0]['language'], 'tester-assembly-assembly', 'language ID should be modified ISA name')
-        self.assertEqual(package_json['contributes']['snippets'][0]['language'], 'tester-assembly-assembly', 'language ID should be modified ISA name')
+        self.assertEqual(
+            package_json['name'],
+            'tester-assembly',
+            'package name should be modified ISA name'
+        )
+        self.assertEqual(
+            package_json['contributes']['languages'][0]['id'],
+            'tester-assembly-assembly',
+            'language ID should be modified ISA name'
+        )
+        self.assertEqual(
+            package_json['contributes']['languages'][0]['extensions'],
+            ['.asmtest'],
+            'file extension list should match'
+        )
+        self.assertEqual(
+            package_json['contributes']['grammars'][0]['language'],
+            'tester-assembly-assembly',
+            'language ID should be modified ISA name'
+        )
+        self.assertEqual(
+            package_json['contributes']['snippets'][0]['language'],
+            'tester-assembly-assembly',
+            'language ID should be modified ISA name'
+        )
+        self.assertEqual(
+            package_json['contributes']['snippets'][0]['language'],
+            'tester-assembly-assembly',
+            'language ID should be modified ISA name'
+        )
 
         grammar_fp = os.path.join(extension_dirpath, 'tester-assembly', 'syntaxes', 'tmGrammar.json')
         self.assertIsFile(grammar_fp)
@@ -151,7 +204,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertFalse(('registers' in syntax_dict['contexts']), 'no registers should be found')
         self._assert_grouped_item_list(
             syntax_dict['contexts']['compiler_directives'][0]['match'],
-            ['\\.org'],
+            ['\\.org', '\\.memzone'],
             'compiler directives'
         )
         self._assert_grouped_item_list(
@@ -165,7 +218,7 @@ class TestConfigurationGeneration(unittest.TestCase):
                 item_match_str = item['match']
         self._assert_grouped_item_list(
             item_match_str,
-            ['include', 'require'],
+            ['include', 'require', 'create_memzone'],
             'data type directives'
         )
         self.assertIsFile(os.path.join(test_tmp_dir, 'bespokeasm-test.sublime-color-scheme'))
@@ -177,7 +230,6 @@ class TestConfigurationGeneration(unittest.TestCase):
         configgen.generate()
         package_fp = os.path.join(test_destination_dir, 'bespokeasm-test.sublime-package')
         self.assertIsFile(package_fp)
-
 
         shutil.rmtree(test_destination_dir)
 
@@ -216,7 +268,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         )
         self._assert_grouped_item_list(
             syntax_dict['contexts']['compiler_directives'][0]['match'],
-            ['\\.org'],
+            ['\\.org', '\\.memzone'],
             'compiler directives'
         )
         self._assert_grouped_item_list(
@@ -234,7 +286,7 @@ class TestConfigurationGeneration(unittest.TestCase):
                 item_match_str = item['match']
         self._assert_grouped_item_list(
             item_match_str,
-            ['include', 'require'],
+            ['include', 'require', 'create_memzone'],
             'data type directives'
         )
         self.assertIsFile(os.path.join(test_tmp_dir, 'tester-assembly.sublime-color-scheme'))
@@ -246,6 +298,5 @@ class TestConfigurationGeneration(unittest.TestCase):
         configgen.generate()
         package_fp = os.path.join(test_destination_dir, 'tester-assembly.sublime-package')
         self.assertIsFile(package_fp)
-
 
         shutil.rmtree(test_destination_dir)

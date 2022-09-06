@@ -19,7 +19,7 @@ predefined:
       value: 44
     - name: CONST2
       value: 0xBEEF
-  memory:
+  data:
     - name: buffer
       address: 0xf200
       value: 0

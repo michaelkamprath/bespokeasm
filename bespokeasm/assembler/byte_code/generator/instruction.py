@@ -8,7 +8,6 @@ from bespokeasm.assembler.model.instruction import Instruction, InstructionVaria
 from bespokeasm.assembler.model import AssemblerModel
 
 
-
 class InstructionBytecodeGenerator:
 
     @classmethod
@@ -36,7 +35,6 @@ class InstructionBytecodeGenerator:
                 return assembled_instruction
 
         sys.exit(f'ERROR: {line_id} - Instruction "{mnemonic}" has no valid operands configured.')
-
 
     @classmethod
     def generate_variant_bytecode_parts(
@@ -87,4 +85,3 @@ class InstructionBytecodeGenerator:
             machine_code = [base_bytecode]
 
         return AssembledInstruction(line_id, machine_code)
-

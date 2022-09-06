@@ -5,6 +5,7 @@ from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.pretty_printer import PrettyPrinterBase
 from bespokeasm.assembler.line_object.directive_line import AddressOrgLine
 
+
 class MinHexPrettyPrinter(PrettyPrinterBase):
     def __init__(self, line_objs:  list[LineObject], model: AssemblerModel) -> None:
         super().__init__(line_objs, model)

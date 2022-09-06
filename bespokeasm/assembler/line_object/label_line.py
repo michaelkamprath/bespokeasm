@@ -6,15 +6,17 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject, INSTRUCTION_EXPRESSION_PATTERN
 from bespokeasm.utilities import is_valid_label
 from bespokeasm.expression import parse_expression
+from bespokeasm.assembler.memory_zone import MemoryZone
+
 
 class LabelLine(LineObject):
     PATTERN_LABEL = re.compile(
         r'^\s*((\.?\w+):)(?:\s*([^;]*))?\;?',
-        flags=re.IGNORECASE|re.MULTILINE
+        flags=re.IGNORECASE | re.MULTILINE
     )
     PATTERN_CONSTANT = re.compile(
         r'^\s*(\w+)(?:\s*)?\=(?:\s*)?({0}|)'.format(INSTRUCTION_EXPRESSION_PATTERN),
-        flags=re.IGNORECASE|re.MULTILINE
+        flags=re.IGNORECASE | re.MULTILINE
     )
 
     @classmethod
@@ -25,6 +27,7 @@ class LabelLine(LineObject):
                 comment: str,
                 registers: set[str],
                 label_scope: LabelScope,
+                current_memzone: MemoryZone,
             ) -> LineObject:
         """Tries to match the passed line string to the Label or Constant directive patterns.
         If succcessful, returns a constructed LabelLine object. If not, None is
@@ -38,7 +41,7 @@ class LabelLine(LineObject):
             if is_valid_label(label_val):
                 if label_val in registers:
                     sys.exit(f'ERROR: {line_id} - used the register label "{label_val}" as a non-register label')
-                return LabelLine(line_id, label_val, None, label_match.group(1).strip(), comment)
+                return LabelLine(line_id, label_val, None, label_match.group(1).strip(), comment, current_memzone)
 
         # Now determine is the line is a constant
         constant_match = re.search(LabelLine.PATTERN_CONSTANT, line_str)
@@ -58,11 +61,12 @@ class LabelLine(LineObject):
                     value_expr.get_value(label_scope, line_id),
                     line_str,
                     comment,
+                    current_memzone,
                 )
             except ValueError as e:
                 sys.exit(f'ERROR: {line_id} - Constant assigned nonnumeric value because {e}')
             return line_obj
-        #if we got here it was neither a Label or a Constant
+        # if we got here it was neither a Label or a Constant
         return None
 
     @classmethod
@@ -77,15 +81,24 @@ class LabelLine(LineObject):
                 return instr_str.strip()
         return None
 
-    def __init__(self, line_id: LineIdentifier, label: str, value: int, instruction: str, comment: str):
-        super().__init__(line_id, instruction, comment)
+    def __init__(
+            self,
+            line_id: LineIdentifier,
+            label: str,
+            value: int,
+            instruction: str,
+            comment: str,
+            current_memzone: MemoryZone,
+    ) -> None:
+        super().__init__(line_id, instruction, comment, current_memzone)
         self._label = label
         self._value = value
-    def __str__(self):
+
+    def __str__(self) -> str:
         return f'LabelLine<{self.get_label()} -> {self.get_value()}>'
 
     @property
-    def is_constant(self):
+    def is_constant(self) -> bool:
         return self._value is not None
 
     def get_label(self) -> str:

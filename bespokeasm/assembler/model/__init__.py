@@ -13,6 +13,7 @@ from bespokeasm.assembler.model.operand_set import OperandSet, OperandSetCollect
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.line_identifier import LineIdentifier
 
+
 class AssemblerModel:
     _config: dict
 
@@ -33,24 +34,8 @@ class AssemblerModel:
             sys.exit('ERROR: unknown ISA config file type')
 
         self._config = config_dict
-        # check for min required BespokeASM version
-        if 'min_version' in self._config['general']:
-            required_version = self._config['general']['min_version']
-            if is_verbose > 0:
-                click.echo(
-                    f'The ISA configuration file requires BespokeASM version {required_version}. This '
-                    f'version of BespokeASM is {BESPOKEASM_VERSION_STR}.'
-                )
-            if required_version > BESPOKEASM_VERSION_STR:
-                sys.exit(
-                    f'ERROR: the instruction set configuration file requires at least BespokeASM '
-                    f'version {required_version}'
-                )
-            if required_version < BESPOKEASM_MIN_REQUIRED_STR:
-                sys.exit(
-                    f'ERROR: this version of BespokeASM requires a configuration file that minimally '
-                    f'requires BespokeASM version {BESPOKEASM_MIN_REQUIRED_STR}'
-                )
+        self._validate_config(is_verbose)
+
         # load ISA version information
         config_file_name = os.path.splitext(os.path.basename(config_file_path))[0]
         if 'identifier' in self._config['general']:
@@ -87,6 +72,34 @@ class AssemblerModel:
                 self._config.get('macros', None),
                 self._operand_sets, self.endian, self.registers
             )
+
+    def _validate_config(self, is_verbose: int) -> None:
+        '''Performs some validation checks on configuration dictionary'''
+        # check to see if old-style "memory block" is defined
+        if 'predefined' in self._config and 'memory' in self._config['predefined']:
+            sys.exit(
+                'ERROR - ISA configuration file defines a predefined "memory" block. '
+                'Memory blocks have been deprecated and replaced with "data" blocks.'
+            )
+
+        # check for min required BespokeASM version
+        if 'min_version' in self._config['general']:
+            required_version = self._config['general']['min_version']
+            if is_verbose > 0:
+                click.echo(
+                    f'The ISA configuration file requires BespokeASM version {required_version}. This '
+                    f'version of BespokeASM is {BESPOKEASM_VERSION_STR}.'
+                )
+            if required_version > BESPOKEASM_VERSION_STR:
+                sys.exit(
+                    f'ERROR: the instruction set configuration file requires at least BespokeASM '
+                    f'version {required_version}'
+                )
+            if required_version < BESPOKEASM_MIN_REQUIRED_STR:
+                sys.exit(
+                    f'ERROR: this version of BespokeASM requires a configuration file that minimally '
+                    f'requires BespokeASM version {BESPOKEASM_MIN_REQUIRED_STR}'
+                )
 
     def __repr__(self) -> str:
         return str(self)
@@ -125,6 +138,7 @@ class AssemblerModel:
 
     @property
     def address_size(self) -> int:
+        '''The number of bits used to rerpesent a memory address'''
         return self._config['general']['address_size']
 
     @property
@@ -154,9 +168,9 @@ class AssemblerModel:
             return []
 
     @property
-    def predefined_memory_blocks(self) -> list[dict]:
-        if 'predefined' in self._config and 'memory' in self._config['predefined']:
-            return self._config['predefined']['memory']
+    def predefined_data_blocks(self) -> list[dict]:
+        if 'predefined' in self._config and 'data' in self._config['predefined']:
+            return self._config['predefined']['data']
         else:
             return []
 
@@ -168,9 +182,18 @@ class AssemblerModel:
         results: list[str] = []
         for item in self.predefined_constants:
             results.append(item['name'])
-        for item in self.predefined_memory_blocks:
+        for item in self.predefined_data_blocks:
+            results.append(item['name'])
+        for item in self.predefined_memory_zones:
             results.append(item['name'])
         return results
+
+    @property
+    def predefined_memory_zones(self) -> list[dict]:
+        if 'predefined' in self._config and 'memory_zones' in self._config['predefined']:
+            return self._config['predefined']['memory_zones']
+        else:
+            return []
 
     @property
     def global_label_scope(self) -> LabelScope:

@@ -9,11 +9,11 @@ general:
   origin: 4
   identifier:
     name: kenbak-1
-    version: "1.0.0"
+    version: "1.0.1"
     extension: kb1
-  min_version: 0.2.0
+  min_version: 0.2.4
 predefined:
-  memory:
+  data:
     - name: A_REG
       address: 0
       value: 0
