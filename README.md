@@ -44,7 +44,7 @@ Contributions are welcome. All contributions should pass the configured linters.
 
 ```sh
 cd /path/to/bespokeasm/repository
-pipenv sync
+pipenv sync --dev
 pre-commit install
 ```
 
