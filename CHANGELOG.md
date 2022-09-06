@@ -16,13 +16,16 @@ Changes that are planned but not implemented yet:
   * unknown labels
 
 ## [Unreleased]
+
+## [0.2.4]
 * Fixed bug where unknown instructions did not produce an error.
 * Fixed bug where `#include` directives did not recognize otherwise valid file names
 * Fixed bug where zero operand macros did not get recognized correctly
 * Added ability to reverse the order of the byte code that an instruction's operands emit.
 * Added the `relative_address` operand type.
 * Added more examples
-* Added named memory zones feature. As a result of this addition, the "memory block" feature was renamed to "data block" to further distinguish the two features.
+* Added named memory zones feature.
+  * As a result of this addition, the "memory block" feature was renamed to "data block" to further distinguish the two features.
 
 ## [0.2.3]
 * Made instructions case insensitive
@@ -93,7 +96,8 @@ First tracked released
 * Enabled the `reverse_argument_order` instruction option be applied to a specific operand configuration. This slightly changed the configuration file format.
 * Added ability for instructions with operands to have a single "empty operand" variant, e.g., `pop`
 
-[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.4...HEAD
+[0.2.3]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.0...v0.2.1

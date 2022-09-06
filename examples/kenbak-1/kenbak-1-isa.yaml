@@ -11,7 +11,7 @@ general:
     name: kenbak-1
     version: "1.0.1"
     extension: kb1
-  min_version: 0.2.0
+  min_version: 0.2.4
 predefined:
   data:
     - name: A_REG
