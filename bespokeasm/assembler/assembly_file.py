@@ -15,7 +15,7 @@ import sys
 from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
-from bespokeasm.assembler.line_object.directive_line import AddressOrgLine, SetMemoryZoneLine
+from bespokeasm.assembler.line_object.directive_line import SetMemoryZoneLine
 from bespokeasm.assembler.line_object.factory import LineOjectFactory
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.model import AssemblerModel
@@ -95,9 +95,9 @@ class AssemblyFile:
                             if not lobj.is_constant \
                                     and LabelScopeType.get_label_scope(lobj.get_label()) != LabelScopeType.LOCAL:
                                 current_scope = LabelScope(LabelScopeType.LOCAL, self.label_scope, lobj.get_label())
-                        elif isinstance(lobj, AddressOrgLine):
+                        # both .org and .memzone directive should reset label scope to FILE and current memzone
+                        elif isinstance(lobj, SetMemoryZoneLine):
                             current_scope = self.label_scope
-                        if isinstance(lobj, SetMemoryZoneLine):
                             current_memzone = lobj.memory_zone
                         lobj.label_scope = current_scope
                         # setting constants now so they can be used when evluating lines later.

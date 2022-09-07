@@ -116,6 +116,10 @@ class LabelScope:
     def type(self) -> LabelScopeType:
         return self._type
 
+    @property
+    def reference(self) -> str:
+        return self._reference
+
     def get_label_value(self, label: str, line_id: LineIdentifier) -> int:
         if label in self._labels:
             return self._labels[label].value
