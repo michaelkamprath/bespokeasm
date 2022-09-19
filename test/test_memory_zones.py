@@ -29,6 +29,8 @@ class TestMemoryZones(unittest.TestCase):
             isa_model.default_origin,
             isa_model.predefined_memory_zones
         )
+        self.assertEqual(memzone_manager.global_zone.start, 0x0100, 'global zone starts at $0100')
+        self.assertEqual(memzone_manager.global_zone.end, 0xDFFF, 'global zone ends at $DFFF')
 
         with pkg_resources.path(test_code, 'test_memory_zones.asm') as asm_fp:
             asm_obj = AssemblyFile(asm_fp, label_scope)
@@ -54,3 +56,21 @@ class TestMemoryZones(unittest.TestCase):
         # note that the current address property of the memory zone isn't updated yet because AssemblyFile
         # does not set the line object addresses.
         self.assertEqual(memzone_manager.zone('predefined_zone').current_address, 0x2000, 'current address')
+
+    def test_invalid_memory_zones(self):
+        with pkg_resources.path(config_files, 'test_memory_zones.yaml') as fp:
+            isa_model = AssemblerModel(str(fp), 0)
+        memzone_manager = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones
+        )
+
+        with self.assertRaises(ValueError, msg='Zone start must be in GLOBAL'):
+            memzone_manager.create_zone(16, 0, 0x3000, 'invalid_start')
+
+        with self.assertRaises(ValueError, msg='Zone end must be in GLOBAL'):
+            memzone_manager.create_zone(16, 0x1000, 0xF000, 'invalid_end')
+
+        with self.assertRaises(ValueError, msg='Zone end must be greater than zone start'):
+            memzone_manager.create_zone(16, 0x2000, 0x1000, 'inverted')

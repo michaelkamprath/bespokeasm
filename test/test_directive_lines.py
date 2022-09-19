@@ -24,59 +24,59 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model.default_origin,
         )
         cls.memzone = cls.memory_zone_manager.global_zone
-        cls.memory_zone_manager.create_zone(16, 2000, 4000, 'zone1')
-        cls.memory_zone_manager.create_zone(16, 5000, 5500, 'zone2')
+        cls.memory_zone_manager.create_zone(4, 2, 15, 'zone1')
+        cls.memory_zone_manager.create_zone(4, 4, 8, 'zone2')
 
     def test_org_directive(self):
         label_values = GlobalLabelScope(['a', 'b', 'sp', 'mar'])
-        label_values.set_label_value('a_const', 40, 1)
+        label_values.set_label_value('a_const', 12, 1)
 
         o1 = DirectiveLine.factory(
             1234,
-            '.org $100',
+            '.org $1',
             'set address to 0=x100',
             TestDirectiveLines.isa_model,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
         )
         self.assertIsInstance(o1, AddressOrgLine)
-        self.assertEqual(o1.address, 256)
-        o1.set_start_address(512)
-        self.assertEqual(o1.address, 256, '.org address values cannot be directly set')
+        self.assertEqual(o1.address, 1)
+        o1.set_start_address(10)
+        self.assertEqual(o1.address, 1, '.org address values cannot be directly set')
         self.assertEqual(o1.byte_size, 0, '.org directives have 0 bytes')
 
         o2 = DirectiveLine.factory(
             5678,
-            '.org 1024',
+            '.org 8',
             'set address to 1024',
             TestDirectiveLines.isa_model,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
         )
         self.assertIsInstance(o2, AddressOrgLine)
-        self.assertEqual(o2.address, 1024)
+        self.assertEqual(o2.address, 8)
 
         o3 = DirectiveLine.factory(
             1357,
-            '.org b100000000000',
+            '.org b000000000100',
             'set address to 2048',
             TestDirectiveLines.isa_model,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
         )
         self.assertIsInstance(o3, AddressOrgLine)
-        self.assertEqual(o3.address, 2048)
+        self.assertEqual(o3.address, 4)
 
         o4 = DirectiveLine.factory(
             1357,
-            '.org 0xFFFF',
+            '.org 0x000F',
             'set address to 54K',
             TestDirectiveLines.isa_model,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
         )
         self.assertIsInstance(o4, AddressOrgLine)
-        self.assertEqual(o4.address, 65535)
+        self.assertEqual(o4.address, 15)
 
         o5 = DirectiveLine.factory(
             1357,
@@ -88,7 +88,7 @@ class TestDirectiveLines(unittest.TestCase):
         )
         o5.label_scope = label_values
         self.assertIsInstance(o5, AddressOrgLine)
-        self.assertEqual(o5.address, 40)
+        self.assertEqual(o5.address, 12)
 
         with self.assertRaises(SystemExit, msg='register address should fail'):
             e1 = DirectiveLine.factory(
@@ -113,11 +113,11 @@ class TestDirectiveLines(unittest.TestCase):
         )
         o6.label_scope = label_values
         self.assertIsInstance(o6, AddressOrgLine)
-        self.assertEqual(o6.address, 2040)
+        self.assertEqual(o6.address, 14)
 
         o7 = DirectiveLine.factory(
             1357,
-            '.org a_const*2 + 5 "zone2"',
+            '.org a_const/2 + 5 "zone2"',
             'set address to a label',
             TestDirectiveLines.isa_model,
             TestDirectiveLines.memzone,
@@ -125,7 +125,7 @@ class TestDirectiveLines(unittest.TestCase):
         )
         o7.label_scope = label_values
         self.assertIsInstance(o7, AddressOrgLine)
-        self.assertEqual(o7.address, 5085)
+        self.assertEqual(o7.address, 15)
 
     def test_fill_directive(self):
 
@@ -179,7 +179,7 @@ class TestDirectiveLines(unittest.TestCase):
 
         o3 = DirectiveLine.factory(
             1234,
-            '.zero b100000000',
+            '.zero b000000100',
             'zipity doo dah',
             TestDirectiveLines.isa_model,
             TestDirectiveLines.memzone,
@@ -187,9 +187,9 @@ class TestDirectiveLines(unittest.TestCase):
         )
         self.assertIsInstance(o3, FillDataLine)
         o3.label_scope = label_values
-        self.assertEqual(o3.byte_size, 256, 'has 256 bytes')
+        self.assertEqual(o3.byte_size, 4, 'has 4 bytes')
         o3.generate_bytes()
-        self.assertEqual(o3.get_bytes(), bytearray([0]*256), 'truncated values')
+        self.assertEqual(o3.get_bytes(), bytearray([0]*4), 'truncated values')
 
         # test with constants
         o4 = DirectiveLine.factory(

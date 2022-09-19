@@ -1,6 +1,7 @@
 from bespokeasm.assembler.byte_code.parts import NumericByteCodePart
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.model.operand import Operand, OperandType, ParsedOperand
+from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 
 
 class EmptyOperand(Operand):
@@ -18,7 +19,13 @@ class EmptyOperand(Operand):
         '''This operand type does not parse any thing from teh instruction'''
         return True
 
-    def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> ParsedOperand:
+    def parse_operand(
+        self,
+        line_id: LineIdentifier,
+        operand: str,
+        register_labels: set[str],
+        memzone_manager: MemoryZoneManager,
+    ) -> ParsedOperand:
         bytecode_part = NumericByteCodePart(
             self.bytecode_value,
             self.bytecode_size,

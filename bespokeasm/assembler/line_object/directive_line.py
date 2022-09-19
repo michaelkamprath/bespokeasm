@@ -129,6 +129,7 @@ class SetMemoryZoneLine(LineObject):
             name_str: str,
             memzone_manager: MemoryZoneManager,
     ) -> None:
+        self._memzone_manager = memzone_manager
         if name_str is None:
             self._name = GLOBAL_ZONE_NAME
         else:
@@ -137,6 +138,10 @@ class SetMemoryZoneLine(LineObject):
         if memzone is None:
             sys.exit(f'ERROR: {line_id} - unknown memory zone "{name_str}"')
         super().__init__(line_id, instruction, comment, memzone)
+
+    @property
+    def memzone_manager(self) -> MemoryZoneManager:
+        return self._memzone_manager
 
     @property
     def memory_zone_name(self) -> int:
@@ -166,9 +171,20 @@ class AddressOrgLine(SetMemoryZoneLine):
         """
         offset_value = self._address_expr.get_value(self.label_scope, self.line_id)
         if self._parsed_memzone_name is None:
-            return offset_value
+            value = offset_value
         else:
-            return self.memory_zone.start + offset_value
+            value = self.memory_zone.start + offset_value
+        if value < self.memzone_manager.global_zone.start:
+            sys.exit(
+                f'ERROR: {self.line_id} - .org address value of {value} is less than the minimum '
+                f'address of {self.memzone_manager.global_zone.start} in memory zone {self._memzone.name}'
+            )
+        if value > self.memzone_manager.global_zone.end:
+            sys.exit(
+                f'ERROR: {self.line_id} - .org address value of {value} is greater than the maximum '
+                f'address of {self.memzone_manager.global_zone.end} in memory zone {self._memzone.name}'
+            )
+        return value
 
     def set_start_address(self, address: int):
         """A no-op for the .org directive

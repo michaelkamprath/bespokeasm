@@ -1,0 +1,150 @@
+description: Test Valid Address Enforcement
+general :
+  address_size: 16
+  origin: 0x5000
+  endian: little
+  identifier:
+    name: bespokeasm-test
+    version: "0.2.4"
+  registers:
+    - a
+    - b
+    - c
+  min_version: "0.2.3"
+predefined:
+  memory_zones:
+    - name: GLOBAL
+      start: 0x2000
+      end: 0xBFFF
+operand_sets:
+  register:
+    operand_values:
+      register_a:
+        type: register
+        register: a
+        bytecode:
+          value: 1
+          size: 4
+      register_b:
+        type: register
+        register: b
+        bytecode:
+          value: 2
+          size: 4
+      register_c:
+        type: register
+        register: c
+        bytecode:
+          value: 3
+          size: 4
+  enums:
+    operand_values:
+      register_enum:
+        type: enumeration
+        argument:
+          size: 4
+          byte_align: false
+          value_dict:
+            aa: 1
+            bb: 2
+            cc: 3
+  addresses:
+    operand_values:
+      address:
+        type: numeric
+        bytecode:
+          value: 5
+          size: 4
+        argument:
+          size: 16
+          byte_align: true
+          valid_address: true
+      relative_addr:
+        type: relative_address
+        use_curly_braces: true
+        bytecode:
+          value: 6
+          size: 4
+        argument:
+          size: 8
+          byte_align: true
+          max: 128
+          min: -127
+instructions:
+  ld:
+    byte_code:
+      value: 128
+      size: 8
+    operands:
+      count: 3
+      operand_sets:
+        list:
+          - register
+          - register
+          - register
+  mv:
+    byte_code:
+      value: 129
+      size: 8
+    operands:
+      count: 3
+      operand_sets:
+        reverse_bytecode_order: true
+        list:
+          - register
+          - register
+          - register
+  ed:
+    byte_code:
+      value: 136
+      size: 8
+    operands:
+      count: 3
+      operand_sets:
+        reverse_argument_order: true
+        list:
+          - enums
+          - enums
+          - enums
+  jmp:
+    byte_code:
+      value: 0xE
+      size: 4
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - addresses
+  jmpr:
+    byte_code:
+      value: 0xEE
+      size: 8
+    operands:
+      count: 1
+      specific_operands:
+        relative_addr:
+          list:
+            relative_addr:
+              type: relative_address
+              argument:
+                size: 8
+                byte_align: true
+                max: 128
+                min: -127
+  jmpre:
+    byte_code:
+      value: 0xEF
+      size: 8
+    operands:
+      count: 1
+      specific_operands:
+        relative_addr:
+          list:
+            relative_addr:
+              type: relative_address
+              offset_from_instruction_end: true
+              argument:
+                size: 8
+                byte_align: true
+                max: 128
+                min: -127

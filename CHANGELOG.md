@@ -16,6 +16,8 @@ Changes that are planned but not implemented yet:
   * unknown labels
 
 ## [Unreleased]
+* Added ability for an numeric operand that is ostensibly an address to be checked to be a valid address value per the `GLOBAL` memory zone. Uses the `valid_address` opetion in the `argument` setting for an operand. Only valid for `numeric`, `indirect_numeric`, `deferred_numeric`, and `relative_address` operand types.
+* Added checks to ensure memory zones are defined within the `GLOBAL` memory zone.
 
 ## [0.2.4]
 * Fixed bug where unknown instructions did not produce an error.

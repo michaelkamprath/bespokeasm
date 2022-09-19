@@ -6,6 +6,7 @@ from bespokeasm.assembler.byte_code.parts import ByteCodePart
 from bespokeasm.assembler.model.operand_set import OperandSetCollection, OperandSet
 from bespokeasm.assembler.model.operand import Operand, ParsedOperand, OperandBytecodePositionType
 from bespokeasm.assembler.model.operand.factory import OperandFactory
+from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 
 # Operand Parser
 #
@@ -72,6 +73,7 @@ class OperandSetsModel:
         line_id: LineIdentifier,
         operands: list[str],
         register_labels: set[str],
+        memzone_manager: MemoryZoneManager,
     ) -> MatchedOperandSet:
         '''attempts to find a operand match based on an operand set combination. Returns
            None if no match is found, or a MatchedOperandSet if a valid match is found.
@@ -81,7 +83,7 @@ class OperandSetsModel:
             return None
         matched_operands: list[ParsedOperand] = []
         for i in range(self.operand_count):
-            operand = self._operand_sets[i].parse_operand(line_id, operands[i], register_labels)
+            operand = self._operand_sets[i].parse_operand(line_id, operands[i], register_labels, memzone_manager)
             if operand is not None:
                 matched_operands.append(operand)
             else:
@@ -161,6 +163,7 @@ class SpecificOperandsModel:
         operands: list[str],
         target_operand_count: int,
         register_labels: set[str],
+        memzone_manager: MemoryZoneManager,
     ) -> MatchedOperandSet:
         '''attempts to find a operand match based on any specific operand configuration.
            Returns None if no match is found, or a MatchedOperandSet if a valid match is found.
@@ -174,13 +177,18 @@ class SpecificOperandsModel:
             matched_operands: list[ParsedOperand] = []
             for i in range(configured_operands.operand_count):
                 if configured_operands[i].null_operand:
-                    operand = configured_operands[i].parse_operand(line_id, '', register_labels)
+                    operand = configured_operands[i].parse_operand(line_id, '', register_labels, memzone_manager)
                     null_operand_count += 1
                 else:
                     if operand_index >= len(operands):
                         # instruction had too few operand present
                         return None
-                    operand = configured_operands[i].parse_operand(line_id, operands[operand_index], register_labels)
+                    operand = configured_operands[i].parse_operand(
+                        line_id,
+                        operands[operand_index],
+                        register_labels,
+                        memzone_manager,
+                    )
                 operand_index += 1
 
                 if operand is None:
@@ -254,7 +262,8 @@ class OperandParser:
     def find_matching_operands(
         self, line_id: LineIdentifier,
         operands: list[str],
-        register_labels: set[str]
+        register_labels: set[str],
+        memzone_manager: MemoryZoneManager,
     ) -> MatchedOperandSet:
         ''' the general goal of this method is to determin if any operands configured for this parser matched.
         If so, return the byte code parts associated with those oeprands. If not, return a flag indicating that
@@ -269,7 +278,8 @@ class OperandParser:
                         line_id,
                         operands,
                         self.operand_count,
-                        register_labels
+                        register_labels,
+                        memzone_manager,
                     )
             if matched_operands is not None:
                 return matched_operands
@@ -277,7 +287,7 @@ class OperandParser:
         # Step 2 - Find an allowed combination match from an operand set
         if self._has_operand_sets:
             matched_operands = \
-                self._operand_sets_model.find_operands_from_operand_sets(line_id, operands, register_labels)
+                self._operand_sets_model.find_operands_from_operand_sets(line_id, operands, register_labels, memzone_manager)
             if matched_operands is not None:
                 return matched_operands
 

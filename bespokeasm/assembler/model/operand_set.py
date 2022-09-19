@@ -3,6 +3,7 @@ import sys
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.model.operand import Operand, ParsedOperand
 from bespokeasm.assembler.model.operand.factory import OperandFactory
+from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 
 
 class OperandSet:
@@ -42,10 +43,11 @@ class OperandSet:
         self,
         line_id: LineIdentifier,
         operand_str: str,
-        register_labels: set[str]
+        register_labels: set[str],
+        memzone_manager: MemoryZoneManager,
     ) -> ParsedOperand:
         for operand in self._ordered_operand_list:
-            op: ParsedOperand = operand.parse_operand(line_id, operand_str, register_labels)
+            op: ParsedOperand = operand.parse_operand(line_id, operand_str, register_labels, memzone_manager)
             if op is not None:
                 # if some part was returned, then this is a valid match. Matching
                 # precedence order is important here!

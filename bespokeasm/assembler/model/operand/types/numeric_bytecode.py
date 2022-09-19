@@ -3,6 +3,7 @@ import sys
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.byte_code.parts import ExpressionByteCodePartWithValidation
 from bespokeasm.assembler.model.operand import Operand, OperandType, ParsedOperand
+from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 
 
 class NumericBytecode(Operand):
@@ -38,7 +39,13 @@ class NumericBytecode(Operand):
     def match_pattern(self) -> str:
         return r'(?:[\$\%\w\(\)\+\-\s]*[\w\)])'
 
-    def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> ParsedOperand:
+    def parse_operand(
+        self,
+        line_id: LineIdentifier,
+        operand: str,
+        register_labels: set[str],
+        memzone_manager: MemoryZoneManager,
+    ) -> ParsedOperand:
         # do not match if expression contains square bracks
         if "[" in operand or "]" in operand:
             return None

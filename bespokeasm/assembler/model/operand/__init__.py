@@ -4,6 +4,7 @@ import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.byte_code.parts import ByteCodePart
+from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 
 
 class OperandType(enum.Enum):
@@ -98,9 +99,15 @@ class Operand:
     def operand_register_string(self) -> str:
         sys.exit(f'ERROR: INTERNAL - tried to fetch operand register string for an unsupported operand type: {self}')
 
-    def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> ParsedOperand:
+    def parse_operand(
+        self,
+        line_id: LineIdentifier,
+        operand: str,
+        register_labels: set[str],
+        memzone_manager: MemoryZoneManager,
+    ) -> ParsedOperand:
         # this should be overridden
-        return None
+        raise NotImplementedError
 
 
 class OperandWithArgument(Operand):

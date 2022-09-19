@@ -1,8 +1,10 @@
 import re
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.byte_code.parts import NumericByteCodePart, ExpressionByteCodePart
+from bespokeasm.assembler.byte_code.parts import \
+    NumericByteCodePart, ExpressionByteCodePart, ExpressionByteCodePartInMemoryZone
 from bespokeasm.assembler.model.operand import OperandWithArgument, OperandType, ParsedOperand
+from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 
 
 class NumericExpressionOperand(OperandWithArgument):
@@ -20,11 +22,17 @@ class NumericExpressionOperand(OperandWithArgument):
     def match_pattern(self) -> str:
         return r'(?:[\$\%\w\(\)\+\-\s]*[\w\)])'
 
-    def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> ParsedOperand:
-        # do not match if expression contains square brack or curly braces
-        punctuation_match = re.search(r'[\[\]\{\}]+', operand)
-        if punctuation_match is not None:
-            return None
+    @property
+    def enforce_argument_valid_address(self) -> bool:
+        return self.config['argument'].get('valid_address', False)
+
+    def _parse_bytecode_parts(
+        self,
+        line_id: LineIdentifier,
+        operand: str,
+        register_labels: set[str],
+        memzone_manager: MemoryZoneManager,
+    ) -> ParsedOperand:
         bytecode_part = NumericByteCodePart(
             self.bytecode_value,
             self.bytecode_size,
@@ -32,7 +40,36 @@ class NumericExpressionOperand(OperandWithArgument):
             'big',
             line_id
         ) if self.bytecode_value is not None else None
-        arg_part = ExpressionByteCodePart(operand, self.argument_size, self.argument_byte_align, self.argument_endian, line_id)
+        if self.enforce_argument_valid_address:
+            arg_part = ExpressionByteCodePartInMemoryZone(
+                memzone_manager.global_zone,
+                operand,
+                self.argument_size,
+                self.argument_byte_align,
+                self.argument_endian,
+                line_id,
+            )
+        else:
+            arg_part = ExpressionByteCodePart(
+                operand,
+                self.argument_size,
+                self.argument_byte_align,
+                self.argument_endian,
+                line_id,
+            )
         if arg_part.contains_register_labels(register_labels):
             return None
         return ParsedOperand(self, bytecode_part, arg_part, operand)
+
+    def parse_operand(
+        self,
+        line_id: LineIdentifier,
+        operand: str,
+        register_labels: set[str],
+        memzone_manager: MemoryZoneManager,
+    ) -> ParsedOperand:
+        # do not match if expression contains square brack or curly braces
+        punctuation_match = re.search(r'[\[\]\{\}]+', operand)
+        if punctuation_match is not None:
+            return None
+        return self._parse_bytecode_parts(line_id, operand, register_labels, memzone_manager)

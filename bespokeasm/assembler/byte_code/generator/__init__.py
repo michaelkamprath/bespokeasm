@@ -10,6 +10,7 @@ from bespokeasm.assembler.byte_code.assembled import AssembledInstruction
 from bespokeasm.assembler.model.instruction_macro import InstructionMacro
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.model.instruction_parser_base import InstructioParserBase
+from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 
 
 class BytecodeGenerator:
@@ -22,15 +23,16 @@ class BytecodeGenerator:
         mnemonic: str,
         operands: str,
         isa_model: AssemblerModel,
+        memzone_manager: MemoryZoneManager,
         parser_class: Type[InstructioParserBase],
     ) -> AssembledInstruction:
         if isinstance(instruction, Instruction):
             return InstructionBytecodeGenerator.generate_bytecode_parts(
-                        instruction, line_id, mnemonic, operands, isa_model
+                        instruction, line_id, mnemonic, operands, isa_model, memzone_manager
                     )
         elif isinstance(instruction, InstructionMacro):
             return MacroBytecodeGenerator.generate_bytecode_parts(
-                        instruction, line_id, mnemonic, operands, isa_model, parser_class
+                        instruction, line_id, mnemonic, operands, isa_model, memzone_manager, parser_class
                     )
 
         sys.exit(f'ERROR: INTERNAL - BytecodeGenerator got an unknown instruction type - {instruction}')

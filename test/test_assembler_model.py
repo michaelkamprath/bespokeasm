@@ -7,6 +7,7 @@ from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType
 import bespokeasm.assembler.model.operand_set as AS
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.model.instruction_parser import InstructioParser
+from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 
 from test import config_files
 
@@ -46,10 +47,13 @@ class TestConfigObject(unittest.TestCase):
     def test_instruction_parsing(self):
         with pkg_resources.path(config_files, 'eater-sap1-isa.yaml') as fp:
             model1 = AssemblerModel(str(fp), 0)
+            memzone_mngr = MemoryZoneManager(model1.address_size, model1.default_origin)
 
         test_line_id = LineIdentifier(1212, 'test_instruction_parsing')
 
-        pi1 = InstructioParser.parse_instruction(model1, test_line_id, 'LDA $f')
+        pi1 = InstructioParser.parse_instruction(
+            model1, test_line_id, 'LDA $f', memzone_mngr,
+        )
         self.assertEqual(pi1.byte_size, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(
             pi1.get_bytes(TestConfigObject.label_values, 0x8000, pi1.byte_size),
@@ -57,7 +61,9 @@ class TestConfigObject(unittest.TestCase):
             'assembled instruction',
         )
 
-        pi2 = InstructioParser.parse_instruction(model1, test_line_id, 'add label1+5')
+        pi2 = InstructioParser.parse_instruction(
+            model1, test_line_id, 'add label1+5', memzone_mngr,
+        )
         self.assertEqual(pi2.byte_size, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(
             pi2.get_bytes(TestConfigObject.label_values, 0x8000, pi2.byte_size),
@@ -65,7 +71,9 @@ class TestConfigObject(unittest.TestCase):
             'assembled instruction',
         )
 
-        pi3 = InstructioParser.parse_instruction(model1, test_line_id, 'out')
+        pi3 = InstructioParser.parse_instruction(
+            model1, test_line_id, 'out', memzone_mngr,
+        )
         self.assertEqual(pi3.byte_size, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(
             pi3.get_bytes(TestConfigObject.label_values, 0x8000, pi3.byte_size),
@@ -75,8 +83,11 @@ class TestConfigObject(unittest.TestCase):
 
         with pkg_resources.path(config_files, 'register_argument_exmaple_config.yaml') as fp:
             model2 = AssemblerModel(str(fp), 0)
+            memzone_mngr2 = MemoryZoneManager(model2.address_size, model2.default_origin)
 
-        piA = InstructioParser.parse_instruction(model2, LineIdentifier(1, 'test_mov_a_i'), 'mov a, i')
+        piA = InstructioParser.parse_instruction(
+            model2, LineIdentifier(1, 'test_mov_a_i'), 'mov a, i', memzone_mngr2,
+        )
         self.assertEqual(piA.byte_size, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(
             list(piA.get_bytes(TestConfigObject.label_values, 0x8000, 1)),
@@ -84,7 +95,9 @@ class TestConfigObject(unittest.TestCase):
             'assembled instruction'
         )
 
-        piB = InstructioParser.parse_instruction(model2, test_line_id, 'mov a,[$1120 + label1]')
+        piB = InstructioParser.parse_instruction(
+            model2, test_line_id, 'mov a,[$1120 + label1]', memzone_mngr2,
+        )
         self.assertEqual(piB.byte_size, 3, 'assembled instruciton is 3 byte')
         self.assertEqual(
             piB.get_bytes(TestConfigObject.label_values, 0x8000, 3),
@@ -92,7 +105,9 @@ class TestConfigObject(unittest.TestCase):
             'assembled instruction'
         )
 
-        piC = InstructioParser.parse_instruction(model2, test_line_id, 'add i')
+        piC = InstructioParser.parse_instruction(
+            model2, test_line_id, 'add i', memzone_mngr2,
+        )
         self.assertEqual(piC.byte_size, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(
             piC.get_bytes(TestConfigObject.label_values, 0x8000, 1),
@@ -100,7 +115,9 @@ class TestConfigObject(unittest.TestCase):
             'assembled instruction'
         )
 
-        piD = InstructioParser.parse_instruction(model2, test_line_id, 'mov [$110D + (label1 + LABEL2)] , 0x88')
+        piD = InstructioParser.parse_instruction(
+            model2, test_line_id, 'mov [$110D + (label1 + LABEL2)] , 0x88', memzone_mngr2,
+        )
         self.assertEqual(piD.byte_size, 4, 'assembled instruciton is 4 byte')
         self.assertEqual(
             piD.get_bytes(TestConfigObject.label_values, 0x8000, 4),
@@ -108,7 +125,9 @@ class TestConfigObject(unittest.TestCase):
             'arguments should be in reverse order'
         )
 
-        piE = InstructioParser.parse_instruction(model2, test_line_id, 'mov [sp - label1] , 0x88')
+        piE = InstructioParser.parse_instruction(
+            model2, test_line_id, 'mov [sp - label1] , 0x88', memzone_mngr2,
+        )
         self.assertEqual(piE.byte_size, 3, 'assembled instruciton is 3 byte')
         self.assertEqual(
             piE.get_bytes(TestConfigObject.label_values, 0x8000, 3),
@@ -116,7 +135,9 @@ class TestConfigObject(unittest.TestCase):
             'arguments should be in reverse order'
         )
 
-        piF = InstructioParser.parse_instruction(model2, test_line_id, 'mov [sp+label1] , 0x88')
+        piF = InstructioParser.parse_instruction(
+            model2, test_line_id, 'mov [sp+label1] , 0x88', memzone_mngr2,
+        )
         self.assertEqual(piF.byte_size, 3, 'assembled instruciton is 3 byte')
         self.assertEqual(
             piF.get_bytes(TestConfigObject.label_values, 0x800, 3),
@@ -124,7 +145,9 @@ class TestConfigObject(unittest.TestCase):
             'arguments should be in reverse order'
         )
 
-        piG = InstructioParser.parse_instruction(model2, test_line_id, 'mov [sp] , 0x88')
+        piG = InstructioParser.parse_instruction(
+            model2, test_line_id, 'mov [sp] , 0x88', memzone_mngr2,
+        )
         self.assertEqual(piG.byte_size, 3, 'assembled instruciton is 3 byte')
         self.assertEqual(
             piG.get_bytes(TestConfigObject.label_values, 0x8000, 3),
@@ -132,7 +155,9 @@ class TestConfigObject(unittest.TestCase):
             'arguments should be in reverse order'
         )
 
-        piH = InstructioParser.parse_instruction(model2, test_line_id, 'mov [$8000], [label1]')
+        piH = InstructioParser.parse_instruction(
+            model2, test_line_id, 'mov [$8000], [label1]', memzone_mngr2,
+        )
         self.assertEqual(piH.byte_size, 5, 'assembled instruciton is 5 byte')
         self.assertEqual(
             piH.get_bytes(TestConfigObject.label_values, 0x8000, 5),
@@ -140,7 +165,9 @@ class TestConfigObject(unittest.TestCase):
             'arguments should be in reverse order'
         )
 
-        piI = InstructioParser.parse_instruction(model2, test_line_id, 'mov [mar], [label1]')
+        piI = InstructioParser.parse_instruction(
+            model2, test_line_id, 'mov [mar], [label1]', memzone_mngr2,
+        )
         self.assertEqual(piI.byte_size, 3, 'assembled instruciton is 3 byte')
         self.assertEqual(
             piI.get_bytes(TestConfigObject.label_values, 0x8000, 3),
@@ -148,7 +175,9 @@ class TestConfigObject(unittest.TestCase):
             'no offset should be emitted for [mar]'
         )
 
-        piJ = InstructioParser.parse_instruction(model2, test_line_id, 'swap [$8000], [label1]')
+        piJ = InstructioParser.parse_instruction(
+            model2, test_line_id, 'swap [$8000], [label1]', memzone_mngr2,
+        )
         self.assertEqual(piJ.byte_size, 5, 'assembled instruciton is 3 byte')
         self.assertEqual(piJ.get_bytes(
             TestConfigObject.label_values, 0x8000, 3),
@@ -156,7 +185,9 @@ class TestConfigObject(unittest.TestCase):
             'arguments should NOT be in reverse order'
         )
 
-        piK = InstructioParser.parse_instruction(model2, test_line_id, 'mov [sp+2], [sp+4]')
+        piK = InstructioParser.parse_instruction(
+            model2, test_line_id, 'mov [sp+2], [sp+4]', memzone_mngr2,
+        )
         self.assertEqual(piK.byte_size, 3, 'assembled instruciton is 3 byte')
         self.assertEqual(
             piK.get_bytes(TestConfigObject.label_values, 0x8000, 3),
@@ -164,15 +195,21 @@ class TestConfigObject(unittest.TestCase):
             'arguments should be in reverse order'
         )
 
-        piL = InstructioParser.parse_instruction(model2, test_line_id, 'pop i')
+        piL = InstructioParser.parse_instruction(
+            model2, test_line_id, 'pop i', memzone_mngr2,
+        )
         self.assertEqual(piL.byte_size, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(list(piL.get_bytes(TestConfigObject.label_values, 0x8000, 1)), [0b00001010], 'pop to i')
 
-        piM = InstructioParser.parse_instruction(model2, LineIdentifier(158, 'test_pop_empty_arg'), 'pop')
+        piM = InstructioParser.parse_instruction(
+            model2, LineIdentifier(158, 'test_pop_empty_arg'), 'pop', memzone_mngr2,
+        )
         self.assertEqual(piM.byte_size, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(piM.get_bytes(TestConfigObject.label_values, 0x8000, 1), bytearray([0b00001111]), 'just pop')
 
-        piN = InstructioParser.parse_instruction(model2, test_line_id, 'mov a, [sp+2]')
+        piN = InstructioParser.parse_instruction(
+            model2, test_line_id, 'mov a, [sp+2]', memzone_mngr2,
+        )
         self.assertEqual(piN.byte_size, 2, 'assembled instruciton is 2 byte')
         self.assertEqual(
             piN.get_bytes(TestConfigObject.label_values, 0x8000, 2),
@@ -181,15 +218,15 @@ class TestConfigObject(unittest.TestCase):
         )
 
         with self.assertRaises(SystemExit, msg='should error on unallowed operand combinations'):
-            InstructioParser.parse_instruction(model2, test_line_id, 'mov a, a')
+            InstructioParser.parse_instruction(model2, test_line_id, 'mov a, a', memzone_mngr2)
         with self.assertRaises(SystemExit, msg='[mar] should have no offset'):
-            InstructioParser.parse_instruction(model2, test_line_id, 'mov [mar+2], [label1]')
+            InstructioParser.parse_instruction(model2, test_line_id, 'mov [mar+2], [label1]', memzone_mngr2)
         with self.assertRaises(SystemExit, msg='should error due to too many operands'):
-            InstructioParser.parse_instruction(model2, test_line_id, 'mov a, i, j')
+            InstructioParser.parse_instruction(model2, test_line_id, 'mov a, i, j', memzone_mngr2)
         with self.assertRaises(SystemExit, msg='should error due to too many operands'):
-            InstructioParser.parse_instruction(model2, test_line_id, 'nop 123')
+            InstructioParser.parse_instruction(model2, test_line_id, 'nop 123', memzone_mngr2)
         with self.assertRaises(SystemExit, msg='should error due to too few operands'):
-            InstructioParser.parse_instruction(model2, test_line_id, 'mov a')
+            InstructioParser.parse_instruction(model2, test_line_id, 'mov a', memzone_mngr2)
 
     def test_bad_registers_in_configuratin(self):
         with pkg_resources.path(config_files, 'test_bad_registers_in_configuratin.yaml') as fp:

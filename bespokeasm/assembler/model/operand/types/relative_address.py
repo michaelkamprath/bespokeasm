@@ -2,13 +2,15 @@ import re
 import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.byte_code.parts import NumericByteCodePart, ExpressionByteCodePart
+from bespokeasm.assembler.byte_code.parts import NumericByteCodePart, ExpressionByteCodePartInMemoryZone
 from bespokeasm.assembler.model.operand import OperandWithArgument, OperandType, ParsedOperand
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.expression import EXPRESSION_PARTS_PATTERN
+from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.memory_zone import MemoryZone
 
 
-class RelativeAddressByteCodePart(ExpressionByteCodePart):
+class RelativeAddressByteCodePart(ExpressionByteCodePartInMemoryZone):
     def __init__(
                 self,
                 value_expression: str,
@@ -18,9 +20,10 @@ class RelativeAddressByteCodePart(ExpressionByteCodePart):
                 line_id: LineIdentifier,
                 min_relative_value: int,
                 max_relative_value: int,
+                memzone: MemoryZone,
                 offset_from_instruction_end: bool,
             ) -> None:
-        super().__init__(value_expression, value_size, byte_align, endian, line_id)
+        super().__init__(memzone, value_expression, value_size, byte_align, endian, line_id)
         self._min_relative_value = min_relative_value
         self._max_relative_value = max_relative_value
         self._offset_from_instruction_end = offset_from_instruction_end
@@ -80,7 +83,13 @@ class RelativeAddressOperand(OperandWithArgument):
     def offset_from_instruction_end(self) -> bool:
         return self.config.get('offset_from_instruction_end', False)
 
-    def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> ParsedOperand:
+    def parse_operand(
+        self,
+        line_id: LineIdentifier,
+        operand: str,
+        register_labels: set[str],
+        memzone_manager: MemoryZoneManager,
+    ) -> ParsedOperand:
         # find argument per the required pattern
         match = re.match(self.match_pattern, operand.strip())
         if match is None or len(match.groups()) != 1:
@@ -103,6 +112,7 @@ class RelativeAddressOperand(OperandWithArgument):
             line_id,
             self.min_offset,
             self.max_offset,
+            memzone_manager.global_zone,
             self.offset_from_instruction_end,
         )
         if arg_part.contains_register_labels(register_labels):

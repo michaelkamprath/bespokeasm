@@ -27,6 +27,14 @@ class MemoryZoneManager:
     def create_zone(self, address_bits: int, start: int, end: int, name: str) -> MemoryZone:
         if name in self._zones:
             raise KeyError(f'MemoryZone name {name} alredy exists.')
+        if start < self.global_zone.start:
+            raise ValueError(
+                f'The start address {start} for memory zone "{name}" is outside the bounds of the GLOBAL zone'
+            )
+        if end > self.global_zone.end:
+            raise ValueError(
+                f'The end address {end} for memory zone "{name}" is outside the bounds of the GLOBAL zone'
+            )
         new_zone = MemoryZone(address_bits, start, end, name)
         self._zones[name] = new_zone
         return new_zone

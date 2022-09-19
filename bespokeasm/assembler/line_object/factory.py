@@ -76,7 +76,14 @@ class LineOjectFactory:
                 continue
 
             # try instruction
-            line_obj = InstructionLine.factory(line_id, instruction_str, comment_str, model, current_memzone)
+            line_obj = InstructionLine.factory(
+                line_id,
+                instruction_str,
+                comment_str,
+                model,
+                current_memzone,
+                memzone_manager,
+            )
             if line_obj is not None:
                 line_obj_list.append(line_obj)
                 instruction_str = instruction_str.replace(line_obj.instruction, '', 1).strip()

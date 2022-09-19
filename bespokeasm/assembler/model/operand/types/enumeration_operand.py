@@ -4,6 +4,7 @@ import sys
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.byte_code.parts import NumericByteCodePart
 from bespokeasm.assembler.model.operand import OperandWithArgument, OperandType, ParsedOperand
+from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 
 
 # TODO: Validate that the passed key is not a label of any sort
@@ -65,7 +66,13 @@ class EnumerationOperand(OperandWithArgument):
         else:
             return ''
 
-    def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> ParsedOperand:
+    def parse_operand(
+        self,
+        line_id: LineIdentifier,
+        operand: str,
+        register_labels: set[str],
+        memzone_manager: MemoryZoneManager,
+    ) -> ParsedOperand:
         match = re.match(self.match_pattern, operand.strip())
         if match is not None and len(match.groups()) > 0:
             matched_key = match.group(1).strip()

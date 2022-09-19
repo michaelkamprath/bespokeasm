@@ -37,10 +37,11 @@ class TestInstructionMacros(unittest.TestCase):
     def test_macro_parsing_numeric_args(self):
         isa_model = self.isa_model
         memzone = self.memzone
+        memzone_mngr = self.memory_zone_manager
 
         line_id = LineIdentifier(1, 'test_macro_parsing_numeric_args')
 
-        ins0 = InstructionLine.factory(line_id, 'push2 $1234', 'some comment!', isa_model, memzone)
+        ins0 = InstructionLine.factory(line_id, 'push2 $1234', 'some comment!', isa_model, memzone, memzone_mngr)
         ins0.set_start_address(1212)
         self.assertIsInstance(ins0, InstructionLine)
         self.assertEqual(ins0.byte_size, 4, 'has 4 bytes')
@@ -48,7 +49,7 @@ class TestInstructionMacros(unittest.TestCase):
         ins0.generate_bytes()
         self.assertEqual(list(ins0.get_bytes()), [0x0F, 0x12, 0x0F, 0x34], 'instruction bytes should match')
 
-        ins1 = InstructionLine.factory(line_id, 'mov2 [$2000],[$1234]', 'some comment!', isa_model, memzone)
+        ins1 = InstructionLine.factory(line_id, 'mov2 [$2000],[$1234]', 'some comment!', isa_model, memzone, memzone_mngr)
         ins1.set_start_address(1212)
         self.assertIsInstance(ins1, InstructionLine)
         self.assertEqual(ins1.byte_size, 10, 'has 10 bytes')
@@ -60,7 +61,7 @@ class TestInstructionMacros(unittest.TestCase):
             'instruction bytes should match'
         )
 
-        ins2 = InstructionLine.factory(line_id, 'add16 [$1234], $5678', 'some comment!', isa_model, memzone)
+        ins2 = InstructionLine.factory(line_id, 'add16 [$1234], $5678', 'some comment!', isa_model, memzone, memzone_mngr)
         ins2.set_start_address(1212)
         self.assertIsInstance(ins2, InstructionLine)
         self.assertEqual(ins2.byte_size, 16, 'has 16 bytes')
@@ -79,7 +80,7 @@ class TestInstructionMacros(unittest.TestCase):
             'instruction bytes should match'
         )
 
-        ins3 = InstructionLine.factory(line_id, 'add16 [$1234], [var1+7]', 'some comment!', isa_model, memzone)
+        ins3 = InstructionLine.factory(line_id, 'add16 [$1234], [var1+7]', 'some comment!', isa_model, memzone, memzone_mngr)
         ins3.set_start_address(1212)
         self.assertIsInstance(ins3, InstructionLine)
         self.assertEqual(ins3.byte_size, 18, 'has 18 bytes')
@@ -101,10 +102,11 @@ class TestInstructionMacros(unittest.TestCase):
     def test_macro_parsing_registers(self):
         isa_model = self.isa_model
         memzone = self.memzone
+        memzone_mngr = self.memory_zone_manager
 
         line_id = LineIdentifier(1, 'test_macro_parsing_registers')
 
-        ins4 = InstructionLine.factory(line_id, 'push2 [ij + 4]', 'some comment!', isa_model, memzone)
+        ins4 = InstructionLine.factory(line_id, 'push2 [ij + 4]', 'some comment!', isa_model, memzone, memzone_mngr)
         ins4.set_start_address(1212)
         self.assertIsInstance(ins4, InstructionLine)
         self.assertEqual(ins4.byte_size, 4, 'has 4 bytes')
@@ -119,7 +121,7 @@ class TestInstructionMacros(unittest.TestCase):
             'instruction bytes should match'
         )
 
-        ins5 = InstructionLine.factory(line_id, 'push2 [sp + 8]', 'some comment!', isa_model, memzone)
+        ins5 = InstructionLine.factory(line_id, 'push2 [sp + 8]', 'some comment!', isa_model, memzone, memzone_mngr)
         ins5.set_start_address(1212)
         self.assertIsInstance(ins5, InstructionLine)
         self.assertEqual(ins5.byte_size, 4, 'has 4 bytes')
@@ -137,10 +139,11 @@ class TestInstructionMacros(unittest.TestCase):
     def test_macro_parsing_operands(self):
         isa_model = self.isa_model
         memzone = self.memzone
+        memzone_mngr = self.memory_zone_manager
 
         line_id = LineIdentifier(1, 'test_macro_parsing_operands')
 
-        ins1 = InstructionLine.factory(line_id, 'swap a,j', 'some comment!', isa_model, memzone)
+        ins1 = InstructionLine.factory(line_id, 'swap a,j', 'some comment!', isa_model, memzone, memzone_mngr)
         ins1.set_start_address(1212)
         self.assertIsInstance(ins1, InstructionLine)
         self.assertEqual(ins1.byte_size, 3, 'has 3 bytes')
@@ -156,7 +159,7 @@ class TestInstructionMacros(unittest.TestCase):
             'instruction bytes should match'
         )
 
-        ins2 = InstructionLine.factory(line_id, 'swap i,j', 'some comment!', isa_model, memzone)
+        ins2 = InstructionLine.factory(line_id, 'swap i,j', 'some comment!', isa_model, memzone, memzone_mngr)
         ins2.set_start_address(1212)
         self.assertIsInstance(ins2, InstructionLine)
         self.assertEqual(ins2.byte_size, 3, 'has 3 bytes')
@@ -172,7 +175,7 @@ class TestInstructionMacros(unittest.TestCase):
             'instruction bytes should match'
         )
 
-        ins3 = InstructionLine.factory(line_id, 'swap a,[ij + 4]', 'some comment!', isa_model, memzone)
+        ins3 = InstructionLine.factory(line_id, 'swap a,[ij + 4]', 'some comment!', isa_model, memzone, memzone_mngr)
         ins3.set_start_address(1212)
         self.assertIsInstance(ins3, InstructionLine)
         self.assertEqual(ins3.byte_size, 5, 'has 5 bytes')
@@ -188,7 +191,7 @@ class TestInstructionMacros(unittest.TestCase):
             'instruction bytes should match'
         )
 
-        ins4 = InstructionLine.factory(line_id, 'swap [sp+10],[ij + 4]', 'some comment!', isa_model, memzone)
+        ins4 = InstructionLine.factory(line_id, 'swap [sp+10],[ij + 4]', 'some comment!', isa_model, memzone, memzone_mngr)
         ins4.set_start_address(1212)
         self.assertIsInstance(ins4, InstructionLine)
         self.assertEqual(ins4.byte_size, 7, 'has 7 bytes')
@@ -204,7 +207,10 @@ class TestInstructionMacros(unittest.TestCase):
             'instruction bytes should match'
         )
 
-        ins5 = InstructionLine.factory(line_id, 'swap [sp+10],[sp+predefined_value1]', 'some comment!', isa_model, memzone)
+        ins5 = InstructionLine.factory(
+            line_id, 'swap [sp+10],[sp+predefined_value1]', 'some comment!',
+            isa_model, memzone, memzone_mngr,
+        )
         ins5.set_start_address(1212)
         self.assertIsInstance(ins5, InstructionLine)
         self.assertEqual(ins5.byte_size, 7, 'has 7 bytes')
@@ -220,7 +226,7 @@ class TestInstructionMacros(unittest.TestCase):
             'instruction bytes should match'
         )
 
-        ins6 = InstructionLine.factory(line_id, 'mov2 [$8008],$1234', 'some comment!', isa_model, memzone)
+        ins6 = InstructionLine.factory(line_id, 'mov2 [$8008],$1234', 'some comment!', isa_model, memzone, memzone_mngr)
         ins6.set_start_address(1212)
         self.assertIsInstance(ins6, InstructionLine)
         self.assertEqual(ins6.byte_size, 8, 'has 8 bytes')

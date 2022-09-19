@@ -6,6 +6,7 @@ from bespokeasm.assembler.line_object import LineWithBytes
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.model.instruction_parser import InstructioParser
 from bespokeasm.assembler.memory_zone import MemoryZone
+from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 
 
 class InstructionLine(LineWithBytes):
@@ -19,6 +20,7 @@ class InstructionLine(LineWithBytes):
             comment: str,
             isa_model: AssemblerModel,
             current_memzone: MemoryZone,
+            memzone_manager: MemoryZoneManager,
     ) -> LineWithBytes:
         """Tries to contruct a instruction line object from the passed instruction line"""
         # first, extract evertything up to the next extruction
@@ -42,7 +44,10 @@ class InstructionLine(LineWithBytes):
 
             argument_str = instruction_str.strip()[len(command_str):]
 
-            return InstructionLine(line_id, command_str, argument_str, isa_model, instruction_str, comment, current_memzone)
+            return InstructionLine(
+                line_id, command_str, argument_str, isa_model,
+                memzone_manager, instruction_str, comment, current_memzone,
+            )
         else:
             return None
 
@@ -52,6 +57,7 @@ class InstructionLine(LineWithBytes):
             command_str: str,
             argument_str: str,
             isa_model: AssemblerModel,
+            memzone_manager: MemoryZoneManager,
             instruction: str,
             comment: str,
             current_memzone: MemoryZone,
@@ -60,7 +66,9 @@ class InstructionLine(LineWithBytes):
         self._command = command_str
         self._argument_str = argument_str
         self._isa_model = isa_model
-        self._assembled_instruction = InstructioParser.parse_instruction(self._isa_model, line_id, instruction)
+        self._assembled_instruction = InstructioParser.parse_instruction(
+            self._isa_model, line_id, instruction, memzone_manager,
+        )
 
     def __str__(self):
         return f'InstructionLine<{self.instruction.strip()} -> {self._assembled_instruction}>'

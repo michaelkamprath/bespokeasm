@@ -21,6 +21,9 @@ predefined:
     - name: predefined_zone
       start: 0x2000
       end: 0x2fff
+    - name: GLOBAL
+      start: 0x0100
+      end: 0xDFFF
 operand_sets:
   8_bit_source:
     operand_values:

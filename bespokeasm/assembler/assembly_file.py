@@ -264,5 +264,7 @@ class AssemblyFile:
                 )
             except KeyError:
                 sys.exit(f'ERROR: {line_id} - Memory zone "{name}" defined multiple times')
+            except ValueError as v_err:
+                sys.exit(f'ERROR: {line_id} - {v_err}')
         else:
             sys.exit(f'ERROR: {line_id} - Syntax error when creating memory zone')

@@ -5,6 +5,7 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.byte_code.parts import NumericByteCodePart, CompositeByteCodePart
 from bespokeasm.assembler.model.operand import Operand, OperandType, ParsedOperand
 from .register import RegisterOperand
+from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 
 import bespokeasm.assembler.model.operand.factory as OF
 
@@ -52,7 +53,13 @@ class IndirectIndexedRegisterOperand(RegisterOperand):
     def match_pattern(self) -> str:
         return self.OPERAND_PATTERN_TEMPLATE.format(self.register, self._index_parse_pattern)
 
-    def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> ParsedOperand:
+    def parse_operand(
+        self,
+        line_id: LineIdentifier,
+        operand: str,
+        register_labels: set[str],
+        memzone_manager: MemoryZoneManager,
+    ) -> ParsedOperand:
         # first check that operand is what we expect
         match = re.match(self._parse_pattern, operand.strip())
         if match is not None and len(match.groups()) >= 3:
@@ -68,7 +75,7 @@ class IndirectIndexedRegisterOperand(RegisterOperand):
                 if self.bytecode_value is not None else NumericByteCodePart(0, 0, False, 'big', line_id)
             # find an index operand match
             for index_op in self._index_operand_list:
-                parsed_index = index_op.parse_operand(line_id, index_operand_str, register_labels)
+                parsed_index = index_op.parse_operand(line_id, index_operand_str, register_labels, memzone_manager)
                 if parsed_index is not None:
                     if parsed_index.byte_code is not None:
                         composit_byte_code = CompositeByteCodePart(

@@ -4,6 +4,7 @@ import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.label_scope import LabelScope
+from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.expression import parse_expression
 
 from .packed_bits import PackedBits
@@ -73,7 +74,14 @@ class NumericByteCodePart(ByteCodePart):
 
 
 class ExpressionByteCodePart(ByteCodePart):
-    def __init__(self, value_expression: str, value_size: int, byte_align: bool, endian: str, line_id: LineIdentifier) -> None:
+    def __init__(
+        self,
+        value_expression: str,
+        value_size: int,
+        byte_align: bool,
+        endian: str,
+        line_id: LineIdentifier,
+    ) -> None:
         super().__init__(value_size, byte_align, endian, line_id)
         self._expression = value_expression
         self._parsed_expression = parse_expression(self.line_id, self._expression)
@@ -119,6 +127,38 @@ class ExpressionByteCodePartWithValidation(ExpressionByteCodePart):
             sys.exit(f'ERROR: {self.line_id} - operand value of {value} exceeds maximun allowed of {self._max}')
         if self._min is not None and value < self._min:
             sys.exit(f'ERROR: {self.line_id} - operand value of {value} is less than minimum allowed of {self._min}')
+        return value
+
+
+class ExpressionByteCodePartInMemoryZone(ExpressionByteCodePart):
+    def __init__(
+        self,
+        memzone: MemoryZone,
+        value_expression: str,
+        value_size: int,
+        byte_align: bool,
+        endian: str,
+        line_id: LineIdentifier,
+    ) -> None:
+        super().__init__(value_expression, value_size, byte_align, endian, line_id)
+        self._memzone = memzone
+
+    def __str__(self) -> str:
+        return f'ExpressionByteCodePartInMemoryZone<expression="{self._expression}",zone={self._memzone}>'
+
+    def get_value(self, label_scope: LabelScope, instruction_address: int, instruction_size: int) -> int:
+        value = super().get_value(label_scope, instruction_address, instruction_size)
+        if self._memzone is not None:
+            if value > self._memzone.end:
+                sys.exit(
+                    f'ERROR: {self.line_id} - address value of {value} exceeds maximun allowed '
+                    f'address of {self._memzone.end} in memory zone {self._memzone.name}'
+                )
+            if value < self._memzone.start:
+                sys.exit(
+                    f'ERROR: {self.line_id} - address value of {value} is less than minimum allowed '
+                    f'address of {self._memzone.start} in memory zone {self._memzone.name}'
+                )
         return value
 
 

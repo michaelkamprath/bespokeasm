@@ -4,6 +4,7 @@ import sys
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.byte_code.parts import NumericByteCodePart, ExpressionByteCodePart
 from bespokeasm.assembler.model.operand import OperandType, ParsedOperand
+from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 
 from .register import RegisterOperand
 
@@ -56,7 +57,13 @@ class IndirectRegisterOperand(RegisterOperand):
     def match_pattern(self) -> str:
         return r'\[\s*{0}\s*(?:(?:\+|\-)\s*(?:[\w()\+\-\s]+\b)\s*)?\]'.format(self.register)
 
-    def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> ParsedOperand:
+    def parse_operand(
+        self,
+        line_id: LineIdentifier,
+        operand: str,
+        register_labels: set[str],
+        memzone_manager: MemoryZoneManager,
+    ) -> ParsedOperand:
         # first check that operand is what we expect
         match = re.match(self._parse_pattern, operand.strip())
         if match is not None and len(match.groups()) > 0:

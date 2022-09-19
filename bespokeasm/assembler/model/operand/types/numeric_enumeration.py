@@ -4,6 +4,7 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.byte_code.parts import ExpressionEnumerationByteCodePart
 from bespokeasm.assembler.model.operand import OperandType, ParsedOperand
 from bespokeasm.assembler.model.operand.types.numeric_expression import NumericExpressionOperand
+from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 
 
 class NumericEnumerationOperand(NumericExpressionOperand):
@@ -48,7 +49,13 @@ class NumericEnumerationOperand(NumericExpressionOperand):
         # bytecode value must be looked up in dictionary
         return None
 
-    def parse_operand(self, line_id: LineIdentifier, operand: str, register_labels: set[str]) -> ParsedOperand:
+    def parse_operand(
+        self,
+        line_id: LineIdentifier,
+        operand: str,
+        register_labels: set[str],
+        memzone_manager: MemoryZoneManager,
+    ) -> ParsedOperand:
         match = re.match(self.match_pattern, operand.strip())
         if match is not None:
             bytecode_part = None

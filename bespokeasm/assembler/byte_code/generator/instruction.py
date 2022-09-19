@@ -6,6 +6,7 @@ from bespokeasm.assembler.model.operand_parser import MatchedOperandSet
 from bespokeasm.assembler.byte_code.parts import NumericByteCodePart
 from bespokeasm.assembler.model.instruction import Instruction, InstructionVariant
 from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 
 
 class InstructionBytecodeGenerator:
@@ -18,6 +19,7 @@ class InstructionBytecodeGenerator:
         mnemonic: str,
         operands: str,
         isa_model: AssemblerModel,
+        memzone_manager: MemoryZoneManager,
     ) -> AssembledInstruction:
         if mnemonic != instruction.mnemonic:
             # this shouldn't happen
@@ -30,6 +32,7 @@ class InstructionBytecodeGenerator:
                 mnemonic,
                 operands,
                 isa_model,
+                memzone_manager,
             )
             if assembled_instruction is not None:
                 return assembled_instruction
@@ -44,6 +47,7 @@ class InstructionBytecodeGenerator:
         mnemonic: str,
         operands: str,
         isa_model: AssemblerModel,
+        memzone_manager: MemoryZoneManager,
     ) -> AssembledInstruction:
         if mnemonic != variant.mnemonic:
             # this shouldn't happen
@@ -74,7 +78,9 @@ class InstructionBytecodeGenerator:
 
         if variant._operand_parser is not None:
             matched_operands: MatchedOperandSet
-            matched_operands = variant._operand_parser.find_matching_operands(line_id, operand_list, isa_model.registers)
+            matched_operands = variant._operand_parser.find_matching_operands(
+                line_id, operand_list, isa_model.registers, memzone_manager,
+            )
             if matched_operands is None:
                 return None
             machine_code = matched_operands.generate_byte_code(base_bytecode, base_bytecode_suffix)
