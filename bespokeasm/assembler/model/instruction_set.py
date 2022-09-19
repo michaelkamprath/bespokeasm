@@ -19,11 +19,11 @@ class InstructionSet(dict[str, InstructionBase]):
         self._instructions_config = instructions_config
         self._macros_config = macros_config
 
-        lower_leywords = {kw.lower(): kw for kw in ASSEMBLER_KEYWORD_SET}
+        lower_keywords = {kw.lower(): kw for kw in ASSEMBLER_KEYWORD_SET}
 
         for mnemonic, instr_config in self._instructions_config.items():
             mnemonic = mnemonic.lower()
-            if mnemonic in lower_leywords:
+            if mnemonic in lower_keywords:
                 sys.exit(f'ERROR - ISA configuration defined instruction "{mnemonic}" which is also a BespokeASM keyword')
             self[mnemonic] = Instruction(mnemonic, instr_config, operand_set_collection, default_endian, registers)
 
@@ -32,7 +32,7 @@ class InstructionSet(dict[str, InstructionBase]):
             macro_list: list[InstructionMacro] = []
             for mnemonic, macro_config_list in self._macros_config.items():
                 mnemonic = mnemonic.lower()
-                if mnemonic in lower_leywords:
+                if mnemonic in lower_keywords:
                     sys.exit(f'ERROR - ISA configuration defined instruction "{mnemonic}" which is also a BespokeASM keyword')
                 # check macro mnemonic is not in existing instructions
                 if mnemonic in self:
