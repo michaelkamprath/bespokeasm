@@ -100,16 +100,17 @@ class Instruction(InstructionBase):
 
         variant_num = 0
         self._variants: list[InstructionVariant] = []
-        self._variants.append(
-            InstructionVariant(
-                mnemonic,
-                instruction_config,
-                operand_set_collection,
-                default_endian,
-                registers,
-                variant_num
+        if 'byte_code' in instruction_config:
+            self._variants.append(
+                InstructionVariant(
+                    mnemonic,
+                    instruction_config,
+                    operand_set_collection,
+                    default_endian,
+                    registers,
+                    variant_num
+                )
             )
-        )
 
         if 'variants' in self._config:
             for variant_config in self._config['variants']:
@@ -124,6 +125,8 @@ class Instruction(InstructionBase):
                         variant_num
                     )
                 )
+        if len(self._variants) == 0:
+            sys.exit(f'ERROR - Configuration for instruction "{mnemonic}" has no valid variant.')
 
     @property
     def variants(self) -> list[InstructionVariant]:

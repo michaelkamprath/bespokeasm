@@ -18,6 +18,7 @@ Changes that are planned but not implemented yet:
 ## [Unreleased]
 * Added ability for an numeric operand that is ostensibly an address to be checked to be a valid address value per the `GLOBAL` memory zone. Uses the `valid_address` opetion in the `argument` setting for an operand. Only valid for `numeric`, `indirect_numeric`, `deferred_numeric`, and `relative_address` operand types.
 * Added checks to ensure memory zones are defined within the `GLOBAL` memory zone.
+* Allow instruction configuration to only contain a `variants` list.
 
 ## [0.2.4]
 * Fixed bug where unknown instructions did not produce an error.
@@ -99,11 +100,12 @@ First tracked released
 * Added ability for instructions with operands to have a single "empty operand" variant, e.g., `pop`
 
 [Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.4...HEAD
-[0.2.3]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.3...v0.2.4
+[0.2.4]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.0...v0.2.1
-[0.2.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.8...v0.2.0
+[0.2.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.9...v0.2.0
+[0.1.9]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/michaelkamprath/bespokeasm/compare/v0.1.5...v0.1.6
