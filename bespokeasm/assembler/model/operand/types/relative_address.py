@@ -34,7 +34,8 @@ class RelativeAddressByteCodePart(ExpressionByteCodePartInMemoryZone):
         expression_value = super().get_value(label_scope, instruction_address, instruction_size)
         relative_value = expression_value - instruction_address
         if self._offset_from_instruction_end:
-            relative_value -= instruction_size
+            # minus one to account for the current address being 1 byte of instruction size
+            relative_value -= instruction_size - 1
         if self._max_relative_value is not None and relative_value > self._max_relative_value:
             sys.exit(
                 f'ERROR: {self.line_id} - Relative address offset is larger than configured '

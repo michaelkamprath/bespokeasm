@@ -613,7 +613,7 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertIsInstance(t4, InstructionLine)
         self.assertEqual(t4.byte_size, 2, 'has 2 bytes')
         t4.generate_bytes()
-        self.assertEqual(list(t4.get_bytes()), [0xEF, 0x1E], 'instruction byte should match')
+        self.assertEqual(list(t4.get_bytes()), [0xEF, 0x1F], 'instruction byte should match')
 
         # test offsets that are too large or too small
         with self.assertRaises(SystemExit, msg='offset out of range'):
