@@ -43,7 +43,7 @@ setup(
     dependency_links=dependency_links,
     author_email='michael@kamprath.net',
     classifiers=[
-        "Development Status :: 2 - Pre-Alpha",
+        "Development Status :: 3 - Alpha",
         "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
         "Programming Language :: Python :: 3.9",
     ]
