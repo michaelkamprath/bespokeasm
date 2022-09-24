@@ -1,0 +1,899 @@
+description: MOSTEK 3870
+general:
+  address_size: 12
+  endian: big
+  registers:
+    # accumulator
+    - a
+    # data counter
+    - dc
+    # auxiliary data counter
+    - dc1
+    # scratch pad registers 10 & 11
+    - h
+    # indirect scratchpad regsiter
+    - is
+    # scratch pad register 9
+    - j
+    # scratch pad registers 12 & 13
+    - k
+    - ku
+    - kl
+    # program counter stack register
+    - p
+    # program counter
+    - p0
+    # scratch pad registers 14 & 15
+    - q
+    - qu
+    - ql
+    # status register
+    - w
+  origin: 0
+  identifier:
+    name: mostek-3870-asm
+    version: "0.0.1"
+    extension: af8
+  min_version: 0.2.4
+operand_sets:
+  nval3:
+    operand_values:
+      uint8:
+        type: numeric
+        argument:
+          size: 3
+          byte_align: false
+  nval4:
+    operand_values:
+      uint8:
+        type: numeric
+        argument:
+          size: 4
+          byte_align: false
+  nval8:
+    operand_values:
+      uint8:
+        type: numeric
+        argument:
+          size: 8
+          byte_align: true
+  nval16:
+    operand_values:
+      uint8:
+        type: numeric
+        argument:
+          size: 16
+          byte_align: true
+          endian: big
+  sreg:
+    operand_values:
+      scratchpad_regs:
+        type: numeric_bytecode
+        bytecode:
+          size: 4
+          max: 0xb
+          min: 0
+  offset_addr:
+    operand_values:
+      offset:
+        type: relative_address
+        use_curly_braces: false
+        offset_from_instruction_end: true
+        argument:
+          size: 8
+          byte_align: true
+          max: 128
+          min: -127
+  absolute_addr:
+    operand_values:
+      address:
+        type: numeric
+        argument:
+          size: 16
+          byte_align: true
+          valid_address: true
+          endian: big
+instructions:
+  # Arithmetic and Logical Group
+  ADC:
+    # Add to Data Counter
+    byte_code:
+      value: 0x8E
+      size: 8
+  AI:
+    # ADD IMMEDIATE TO ACCUMULATOR
+    byte_code:
+      value: 0x24
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - nval8
+  AM:
+    # ADD (BINARY) MEMORY TO ACCUMULATOR
+    byte_code:
+      value: 0x88
+      size: 8
+  AMD:
+    # DECIMAL ADD, MEMORY TO ACCUMULATOR
+    byte_code:
+      value: 0x89
+      size: 8
+  AS:
+    # BINARY ADDITION, SCRATCHPAD MEMORY TO ACCUMULATOR
+    byte_code:
+      value: 0xC
+      size: 4
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - sreg
+  ASD:
+    # DECIMAL ADD, SCRATCHPAD TO ACCUMULATOR
+    byte_code:
+      value: 0xD
+      size: 4
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - sreg
+  CI:
+    # COMPARE IMMEDIATE
+    byte_code:
+      value: 0x25
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - nval8
+  CM:
+    # COMPARE MEMORY TO ACCUMULATOR
+    byte_code:
+      value: 0x8D
+      size: 8
+  COM:
+    # COMPLEMENT
+    byte_code:
+      value: 0x18
+      size: 8
+  DS:
+    # DECREMENT SCRATCHPAD CONTENT
+    byte_code:
+      value: 0x3
+      size: 4
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - sreg
+  INC:
+    # INCREMENT ACCUMULATOR
+    byte_code:
+      value: 0x1F
+      size: 8
+  LNK:
+    # LlNK CARRY TO THE ACCUMULATOR
+    byte_code:
+      value: 0x19
+      size: 8
+  NI:
+    # AND IMMEDIATE
+    byte_code:
+      value: 0x21
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - nval8
+  NM:
+    # LOGICAL AND FROM MEMORY
+    byte_code:
+      value: 0x8A
+      size: 8
+  NS:
+    # LOGICAL AND FROM SCRATCHPAD MEMORY
+    byte_code:
+      value: 0xF
+      size: 4
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - sreg
+  OI:
+    # OR IMMEDIATE
+    byte_code:
+      value: 0x22
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - nval8
+  OM:
+    # LOGICAL "OR" FROM MEMORY
+    byte_code:
+      value: 0x8B
+      size: 8
+  SL:
+    # SHIFT LEFT
+    byte_code:
+      value: 2
+      size: 5
+    operands:
+      count: 1
+      specific_operands:
+        shift_bits:
+          list:
+            num_enum:
+              type: numeric_enumeration
+              bytecode:
+                value_dict:
+                  1: 0b011
+                  4: 0b101
+                size: 3
+  SR:
+    # SHIFT RIGHT
+    byte_code:
+      value: 2
+      size: 5
+    operands:
+      count: 1
+      specific_operands:
+        shift_bits:
+          list:
+            num_enum:
+              type: numeric_enumeration
+              bytecode:
+                value_dict:
+                  1: 0b010
+                  4: 0b100
+                size: 3
+  XI:
+    # EXCLUSIVE-OR IMMEDIATE
+    byte_code:
+      value: 0x23
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - nval8
+  XM:
+    # EXCLUSIVE-OR FROM MEMORY
+    byte_code:
+      value: 0x8C
+      size: 8
+  XS:
+    # EXCLUSIVE-OR FROM SCRATCHPAD
+    byte_code:
+      value: 0xE
+      size: 4
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - sreg
+  # BRANCH, JUMP, CALL, AND RETURN GROUP
+  BC:
+    # Branch on Carry
+    byte_code:
+      value: 0x82
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - offset_addr
+  BF:
+    # Branch on False
+    byte_code:
+      value: 0x9
+      size: 4
+    operands:
+      count: 2
+      specific_operands:
+        false_conditions:
+          list:
+            selector:
+              type: numeric_bytecode
+              bytecode:
+                size: 4
+                max: 0xf
+                min: 0
+            relative_addr:
+              type: relative_address
+              use_curly_braces: false
+              argument:
+                size: 8
+                byte_align: true
+                max: 128
+                min: -127
+  BM:
+    # BRANCH ON NEGATIVE
+    byte_code:
+      value: 0x91
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - offset_addr
+  BNC:
+    # BRANCH IF NO CARRY
+    byte_code:
+      value: 0x92
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - offset_addr
+  BNO:
+    # BRANCH IF NO OVERFLOW
+    byte_code:
+      value: 0x98
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - offset_addr
+  BNZ:
+    # BRANCH IF NO ZERO
+    byte_code:
+      value: 0x94
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - offset_addr
+  BP:
+    # BRANCH IF POSITIVE
+    byte_code:
+      value: 0x81
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - offset_addr
+  BR:
+    # UNCONDITIONAL BRANCH
+    byte_code:
+      value: 0x90
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - offset_addr
+  BT:
+    # Branch on True
+    byte_code:
+      value: 0x8
+      size: 4
+    operands:
+      count: 2
+      specific_operands:
+        false_conditions:
+          list:
+            selector:
+              type: numeric_bytecode
+              bytecode:
+                size: 4
+                max: 0x7
+                min: 0
+            relative_addr:
+              type: relative_address
+              use_curly_braces: false
+              argument:
+                size: 8
+                byte_align: true
+                max: 128
+                min: -127
+  BZ:
+    # BRANCH ON ZERO
+    byte_code:
+      value: 0x84
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - offset_addr
+  JMP:
+    # BRANCH IMMEDIATE
+    byte_code:
+      value: 0x29
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_addr
+  PI:
+    # CALL TO SUBROUTINE IMMEDIATE
+    byte_code:
+      value: 0x28
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_addr
+  PK:
+    # CALL TO SUBROUTINE DIRECT AND RETURN FROM SUBROUTINE DIRECT
+    byte_code:
+      value: 0x0C
+      size: 8
+  POP:
+    # RETURN FROM SUBROUTINE
+    byte_code:
+      value: 0x1C
+      size: 8
+  # ACCUMULATOR DATA MOVEMENT GROUP
+  CLR:
+    # CLEAR ACCUMULATOR
+    byte_code:
+      value: 0x70
+      size: 8
+  LI:
+    # LOAD IMMEDIATE
+    byte_code:
+      value: 0x20
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - nval8
+  LIS:
+    # LOAD IMMEDIATE
+    byte_code:
+      value: 0x7
+      size: 4
+    operands:
+      count: 1
+      specific_operands:
+        nval_4:
+          list:
+            uint4:
+              type: numeric
+              argument:
+                size: 4
+                byte_align: false
+  LM:
+    # LOAD ACCUMULATOR FROM MEMORY
+    byte_code:
+      value: 0x16
+      size: 8
+  ST:
+    # STORE ACCUMULATOR TO MEMORY
+    byte_code:
+      value: 0x17
+      size: 8
+  # ADDRESS REGISTER GROUP
+  DCI:
+    # LOAD DC IMMEDIATE
+    byte_code:
+      value: 0x2A
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - nval16
+  XDC:
+    # EXCHANGE DATA COUNTERS
+    byte_code:
+      value: 0x2C
+      size: 8
+  LISL:
+    # LOAD LOWER OCTAL DIGIT OF ISAR
+    byte_code:
+      value: 0b01100
+      size: 5
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - nval3
+  LISU:
+    # LOAD UPPER OCTAL DIGIT OF ISAR
+    byte_code:
+      value: 0b01101
+      size: 5
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - nval3
+  # INPUT/OUTPUT GROUP
+  IN:
+    # INPUT LONG ADDRESS
+    byte_code:
+      value: 0x26
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - nval8
+  INS:
+    # INPUT SHORT ADDRESS
+    byte_code:
+      value: 0xA
+      size: 4
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - nval4
+  OUT:
+    # OUTPUT LONG ADDRESS
+    byte_code:
+      value: 0x27
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - nval8
+  OUTS:
+    # OUTPUT SHORT ADDRESS
+    byte_code:
+      value: 0xB
+      size: 4
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - nval4
+  # CPU CONTROL GROUP
+  DI:
+    # DISABLE INTERRUPT
+    byte_code:
+      value: 0x1A
+      size: 8
+  EI:
+    # ENABLE INTERRUPT
+    byte_code:
+      value: 0x1B
+      size: 8
+  NOP:
+    # NO OPERATION
+    byte_code:
+      value: 0x2B
+      size: 8
+  # load register variants
+  LR:
+    # LOAD REGISTER
+    variants:
+      # A, KU
+      - byte_code:
+          value: 0x00
+          size: 8
+        operands:
+          count: 2
+          specific_operands:
+            a_ku:
+              list:
+                a:
+                  type: register
+                  register: a
+                ku:
+                  type: register
+                  register: ku
+      # A, KL
+      - byte_code:
+          value: 0x01
+          size: 8
+        operands:
+          count: 2
+          specific_operands:
+            a_ku:
+              list:
+                a:
+                  type: register
+                  register: a
+                kl:
+                  type: register
+                  register: kl
+      # A, QU
+      - byte_code:
+          value: 0x02
+          size: 8
+        operands:
+          count: 2
+          specific_operands:
+            a_ku:
+              list:
+                a:
+                  type: register
+                  register: a
+                qu:
+                  type: register
+                  register: qu
+      # A, QL
+      - byte_code:
+          value: 0x03
+          size: 8
+        operands:
+          count: 2
+          specific_operands:
+            a_ku:
+              list:
+                a:
+                  type: register
+                  register: a
+                ql:
+                  type: register
+                  register: ql
+      # A, IS
+      - byte_code:
+          value: 0x0A
+          size: 8
+        operands:
+          count: 2
+          specific_operands:
+            a_ku:
+              list:
+                a:
+                  type: register
+                  register: a
+                is:
+                  type: register
+                  register: is
+      # KU, A
+      - byte_code:
+          value: 0x04
+          size: 8
+        operands:
+          count: 2
+          specific_operands:
+            a_ku:
+              list:
+                ku:
+                  type: register
+                  register: ku
+                a:
+                  type: register
+                  register: a
+      # KL, A
+      - byte_code:
+          value: 0x05
+          size: 8
+        operands:
+          count: 2
+          specific_operands:
+            a_ku:
+              list:
+                kl:
+                  type: register
+                  register: kl
+                a:
+                  type: register
+                  register: a
+      # QU, A
+      - byte_code:
+          value: 0x06
+          size: 8
+        operands:
+          count: 2
+          specific_operands:
+            a_ku:
+              list:
+                qu:
+                  type: register
+                  register: qu
+                a:
+                  type: register
+                  register: a
+      # QL, A
+      - byte_code:
+          value: 0x07
+          size: 8
+        operands:
+          count: 2
+          specific_operands:
+            a_ku:
+              list:
+                ql:
+                  type: register
+                  register: ql
+                a:
+                  type: register
+                  register: a
+      # IS, A
+      - byte_code:
+          value: 0x0B
+          size: 8
+        operands:
+          count: 2
+          specific_operands:
+            a_ku:
+              list:
+                is:
+                  type: register
+                  register: is
+                a:
+                  type: register
+                  register: a
+      # A, r
+      - byte_code:
+          value: 0x4
+          size: 4
+        operands:
+          count: 2
+          specific_operands:
+            a_ku:
+              list:
+                a:
+                  type: register
+                  register: a
+                scratchpad_regs:
+                  type: numeric_bytecode
+                  bytecode:
+                    size: 4
+                    max: 0xb
+                    min: 0
+      # r, A
+      - byte_code:
+          value: 0x5
+          size: 4
+        operands:
+          count: 2
+          specific_operands:
+            a_ku:
+              list:
+                scratchpad_regs:
+                  type: numeric_bytecode
+                  bytecode:
+                    size: 4
+                    max: 0xb
+                    min: 0
+                a:
+                  type: register
+                  register: a
+      # P0, Q
+      - byte_code:
+          value: 0x0D
+          size: 8
+        operands:
+          count: 2
+          specific_operands:
+            a_ku:
+              list:
+                p0:
+                  type: register
+                  register: p0
+                q:
+                  type: register
+                  register: q
+      # DC, Q
+      - byte_code:
+          value: 0x0F
+          size: 8
+        operands:
+          count: 2
+          specific_operands:
+            a_ku:
+              list:
+                dc:
+                  type: register
+                  register: dc
+                q:
+                  type: register
+                  register: q
+      # Q, DC
+      - byte_code:
+          value: 0x0E
+          size: 8
+        operands:
+          count: 2
+          specific_operands:
+            a_ku:
+              list:
+                q:
+                  type: register
+                  register: q
+                dc:
+                  type: register
+                  register: dc
+      # DC, H
+      - byte_code:
+          value: 0x10
+          size: 8
+        operands:
+          count: 2
+          specific_operands:
+            a_ku:
+              list:
+                dc:
+                  type: register
+                  register: dc
+                h:
+                  type: register
+                  register: h
+      # H, DC
+      - byte_code:
+          value: 0x11
+          size: 8
+        operands:
+          count: 2
+          specific_operands:
+            a_ku:
+              list:
+                h:
+                  type: register
+                  register: h
+                dc:
+                  type: register
+                  register: dc
+      # K, P
+      - byte_code:
+          value: 0x08
+          size: 8
+        operands:
+          count: 2
+          specific_operands:
+            a_ku:
+              list:
+                k:
+                  type: register
+                  register: k
+                p:
+                  type: register
+                  register: p
+      # P, K
+      - byte_code:
+          value: 0x09
+          size: 8
+        operands:
+          count: 2
+          specific_operands:
+            a_ku:
+              list:
+                p:
+                  type: register
+                  register: p
+                k:
+                  type: register
+                  register: k
+      # J, W
+      - byte_code:
+          value: 0x1E
+          size: 8
+        operands:
+          count: 2
+          specific_operands:
+            a_ku:
+              list:
+                j:
+                  type: register
+                  register: j
+                w:
+                  type: register
+                  register: w
+      # W, J
+      - byte_code:
+          value: 0x1D
+          size: 8
+        operands:
+          count: 2
+          specific_operands:
+            a_ku:
+              list:
+                w:
+                  type: register
+                  register: w
+                j:
+                  type: register
+                  register: j
