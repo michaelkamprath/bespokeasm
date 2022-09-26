@@ -9,6 +9,12 @@ The instruction set for the MOSTEK 3870 is documented in these two vintage docum
 * [MOSTEK 3870 Instructions](./documentation/mostek3870_instructions.pdf) - This document is an extract from the _3870/F8 Microcontroller Data Book_ covering just the instruction set.
 * [F8 Guide to Programming](./documentation/F8_Guide_To_Programming_1977.pdf) - This document covered the F8 instruction set, which the MK3870 uses, and provides several programming techniques for the F8 family of CPUs. Some of this document was written for F8-based CPUs other than the MK3870 as it discusses hardware capabilities the MK3870 doesn't have. However, it does a more thorough job of explaining the instruction set.
 
+Generally, the mnemonics documented above is replicated in this ISA configuration for **BespokeASM**, However, there are some small modifications to the instructions set syntax:
+
+* The `LR r,A` and `LR A,r` instructions allow data movement between the accumulator and scratch pad registers `0` through `11` (`$B`). However the value `12` (`$C`)can be used for `r` and this represents the scratchpad registers pointed to by the `IS` regsiter. The syntax in the various F8 docments is inconcistent on the syntax for how use the `LR` instruction with the indirect `IS` register. Given that, this implementation will use the **BespokeASM** syntax for indirect registers. That is, moving data between A and the scratch pad register pointed to by the `IS` register will take the following form:
+  * `lr [is],a` : Move data from accumulator `A` to scratch pad register pointed to by register `IS`. This results ion bytecode value `$5C`.
+  * `lr a,[is]` : Move data from scratch pad register pointed to by register `IS` to accumulator `A` This results ion bytecode value `$4C`.
+
 ## Examples
 Examples programs that use the MOSTEK 3870 instruction set can be found in [this directory](./).
 

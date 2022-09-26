@@ -598,7 +598,7 @@ instructions:
         operands:
           count: 2
           specific_operands:
-            a_ku:
+            a_kl:
               list:
                 a:
                   type: register
@@ -613,7 +613,7 @@ instructions:
         operands:
           count: 2
           specific_operands:
-            a_ku:
+            a_qu:
               list:
                 a:
                   type: register
@@ -628,7 +628,7 @@ instructions:
         operands:
           count: 2
           specific_operands:
-            a_ku:
+            a_ql:
               list:
                 a:
                   type: register
@@ -643,7 +643,7 @@ instructions:
         operands:
           count: 2
           specific_operands:
-            a_ku:
+            a_is:
               list:
                 a:
                   type: register
@@ -658,7 +658,7 @@ instructions:
         operands:
           count: 2
           specific_operands:
-            a_ku:
+            ku_a:
               list:
                 ku:
                   type: register
@@ -673,7 +673,7 @@ instructions:
         operands:
           count: 2
           specific_operands:
-            a_ku:
+            kl_a:
               list:
                 kl:
                   type: register
@@ -688,7 +688,7 @@ instructions:
         operands:
           count: 2
           specific_operands:
-            a_ku:
+            qu_a:
               list:
                 qu:
                   type: register
@@ -703,7 +703,7 @@ instructions:
         operands:
           count: 2
           specific_operands:
-            a_ku:
+            ql_a:
               list:
                 ql:
                   type: register
@@ -718,7 +718,7 @@ instructions:
         operands:
           count: 2
           specific_operands:
-            a_ku:
+            is_a:
               list:
                 is:
                   type: register
@@ -733,7 +733,7 @@ instructions:
         operands:
           count: 2
           specific_operands:
-            a_ku:
+            a_r:
               list:
                 a:
                   type: register
@@ -751,7 +751,7 @@ instructions:
         operands:
           count: 2
           specific_operands:
-            a_ku:
+            r_A:
               list:
                 scratchpad_regs:
                   type: numeric_bytecode
@@ -762,6 +762,36 @@ instructions:
                 a:
                   type: register
                   register: a
+      # A, [is]
+      - byte_code:
+          value: 0x4C
+          size: 8
+        operands:
+          count: 2
+          specific_operands:
+            indirect_is_A:
+              list:
+                a:
+                  type: register
+                  register: a
+                indirect_is:
+                  type: indirect_register
+                  register: is
+      # [is], A
+      - byte_code:
+          value: 0x5C
+          size: 8
+        operands:
+          count: 2
+          specific_operands:
+            indirect_is_A:
+              list:
+                indirect_is:
+                  type: indirect_register
+                  register: is
+                a:
+                  type: register
+                  register: a
       # P0, Q
       - byte_code:
           value: 0x0D
@@ -769,7 +799,7 @@ instructions:
         operands:
           count: 2
           specific_operands:
-            a_ku:
+            p0_q:
               list:
                 p0:
                   type: register
@@ -784,7 +814,7 @@ instructions:
         operands:
           count: 2
           specific_operands:
-            a_ku:
+            dc_q:
               list:
                 dc:
                   type: register
@@ -799,7 +829,7 @@ instructions:
         operands:
           count: 2
           specific_operands:
-            a_ku:
+            q_dc:
               list:
                 q:
                   type: register
@@ -814,7 +844,7 @@ instructions:
         operands:
           count: 2
           specific_operands:
-            a_ku:
+            sc_h:
               list:
                 dc:
                   type: register
@@ -829,7 +859,7 @@ instructions:
         operands:
           count: 2
           specific_operands:
-            a_ku:
+            h_dc:
               list:
                 h:
                   type: register
@@ -844,7 +874,7 @@ instructions:
         operands:
           count: 2
           specific_operands:
-            a_ku:
+            k_p:
               list:
                 k:
                   type: register
@@ -859,7 +889,7 @@ instructions:
         operands:
           count: 2
           specific_operands:
-            a_ku:
+            p_k:
               list:
                 p:
                   type: register
@@ -874,7 +904,7 @@ instructions:
         operands:
           count: 2
           specific_operands:
-            a_ku:
+            j_w:
               list:
                 j:
                   type: register
@@ -889,7 +919,7 @@ instructions:
         operands:
           count: 2
           specific_operands:
-            a_ku:
+            w_j:
               list:
                 w:
                   type: register
