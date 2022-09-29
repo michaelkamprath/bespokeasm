@@ -11,7 +11,7 @@ The instruction set for the MOSTEK 3870 is documented in these two vintage docum
 
 Generally, the mnemonics documented above is replicated in this ISA configuration for **BespokeASM**, However, there are some small modifications to the instructions set syntax:
 
-* The `LR r,A` and `LR A,r` instructions allow data movement between the accumulator and scratch pad registers `0` through `11` (`$B`). However the value `12` (`$C`)can be used for `r` and this represents the scratchpad registers pointed to by the `IS` regsiter. The syntax in the various F8 docments is inconcistent on the syntax for how use the `LR` instruction with the indirect `IS` register. Given that, this implementation will use the **BespokeASM** syntax for indirect registers. That is, moving data between A and the scratch pad register pointed to by the `IS` register will take the following form:
+* The `LR r,A` and `LR A,r` instructions allow data movement between the accumulator and scratch pad registers `0` through `11` (`$B`). However the value `12` (`$C`)can be used for `r` and this represents the scratchpad registers pointed to by the `IS` register. The various F8 documents are inconsistent on the syntax for how use the `LR` instruction with the indirect `IS` register. Given that, this ISA implementation will use the **BespokeASM** syntax for indirect registers. That is, moving data between A and the scratch pad register pointed to by the `IS` register will take the following form:
   * `lr [is],a` : Move data from accumulator `A` to scratch pad register pointed to by register `IS`. This results ion bytecode value `$5C`.
   * `lr a,[is]` : Move data from scratch pad register pointed to by register `IS` to accumulator `A` This results ion bytecode value `$4C`.
 
