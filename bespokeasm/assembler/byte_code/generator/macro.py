@@ -86,11 +86,21 @@ class MacroBytecodeGenerator:
                     # handle @ARG
                     arg_str = f'@ARG({op_num})'
                     if arg_str in instruction_str:
+                        if op.operand_argument_string is None:
+                            sys.exit(
+                                f'ERROR: {line_id} - Macro "{variant.mnemonic}" step {step_num} uses @ARG({op_num}) '
+                                f'but no operand argument exist. Consider using @OP{step_num} instead.'
+                            )
                         # gate the replace so that not called on unspported operand types
                         instruction_str = instruction_str.replace(arg_str, op.operand_argument_string)
                     # handle @REG
                     reg_str = f'@REG({op_num})'
                     if reg_str in instruction_str:
+                        if op.operand_register_string is None:
+                            sys.exit(
+                                f'ERROR: {line_id} - Macro "{variant.mnemonic}" step {step_num} uses @REG({op_num}) '
+                                f'but no operand register exist. Consider using @OP{step_num} instead.'
+                            )
                         # gate the replace so that not called on unspported operand types
                         instruction_str = instruction_str.replace(reg_str, op.operand_register_string)
                     # handle @OP

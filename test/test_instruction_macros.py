@@ -240,3 +240,38 @@ class TestInstructionMacros(unittest.TestCase):
             ],
             'instruction bytes should match'
         )
+
+    def test_macro_with_variants(self):
+        isa_model = self.isa_model
+        memzone = self.memzone
+        memzone_mngr = self.memory_zone_manager
+
+        line_id = LineIdentifier(1, 'test_macro_with_variants')
+
+        ins1 = InstructionLine.factory(line_id, 'incs sp', 'some comment!', isa_model, memzone, memzone_mngr)
+        ins1.set_start_address(1212)
+        self.assertIsInstance(ins1, InstructionLine)
+        self.assertEqual(ins1.byte_size, 1, 'has 1 bytes')
+        ins1.label_scope = TestInstructionMacros.label_values
+        ins1.generate_bytes()
+        self.assertEqual(
+            list(ins1.get_bytes()),
+            [
+                0b00100110,
+            ],
+            'instruction bytes should match'
+        )
+
+        ins2 = InstructionLine.factory(line_id, 'incs 3', 'some comment!', isa_model, memzone, memzone_mngr)
+        ins2.set_start_address(1212)
+        self.assertIsInstance(ins2, InstructionLine)
+        self.assertEqual(ins2.byte_size, 1, 'has 1 bytes')
+        ins2.label_scope = TestInstructionMacros.label_values
+        ins2.generate_bytes()
+        self.assertEqual(
+            list(ins2.get_bytes()),
+            [
+                0b00100011,
+            ],
+            'instruction bytes should match'
+        )

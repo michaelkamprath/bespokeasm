@@ -169,8 +169,12 @@ class ParsedOperand:
 
     @property
     def operand_argument_string(self) -> str:
+        if self.argument is None:
+            return None
         return self.argument.instruction_string
 
     @property
     def operand_register_string(self) -> str:
+        if self.operand is None:
+            return None
         return self.operand.operand_register_string

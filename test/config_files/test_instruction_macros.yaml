@@ -153,6 +153,14 @@ operand_sets:
           min: -128
           size: 8
           byte_align: true
+  direct_bytecode:
+    operand_values:
+      scratchpad_regs:
+        type: numeric_bytecode
+        bytecode:
+          size: 3
+          max: 5
+          min: 0
 instructions:
   push:
     operands:
@@ -200,6 +208,38 @@ instructions:
       operand_sets:
         list:
           - 8_bit_source
+  ldar:
+    variants:
+      - byte_code:
+          value: 4
+          size: 5
+        operands:
+          count: 1
+          operand_sets:
+            list:
+              - direct_bytecode
+      - byte_code:
+          value: 0b00100110
+          size: 8
+        operands:
+          count: 1
+          specific_operands:
+            stack_pointer:
+              list:
+                sp:
+                  type: register
+                  register: sp
+      - byte_code:
+          value: 0b00100111
+          size: 8
+        operands:
+          count: 1
+          specific_operands:
+            indirect_stack_pointer:
+              list:
+                sp:
+                  type: indirect_register
+                  register: sp
 macros:
   push2:
     - operands:
@@ -386,3 +426,21 @@ macros:
         - "push @OP(0)"
         - "mov [@REG(0) + (@ARG(0)+1)],[@REG(1) + (@ARG(1)+1)]"
         - "pop [@REG(1) + (@ARG(1)+1)]"
+  incs:
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - direct_bytecode
+      instructions:
+        - "ldar @OP(0)"
+    - operands:
+        count: 1
+        specific_operands:
+          stack_pointer:
+            list:
+              sp:
+                type: register
+                register: sp
+      instructions:
+        - "ldar @REG(0)"
