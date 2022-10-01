@@ -927,3 +927,63 @@ instructions:
                 j:
                   type: register
                   register: j
+macros:
+  jmps:
+    # jump to an address stored in two consecutive scratchpads
+    # operand is location of start of two consecutive scratchpads
+    - operands:
+        count: 1
+        specific_operands:
+          immediate:
+            list:
+              sp_addr:
+                type: numeric
+                argument:
+                  size: 8
+                  byte_align: true
+      instructions:
+        - "li (@ARG(0)+0)"
+        - "lr is,a"
+        - "lr a,[is]"
+        - "lr qu,a"
+        - "li (@ARG(0)+1)"
+        - "lr is,a"
+        - "lr a,[is]"
+        - "lr ql,a"
+        - "lr p0,q"
+  incs:
+    # increment scratchpad value
+    # destroys A register value
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - sreg
+      instructions:
+        - "lr a,@OP(0)"
+        - "inc"
+        - "lr @OP(0),a"
+    - operands:
+        count: 1
+        specific_operands:
+          indirect_is:
+            list:
+              indirect_is:
+                type: indirect_register
+                register: is
+      instructions:
+        - "lr a,[@REG(0)]"
+        - "inc"
+        - "lr [@REG(0)],a"
+    - operands:
+        count: 1
+        specific_operands:
+          is:
+            list:
+              is:
+                type: register
+                register: is
+      instructions:
+        - "lr a,@REG(0)"
+        - "inc"
+        - "lr @REG(0),a"
