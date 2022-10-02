@@ -20,9 +20,10 @@ The MOSTEK 3870 ISA configuration file does define a number of macros to expedit
 
 | Macros Instruction | Operand 1 | Operand 2 | Description|
 |:-:|:-:|:-:|:--|
-| `jmps` | scratch pad index | - | Set the program counter (jump) to the address value store in the two consecutive scratch pad locations starting at the scratch pad indicated in the operand. |
-|`incs`| scratch pad index | - | Increments the value contained in scratch pad location indicated by operand. _Destroys A register value._ |
-|`incs`| `[is]` | - | Increments the value contained in scratch pad location indicated by IS register. _Destroys A register value._ |
+| `jmps` | scratch pad index | - | Set the program counter (jump) to the address value store in the two consecutive scratch pad locations starting at the scratch pad indicated in the operand. _Destroys value in `A` register._ |
+|`incs`| scratch pad index | - | Increments the value contained in scratch pad location indicated by operand. _Destroys value in `A` register._ |
+|`incs`| `[is]` | - | Increments the value contained in scratch pad location indicated by IS register. _Destroys value in `A` register._ |
+| `lris` | `a` register | scratch pad index  | Copies value at scratch pad location indicated in second operand to register `A`. |
 
 ## Examples
 Examples programs that use the MOSTEK 3870 instruction set can be found in [this directory](./).

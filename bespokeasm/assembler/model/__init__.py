@@ -146,8 +146,19 @@ class AssemblerModel:
         return self._registers
 
     @property
-    def instruction_mnemonics(self) -> list[str]:
+    def operation_mnemonics(self) -> list[str]:
+        '''returns list of all mnemonics, instructions and macros'''
         return list(self._instructions.keys())
+
+    @property
+    def instruction_mnemonics(self) -> set[str]:
+        '''returns a set of only native instruction mnemonics'''
+        return self._instructions.instruction_mnemonics
+
+    @property
+    def macro_mnemonics(self) -> set[str]:
+        '''returns a set of only defined macro mnemonics'''
+        return self._instructions.macro_mnemonics
 
     @property
     def instructions(self) -> InstructionSet:

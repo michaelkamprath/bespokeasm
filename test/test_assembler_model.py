@@ -244,6 +244,30 @@ class TestConfigObject(unittest.TestCase):
 
         self.assertSetEqual(set(model.predefined_labels), set(['CONST1', 'CONST2', 'buffer']), 'label set should equal')
 
+    def test_mnemonic_lists(self):
+        with pkg_resources.path(config_files, 'test_instruction_macros.yaml') as fp:
+            model = AssemblerModel(str(fp), 0)
+
+        self.assertSetEqual(
+            model.instruction_mnemonics,
+            set(['push', 'pop', 'mov', 'add', 'addc', 'ldar']),
+            'instruction mnomonics should match'
+        )
+        self.assertSetEqual(
+            model.macro_mnemonics,
+            set(['push2', 'mov2', 'add16', 'swap', 'incs']),
+            'macro mnomonics should match'
+        )
+        self.assertListEqual(
+            model.operation_mnemonics,
+            [
+                'push', 'pop', 'mov', 'add',
+                'addc', 'ldar', 'push2', 'mov2',
+                'add16', 'swap', 'incs',
+            ],
+            'instruction + macro mnomonics should match'
+        )
+
 
 if __name__ == '__main__':
     unittest.main()

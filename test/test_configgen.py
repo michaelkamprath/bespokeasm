@@ -93,6 +93,17 @@ class TestConfigurationGeneration(unittest.TestCase):
             ['\\blda\\b', '\\badd\\b', '\\bset\\b', '\\bbig\\b', '\\bhlt\\b'],
             'instructions'
         )
+        # there should be no macros for this ISA
+        self.assertFalse(
+            'macros' in grammar_json['repository'],
+            'there should be no macros for this ISA'
+        )
+        for pattern in grammar_json['repository']['main']['patterns']:
+            self.assertFalse(
+                pattern['include'] == '#macros',
+                'there should be no macros for this ISA'
+            )
+
         self.assertFalse(('registers' in grammar_json['repository']), 'no registers should be found')
 
         self.assertIsFile(os.path.join(extension_dirpath, 'bespokeasm-test', 'snippets.json'))
@@ -196,11 +207,24 @@ class TestConfigurationGeneration(unittest.TestCase):
             syntax_dict = yaml.safe_load(yaml_file)
 
         self.assertListEqual(syntax_dict['file_extensions'], ['asmtest'], 'file extension should be as assigned')
-        self._assert_grouped_item_list(
-            syntax_dict['contexts']['instructions'][0]['match'],
-            ['\\blda\\b', '\\badd\\b', '\\bset\\b', '\\bbig\\b', '\\bhlt\\b'],
-            'instructions'
-        )
+        for instr_dict in syntax_dict['contexts']['instructions']:
+            if instr_dict['scope'] == 'variable.function.instruction':
+                self._assert_grouped_item_list(
+                    instr_dict['match'],
+                    ['\\blda\\b', '\\badd\\b', '\\bset\\b', '\\bbig\\b', '\\bhlt\\b'],
+                    'instructions'
+                )
+            elif instr_dict['scope'] == 'variable.function.macro':
+                self.fail('There should be no macros defined in this list')
+
+        for config_dict in syntax_dict['contexts']['pop_instruction_end']:
+            if config_dict['name'] == 'instructions':
+                self._assert_grouped_item_list(
+                    instr_dict['match'],
+                    ['\\blda\\b', '\\badd\\b', '\\bset\\b', '\\bbig\\b', '\\bhlt\\b'],
+                    'instructions'
+                )
+
         self.assertFalse(('registers' in syntax_dict['contexts']), 'no registers should be found')
         self._assert_grouped_item_list(
             syntax_dict['contexts']['compiler_directives'][0]['match'],
@@ -256,11 +280,24 @@ class TestConfigurationGeneration(unittest.TestCase):
             syntax_dict = yaml.safe_load(yaml_file)
 
         self.assertListEqual(syntax_dict['file_extensions'], ['asmtest'], 'file extension should be as assigned')
-        self._assert_grouped_item_list(
-            syntax_dict['contexts']['instructions'][0]['match'],
-            ['\\bnop\\b', '\\bmov\\b', '\\bcmp\\b'],
-            'instructions'
-        )
+        for instr_dict in syntax_dict['contexts']['instructions']:
+            if instr_dict['scope'] == 'variable.function.instruction':
+                self._assert_grouped_item_list(
+                    instr_dict['match'],
+                    ['\\bnop\\b', '\\bmov\\b', '\\bcmp\\b'],
+                    'instructions'
+                )
+            elif instr_dict['scope'] == 'variable.function.macro':
+                self.fail('There should be no macros defined in this list')
+
+        for config_dict in syntax_dict['contexts']['pop_instruction_end']:
+            if config_dict['name'] == 'instructions':
+                self._assert_grouped_item_list(
+                    instr_dict['match'],
+                    ['\\bnop\\b', '\\bmov\\b', '\\bcmp\\b'],
+                    'instructions'
+                )
+
         self._assert_grouped_item_list(
             syntax_dict['contexts']['registers'][0]['match'],
             ['\\ba\\b', '\\bj\\b', '\\bi\\b', '\\bh\\b', '\\bl\\b', '\\bhl\\b', '\\bsp\\b', '\\bmar\\b'],

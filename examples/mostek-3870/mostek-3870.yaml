@@ -987,3 +987,22 @@ macros:
         - "lr a,@REG(0)"
         - "inc"
         - "lr @REG(0),a"
+  lris:
+    # copies value at scratch pad location "addr" to register A
+    - operands:
+        count: 2
+        specific_operands:
+          to_reg_a:
+            list:
+              a_reg:
+                type: register
+                register: a
+              isar_addr:
+                type: numeric
+                argument:
+                  size: 8
+                  byte_align: true
+      instructions:
+        - "li @OP(1)"
+        - "lr is,a"
+        - "lr a,[is]"

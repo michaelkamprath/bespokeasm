@@ -69,9 +69,26 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
         )
         grammar_json['repository']['instructions']['end'] = self._replace_token_with_regex_list(
             grammar_json['repository']['instructions']['end'],
-            '##INSTRUCTIONS##',
-            self.model.instruction_mnemonics
+            '##OPERATIONS##',
+            self.model.operation_mnemonics
         )
+        if len(self.model.macro_mnemonics) > 0:
+            grammar_json['repository']['macros']['begin'] = self._replace_token_with_regex_list(
+                grammar_json['repository']['macros']['begin'],
+                '##MACROS##',
+                self.model.macro_mnemonics
+            )
+            grammar_json['repository']['macros']['end'] = self._replace_token_with_regex_list(
+                grammar_json['repository']['macros']['end'],
+                '##OPERATIONS##',
+                self.model.operation_mnemonics
+            )
+        else:
+            del grammar_json['repository']['macros']
+            for idx, pattern_item in enumerate(grammar_json['repository']['main']['patterns']):
+                if pattern_item['include'] == '#macros':
+                    grammar_json['repository']['main']['patterns'].remove(pattern_item)
+                    break
 
         # handle registers
         if len(self.model.registers) > 0:

@@ -20,6 +20,8 @@ Changes that are planned but not implemented yet:
 * Added checks to ensure memory zones are defined within the `GLOBAL` memory zone.
 * Allow instruction configuration to only contain a `variants` list.
 * Added example for the MOSTEK 3870
+* Addressed some bugs in how macros are handled.
+* Added syntax highlighting to differentiate macros from native instructions
 
 ## [0.2.4]
 * Fixed bug where unknown instructions did not produce an error.

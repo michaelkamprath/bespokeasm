@@ -52,13 +52,38 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
                     sys.exit(f'ERROR: {exc}')
 
         # handle instructions
+        update_instructions = False
+        update_macros = False
         syntax_dict['file_extensions'] = [self.code_extension]
-        syntax_dict['contexts']['instructions'][0]['match'] = self._replace_token_with_regex_list(
-            syntax_dict['contexts']['instructions'][0]['match'],
-            '##INSTRUCTIONS##',
-            self.model.instruction_mnemonics
-        )
-        index = None
+        for idx, instr_dict in enumerate(syntax_dict['contexts']['instructions']):
+            if instr_dict['scope'] == 'variable.function.instruction':
+                instr_dict['match'] = self._replace_token_with_regex_list(
+                    instr_dict['match'],
+                    '##INSTRUCTIONS##',
+                    self.model.instruction_mnemonics
+                )
+                update_instructions = True
+            elif instr_dict['scope'] == 'variable.function.macro':
+                if len(self.model.macro_mnemonics) > 0:
+                    instr_dict['match'] = self._replace_token_with_regex_list(
+                        instr_dict['match'],
+                        '##MACROS##',
+                        self.model.macro_mnemonics
+                    )
+                else:
+                    syntax_dict['contexts']['instructions'].remove(instr_dict)
+                update_macros = True
+        if not update_instructions:
+            sys.exit(
+                'ERROR - INTERNAL - Could not find "variable.function.instruction" '
+                'configuration in instructions for Sulime syntax'
+            )
+        if not update_macros:
+            sys.exit(
+                'ERROR - INTERNAL - Could not find "variable.function.macro" configuration '
+                'in instructions for Sulime syntax'
+            )
+
         for idx, config_dict in enumerate(syntax_dict['contexts']['pop_instruction_end']):
             if config_dict['name'] == 'instructions':
                 index = idx
@@ -68,7 +93,7 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         syntax_dict['contexts']['pop_instruction_end'][index]['match'] = self._replace_token_with_regex_list(
             syntax_dict['contexts']['pop_instruction_end'][index]['match'],
             '##INSTRUCTIONS##',
-            self.model.instruction_mnemonics
+            self.model.operation_mnemonics
         )
 
         # handle registers

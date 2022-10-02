@@ -39,6 +39,19 @@ contexts:
         - include: operands_variables
         - match: \,
           scope: punctuation.separator
+    - match: (?i)(?:##MACROS##)
+      scope: variable.function.macro
+      push:
+        - meta_scope: meta.function
+        - include: pop_instruction_end
+        - include: registers
+        - include: compiler_labels
+        - include: indirect_addressing
+        - include: deferred_addressing
+        - include: numerical_expressions
+        - include: operands_variables
+        - match: \,
+          scope: punctuation.separator
 
   operands_variables:
     - match: (?<!\w)((?:\.|_|\w){1}[\w\d_]*)\b
@@ -175,4 +188,3 @@ contexts:
     - match: (?=(?:\.|_|\w){1}[\w\d_]*:)
       pop: true
       name: label
-

@@ -60,9 +60,15 @@
 
         },
         {
-            "name": "Functions",
-            "scope": "variable.function",
+            "name": "Instruction Functions",
+            "scope": "variable.function.instruction",
             "foreground": "#ffa83f"
+
+        },
+        {
+            "name": "Macro Functions",
+            "scope": "variable.function.macro",
+            "foreground": "#ff883f"
 
         },
         {

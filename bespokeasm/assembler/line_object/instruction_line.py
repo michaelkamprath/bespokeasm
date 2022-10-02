@@ -25,7 +25,7 @@ class InstructionLine(LineWithBytes):
         """Tries to contruct a instruction line object from the passed instruction line"""
         # first, extract evertything up to the next extruction
         if InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN is None:
-            instructions_regex = '\\b' + '\\b|\\b'.join(isa_model.instruction_mnemonics) + '\\b'
+            instructions_regex = '\\b' + '\\b|\\b'.join(isa_model.operation_mnemonics) + '\\b'
             InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN = re.compile(
                 r'(?i)(?:((?:{0})\b.*?)(?:(?={1})|\;|$))'.format(instructions_regex, instructions_regex),
                 flags=re.IGNORECASE | re.MULTILINE,
@@ -39,7 +39,7 @@ class InstructionLine(LineWithBytes):
             if command_match is None or len(command_match.groups()) != 1:
                 sys.exit(f'ERROR: {line_id} - Wrongly formatted instruction: {instruction_str}')
             command_str = command_match.group(1).strip().lower()
-            if command_str not in isa_model.instruction_mnemonics:
+            if command_str not in isa_model.operation_mnemonics:
                 sys.exit(f'ERROR: {line_id} - Unreconized instruction: {instruction_str}')
 
             argument_str = instruction_str.strip()[len(command_str):]

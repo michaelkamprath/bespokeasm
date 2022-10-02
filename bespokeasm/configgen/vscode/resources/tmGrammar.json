@@ -5,6 +5,7 @@
         "main": {
             "patterns": [
                 { "include": "#instructions" },
+                { "include": "#macros" },
                 { "include": "#registers" },
                 { "include": "#compiler_labels" },
                 { "include": "#labels" },
@@ -36,9 +37,31 @@
                 }
             ],
             "begin": "(?i)(##INSTRUCTIONS##)",
-            "end": "(?i)(?=(?:\\s*\\;|\\s*$|##INSTRUCTIONS##))",
+            "end": "(?i)(?=(?:\\s*\\;|\\s*$|##OPERATIONS##))",
             "beginCaptures": {
                 "0": { "name": "variable.function.instruction" }
+            }
+        },
+        "macros": {
+            "name": "meta.function",
+            "patterns": [
+                { "include": "#registers" },
+                { "include": "#compiler_labels" },
+                { "include": "#numeric-values" },
+                { "include": "#operators" },
+                { "include": "#expressions" },
+                { "include": "#deferred-addressing"},
+                { "include": "#indirect-addressing" },
+                { "include": "#operands_variables" },
+                {
+                    "name": "punctuation.separator",
+                    "match": "\\,"
+                }
+            ],
+            "begin": "(?i)(##MACROS##)",
+            "end": "(?i)(?=(?:\\s*\\;|\\s*$|##OPERATIONS##))",
+            "beginCaptures": {
+                "0": { "name": "variable.function.macro" }
             }
         },
         "operands_variables": {
