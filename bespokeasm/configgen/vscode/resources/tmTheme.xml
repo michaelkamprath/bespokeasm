@@ -120,13 +120,24 @@
         </dict>
         <dict>
             <key>name</key>
-            <string>Functions</string>
+            <string>Functions - Instruction</string>
             <key>scope</key>
-            <string>variable.function</string>
+            <string>variable.function.instruction</string>
             <key>settings</key>
             <dict>
                 <key>foreground</key>
                 <string>#ffa83f</string>
+            </dict>
+        </dict>
+        <dict>
+            <key>name</key>
+            <string>Functions - Macro</string>
+            <key>scope</key>
+            <string>variable.function.macro</string>
+            <key>settings</key>
+            <dict>
+                <key>foreground</key>
+                <string>#ff883f</string>
             </dict>
         </dict>
         <dict>
