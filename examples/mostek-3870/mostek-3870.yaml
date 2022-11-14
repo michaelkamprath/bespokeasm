@@ -32,7 +32,7 @@ general:
   origin: 0
   identifier:
     name: mostek-3870-asm
-    version: "0.0.1"
+    version: "0.0.2"
     extension: af8
   min_version: 0.2.4
 operand_sets:
@@ -988,8 +988,9 @@ macros:
         - "inc"
         - "lr @REG(0),a"
   lris:
-    # copies value at scratch pad location "addr" to register A
     - operands:
+        # copies value at scratch pad location "addr" to register A
+        # lr a, SCRATCH_PAD_ADDR
         count: 2
         specific_operands:
           to_reg_a:
@@ -1006,3 +1007,26 @@ macros:
         - "li @OP(1)"
         - "lr is,a"
         - "lr a,[is]"
+  liis:
+    # copies immediate value to scratch pad location "addr"
+    - operands:
+        # li SCRATCH_PAD_ADDR, IMMEDIATE_VALUE
+        count: 2
+        specific_operands:
+          immediate_to_isar:
+            list:
+              isar_addr:
+                type: numeric
+                argument:
+                  size: 8
+                  byte_align: true
+              immediate_value:
+                type: numeric
+                argument:
+                  size: 8
+                  byte_align: true
+      instructions:
+        - "li @OP(0)"
+        - "lr is,a"
+        - "li @OP(1)"
+        - "lr [is],a"
