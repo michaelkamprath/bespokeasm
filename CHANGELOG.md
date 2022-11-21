@@ -14,6 +14,7 @@ Changes that are planned but not implemented yet:
   * Disallowed operands
   * missing `:` after labels
   * unknown labels
+* Add a Intel Hex and plain hex pretty print output formats.
 
 ## [Unreleased]
 * Added ability for an numeric operand that is ostensibly an address to be checked to be a valid address value per the `GLOBAL` memory zone. Uses the `valid_address` opetion in the `argument` setting for an operand. Only valid for `numeric`, `indirect_numeric`, `deferred_numeric`, and `relative_address` operand types.

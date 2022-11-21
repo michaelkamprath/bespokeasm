@@ -1,4 +1,5 @@
 click
+intelhex
 packaging
 pyyaml
 pre-commit

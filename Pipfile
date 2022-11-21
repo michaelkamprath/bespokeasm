@@ -5,6 +5,7 @@ name = "pypi"
 
 [packages]
 click = "*"
+intelhex = "*"
 PyYAML = "*"
 
 [dev-packages]
