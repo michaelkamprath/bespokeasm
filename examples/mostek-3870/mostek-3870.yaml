@@ -32,9 +32,9 @@ general:
   origin: 0
   identifier:
     name: mostek-3870-asm
-    version: "0.0.2"
+    version: "0.0.3"
     extension: af8
-  min_version: 0.2.4
+  min_version: 0.2.5
 operand_sets:
   nval3:
     operand_values:
@@ -777,6 +777,42 @@ instructions:
                 indirect_is:
                   type: indirect_register
                   register: is
+      # A, [is]+
+      - byte_code:
+          value: 0x4D
+          size: 8
+        operands:
+          count: 2
+          specific_operands:
+            indirect_is_A:
+              list:
+                a:
+                  type: register
+                  register: a
+                indirect_is:
+                  type: indirect_register
+                  register: is
+                  decorator:
+                    type: plus
+                    is_prefix: false
+      # A, [is]-
+      - byte_code:
+          value: 0x4E
+          size: 8
+        operands:
+          count: 2
+          specific_operands:
+            indirect_is_A:
+              list:
+                a:
+                  type: register
+                  register: a
+                indirect_is:
+                  type: indirect_register
+                  register: is
+                  decorator:
+                    type: minus
+                    is_prefix: false
       # [is], A
       - byte_code:
           value: 0x5C
@@ -789,6 +825,42 @@ instructions:
                 indirect_is:
                   type: indirect_register
                   register: is
+                a:
+                  type: register
+                  register: a
+      # [is]+, A
+      - byte_code:
+          value: 0x5D
+          size: 8
+        operands:
+          count: 2
+          specific_operands:
+            indirect_is_A:
+              list:
+                indirect_is:
+                  type: indirect_register
+                  register: is
+                  decorator:
+                    type: plus
+                    is_prefix: false
+                a:
+                  type: register
+                  register: a
+      # [is]-, A
+      - byte_code:
+          value: 0x5E
+          size: 8
+        operands:
+          count: 2
+          specific_operands:
+            indirect_is_A:
+              list:
+                indirect_is:
+                  type: indirect_register
+                  register: is
+                  decorator:
+                    type: minus
+                    is_prefix: false
                 a:
                   type: register
                   register: a
@@ -944,10 +1016,8 @@ macros:
       instructions:
         - "li (@ARG(0)+0)"
         - "lr is,a"
-        - "lr a,[is]"
+        - "lr a,[is]+"
         - "lr qu,a"
-        - "li (@ARG(0)+1)"
-        - "lr is,a"
         - "lr a,[is]"
         - "lr ql,a"
         - "lr p0,q"

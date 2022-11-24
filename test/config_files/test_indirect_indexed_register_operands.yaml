@@ -183,7 +183,6 @@ operand_sets:
         bytecode:
           value: 0
           size: 3
-    operand_values:
       register_mar:
         type: register
         register: mar
@@ -226,6 +225,77 @@ operand_sets:
             offset:
               max: 255
               min: 0
+              size: 8
+              byte_align: true
+  8_bit_indirect_registers_with_decorators:
+    operand_values:
+      inc_hl:
+        type: indirect_register
+        register: hl
+        bytecode:
+          value: 0
+          size: 3
+        offset:
+          size: 8
+          byte_align: true
+        decorator:
+          type: plus
+          is_prefix: false
+      dec_hl:
+        type: indirect_register
+        register: hl
+        bytecode:
+          value: 1
+          size: 3
+        offset:
+          size: 8
+          byte_align: true
+        decorator:
+          type: minus
+          is_prefix: false
+      inc_i:
+        type: register
+        register: i
+        bytecode:
+          value: 2
+          size: 3
+        decorator:
+          type: plus
+          is_prefix: true
+      inc_mar:
+        type: indirect_indexed_register
+        register: mar
+        bytecode:
+          value: 1
+          size: 1
+        decorator:
+          type: plus_plus
+          is_prefix: false
+        index_operands:
+          register_a:
+            type: register
+            register: a
+            bytecode:
+              value: 0
+              size: 2
+          register_i:
+            type: register
+            register: i
+            bytecode:
+              value: 1
+              size: 2
+          register_j:
+            type: register
+            register: j
+            bytecode:
+              value: 2
+              size: 2
+          iaddr:
+            type: numeric
+            bytecode:
+              value: 3
+              size: 2
+            argument:
               size: 8
               byte_align: true
 instructions:
@@ -303,6 +373,29 @@ instructions:
             reverse_argument_order: true
             list:
               - 8_bit_indirect_indexed_registers
+              - 8_bit_source
+      # indrect register with decorators
+      - byte_code:
+          value: 1021
+          size: 10
+          endian: big
+        operands:
+          count: 2
+          operand_sets:
+            reverse_argument_order: true
+            list:
+              - 8_bit_destination
+              - 8_bit_indirect_registers_with_decorators
+      - byte_code:
+          value: 1022
+          size: 10
+          endian: big
+        operands:
+          count: 2
+          operand_sets:
+            reverse_argument_order: true
+            list:
+              - 8_bit_indirect_registers_with_decorators
               - 8_bit_source
   cmp:
     byte_code:

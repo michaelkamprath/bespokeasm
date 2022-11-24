@@ -13,7 +13,7 @@ import bespokeasm.assembler.model.operand.factory as OF
 class IndirectIndexedRegisterOperand(RegisterOperand):
     _index_operand_list: list[Operand]
 
-    OPERAND_PATTERN_TEMPLATE = r'^\[\s*({0})\s*(\+|\-)\s*({1})\s*\]$'
+    OPERAND_PATTERN_TEMPLATE = r'\[\s*({0})\s*(\+|\-)\s*({1})\s*\]'
 
     def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str, regsiters: set[str]) -> None:
         super().__init__(operand_id, arg_config_dict, default_endian, regsiters)
@@ -38,7 +38,7 @@ class IndirectIndexedRegisterOperand(RegisterOperand):
 
         self._index_parse_pattern = '|'.join(op_match_patterns)
         self._parse_pattern = re.compile(
-            self.match_pattern,
+            r'^{0}$'.format(self.match_pattern),
             flags=(re.IGNORECASE | re.MULTILINE),
         )
 
@@ -51,7 +51,22 @@ class IndirectIndexedRegisterOperand(RegisterOperand):
 
     @property
     def match_pattern(self) -> str:
-        return self.OPERAND_PATTERN_TEMPLATE.format(self.register, self._index_parse_pattern)
+        if not self.has_decorator:
+            pattern_str = IndirectIndexedRegisterOperand.OPERAND_PATTERN_TEMPLATE.format(
+                self.register,
+                self._index_parse_pattern,
+            )
+        elif self.decorator_is_prefix:
+            pattern_str = r'(?<!(?:\+|\-|\d|\w)){0}{1}'.format(
+                self.decorator_pattern,
+                IndirectIndexedRegisterOperand.OPERAND_PATTERN_TEMPLATE.format(self.register, self._index_parse_pattern),
+            )
+        else:
+            pattern_str = r'{0}{1}(?!(?:\+|\-|\d|\w))'.format(
+                IndirectIndexedRegisterOperand.OPERAND_PATTERN_TEMPLATE.format(self.register, self._index_parse_pattern),
+                self.decorator_pattern,
+            )
+        return pattern_str
 
     def parse_operand(
         self,

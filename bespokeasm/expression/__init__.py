@@ -232,4 +232,4 @@ def _match(line_id: LineIdentifier, tokens: list[ExpressionNode], token: TokenTy
     if tokens[0].token_type == token:
         return tokens.pop(0)
     else:
-        sys.exit(f'ERROR: {line_id} - Invalid syntax on token: {tokens[0]}')
+        raise SyntaxError(f'ERROR: {line_id} - Invalid syntax on token: {tokens}')

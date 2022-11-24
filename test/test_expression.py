@@ -60,7 +60,7 @@ class TestExpression(unittest.TestCase):
             3, 'test handling of modulo: (MAX_N + 3) % %101 = 3'
         )
 
-        with self.assertRaises(SystemExit, msg='only integer numeric values are supported'):
+        with self.assertRaises(SyntaxError, msg='only integer numeric values are supported'):
             parse_expression(1212, '(value_1/5)/2.4').get_value(TestExpression.label_values, 100)
 
     def test_expression_numeric_types(self):

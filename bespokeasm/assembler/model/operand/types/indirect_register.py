@@ -10,12 +10,12 @@ from .register import RegisterOperand
 
 
 class IndirectRegisterOperand(RegisterOperand):
-    OPERAND_PATTERN_TEMPLATE = r'^\[\s*({0})\s*(?:(\+|\-)\s*([\s\w\+\-\*\/\&\|\^\(\)\$\%]+)\s*)?\]$'
+    _BASE_PATTERN_TEMPLATE = r'\[\s*({0})\s*(?:(\+|\-)\s*([\s\w\+\-\*\/\&\|\^\(\)\$\%]+)\s*)?\]'
 
     def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str, regsiters: set[str]) -> None:
         super().__init__(operand_id, arg_config_dict, default_endian, regsiters)
         self._parse_pattern = re.compile(
-            self.OPERAND_PATTERN_TEMPLATE.format(self.register),
+            r'^{0}$'.format(self.match_pattern),
             flags=re.IGNORECASE | re.MULTILINE
         )
         if self.has_offset:
@@ -55,7 +55,19 @@ class IndirectRegisterOperand(RegisterOperand):
 
     @property
     def match_pattern(self) -> str:
-        return r'\[\s*{0}\s*(?:(?:\+|\-)\s*(?:[\w()\+\-\s]+\b)\s*)?\]'.format(self.register)
+        if not self.has_decorator:
+            pattern_str = IndirectRegisterOperand._BASE_PATTERN_TEMPLATE.format(self.register)
+        elif self.decorator_is_prefix:
+            pattern_str = r'(?<!(?:\+|\-|\d|\w)){0}{1}'.format(
+                self.decorator_pattern,
+                IndirectRegisterOperand._BASE_PATTERN_TEMPLATE.format(self.register),
+            )
+        else:
+            pattern_str = r'{0}{1}(?!(?:\+|\-|\d|\w))'.format(
+                IndirectRegisterOperand._BASE_PATTERN_TEMPLATE.format(self.register),
+                self.decorator_pattern,
+            )
+        return r'{0}'.format(pattern_str)
 
     def parse_operand(
         self,

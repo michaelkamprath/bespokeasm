@@ -72,4 +72,8 @@ class NumericExpressionOperand(OperandWithArgument):
         punctuation_match = re.search(r'[\[\]\{\}]+', operand)
         if punctuation_match is not None:
             return None
-        return self._parse_bytecode_parts(line_id, operand, register_labels, memzone_manager)
+        try:
+            op = self._parse_bytecode_parts(line_id, operand, register_labels, memzone_manager)
+        except SyntaxError:
+            return None
+        return op
