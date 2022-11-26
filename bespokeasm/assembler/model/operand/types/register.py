@@ -13,6 +13,7 @@ class RegisterOperand(Operand):
         'plus_plus': r'\+\+',
         'minus': r'\-',
         'minus_minus': r'\-\-',
+        'exclamation': r'\!',
     }
 
     _OPERAND_PATTERN_TEMPLATE = r'{0}{1}'
