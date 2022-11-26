@@ -14,6 +14,7 @@ class RegisterOperand(Operand):
         'minus': r'\-',
         'minus_minus': r'\-\-',
         'exclamation': r'\!',
+        'at': r'\@',
     }
 
     _OPERAND_PATTERN_TEMPLATE = r'{0}{1}'
