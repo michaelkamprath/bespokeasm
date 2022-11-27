@@ -77,7 +77,10 @@ class IndirectRegisterOperand(RegisterOperand):
         memzone_manager: MemoryZoneManager,
     ) -> ParsedOperand:
         # first check that operand is what we expect
-        match = re.match(self._parse_pattern, operand.strip())
+        match = re.match(
+            self._parse_pattern,
+            operand.strip(),
+        )
         if match is not None and len(match.groups()) > 0:
             bytecode_part = NumericByteCodePart(self.bytecode_value, self.bytecode_size, False, 'big', line_id) \
                 if self.bytecode_value is not None else None

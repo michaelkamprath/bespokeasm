@@ -86,7 +86,8 @@ class RegisterOperand(Operand):
         # first check that operand is what we expect
         match = re.match(
             r'^{0}$'.format(self.match_pattern),
-            operand.strip()
+            operand.strip(),
+            flags=re.IGNORECASE,
         )
         if match is not None:
             bytecode_part = NumericByteCodePart(

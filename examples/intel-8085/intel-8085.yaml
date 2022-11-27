@@ -81,17 +81,35 @@ operand_sets:
           size: 3
   register_pairs:
     operand_values:
+      bc_pair_orig:
+        type: register
+        register: b
+        bytecode:
+          value: 0
+          size: 2
       bc_pair:
         type: register
         register: bc
         bytecode:
           value: 0
           size: 2
+      de_pair_orig:
+        type: register
+        register: d
+        bytecode:
+          value: 1
+          size: 2
       de_pair:
         type: register
         register: de
         bytecode:
           value: 1
+          size: 2
+      hl_pair_orig:
+        type: register
+        register: h
+        bytecode:
+          value: 2
           size: 2
       hl_pair:
         type: register
@@ -107,27 +125,27 @@ operand_sets:
           size: 2
   register_pairs_bc_de_only:
     operand_values:
+      bc_pair_orig:
+        type: register
+        register: b
+        bytecode:
+          value: 0
+          size: 2
       bc_pair:
         type: register
         register: bc
         bytecode:
           value: 0
           size: 2
-      bc_pair_short:
+      de_pair_orig:
         type: register
-        register: b
+        register: d
         bytecode:
-          value: 0
+          value: 1
           size: 2
       de_pair:
         type: register
         register: de
-        bytecode:
-          value: 1
-          size: 2
-      de_pair_short:
-        type: register
-        register: d
         bytecode:
           value: 1
           size: 2
@@ -165,6 +183,7 @@ instructions:
       size: 8
   cmc:
     # toggle carry flag (1's complement)
+    byte_code:
       value: 0x3F
       size: 8
   out:
