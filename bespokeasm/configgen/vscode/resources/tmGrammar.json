@@ -70,7 +70,7 @@
         },
         "registers": {
             "name": "variable.language.register",
-            "match": "(?:##REGISTERS##)"
+            "match": "(?i)(?:##REGISTERS##)"
         },
         "compiler_labels": {
             "name": "constant.language",
@@ -84,8 +84,11 @@
             }
         },
         "constants": {
-            "name": "variable.other.constant",
-            "match": "^\\s*(\\w*)(?:\\s*)?(?=\\=)"
+            "match": "^\\s*(\\w*)(?:\\s*)?(\\=|EQU)\\b",
+            "captures": {
+                "1": { "name": "variable.other.constant" },
+                "2": { "name": "keyword.operator.assignment" }
+            }
         },
         "comments": {
             "name": "comment.line.semicolon",
@@ -96,7 +99,7 @@
             "patterns": [
                 {
                     "name": "constant.numeric.integer.hexadecimal",
-                    "match": "(?<!\\w)(?:\\$[0-9a-fA-F]+|0x[0-9a-fA-F]+)\\b"
+                    "match": "(?<!\\w)(?:\\$[0-9a-fA-F]+|0x[0-9a-fA-F]+|[0-9a-fA-F]+H)\\b"
                 },
                 {
                     "name": "constant.numeric.integer.binary",

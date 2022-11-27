@@ -10,13 +10,16 @@ def parse_numeric_string(numeric_str: str) -> int:
         return int(numeric_str[1:], 16)
     elif numeric_str.startswith('0x'):
         return int(numeric_str[2:], 16)
+    elif numeric_str.endswith('H'):
+        return int(numeric_str[:-1], 16)
     elif numeric_str.startswith('b') or numeric_str.startswith('%'):
         return int(numeric_str[1:], 2)
     else:
         return int(numeric_str)
 
 
-PATTERN_NUMERIC = r'(?:(?:\$|0x)[0-9a-fA-F]+|(?:b|%)[01]+|\d+)'
+PATTERN_HEX = r'(?:\$|0x)[0-9a-fA-F]+|[0-9a-fA-F]+H\b'
+PATTERN_NUMERIC = r'(?:{0}|(?:b|%)[01]+|\d+)'.format(PATTERN_HEX)
 PATTERN_NUMERIC_COMPILED = re.compile(f'^({PATTERN_NUMERIC})$', flags=re.IGNORECASE | re.MULTILINE)
 
 

@@ -291,6 +291,20 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertFalse(l2.is_constant, )
         self.assertEqual(l2.get_value(), 42, 'value should be right')
 
+        l3: LineObject = LineOjectFactory.parse_line(
+            lineid,
+            "old_style EQU 42H",
+            isa_model,
+            TestInstructionParsing.label_values,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )[0]
+        l3.set_start_address(42)
+        l3.label_scope = TestInstructionParsing.label_values
+        self.assertIsInstance(l3, LabelLine)
+        self.assertTrue(l3.is_constant, "label should be a constant")
+        self.assertEqual(l3.get_value(), 0x42, 'value should be right')
+
     def test_operand_bytecode_ordering(self):
         with pkg_resources.path(config_files, 'test_operand_features.yaml') as fp:
             isa_model = AssemblerModel(str(fp), 0)

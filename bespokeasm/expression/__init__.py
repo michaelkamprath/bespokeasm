@@ -12,13 +12,15 @@ import operator
 import re
 import sys
 
-from bespokeasm.utilities import is_string_numeric, parse_numeric_string
+from bespokeasm.utilities import is_string_numeric, parse_numeric_string, PATTERN_HEX
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.utilities import is_valid_label
 
 EXPRESSION_PARTS_PATTERN = \
-    r'(?:(?:\%|b)[01]+|(?:\$|0x)[0-9a-fA-F]+|\d+|[\+\-\*\/\&\|\^\(\)]|>>|<<|%|LSB\(|BYTE\d\(|(?:\.|_)?\w+)'
+    r'(?:(?:\%|b)[01]+|{0}|\d+|[\+\-\*\/\&\|\^\(\)]|>>|<<|%|LSB\(|BYTE\d\(|(?:\.|_)?\w+)'.format(
+        PATTERN_HEX
+    )
 
 
 class TokenType(enum.Enum):

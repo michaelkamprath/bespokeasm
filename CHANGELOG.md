@@ -24,6 +24,8 @@ Changes that are planned but not implemented yet:
 * Added syntax highlighting to differentiate macros from native instructions
 * Added operand decorators to some operand types. This allows for some semantically differentiation notation, for exmaple, here `++` is the decorator: `[sp]++`
 * Added example for Intel 8085 processor
+* Added hexadecimal format indicated by a trailing capital `H`. For example `08FH` would be a hex value for `$8F`.
+* Added ability to use `EQU` to assign constant label values in addition to `=`.
 
 ## [0.2.4]
 * Fixed bug where unknown instructions did not produce an error.
