@@ -1,9 +1,9 @@
 import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.byte_code.assembled import AssembledInstruction
+from bespokeasm.assembler.bytecode.assembled import AssembledInstruction
 from bespokeasm.assembler.model.operand_parser import MatchedOperandSet
-from bespokeasm.assembler.byte_code.parts import NumericByteCodePart
+from bespokeasm.assembler.bytecode.parts import NumericByteCodePart
 from bespokeasm.assembler.model.instruction import Instruction, InstructionVariant
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
@@ -58,7 +58,7 @@ class InstructionBytecodeGenerator:
             operand_list = []
 
         # generate the machine code parts
-        instruction_endian = variant._variant_config['byte_code'].get('endian', isa_model.endian)
+        instruction_endian = variant._variant_config['bytecode'].get('endian', isa_model.endian)
         base_bytecode = NumericByteCodePart(
             variant.base_bytecode_value,
             variant.base_bytecode_size,
@@ -83,7 +83,7 @@ class InstructionBytecodeGenerator:
             )
             if matched_operands is None:
                 return None
-            machine_code = matched_operands.generate_byte_code(base_bytecode, base_bytecode_suffix)
+            machine_code = matched_operands.generate_bytecode(base_bytecode, base_bytecode_suffix)
         elif len(operand_list) > 0:
             # This variant was expecting no operands but some were found. No match.
             return None

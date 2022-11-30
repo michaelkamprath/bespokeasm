@@ -3,7 +3,7 @@ import enum
 import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.byte_code.parts import ByteCodePart
+from bespokeasm.assembler.bytecode.parts import ByteCodePart
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 
 
@@ -135,9 +135,9 @@ class OperandWithArgument(Operand):
 
 class ParsedOperand:
     '''A structure class to contain the results of a operand parsing.'''
-    def __init__(self, operand: Operand, byte_code: ByteCodePart, argument: ByteCodePart, operand_str: str):
+    def __init__(self, operand: Operand, bytecode: ByteCodePart, argument: ByteCodePart, operand_str: str):
         self._operand = operand
-        self._byte_code = byte_code
+        self._bytecode = bytecode
         self._argument = argument
         self._operand_str = operand_str
 
@@ -145,7 +145,7 @@ class ParsedOperand:
         return str(self)
 
     def __str__(self):
-        return f'ParsedOperand<{self.operand},{self.byte_code},{self.argument}>'
+        return f'ParsedOperand<{self.operand},{self.bytecode},{self.argument}>'
 
     @property
     def operand(self) -> Operand:
@@ -156,8 +156,8 @@ class ParsedOperand:
         return self.operand.id
 
     @property
-    def byte_code(self) -> ByteCodePart:
-        return self._byte_code
+    def bytecode(self) -> ByteCodePart:
+        return self._bytecode
 
     @property
     def argument(self) -> ByteCodePart:

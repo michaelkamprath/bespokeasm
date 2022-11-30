@@ -51,7 +51,7 @@
                     ]
                 }
             },
-            "byte_code": {
+            "bytecode": {
                 "value": 1,
                 "size": 4
             }
@@ -65,7 +65,7 @@
                     ]
                 }
             },
-            "byte_code": {
+            "bytecode": {
                 "value": 2,
                 "size": 4
             }
@@ -79,7 +79,7 @@
                     ]
                 }
             },
-            "byte_code": {
+            "bytecode": {
                 "value": 3,
                 "size": 4
             }
@@ -93,13 +93,13 @@
                     ]
                 }
             },
-            "byte_code": {
+            "bytecode": {
                 "value": 4,
                 "size": 4
             }
         },
         "hlt": {
-            "byte_code": {
+            "bytecode": {
                 "value": 15,
                 "size": 4
             }

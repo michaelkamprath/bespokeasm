@@ -32,9 +32,9 @@ general:
   origin: 0
   identifier:
     name: mostek-3870-asm
-    version: "0.0.3"
+    version: "0.1.0"
     extension: af8
-  min_version: 0.2.5
+  min_version: 0.3.0
 operand_sets:
   nval3:
     operand_values:
@@ -97,12 +97,12 @@ instructions:
   # Arithmetic and Logical Group
   ADC:
     # Add to Data Counter
-    byte_code:
+    bytecode:
       value: 0x8E
       size: 8
   AI:
     # ADD IMMEDIATE TO ACCUMULATOR
-    byte_code:
+    bytecode:
       value: 0x24
       size: 8
     operands:
@@ -112,17 +112,17 @@ instructions:
           - nval8
   AM:
     # ADD (BINARY) MEMORY TO ACCUMULATOR
-    byte_code:
+    bytecode:
       value: 0x88
       size: 8
   AMD:
     # DECIMAL ADD, MEMORY TO ACCUMULATOR
-    byte_code:
+    bytecode:
       value: 0x89
       size: 8
   AS:
     # BINARY ADDITION, SCRATCHPAD MEMORY TO ACCUMULATOR
-    byte_code:
+    bytecode:
       value: 0xC
       size: 4
     operands:
@@ -132,7 +132,7 @@ instructions:
           - sreg
   ASD:
     # DECIMAL ADD, SCRATCHPAD TO ACCUMULATOR
-    byte_code:
+    bytecode:
       value: 0xD
       size: 4
     operands:
@@ -142,7 +142,7 @@ instructions:
           - sreg
   CI:
     # COMPARE IMMEDIATE
-    byte_code:
+    bytecode:
       value: 0x25
       size: 8
     operands:
@@ -152,17 +152,17 @@ instructions:
           - nval8
   CM:
     # COMPARE MEMORY TO ACCUMULATOR
-    byte_code:
+    bytecode:
       value: 0x8D
       size: 8
   COM:
     # COMPLEMENT
-    byte_code:
+    bytecode:
       value: 0x18
       size: 8
   DS:
     # DECREMENT SCRATCHPAD CONTENT
-    byte_code:
+    bytecode:
       value: 0x3
       size: 4
     operands:
@@ -172,17 +172,17 @@ instructions:
           - sreg
   INC:
     # INCREMENT ACCUMULATOR
-    byte_code:
+    bytecode:
       value: 0x1F
       size: 8
   LNK:
     # LlNK CARRY TO THE ACCUMULATOR
-    byte_code:
+    bytecode:
       value: 0x19
       size: 8
   NI:
     # AND IMMEDIATE
-    byte_code:
+    bytecode:
       value: 0x21
       size: 8
     operands:
@@ -192,12 +192,12 @@ instructions:
           - nval8
   NM:
     # LOGICAL AND FROM MEMORY
-    byte_code:
+    bytecode:
       value: 0x8A
       size: 8
   NS:
     # LOGICAL AND FROM SCRATCHPAD MEMORY
-    byte_code:
+    bytecode:
       value: 0xF
       size: 4
     operands:
@@ -207,7 +207,7 @@ instructions:
           - sreg
   OI:
     # OR IMMEDIATE
-    byte_code:
+    bytecode:
       value: 0x22
       size: 8
     operands:
@@ -217,12 +217,12 @@ instructions:
           - nval8
   OM:
     # LOGICAL "OR" FROM MEMORY
-    byte_code:
+    bytecode:
       value: 0x8B
       size: 8
   SL:
     # SHIFT LEFT
-    byte_code:
+    bytecode:
       value: 2
       size: 5
     operands:
@@ -239,7 +239,7 @@ instructions:
                 size: 3
   SR:
     # SHIFT RIGHT
-    byte_code:
+    bytecode:
       value: 2
       size: 5
     operands:
@@ -256,7 +256,7 @@ instructions:
                 size: 3
   XI:
     # EXCLUSIVE-OR IMMEDIATE
-    byte_code:
+    bytecode:
       value: 0x23
       size: 8
     operands:
@@ -266,12 +266,12 @@ instructions:
           - nval8
   XM:
     # EXCLUSIVE-OR FROM MEMORY
-    byte_code:
+    bytecode:
       value: 0x8C
       size: 8
   XS:
     # EXCLUSIVE-OR FROM SCRATCHPAD
-    byte_code:
+    bytecode:
       value: 0xE
       size: 4
     operands:
@@ -282,7 +282,7 @@ instructions:
   # BRANCH, JUMP, CALL, AND RETURN GROUP
   BC:
     # Branch on Carry
-    byte_code:
+    bytecode:
       value: 0x82
       size: 8
     operands:
@@ -292,7 +292,7 @@ instructions:
           - offset_addr
   BF:
     # Branch on False
-    byte_code:
+    bytecode:
       value: 0x9
       size: 4
     operands:
@@ -316,7 +316,7 @@ instructions:
                 min: -127
   BM:
     # BRANCH ON NEGATIVE
-    byte_code:
+    bytecode:
       value: 0x91
       size: 8
     operands:
@@ -326,7 +326,7 @@ instructions:
           - offset_addr
   BNC:
     # BRANCH IF NO CARRY
-    byte_code:
+    bytecode:
       value: 0x92
       size: 8
     operands:
@@ -336,7 +336,7 @@ instructions:
           - offset_addr
   BNO:
     # BRANCH IF NO OVERFLOW
-    byte_code:
+    bytecode:
       value: 0x98
       size: 8
     operands:
@@ -346,7 +346,7 @@ instructions:
           - offset_addr
   BNZ:
     # BRANCH IF NO ZERO
-    byte_code:
+    bytecode:
       value: 0x94
       size: 8
     operands:
@@ -356,7 +356,7 @@ instructions:
           - offset_addr
   BP:
     # BRANCH IF POSITIVE
-    byte_code:
+    bytecode:
       value: 0x81
       size: 8
     operands:
@@ -366,7 +366,7 @@ instructions:
           - offset_addr
   BR:
     # UNCONDITIONAL BRANCH
-    byte_code:
+    bytecode:
       value: 0x90
       size: 8
     operands:
@@ -376,7 +376,7 @@ instructions:
           - offset_addr
   BT:
     # Branch on True
-    byte_code:
+    bytecode:
       value: 0x8
       size: 4
     operands:
@@ -400,7 +400,7 @@ instructions:
                 min: -127
   BZ:
     # BRANCH ON ZERO
-    byte_code:
+    bytecode:
       value: 0x84
       size: 8
     operands:
@@ -410,7 +410,7 @@ instructions:
           - offset_addr
   JMP:
     # BRANCH IMMEDIATE
-    byte_code:
+    bytecode:
       value: 0x29
       size: 8
     operands:
@@ -420,7 +420,7 @@ instructions:
           - absolute_addr
   PI:
     # CALL TO SUBROUTINE IMMEDIATE
-    byte_code:
+    bytecode:
       value: 0x28
       size: 8
     operands:
@@ -430,23 +430,23 @@ instructions:
           - absolute_addr
   PK:
     # CALL TO SUBROUTINE DIRECT AND RETURN FROM SUBROUTINE DIRECT
-    byte_code:
+    bytecode:
       value: 0x0C
       size: 8
   POP:
     # RETURN FROM SUBROUTINE
-    byte_code:
+    bytecode:
       value: 0x1C
       size: 8
   # ACCUMULATOR DATA MOVEMENT GROUP
   CLR:
     # CLEAR ACCUMULATOR
-    byte_code:
+    bytecode:
       value: 0x70
       size: 8
   LI:
     # LOAD IMMEDIATE
-    byte_code:
+    bytecode:
       value: 0x20
       size: 8
     operands:
@@ -456,7 +456,7 @@ instructions:
           - nval8
   LIS:
     # LOAD IMMEDIATE
-    byte_code:
+    bytecode:
       value: 0x7
       size: 4
     operands:
@@ -471,18 +471,18 @@ instructions:
                 byte_align: false
   LM:
     # LOAD ACCUMULATOR FROM MEMORY
-    byte_code:
+    bytecode:
       value: 0x16
       size: 8
   ST:
     # STORE ACCUMULATOR TO MEMORY
-    byte_code:
+    bytecode:
       value: 0x17
       size: 8
   # ADDRESS REGISTER GROUP
   DCI:
     # LOAD DC IMMEDIATE
-    byte_code:
+    bytecode:
       value: 0x2A
       size: 8
     operands:
@@ -492,12 +492,12 @@ instructions:
           - nval16
   XDC:
     # EXCHANGE DATA COUNTERS
-    byte_code:
+    bytecode:
       value: 0x2C
       size: 8
   LISL:
     # LOAD LOWER OCTAL DIGIT OF ISAR
-    byte_code:
+    bytecode:
       value: 0b01100
       size: 5
     operands:
@@ -507,7 +507,7 @@ instructions:
           - nval3
   LISU:
     # LOAD UPPER OCTAL DIGIT OF ISAR
-    byte_code:
+    bytecode:
       value: 0b01101
       size: 5
     operands:
@@ -518,7 +518,7 @@ instructions:
   # INPUT/OUTPUT GROUP
   IN:
     # INPUT LONG ADDRESS
-    byte_code:
+    bytecode:
       value: 0x26
       size: 8
     operands:
@@ -528,7 +528,7 @@ instructions:
           - nval8
   INS:
     # INPUT SHORT ADDRESS
-    byte_code:
+    bytecode:
       value: 0xA
       size: 4
     operands:
@@ -538,7 +538,7 @@ instructions:
           - nval4
   OUT:
     # OUTPUT LONG ADDRESS
-    byte_code:
+    bytecode:
       value: 0x27
       size: 8
     operands:
@@ -548,7 +548,7 @@ instructions:
           - nval8
   OUTS:
     # OUTPUT SHORT ADDRESS
-    byte_code:
+    bytecode:
       value: 0xB
       size: 4
     operands:
@@ -559,17 +559,17 @@ instructions:
   # CPU CONTROL GROUP
   DI:
     # DISABLE INTERRUPT
-    byte_code:
+    bytecode:
       value: 0x1A
       size: 8
   EI:
     # ENABLE INTERRUPT
-    byte_code:
+    bytecode:
       value: 0x1B
       size: 8
   NOP:
     # NO OPERATION
-    byte_code:
+    bytecode:
       value: 0x2B
       size: 8
   # load register variants
@@ -577,7 +577,7 @@ instructions:
     # LOAD REGISTER
     variants:
       # A, KU
-      - byte_code:
+      - bytecode:
           value: 0x00
           size: 8
         operands:
@@ -592,7 +592,7 @@ instructions:
                   type: register
                   register: ku
       # A, KL
-      - byte_code:
+      - bytecode:
           value: 0x01
           size: 8
         operands:
@@ -607,7 +607,7 @@ instructions:
                   type: register
                   register: kl
       # A, QU
-      - byte_code:
+      - bytecode:
           value: 0x02
           size: 8
         operands:
@@ -622,7 +622,7 @@ instructions:
                   type: register
                   register: qu
       # A, QL
-      - byte_code:
+      - bytecode:
           value: 0x03
           size: 8
         operands:
@@ -637,7 +637,7 @@ instructions:
                   type: register
                   register: ql
       # A, IS
-      - byte_code:
+      - bytecode:
           value: 0x0A
           size: 8
         operands:
@@ -652,7 +652,7 @@ instructions:
                   type: register
                   register: is
       # KU, A
-      - byte_code:
+      - bytecode:
           value: 0x04
           size: 8
         operands:
@@ -667,7 +667,7 @@ instructions:
                   type: register
                   register: a
       # KL, A
-      - byte_code:
+      - bytecode:
           value: 0x05
           size: 8
         operands:
@@ -682,7 +682,7 @@ instructions:
                   type: register
                   register: a
       # QU, A
-      - byte_code:
+      - bytecode:
           value: 0x06
           size: 8
         operands:
@@ -697,7 +697,7 @@ instructions:
                   type: register
                   register: a
       # QL, A
-      - byte_code:
+      - bytecode:
           value: 0x07
           size: 8
         operands:
@@ -712,7 +712,7 @@ instructions:
                   type: register
                   register: a
       # IS, A
-      - byte_code:
+      - bytecode:
           value: 0x0B
           size: 8
         operands:
@@ -727,7 +727,7 @@ instructions:
                   type: register
                   register: a
       # A, r
-      - byte_code:
+      - bytecode:
           value: 0x4
           size: 4
         operands:
@@ -745,7 +745,7 @@ instructions:
                     max: 0xb
                     min: 0
       # r, A
-      - byte_code:
+      - bytecode:
           value: 0x5
           size: 4
         operands:
@@ -763,7 +763,7 @@ instructions:
                   type: register
                   register: a
       # A, [is]
-      - byte_code:
+      - bytecode:
           value: 0x4C
           size: 8
         operands:
@@ -778,7 +778,7 @@ instructions:
                   type: indirect_register
                   register: is
       # A, [is]+
-      - byte_code:
+      - bytecode:
           value: 0x4D
           size: 8
         operands:
@@ -796,7 +796,7 @@ instructions:
                     type: plus
                     is_prefix: false
       # A, [is]-
-      - byte_code:
+      - bytecode:
           value: 0x4E
           size: 8
         operands:
@@ -814,7 +814,7 @@ instructions:
                     type: minus
                     is_prefix: false
       # [is], A
-      - byte_code:
+      - bytecode:
           value: 0x5C
           size: 8
         operands:
@@ -829,7 +829,7 @@ instructions:
                   type: register
                   register: a
       # [is]+, A
-      - byte_code:
+      - bytecode:
           value: 0x5D
           size: 8
         operands:
@@ -847,7 +847,7 @@ instructions:
                   type: register
                   register: a
       # [is]-, A
-      - byte_code:
+      - bytecode:
           value: 0x5E
           size: 8
         operands:
@@ -865,7 +865,7 @@ instructions:
                   type: register
                   register: a
       # P0, Q
-      - byte_code:
+      - bytecode:
           value: 0x0D
           size: 8
         operands:
@@ -880,7 +880,7 @@ instructions:
                   type: register
                   register: q
       # DC, Q
-      - byte_code:
+      - bytecode:
           value: 0x0F
           size: 8
         operands:
@@ -895,7 +895,7 @@ instructions:
                   type: register
                   register: q
       # Q, DC
-      - byte_code:
+      - bytecode:
           value: 0x0E
           size: 8
         operands:
@@ -910,7 +910,7 @@ instructions:
                   type: register
                   register: dc
       # DC, H
-      - byte_code:
+      - bytecode:
           value: 0x10
           size: 8
         operands:
@@ -925,7 +925,7 @@ instructions:
                   type: register
                   register: h
       # H, DC
-      - byte_code:
+      - bytecode:
           value: 0x11
           size: 8
         operands:
@@ -940,7 +940,7 @@ instructions:
                   type: register
                   register: dc
       # K, P
-      - byte_code:
+      - bytecode:
           value: 0x08
           size: 8
         operands:
@@ -955,7 +955,7 @@ instructions:
                   type: register
                   register: p
       # P, K
-      - byte_code:
+      - bytecode:
           value: 0x09
           size: 8
         operands:
@@ -970,7 +970,7 @@ instructions:
                   type: register
                   register: k
       # J, W
-      - byte_code:
+      - bytecode:
           value: 0x1E
           size: 8
         operands:
@@ -985,7 +985,7 @@ instructions:
                   type: register
                   register: w
       # W, J
-      - byte_code:
+      - bytecode:
           value: 0x1D
           size: 8
         operands:

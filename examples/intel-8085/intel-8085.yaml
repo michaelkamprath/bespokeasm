@@ -21,7 +21,7 @@ general:
     name: intel-8085-asm
     version: "0.1.0"
     extension: 8085-asm
-  min_version: 0.2.5
+  min_version: 0.3.0
 operand_sets:
   8_bit_source:
     operand_values:
@@ -168,27 +168,27 @@ instructions:
   # General
   nop:
     # no operation
-    byte_code:
+    bytecode:
       value: 0
       size: 8
   hlt:
     # halt
-    byte_code:
+    bytecode:
       value: 0x76
       size: 8
   stc:
     # set Carry flag
-    byte_code:
+    bytecode:
       value: 0x37
       size: 8
   cmc:
     # toggle carry flag (1's complement)
-    byte_code:
+    bytecode:
       value: 0x3F
       size: 8
   out:
     # place A on data bus and indicated port on address bus
-    byte_code:
+    bytecode:
         value: 0xD3
         size: 8
     operands:
@@ -198,7 +198,7 @@ instructions:
           - uint8_no_bytecode
   in:
     # reads eight bits of data from the specified port and loads it into the accumulator.
-    byte_code:
+    bytecode:
         value: 0xDB
         size: 8
     operands:
@@ -210,22 +210,22 @@ instructions:
   # Undocumented Instructions
   arhl:
     # rotate HL right (undocumented)
-    byte_code:
+    bytecode:
       value: 0x10
       size: 8
   dsub:
     # subtract BC from HL results in HL (undocumented)
-    byte_code:
+    bytecode:
       value: 0x08
       size: 8
   rdel:
     # rotate DE left through Carry (undocumented)
-    byte_code:
+    bytecode:
       value: 0x18
       size: 8
   ldhi:
     # DE = HL + 1 byte argument (undocumented)
-    byte_code:
+    bytecode:
       value: 0x28
       size: 8
     operands:
@@ -235,7 +235,7 @@ instructions:
           - uint8_no_bytecode
   ldsi:
     # DE = SP + 1 byte argument (undocumented)
-    byte_code:
+    bytecode:
       value: 0x38
       size: 8
     operands:
@@ -245,23 +245,23 @@ instructions:
           - uint8_no_bytecode
   shlx:
     # Store HL as per DE
-    byte_code:
+    bytecode:
         value: 0xD9
         size: 8
   lhlx:
     # load HL as per DE
-    byte_code:
+    bytecode:
         value: 0xED
         size: 8
   rstv:
     # restart on overflow
     # On overflow CALL 0040
-    byte_code:
+    bytecode:
       value: 0xCB
       size: 8
   jk:
     # jump if K (X5) - undocumented underflow or overflow indicator
-    byte_code:
+    bytecode:
         value: 0xFD
         size: 8
     operands:
@@ -271,7 +271,7 @@ instructions:
           - uint16_no_bytecode
   jnk:
     # jump if not K (X5) - undocumented underflow or overflow indicator
-    byte_code:
+    bytecode:
         value: 0xDD
         size: 8
     operands:
@@ -283,22 +283,22 @@ instructions:
   # Interupt Control
   rim:
     #
-    byte_code:
+    bytecode:
       value: 0x20
       size: 8
   sim:
     # Set Interupt Mask
-    byte_code:
+    bytecode:
       value: 0x30
       size: 8
   di:
     # disable interupts
-    byte_code:
+    bytecode:
         value: 0xF3
         size: 8
   ei:
     # enable interupts
-    byte_code:
+    bytecode:
         value: 0xFB
         size: 8
 
@@ -306,7 +306,7 @@ instructions:
   lxi:
     # load immediate 16-bit
     # Bit format 00xx0001, xx = register pair
-    byte_code:
+    bytecode:
         value: 0
         size: 2
         suffix:
@@ -320,7 +320,7 @@ instructions:
   stax:
     # store A direct to memory address in register pair
     # Bit format 00xx0010, xx = register pair BC or DE
-    byte_code:
+    bytecode:
       value: 0
       size: 2
       suffix:
@@ -334,7 +334,7 @@ instructions:
   ldax:
     # load A direct from memory address in register pair
     # Bit format 00xx0010, xx = register pair BC or DE
-    byte_code:
+    bytecode:
       value: 0
       size: 2
       suffix:
@@ -347,7 +347,7 @@ instructions:
           - register_pairs_bc_de_only
   shld:
     # store HL direct
-    byte_code:
+    bytecode:
       value: 0x22
       size: 8
     operands:
@@ -357,7 +357,7 @@ instructions:
           - uint16_no_bytecode
   lhld:
     # load HL direct
-    byte_code:
+    bytecode:
       value: 0x2A
       size: 8
     operands:
@@ -367,7 +367,7 @@ instructions:
           - uint16_no_bytecode
   sta:
     # store A direct
-    byte_code:
+    bytecode:
       value: 0x32
       size: 8
     operands:
@@ -377,7 +377,7 @@ instructions:
           - uint16_no_bytecode
   lda:
     # load A direct
-    byte_code:
+    bytecode:
       value: 0x3A
       size: 8
     operands:
@@ -388,7 +388,7 @@ instructions:
   mvi:
     # move immediate
     # Bit format 00xxx110, xxx = register
-    byte_code:
+    bytecode:
         value: 0
         size: 2
         suffix:
@@ -402,7 +402,7 @@ instructions:
           - uint8_no_bytecode
   mov:
     # move value from register to register
-    byte_code:
+    bytecode:
         value: 1
         size: 2
     operands:
@@ -418,19 +418,19 @@ instructions:
           - [m_reg_actual,m_reg_actual]
   xthl:
     # exchange contentents of HL with memory pointed to by SP (stack pointer)
-    byte_code:
+    bytecode:
         value: 0xE3
         size: 8
   xchg:
     # exchange FL with DE
-    byte_code:
+    bytecode:
         value: 0xEB
         size: 8
 
   # Arithmetic and Logic
   add:
     # add source value to A register
-    byte_code:
+    bytecode:
         value: 16
         size: 5
     operands:
@@ -440,7 +440,7 @@ instructions:
           - 8_bit_source
   adc:
     # add source value and carry flag to A register
-    byte_code:
+    bytecode:
         value: 17
         size: 5
     operands:
@@ -450,7 +450,7 @@ instructions:
           - 8_bit_source
   adi:
     # add immediate value to A register
-    byte_code:
+    bytecode:
         value: 0xC6
         size: 8
     operands:
@@ -460,7 +460,7 @@ instructions:
           - uint8_no_bytecode
   aci:
     # add with carry immediate value to A register
-    byte_code:
+    bytecode:
         value: 0xCE
         size: 8
     operands:
@@ -470,7 +470,7 @@ instructions:
           - uint8_no_bytecode
   sub:
     # subtract source value from A register
-    byte_code:
+    bytecode:
         value: 18
         size: 5
     operands:
@@ -480,7 +480,7 @@ instructions:
           - 8_bit_source
   sbb:
     # subtract with borrow source value from A register
-    byte_code:
+    bytecode:
         value: 19
         size: 5
     operands:
@@ -490,7 +490,7 @@ instructions:
           - 8_bit_source
   sui:
     # subtract immediate value from A register
-    byte_code:
+    bytecode:
         value: 0xD6
         size: 8
     operands:
@@ -500,7 +500,7 @@ instructions:
           - uint8_no_bytecode
   sbi:
     # subtract with borrow immediate value from A register
-    byte_code:
+    bytecode:
         value: 0xDE
         size: 8
     operands:
@@ -511,7 +511,7 @@ instructions:
   inx:
     # increment register pair
     # Bit format 00xx0011, xx = register pair
-    byte_code:
+    bytecode:
         value: 0
         size: 2
         suffix:
@@ -525,7 +525,7 @@ instructions:
   dcx:
     # decrement register pair
     # Bit format 00xx1011, xx = register pair
-    byte_code:
+    bytecode:
         value: 0
         size: 2
         suffix:
@@ -539,7 +539,7 @@ instructions:
   inr:
     # increment register
     # Bit format 00xxx100, xxx = register
-    byte_code:
+    bytecode:
         value: 0
         size: 2
         suffix:
@@ -553,7 +553,7 @@ instructions:
   dcr:
     # decrement register
     # Bit format 00xxx101, xxx = register
-    byte_code:
+    bytecode:
         value: 0
         size: 2
         suffix:
@@ -566,38 +566,38 @@ instructions:
           - 8_bit_source
   cma:
     # product 1's complement of A in A
-    byte_code:
+    bytecode:
       value: 0x2F
       size: 8
   rlc:
     # rotate A left (B7 to B0 and Carry)
-    byte_code:
+    bytecode:
       value: 0x07
       size: 8
   rrc:
     # rotate A right (B0 to B7 and Carry)
-    byte_code:
+    bytecode:
       value: 0x0F
       size: 8
   ral:
     # rotate A left through carry (B7 to Carry, Carry to B0)
-    byte_code:
+    bytecode:
       value: 0x17
       size: 8
   rar:
     # rotate A right through carry (B0 to Carry, Carry to B7)
-    byte_code:
+    bytecode:
       value: 0x1F
       size: 8
   daa:
     # adjust A to binary coded decimal
-    byte_code:
+    bytecode:
       value: 0x27
       size: 8
   dad:
     # add contents of register pair to HL
     # Bit format 00xx1001, xx = register pair
-    byte_code:
+    bytecode:
         value: 0
         size: 2
         suffix:
@@ -610,7 +610,7 @@ instructions:
           - register_pairs
   ana:
     # AND source value to A register
-    byte_code:
+    bytecode:
         value: 20
         size: 5
     operands:
@@ -620,7 +620,7 @@ instructions:
           - 8_bit_source
   ani:
     # AND immediate value to A register
-    byte_code:
+    bytecode:
         value: 0xE6
         size: 8
     operands:
@@ -630,7 +630,7 @@ instructions:
           - uint8_no_bytecode
   xra:
     # XOR source value to A register
-    byte_code:
+    bytecode:
         value: 21
         size: 5
     operands:
@@ -640,7 +640,7 @@ instructions:
           - 8_bit_source
   xri:
     # XOR immediate value to A register
-    byte_code:
+    bytecode:
         value: 0xEE
         size: 8
     operands:
@@ -650,7 +650,7 @@ instructions:
           - uint8_no_bytecode
   ora:
     # OR source value to A register
-    byte_code:
+    bytecode:
         value: 22
         size: 5
     operands:
@@ -660,7 +660,7 @@ instructions:
           - 8_bit_source
   ori:
     # OR immediate value to A register
-    byte_code:
+    bytecode:
         value: 0xF6
         size: 8
     operands:
@@ -672,7 +672,7 @@ instructions:
     # Compare source value to A register
     # Zero flag indictes equality
     # Carry flag indicates source valye us greater than A
-    byte_code:
+    bytecode:
         value: 23
         size: 5
     operands:
@@ -682,7 +682,7 @@ instructions:
           - 8_bit_source
   cpi:
     # Compare immediate value to A register
-    byte_code:
+    bytecode:
         value: 0xFE
         size: 8
     operands:
@@ -694,7 +694,7 @@ instructions:
   # Program Flow Control
   jmp:
     # unconditional jump
-    byte_code:
+    bytecode:
         value: 0xC3
         size: 8
     operands:
@@ -704,7 +704,7 @@ instructions:
           - uint16_no_bytecode
   jz:
     # jump if zero flag is set
-    byte_code:
+    bytecode:
         value: 0xCA
         size: 8
     operands:
@@ -714,7 +714,7 @@ instructions:
           - uint16_no_bytecode
   jnz:
     # jump if zero flag not set
-    byte_code:
+    bytecode:
         value: 0xC2
         size: 8
     operands:
@@ -724,7 +724,7 @@ instructions:
           - uint16_no_bytecode
   jc:
     # jump if carry flag is set
-    byte_code:
+    bytecode:
         value: 0xDA
         size: 8
     operands:
@@ -734,7 +734,7 @@ instructions:
           - uint16_no_bytecode
   jnc:
     # jump if carry flag not set
-    byte_code:
+    bytecode:
         value: 0xD2
         size: 8
     operands:
@@ -744,7 +744,7 @@ instructions:
           - uint16_no_bytecode
   jpe:
     # jump if parity is even (parity flag is one)
-    byte_code:
+    bytecode:
         value: 0xEA
         size: 8
     operands:
@@ -754,7 +754,7 @@ instructions:
           - uint16_no_bytecode
   jpo:
     # jump if parity is odd (parity flag is zero)
-    byte_code:
+    bytecode:
         value: 0xE2
         size: 8
     operands:
@@ -764,7 +764,7 @@ instructions:
           - uint16_no_bytecode
   jm:
     # jump if accumultor is minus (sign flag is one)
-    byte_code:
+    bytecode:
         value: 0xFA
         size: 8
     operands:
@@ -774,7 +774,7 @@ instructions:
           - uint16_no_bytecode
   jp:
     # jump if accumultor is positive (sign flag is zero)
-    byte_code:
+    bytecode:
         value: 0xF2
         size: 8
     operands:
@@ -784,59 +784,59 @@ instructions:
           - uint16_no_bytecode
   pchl:
     # Move HL to Program Counter (Jump to address in HL)
-    byte_code:
+    bytecode:
         value: 0xE9
         size: 8
 
   # Stack Operations
   ret:
     # return unconditionally
-    byte_code:
+    bytecode:
         value: 0xC9
         size: 8
   rz:
     # return if zero flag is set
-    byte_code:
+    bytecode:
         value: 0xC8
         size: 8
   rnz:
     # return if zero flag not set
-    byte_code:
+    bytecode:
         value: 0xC0
         size: 8
   rc:
     # return if carry flag is set
-    byte_code:
+    bytecode:
         value: 0xD8
         size: 8
   rnc:
     # return if carry flag not set
-    byte_code:
+    bytecode:
         value: 0xD0
         size: 8
   rpe:
     # return if parity is even (parity flag is one)
-    byte_code:
+    bytecode:
         value: 0xE8
         size: 8
   rpo:
     # return if parity is odd (parity flag is zero)
-    byte_code:
+    bytecode:
         value: 0xE0
         size: 8
   rm:
     # return if accumultor is negative (sign flag is one)
-    byte_code:
+    bytecode:
         value: 0xF8
         size: 8
   rp:
     # return if accumultor is positive (sign flag is zero)
-    byte_code:
+    bytecode:
         value: 0xF0
         size: 8
   call:
     # Call unconditionally
-    byte_code:
+    bytecode:
         value: 0xCD
         size: 8
     operands:
@@ -846,7 +846,7 @@ instructions:
           - uint16_no_bytecode
   cz:
     # Call if zero
-    byte_code:
+    bytecode:
         value: 0xCC
         size: 8
     operands:
@@ -856,7 +856,7 @@ instructions:
           - uint16_no_bytecode
   cnz:
     # Call if not zero
-    byte_code:
+    bytecode:
         value: 0xC4
         size: 8
     operands:
@@ -866,7 +866,7 @@ instructions:
           - uint16_no_bytecode
   cc:
     # Call if carry
-    byte_code:
+    bytecode:
         value: 0xDC
         size: 8
     operands:
@@ -876,7 +876,7 @@ instructions:
           - uint16_no_bytecode
   cnc:
     # Call if not carry
-    byte_code:
+    bytecode:
         value: 0xD4
         size: 8
     operands:
@@ -886,7 +886,7 @@ instructions:
           - uint16_no_bytecode
   cpe:
     # Call if parity even (panty flag is set to one)
-    byte_code:
+    bytecode:
         value: 0xEC
         size: 8
     operands:
@@ -896,7 +896,7 @@ instructions:
           - uint16_no_bytecode
   cpo:
     # Call if parity odd (panty flag is set to zero)
-    byte_code:
+    bytecode:
         value: 0xE4
         size: 8
     operands:
@@ -906,7 +906,7 @@ instructions:
           - uint16_no_bytecode
   cm:
     # Call if accumulator is minus (sign flag is one)
-    byte_code:
+    bytecode:
         value: 0xFC
         size: 8
     operands:
@@ -916,7 +916,7 @@ instructions:
           - uint16_no_bytecode
   cp:
     # Call if accumulator is positive (sign flag is zero)
-    byte_code:
+    bytecode:
         value: 0xF4
         size: 8
     operands:
@@ -925,7 +925,7 @@ instructions:
         list:
           - uint16_no_bytecode
   rst:
-    byte_code:
+    bytecode:
       value: 3
       size: 2
       suffix:
@@ -945,7 +945,7 @@ instructions:
     variants:
       # Push a register pair to the stack
       # Bit format 00xx1011, xx = register pair
-      - byte_code:
+      - bytecode:
           value: 3
           size: 2
           suffix:
@@ -959,7 +959,7 @@ instructions:
             disallowed_pairs:
               - [sp_pair]
       # Push the Program Status Words (A + flags)
-      - byte_code:
+      - bytecode:
           value: 0xF5
           size: 8
         operands:
@@ -971,15 +971,15 @@ instructions:
                 register: psw
   sphl:
     # Move HL to SP
-    byte_code:
+    bytecode:
         value: 0xF9
         size: 8
   pop:
     variants:
       # Pop to a register pair except stack pointer SP
       # Bit format 00xx1011, xx = register pair
-      - byte_code:
-          byte_code:
+      - bytecode:
+          bytecode:
               value: 3
               size: 2
               suffix:
@@ -993,8 +993,8 @@ instructions:
               disallowed_pairs:
                 - [sp_pair]
       # Pop to Program Status Words (A + flags)
-      - byte_code:
-          byte_code:
+      - bytecode:
+          bytecode:
               value: 0xF1
               size: 8
           operands:

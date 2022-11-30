@@ -371,7 +371,7 @@ class TestInstructionParsing(unittest.TestCase):
         t2.generate_bytes()
         self.assertEqual(list(t2.get_bytes()), [0b10011101, 0x08], 'instruction byte should match')
 
-    def test_instruction_byte_code_suffixes(self):
+    def test_instruction_bytecode_suffixes(self):
         with pkg_resources.path(config_files, 'test_operand_features.yaml') as fp:
             isa_model = AssemblerModel(str(fp), 0)
             memzone_mngr = MemoryZoneManager(
@@ -380,7 +380,7 @@ class TestInstructionParsing(unittest.TestCase):
                 isa_model.predefined_memory_zones,
             )
 
-        lineid = LineIdentifier(13, 'test_instruction_byte_code_suffixes')
+        lineid = LineIdentifier(13, 'test_instruction_bytecode_suffixes')
 
         t1 = InstructionLine.factory(
             lineid, '  foo [[$F0]]', 'comment',

@@ -7,9 +7,9 @@ general:
   origin: 0x8000
   identifier:
     name: slu4-mincpu-asm
-    version: "1.5.0"
+    version: "1.5.1"
     extension: min-asm
-  min_version: 0.2.3
+  min_version: 0.3.0
 operand_sets:
   immediate:
     operand_values:
@@ -80,63 +80,63 @@ predefined:
       value: 0xfec9
 instructions:
   nop:
-    byte_code:
+    bytecode:
       value: 0
       size: 8
   bnk:
-    byte_code:
+    bytecode:
       value: 1
       size: 8
   out:
-    byte_code:
+    bytecode:
       value: 2
       size: 8
   clc:
-    byte_code:
+    bytecode:
       value: 3
       size: 8
   sec:
-    byte_code:
+    bytecode:
       value: 4
       size: 8
   lsl:
-    byte_code:
+    bytecode:
       value: 5
       size: 8
   rol:
-    byte_code:
+    bytecode:
       value: 6
       size: 8
   lsr:
-    byte_code:
+    bytecode:
       value: 7
       size: 8
   ror:
-    byte_code:
+    bytecode:
       value: 8
       size: 8
   asr:
-    byte_code:
+    bytecode:
       value: 9
       size: 8
   inp:
-    byte_code:
+    bytecode:
       value: 10
       size: 8
   neg:
-    byte_code:
+    bytecode:
       value: 11
       size: 8
   inc:
-    byte_code:
+    bytecode:
       value: 12
       size: 8
   dec:
-    byte_code:
+    bytecode:
       value: 13
       size: 8
   ldi:
-    byte_code:
+    bytecode:
       value: 14
       size: 8
     operands:
@@ -145,7 +145,7 @@ instructions:
         list:
           - immediate
   adi:
-    byte_code:
+    bytecode:
       value: 15
       size: 8
     operands:
@@ -154,7 +154,7 @@ instructions:
         list:
           - immediate
   sbi:
-    byte_code:
+    bytecode:
       value: 16
       size: 8
     operands:
@@ -163,7 +163,7 @@ instructions:
         list:
           - immediate
   cpi:
-    byte_code:
+    bytecode:
       value: 17
       size: 8
     operands:
@@ -172,7 +172,7 @@ instructions:
         list:
           - immediate
   aci:
-    byte_code:
+    bytecode:
       value: 18
       size: 8
     operands:
@@ -181,7 +181,7 @@ instructions:
         list:
           - immediate
   sci:
-    byte_code:
+    bytecode:
       value: 19
       size: 8
     operands:
@@ -190,7 +190,7 @@ instructions:
         list:
           - immediate
   jpa:
-    byte_code:
+    bytecode:
       value: 20
       size: 8
     operands:
@@ -199,7 +199,7 @@ instructions:
         list:
           - absolute_address
   lda:
-    byte_code:
+    bytecode:
       value: 21
       size: 8
     operands:
@@ -208,7 +208,7 @@ instructions:
         list:
           - absolute_address
   sta:
-    byte_code:
+    bytecode:
       value: 22
       size: 8
     operands:
@@ -217,7 +217,7 @@ instructions:
         list:
           - absolute_address
   ada:
-    byte_code:
+    bytecode:
       value: 23
       size: 8
     operands:
@@ -226,7 +226,7 @@ instructions:
         list:
           - absolute_address
   sba:
-    byte_code:
+    bytecode:
       value: 24
       size: 8
     operands:
@@ -235,7 +235,7 @@ instructions:
         list:
           - absolute_address
   cpa:
-    byte_code:
+    bytecode:
       value: 25
       size: 8
     operands:
@@ -244,7 +244,7 @@ instructions:
         list:
           - absolute_address
   aca:
-    byte_code:
+    bytecode:
       value: 26
       size: 8
     operands:
@@ -253,7 +253,7 @@ instructions:
         list:
           - absolute_address
   sca:
-    byte_code:
+    bytecode:
       value: 27
       size: 8
     operands:
@@ -262,7 +262,7 @@ instructions:
         list:
           - absolute_address
   jpr:
-    byte_code:
+    bytecode:
       value: 28
       size: 8
     operands:
@@ -271,7 +271,7 @@ instructions:
         list:
           - relative_address
   ldr:
-    byte_code:
+    bytecode:
       value: 29
       size: 8
     operands:
@@ -280,7 +280,7 @@ instructions:
         list:
           - relative_address
   str:
-    byte_code:
+    bytecode:
       value: 30
       size: 8
     operands:
@@ -289,7 +289,7 @@ instructions:
         list:
           - relative_address
   adr:
-    byte_code:
+    bytecode:
       value: 31
       size: 8
     operands:
@@ -298,7 +298,7 @@ instructions:
         list:
           - relative_address
   sbr:
-    byte_code:
+    bytecode:
       value: 32
       size: 8
     operands:
@@ -307,7 +307,7 @@ instructions:
         list:
           - relative_address
   cpr:
-    byte_code:
+    bytecode:
       value: 33
       size: 8
     operands:
@@ -316,7 +316,7 @@ instructions:
         list:
           - relative_address
   acr:
-    byte_code:
+    bytecode:
       value: 34
       size: 8
     operands:
@@ -325,7 +325,7 @@ instructions:
         list:
           - relative_address
   scr:
-    byte_code:
+    bytecode:
       value: 35
       size: 8
     operands:
@@ -334,7 +334,7 @@ instructions:
         list:
           - relative_address
   clb:
-    byte_code:
+    bytecode:
       value: 36
       size: 8
     operands:
@@ -343,7 +343,7 @@ instructions:
         list:
           - absolute_address
   neb:
-    byte_code:
+    bytecode:
       value: 37
       size: 8
     operands:
@@ -352,7 +352,7 @@ instructions:
         list:
           - absolute_address
   inb:
-    byte_code:
+    bytecode:
       value: 38
       size: 8
     operands:
@@ -361,7 +361,7 @@ instructions:
         list:
           - absolute_address
   deb:
-    byte_code:
+    bytecode:
       value: 39
       size: 8
     operands:
@@ -370,7 +370,7 @@ instructions:
         list:
           - absolute_address
   adb:
-    byte_code:
+    bytecode:
       value: 40
       size: 8
     operands:
@@ -379,7 +379,7 @@ instructions:
         list:
           - absolute_address
   sbb:
-    byte_code:
+    bytecode:
       value: 41
       size: 8
     operands:
@@ -388,7 +388,7 @@ instructions:
         list:
           - absolute_address
   acb:
-    byte_code:
+    bytecode:
       value: 42
       size: 8
     operands:
@@ -397,7 +397,7 @@ instructions:
         list:
           - absolute_address
   scb:
-    byte_code:
+    bytecode:
       value: 43
       size: 8
     operands:
@@ -406,7 +406,7 @@ instructions:
         list:
           - absolute_address
   clw:
-    byte_code:
+    bytecode:
       value: 44
       size: 8
     operands:
@@ -415,7 +415,7 @@ instructions:
         list:
           - absolute_address
   new:
-    byte_code:
+    bytecode:
       value: 45
       size: 8
     operands:
@@ -424,7 +424,7 @@ instructions:
         list:
           - absolute_address
   inw:
-    byte_code:
+    bytecode:
       value: 46
       size: 8
     operands:
@@ -433,7 +433,7 @@ instructions:
         list:
           - absolute_address
   dew:
-    byte_code:
+    bytecode:
       value: 47
       size: 8
     operands:
@@ -442,7 +442,7 @@ instructions:
         list:
           - absolute_address
   adw:
-    byte_code:
+    bytecode:
       value: 48
       size: 8
     operands:
@@ -451,7 +451,7 @@ instructions:
         list:
           - absolute_address
   sbw:
-    byte_code:
+    bytecode:
       value: 49
       size: 8
     operands:
@@ -460,7 +460,7 @@ instructions:
         list:
           - absolute_address
   acw:
-    byte_code:
+    bytecode:
       value: 50
       size: 8
     operands:
@@ -469,7 +469,7 @@ instructions:
         list:
           - absolute_address
   scw:
-    byte_code:
+    bytecode:
       value: 51
       size: 8
     operands:
@@ -478,7 +478,7 @@ instructions:
         list:
           - absolute_address
   lds:
-    byte_code:
+    bytecode:
       value: 52
       size: 8
     operands:
@@ -487,7 +487,7 @@ instructions:
         list:
           - immediate
   sts:
-    byte_code:
+    bytecode:
       value: 53
       size: 8
     operands:
@@ -496,15 +496,15 @@ instructions:
         list:
           - immediate
   phs:
-    byte_code:
+    bytecode:
       value: 54
       size: 8
   pls:
-    byte_code:
+    bytecode:
       value: 55
       size: 8
   jps:
-    byte_code:
+    bytecode:
       value: 56
       size: 8
     operands:
@@ -513,11 +513,11 @@ instructions:
         list:
           - absolute_address
   rts:
-    byte_code:
+    bytecode:
       value: 57
       size: 8
   bne:
-    byte_code:
+    bytecode:
       value: 58
       size: 8
     operands:
@@ -526,7 +526,7 @@ instructions:
         list:
           - absolute_address
   beq:
-    byte_code:
+    bytecode:
       value: 59
       size: 8
     operands:
@@ -535,7 +535,7 @@ instructions:
         list:
           - absolute_address
   bcc:
-    byte_code:
+    bytecode:
       value: 60
       size: 8
     operands:
@@ -544,7 +544,7 @@ instructions:
         list:
           - absolute_address
   bcs:
-    byte_code:
+    bytecode:
       value: 61
       size: 8
     operands:
@@ -553,7 +553,7 @@ instructions:
         list:
           - absolute_address
   bpl:
-    byte_code:
+    bytecode:
       value: 62
       size: 8
     operands:
@@ -562,7 +562,7 @@ instructions:
         list:
           - absolute_address
   bmi:
-    byte_code:
+    bytecode:
       value: 63
       size: 8
     operands:

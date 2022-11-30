@@ -91,7 +91,12 @@ class Assembler:
             lobj.set_start_address(lobj.memory_zone.current_address)
             if lobj.address is None:
                 sys.exit(f'ERROR: {lobj.line_id} - INTERNAL line object address is None. Memory zone = {lobj.memory_zone}')
-            lobj.memory_zone.current_address = lobj.address + lobj.byte_size
+
+            try:
+                lobj.memory_zone.current_address = lobj.address + lobj.byte_size
+            except ValueError as e:
+                sys.exit(f'ERROR: {lobj.line_id} - {str(e)}')
+
             if isinstance(lobj, LabelLine) and not lobj.is_constant:
                 lobj.label_scope.set_label_value(lobj.get_label(), lobj.get_value(), lobj.line_id)
 
@@ -107,7 +112,7 @@ class Assembler:
         if self._verbose > 2:
             print("\nProcessing lines:")
         max_instruction_text_size = 0
-        byte_code = bytearray()
+        bytecode = bytearray()
         last_line = None
         for lobj in line_obs:
             if isinstance(lobj, LineWithBytes):
@@ -142,12 +147,12 @@ class Assembler:
                         if self._verbose > 2:
                             line_bytes_str = binascii.hexlify(line_bytes, sep=' ').decode("utf-8")
                             click.echo(f'Address ${addr:x} : {lobj} bytes = {line_bytes_str}')
-                byte_code.extend(insertion_bytes)
+                bytecode.extend(insertion_bytes)
                 addr += len(insertion_bytes)
 
-            click.echo(f'Writing {len(byte_code)} bytes of byte code to {self._output_file}')
+            click.echo(f'Writing {len(bytecode)} bytes of byte code to {self._output_file}')
             with open(self._output_file, 'wb') as f:
-                f.write(byte_code)
+                f.write(bytecode)
         elif self._verbose > 1:
             print('NOT writing byte code to binary image.')
 

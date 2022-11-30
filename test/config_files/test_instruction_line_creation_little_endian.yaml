@@ -37,7 +37,7 @@ instructions:
       operand_sets:
         list:
           - address
-    byte_code:
+    bytecode:
       value: 1
       size: 4
   add:
@@ -46,7 +46,7 @@ instructions:
       operand_sets:
         list:
           - address
-    byte_code:
+    bytecode:
       value: 2
       size: 4
   set:
@@ -55,7 +55,7 @@ instructions:
       operand_sets:
         list:
           - 2byte_value
-    byte_code:
+    bytecode:
       value: 3
       size: 4
   big:
@@ -64,11 +64,11 @@ instructions:
       operand_sets:
         list:
           - 4bit
-    byte_code:
+    bytecode:
       value: 1020
       size: 10
       endian: big
   hlt:
-    byte_code:
+    bytecode:
       value: 15
       size: 4

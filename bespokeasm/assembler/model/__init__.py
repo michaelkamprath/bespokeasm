@@ -101,6 +101,16 @@ class AssemblerModel:
                     f'requires BespokeASM version {BESPOKEASM_MIN_REQUIRED_STR}'
                 )
 
+        # check to see if a GLOBAL memory sone was defined and has an illegal origin
+        for zone in self.predefined_memory_zones:
+            if zone['name'] == 'GLOBAL':
+                if self.default_origin < zone['start']:
+                    sys.exit(
+                        f'ERROR: The ISA configuration file has redefined the GLOBAL memory zone and the '
+                        f'default origin value of {self.default_origin} is less than the GLOBAL memory '
+                        f'zone start value of {zone["start"]}.'
+                    )
+
     def __repr__(self) -> str:
         return str(self)
 

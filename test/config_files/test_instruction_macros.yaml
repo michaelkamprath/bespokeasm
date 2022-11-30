@@ -12,7 +12,7 @@ general :
     - sp
     - ij
     - mar
-  min_version: "0.2.2"
+  min_version: "0.3.0"
 predefined:
   constants:
     - name: predefined_value1
@@ -168,7 +168,7 @@ instructions:
       operand_sets:
         list:
           - 8_bit_source
-    byte_code:
+    bytecode:
       value: 1
       size: 5
   pop:
@@ -177,7 +177,7 @@ instructions:
       operand_sets:
         list:
           - 8_bit_destination
-    byte_code:
+    bytecode:
       value: 0
       size: 5
   mov:
@@ -187,11 +187,11 @@ instructions:
         list:
           - 8_bit_destination
           - 8_bit_source
-    byte_code:
+    bytecode:
       value: 1
       size: 2
   add:
-    byte_code:
+    bytecode:
       value: 2
       size: 5
     operands:
@@ -200,7 +200,7 @@ instructions:
         list:
           - 8_bit_source
   addc:
-    byte_code:
+    bytecode:
       value: 3
       size: 5
     operands:
@@ -210,7 +210,7 @@ instructions:
           - 8_bit_source
   ldar:
     variants:
-      - byte_code:
+      - bytecode:
           value: 4
           size: 5
         operands:
@@ -218,7 +218,7 @@ instructions:
           operand_sets:
             list:
               - direct_bytecode
-      - byte_code:
+      - bytecode:
           value: 0b00100110
           size: 8
         operands:
@@ -229,7 +229,7 @@ instructions:
                 sp:
                   type: register
                   register: sp
-      - byte_code:
+      - bytecode:
           value: 0b00100111
           size: 8
         operands:

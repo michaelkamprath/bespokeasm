@@ -76,7 +76,7 @@ operand_sets:
           byte_align: true
 instructions:
   ld:
-    byte_code:
+    bytecode:
       value: 2
       size: 3
     operands:
@@ -87,7 +87,7 @@ instructions:
           - memory_operands
     variants:
       # "store" variant
-      - byte_code:
+      - bytecode:
           value: 3
           size: 3
         operands:
@@ -96,5 +96,3 @@ instructions:
             list:
               - memory_operands
               - register_operands
-
-

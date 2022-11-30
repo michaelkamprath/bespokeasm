@@ -9,9 +9,9 @@ general:
   origin: 4
   identifier:
     name: kenbak-1
-    version: "1.0.1"
+    version: "1.0.2"
     extension: kb1
-  min_version: 0.2.4
+  min_version: 0.3.0
 predefined:
   data:
     - name: A_REG
@@ -179,15 +179,15 @@ operand_sets:
           size: 1
 instructions:
   noop:
-    byte_code:
+    bytecode:
       value: 128
       size: 8
   halt:
-    byte_code:
+    bytecode:
       value: 0
       size: 8
   ld:
-    byte_code:
+    bytecode:
       value: 2
       size: 3
     operands:
@@ -198,7 +198,7 @@ instructions:
           - memory_operands
     variants:
       # "store" variant
-      - byte_code:
+      - bytecode:
           value: 3
           size: 3
         operands:
@@ -208,7 +208,7 @@ instructions:
               - memory_operands
               - register_operands
   add:
-    byte_code:
+    bytecode:
       value: 0
       size: 3
     operands:
@@ -218,7 +218,7 @@ instructions:
           - register_operands
           - memory_operands
   sub:
-    byte_code:
+    bytecode:
       value: 1
       size: 3
     operands:
@@ -228,7 +228,7 @@ instructions:
           - register_operands
           - memory_operands
   and:
-    byte_code:
+    bytecode:
       value: 26
       size: 5
     operands:
@@ -237,7 +237,7 @@ instructions:
         list:
           - memory_operands
   or:
-    byte_code:
+    bytecode:
       value: 24
       size: 5
     operands:
@@ -246,7 +246,7 @@ instructions:
         list:
           - memory_operands
   lneg:
-    byte_code:
+    bytecode:
       value: 27
       size: 5
     operands:
@@ -255,7 +255,7 @@ instructions:
         list:
           - memory_operands
   jp:
-    byte_code:
+    bytecode:
       value: 231
       size: 8
     operands:
@@ -264,7 +264,7 @@ instructions:
         list:
           - direct_memory_no_bc
     variants:
-      - byte_code:
+      - bytecode:
           value: 239
           size: 8
         operands:
@@ -273,7 +273,7 @@ instructions:
             list:
               - deferred_memory_no_bc
   jm:
-    byte_code:
+    bytecode:
       value: 247
       size: 8
     operands:
@@ -282,7 +282,7 @@ instructions:
         list:
           - direct_memory_no_bc
     variants:
-      - byte_code:
+      - bytecode:
           value: 255
           size: 8
         operands:
@@ -291,7 +291,7 @@ instructions:
             list:
               - deferred_memory_no_bc
   jpnz:
-    byte_code:
+    bytecode:
       value: 35
       size: 6
     operands:
@@ -301,7 +301,7 @@ instructions:
           - register_operands
           - direct_memory_no_bc
     variants:
-      - byte_code:
+      - bytecode:
           value: 43
           size: 6
         operands:
@@ -311,7 +311,7 @@ instructions:
               - register_operands
               - deferred_memory_no_bc
   jpz:
-    byte_code:
+    bytecode:
       value: 36
       size: 6
     operands:
@@ -321,7 +321,7 @@ instructions:
           - register_operands
           - direct_memory_no_bc
     variants:
-      - byte_code:
+      - bytecode:
           value: 44
           size: 6
         operands:
@@ -331,7 +331,7 @@ instructions:
               - register_operands
               - deferred_memory_no_bc
   jpn:
-    byte_code:
+    bytecode:
       value: 37
       size: 6
     operands:
@@ -341,7 +341,7 @@ instructions:
           - register_operands
           - direct_memory_no_bc
     variants:
-      - byte_code:
+      - bytecode:
           value: 45
           size: 6
         operands:
@@ -351,7 +351,7 @@ instructions:
               - register_operands
               - deferred_memory_no_bc
   jpp:
-    byte_code:
+    bytecode:
       value: 38
       size: 6
     operands:
@@ -361,7 +361,7 @@ instructions:
           - register_operands
           - direct_memory_no_bc
     variants:
-      - byte_code:
+      - bytecode:
           value: 46
           size: 6
         operands:
@@ -371,7 +371,7 @@ instructions:
               - register_operands
               - deferred_memory_no_bc
   jppnz:
-    byte_code:
+    bytecode:
       value: 39
       size: 6
     operands:
@@ -381,7 +381,7 @@ instructions:
           - register_operands
           - direct_memory_no_bc
     variants:
-      - byte_code:
+      - bytecode:
           value: 47
           size: 6
         operands:
@@ -391,7 +391,7 @@ instructions:
               - register_operands
               - deferred_memory_no_bc
   jmnz:
-    byte_code:
+    bytecode:
       value: 51
       size: 6
     operands:
@@ -401,7 +401,7 @@ instructions:
           - register_operands
           - direct_memory_no_bc
     variants:
-      - byte_code:
+      - bytecode:
           value: 59
           size: 6
         operands:
@@ -411,7 +411,7 @@ instructions:
               - register_operands
               - deferred_memory_no_bc
   jmz:
-    byte_code:
+    bytecode:
       value: 52
       size: 6
     operands:
@@ -421,7 +421,7 @@ instructions:
           - register_operands
           - direct_memory_no_bc
     variants:
-      - byte_code:
+      - bytecode:
           value: 60
           size: 6
         operands:
@@ -431,7 +431,7 @@ instructions:
               - register_operands
               - deferred_memory_no_bc
   jmn:
-    byte_code:
+    bytecode:
       value: 53
       size: 6
     operands:
@@ -441,7 +441,7 @@ instructions:
           - register_operands
           - direct_memory_no_bc
     variants:
-      - byte_code:
+      - bytecode:
           value: 61
           size: 6
         operands:
@@ -451,7 +451,7 @@ instructions:
               - register_operands
               - deferred_memory_no_bc
   jmp:
-    byte_code:
+    bytecode:
       value: 54
       size: 6
     operands:
@@ -461,7 +461,7 @@ instructions:
           - register_operands
           - direct_memory_no_bc
     variants:
-      - byte_code:
+      - bytecode:
           value: 62
           size: 6
         operands:
@@ -471,7 +471,7 @@ instructions:
               - register_operands
               - deferred_memory_no_bc
   jmpnz:
-    byte_code:
+    bytecode:
       value: 55
       size: 6
     operands:
@@ -481,7 +481,7 @@ instructions:
           - register_operands
           - direct_memory_no_bc
     variants:
-      - byte_code:
+      - bytecode:
           value: 63
           size: 6
         operands:
@@ -491,7 +491,7 @@ instructions:
               - register_operands
               - deferred_memory_no_bc
   skip0:
-    byte_code:
+    bytecode:
       value: 2
       size: 2
       suffix:
@@ -504,7 +504,7 @@ instructions:
           - bit_indexes
           - indirect_memory_no_bc
   skip1:
-    byte_code:
+    bytecode:
       value: 3
       size: 2
       suffix:
@@ -517,7 +517,7 @@ instructions:
           - bit_indexes
           - indirect_memory_no_bc
   set0:
-    byte_code:
+    bytecode:
       value: 0
       size: 2
       suffix:
@@ -530,7 +530,7 @@ instructions:
           - bit_indexes
           - indirect_memory_no_bc
   set1:
-    byte_code:
+    bytecode:
       value: 1
       size: 2
       suffix:
@@ -543,7 +543,7 @@ instructions:
           - bit_indexes
           - indirect_memory_no_bc
   sftl:
-    byte_code:
+    bytecode:
       value: 0b10
       size: 2
       suffix:
@@ -556,7 +556,7 @@ instructions:
           - shift_registers
           - shift_enums
   sftr:
-    byte_code:
+    bytecode:
       value: 0b00
       size: 2
       suffix:
@@ -569,7 +569,7 @@ instructions:
           - shift_registers
           - shift_enums
   rotl:
-    byte_code:
+    bytecode:
       value: 0b11
       size: 2
       suffix:
@@ -582,7 +582,7 @@ instructions:
           - shift_registers
           - shift_enums
   rotr:
-    byte_code:
+    bytecode:
       value: 0b01
       size: 2
       suffix:

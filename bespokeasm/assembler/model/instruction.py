@@ -31,7 +31,7 @@ class InstructionVariant(InstructionBase):
         super().__init__(mnemonic, default_endian, registers)
         self._variant_config = instruction_variant_config
         # validate config
-        if 'byte_code' not in self._variant_config:
+        if 'bytecode' not in self._variant_config:
             if variant_num == 0:
                 sys.exit(f'ERROR: configuration for instruction "{mnemonic}" does not have a byte code configuration')
             else:
@@ -57,27 +57,27 @@ class InstructionVariant(InstructionBase):
 
     @property
     def base_bytecode_size(self) -> int:
-        return self._variant_config['byte_code']['size']
+        return self._variant_config['bytecode']['size']
 
     @property
     def base_bytecode_value(self) -> int:
-        return self._variant_config['byte_code']['value']
+        return self._variant_config['bytecode']['value']
 
     @property
     def has_bytecode_suffix(self) -> bool:
-        return 'suffix' in self._variant_config['byte_code']
+        return 'suffix' in self._variant_config['bytecode']
 
     @property
     def suffix_bytecode_size(self) -> int:
         if self.has_bytecode_suffix:
-            return self._variant_config['byte_code']['suffix']['size']
+            return self._variant_config['bytecode']['suffix']['size']
         else:
             return 0
 
     @property
     def suffix_bytecode_value(self) -> int:
         if self.has_bytecode_suffix:
-            return self._variant_config['byte_code']['suffix']['value']
+            return self._variant_config['bytecode']['suffix']['value']
         else:
             return 0
 
@@ -100,7 +100,7 @@ class Instruction(InstructionBase):
 
         variant_num = 0
         self._variants: list[InstructionVariant] = []
-        if 'byte_code' in instruction_config:
+        if 'bytecode' in instruction_config:
             self._variants.append(
                 InstructionVariant(
                     mnemonic,

@@ -2,7 +2,7 @@ import re
 import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.byte_code.parts import NumericByteCodePart, ExpressionByteCodePart
+from bespokeasm.assembler.bytecode.parts import NumericByteCodePart, ExpressionByteCodePart
 from bespokeasm.assembler.model.operand import OperandType, ParsedOperand
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 

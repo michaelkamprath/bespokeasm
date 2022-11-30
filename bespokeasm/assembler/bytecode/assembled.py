@@ -2,8 +2,8 @@ import math
 import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.byte_code.parts import ByteCodePart
-from bespokeasm.assembler.byte_code.packed_bits import PackedBits
+from bespokeasm.assembler.bytecode.parts import ByteCodePart
+from bespokeasm.assembler.bytecode.packed_bits import PackedBits
 from bespokeasm.assembler.label_scope import LabelScope
 
 

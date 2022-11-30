@@ -9,14 +9,13 @@ Changes that are planned but not implemented yet:
 
 * Add ability for an instruction to have order agnostic operands. That is, `instr a, b` is the same as `instr b, a`. This allows `swap` to occupy less instruction space.
 * Enable instruction aliases that allow alternative mnemonics for an instruction. For example, allowing `call` and `jsr` to mean the same thing.
-* Normalize use of `byte_code` or `bytecode` in instruction set configuration file
 * Improve error checking:
   * Disallowed operands
   * missing `:` after labels
   * unknown labels
 
 ## [Unreleased]
-* Added ability for an numeric operand that is ostensibly an address to be checked to be a valid address value per the `GLOBAL` memory zone. Uses the `valid_address` opetion in the `argument` setting for an operand. Only valid for `numeric`, `indirect_numeric`, `deferred_numeric`, and `relative_address` operand types.
+* Added ability for an numeric operand that is ostensibly an address to be checked to be a valid address value per the `GLOBAL` memory zone. Uses the `valid_address` option in the `argument` setting for an operand. Only valid for `numeric`, `indirect_numeric`, `deferred_numeric`, and `relative_address` operand types.
 * Added checks to ensure memory zones are defined within the `GLOBAL` memory zone.
 * Allow instruction configuration to only contain a `variants` list.
 * Added example for the MOSTEK 3870
@@ -26,6 +25,7 @@ Changes that are planned but not implemented yet:
 * Added example for Intel 8085 processor
 * Added hexadecimal format indicated by a trailing capital `H`. For example `08FH` would be a hex value for `$8F`.
 * Added ability to use `EQU` to assign constant label values in addition to `=`.
+* Changed use of `byte_code` to `bytecode` in instruction set configuration file. THIS IS A BREAKING CHANGE
 
 ## [0.2.4]
 * Fixed bug where unknown instructions did not produce an error.

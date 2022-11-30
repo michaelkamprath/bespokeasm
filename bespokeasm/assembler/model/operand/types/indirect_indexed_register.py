@@ -2,7 +2,7 @@ import re
 import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.byte_code.parts import NumericByteCodePart, CompositeByteCodePart
+from bespokeasm.assembler.bytecode.parts import NumericByteCodePart, CompositeByteCodePart
 from bespokeasm.assembler.model.operand import Operand, OperandType, ParsedOperand
 from .register import RegisterOperand
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
@@ -92,13 +92,13 @@ class IndirectIndexedRegisterOperand(RegisterOperand):
             for index_op in self._index_operand_list:
                 parsed_index = index_op.parse_operand(line_id, index_operand_str, register_labels, memzone_manager)
                 if parsed_index is not None:
-                    if parsed_index.byte_code is not None:
-                        composit_byte_code = CompositeByteCodePart(
-                            [bytecode_part, parsed_index.byte_code],
+                    if parsed_index.bytecode is not None:
+                        composit_bytecode = CompositeByteCodePart(
+                            [bytecode_part, parsed_index.bytecode],
                             bytecode_part.byte_align,
                             bytecode_part.endian,
                             line_id
                         )
-                        return ParsedOperand(self, composit_byte_code, parsed_index.argument, operand)
+                        return ParsedOperand(self, composit_bytecode, parsed_index.argument, operand)
                     return ParsedOperand(self, bytecode_part, parsed_index.argument, operand)
         return None

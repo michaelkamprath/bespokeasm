@@ -1,12 +1,12 @@
 import sys
 from typing import Type
 
-from bespokeasm.assembler.byte_code.generator.instruction import InstructionBytecodeGenerator
-from bespokeasm.assembler.byte_code.generator.macro import MacroBytecodeGenerator
+from bespokeasm.assembler.bytecode.generator.instruction import InstructionBytecodeGenerator
+from bespokeasm.assembler.bytecode.generator.macro import MacroBytecodeGenerator
 from bespokeasm.assembler.model.instruction import Instruction
 from bespokeasm.assembler.model.instruction_base import InstructionBase
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.byte_code.assembled import AssembledInstruction
+from bespokeasm.assembler.bytecode.assembled import AssembledInstruction
 from bespokeasm.assembler.model.instruction_macro import InstructionMacro
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.model.instruction_parser_base import InstructioParserBase

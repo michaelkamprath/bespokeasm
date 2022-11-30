@@ -2,7 +2,7 @@ import sys
 from typing import Type
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.byte_code.assembled import AssembledInstruction, CompositeAssembledInstruction
+from bespokeasm.assembler.bytecode.assembled import AssembledInstruction, CompositeAssembledInstruction
 from bespokeasm.assembler.model.operand_parser import MatchedOperandSet
 from bespokeasm.assembler.model.instruction_macro import InstructionMacro, InstructionMacroVariant, MacroLineIdentifier
 from bespokeasm.assembler.model import AssemblerModel

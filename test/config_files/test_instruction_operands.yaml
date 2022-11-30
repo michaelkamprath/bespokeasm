@@ -9,7 +9,7 @@ general :
     - a
     - b
     - c
-  min_version: "0.2.3"
+  min_version: "0.3.0"
 operand_sets:
   register:
     operand_values:
@@ -65,7 +65,7 @@ operand_sets:
           min: -127
 instructions:
   ld:
-    byte_code:
+    bytecode:
       value: 128
       size: 8
     operands:
@@ -76,7 +76,7 @@ instructions:
           - register
           - register
   mv:
-    byte_code:
+    bytecode:
       value: 129
       size: 8
     operands:
@@ -88,7 +88,7 @@ instructions:
           - register
           - register
   ed:
-    byte_code:
+    bytecode:
       value: 136
       size: 8
     operands:
@@ -100,7 +100,7 @@ instructions:
           - enums
           - enums
   jmp:
-    byte_code:
+    bytecode:
       value: 0xE
       size: 4
     operands:
@@ -109,7 +109,7 @@ instructions:
         list:
           - addresses
   jmpr:
-    byte_code:
+    bytecode:
       value: 0xEE
       size: 8
     operands:
@@ -125,7 +125,7 @@ instructions:
                 max: 128
                 min: -127
   jmpre:
-    byte_code:
+    bytecode:
       value: 0xEF
       size: 8
     operands:

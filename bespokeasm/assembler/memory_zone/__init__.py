@@ -42,8 +42,16 @@ class MemoryZone:
 
     @current_address.setter
     def current_address(self, value: int):
-        if value > self.end:
+        if value < self.start:
             raise ValueError(
-                f'Setting current address of memory zone "{self.name}" to {value} exceed maximum zone address {self.end}.'
+                f'Setting current address of memory zone "{self.name}" to {value} is '
+                f'less than minimum zone address {self.start}.'
+            )
+        # check against 1 byte past zone end. This allows for the address updates to be
+        # right up to the end.
+        if value > self.end + 1:
+            raise ValueError(
+                f'Setting current address of memory zone "{self.name}" to {value} exceed '
+                f'maximum zone address {self.end}.'
             )
         self._current_address = value

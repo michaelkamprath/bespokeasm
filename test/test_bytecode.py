@@ -1,8 +1,8 @@
 import unittest
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.byte_code.assembled import AssembledInstruction
-from bespokeasm.assembler.byte_code.parts import NumericByteCodePart, ExpressionByteCodePart, CompositeByteCodePart
+from bespokeasm.assembler.bytecode.assembled import AssembledInstruction
+from bespokeasm.assembler.bytecode.parts import NumericByteCodePart, ExpressionByteCodePart, CompositeByteCodePart
 from bespokeasm.assembler.label_scope import GlobalLabelScope
 
 

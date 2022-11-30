@@ -91,11 +91,11 @@ operand_sets:
           size: 1
 instructions:
   nop:
-    byte_code:
+    bytecode:
       value: 0
       size: 4
   mov:
-    byte_code:
+    bytecode:
       value: 1
       size: 2
     operands:
@@ -125,7 +125,7 @@ instructions:
                 size: 8
                 byte_align: true
     variants:
-      - byte_code:
+      - bytecode:
           value: 8
           size: 4
         operands:
@@ -134,7 +134,7 @@ instructions:
             list:
               - 8_bit_destination
               - hl_subregisters
-      - byte_code:
+      - bytecode:
           value: 9
           size: 4
         operands:

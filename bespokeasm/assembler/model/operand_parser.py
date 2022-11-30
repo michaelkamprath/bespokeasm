@@ -2,7 +2,7 @@ from __future__ import annotations
 import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.byte_code.parts import ByteCodePart
+from bespokeasm.assembler.bytecode.parts import ByteCodePart
 from bespokeasm.assembler.model.operand_set import OperandSetCollection, OperandSet
 from bespokeasm.assembler.model.operand import Operand, ParsedOperand, OperandBytecodePositionType
 from bespokeasm.assembler.model.operand.factory import OperandFactory
@@ -311,17 +311,17 @@ class MatchedOperandSet:
     def operands(self) -> list[ParsedOperand]:
         return self._operands
 
-    def generate_byte_code(self, base_bytecode: ByteCodePart, base_bytecode_suffix: ByteCodePart) -> list[ByteCodePart]:
+    def generate_bytecode(self, base_bytecode: ByteCodePart, base_bytecode_suffix: ByteCodePart) -> list[ByteCodePart]:
         machine_code: list[ByteCodePart] = [base_bytecode]
         suffix_op_bytecode: list[ByteCodePart] = []
         prefix_op_bytecode: list[ByteCodePart] = []
         # first add bytecode
         for op in self._operands:
-            if op.byte_code is not None:
+            if op.bytecode is not None:
                 if op.operand.bytecode_position == OperandBytecodePositionType.SUFFIX:
-                    suffix_op_bytecode.append(op.byte_code)
+                    suffix_op_bytecode.append(op.bytecode)
                 elif op.operand.bytecode_position == OperandBytecodePositionType.PREFIX:
-                    prefix_op_bytecode.insert(0, op.byte_code)
+                    prefix_op_bytecode.insert(0, op.bytecode)
 
         if self._reverse_op_bytecode_order:
             suffix_op_bytecode.reverse()

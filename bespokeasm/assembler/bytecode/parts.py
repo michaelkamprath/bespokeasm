@@ -191,10 +191,10 @@ class ExpressionEnumerationByteCodePart(ExpressionByteCodePart):
 class CompositeByteCodePart(ByteCodePart):
     _parts_list: list[ByteCodePart]
 
-    def __init__(self, byte_code_parts: list[ByteCodePart], byte_align: bool, endian: str, line_id: LineIdentifier) -> None:
-        total_size = reduce(lambda a, b: a+b.value_size, byte_code_parts, 0)
+    def __init__(self, bytecode_parts: list[ByteCodePart], byte_align: bool, endian: str, line_id: LineIdentifier) -> None:
+        total_size = reduce(lambda a, b: a+b.value_size, bytecode_parts, 0)
         super().__init__(total_size, byte_align, endian, line_id)
-        self._parts_list = byte_code_parts
+        self._parts_list = bytecode_parts
 
     def get_value(self, label_scope: LabelScope, instruction_address: int, instruction_size: int) -> int:
         bits = PackedBits()

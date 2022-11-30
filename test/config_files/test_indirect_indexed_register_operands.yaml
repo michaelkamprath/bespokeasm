@@ -300,11 +300,11 @@ operand_sets:
               byte_align: true
 instructions:
   nop:
-    byte_code:
+    bytecode:
       value: 0
       size: 4
   mov:
-    byte_code:
+    bytecode:
       value: 1
       size: 2
     operands:
@@ -335,7 +335,7 @@ instructions:
                 byte_align: true
     variants:
       # sourced from h and l registers
-      - byte_code:
+      - bytecode:
           value: 8
           size: 4
         operands:
@@ -345,7 +345,7 @@ instructions:
               - 8_bit_destination
               - hl_subregisters
       # destination to h and l regsiters
-      - byte_code:
+      - bytecode:
           value: 9
           size: 4
         operands:
@@ -355,7 +355,7 @@ instructions:
               - hl_subregisters
               - 8_bit_source
       # sourced from indrect hl register with register offsets
-      - byte_code:
+      - bytecode:
           value: 2
           size: 2
         operands:
@@ -364,7 +364,7 @@ instructions:
             list:
               - 8_bit_destination
               - 8_bit_indirect_indexed_registers
-      - byte_code:
+      - bytecode:
           value: 3
           size: 2
         operands:
@@ -375,7 +375,7 @@ instructions:
               - 8_bit_indirect_indexed_registers
               - 8_bit_source
       # indrect register with decorators
-      - byte_code:
+      - bytecode:
           value: 1021
           size: 10
           endian: big
@@ -386,7 +386,7 @@ instructions:
             list:
               - 8_bit_destination
               - 8_bit_indirect_registers_with_decorators
-      - byte_code:
+      - bytecode:
           value: 1022
           size: 10
           endian: big
@@ -398,7 +398,7 @@ instructions:
               - 8_bit_indirect_registers_with_decorators
               - 8_bit_source
   cmp:
-    byte_code:
+    bytecode:
       value: 1023
       size: 10
       endian: big
@@ -415,7 +415,7 @@ instructions:
           - [j_register, j_register]
           - [immediate_value, immediate_value]
     variants:
-      - byte_code:
+      - bytecode:
           value: 2044
           size: 11
           endian: big

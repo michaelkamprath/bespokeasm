@@ -1,4 +1,4 @@
-from bespokeasm.assembler.byte_code.parts import NumericByteCodePart
+from bespokeasm.assembler.bytecode.parts import NumericByteCodePart
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.model.operand import Operand, OperandType, ParsedOperand
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager

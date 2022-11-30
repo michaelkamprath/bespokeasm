@@ -1,6 +1,6 @@
 description: Eater SAP-1 ISA
 general:
-  min_version: 0.1.4
+  min_version: 0.3.0
   address_size: 4
 operand_sets:
   integer:
@@ -19,11 +19,11 @@ operand_sets:
           byte_align: false
 instructions:
   nop:
-    byte_code:
+    bytecode:
       value: 0
       size: 4
   lda:
-    byte_code:
+    bytecode:
       value: 1
       size: 4
     operands:
@@ -32,7 +32,7 @@ instructions:
         list:
           - address
   add:
-    byte_code:
+    bytecode:
       value: 2
       size: 4
     operands:
@@ -41,7 +41,7 @@ instructions:
         list:
           - address
   sub:
-    byte_code:
+    bytecode:
       value: 3
       size: 4
     operands:
@@ -50,7 +50,7 @@ instructions:
         list:
           - address
   sta:
-    byte_code:
+    bytecode:
       value: 4
       size: 4
     operands:
@@ -59,7 +59,7 @@ instructions:
         list:
           - address
   ldi:
-    byte_code:
+    bytecode:
       value: 5
       size: 4
     operands:
@@ -68,7 +68,7 @@ instructions:
         list:
           - integer
   jmp:
-    byte_code:
+    bytecode:
       value: 6
       size: 4
     operands:
@@ -77,7 +77,7 @@ instructions:
         list:
           - address
   jc:
-    byte_code:
+    bytecode:
       value: 7
       size: 4
     operands:
@@ -86,7 +86,7 @@ instructions:
         list:
           - address
   jz:
-    byte_code:
+    bytecode:
       value: 8
       size: 4
     operands:
@@ -95,10 +95,10 @@ instructions:
         list:
           - address
   out:
-    byte_code:
+    bytecode:
       value: 14
       size: 4
   hlt:
-    byte_code:
+    bytecode:
       value: 15
       size: 4

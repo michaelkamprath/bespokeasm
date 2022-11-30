@@ -2,7 +2,7 @@ import sys
 
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.byte_code.assembled import AssembledInstruction
+from bespokeasm.assembler.bytecode.assembled import AssembledInstruction
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 
 

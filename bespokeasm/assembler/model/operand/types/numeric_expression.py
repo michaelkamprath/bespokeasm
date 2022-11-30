@@ -1,7 +1,7 @@
 import re
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.byte_code.parts import \
+from bespokeasm.assembler.bytecode.parts import \
     NumericByteCodePart, ExpressionByteCodePart, ExpressionByteCodePartInMemoryZone
 from bespokeasm.assembler.model.operand import OperandWithArgument, OperandType, ParsedOperand
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
