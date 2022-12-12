@@ -15,14 +15,16 @@ Changes that are planned but not implemented yet:
   * unknown labels
 
 ## [Unreleased]
+
+## [0.3.0]
 * Added ability for an numeric operand that is ostensibly an address to be checked to be a valid address value per the `GLOBAL` memory zone. Uses the `valid_address` option in the `argument` setting for an operand. Only valid for `numeric`, `indirect_numeric`, `deferred_numeric`, and `relative_address` operand types.
 * Added checks to ensure memory zones are defined within the `GLOBAL` memory zone.
 * Allow instruction configuration to only contain a `variants` list.
 * Added example for the MOSTEK 3870
+* Added example for Intel 8085 processor
 * Addressed some bugs in how macros are handled.
 * Added syntax highlighting to differentiate macros from native instructions
-* Added operand decorators to some operand types. This allows for some semantically differentiation notation, for exmaple, here `++` is the decorator: `[sp]++`
-* Added example for Intel 8085 processor
+* Added operand decorators to some operand types. This allows for some semantically differentiated notation, for exmaple, here `++` is the decorator: `[sp]++`
 * Added hexadecimal format indicated by a trailing capital `H`. For example `08FH` would be a hex value for `$8F`.
 * Added ability to use `EQU` to assign constant label values in addition to `=`.
 * Changed use of `byte_code` to `bytecode` in instruction set configuration file. THIS IS A BREAKING CHANGE
@@ -106,7 +108,8 @@ First tracked released
 * Enabled the `reverse_argument_order` instruction option be applied to a specific operand configuration. This slightly changed the configuration file format.
 * Added ability for instructions with operands to have a single "empty operand" variant, e.g., `pop`
 
-[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.4...HEAD
+[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.4...v0.3.0
 [0.2.4]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.1...v0.2.2
