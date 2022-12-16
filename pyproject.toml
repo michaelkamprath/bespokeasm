@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bespokeasm"
+version = "0.3.1"
+authors = [
+  { name="Michael Kamprath", email="michael@kamprath.net" },
+]
+description = "A customizable byte code assembler that allows for the definition of custom instruction set architecture"
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.9"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Programming Language :: Python :: 3.9",
+]
+dependencies = [
+    "click",
+    "intelhex",
+    "packaging",
+    "pyyaml",
+    "pre-commit",
+]
+
+[project.urls]
+homepage = "https://github.com/michaelkamprath/bespokeasm"
+repository = "https://github.com/michaelkamprath/bespokeasm"
+documentation = "https://github.com/michaelkamprath/bespokeasm/wiki"
+changelog = "https://github.com/michaelkamprath/bespokeasm/blob/main/CHANGELOG.md"
+
+[project.scripts]
+bespokeasm = "bespokeasm.__main__:entry_point"
+
+# [tool.setuptools]
+# include-package-data = true
+
+[tool.setuptools.packages.find]
+# namespaces = true
+where = ["src"]
+
+[tool.setuptools.package-data]
+"*" = ["*.json", "*.xml", "*.yaml"]
