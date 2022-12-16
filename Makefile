@@ -1,6 +1,6 @@
 
 tests:
-	python -m unittest discover . -v
+	PYTHONPATH=./src:${PYTHONPATH} python -m unittest discover . -v
 
 clean:
 	find . -name '*.pyc' -delete
@@ -10,4 +10,4 @@ clean:
 	rm -Rf ./dist/
 
 flake8:
-	flake8 ./bespokeasm/ ./test/ setup.py --count --max-line-length=127 --statistics
+	flake8 ./src/ ./test/ --count --max-line-length=127 --statistics
