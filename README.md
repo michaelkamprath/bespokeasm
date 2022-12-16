@@ -11,7 +11,6 @@ To install, clone this repository and install using `pip`. Preferably, you have 
 ```sh
 git clone git@github.com:michaelkamprath/bespokeasm.git
 cd bespokeasm
-pipenv install
 pip install .
 ```
 
@@ -34,7 +33,7 @@ BespokeASM can generate a syntax highlighting extension for [Sublime Text](https
 ```sh
 bespokeasm generate-extension vscode -c isa-config.yaml -d /path/to/some/directory
 ```
-Once generated, move the `.sublime-package` file to the `Installed Packages` directory of the Sublime Text application settings directory. On MacOS, this can be found at `~/Library/Application Support/Sublime Text/Installed Packages`. Of course, this directory can also be used for the `-d` option in the above command.
+Once generated, move the `.sublime-package` file to the `Installed Packages` directory of the Sublime Text application settings directory. On MacOS, this can be found at `~/Library/Application Support/Sublime Text/Installed Packages`, and on Linux this is typically found at `~/.config/sublime-text/Installed\ Packages/`. Of course, this directory can also be used for the `-d` option in the above command.
 
 # Documentation
 Documentation is available on the [Bespoke ASM Wiki](https://github.com/michaelkamprath/bespokeasm/wiki).

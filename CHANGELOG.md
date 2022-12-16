@@ -16,6 +16,9 @@ Changes that are planned but not implemented yet:
 
 ## [Unreleased]
 
+## [0.3.1]
+* Changed the instaltion method to use the modern `pyproject.toml` approach.
+
 ## [0.3.0]
 * Added ability for an numeric operand that is ostensibly an address to be checked to be a valid address value per the `GLOBAL` memory zone. Uses the `valid_address` option in the `argument` setting for an operand. Only valid for `numeric`, `indirect_numeric`, `deferred_numeric`, and `relative_address` operand types.
 * Added checks to ensure memory zones are defined within the `GLOBAL` memory zone.
@@ -108,7 +111,8 @@ First tracked released
 * Enabled the `reverse_argument_order` instruction option be applied to a specific operand configuration. This slightly changed the configuration file format.
 * Added ability for instructions with operands to have a single "empty operand" variant, e.g., `pop`
 
-[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/michaelkamprath/bespokeasm/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.4...v0.3.0
 [0.2.4]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.2...v0.2.3

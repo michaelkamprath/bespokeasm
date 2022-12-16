@@ -166,8 +166,12 @@ def sublime(config_file, verbose, editor_config_dir, language_name, language_ver
     generator.generate()
 
 
-if __name__ == '__main__':
+def entry_point():
     args = sys.argv
     if "--help" in args or len(args) == 1:
         click.echo("bespokeasm")
     main(auto_envvar_prefix='BESPOKEASM')
+
+
+if __name__ == '__main__':
+    sys.exit(entry_point())
