@@ -57,10 +57,14 @@ class InstructionVariant(InstructionBase):
 
     @property
     def base_bytecode_size(self) -> int:
+        if 'size' not in self._variant_config['bytecode']:
+            sys.exit(f'ERROR: Instruction "{self.mnemonic}" does not have a bytecode size configured')
         return self._variant_config['bytecode']['size']
 
     @property
     def base_bytecode_value(self) -> int:
+        if 'value' not in self._variant_config['bytecode']:
+            sys.exit(f'ERROR: Instruction "{self.mnemonic}" does not have a bytecode value configured')
         return self._variant_config['bytecode']['value']
 
     @property

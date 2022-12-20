@@ -20,7 +20,7 @@ general:
   identifier:
     name: intel-8085-asm
     version: "0.1.0"
-    extension: 8085-asm
+    extension: a85
   min_version: 0.3.0
 operand_sets:
   8_bit_source:
@@ -313,10 +313,11 @@ instructions:
           value: 1
           size: 4
     operands:
-      count: 1
+      count: 2
       operand_sets:
         list:
           - register_pairs
+          - uint16_no_bytecode
   stax:
     # store A direct to memory address in register pair
     # Bit format 00xx0010, xx = register pair BC or DE
@@ -934,23 +935,25 @@ instructions:
     operands:
       count: 1
       specific_operands:
-        list:
-          address_code:
-            type: numeric_bytecode
-            bytecode:
-              max: 7
-              min: 0
-              byte_align: false
+        reset_index:
+          list:
+            address_code:
+              type: numeric_bytecode
+              bytecode:
+                size: 3
+                max: 7
+                min: 0
+                byte_align: false
   push:
     variants:
       # Push a register pair to the stack
-      # Bit format 00xx1011, xx = register pair
+      # Bit format 11xx0101, xx = register pair
       - bytecode:
           value: 3
           size: 2
           suffix:
-            value: 1
-            size: 5
+            value: 5
+            size: 4
         operands:
           count: 1
           operand_sets:
@@ -965,10 +968,11 @@ instructions:
         operands:
           count: 1
           specific_operands:
-            list:
-              program_status_word:
-                type: register
-                register: psw
+            psw_register:
+              list:
+                program_status_word:
+                  type: register
+                  register: psw
   sphl:
     # Move HL to SP
     bytecode:
@@ -979,27 +983,26 @@ instructions:
       # Pop to a register pair except stack pointer SP
       # Bit format 00xx1011, xx = register pair
       - bytecode:
-          bytecode:
-              value: 3
-              size: 2
-              suffix:
-                value: 1
-                size: 4
-          operands:
-            count: 1
-            operand_sets:
-              list:
-                - register_pairs
-              disallowed_pairs:
-                - [sp_pair]
+          value: 3
+          size: 2
+          suffix:
+            value: 1
+            size: 4
+        operands:
+          count: 1
+          operand_sets:
+            list:
+              - register_pairs
+            disallowed_pairs:
+              - [sp_pair]
       # Pop to Program Status Words (A + flags)
       - bytecode:
-          bytecode:
-              value: 0xF1
-              size: 8
-          operands:
-            count: 1
-            specific_operands:
+          value: 0xF1
+          size: 8
+        operands:
+          count: 1
+          specific_operands:
+            register_psw:
               list:
                 program_status_word:
                   type: register
