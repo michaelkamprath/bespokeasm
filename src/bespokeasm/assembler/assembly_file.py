@@ -51,59 +51,62 @@ class AssemblyFile:
             ) -> list[LineObject]:
         line_objects = []
 
-        with open(self.filename, 'r') as f:
-            assembly_files_used.add(self.filename)
-            line_num = 0
-            current_scope = self.label_scope
-            current_memzone = memzone_manager.global_zone
-            for line in f:
-                line_num += 1
-                line_id = LineIdentifier(line_num, filename=self.filename)
-                line_str = line.strip()
-                if len(line_str) > 0:
-                    # check to see if this is a #include line
-                    if line_str.startswith('#include'):
-                        additional_line_objects = self._handle_include_file(
-                            line_str,
+        try:
+            with open(self.filename, 'r') as f:
+                assembly_files_used.add(self.filename)
+                line_num = 0
+                current_scope = self.label_scope
+                current_memzone = memzone_manager.global_zone
+                for line in f:
+                    line_num += 1
+                    line_id = LineIdentifier(line_num, filename=self.filename)
+                    line_str = line.strip()
+                    if len(line_str) > 0:
+                        # check to see if this is a #include line
+                        if line_str.startswith('#include'):
+                            additional_line_objects = self._handle_include_file(
+                                line_str,
+                                line_id,
+                                isa_model,
+                                memzone_manager,
+                                include_paths,
+                                log_verbosity,
+                                assembly_files_used
+                            )
+                            line_objects.extend(additional_line_objects)
+                            continue
+                        if line_str.startswith('#require'):
+                            self._handle_require_language(line_str, line_id, isa_model, log_verbosity)
+                            continue
+
+                        if line_str.startswith('#create_memzone'):
+                            self._handle_create_memzone(line_str, line_id, isa_model, memzone_manager, log_verbosity)
+                            continue
+
+                        lobj_list = LineOjectFactory.parse_line(
                             line_id,
+                            line_str,
                             isa_model,
+                            current_scope,
+                            current_memzone,
                             memzone_manager,
-                            include_paths,
-                            log_verbosity,
-                            assembly_files_used
                         )
-                        line_objects.extend(additional_line_objects)
-                        continue
-                    if line_str.startswith('#require'):
-                        self._handle_require_language(line_str, line_id, isa_model, log_verbosity)
-                        continue
-
-                    if line_str.startswith('#create_memzone'):
-                        self._handle_create_memzone(line_str, line_id, isa_model, memzone_manager, log_verbosity)
-                        continue
-
-                    lobj_list = LineOjectFactory.parse_line(
-                        line_id,
-                        line_str,
-                        isa_model,
-                        current_scope,
-                        current_memzone,
-                        memzone_manager,
-                    )
-                    for lobj in lobj_list:
-                        if isinstance(lobj, LabelLine):
-                            if not lobj.is_constant \
-                                    and LabelScopeType.get_label_scope(lobj.get_label()) != LabelScopeType.LOCAL:
-                                current_scope = LabelScope(LabelScopeType.LOCAL, self.label_scope, lobj.get_label())
-                        # both .org and .memzone directive should reset label scope to FILE and current memzone
-                        elif isinstance(lobj, SetMemoryZoneLine):
-                            current_scope = self.label_scope
-                            current_memzone = lobj.memory_zone
-                        lobj.label_scope = current_scope
-                        # setting constants now so they can be used when evluating lines later.
-                        if isinstance(lobj, LabelLine) and lobj.is_constant:
-                            lobj.label_scope.set_label_value(lobj.get_label(), lobj.get_value(), lobj.line_id)
-                        line_objects.append(lobj)
+                        for lobj in lobj_list:
+                            if isinstance(lobj, LabelLine):
+                                if not lobj.is_constant \
+                                        and LabelScopeType.get_label_scope(lobj.get_label()) != LabelScopeType.LOCAL:
+                                    current_scope = LabelScope(LabelScopeType.LOCAL, self.label_scope, lobj.get_label())
+                            # both .org and .memzone directive should reset label scope to FILE and current memzone
+                            elif isinstance(lobj, SetMemoryZoneLine):
+                                current_scope = self.label_scope
+                                current_memzone = lobj.memory_zone
+                            lobj.label_scope = current_scope
+                            # setting constants now so they can be used when evluating lines later.
+                            if isinstance(lobj, LabelLine) and lobj.is_constant:
+                                lobj.label_scope.set_label_value(lobj.get_label(), lobj.get_value(), lobj.line_id)
+                            line_objects.append(lobj)
+        except FileNotFoundError:
+            sys.exit(f'ERROR: Compilation file "{self.filename}" not found.')
 
         if log_verbosity > 1:
             click.echo(f'Found {len(line_objects)} lines in source file {self.filename}')
@@ -244,7 +247,7 @@ class AssemblyFile:
         memzone_manager: MemoryZoneManager,
         log_verbosity: int
     ) -> None:
-        '''Cre  ates a new memory zone based on the #create_memzone line'''
+        '''Creates a new memory zone based on the #create_memzone line'''
         memzone_match = re.search(AssemblyFile.PATTERN_CREATE_MEMORY_ZONE, line_str)
         if memzone_match is not None and len(memzone_match.groups()) == 3:
             name = memzone_match.group(1).strip()
