@@ -4,7 +4,7 @@ from bespokeasm.assembler.model.operand import Operand
 from bespokeasm.assembler.model.operand.types import empty, numeric_expression, indirect_register, \
                                                      indirect_numeric, register, indirect_indexed_register, \
                                                      deferred_numeric, numeric_bytecode, enumeration_operand, \
-                                                     numeric_enumeration, relative_address
+                                                     numeric_enumeration, relative_address, indexed_register
 
 
 class OperandFactory:
@@ -16,6 +16,8 @@ class OperandFactory:
             return numeric_expression.NumericExpressionOperand(operand_id, arg_config_dict, default_endian)
         elif type_str == 'register':
             return register.RegisterOperand(operand_id, arg_config_dict, default_endian, registers)
+        elif type_str == 'indexed_register':
+            return indexed_register.IndexedRegisterOperand(operand_id, arg_config_dict, default_endian, registers)
         elif type_str == 'indirect_register':
             return indirect_register.IndirectRegisterOperand(operand_id, arg_config_dict, default_endian, registers)
         elif type_str == 'indirect_indexed_register':

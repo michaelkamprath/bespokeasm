@@ -17,6 +17,7 @@ Changes that are planned but not implemented yet:
 ## [Unreleased]
 * Corrected workflows bug
 * Improved error messaging
+* Added `indexed_register` operand type. Similar to `indirect_indexed_register`, but it does not imply the address dereferencing.
 
 ## [0.3.1]
 * Changed the instaltion method to use the modern `pyproject.toml` approach.

@@ -170,7 +170,7 @@ class TestConfigurationGeneration(unittest.TestCase):
             grammar_json = json.load(json_file)
         self._assert_grouped_item_list(
             grammar_json['repository']['instructions']['begin'],
-            ['\\bnop\\b', '\\bmov\\b', '\\bcmp\\b'],
+            ['\\bnop\\b', '\\bmov\\b', '\\bcmp\\b', '\\bjmp\\b'],
             'instructions'
         )
         self._assert_grouped_item_list(
@@ -284,7 +284,7 @@ class TestConfigurationGeneration(unittest.TestCase):
             if instr_dict['scope'] == 'variable.function.instruction':
                 self._assert_grouped_item_list(
                     instr_dict['match'],
-                    ['\\bnop\\b', '\\bmov\\b', '\\bcmp\\b'],
+                    ['\\bnop\\b', '\\bmov\\b', '\\bcmp\\b', '\\bjmp\\b'],
                     'instructions'
                 )
             elif instr_dict['scope'] == 'variable.function.macro':
@@ -294,7 +294,7 @@ class TestConfigurationGeneration(unittest.TestCase):
             if config_dict['name'] == 'instructions':
                 self._assert_grouped_item_list(
                     instr_dict['match'],
-                    ['\\bnop\\b', '\\bmov\\b', '\\bcmp\\b'],
+                    ['\\bnop\\b', '\\bmov\\b', '\\bcmp\\b', '\\bjmp\\b'],
                     'instructions'
                 )
 

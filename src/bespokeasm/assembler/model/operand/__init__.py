@@ -11,15 +11,16 @@ class OperandType(enum.Enum):
     # these values double as sort order for processing in an operand set
     UNKNOWN = -1
     EMPTY = 1
-    NUMERIC = 8
-    NUMERIC_BYTECODE = 10
-    REGISTER = 7
-    DICTIONARY_KEY = 6
+    NUMERIC = 9
+    NUMERIC_BYTECODE = 11
+    REGISTER = 8
+    INDEXED_REGISTER = 6
+    DICTIONARY_KEY = 7
     INDIRECT_REGISTER = 2
     INDIRECT_INDEXED_REGISTER = 3
     INDIRECT_NUMERIC = 4
     DEFERRED_NUMERIC = 5
-    RELATIVE_ADDRESS = 9
+    RELATIVE_ADDRESS = 10
 
 
 class OperandBytecodePositionType(enum.Enum):

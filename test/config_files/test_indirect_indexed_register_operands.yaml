@@ -227,6 +227,44 @@ operand_sets:
               min: 0
               size: 8
               byte_align: true
+  hl_indexed:
+    operand_values:
+      register_hl:
+        type: indexed_register
+        register: hl
+        bytecode:
+          value: 0
+          size: 0
+        index_operands:
+          register_a:
+            type: register
+            register: a
+            bytecode:
+              value: 0
+              size: 2
+          register_i:
+            type: register
+            register: i
+            bytecode:
+              value: 1
+              size: 2
+          register_j:
+            type: register
+            register: j
+            bytecode:
+              value: 2
+              size: 2
+          indirect_sp:
+            type: indirect_register
+            register: sp
+            bytecode:
+              value: 3
+              size: 2
+            offset:
+              max: 255
+              min: 0
+              size: 8
+              byte_align: true
   8_bit_indirect_registers_with_decorators:
     operand_values:
       inc_hl:
@@ -425,3 +463,13 @@ instructions:
             list:
               - hl_indirect_indexed
               - 8_bit_source
+  jmp:
+    variants:
+      - bytecode:
+          value: 0b110000
+          size: 6
+        operands:
+          count: 1
+          operand_sets:
+            list:
+              - hl_indexed

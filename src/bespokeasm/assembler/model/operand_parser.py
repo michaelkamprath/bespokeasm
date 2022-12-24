@@ -32,7 +32,7 @@ class OperandSetsModel:
     def __init__(self, instruction: str, config: dict, operand_set_collection: OperandSetCollection):
         self._config = config
         if 'list' not in self._config:
-            sys.exit(f'ERROR - Operand Set configuration dictionary is missting "list" key for instruction "{instruction}"')
+            sys.exit(f'ERROR - Operand Set configuration dictionary is missing "list" key for instruction "{instruction}"')
         operand_sets = self._config['list']
         self._operand_sets = []
         for k in operand_sets:

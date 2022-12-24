@@ -182,6 +182,37 @@ class TestInstructionParsing(unittest.TestCase):
         ins2.generate_bytes()
         self.assertEqual(list(ins2.get_bytes()), [0xFF, 0x64, 0x1D], 'instruction byte should match')
 
+    def test_indexed_regsiter_operands(self):
+        with pkg_resources.path(config_files, 'test_indirect_indexed_register_operands.yaml') as fp:
+            isa_model = AssemblerModel(str(fp), 0)
+            memzone_mngr = MemoryZoneManager(
+                isa_model.address_size,
+                isa_model.default_origin,
+                isa_model.predefined_memory_zones,
+            )
+
+        ins0 = InstructionLine.factory(
+            22, 'jmp hl+j', 'some comment!',
+            isa_model, memzone_mngr.global_zone, memzone_mngr,
+        )
+        ins0.set_start_address(1212)
+        self.assertIsInstance(ins0, InstructionLine)
+        self.assertEqual(ins0.byte_size, 1, 'has 1 bytes')
+        ins0.label_scope = TestInstructionParsing.label_values
+        ins0.generate_bytes()
+        self.assertEqual(list(ins0.get_bytes()), [0xC2], 'instruction byte should match')
+
+        ins1 = InstructionLine.factory(
+            22, 'jmp hl+[sp+7]', 'some comment!',
+            isa_model, memzone_mngr.global_zone, memzone_mngr,
+        )
+        ins1.set_start_address(1212)
+        self.assertIsInstance(ins1, InstructionLine)
+        self.assertEqual(ins1.byte_size, 2, 'has 2 bytes')
+        ins1.label_scope = TestInstructionParsing.label_values
+        ins1.generate_bytes()
+        self.assertEqual(list(ins1.get_bytes()), [0xC3, 0x07], 'instruction byte should match')
+
     def test_indirect_indexed_regsiter_operands(self):
         with pkg_resources.path(config_files, 'test_indirect_indexed_register_operands.yaml') as fp:
             isa_model = AssemblerModel(str(fp), 0)
