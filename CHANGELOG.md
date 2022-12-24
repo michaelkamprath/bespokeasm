@@ -16,6 +16,7 @@ Changes that are planned but not implemented yet:
 
 ## [Unreleased]
 * Corrected workflows bug
+* Improved error messaging
 
 ## [0.3.1]
 * Changed the instaltion method to use the modern `pyproject.toml` approach.

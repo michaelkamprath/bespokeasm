@@ -123,10 +123,11 @@ class Assembler:
                 max_instruction_text_size = len(lobj.instruction)
             if isinstance(lobj, LineWithBytes):
                 if last_line is not None and (last_line.address + last_line.byte_size) > lobj.address:
-                    print(line_obs)
                     sys.exit(
                         f'ERROR: {lobj.line_id} - Address of byte code at this line overlaps with bytecode from '
-                        f'line {last_line.line_id} at address {hex(lobj.address)}'
+                        f'line <{last_line.line_id}> at address {hex(lobj.address)}\n'
+                        f'  memory zone of current line <{lobj.line_id}> = {lobj.memory_zone}\n'
+                        f'  memory zone of other line <{last_line.line_id}> = {last_line.memory_zone}\n'
                     )
                 last_line = lobj
 

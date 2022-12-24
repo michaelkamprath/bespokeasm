@@ -196,6 +196,9 @@ class CompositeByteCodePart(ByteCodePart):
         super().__init__(total_size, byte_align, endian, line_id)
         self._parts_list = bytecode_parts
 
+    def __str__(self) -> str:
+        return f'CompositeByteCodePart<parts="{self._parts_list}">'
+
     def get_value(self, label_scope: LabelScope, instruction_address: int, instruction_size: int) -> int:
         bits = PackedBits()
         for p in self._parts_list:
