@@ -1007,3 +1007,155 @@ instructions:
                 program_status_word:
                   type: register
                   register: psw
+macros:
+  lmi4:
+    # copies 4 immediate bytes to memory starting at address in HL
+    # increments HL value
+    - operands:
+        count: 1
+        specific_operands:
+          uint32:
+            list:
+              uint32:
+                type: numeric
+                argument:
+                  size: 32
+                  byte_align: true
+      instructions:
+        # value on stack is big endian, start with LSB
+        - "push psw"
+        - "mvi m,(BYTE0(@ARG(0))"
+        - "inx hl"
+        - "mvi m,(BYTE1(@ARG(0))"
+        - "inx hl"
+        - "mvi m,(BYTE2(@ARG(0))"
+        - "inx hl"
+        - "mvi m,(BYTE3(@ARG(0))"
+        - "pop psw"
+  push2m:
+    # pushes the 2 bytes in memory starting at address in HL to stack
+    # uses register BC
+    # maintains little endian ordering
+    - operands:
+        count: 0
+      instructions:
+        - "inx hl"
+        - "mov b,[hl]"
+        - "dcx hl"
+        - "mov c,[hl]"
+        - "push bc"
+  push4m:
+    # pushes the 4 bytes in memory starting at address in HL to stack
+    # uses register BC
+    # maintains little endian ordering
+    - operands:
+        count: 0
+      instructions:
+        - "inx hl"
+        - "inx hl"
+        - "inx hl"
+        - "mov b,[hl]"
+        - "dcx hl"
+        - "mov c,[hl]"
+        - "push bc"
+        - "dcx hl"
+        - "mov b,[hl]"
+        - "dcx hl"
+        - "mov c,[hl]"
+        - "push bc"
+  push4i:
+    # pushes the 4 immediate bytes  to stack
+    # uses register HL
+    # maintains little endian ordering
+    - operands:
+        count: 1
+        specific_operands:
+          uint32:
+            list:
+              uint32:
+                type: numeric
+                argument:
+                  size: 32
+                  byte_align: true
+      instructions:
+        - "mvi h,(BYTE3(@ARG(0))"
+        - "mvi 1,(BYTE2(@ARG(0))"
+        - "push hl"
+        - "mvi h,(BYTE1(@ARG(0))"
+        - "mvi l,(BYTE0(@ARG(0))"
+        - "push hl"
+  pop2:
+    # pop 2 buytes on stack, placing the values nowhere
+    # uses register HL
+    - operands:
+        count: 0
+      instructions:
+        - "push psw"
+        - "lxi hl,2"
+        - "dad sp"
+        - "inx hl"
+        - "inx hl"
+        - "pop psw"
+        - "sphl"
+  pop4:
+    # pop 4 buytes on stack, placing the values nowhere
+    # uses register HL
+    - operands:
+        count: 0
+      instructions:
+        - "push psw"
+        - "lxi hl,2"
+        - "dad sp"
+        - "inx hl"
+        - "inx hl"
+        - "inx hl"
+        - "inx hl"
+        - "pop psw"
+        - "sphl"
+  pop4m:
+    # pop 4 bytes on stack, placing the values into memory at address in HL
+    - operands:
+        count: 0
+      instructions:
+        - "push psw"
+        - "push de"
+        - "xchg"
+        - "lxi hl,4"
+        - "dad sp"
+        - "xchg"
+        - "copy4hlde"
+        - "xchg"
+        - "lxi de,4"
+        - "dad de"
+        - "pop de"
+        - "pop psw"
+        - "sphl"
+  copy4hlde:
+    # copies 4 bytes from memory address in DE to memory address in HL
+    # uses BC
+    - operands:
+        count: 0
+      instructions:
+        - "push psw"
+        - "push bc"
+        - "lxi bc,3"
+        - "dad bc"
+        - "xchg"
+        - "dad bc"
+        - "xchg"
+        - "ldax de"
+        - "mov [hl],a"
+        - "dcx de"
+        - "dcx hl"
+        - "ldax de"
+        - "mov [hl],a"
+        - "dcx de"
+        - "dcx hl"
+        - "ldax de"
+        - "mov [hl],a"
+        - "dcx de"
+        - "dcx hl"
+        - "ldax de"
+        - "mov [hl],a"
+        - "pop bc"
+        - "pop psw"
