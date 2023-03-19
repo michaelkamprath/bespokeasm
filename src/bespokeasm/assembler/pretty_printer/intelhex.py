@@ -14,7 +14,7 @@ class IntelHexPrettyPrinter(PrettyPrinterBase):
         self._intel_hex = IntelHex()
         self._as_intel_hex = as_intel_hex
 
-    def pretty_print(self, max_instruction_text_size: int) -> str:
+    def pretty_print(self) -> str:
         output = io.StringIO()
         for lobj in self.line_objects:
             if isinstance(lobj, LineWithBytes):

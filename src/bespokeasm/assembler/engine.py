@@ -111,7 +111,6 @@ class Assembler:
         # second pass: build the machine code and check for overlaps
         if self._verbose > 2:
             print("\nProcessing lines:")
-        max_instruction_text_size = 0
         bytecode = bytearray()
         last_line = None
         for lobj in line_obs:
@@ -119,8 +118,6 @@ class Assembler:
                 lobj.generate_bytes()
             if self._verbose > 2:
                 click.echo(f'Processing {lobj.line_id} = {lobj} at address ${lobj.address:x}')
-            if len(lobj.instruction) > max_instruction_text_size:
-                max_instruction_text_size = len(lobj.instruction)
             if isinstance(lobj, LineWithBytes):
                 if last_line is not None and (last_line.address + last_line.byte_size) > lobj.address:
                     sys.exit(
@@ -159,7 +156,7 @@ class Assembler:
 
         if self._enable_pretty_print:
             pprinter = PrettyPrinterFactory.getPrettyPrinter(self._pretty_print_format, line_obs, self._model)
-            pretty_str = pprinter.pretty_print(max_instruction_text_size)
+            pretty_str = pprinter.pretty_print()
             if self._pretty_print_output == 'stdout':
                 print(pretty_str)
             else:

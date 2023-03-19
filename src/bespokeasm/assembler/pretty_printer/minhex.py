@@ -10,7 +10,7 @@ class MinHexPrettyPrinter(PrettyPrinterBase):
     def __init__(self, line_objs:  list[LineObject], model: AssemblerModel) -> None:
         super().__init__(line_objs, model)
 
-    def pretty_print(self, max_instruction_text_size: int) -> str:
+    def pretty_print(self) -> str:
         output = io.StringIO()
         line_byte_count = 0
         address_width = int(self.model.address_size/4)

@@ -2,6 +2,7 @@ from bespokeasm.assembler.pretty_printer import PrettyPrinterBase
 from bespokeasm.assembler.pretty_printer.source_details import SourceDetailsPrettyPrinter
 from bespokeasm.assembler.pretty_printer.minhex import MinHexPrettyPrinter
 from bespokeasm.assembler.pretty_printer.intelhex import IntelHexPrettyPrinter
+from bespokeasm.assembler.pretty_printer.listing import ListingPrettyPrinter
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.model import AssemblerModel
 
@@ -23,4 +24,6 @@ class PrettyPrinterFactory:
             return IntelHexPrettyPrinter(line_objs, model, False)
         elif pretty_printer_type == 'intel_hex':
             return IntelHexPrettyPrinter(line_objs, model, True)
+        elif pretty_printer_type == 'listing':
+            return ListingPrettyPrinter(line_objs, model)
         raise NotImplementedError

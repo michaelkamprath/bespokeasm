@@ -319,7 +319,7 @@ instructions:
           - register_pairs
           - uint16_no_bytecode
   stax:
-    # store A direct to memory address in register pair
+    # store A contents direct to memory address in register pair
     # Bit format 00xx0010, xx = register pair BC or DE
     bytecode:
       value: 0

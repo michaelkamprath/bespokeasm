@@ -11,7 +11,7 @@ class SourceDetailsPrettyPrinter(PrettyPrinterBase):
     def __init__(self, line_objs:  list[LineObject], model: AssemblerModel) -> None:
         super().__init__(line_objs, model)
 
-    def pretty_print(self, max_instruction_text_size: int) -> str:
+    def pretty_print(self) -> str:
         output = io.StringIO()
 
         address_size = math.ceil(self.model.address_size/4)
@@ -21,23 +21,22 @@ class SourceDetailsPrettyPrinter(PrettyPrinterBase):
         COL_WIDTH_BYTE = 4
         COL_WIDTH_BINARY = 8
         INSTRUCTION_INDENT = 4
-        max_instruction_text_size = max_instruction_text_size + INSTRUCTION_INDENT
         blank_line_num = ''.join([' '*COL_WIDTH_LINE])
-        blank_instruction_text = ''.join([' '*max_instruction_text_size])
+        blank_instruction_text = ''.join([' '*(self.max_instruction_width + INSTRUCTION_INDENT)])
         blank_address_text = ''.join([' '*COL_WIDTH_ADDRESS])
         blank_byte_text = ''.join([' '*COL_WIDTH_BYTE])
         blank_binary_text = ''.join([' '*COL_WIDTH_BINARY])
 
         header_text = ' {0} | {1} | {2} | {3} | {4} | Comment '.format(
             'Line'.center(COL_WIDTH_LINE),
-            'Code'.ljust(max_instruction_text_size),
+            'Code'.ljust(self.max_instruction_width + INSTRUCTION_INDENT),
             'Address'.center(COL_WIDTH_ADDRESS),
             'Byte'.center(COL_WIDTH_BYTE),
             'Binary'.center(COL_WIDTH_BINARY),
         )
         header_line_text = '-{0}-+-{1}-+-{2}-+-{3}-+-{4}-+---------------'.format(
             ''.join('-'*(COL_WIDTH_LINE)),
-            ''.join('-'*(max_instruction_text_size)),
+            ''.join('-'*(self.max_instruction_width)),
             ''.join('-'*(COL_WIDTH_ADDRESS)),
             ''.join('-'*(COL_WIDTH_BYTE)),
             ''.join('-'*(COL_WIDTH_BINARY)),
@@ -50,7 +49,7 @@ class SourceDetailsPrettyPrinter(PrettyPrinterBase):
             instruction_str = lobj.instruction
             if not isinstance(lobj, LabelLine):
                 instruction_str = ' '*INSTRUCTION_INDENT + instruction_str
-            instruction_str = instruction_str.ljust(max_instruction_text_size)
+            instruction_str = instruction_str.ljust(self.max_instruction_width + INSTRUCTION_INDENT)
 
             if isinstance(lobj, LineWithBytes):
                 line_bytes = lobj.get_bytes()
