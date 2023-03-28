@@ -111,7 +111,8 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         #
 
         # first, get the line bytes, if any
-        line_bytes = None if not isinstance(lobj, LineWithBytes) else self._generate_bytecode_line_string(lobj.get_bytes())
+        line_bytes = None if not isinstance(lobj, LineWithBytes) \
+                        else ListingPrettyPrinter._generate_bytecode_line_string(lobj.get_bytes(), self._bytes_per_line)
 
         # write the line number
         output.write(f' {lobj.line_id.line_num:{self.max_line_num_width}d} | ')
@@ -149,7 +150,8 @@ class ListingPrettyPrinter(PrettyPrinterBase):
                     + ' '*self.max_instruction_width + ' | \n'
                 )
 
-    def _generate_bytecode_line_string(self, line_bytes: bytearray) -> list[str]:
+    @classmethod
+    def _generate_bytecode_line_string(cls, line_bytes: bytearray, bytes_per_str: int) -> list[str]:
         # convert the line_bytes to a list of strings, each string being a hex representation of a byte.
         # Each line should contain at most 6 bytes. There should be as many strings in the return list
         # as needed for each string to contain up to 6 bytes of line_bytes. The first byt through 6th byte
@@ -173,9 +175,9 @@ class ListingPrettyPrinter(PrettyPrinterBase):
             if cur_str is None:
                 cur_str = ''
             cur_str += f'{b:02x} '
-            if len(cur_str) == self._bytes_per_line*3:
+            if len(cur_str) == bytes_per_str*3:
                 results.append(cur_str)
                 cur_str = None
         if cur_str is not None:
-            results.append(f'{cur_str:<{self._bytes_per_line*3}}')
+            results.append(f'{cur_str:<{bytes_per_str*3}}')
         return results
