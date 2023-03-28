@@ -14,7 +14,8 @@ class PrettyPrinterFactory:
             cls,
             pretty_printer_type: str,
             line_objs:  list[LineObject],
-            model: AssemblerModel
+            model: AssemblerModel,
+            main_filename: str,
     ) -> PrettyPrinterBase:
         if pretty_printer_type == 'source_details':
             return SourceDetailsPrettyPrinter(line_objs, model)
@@ -25,5 +26,5 @@ class PrettyPrinterFactory:
         elif pretty_printer_type == 'intel_hex':
             return IntelHexPrettyPrinter(line_objs, model, True)
         elif pretty_printer_type == 'listing':
-            return ListingPrettyPrinter(line_objs, model)
+            return ListingPrettyPrinter(line_objs, model, main_filename)
         raise NotImplementedError

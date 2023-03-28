@@ -40,13 +40,16 @@ class InstructionVariant(InstructionBase):
                     f'byte code configuration in variant {variant_num}.'
                 )
         if 'operands' in self._variant_config:
-            self._operand_parser = OperandParser(
-                mnemonic,
-                self._variant_config.get('operands', None),
-                operand_set_collection,
-                default_endian,
-                registers,
-            )
+            try:
+                self._operand_parser = OperandParser(
+                    mnemonic,
+                    self._variant_config.get('operands', None),
+                    operand_set_collection,
+                    default_endian,
+                    registers,
+                )
+            except TypeError as e:
+                sys.exit(f'ERROR: Operand configuration for instruction "{mnemonic}" is invalid: {e}')
             self._operand_parser.validate(mnemonic)
         else:
             self._operand_parser = None

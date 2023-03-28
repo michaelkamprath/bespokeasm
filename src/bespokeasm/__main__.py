@@ -19,7 +19,7 @@ def main():
 @click.argument('asm_file')
 @click.option('--config-file', '-c', required=True, help='The filepath to the instruction set configuration file,')
 @click.option(
-        '--generate-binary/--no-binary',
+        '--binary/--no-binary', '-b/-n',
         default=True,
         help='Indicates whether a binary image of the compiled bytecode should be generated.'
     )
@@ -50,7 +50,7 @@ def main():
     )
 @click.option(
         '--pretty-print-format', '-t',
-        type=click.Choice(['source_details', 'minhex', 'hex', 'intel_hex'], case_sensitive=False),
+        type=click.Choice(['source_details', 'minhex', 'hex', 'intel_hex', 'listing'], case_sensitive=False),
         default='source_details',
         help='The format that should be used when pretty printing.',
 )
@@ -66,7 +66,7 @@ def main():
 def compile(
             asm_file,
             config_file,
-            generate_binary,
+            binary,
             output_file,
             binary_min_address,
             binary_max_address,
@@ -81,7 +81,7 @@ def compile(
         output_file = os.path.splitext(asm_file)[0] + '.bin'
     if verbose:
         click.echo(f'The file to assemble is: {asm_file}')
-        if generate_binary:
+        if binary:
             click.echo(f'The binary image will be written to: {output_file}')
         if int(binary_min_address) > 0:
             click.echo(f'  with the starting address written: {binary_min_address}')
@@ -90,7 +90,7 @@ def compile(
 
     asm = Assembler(
         asm_file, config_file,
-        generate_binary, output_file,
+        binary, output_file,
         int(binary_min_address), int(binary_max_address) if int(binary_max_address) >= 0 else None,
         binary_fill,
         pretty_print, pretty_print_format, pretty_print_output, verbose,

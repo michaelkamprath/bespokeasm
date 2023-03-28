@@ -15,6 +15,8 @@ Changes that are planned but not implemented yet:
   * unknown labels
 
 ## [Unreleased]
+* Improved error messages for a badly configured configuration file.
+* Added the listing pretty print format, replacing the legacy default pretty print format.
 
 ## [0.3.2]
 * Corrected workflows bug

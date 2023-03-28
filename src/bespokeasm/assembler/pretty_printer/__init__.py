@@ -1,4 +1,4 @@
-from bespokeasm.assembler.line_object import LineObject
+from bespokeasm.assembler.line_object import LineObject, LineWithBytes
 from bespokeasm.assembler.model import AssemblerModel
 
 
@@ -9,11 +9,15 @@ class PrettyPrinterBase:
         # scan though the line objects to get max widths
         line_num_max = 0
         instruction_max_width = 0
+        self._max_byte_count = 0
         for lo in line_objs:
             if lo.line_id.line_num > line_num_max:
                 line_num_max = lo.line_id.line_num
             if len(lo.instruction) > instruction_max_width:
                 instruction_max_width = len(lo.instruction)
+            if isinstance(lo, LineWithBytes):
+                if len(lo.get_bytes()) > self._max_byte_count:
+                    self._max_byte_count = len(lo.get_bytes())
         self._max_line_num_width = len(str(line_num_max))
         self._max_instruction_width = instruction_max_width
 
@@ -32,6 +36,10 @@ class PrettyPrinterBase:
     @property
     def max_instruction_width(self) -> int:
         return self._max_instruction_width
+
+    @property
+    def max_byte_count(self) -> int:
+        return self._max_byte_count
 
     def pretty_print(self) -> str:
         raise NotImplementedError
