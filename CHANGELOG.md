@@ -16,6 +16,10 @@ Changes that are planned but not implemented yet:
 
 ## [Unreleased]
 
+## [0.3.3]
+* Improved error messages for a badly configured configuration file.
+* Added the listing pretty print format, replacing the legacy default pretty print format.
+
 ## [0.3.2]
 * Corrected workflows bug
 * Improved error messaging
@@ -116,7 +120,8 @@ First tracked released
 * Enabled the `reverse_argument_order` instruction option be applied to a specific operand configuration. This slightly changed the configuration file format.
 * Added ability for instructions with operands to have a single "empty operand" variant, e.g., `pop`
 
-[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.3.3...HEAD
+[0.3.3]: https://github.com/michaelkamprath/bespokeasm/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/michaelkamprath/bespokeasm/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/michaelkamprath/bespokeasm/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.2.4...v0.3.0

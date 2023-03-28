@@ -29,7 +29,7 @@ class Assembler:
                 is_verbose: int,
                 include_paths: list[str],
             ):
-        self.source_file = source_file
+        self._source_file = source_file
         self._output_file = output_file
         self._config_file = config_file
         self._generate_binary = generate_binary
@@ -73,9 +73,9 @@ class Assembler:
 
             # add its label to the global scope
         # find base file containing directory
-        include_dirs = set([os.path.dirname(self.source_file)]+list(self._include_paths))
+        include_dirs = set([os.path.dirname(self._source_file)]+list(self._include_paths))
 
-        asm_file = AssemblyFile(self.source_file, global_label_scope)
+        asm_file = AssemblyFile(self._source_file, global_label_scope)
         line_obs: list[LineObject] = asm_file.load_line_objects(
             self._model,
             include_dirs,
@@ -111,7 +111,6 @@ class Assembler:
         # second pass: build the machine code and check for overlaps
         if self._verbose > 2:
             print("\nProcessing lines:")
-        max_instruction_text_size = 0
         bytecode = bytearray()
         last_line = None
         for lobj in line_obs:
@@ -119,8 +118,6 @@ class Assembler:
                 lobj.generate_bytes()
             if self._verbose > 2:
                 click.echo(f'Processing {lobj.line_id} = {lobj} at address ${lobj.address:x}')
-            if len(lobj.instruction) > max_instruction_text_size:
-                max_instruction_text_size = len(lobj.instruction)
             if isinstance(lobj, LineWithBytes):
                 if last_line is not None and (last_line.address + last_line.byte_size) > lobj.address:
                     sys.exit(
@@ -158,8 +155,13 @@ class Assembler:
             print('NOT writing byte code to binary image.')
 
         if self._enable_pretty_print:
-            pprinter = PrettyPrinterFactory.getPrettyPrinter(self._pretty_print_format, line_obs, self._model)
-            pretty_str = pprinter.pretty_print(max_instruction_text_size)
+            pprinter = PrettyPrinterFactory.getPrettyPrinter(
+                self._pretty_print_format,
+                line_obs,
+                self._model,
+                self._source_file,
+            )
+            pretty_str = pprinter.pretty_print()
             if self._pretty_print_output == 'stdout':
                 print(pretty_str)
             else:
