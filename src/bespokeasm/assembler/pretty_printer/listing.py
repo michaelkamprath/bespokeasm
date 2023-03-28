@@ -2,21 +2,26 @@ import io
 import math
 
 from bespokeasm.assembler.line_object import LineObject, LineWithBytes
+from bespokeasm.assembler.line_object.label_line import LabelLine
+from bespokeasm.assembler.line_object.directive_line import SetMemoryZoneLine
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.pretty_printer import PrettyPrinterBase
 from bespokeasm.assembler.line_identifier import LineIdentifier
 
 
 class ListingPrettyPrinter(PrettyPrinterBase):
-    """
-    line number | address | machine code (6 bytes wide) | instruction | comment
-    """
+    MAX_NUM_BYTES_PER_LINE = 6
+    INSTRUCTION_INDENT = 4
+
     def __init__(self, line_objs:  list[LineObject], model: AssemblerModel, main_filename: str) -> None:
-        super().__init__(line_objs, model)
+        super().__init__(line_objs, model, instruction_indent=ListingPrettyPrinter.INSTRUCTION_INDENT)
         self._address_size = math.ceil(self.model.address_size/4)
         self._address_format_str = f'{{0:0{self._address_size}x}}'
         self._main_filename = main_filename
-        self._bytes_per_line = min(6, self.max_byte_count)
+        self._bytes_per_line = min(
+            ListingPrettyPrinter.MAX_NUM_BYTES_PER_LINE,
+            self.max_byte_count,
+        )
 
     def pretty_print(self) -> str:
         if len(self.line_objects) < 1:
@@ -45,9 +50,51 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         return output.getvalue()
 
     def _print_file_header(self, output: io.StringIO, filename: str) -> None:
-        output.write('\n********************\n\n')
-        output.write(f'File: {filename}\n')
-        output.write('---\n')
+        output.write(f'\n\nFile: {filename}\n')
+        output.write(
+            '-'*(self.max_line_num_width + 2) + '+' +
+            '-'*(self._address_size + 2) + '+' +
+            '-'*(self._bytes_per_line*3 + 1) + '+' +
+            '-'*(self.max_instruction_width + 2) + '+' +
+            '-'*(self.max_comment_width + 2) + '\n'
+        )
+
+        if self._address_size >= 8:
+            address_header = 'address'
+        elif self._address_size >= 4:
+            address_header = 'addr'
+        else:
+            address_header = 'a'
+
+        if self._bytes_per_line >= 4:
+            bytes_header = 'machine code'
+        elif self._bytes_per_line >= 2:
+            bytes_header = 'bytes'
+        else:
+            bytes_header = 'b'
+
+        if self.max_instruction_width >= 10:
+            instruction_header = ' instruction'
+        elif self.max_instruction_width >= 5:
+            instruction_header = ' instr'
+        else:
+            instruction_header = ' i'
+
+        output.write(
+            'line'.center(self.max_line_num_width + 2) + '|' +
+            address_header.center(self._address_size + 2) + '|' +
+            bytes_header.center(self._bytes_per_line*3 + 1) + '|' +
+            instruction_header.ljust(self.max_instruction_width + 2) + '|' +
+            ' comment\n'
+        )
+
+        output.write(
+            '-'*(self.max_line_num_width + 2) + '+' +
+            '-'*(self._address_size + 2) + '+' +
+            '-'*(self._bytes_per_line*3 + 1) + '+' +
+            '-'*(self.max_instruction_width + 2) + '+' +
+            '-'*(self.max_comment_width + 2) + '\n'
+        )
 
     def _print_line_object(self, output: io.StringIO, lobj: LineObject) -> None:
         # wite the lobj details to output using the following format:
@@ -67,7 +114,7 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         line_bytes = None if not isinstance(lobj, LineWithBytes) else self._generate_bytecode_line_string(lobj.get_bytes())
 
         # write the line number
-        output.write(f'{lobj.line_id.line_num:4d} | ')
+        output.write(f' {lobj.line_id.line_num:{self.max_line_num_width}d} | ')
 
         # write the address
         if lobj.address is not None:
@@ -84,7 +131,11 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         output.write('| ')
 
         # write the instruction
-        output.write(f'{lobj.instruction: <{self.max_instruction_width}} | ')
+        if not isinstance(lobj, LabelLine) and not isinstance(lobj, SetMemoryZoneLine):
+            instruction_str = ' '*ListingPrettyPrinter.INSTRUCTION_INDENT + lobj.instruction
+        else:
+            instruction_str = lobj.instruction
+        output.write(f'{instruction_str: <{self.max_instruction_width}} | ')
 
         # write the comment
         output.write(lobj.comment)
@@ -93,12 +144,13 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         if line_bytes is not None and len(line_bytes) > 1:
             for bytes in line_bytes[1:]:
                 output.write(
-                    ' '*4 + ' | ' + ' '*self._address_size + ' | ' + bytes
-                    + '| ' + ' '*self.max_instruction_width + ' | \n'
+                    ' '*(self.max_line_num_width+1) + ' | ' + ' '*self._address_size
+                    + ' | ' + bytes + '| '
+                    + ' '*self.max_instruction_width + ' | \n'
                 )
 
     def _generate_bytecode_line_string(self, line_bytes: bytearray) -> list[str]:
-        # conver the line_bytes to a list of strings, each string being a hex representation of a byte.
+        # convert the line_bytes to a list of strings, each string being a hex representation of a byte.
         # Each line should contain at most 6 bytes. There should be as many strings in the return list
         # as needed for each string to contain up to 6 bytes of line_bytes. The first byt through 6th byte
         # in line_bytes gets added to the first string in the list, the 7th through 12th bytes get added

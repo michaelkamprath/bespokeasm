@@ -50,8 +50,8 @@ def main():
     )
 @click.option(
         '--pretty-print-format', '-t',
-        type=click.Choice(['source_details', 'minhex', 'hex', 'intel_hex', 'listing'], case_sensitive=False),
-        default='source_details',
+        type=click.Choice(['minhex', 'hex', 'intel_hex', 'listing'], case_sensitive=False),
+        default='listing',
         help='The format that should be used when pretty printing.',
 )
 @click.option(
