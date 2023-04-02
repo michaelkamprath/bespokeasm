@@ -1,3 +1,4 @@
+from functools import cached_property
 import re
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
@@ -18,7 +19,7 @@ class IndirectNumericOperand(NumericExpressionOperand):
     def type(self) -> OperandType:
         return OperandType.INDIRECT_NUMERIC
 
-    @property
+    @cached_property
     def match_pattern(self) -> str:
         return r'^\[\s*({0})\s*\]$'.format(super().match_pattern)
 

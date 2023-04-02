@@ -1,3 +1,4 @@
+from functools import cached_property
 import re
 import sys
 
@@ -53,7 +54,7 @@ class IndirectRegisterOperand(RegisterOperand):
     def offset_endian(self) -> str:
         return self._config['offset'].get('endian', self._default_endian)
 
-    @property
+    @cached_property
     def match_pattern(self) -> str:
         if not self.has_decorator:
             pattern_str = IndirectRegisterOperand._BASE_PATTERN_TEMPLATE.format(self.register)

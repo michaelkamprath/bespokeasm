@@ -1,3 +1,4 @@
+from functools import cached_property
 import re
 import sys
 
@@ -58,7 +59,7 @@ class EnumerationOperand(OperandWithArgument):
         # bytecode value must be looked up in dictionary
         return None
 
-    @property
+    @cached_property
     def match_pattern(self) -> str:
         if self._argument_dictionary is not None:
             keys_str = '|'.join(self._argument_dictionary.keys())

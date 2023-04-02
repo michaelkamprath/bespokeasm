@@ -1,3 +1,4 @@
+from functools import cached_property
 import re
 import sys
 
@@ -49,7 +50,7 @@ class IndexedRegisterOperand(RegisterOperand):
     def type(self) -> OperandType:
         return OperandType.INDEXED_REGISTER
 
-    @property
+    @cached_property
     def match_pattern(self) -> str:
         return IndexedRegisterOperand.OPERAND_PATTERN_TEMPLATE.format(
             self.register,

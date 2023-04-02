@@ -1,6 +1,7 @@
 import click
 import json
 import os
+from functools import cached_property
 from packaging import version
 import re
 import sys
@@ -184,25 +185,25 @@ class AssemblerModel:
     def get_operand_set(self, operand_set_name: str) -> OperandSet:
         return self._operand_sets.get_operand_set(operand_set_name)
 
-    @property
+    @cached_property
     def default_origin(self) -> int:
         return self._config['general'].get('origin', 0)
 
-    @property
+    @cached_property
     def predefined_constants(self) -> list[dict[str, int]]:
         if 'predefined' in self._config and 'constants' in self._config['predefined']:
             return self._config['predefined']['constants']
         else:
             return []
 
-    @property
+    @cached_property
     def predefined_data_blocks(self) -> list[dict]:
         if 'predefined' in self._config and 'data' in self._config['predefined']:
             return self._config['predefined']['data']
         else:
             return []
 
-    @property
+    @cached_property
     def predefined_labels(self) -> list[str]:
         '''Provides a list of labels that were created by entities defined in the ISA model.
            Intend use is for creating syntax highlighting rules.
@@ -216,7 +217,7 @@ class AssemblerModel:
             results.append(item['name'])
         return results
 
-    @property
+    @cached_property
     def predefined_memory_zones(self) -> list[dict]:
         if 'predefined' in self._config and 'memory_zones' in self._config['predefined']:
             return self._config['predefined']['memory_zones']

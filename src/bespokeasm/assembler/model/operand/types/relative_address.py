@@ -1,3 +1,4 @@
+from functools import cached_property
 import re
 import sys
 
@@ -60,7 +61,7 @@ class RelativeAddressOperand(OperandWithArgument):
     def type(self) -> OperandType:
         return OperandType.RELATIVE_ADDRESS
 
-    @property
+    @cached_property
     def match_pattern(self) -> str:
         base_match_str = r'((?:{0}|\s)+)'.format(EXPRESSION_PARTS_PATTERN)
         if self.uses_curly_braces:
