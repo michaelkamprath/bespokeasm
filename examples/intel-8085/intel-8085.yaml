@@ -423,7 +423,7 @@ instructions:
         value: 0xE3
         size: 8
   xchg:
-    # exchange FL with DE
+    # exchange HL with DE
     bytecode:
         value: 0xEB
         size: 8
@@ -672,7 +672,7 @@ instructions:
   cmp:
     # Compare source value to A register
     # Zero flag indictes equality
-    # Carry flag indicates source valye us greater than A
+    # Carry flag indicates source value us greater than A
     bytecode:
         value: 23
         size: 5
