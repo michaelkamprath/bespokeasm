@@ -6,6 +6,7 @@ from test import config_files
 from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType
 from bespokeasm.assembler.line_object.directive_line import DirectiveLine, AddressOrgLine, FillDataLine, FillUntilDataLine
+from bespokeasm.assembler.line_object import LineWithBytes
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 
@@ -35,7 +36,7 @@ class TestDirectiveLines(unittest.TestCase):
             1234,
             '.org $1',
             'set address to 0=x100',
-            TestDirectiveLines.isa_model,
+            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
         )
@@ -49,7 +50,7 @@ class TestDirectiveLines(unittest.TestCase):
             5678,
             '.org 8',
             'set address to 1024',
-            TestDirectiveLines.isa_model,
+            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
         )
@@ -60,7 +61,7 @@ class TestDirectiveLines(unittest.TestCase):
             1357,
             '.org b000000000100',
             'set address to 2048',
-            TestDirectiveLines.isa_model,
+            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
         )
@@ -71,7 +72,7 @@ class TestDirectiveLines(unittest.TestCase):
             1357,
             '.org 0x000F',
             'set address to 54K',
-            TestDirectiveLines.isa_model,
+            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
         )
@@ -82,7 +83,7 @@ class TestDirectiveLines(unittest.TestCase):
             1357,
             '.org a_const',
             'set address to a label',
-            TestDirectiveLines.isa_model,
+            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
         )
@@ -95,7 +96,7 @@ class TestDirectiveLines(unittest.TestCase):
                 1357,
                 '.org sp',
                 'set address to a register',
-                TestDirectiveLines.isa_model,
+                TestDirectiveLines.isa_model.endian,
                 TestDirectiveLines.memzone,
                 TestDirectiveLines.memory_zone_manager,
             )
@@ -107,7 +108,7 @@ class TestDirectiveLines(unittest.TestCase):
             1357,
             '.org a_const "zone1"',
             'set address to a label',
-            TestDirectiveLines.isa_model,
+            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
         )
@@ -119,7 +120,7 @@ class TestDirectiveLines(unittest.TestCase):
             1357,
             '.org a_const/2 + 5 "zone2"',
             'set address to a label',
-            TestDirectiveLines.isa_model,
+            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
         )
@@ -139,7 +140,7 @@ class TestDirectiveLines(unittest.TestCase):
             1234,
             ' .fill 32, $77',
             'fill with luck sevens',
-            TestDirectiveLines.isa_model,
+            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
         )
@@ -153,7 +154,7 @@ class TestDirectiveLines(unittest.TestCase):
             1234,
             ' .fill 0xFF, 0x2211',
             'snake eyes',
-            TestDirectiveLines.isa_model,
+            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
         )
@@ -167,7 +168,7 @@ class TestDirectiveLines(unittest.TestCase):
             1234,
             ' .fill 8*MAX_N + 1, eff|$A0',
             'snake eyes',
-            TestDirectiveLines.isa_model,
+            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
         )
@@ -181,7 +182,7 @@ class TestDirectiveLines(unittest.TestCase):
             1234,
             '.zero b000000100',
             'zipity doo dah',
-            TestDirectiveLines.isa_model,
+            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
         )
@@ -196,7 +197,7 @@ class TestDirectiveLines(unittest.TestCase):
             1234,
             '.zero forty',
             'constants in directives',
-            TestDirectiveLines.isa_model,
+            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
         )
@@ -210,7 +211,7 @@ class TestDirectiveLines(unittest.TestCase):
             1234,
             '.fill eff, forty',
             'constants in directives',
-            TestDirectiveLines.isa_model,
+            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
         )
@@ -224,7 +225,7 @@ class TestDirectiveLines(unittest.TestCase):
             1234,
             '.fill eff+eff, forty+2',
             'constants in directives',
-            TestDirectiveLines.isa_model,
+            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
         )
@@ -238,7 +239,7 @@ class TestDirectiveLines(unittest.TestCase):
             1234,
             '.zero forty+2',
             'constants in directives',
-            TestDirectiveLines.isa_model,
+            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
         )
@@ -252,7 +253,7 @@ class TestDirectiveLines(unittest.TestCase):
             1234,
             '.zero 8*(MAX_N+1)',
             'constants in directives',
-            TestDirectiveLines.isa_model,
+            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
         )
@@ -270,7 +271,7 @@ class TestDirectiveLines(unittest.TestCase):
             1234,
             ' .zerountil $100',
             'fill with nothing',
-            TestDirectiveLines.isa_model,
+            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
         )
@@ -286,7 +287,7 @@ class TestDirectiveLines(unittest.TestCase):
             1234,
             '.zerountil 0xF',
             'them zeros',
-            TestDirectiveLines.isa_model,
+            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
         )
@@ -301,7 +302,7 @@ class TestDirectiveLines(unittest.TestCase):
             1234,
             '.zerountil my_label+$f',
             'them zeros',
-            TestDirectiveLines.isa_model,
+            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
         )
@@ -311,6 +312,42 @@ class TestDirectiveLines(unittest.TestCase):
         self.assertEqual(o3.byte_size, 0x81, 'must have the right number of bytes')
         o3.generate_bytes()
         self.assertEqual(list(o3.get_bytes()), [0]*0x81, 'must have all the bytes')
+
+    def test_cstr_directive(self):
+        label_values = LabelScope(LabelScopeType.GLOBAL, None, 'global')
+        label_values.set_label_value('my_label', 0x80, 1)
+
+        t1 = DirectiveLine.factory(
+            1234,
+            '.cstr "this is a test"',
+            'that str',
+            TestDirectiveLines.isa_model.endian,
+            TestDirectiveLines.memzone,
+            TestDirectiveLines.memory_zone_manager,
+            0,
+        )
+        self.assertIsInstance(t1, LineWithBytes)
+        t1.set_start_address(0xF)
+        t1.label_scope = label_values
+        self.assertEqual(t1.byte_size, 15, 'must have the right number of bytes')
+        t1.generate_bytes()
+        self.assertEqual(list(t1.get_bytes())[-1], 0, 'terminating character must match')
+
+        t2 = DirectiveLine.factory(
+            1234,
+            '.cstr "this is a test"',
+            'that str',
+            TestDirectiveLines.isa_model.endian,
+            TestDirectiveLines.memzone,
+            TestDirectiveLines.memory_zone_manager,
+            3,
+        )
+        self.assertIsInstance(t1, LineWithBytes)
+        t2.set_start_address(0xF)
+        t2.label_scope = label_values
+        self.assertEqual(t2.byte_size, 15, 'must have the right number of bytes')
+        t2.generate_bytes()
+        self.assertEqual(list(t2.get_bytes())[-1], 3, 'terminating character must match')
 
 
 if __name__ == '__main__':

@@ -69,6 +69,7 @@ class LineOjectFactory:
                 model.endian,
                 current_memzone,
                 memzone_manager,
+                model.cstr_terminator,
             )
             if line_obj is not None:
                 line_obj_list.append(line_obj)

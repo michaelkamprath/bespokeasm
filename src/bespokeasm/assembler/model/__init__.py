@@ -147,6 +147,13 @@ class AssemblerModel:
             return 'big'
 
     @property
+    def cstr_terminator(self) -> int:
+        if 'cstr_terminator' in self._config['general']:
+            return int(self._config['general']['cstr_terminator']) & 0xFF
+        else:
+            return 0
+
+    @property
     def address_size(self) -> int:
         '''The number of bits used to rerpesent a memory address'''
         return self._config['general']['address_size']

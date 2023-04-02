@@ -37,7 +37,7 @@ class TestLineObject(unittest.TestCase):
         label_values.set_label_value('test1', 0x1234, 1)
         memzone = MemoryZone(16, 0, 2**16 - 1, 'GLOBAL')
 
-        d1 = DataLine.factory(27, ' .byte $de, $ad, 0xbe, $ef', 'steak', 'big', memzone)
+        d1 = DataLine.factory(27, ' .byte $de, $ad, 0xbe, $ef', 'steak', 'big', memzone, '\0')
         d1.label_scope = label_values
         d1.generate_bytes()
         self.assertIsInstance(d1, DataLine)

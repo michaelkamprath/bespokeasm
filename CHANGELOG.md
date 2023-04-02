@@ -15,6 +15,7 @@ Changes that are planned but not implemented yet:
   * unknown labels
 
 ## [Unreleased]
+* Added the ability to set the `cstr` terminating character. It default to `0`, but can be set to another byte value.
 
 ## [0.3.3]
 * Improved error messages for a badly configured configuration file.

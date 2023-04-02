@@ -56,6 +56,7 @@ class DirectiveLine:
         endian: str,
         current_memzone: MemoryZone,
         memzone_manager: MemoryZoneManager,
+        cstr_terminator: int = 0,
     ) -> LineObject:
         # for efficiency, if it doesn't start with a period, it is not a directive
         cleaned_line_str = line_str.strip()
@@ -117,7 +118,7 @@ class DirectiveLine:
             )
 
         # nothing was matched here. pass to data directive
-        return DataLine.factory(line_id, line_str, comment, endian, current_memzone)
+        return DataLine.factory(line_id, line_str, comment, endian, current_memzone, cstr_terminator)
 
 
 class SetMemoryZoneLine(LineObject):

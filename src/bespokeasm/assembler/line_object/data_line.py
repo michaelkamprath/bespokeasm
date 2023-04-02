@@ -35,6 +35,7 @@ class DataLine(LineWithBytes):
             comment: str,
             endian: str,
             current_memzone: MemoryZone,
+            cstr_terminator: int = 0,
     ) -> LineWithBytes:
         """Tries to match the passed line string to the data directive pattern.
         If succcessful, returns a constructed DataLine object. If not, None is
@@ -57,7 +58,7 @@ class DataLine(LineWithBytes):
                 values_list = [ord(x) for x in list(converted_str)]
                 if directive_str == '.cstr':
                     # Add a 0-value at the end of the string values.
-                    values_list.extend([0])
+                    values_list.extend([cstr_terminator])
             else:
                 # don't know what this is
                 return None
