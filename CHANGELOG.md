@@ -16,6 +16,7 @@ Changes that are planned but not implemented yet:
 
 ## [Unreleased]
 * Added the ability to set the `cstr` terminating character. It default to `0`, but can be set to another byte value.
+* Added support for using characeter ordinals in numeric expressions. For example, `'a'` is the same as `97`. Only valid for single character strings using single quotes.
 
 ## [0.3.3]
 * Improved error messages for a badly configured configuration file.

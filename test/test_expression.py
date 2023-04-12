@@ -190,6 +190,25 @@ class TestExpression(unittest.TestCase):
             2, 'BYTE2( MAX_N*MAX_N*MAX_N*MAX_N ) = BYTE2( 0x027100 ) = 2'
         )
 
+    def test_character_ordinals_in_expressions(self):
+        line_id = LineIdentifier(888, 'test_character_ordinals_in_expressions')
+        self.assertEqual(
+            parse_expression(line_id, "'a'").get_value(TestExpression.label_values, 1),
+            97, "'a' = 97"
+        )
+        self.assertEqual(
+            parse_expression(line_id, "'A' + 32").get_value(TestExpression.label_values, 1),
+            97, "'A' + 32 = 97"
+        )
+        self.assertEqual(
+            parse_expression(line_id, "(' '*32)").get_value(TestExpression.label_values, 1),
+            1024, "(' '*32) = 1024"
+        )
+        self.assertEqual(
+            parse_expression(line_id, "(' ' + ' ')").get_value(TestExpression.label_values, 1),
+            64, "(' ' + ' ') = 64"
+        )
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -18,7 +18,7 @@ from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.utilities import is_valid_label
 
 EXPRESSION_PARTS_PATTERN = \
-    r'(?:(?:\%|b)[01]+|{0}|\d+|[\+\-\*\/\&\|\^\(\)]|>>|<<|%|LSB\(|BYTE\d\(|(?:\.|_)?\w+)'.format(
+    r'(?:(?:\%|b)[01]+|{0}|\d+|[\+\-\*\/\&\|\^\(\)]|>>|<<|%|LSB\(|BYTE\d\(|(?:\.|_)?\w+|\'.\')'.format(
         PATTERN_HEX
     )
 
