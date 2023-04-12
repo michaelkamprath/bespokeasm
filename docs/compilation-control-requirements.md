@@ -7,7 +7,7 @@
 
 * A symbol has two attributes: the fact it has been defined and what its replacement value is.
 * A symbol name is case sensitive, alphanumeric plus `_`, and must not have spaces in it
-* The replacement value is all text after the first white space after the symbol name up to either the end of line or a comment start symbol (`;`), which ever comes first. This text will get trimmed of bounding whitespace.
+* The replacement value is all text after the first white space after the symbol name up to either the end of line or a comment start symbol (`;`), which ever comes first. This text will get trimmed of bounding whitespace. The reaplement value may be a zero-length string.
 * The replacement value will be lazily evaluated.
 * A symbol is in the global scope at the moment it gets defined (when it's line of code is processed) and may be used from that point forward.
 * When a defined symbol is present in a line of note (not any preprocessor directive), before that line of code is compiled the symbol with be replaced with its replacement value string.
