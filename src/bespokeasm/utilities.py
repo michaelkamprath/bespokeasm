@@ -1,6 +1,12 @@
 import re
 
 
+PATTERN_HEX = r'(?:\$|0x)[0-9a-fA-F]+|[0-9a-fA-F]+H\b'
+PATTERN_NUMERIC = r'(?:{0}|(?:b|%)[01]+|\d+|\'.\')'.format(PATTERN_HEX)
+PATTERN_NUMERIC_COMPILED = re.compile(f'^({PATTERN_NUMERIC})$', flags=re.IGNORECASE | re.MULTILINE)
+PATTERN_CHARACTER_ORDINAL = re.compile(r'\'(.)\'', flags=re.IGNORECASE | re.MULTILINE)
+
+
 def parse_numeric_string(numeric_str: str) -> int:
     """returns an integer value for the passed numeric string. Supports decimal,
     hexadecimal, and binary numbers. Throws `ValueError` for strings that are not
@@ -14,13 +20,13 @@ def parse_numeric_string(numeric_str: str) -> int:
         return int(numeric_str[:-1], 16)
     elif numeric_str.startswith('b') or numeric_str.startswith('%'):
         return int(numeric_str[1:], 2)
+    elif numeric_str.startswith('\'') or numeric_str.startswith('"'):
+        match = re.match(PATTERN_CHARACTER_ORDINAL, numeric_str)
+        if match is None:
+            raise ValueError(f'Invalid character literal: {numeric_str}')
+        return ord(match.group(1))
     else:
         return int(numeric_str)
-
-
-PATTERN_HEX = r'(?:\$|0x)[0-9a-fA-F]+|[0-9a-fA-F]+H\b'
-PATTERN_NUMERIC = r'(?:{0}|(?:b|%)[01]+|\d+)'.format(PATTERN_HEX)
-PATTERN_NUMERIC_COMPILED = re.compile(f'^({PATTERN_NUMERIC})$', flags=re.IGNORECASE | re.MULTILINE)
 
 
 def is_string_numeric(value_str: str) -> bool:
