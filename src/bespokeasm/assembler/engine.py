@@ -11,6 +11,7 @@ from bespokeasm.assembler.line_object.predefined_data import PredefinedDataLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.pretty_printer.factory import PrettyPrinterFactory
+from bespokeasm.assembler.preprocessor import Preprocessor
 
 
 class Assembler:
@@ -50,6 +51,8 @@ class Assembler:
             self._model.default_origin,
             self._model.predefined_memory_zones,
         )
+        preprocessor: Preprocessor = Preprocessor()
+
         # create the predefined memory blocks
         predefines_lineid = LineIdentifier(0, os.path.basename(self._config_file))
         predefined_line_obs: list[LineObject] = []
@@ -80,6 +83,7 @@ class Assembler:
             self._model,
             include_dirs,
             memzone_manager,
+            preprocessor,
             self._verbose
         )
 

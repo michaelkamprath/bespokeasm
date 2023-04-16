@@ -22,6 +22,7 @@ from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.memory_zone import MEMORY_ZONE_NAME_PATTERN
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.utilities import PATTERN_NUMERIC, parse_numeric_string
+from bespokeasm.assembler.preprocessor import Preprocessor
 
 
 class AssemblyFile:
@@ -46,6 +47,7 @@ class AssemblyFile:
                 isa_model: AssemblerModel,
                 include_paths: set[str],
                 memzone_manager: MemoryZoneManager,
+                preprocessor: Preprocessor,
                 log_verbosity: int,
                 assembly_files_used: set = set()
             ) -> list[LineObject]:
@@ -69,6 +71,7 @@ class AssemblyFile:
                                 line_id,
                                 isa_model,
                                 memzone_manager,
+                                preprocessor,
                                 include_paths,
                                 log_verbosity,
                                 assembly_files_used
@@ -136,6 +139,7 @@ class AssemblyFile:
                 line_id: LineIdentifier,
                 isa_model: AssemblerModel,
                 memzone_manager: MemoryZoneManager,
+                preprocessor: Preprocessor,
                 include_paths: set[str],
                 log_verbosity: int,
                 assembly_files_used: set
@@ -154,6 +158,7 @@ class AssemblyFile:
                 isa_model,
                 include_paths,
                 memzone_manager,
+                preprocessor,
                 log_verbosity,
                 assembly_files_used=assembly_files_used
             )

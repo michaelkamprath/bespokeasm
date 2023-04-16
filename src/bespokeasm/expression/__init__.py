@@ -4,7 +4,7 @@
 #
 # To use this class, import the following:
 #
-#    from bespokeasm.expression import parse_expression, ExpresionType
+#    from bespokeasm.expression import parse_expression, ExpressionNode
 #
 
 import enum
@@ -78,6 +78,8 @@ class ExpressionNode:
         if self.token_type == TokenType.T_NUM:
             return self.value
         elif self.token_type == TokenType.T_LABEL:
+            if label_scope is None:
+                sys.exit(f'ERROR - INTERNAL: {line_id} - Label {self.value} has no label scope = {self}')
             # in ths case value is a label
             val = label_scope.get_label_value(self.value, line_id)
             if val is None:
@@ -117,21 +119,22 @@ class ExpressionNode:
         return int(self._compute(label_scope, line_id))
 
     def contains_register_labels(self, register_labels: set[str]) -> bool:
+        contained_registers = self.contained_labels().intersection(register_labels)
+        return len(contained_registers) > 0
+
+    def contained_labels(self) -> set[str]:
         if self.token_type == TokenType.T_LABEL:
-            return self.value in register_labels
+            return set([self.value])
         elif self.token_type in [TokenType.T_NUM]:
-            return False
-        left_result = self.left_child.contains_register_labels(register_labels)
-        right_result = False
+            return set()
+        left_result: set[str] = self.left_child.contained_labels()
+        right_result: set[str] = set()
         if not self.is_unary:
-            right_result = self.right_child.contains_register_labels(register_labels)
-        return left_result or right_result
+            right_result = self.right_child.contained_labels()
+        return left_result.union(right_result)
 
 
-ExpresionType = ExpressionNode
-
-
-def parse_expression(line_id: LineIdentifier, expression: str) -> ExpresionType:
+def parse_expression(line_id: LineIdentifier, expression: str) -> ExpressionNode:
     tokens = _lexical_analysis(line_id, expression)
     ast = _parse_e(line_id, tokens)
     _match(line_id, tokens, TokenType.T_END)

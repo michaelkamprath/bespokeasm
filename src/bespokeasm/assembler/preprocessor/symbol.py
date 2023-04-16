@@ -1,10 +1,12 @@
-from bespokeasm.utilities import is_string_numeric
+from functools import cached_property
+
+from bespokeasm.utilities import is_string_numeric, parse_numeric_string
 
 
 class PreprocessorSymbol:
     def __init__(self, name: str, value: str):
-        self.name = name
-        self.value = value
+        self._name = name
+        self._value = value
 
     def __repr__(self) -> str:
         return f"PrerocessorSymbol({self.name} = {self.value})"
@@ -23,7 +25,14 @@ class PreprocessorSymbol:
     def value(self) -> str:
         return self._value
 
-    @property
+    @cached_property
+    def value_numeric(self) -> int:
+        '''Returns the numeric value of the symbol, or None if the value is not numeric'''
+        if self.value is None or not self.is_value_numeric:
+            return None
+        return parse_numeric_string(self.value)
+
+    @cached_property
     def is_value_numeric(self) -> bool:
         if self.value is None:
             return False

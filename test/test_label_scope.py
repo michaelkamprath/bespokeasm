@@ -12,6 +12,7 @@ from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType, GlobalL
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.assembler.preprocessor import Preprocessor
 
 
 class TestLabelScope(unittest.TestCase):
@@ -96,6 +97,7 @@ class TestLabelScope(unittest.TestCase):
             isa_model.default_origin,
             isa_model.predefined_memory_zones
         )
+        preprocessor = Preprocessor()
 
         with pkg_resources.path(test_code, 'test_line_object_scope_assignment.asm') as asm_fp:
             asm_obj = AssemblyFile(asm_fp, label_scope)
@@ -105,6 +107,7 @@ class TestLabelScope(unittest.TestCase):
                 isa_model,
                 [],
                 memzone_manager,
+                preprocessor,
                 3,
             )
         except SystemExit:
