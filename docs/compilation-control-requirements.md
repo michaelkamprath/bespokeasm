@@ -34,10 +34,10 @@ When a `#ifdef` directive is encountered, the symbol will be checked for a defin
 ### Symbol Value Comparison
 `#if <symbol-expression> [<comparison-operator> <symbol-expression>]`
 
-* A symbol expression is any combination of preprocessor symbols, label or constant values, numeric values, and mathemtical operators.
+* A symbol expression is any combination of preprocessor symbols, numeric values, and mathemtical operators.
 * The comparison operator and right side symbol expression is optional. If not present, the comparison operator and right side symbol expression is assumed to be `!= 0`
 * If both symbol expressions value and the comparison value can be converted to an integer, they will be and the comparison will be made based on theirinterger values.
-* If a symbol used in the symbol expression is undefined at the time of evaluation, the boolean comparison will always evaluate to `false`. If a label or constant used in the symbol expression is undefined at the time of evaluation, an error will be generated.
+* If a symbol used in the symbol expression is undefined at the time of evaluation, the boolean comparison will always evaluate to `false`. If a label or constant used in the symbol expression, an error will be generated.
 * The comparison operator may be one of the following:
   * `==` - equal to
   * `!=` - not equal to

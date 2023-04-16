@@ -56,3 +56,7 @@ class TestPreprocessorSymbols(unittest.TestCase):
 
         c8 = PreprocessorCondition('#if s7 == 1<<4', LineIdentifier('test_preprocessor_comparisons', 8))
         self.assertTrue(c8.evaluate(preprocessor), 's7 == 1<<4 should be true')
+
+        # test implied != 0 comparison
+        c9 = PreprocessorCondition('#if s7', LineIdentifier('test_preprocessor_comparisons', 9))
+        self.assertTrue(c9.evaluate(preprocessor), 's7 should be true')

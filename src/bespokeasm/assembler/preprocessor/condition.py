@@ -13,6 +13,10 @@ PREPROCESSOR_CONDITION_IF_PATTERN = re.compile(
     f"(?:(?:\\\')(.+)(?:\\\')|(?:\\\")(.+)(?:\\\")|({INSTRUCTION_EXPRESSION_PATTERN}))"
 )
 
+PREPROCESSOR_CONDITION_IMPLIED_IF_PATTERN = re.compile(
+    r"^(?:#if)\s+([\w\d_]+)\b"
+)
+
 
 class PreprocessorCondition:
     def __init__(self, line_str: str, line: LineIdentifier):
@@ -21,11 +25,16 @@ class PreprocessorCondition:
 
         match = PREPROCESSOR_CONDITION_IF_PATTERN.match(line_str.strip())
         if match is None:
-            raise ValueError(f"Invalid preprocessor condition at line: {line_str}")
-
-        self._lhs_expression = match.group(1)
-        self._operator = match.group(2)
-        self._rhs_expression = match.group(3) or match.group(4) or match.group(5)
+            match2 = PREPROCESSOR_CONDITION_IMPLIED_IF_PATTERN.match(line_str.strip())
+            if match2 is None:
+                raise ValueError(f"Invalid preprocessor condition at line: {line_str}")
+            self._lhs_expression = match2.group(1)
+            self._operator = "!="
+            self._rhs_expression = "0"
+        else:
+            self._lhs_expression = match.group(1)
+            self._operator = match.group(2)
+            self._rhs_expression = match.group(3) or match.group(4) or match.group(5)
 
     def __repr__(self) -> str:
         return f"PreprocessorCondition<#if {self._lhs_symbol} {self._operator} {self._rhs_expression}>"
@@ -48,8 +57,6 @@ class PreprocessorCondition:
             # can do a numeric comparison
             lhs_value = lhs_expression.get_value(None, self._line)
             rhs_value = rhs_expression.get_value(None, self._line)
-
-        print(f"Comparing {lhs_value} {self._operator} {rhs_value}")
 
         if self._operator == "==":
             return lhs_value == rhs_value
