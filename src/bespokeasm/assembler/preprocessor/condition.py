@@ -17,8 +17,23 @@ PREPROCESSOR_CONDITION_IMPLIED_IF_PATTERN = re.compile(
     r"^(?:#if)\s+([\w\d_]+)\b"
 )
 
+PREPROCESSOR_CONDITION_IFDEF_PATTERN = re.compile(
+    r"^(#ifdef|#ifndef)\s+([\w\d_]+)\b"
+)
+
 
 class PreprocessorCondition:
+    def __repr__(self) -> str:
+        raise NotImplementedError()
+
+    def __str__(self) -> str:
+        return self.__repr__()
+
+    def evaluate(self, preprocessor: Preprocessor) -> bool:
+        raise NotImplementedError()
+
+
+class IfPreprocessorCondition(PreprocessorCondition):
     def __init__(self, line_str: str, line: LineIdentifier):
         self._line_str = line_str
         self._line = line
@@ -39,12 +54,9 @@ class PreprocessorCondition:
     def __repr__(self) -> str:
         return f"PreprocessorCondition<#if {self._lhs_symbol} {self._operator} {self._rhs_expression}>"
 
-    def __str__(self) -> str:
-        return self.__repr__()
-
-    def evaluate(self, preprocess: Preprocessor) -> bool:
-        lhs_resolved = preprocess.resolve_symbols(self._lhs_expression)
-        rhs_resolved = preprocess.resolve_symbols(self._rhs_expression)
+    def evaluate(self, preprocessor: Preprocessor) -> bool:
+        lhs_resolved = preprocessor.resolve_symbols(self._lhs_expression)
+        rhs_resolved = preprocessor.resolve_symbols(self._rhs_expression)
 
         lhs_expression: ExpressionNode = parse_expression(self._line, lhs_resolved)
         rhs_expression: ExpressionNode = parse_expression(self._line, rhs_resolved)
@@ -72,3 +84,25 @@ class PreprocessorCondition:
             return lhs_value <= rhs_value
         else:
             raise ValueError(f"Unknown operator {self._operator}")
+
+
+class IfdefPreprocessorCondition(PreprocessorCondition):
+    def __init__(self, line_str: str, line: LineIdentifier):
+        self._line_str = line_str
+        self._line = line
+
+        match = PREPROCESSOR_CONDITION_IFDEF_PATTERN.match(line_str.strip())
+        if match is None:
+            raise ValueError(f"Invalid preprocessor condition at line: {line_str}")
+        self._is_ifndef = match.group(1) == "#ifndef"
+        self._symbol = match.group(2)
+
+    def __repr__(self) -> str:
+        return f'IfdefPreprocessorCondition<{"#ifndef" if self._is_ifndef else "#ifdef"} {self._symbol}>'
+
+    def evaluate(self, preprocessor: Preprocessor) -> bool:
+        symbol = preprocessor.get_symbol(self._symbol)
+        if symbol is None:
+            return self._is_ifndef
+        else:
+            return not self._is_ifndef

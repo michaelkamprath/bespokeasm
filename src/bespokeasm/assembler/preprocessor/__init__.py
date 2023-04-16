@@ -23,9 +23,6 @@ class Preprocessor:
         # Errors if there are recursion loops caused byt symbols that indirectly refer to themselves.
 
         # to make this fast, all symbol candidates should be identified first, then the symbols should be resolved
-        print(
-            f"Resolving symbols in line: {line_str} (symbols: {self._symbols.keys()})",
-        )
         found_symbols: list[str] = re.findall(r"\b([\w\d_]+)\b", line_str)
         symbol_replaced: bool = False
         for s in found_symbols:
