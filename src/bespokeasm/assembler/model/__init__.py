@@ -13,7 +13,6 @@ from bespokeasm.assembler.model.instruction_set import InstructionSet
 from bespokeasm.assembler.model.operand_set import OperandSet, OperandSetCollection
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.preprocessor import Preprocessor
 
 
 class AssemblerModel:
@@ -238,16 +237,8 @@ class AssemblerModel:
         return self._global_label_scope
 
     @property
-    def preprocessor_symbols(self) -> Preprocessor:
-        if self._preprocessor_symbols is None:
-            self._preprocessor_symbols = Preprocessor()
-            if 'predefined' in self._config and 'symbols' in self._config['predefined']:
-                for symbol_def in self._config['predefined']['symbols']:
-                    try:
-                        self._preprocessor_symbols.create_symbol(symbol_def['name'], symbol_def.get('value', ''))
-                    except ValueError:
-                        sys.exit(
-                            f'ERROR: Preprocessor symbol {symbol_def["name"]} is defined multiple times in '
-                            f'instruction set configuration YAML file.'
-                        )
-        return self._preprocessor_symbols
+    def predefined_symbols(self) -> list[dict]:
+        if 'predefined' in self._config and 'symbols' in self._config['predefined']:
+            return self._config['predefined']['symbols']
+        else:
+            return []

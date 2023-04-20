@@ -8,7 +8,6 @@
 from __future__ import annotations
 import click
 import os
-from packaging import version
 import re
 import sys
 
@@ -19,9 +18,7 @@ from bespokeasm.assembler.line_object.directive_line import SetMemoryZoneLine
 from bespokeasm.assembler.line_object.factory import LineOjectFactory
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.model import AssemblerModel
-from bespokeasm.assembler.memory_zone import MEMORY_ZONE_NAME_PATTERN
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
-from bespokeasm.utilities import PATTERN_NUMERIC, parse_numeric_string
 from bespokeasm.assembler.preprocessor import Preprocessor
 
 
@@ -64,7 +61,9 @@ class AssemblyFile:
                     line_id = LineIdentifier(line_num, filename=self.filename)
                     line_str = line.strip()
                     if len(line_str) > 0:
-                        # check to see if this is a #include line
+                        # check to see if this is a #include line.
+                        # this is the one preprocessor directive that is handled
+                        # by the assembly file object.
                         if line_str.startswith('#include'):
                             additional_line_objects = self._handle_include_file(
                                 line_str,
@@ -78,22 +77,19 @@ class AssemblyFile:
                             )
                             line_objects.extend(additional_line_objects)
                             continue
-                        if line_str.startswith('#require'):
-                            self._handle_require_language(line_str, line_id, isa_model, log_verbosity)
-                            continue
 
-                        if line_str.startswith('#create_memzone'):
-                            self._handle_create_memzone(line_str, line_id, isa_model, memzone_manager, log_verbosity)
-                            continue
-
-                        lobj_list = LineOjectFactory.parse_line(
+                        lobj_list = []
+                        # parse the line
+                        lobj_list.extend(LineOjectFactory.parse_line(
                             line_id,
                             line_str,
                             isa_model,
                             current_scope,
                             current_memzone,
                             memzone_manager,
-                        )
+                            preprocessor,
+                            log_verbosity,
+                        ))
                         for lobj in lobj_list:
                             if isinstance(lobj, LabelLine):
                                 if not lobj.is_constant \
@@ -104,7 +100,7 @@ class AssemblyFile:
                                 current_scope = self.label_scope
                                 current_memzone = lobj.memory_zone
                             lobj.label_scope = current_scope
-                            # setting constants now so they can be used when evluating lines later.
+                            # setting constants now so they can be used when evaluating lines later.
                             if isinstance(lobj, LabelLine) and lobj.is_constant:
                                 lobj.label_scope.set_label_value(lobj.get_label(), lobj.get_value(), lobj.line_id)
                             line_objects.append(lobj)
@@ -119,18 +115,6 @@ class AssemblyFile:
     PATTERN_INCLUDE_FILE = re.compile(
         r'^\#include\s+(?:\'|\")([\w\.\-\_]+)(?:\'|\")',
         flags=re.IGNORECASE | re.MULTILINE
-    )
-    PATTERN_REQUIRE_LANGUAGE = re.compile(
-        r'\#require\s+\"([\w\-\_\.]*)(?:\s*(==|>=|<=|>|<)\s*({0}))?\"'.format(version.VERSION_PATTERN),
-        flags=re.IGNORECASE | re.VERBOSE
-    )
-
-    PATTERN_CREATE_MEMORY_ZONE = re.compile(
-        r'#create_memzone\s+({0})\s+({1})\s+({2})'.format(
-            MEMORY_ZONE_NAME_PATTERN,
-            PATTERN_NUMERIC,
-            PATTERN_NUMERIC,
-        )
     )
 
     def _handle_include_file(
@@ -165,71 +149,6 @@ class AssemblyFile:
         else:
             sys.exit(f'ERROR: {line_id} - Improperly formatted include directive')
 
-    def _handle_require_language(
-                self,
-                line_str: int,
-                line_id: LineIdentifier,
-                isa_model: AssemblerModel,
-                log_verbosity: int
-            ) -> None:
-        require_match = re.search(AssemblyFile.PATTERN_REQUIRE_LANGUAGE, line_str)
-        if require_match is not None:
-            required_language = require_match.group(1).strip()
-            if required_language != isa_model.isa_name:
-                sys.exit(
-                    f'ERROR: {line_id} - language "{required_language}" is required but ISA '
-                    f'configuration file declares language "{isa_model.isa_name}"'
-                )
-            if len(require_match.groups()) >= 3 and require_match.group(2) is not None and require_match.group(3) is not None:
-                operator_str = require_match.group(2).strip()
-                version_str = require_match.group(3).strip()
-                version_obj = version.parse(version_str)
-                model_version_obj = version.parse(isa_model.isa_version)
-                operator_actions = {
-                    '>=': {
-                        'check': model_version_obj >= version_obj,
-                        'error': f'ERROR: {line_id} - at least language version "{version_str}" is required but '
-                                 f'ISA configuration file declares language version "{isa_model.isa_version}"',
-                    },
-                    '<=': {
-                        'check': model_version_obj <= version_obj,
-                        'error': f'ERROR: {line_id} - up to language version "{version_str}" is required but '
-                                 f'ISA configuration file declares language version "{isa_model.isa_version}"',
-                    },
-                    '>': {
-                        'check': model_version_obj > version_obj,
-                        'error': f'ERROR: {line_id} - greater than language version "{version_str}" is required but '
-                                 f'ISA configuration file declares language version "{isa_model.isa_version}"',
-                    },
-                    '<': {
-                        'check': model_version_obj < version_obj,
-                        'error': f'ERROR: {line_id} - less than language version "{version_str}" is required but '
-                                 f'ISA configuration file declares language version "{isa_model.isa_version}"',
-                    },
-                    '==': {
-                        'check': model_version_obj < version_obj,
-                        'error': f'ERROR: {line_id} - exactly language version "{version_str}" is required but '
-                                 f'ISA configuration file declares language version "{isa_model.isa_version}"',
-                    },
-                }
-
-                if operator_str in operator_actions:
-                    if not operator_actions[operator_str]['check']:
-                        sys.exit(operator_actions[operator_str]['error'])
-                else:
-                    sys.exit(f'ERROR: {line_id} - got a language requirement comparison that is not understood.')
-                if log_verbosity > 1:
-                    print(
-                        f'Code file requires language "{require_match.group(1)} {require_match.group(2)} '
-                        f'{require_match.group(3)}". Configurate file declares language "{isa_model.isa_name} '
-                        f'{isa_model.isa_version}"'
-                    )
-            elif log_verbosity > 1:
-                print(
-                    f'Code file requires language "{require_match.group(1)}". '
-                    f'Configurate file declares language "{isa_model.isa_name} v{isa_model.isa_version}"'
-                )
-
     def _locate_filename(self, filename: str, include_paths: set[str], line_id: LineIdentifier) -> str:
         '''locates the filename in the include paths, and returns the full file path. Errors if file name is ambiguous.'''
         filepath = None
@@ -243,36 +162,3 @@ class AssemblyFile:
         if filepath is None:
             sys.exit(f'ERROR: {line_id} - could not find file "{filename}" to include')
         return filepath
-
-    def _handle_create_memzone(
-        self,
-        line_str: str,
-        line_id: LineIdentifier,
-        isa_model: AssemblerModel,
-        memzone_manager: MemoryZoneManager,
-        log_verbosity: int
-    ) -> None:
-        '''Creates a new memory zone based on the #create_memzone line'''
-        memzone_match = re.search(AssemblyFile.PATTERN_CREATE_MEMORY_ZONE, line_str)
-        if memzone_match is not None and len(memzone_match.groups()) == 3:
-            name = memzone_match.group(1).strip()
-            start_addr = parse_numeric_string(memzone_match.group(2))
-            end_addr = parse_numeric_string(memzone_match.group(3))
-            if log_verbosity > 2:
-                print(
-                    f'Creating memory zone "{name}" with start address {start_addr} '
-                    f'and end address {end_addr}'
-                )
-            try:
-                memzone_manager.create_zone(
-                    isa_model.address_size,
-                    start_addr,
-                    end_addr,
-                    name,
-                )
-            except KeyError:
-                sys.exit(f'ERROR: {line_id} - Memory zone "{name}" defined multiple times')
-            except ValueError as v_err:
-                sys.exit(f'ERROR: {line_id} - {v_err}')
-        else:
-            sys.exit(f'ERROR: {line_id} - Syntax error when creating memory zone')

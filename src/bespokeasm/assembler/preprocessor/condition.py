@@ -1,3 +1,4 @@
+from __future__ import annotations
 import re
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
@@ -23,6 +24,10 @@ PREPROCESSOR_CONDITION_IFDEF_PATTERN = re.compile(
 
 
 class PreprocessorCondition:
+    def __init__(self, line_str: str, line: LineIdentifier):
+        self._line_str = line_str
+        self._line = line
+
     def __repr__(self) -> str:
         raise NotImplementedError()
 
@@ -32,11 +37,32 @@ class PreprocessorCondition:
     def evaluate(self, preprocessor: Preprocessor) -> bool:
         raise NotImplementedError()
 
+    def evaluate_lineage(self, preprocessor: Preprocessor) -> bool:
+        return self.evaluate(preprocessor)
+
+    @property
+    def parent(self) -> PreprocessorCondition:
+        return None
+
+
+class DependentPreprocessorCondition(PreprocessorCondition):
+    def __init__(self, line_str: str, line: LineIdentifier, parent: PreprocessorCondition):
+        super().__init__(line_str, line)
+        if parent is None:
+            raise ValueError("Parent cannot be None")
+        self._parent = parent
+
+    @property
+    def parent(self) -> PreprocessorCondition:
+        return self._parent
+
+    def evaluate_lineage(self, preprocessor: Preprocessor) -> bool:
+        return self.evaluate(preprocessor) or self.parent.evaluate_lineage(preprocessor)
+
 
 class IfPreprocessorCondition(PreprocessorCondition):
     def __init__(self, line_str: str, line: LineIdentifier):
-        self._line_str = line_str
-        self._line = line
+        super().__init__(line_str, line)
 
         match = PREPROCESSOR_CONDITION_IF_PATTERN.match(line_str.strip())
         if match is None:
@@ -88,8 +114,7 @@ class IfPreprocessorCondition(PreprocessorCondition):
 
 class IfdefPreprocessorCondition(PreprocessorCondition):
     def __init__(self, line_str: str, line: LineIdentifier):
-        self._line_str = line_str
-        self._line = line
+        super().__init__(line_str, line)
 
         match = PREPROCESSOR_CONDITION_IFDEF_PATTERN.match(line_str.strip())
         if match is None:
@@ -106,3 +131,17 @@ class IfdefPreprocessorCondition(PreprocessorCondition):
             return self._is_ifndef
         else:
             return not self._is_ifndef
+
+
+class ElsePreprocessorCondition(DependentPreprocessorCondition):
+    def __init__(self, line_str: str, line: LineIdentifier, parent: PreprocessorCondition):
+        super().__init__(line_str, line, parent)
+
+    def __repr__(self) -> str:
+        return "ElsePreprocessorCondition<#else>"
+
+    def evaluate(self, preprocessor: Preprocessor) -> bool:
+        return not self.parent.evaluate_lineage(preprocessor)
+
+    def evaluate_lineage(self, preprocessor: Preprocessor) -> bool:
+        return self.parent.evaluate_lineage(preprocessor)

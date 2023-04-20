@@ -45,7 +45,7 @@ class TestMemoryZones(unittest.TestCase):
                 3,
             )
 
-        self.assertEqual(len(line_objs), 9, '9 code lines')
+        self.assertEqual(len(line_objs), 10, '10 code lines')
         self.assertIsNotNone(memzone_manager.zone('variables'), 'variables memory zone should exist')
         self.assertEqual(memzone_manager.zone('variables').start, 0x3000, 'memory zone starts at $3000')
         self.assertEqual(memzone_manager.zone('variables').end, 0x47FF, 'memory zone starts at $3000')

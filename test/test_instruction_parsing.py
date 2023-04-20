@@ -11,6 +11,7 @@ from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.preprocessor import Preprocessor
 
 
 class TestInstructionParsing(unittest.TestCase):
@@ -296,6 +297,8 @@ class TestInstructionParsing(unittest.TestCase):
             )
 
         lineid = LineIdentifier(42, 'test_label_parsing')
+        preprocessor = Preprocessor()
+
         l1: LineObject = LineOjectFactory.parse_line(
             lineid,
             "LABEL = %00001111",
@@ -303,6 +306,8 @@ class TestInstructionParsing(unittest.TestCase):
             TestInstructionParsing.label_values,
             memzone_mngr.global_zone,
             memzone_mngr,
+            preprocessor,
+            0,
         )[0]
         self.assertIsInstance(l1, LabelLine)
         self.assertTrue(l1.is_constant, )
@@ -315,6 +320,8 @@ class TestInstructionParsing(unittest.TestCase):
             TestInstructionParsing.label_values,
             memzone_mngr.global_zone,
             memzone_mngr,
+            preprocessor,
+            0,
         )[0]
         l2.set_start_address(42)
         l2.label_scope = TestInstructionParsing.label_values
@@ -329,6 +336,8 @@ class TestInstructionParsing(unittest.TestCase):
             TestInstructionParsing.label_values,
             memzone_mngr.global_zone,
             memzone_mngr,
+            preprocessor,
+            0,
         )[0]
         l3.set_start_address(42)
         l3.label_scope = TestInstructionParsing.label_values

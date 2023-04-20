@@ -51,7 +51,8 @@ class Assembler:
             self._model.default_origin,
             self._model.predefined_memory_zones,
         )
-        preprocessor: Preprocessor = Preprocessor()
+
+        preprocessor: Preprocessor = Preprocessor(self._model.predefined_symbols)
 
         # create the predefined memory blocks
         predefines_lineid = LineIdentifier(0, os.path.basename(self._config_file))

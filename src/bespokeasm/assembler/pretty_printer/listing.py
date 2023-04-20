@@ -4,6 +4,7 @@ import math
 from bespokeasm.assembler.line_object import LineObject, LineWithBytes
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.line_object.directive_line import SetMemoryZoneLine
+from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.pretty_printer import PrettyPrinterBase
 from bespokeasm.assembler.line_identifier import LineIdentifier
@@ -132,7 +133,9 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         output.write('| ')
 
         # write the instruction
-        if not isinstance(lobj, LabelLine) and not isinstance(lobj, SetMemoryZoneLine):
+        if not isinstance(lobj, LabelLine) \
+                and not isinstance(lobj, SetMemoryZoneLine) \
+                and not isinstance(lobj, PreprocessorLine):
             instruction_str = ' '*ListingPrettyPrinter.INSTRUCTION_INDENT + lobj.instruction
         else:
             instruction_str = lobj.instruction
