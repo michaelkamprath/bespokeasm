@@ -11,6 +11,7 @@ from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.preprocessor import Preprocessor
+from bespokeasm.assembler.line_object.preprocessor_line.factory import PreprocessorLineFactory
 
 
 class LineOjectFactory:
@@ -51,7 +52,7 @@ class LineOjectFactory:
         # check to see if this is preprocessor directive
         if instruction_str.startswith('#'):
             # this is a preprocessor directive
-            line_obj_list.extend(preprocessor.parse_line(
+            line_obj_list.extend(PreprocessorLineFactory.parse_line(
                     line_id,
                     instruction_str,
                     comment_str,
@@ -59,6 +60,7 @@ class LineOjectFactory:
                     label_scope,
                     current_memzone,
                     memzone_manager,
+                    preprocessor,
                     log_verbosity,
                 ))
         else:

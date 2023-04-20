@@ -15,6 +15,15 @@ Changes that are planned but not implemented yet:
   * unknown labels
 
 ## [Unreleased]
+* Added conditional assembly preprocessor directives:
+  * `#define`
+  * `#if`
+  * `#elif`
+  * `#else`
+  * `#endif`
+  * `#ifdef`
+  * `#ifndef`
+  Also added the ability to define proporcessor symbols on the command line and in the instruction set configuration file.
 * Added the ability to set the `cstr` terminating character. It default to `0`, but can be set to another byte value.
 * Added support for using characeter ordinals in numeric expressions. For example, `'a'` is the same as `97`. Only valid for single character strings using single quotes.
 

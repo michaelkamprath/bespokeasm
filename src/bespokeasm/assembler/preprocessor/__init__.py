@@ -2,14 +2,8 @@ import re
 import sys
 
 from bespokeasm.assembler.preprocessor.symbol import PreprocessorSymbol
-from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.memory_zone import MemoryZone
-from bespokeasm.assembler.model import AssemblerModel
-from bespokeasm.assembler.label_scope import LabelScope
-from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
-from bespokeasm.assembler.line_object.preprocessor_line.required_language import RequiredLanguageLine
-from bespokeasm.assembler.line_object.preprocessor_line.create_memzone import CreateMemzoneLine
+from bespokeasm.assembler.preprocessor.symbol import SYMBOL_PATTERN
 
 
 class Preprocessor:
@@ -29,9 +23,9 @@ class Preprocessor:
                     f'instruction set configuration YAML file.'
                 )
 
-    def create_symbol(self, name: str, value: str) -> PreprocessorSymbol:
+    def create_symbol(self, name: str, value: str, line_id: LineIdentifier = None) -> PreprocessorSymbol:
         if name not in self._symbols:
-            symbol = PreprocessorSymbol(name, value)
+            symbol = PreprocessorSymbol(name, value, line_id)
             self._symbols[name] = symbol
             return symbol
         else:
@@ -45,7 +39,7 @@ class Preprocessor:
         # Errors if there are recursion loops caused byt symbols that indirectly refer to themselves.
 
         # to make this fast, all symbol candidates should be identified first, then the symbols should be resolved
-        found_symbols: list[str] = re.findall(r"\b([\w\d_]+)\b", line_str)
+        found_symbols: list[str] = re.findall(f'\\b({SYMBOL_PATTERN})\\b', line_str)
         symbol_replaced: bool = False
         for s in found_symbols:
             symbol = self.get_symbol(s)
@@ -57,37 +51,3 @@ class Preprocessor:
             return self.resolve_symbols(line_str)
         else:
             return line_str
-
-    def parse_line(
-                self,
-                line_id: LineIdentifier,
-                instruction: str,
-                comment: str,
-                isa_model: AssemblerModel,
-                label_scope: LabelScope,
-                current_memzone: MemoryZone,
-                memzone_manager: MemoryZoneManager,
-                log_verbosity: int,
-            ) -> list[LineObject]:
-        '''Parse a preprocessor line.'''
-        if instruction.startswith('#require '):
-            return [RequiredLanguageLine(
-                        line_id,
-                        instruction,
-                        comment,
-                        current_memzone,
-                        isa_model,
-                        log_verbosity
-                    )]
-
-        if instruction.startswith('#create_memzone '):
-            return [CreateMemzoneLine(
-                        line_id,
-                        instruction,
-                        comment,
-                        current_memzone,
-                        memzone_manager,
-                        isa_model,
-                        log_verbosity,
-                    )]
-        return []

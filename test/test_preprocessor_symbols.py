@@ -1,8 +1,17 @@
+import importlib.resources as pkg_resources
 import unittest
+
+from test import config_files
 
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.condition import IfPreprocessorCondition, IfdefPreprocessorCondition
 from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.line_object import LineObject
+from bespokeasm.assembler.line_object.factory import LineOjectFactory
+from bespokeasm.assembler.label_scope import GlobalLabelScope
+from bespokeasm.assembler.line_object.preprocessor_line.define_symbol import DefineSymbolLine
 
 
 class TestPreprocessorSymbols(unittest.TestCase):
@@ -77,3 +86,57 @@ class TestPreprocessorSymbols(unittest.TestCase):
 
         c14 = IfdefPreprocessorCondition('#ifndef s8', LineIdentifier('test_preprocessor_comparisons', 12))
         self.assertTrue(c14.evaluate(preprocessor), 's8 should not be defined')
+
+    def test_define_symbol_line_objects(self):
+        with pkg_resources.path(config_files, 'test_instructions_with_variants.yaml') as fp:
+            isa_model = AssemblerModel(str(fp), 0)
+            memzone_mngr = MemoryZoneManager(
+                isa_model.address_size,
+                isa_model.default_origin,
+                isa_model.predefined_memory_zones,
+            )
+
+        global_scope = GlobalLabelScope(set())
+        lineid = LineIdentifier(12, 'test_define_symbol_line_objects')
+        preprocessor = Preprocessor()
+
+        l1: LineObject = LineOjectFactory.parse_line(
+            lineid,
+            "#define TEST_SYMBOL 0x1234",
+            isa_model,
+            global_scope,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+            preprocessor,
+            0,
+        )[0]
+        self.assertTrue(isinstance(l1, DefineSymbolLine), 'l1 should be a DefineSymbolLine')
+        dsl1: DefineSymbolLine = l1
+        self.assertEqual(dsl1.symbol.name, 'TEST_SYMBOL', 'symbol name should be TEST_SYMBOL')
+        self.assertEqual(dsl1.symbol.value, '0x1234', 'symbol value should be 0x1234')
+        self.assertEqual(dsl1.symbol.value_numeric, 0x1234, 'symbol value should be 0x1234')
+        self.assertEqual(dsl1.symbol.created_line_id, lineid, 'symbol created line id should be lineid')
+        self.assertTrue(preprocessor.get_symbol('TEST_SYMBOL') is not None, 'TEST_SYMBOL should be defined')
+        self.assertEqual(preprocessor.get_symbol('TEST_SYMBOL').value, '0x1234', 'symbol value should be 0x1234')
+
+        l2: LineObject = LineOjectFactory.parse_line(
+            lineid,
+            '#define MY_NAME "George Washington!"',
+            isa_model,
+            global_scope,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+            preprocessor,
+            0,
+        )[0]
+        self.assertTrue(isinstance(l2, DefineSymbolLine), 'l1 should be a DefineSymbolLine')
+        dsl2: DefineSymbolLine = l2
+        self.assertEqual(dsl2.symbol.name, 'MY_NAME', 'symbol name should be MY_NAME')
+        self.assertEqual(dsl2.symbol.value, '"George Washington!"', 'symbol value should be "George Washington!"')
+        self.assertEqual(dsl2.symbol.created_line_id, lineid, 'symbol created line id should be lineid')
+        self.assertTrue(preprocessor.get_symbol('MY_NAME') is not None, 'MY_NAME should be defined')
+        self.assertEqual(
+            preprocessor.get_symbol('MY_NAME').value,
+            '"George Washington!"',
+            'symbol value should be "George Washington!"'
+        )
