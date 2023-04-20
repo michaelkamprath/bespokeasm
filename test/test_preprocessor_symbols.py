@@ -140,3 +140,26 @@ class TestPreprocessorSymbols(unittest.TestCase):
             '"George Washington!"',
             'symbol value should be "George Washington!"'
         )
+
+        l3: LineObject = LineOjectFactory.parse_line(
+            lineid,
+            '#define WITH_COMMENT (13 + 27) ; my comment',
+            isa_model,
+            global_scope,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+            preprocessor,
+            0,
+        )[0]
+        self.assertTrue(isinstance(l3, DefineSymbolLine), 'l1 should be a DefineSymbolLine')
+        self.assertEqual(l3.comment, 'my comment', 'comment should be "my comment"')
+        dsl3: DefineSymbolLine = l3
+        self.assertEqual(dsl3.symbol.name, 'WITH_COMMENT', 'symbol name should be WITH_COMMENT')
+        self.assertEqual(dsl3.symbol.value, '(13 + 27)', 'symbol value should be (13 + 27)')
+        self.assertEqual(dsl3.symbol.created_line_id, lineid, 'symbol created line id should be lineid')
+        self.assertTrue(preprocessor.get_symbol('WITH_COMMENT') is not None, 'WITH_COMMENT should be defined')
+        self.assertEqual(
+            preprocessor.get_symbol('WITH_COMMENT').value,
+            '(13 + 27)',
+            'symbol value should be (13 + 27)'
+        )
