@@ -1,6 +1,6 @@
 
 from bespokeasm.assembler.preprocessor.condition import \
-            PreprocessorCondition, DependentPreprocessorCondition, EndifPreprocessorCondition
+            PreprocessorCondition, EndifPreprocessorCondition
 from bespokeasm.assembler.preprocessor import Preprocessor
 
 
@@ -11,14 +11,14 @@ class ConsitionStack:
     def process_condition(self, condition: PreprocessorCondition):
         if isinstance(condition, EndifPreprocessorCondition):
             popped_consition = self._stack.pop()
-            if isinstance(popped_consition, DependentPreprocessorCondition):
+            if popped_consition.is_dependent:
                 pass
-        elif isinstance(condition, DependentPreprocessorCondition):
+        elif condition.is_dependent:
             # a dependent condition pops the current condition and makes it the parent to the new condition.
             # this way the dependent chain is only ever 1-deep in the stack, making nested #if/#else/#endif
             # statements easier to handle.
             popped_condition = self._stack.pop()
-            # TODO: check if popped_condition is allowed to be the parent of tihs condition
+            # TODO: check if popped_condition is allowed to be the parent of this condition
             condition.parent = popped_condition
             self._stack.append(condition)
         else:

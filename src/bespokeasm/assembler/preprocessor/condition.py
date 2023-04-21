@@ -6,30 +6,30 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.expression import parse_expression, ExpressionNode
 from bespokeasm.assembler.line_object import INSTRUCTION_EXPRESSION_PATTERN
-
+from bespokeasm.assembler.preprocessor.symbol import SYMBOL_PATTERN
 
 # NOTE: the order of the RHS expressions is important, as it determines the order of evaluation. Need to parse the
 #       quoted strings first, then the expressions.
 PREPROCESSOR_CONDITION_IF_PATTERN = re.compile(
-    f"^(?:#if)\\s+([\\w\\d_]+)\\s+(==|!=|>|>=|<|<=)\\s+"
+    f"^(?:#if)\\s+({INSTRUCTION_EXPRESSION_PATTERN})\\s+(==|!=|>|>=|<|<=)\\s+"
     f"(?:(?:\\\')(.+)(?:\\\')|(?:\\\")(.+)(?:\\\")|({INSTRUCTION_EXPRESSION_PATTERN}))"
 )
 
 PREPROCESSOR_CONDITION_IMPLIED_IF_PATTERN = re.compile(
-    r"^(?:#if)\s+([\w\d_]+)\b"
+    r"^(?:#if)\s+({0})".format(INSTRUCTION_EXPRESSION_PATTERN)
 )
 
 PREPROCESSOR_CONDITION_ELIF_PATTERN = re.compile(
-    f"^(?:#elif)\\s+([\\w\\d_]+)\\s+(==|!=|>|>=|<|<=)\\s+"
+    f"^(?:#elif)\\s+({INSTRUCTION_EXPRESSION_PATTERN})\\s+(==|!=|>|>=|<|<=)\\s+"
     f"(?:(?:\\\')(.+)(?:\\\')|(?:\\\")(.+)(?:\\\")|({INSTRUCTION_EXPRESSION_PATTERN}))"
 )
 
 PREPROCESSOR_CONDITION_IMPLIED_ELIF_PATTERN = re.compile(
-    r"^(?:#elif)\s+([\w\d_]+)\b"
+    r"^(?:#elif)\s+({0})".format(INSTRUCTION_EXPRESSION_PATTERN)
 )
 
 PREPROCESSOR_CONDITION_IFDEF_PATTERN = re.compile(
-    r"^(#ifdef|#ifndef)\s+([\w\d_]+)\b"
+    r"^(#ifdef|#ifndef)\s+({0})\b".format(SYMBOL_PATTERN)
 )
 
 
@@ -37,6 +37,7 @@ class PreprocessorCondition:
     def __init__(self, line_str: str, line: LineIdentifier):
         self._line_str = line_str
         self._line = line
+        self._parent = None
 
     def __repr__(self) -> str:
         raise NotImplementedError()
@@ -47,18 +48,10 @@ class PreprocessorCondition:
     def evaluate(self, preprocessor: Preprocessor) -> bool:
         raise NotImplementedError()
 
-    def evaluate_lineage(self, preprocessor: Preprocessor) -> bool:
-        return self.evaluate(preprocessor)
-
-    @property
-    def parent(self) -> PreprocessorCondition:
-        return None
-
-
-class DependentPreprocessorCondition(PreprocessorCondition):
-    def __init__(self, line_str: str, line: LineIdentifier):
-        super().__init__(line_str, line)
-        self._parent: PreprocessorCondition = None
+    def is_lineage_true(self, preprocessor: Preprocessor) -> bool:
+        if self.parent is None:
+            return self.evaluate(preprocessor)
+        return self.parent.is_lineage_true(preprocessor) or self.evaluate(preprocessor)
 
     @property
     def parent(self) -> PreprocessorCondition:
@@ -68,19 +61,30 @@ class DependentPreprocessorCondition(PreprocessorCondition):
     def parent(self, parent: PreprocessorCondition):
         self._parent = parent
 
-    def evaluate_lineage(self, preprocessor: Preprocessor) -> bool:
-        if self.parent is None:
-            sys.exit(f"ERROR - Internal: parent condition not set for {self} at line {self._line}")
-        return self.evaluate(preprocessor) or self.parent.evaluate_lineage(preprocessor)
+    @property
+    def is_dependent(self) -> bool:
+        return False
 
 
 class IfPreprocessorCondition(PreprocessorCondition):
     def __init__(self, line_str: str, line: LineIdentifier):
         super().__init__(line_str, line)
+        self._handle_matching(
+            line_str, line,
+            PREPROCESSOR_CONDITION_IF_PATTERN,
+            PREPROCESSOR_CONDITION_IMPLIED_IF_PATTERN,
+        )
 
-        match = PREPROCESSOR_CONDITION_IF_PATTERN.match(line_str.strip())
+    def _handle_matching(
+                self,
+                line_str: str,
+                line: LineIdentifier,
+                compare_pattern: re.Pattern[str],
+                implied_pattern: re.Pattern[str],
+            ) -> None:
+        match = compare_pattern.match(line_str.strip())
         if match is None:
-            match2 = PREPROCESSOR_CONDITION_IMPLIED_IF_PATTERN.match(line_str.strip())
+            match2 = implied_pattern.match(line_str.strip())
             if match2 is None:
                 raise ValueError(f"Invalid preprocessor condition at line: {line_str}")
             self._lhs_expression = match2.group(1)
@@ -92,9 +96,9 @@ class IfPreprocessorCondition(PreprocessorCondition):
             self._rhs_expression = match.group(3) or match.group(4) or match.group(5)
 
     def __repr__(self) -> str:
-        return f"PreprocessorCondition<#if {self._lhs_symbol} {self._operator} {self._rhs_expression}>"
+        return f"IfPreprocessorCondition<#if {self._lhs_expression} {self._operator} {self._rhs_expression}>"
 
-    def evaluate(self, preprocessor: Preprocessor) -> bool:
+    def _evaluate_condition(self, preprocessor: Preprocessor) -> bool:
         lhs_resolved = preprocessor.resolve_symbols(self._lhs_expression)
         rhs_resolved = preprocessor.resolve_symbols(self._rhs_expression)
 
@@ -125,57 +129,38 @@ class IfPreprocessorCondition(PreprocessorCondition):
         else:
             raise ValueError(f"Unknown operator {self._operator}")
 
+    def evaluate(self, preprocessor: Preprocessor) -> bool:
+        return self._evaluate_condition(preprocessor)
 
-class ElifPreprocessorCondition(DependentPreprocessorCondition):
+
+class ElifPreprocessorCondition(IfPreprocessorCondition):
     def __init__(self, line_str: str, line: LineIdentifier):
-        super().__init__(line_str, line)
+        # skipping the super() init here as we need for it to not do the matching
+        self._line_str = line_str
+        self._line = line
 
-        match = PREPROCESSOR_CONDITION_ELIF_PATTERN.match(line_str.strip())
-        if match is None:
-            match2 = PREPROCESSOR_CONDITION_IMPLIED_ELIF_PATTERN.match(line_str.strip())
-            if match2 is None:
-                raise ValueError(f"Invalid preprocessor condition at line: {line_str}")
-            self._lhs_expression = match2.group(1)
-            self._operator = "!="
-            self._rhs_expression = "0"
-        else:
-            self._lhs_expression = match.group(1)
-            self._operator = match.group(2)
-            self._rhs_expression = match.group(3) or match.group(4) or match.group(5)
+        self._handle_matching(
+            line_str, line,
+            PREPROCESSOR_CONDITION_ELIF_PATTERN,
+            PREPROCESSOR_CONDITION_IMPLIED_ELIF_PATTERN,
+        )
 
     def __repr__(self) -> str:
-        return f"PreprocessorCondition<#if {self._lhs_symbol} {self._operator} {self._rhs_expression}>"
+        return f"ElifPreprocessorCondition<#elif {self._lhs_expression} {self._operator} {self._rhs_expression}>"
+
+    @property
+    def is_dependent(self) -> bool:
+        return True
 
     def evaluate(self, preprocessor: Preprocessor) -> bool:
-        lhs_resolved = preprocessor.resolve_symbols(self._lhs_expression)
-        rhs_resolved = preprocessor.resolve_symbols(self._rhs_expression)
-
-        lhs_expression: ExpressionNode = parse_expression(self._line, lhs_resolved)
-        rhs_expression: ExpressionNode = parse_expression(self._line, rhs_resolved)
-
-        if len(lhs_expression.contained_labels()) > 0 or len(rhs_expression.contained_labels()) > 0:
-            # must do a string comparison
-            lhs_value = lhs_resolved
-            rhs_value = rhs_resolved
-        else:
-            # can do a numeric comparison
-            lhs_value = lhs_expression.get_value(None, self._line)
-            rhs_value = rhs_expression.get_value(None, self._line)
-
-        if self._operator == "==":
-            return lhs_value == rhs_value
-        elif self._operator == "!=":
-            return lhs_value != rhs_value
-        elif self._operator == ">":
-            return lhs_value > rhs_value
-        elif self._operator == ">=":
-            return lhs_value >= rhs_value
-        elif self._operator == "<":
-            return lhs_value < rhs_value
-        elif self._operator == "<=":
-            return lhs_value <= rhs_value
-        else:
-            raise ValueError(f"Unknown operator {self._operator}")
+        # if the parent is true, this should be false regardless
+        # if its condition evaluates true. If the parent lineage is false,
+        # this should evaluate to true if its condition evaluates true.
+        if self.parent is None:
+            sys.exit(f"ERROR - Internal: parent condition not set for {self} at line {self._line}")
+        if self.parent.is_lineage_true(preprocessor):
+            return False
+        return self._evaluate_condition(preprocessor)
 
 
 class IfdefPreprocessorCondition(PreprocessorCondition):
@@ -199,29 +184,33 @@ class IfdefPreprocessorCondition(PreprocessorCondition):
             return not self._is_ifndef
 
 
-class ElsePreprocessorCondition(DependentPreprocessorCondition):
+class ElsePreprocessorCondition(PreprocessorCondition):
     def __init__(self, line_str: str, line: LineIdentifier):
         super().__init__(line_str, line)
 
     def __repr__(self) -> str:
         return "ElsePreprocessorCondition<#else>"
 
+    @property
+    def is_dependent(self) -> bool:
+        return True
+
     def evaluate(self, preprocessor: Preprocessor) -> bool:
-        return not self.parent.evaluate_lineage(preprocessor)
+        if self.parent is None:
+            sys.exit(f"ERROR - Internal: parent condition not set for {self} at line {self._line}")
+        return not self.parent.is_lineage_true(preprocessor)
 
-    def evaluate_lineage(self, preprocessor: Preprocessor) -> bool:
-        return self.parent.evaluate_lineage(preprocessor)
 
-
-class EndifPreprocessorCondition(DependentPreprocessorCondition):
+class EndifPreprocessorCondition(PreprocessorCondition):
     def __init__(self, line_str: str, line: LineIdentifier):
         super().__init__(line_str, line)
 
     def __repr__(self) -> str:
         return "EndifPreprocessorCondition<#endif>"
 
-    def evaluate(self, preprocessor: Preprocessor) -> bool:
+    @property
+    def is_dependent(self) -> bool:
         return True
 
-    def evaluate_lineage(self, preprocessor: Preprocessor) -> bool:
-        return self.parent.evaluate_lineage(preprocessor)
+    def evaluate(self, preprocessor: Preprocessor) -> bool:
+        return True

@@ -6,7 +6,8 @@ from test import test_code
 
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.condition import \
-    IfPreprocessorCondition, IfdefPreprocessorCondition, ElifPreprocessorCondition
+    IfPreprocessorCondition, IfdefPreprocessorCondition, ElifPreprocessorCondition, \
+    ElsePreprocessorCondition, EndifPreprocessorCondition, PreprocessorCondition
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
@@ -37,6 +38,26 @@ class TestPreprocessorSymbols(unittest.TestCase):
         self.assertEqual(t3, '57 + 57*2 + label1', 's1 + s2 should resolve to 57 + 57*2')
 
     def test_preprocessor_comparisons(self):
+        class MockPreprocessorCondition_True(PreprocessorCondition):
+            def __init__(self, line: LineIdentifier):
+                super().__init__('mock-true', line)
+
+            def __repr__(self) -> str:
+                return "MockPreprocessorCondition_True"
+
+            def evaluate(self, preprocessor: Preprocessor) -> bool:
+                return True
+
+        class MockPreprocessorCondition_False(PreprocessorCondition):
+            def __init__(self, line: LineIdentifier):
+                super().__init__('mock-false', line)
+
+            def __repr__(self) -> str:
+                return "MockPreprocessorCondition_False"
+
+            def evaluate(self, preprocessor: Preprocessor) -> bool:
+                return False
+
         preprocessor = Preprocessor()
         preprocessor.create_symbol('s1', '57')
         preprocessor.create_symbol('s2', 's1*2')
@@ -75,6 +96,10 @@ class TestPreprocessorSymbols(unittest.TestCase):
         c9 = IfPreprocessorCondition('#if s7', LineIdentifier('test_preprocessor_comparisons', 9))
         self.assertTrue(c9.evaluate(preprocessor), 's7 should be true')
 
+        c9b = IfPreprocessorCondition('#if (s7-16)', LineIdentifier('test_preprocessor_comparisons', 9))
+        print(f'c9b = {c9b}')
+        self.assertFalse(c9b.evaluate(preprocessor), 's7-16 should be false (equal to zero)')
+
         # test expression on LHS
         c10 = IfPreprocessorCondition('#if 1<<4 == s7', LineIdentifier('test_preprocessor_comparisons', 10))
         self.assertTrue(c10.evaluate(preprocessor), '1<<4 == s7 should be true')
@@ -94,10 +119,29 @@ class TestPreprocessorSymbols(unittest.TestCase):
 
         # test #elif
         c15 = ElifPreprocessorCondition('#elif s7 == 1<<4', LineIdentifier('test_preprocessor_comparisons', 15))
-        self.assertTrue(c15.evaluate(preprocessor), 's7 == 1<<4 should be true')
+        c15.parent = MockPreprocessorCondition_True(LineIdentifier('test_preprocessor_comparisons', 15))
+        self.assertFalse(c15.evaluate(preprocessor), 's7 == 1<<4 should be false when parent is true')
+        c15.parent = MockPreprocessorCondition_False(LineIdentifier('test_preprocessor_comparisons', 15))
+        self.assertTrue(c15.evaluate(preprocessor), 's7 == 1<<4 should be true when parent is false')
 
         c16 = ElifPreprocessorCondition('#elif s8', LineIdentifier('test_preprocessor_comparisons', 16))
-        self.assertFalse(c16.evaluate(preprocessor), 's8 != 0 should be false')
+        c16.parent = MockPreprocessorCondition_True(LineIdentifier('test_preprocessor_comparisons', 16))
+        self.assertFalse(c16.evaluate(preprocessor), 's8 != 0 should be false when parent is true')
+        c16.parent = MockPreprocessorCondition_False(LineIdentifier('test_preprocessor_comparisons', 16))
+        self.assertFalse(c16.evaluate(preprocessor), 's8 != 0 should be false when parent is false')
+
+        c17 = ElifPreprocessorCondition('#elif ((s8)+(21))', LineIdentifier('test_preprocessor_comparisons', 17))
+        c17.parent = MockPreprocessorCondition_True(LineIdentifier('test_preprocessor_comparisons', 17))
+        self.assertFalse(c17.evaluate(preprocessor), 's8+21 != 0 should be false when parent is true')
+        c17.parent = MockPreprocessorCondition_False(LineIdentifier('test_preprocessor_comparisons', 17))
+        self.assertTrue(c17.evaluate(preprocessor), 's8+21 != 0 should be true when parent is false')
+
+        # test #else
+        c18 = ElsePreprocessorCondition('#else', LineIdentifier('test_preprocessor_comparisons', 18))
+        c18.parent = MockPreprocessorCondition_True(LineIdentifier('test_preprocessor_comparisons', 18))
+        self.assertFalse(c18.evaluate(preprocessor), 'else should be false when parent is true')
+        c18.parent = MockPreprocessorCondition_False(LineIdentifier('test_preprocessor_comparisons', 18))
+        self.assertTrue(c18.evaluate(preprocessor), 'else should be true when parent is false')
 
     def test_define_symbol_line_objects(self):
         with pkg_resources.path(config_files, 'test_instructions_with_variants.yaml') as fp:
@@ -221,4 +265,43 @@ class TestPreprocessorSymbols(unittest.TestCase):
         for i in range(len(line_objs)):
             if not line_objs[i].compilable:
                 actual_no_compile_lines.append(i)
-        self.assertEqual(actual_no_compile_lines, expected_no_compile_lines, 'no compile lines should be 9, 12, 18')
+        self.assertEqual(actual_no_compile_lines, expected_no_compile_lines, 'no compile lines should be 9, 12, 18, 22, 26')
+
+    def test_condition_stack(self):
+        stack = ConsitionStack()
+        preprocessor = Preprocessor()
+        preprocessor.create_symbol('s1', '57')
+        preprocessor.create_symbol('s2', 's1*2')
+        preprocessor.create_symbol('s3', '57')
+        preprocessor.create_symbol('s4', 'string_value1')
+        preprocessor.create_symbol('s5', 'string_value2')
+        preprocessor.create_symbol('s6', 's4')
+        preprocessor.create_symbol('s7', '0x10')
+        preprocessor.create_symbol('s8', '0')
+
+        self.assertEqual(stack.currently_active(preprocessor), True, 'initial condition should be True')
+
+        # add an if condition that should be false
+        c1 = IfPreprocessorCondition('#if s1 < 50', LineIdentifier('test_condition_stack', 1))
+        stack.process_condition(c1)
+        self.assertFalse(stack.currently_active(preprocessor), 'condition should be False')
+
+        # add an elif condition that should be true
+        c2 = ElifPreprocessorCondition('#elif s1 >= 55', LineIdentifier('test_condition_stack', 2))
+        stack.process_condition(c2)
+        self.assertTrue(stack.currently_active(preprocessor), 'condition should be True')
+
+        # add an elif that could be true but is false because it follows a true elif
+        c3 = ElifPreprocessorCondition('#elif s1 < 60', LineIdentifier('test_condition_stack', 3))
+        stack.process_condition(c3)
+        self.assertFalse(stack.currently_active(preprocessor), 'condition should be False')
+
+        # add the else condition
+        c4 = ElsePreprocessorCondition('#else', LineIdentifier('test_condition_stack', 4))
+        stack.process_condition(c4)
+        self.assertFalse(stack.currently_active(preprocessor), 'condition should be False')
+
+        # add endif
+        c5 = EndifPreprocessorCondition('#endif', LineIdentifier('test_condition_stack', 5))
+        stack.process_condition(c5)
+        self.assertTrue(stack.currently_active(preprocessor), 'condition should be True')

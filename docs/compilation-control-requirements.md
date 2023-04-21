@@ -6,8 +6,8 @@
 `#define <symbol-name> <replacement-value>`
 
 * A symbol has two attributes: the fact it has been defined and what its replacement value is.
-* A symbol name is case sensitive, alphanumeric plus `_`, and must not have spaces in it
-* The replacement value is all text after the first white space after the symbol name up to either the end of line or a comment start symbol (`;`), which ever comes first. This text will get trimmed of bounding whitespace. The reaplement value may be a zero-length string.
+* A symbol name is case sensitive, alphanumeric plus `_`, and must not have spaces in it. The first character must be a letter or `_`.
+* The replacement value is all text after the first white space after the symbol name up to either the end of line or a comment start symbol (`;`), which ever comes first. This text will get trimmed of bounding whitespace. The replacement value may be a zero-length string.
 * The replacement value will be lazily evaluated.
 * A symbol is in the global scope at the moment it gets defined (when it's line of code is processed) and may be used from that point forward.
 * When a defined symbol is present in a line of note (not any preprocessor directive), before that line of code is compiled the symbol with be replaced with its replacement value string.
@@ -48,7 +48,7 @@ When a `#ifdef` directive is encountered, the symbol will be checked for a defin
 * If the boolean comparison is true, the lines of code between the `#if` and `#else` directives will be compiled, and the lines of code between the `#else` and `#endif` directives will not be compiled. If the boolean comparison is false, the lines of code between the `#else` and `#endif` directives will be compiled, and the lines of code between the `#if` and `#else` directives will not be compiled. Tf there is no `#else` directive, the lines of code between the `#if` and `#endif` directives will be compiled if the comparison is true.
 * The `#if` directive may be followed by an `#else` directive, which will be followed by a `#endif` directive. The `#else` directive is optional.
 * `#if` directives may be nested. The outer most `#if` directive will be evaluated first, and the inner most `#if` directive will be evaluated last. If an `#if` block is contained within another `#if` block, the inner `#if` block will be evaluated if the outer `#if` block is compiled. If the outer `#if` block is not compiled, the inner `#if` block will not be evaluted.
-* The `#if` directive may be followed by an `#elif` directive, which will be followed by another `#elif`, an `#else`, or an `#endif` directive. The `#elif` directive is shorthand for embedded another `#if` directive in the current `#if` block. The `#elif` directive is optional. In an `#if` / `#elif` / `#else` / `#endif` block, there can be only one `#if` at the start, and only zero or one `#else` at the end. There can be zero or more `#elif` directives in between the `#if` and `#else` directives. In an `#if` / `#elif` / `#else` / `#endif` block, only one of the `#if`, `#elif`, and `#else` directives will be compiled.
+* The `#if` directive may be followed by one or more `#elif` directives, which will be followed by an `#else` or an `#endif` directive. The `#elif` directive is shorthand for embedded another `#if` directive in the current `#if` block. The `#elif` directive is optional. In an `#if` / `#elif` / `#else` / `#endif` block, there can be only one `#if` at the start, and only zero or one `#else` at the end prior to the `#endif`. There can be zero or more `#elif` directives in between the `#if` and `#else` directives. In an `#if` / `#elif` / `#else` / `#endif` block, only one of the `#if`, `#elif`, and `#else` directives will be compiled, which is the first one that evaluates to true.
 
 ## In-code Symbol Replacement
 
