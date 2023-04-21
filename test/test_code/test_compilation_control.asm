@@ -16,10 +16,17 @@ start:
     pop i
 #else
     pop j
-#endif
-
-#ifdef SYMBOL3
+#ifdef SYMBOL3      ; nested #ifdef
     mov a, 0
 #else
     mov a, 1
+#endif
+#endif
+
+#if SYMBOL1 == 2
+    push a
+#elif SYMBOL1 == 1
+    push i
+#else
+    push j
 #endif

@@ -5,7 +5,8 @@ from test import config_files
 from test import test_code
 
 from bespokeasm.assembler.preprocessor import Preprocessor
-from bespokeasm.assembler.preprocessor.condition import IfPreprocessorCondition, IfdefPreprocessorCondition
+from bespokeasm.assembler.preprocessor.condition import \
+    IfPreprocessorCondition, IfdefPreprocessorCondition, ElifPreprocessorCondition
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
@@ -44,6 +45,7 @@ class TestPreprocessorSymbols(unittest.TestCase):
         preprocessor.create_symbol('s5', 'string_value2')
         preprocessor.create_symbol('s6', 's4')
         preprocessor.create_symbol('s7', '0x10')
+        preprocessor.create_symbol('s8', '0')
 
         c1 = IfPreprocessorCondition('#if s1 == s2', LineIdentifier('test_preprocessor_comparisons', 1))
         self.assertFalse(c1.evaluate(preprocessor), 's1 == s2 should be false')
@@ -81,14 +83,21 @@ class TestPreprocessorSymbols(unittest.TestCase):
         c11 = IfdefPreprocessorCondition('#ifdef s7', LineIdentifier('test_preprocessor_comparisons', 11))
         self.assertTrue(c11.evaluate(preprocessor), 's7 should be defined')
 
-        c12 = IfdefPreprocessorCondition('#ifdef s8', LineIdentifier('test_preprocessor_comparisons', 12))
-        self.assertFalse(c12.evaluate(preprocessor), 's8 should not be defined')
+        c12 = IfdefPreprocessorCondition('#ifdef s9', LineIdentifier('test_preprocessor_comparisons', 12))
+        self.assertFalse(c12.evaluate(preprocessor), 's9 should not be defined')
 
         c13 = IfdefPreprocessorCondition('#ifndef s7', LineIdentifier('test_preprocessor_comparisons', 11))
         self.assertFalse(c13.evaluate(preprocessor), 's7 should be defined')
 
-        c14 = IfdefPreprocessorCondition('#ifndef s8', LineIdentifier('test_preprocessor_comparisons', 12))
-        self.assertTrue(c14.evaluate(preprocessor), 's8 should not be defined')
+        c14 = IfdefPreprocessorCondition('#ifndef s100', LineIdentifier('test_preprocessor_comparisons', 12))
+        self.assertTrue(c14.evaluate(preprocessor), 's100 should not be defined')
+
+        # test #elif
+        c15 = ElifPreprocessorCondition('#elif s7 == 1<<4', LineIdentifier('test_preprocessor_comparisons', 15))
+        self.assertTrue(c15.evaluate(preprocessor), 's7 == 1<<4 should be true')
+
+        c16 = ElifPreprocessorCondition('#elif s8', LineIdentifier('test_preprocessor_comparisons', 16))
+        self.assertFalse(c16.evaluate(preprocessor), 's8 != 0 should be false')
 
     def test_define_symbol_line_objects(self):
         with pkg_resources.path(config_files, 'test_instructions_with_variants.yaml') as fp:
@@ -204,5 +213,12 @@ class TestPreprocessorSymbols(unittest.TestCase):
         #   there is one for each preprocessor statement, plus one for the label,
         #   plus one for each of the valid instructions inside the compilation control
         #   directives.
-        self.assertEqual(len(line_objs), 21, '21 total code lines')
-        self.assertEqual(len([lo for lo in line_objs if lo.compilable]), 18, '18 compilable code lines')
+        self.assertEqual(len(line_objs), 28, '28 total code lines')
+        self.assertEqual(len([lo for lo in line_objs if lo.compilable]), 23, '23 compilable code lines')
+
+        expected_no_compile_lines = [9, 12, 18, 22, 26]
+        actual_no_compile_lines = []
+        for i in range(len(line_objs)):
+            if not line_objs[i].compilable:
+                actual_no_compile_lines.append(i)
+        self.assertEqual(actual_no_compile_lines, expected_no_compile_lines, 'no compile lines should be 9, 12, 18')

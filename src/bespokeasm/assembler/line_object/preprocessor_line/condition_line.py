@@ -5,7 +5,7 @@ import bespokeasm.assembler.preprocessor.condition as condition
 from bespokeasm.assembler.preprocessor.condition_stack import ConsitionStack
 
 
-CONDITIONAL_LINE_PREFIX_LIST = ["#if ", "#ifdef ", "#ifndef ", "#else", "#endif"]
+CONDITIONAL_LINE_PREFIX_LIST = ["#if ", "#ifdef ", "#ifndef ", "#elif ", "#else", "#endif"]
 
 
 class ConditionLine(PreprocessorLine):
@@ -21,6 +21,8 @@ class ConditionLine(PreprocessorLine):
 
         if instruction.startswith("#if "):
             self._condition = condition.IfPreprocessorCondition(instruction, line_id)
+        elif instruction.startswith("#elif "):
+            self._condition = condition.ElifPreprocessorCondition(instruction, line_id)
         elif instruction == "#else":
             self._condition = condition.ElsePreprocessorCondition(instruction, line_id)
         elif instruction == "#endif":
