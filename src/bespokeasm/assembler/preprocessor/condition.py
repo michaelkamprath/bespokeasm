@@ -1,5 +1,6 @@
 from __future__ import annotations
 import re
+import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.preprocessor import Preprocessor
@@ -46,17 +47,21 @@ class PreprocessorCondition:
 
 
 class DependentPreprocessorCondition(PreprocessorCondition):
-    def __init__(self, line_str: str, line: LineIdentifier, parent: PreprocessorCondition):
+    def __init__(self, line_str: str, line: LineIdentifier):
         super().__init__(line_str, line)
-        if parent is None:
-            raise ValueError("Parent cannot be None")
-        self._parent = parent
+        self._parent: PreprocessorCondition = None
 
     @property
     def parent(self) -> PreprocessorCondition:
         return self._parent
 
+    @parent.setter
+    def parent(self, parent: PreprocessorCondition):
+        self._parent = parent
+
     def evaluate_lineage(self, preprocessor: Preprocessor) -> bool:
+        if self.parent is None:
+            sys.exit(f"ERROR - Internal: parent condition not set for {self} at line {self._line}")
         return self.evaluate(preprocessor) or self.parent.evaluate_lineage(preprocessor)
 
 
@@ -134,14 +139,28 @@ class IfdefPreprocessorCondition(PreprocessorCondition):
 
 
 class ElsePreprocessorCondition(DependentPreprocessorCondition):
-    def __init__(self, line_str: str, line: LineIdentifier, parent: PreprocessorCondition):
-        super().__init__(line_str, line, parent)
+    def __init__(self, line_str: str, line: LineIdentifier):
+        super().__init__(line_str, line)
 
     def __repr__(self) -> str:
         return "ElsePreprocessorCondition<#else>"
 
     def evaluate(self, preprocessor: Preprocessor) -> bool:
         return not self.parent.evaluate_lineage(preprocessor)
+
+    def evaluate_lineage(self, preprocessor: Preprocessor) -> bool:
+        return self.parent.evaluate_lineage(preprocessor)
+
+
+class EndifPreprocessorCondition(DependentPreprocessorCondition):
+    def __init__(self, line_str: str, line: LineIdentifier):
+        super().__init__(line_str, line)
+
+    def __repr__(self) -> str:
+        return "EndifPreprocessorCondition<#endif>"
+
+    def evaluate(self, preprocessor: Preprocessor) -> bool:
+        return True
 
     def evaluate_lineage(self, preprocessor: Preprocessor) -> bool:
         return self.parent.evaluate_lineage(preprocessor)

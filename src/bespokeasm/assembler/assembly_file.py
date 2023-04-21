@@ -20,6 +20,8 @@ from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.preprocessor import Preprocessor
+from bespokeasm.assembler.preprocessor.condition_stack import ConsitionStack
+from bespokeasm.assembler.line_object.preprocessor_line.condition_line import ConditionLine
 
 
 class AssemblyFile:
@@ -56,6 +58,7 @@ class AssemblyFile:
                 line_num = 0
                 current_scope = self.label_scope
                 current_memzone = memzone_manager.global_zone
+                condition_stack = ConsitionStack()
                 for line in f:
                     line_num += 1
                     line_id = LineIdentifier(line_num, filename=self.filename)
@@ -78,7 +81,7 @@ class AssemblyFile:
                             line_objects.extend(additional_line_objects)
                             continue
 
-                        lobj_list = []
+                        lobj_list: list[LineObject] = []
                         # parse the line
                         lobj_list.extend(LineOjectFactory.parse_line(
                             line_id,
@@ -88,21 +91,26 @@ class AssemblyFile:
                             current_memzone,
                             memzone_manager,
                             preprocessor,
+                            condition_stack,
                             log_verbosity,
                         ))
                         for lobj in lobj_list:
-                            if isinstance(lobj, LabelLine):
-                                if not lobj.is_constant \
-                                        and LabelScopeType.get_label_scope(lobj.get_label()) != LabelScopeType.LOCAL:
-                                    current_scope = LabelScope(LabelScopeType.LOCAL, self.label_scope, lobj.get_label())
-                            # both .org and .memzone directive should reset label scope to FILE and current memzone
-                            elif isinstance(lobj, SetMemoryZoneLine):
-                                current_scope = self.label_scope
-                                current_memzone = lobj.memory_zone
-                            lobj.label_scope = current_scope
-                            # setting constants now so they can be used when evaluating lines later.
-                            if isinstance(lobj, LabelLine) and lobj.is_constant:
-                                lobj.label_scope.set_label_value(lobj.get_label(), lobj.get_value(), lobj.line_id)
+                            if not isinstance(lobj, ConditionLine):
+                                lobj.compilable = condition_stack.currently_active(preprocessor)
+
+                            if lobj.compilable:
+                                if isinstance(lobj, LabelLine):
+                                    if not lobj.is_constant \
+                                            and LabelScopeType.get_label_scope(lobj.get_label()) != LabelScopeType.LOCAL:
+                                        current_scope = LabelScope(LabelScopeType.LOCAL, self.label_scope, lobj.get_label())
+                                # both .org and .memzone directive should reset label scope to FILE and current memzone
+                                elif isinstance(lobj, SetMemoryZoneLine):
+                                    current_scope = self.label_scope
+                                    current_memzone = lobj.memory_zone
+                                lobj.label_scope = current_scope
+                                # setting constants now so they can be used when evaluating lines later.
+                                if isinstance(lobj, LabelLine) and lobj.is_constant:
+                                    lobj.label_scope.set_label_value(lobj.get_label(), lobj.get_value(), lobj.line_id)
                             line_objects.append(lobj)
         except FileNotFoundError:
             sys.exit(f'ERROR: Compilation file "{self.filename}" not found.')

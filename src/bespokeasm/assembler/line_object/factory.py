@@ -12,6 +12,7 @@ from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.line_object.preprocessor_line.factory import PreprocessorLineFactory
+from bespokeasm.assembler.preprocessor.condition_stack import ConsitionStack
 
 
 class LineOjectFactory:
@@ -34,6 +35,7 @@ class LineOjectFactory:
                 current_memzone: MemoryZone,
                 memzone_manager: MemoryZoneManager,
                 preprocessor: Preprocessor,
+                condition_stack: ConsitionStack,
                 log_verbosity: int,
             ) -> list[LineObject]:
         # find comments
@@ -61,6 +63,7 @@ class LineOjectFactory:
                     current_memzone,
                     memzone_manager,
                     preprocessor,
+                    condition_stack,
                     log_verbosity,
                 ))
         else:

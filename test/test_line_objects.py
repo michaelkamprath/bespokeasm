@@ -13,6 +13,7 @@ from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.preprocessor import Preprocessor
+from bespokeasm.assembler.preprocessor.condition_stack import ConsitionStack
 
 from test import config_files
 
@@ -250,6 +251,7 @@ class TestLineObject(unittest.TestCase):
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
+            ConsitionStack(),
             0,
         )
         self.assertEqual(len(objs1), 2, 'there should be two instructions')
@@ -270,6 +272,7 @@ class TestLineObject(unittest.TestCase):
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
+            ConsitionStack(),
             0,
         )
         self.assertEqual(len(objs2), 2, 'there should be two instructions')
@@ -290,6 +293,7 @@ class TestLineObject(unittest.TestCase):
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
+            ConsitionStack(),
             0,
         )
         self.assertEqual(len(objs3), 1, 'there should be two instructions')
@@ -556,6 +560,7 @@ class TestLineObject(unittest.TestCase):
             memzone_mngr.global_zone,
             memzone_mngr,
             Preprocessor(),
+            ConsitionStack(),
             0,
         )
         self.assertEqual(len(lo1), 1, 'only one instruction to parse')
@@ -585,6 +590,7 @@ class TestLineObject(unittest.TestCase):
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
+            ConsitionStack(),
             0,
         )
         self.assertEqual(len(lol1), 2, 'There should be two parsed instructions')
@@ -602,6 +608,7 @@ class TestLineObject(unittest.TestCase):
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
+            ConsitionStack(),
             0,
         )
         self.assertEqual(len(lol2), 3, 'There should be 3 parsed instructions')
@@ -622,6 +629,7 @@ class TestLineObject(unittest.TestCase):
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
+            ConsitionStack(),
             0,
         )
         self.assertEqual(len(lol3), 2, 'There should be 2 parsed instructions')
@@ -638,6 +646,7 @@ class TestLineObject(unittest.TestCase):
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
+            ConsitionStack(),
             0,
         )
         self.assertEqual(len(lol4), 2, 'There should be 2 parsed instructions')
@@ -656,6 +665,7 @@ class TestLineObject(unittest.TestCase):
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
+            ConsitionStack(),
             0,
         )
         self.assertEqual(len(lol4), 1, 'There should be 2 parsed instructions')
@@ -669,6 +679,7 @@ class TestLineObject(unittest.TestCase):
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
+            ConsitionStack(),
             0,
         )
         self.assertEqual(len(lol5), 2, 'There should be 2 parsed instructions')
@@ -685,6 +696,7 @@ class TestLineObject(unittest.TestCase):
                     memzone_mngr.global_zone,
                     memzone_mngr,
                     preprocessor,
+                    ConsitionStack(),
                     0,
                 )
 
@@ -708,6 +720,7 @@ class TestLineObject(unittest.TestCase):
                     memzone_mngr.global_zone,
                     memzone_mngr,
                     Preprocessor(),
+                    ConsitionStack(),
                     0,
                 )
 

@@ -2,6 +2,7 @@ import importlib.resources as pkg_resources
 import unittest
 
 from test import config_files
+from test import test_code
 
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.condition import IfPreprocessorCondition, IfdefPreprocessorCondition
@@ -12,6 +13,8 @@ from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object.factory import LineOjectFactory
 from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.line_object.preprocessor_line.define_symbol import DefineSymbolLine
+from bespokeasm.assembler.assembly_file import AssemblyFile
+from bespokeasm.assembler.preprocessor.condition_stack import ConsitionStack
 
 
 class TestPreprocessorSymbols(unittest.TestCase):
@@ -108,6 +111,7 @@ class TestPreprocessorSymbols(unittest.TestCase):
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
+            ConsitionStack(),
             0,
         )[0]
         self.assertTrue(isinstance(l1, DefineSymbolLine), 'l1 should be a DefineSymbolLine')
@@ -127,6 +131,7 @@ class TestPreprocessorSymbols(unittest.TestCase):
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
+            ConsitionStack(),
             0,
         )[0]
         self.assertTrue(isinstance(l2, DefineSymbolLine), 'l1 should be a DefineSymbolLine')
@@ -149,6 +154,7 @@ class TestPreprocessorSymbols(unittest.TestCase):
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
+            ConsitionStack(),
             0,
         )[0]
         self.assertTrue(isinstance(l3, DefineSymbolLine), 'l1 should be a DefineSymbolLine')
@@ -163,3 +169,40 @@ class TestPreprocessorSymbols(unittest.TestCase):
             '(13 + 27)',
             'symbol value should be (13 + 27)'
         )
+
+    def test_compilation_control(self):
+        with pkg_resources.path(config_files, 'test_compilation_control.yaml') as fp:
+            isa_model = AssemblerModel(str(fp), 0)
+        label_scope = GlobalLabelScope(isa_model.registers)
+        memzone_manager = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones
+        )
+        preprocessor = Preprocessor()
+
+        with pkg_resources.path(test_code, 'test_compilation_control.asm') as asm_fp:
+            asm_obj = AssemblyFile(asm_fp, label_scope)
+
+        try:
+            line_objs: list[LineObject] = asm_obj.load_line_objects(
+                isa_model,
+                [],
+                memzone_manager,
+                preprocessor,
+                3,
+            )
+        except SystemExit:
+            print(isa_model)
+            print(f'  instructions = {isa_model.instructions}')
+            raise
+
+        for lobj in line_objs:
+            print(f'{lobj} ==> {lobj.compilable}')
+
+        # ensure file was assembled as expected
+        #   there is one for each preprocessor statement, plus one for the label,
+        #   plus one for each of the valid instructions inside the compilation control
+        #   directives.
+        self.assertEqual(len(line_objs), 21, '21 total code lines')
+        self.assertEqual(len([lo for lo in line_objs if lo.compilable]), 18, '18 compilable code lines')

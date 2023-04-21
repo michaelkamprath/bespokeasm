@@ -77,7 +77,9 @@ class AssemblerModel:
     def _validate_config(self, is_verbose: int) -> None:
         '''Performs some validation checks on configuration dictionary'''
         # check to see if old-style "memory block" is defined
-        if 'predefined' in self._config and 'memory' in self._config['predefined']:
+        if 'predefined' in self._config \
+                and self._config['predefined'] is not None \
+                and 'memory' in self._config['predefined']:
             sys.exit(
                 'ERROR - ISA configuration file defines a predefined "memory" block. '
                 'Memory blocks have been deprecated and replaced with "data" blocks.'
@@ -219,7 +221,9 @@ class AssemblerModel:
 
     @cached_property
     def predefined_memory_zones(self) -> list[dict]:
-        if 'predefined' in self._config and 'memory_zones' in self._config['predefined']:
+        if 'predefined' in self._config \
+                and self._config['predefined'] is not None \
+                and 'memory_zones' in self._config['predefined']:
             return self._config['predefined']['memory_zones']
         else:
             return []

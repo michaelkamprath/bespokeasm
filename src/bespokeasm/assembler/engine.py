@@ -91,8 +91,9 @@ class Assembler:
         if self._verbose > 2:
             click.echo(f'Found {len(line_obs)} lines across all source files')
 
+        compilable_line_obs = [lobj for lobj in line_obs if lobj.compilable]
         # First pass: assign addresses to labels
-        for lobj in line_obs:
+        for lobj in compilable_line_obs:
             lobj.set_start_address(lobj.memory_zone.current_address)
             if lobj.address is None:
                 sys.exit(f'ERROR: {lobj.line_id} - INTERNAL line object address is None. Memory zone = {lobj.memory_zone}')
@@ -106,19 +107,20 @@ class Assembler:
                 lobj.label_scope.set_label_value(lobj.get_label(), lobj.get_value(), lobj.line_id)
 
         # now merge prefined line objects and parsed line objects
-        line_obs.extend(predefined_line_obs)
+        compilable_line_obs.extend(predefined_line_obs)
 
         # Sort lines according to their assigned address. This allows for .org directives
-        line_obs.sort(key=lambda x: x.address)
-        max_generated_address = line_obs[-1].address
-        line_dict = {lobj.address: lobj for lobj in line_obs if isinstance(lobj, LineWithBytes)}
+        compilable_line_obs.sort(key=lambda x: x.address)
+        max_generated_address = compilable_line_obs[-1].address
+        line_dict = {lobj.address: lobj for lobj in compilable_line_obs if isinstance(lobj, LineWithBytes)}
 
         # second pass: build the machine code and check for overlaps
         if self._verbose > 2:
             print("\nProcessing lines:")
         bytecode = bytearray()
         last_line = None
-        for lobj in line_obs:
+
+        for lobj in compilable_line_obs:
             if isinstance(lobj, LineWithBytes):
                 lobj.generate_bytes()
             if self._verbose > 2:
@@ -162,7 +164,7 @@ class Assembler:
         if self._enable_pretty_print:
             pprinter = PrettyPrinterFactory.getPrettyPrinter(
                 self._pretty_print_format,
-                line_obs,
+                compilable_line_obs,
                 self._model,
                 self._source_file,
             )
