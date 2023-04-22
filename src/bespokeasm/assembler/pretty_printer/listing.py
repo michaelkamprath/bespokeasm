@@ -1,9 +1,11 @@
 import io
 import math
+import sys
 
 from bespokeasm.assembler.line_object import LineObject, LineWithBytes
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.line_object.directive_line import SetMemoryZoneLine
+from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.pretty_printer import PrettyPrinterBase
 from bespokeasm.assembler.line_identifier import LineIdentifier
@@ -126,13 +128,18 @@ class ListingPrettyPrinter(PrettyPrinterBase):
 
         # write the machine code
         if line_bytes is not None:
-            output.write(line_bytes[0])
+            try:
+                output.write(line_bytes[0])
+            except IndexError:
+                sys.exit(f'ERROR - internal: line_bytes is empty for line {lobj} at {lobj.line_id}')
         else:
             output.write(' ' * self._bytes_per_line * 3)
         output.write('| ')
 
         # write the instruction
-        if not isinstance(lobj, LabelLine) and not isinstance(lobj, SetMemoryZoneLine):
+        if not isinstance(lobj, LabelLine) \
+                and not isinstance(lobj, SetMemoryZoneLine) \
+                and not isinstance(lobj, PreprocessorLine):
             instruction_str = ' '*ListingPrettyPrinter.INSTRUCTION_INDENT + lobj.instruction
         else:
             instruction_str = lobj.instruction

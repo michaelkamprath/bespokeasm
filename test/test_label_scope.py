@@ -12,6 +12,7 @@ from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType, GlobalL
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.assembler.preprocessor import Preprocessor
 
 
 class TestLabelScope(unittest.TestCase):
@@ -96,6 +97,7 @@ class TestLabelScope(unittest.TestCase):
             isa_model.default_origin,
             isa_model.predefined_memory_zones
         )
+        preprocessor = Preprocessor()
 
         with pkg_resources.path(test_code, 'test_line_object_scope_assignment.asm') as asm_fp:
             asm_obj = AssemblyFile(asm_fp, label_scope)
@@ -105,6 +107,7 @@ class TestLabelScope(unittest.TestCase):
                 isa_model,
                 [],
                 memzone_manager,
+                preprocessor,
                 3,
             )
         except SystemExit:
@@ -113,7 +116,7 @@ class TestLabelScope(unittest.TestCase):
             raise
 
         # ensure file was assembled as expected
-        self.assertEqual(len(line_objs), 12, '12 code lines')
+        self.assertEqual(len(line_objs), 13, '13 code lines')
         # the memzone manager should have created memzone
         self.assertIsNotNone(memzone_manager.zone('zone1'), 'zone1 memory zone should exist')
         # label scope should have 1 file and 3 local scopes assigned to lines
@@ -125,21 +128,22 @@ class TestLabelScope(unittest.TestCase):
         self.assertEqual(len(label_scope_dict[LabelScopeType.LOCAL]), 3, '3 local label scopes')
         # validate each line's label scope
         self.assertEqual(line_objs[0].label_scope.type, LabelScopeType.FILE)
-        self.assertEqual(line_objs[1].label_scope.type, LabelScopeType.LOCAL)
-        self.assertEqual(line_objs[1].label_scope.reference, 'label1')
+        self.assertEqual(line_objs[1].label_scope.type, LabelScopeType.FILE)
         self.assertEqual(line_objs[2].label_scope.type, LabelScopeType.LOCAL)
         self.assertEqual(line_objs[2].label_scope.reference, 'label1')
         self.assertEqual(line_objs[3].label_scope.type, LabelScopeType.LOCAL)
         self.assertEqual(line_objs[3].label_scope.reference, 'label1')
         self.assertEqual(line_objs[4].label_scope.type, LabelScopeType.LOCAL)
-        self.assertEqual(line_objs[4].label_scope.reference, 'label2')
+        self.assertEqual(line_objs[4].label_scope.reference, 'label1')
         self.assertEqual(line_objs[5].label_scope.type, LabelScopeType.LOCAL)
         self.assertEqual(line_objs[5].label_scope.reference, 'label2')
-        self.assertEqual(line_objs[6].label_scope.type, LabelScopeType.FILE, '.org should reset label scope to FILE')
-        self.assertEqual(line_objs[7].label_scope.type, LabelScopeType.FILE)
-        self.assertEqual(line_objs[8].label_scope.type, LabelScopeType.LOCAL)
-        self.assertEqual(line_objs[8].label_scope.reference, 'label3')
+        self.assertEqual(line_objs[6].label_scope.type, LabelScopeType.LOCAL)
+        self.assertEqual(line_objs[6].label_scope.reference, 'label2')
+        self.assertEqual(line_objs[7].label_scope.type, LabelScopeType.FILE, '.org should reset label scope to FILE')
+        self.assertEqual(line_objs[8].label_scope.type, LabelScopeType.FILE)
         self.assertEqual(line_objs[9].label_scope.type, LabelScopeType.LOCAL)
         self.assertEqual(line_objs[9].label_scope.reference, 'label3')
-        self.assertEqual(line_objs[10].label_scope.type, LabelScopeType.FILE, '.memzone should reset label scope to FILE')
-        self.assertEqual(line_objs[11].label_scope.type, LabelScopeType.FILE)
+        self.assertEqual(line_objs[10].label_scope.type, LabelScopeType.LOCAL)
+        self.assertEqual(line_objs[10].label_scope.reference, 'label3')
+        self.assertEqual(line_objs[11].label_scope.type, LabelScopeType.FILE, '.memzone should reset label scope to FILE')
+        self.assertEqual(line_objs[12].label_scope.type, LabelScopeType.FILE)

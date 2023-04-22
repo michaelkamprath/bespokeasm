@@ -12,6 +12,8 @@ from bespokeasm.assembler.line_object.directive_line import AddressOrgLine
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.memory_zone import MemoryZone
+from bespokeasm.assembler.preprocessor import Preprocessor
+from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
 
 from test import config_files
 
@@ -152,6 +154,15 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(d11.byte_size, 7, 'byte string has 7 bytes')
         self.assertEqual(d11.get_bytes(), bytearray(d11_values), 'character string matches')
 
+        # test expressions in .byte lists
+        d12 = DataLine.factory(38, '.byte ((PSAV+1) & 0FFH), $22+$44, 1<<4', 'escape reality', 'big', memzone)
+        label_values.set_label_value('PSAV', 0x1234, LineIdentifier(1, 'test_d12'))
+        d12.label_scope = label_values
+        d12.generate_bytes()
+        self.assertIsInstance(d12, DataLine)
+        self.assertEqual(d12.byte_size, 3, 'byte string has 3 bytes')
+        self.assertEqual(d12.get_bytes(), bytearray([0x35, 0x66, 0x10]), 'byte array matches')
+
         with self.assertRaises(SystemExit, msg='this instruction should fail'):
             DataLine.factory(42, ' .cstr 0x42', 'bad cstr usage', 'big', memzone)
 
@@ -238,6 +249,8 @@ class TestLineObject(unittest.TestCase):
 
         lineid = LineIdentifier(123, 'test_label_line_with_instruction')
 
+        preprocessor = Preprocessor()
+
         # test data line on label line
         objs1: list[LineObject] = LineOjectFactory.parse_line(
             lineid,
@@ -246,6 +259,9 @@ class TestLineObject(unittest.TestCase):
             label_values,
             memzone_mngr.global_zone,
             memzone_mngr,
+            preprocessor,
+            ConditionStack(),
+            0,
         )
         self.assertEqual(len(objs1), 2, 'there should be two instructions')
         self.assertIsInstance(objs1[0], LabelLine, 'the first line object should be a label')
@@ -264,6 +280,9 @@ class TestLineObject(unittest.TestCase):
             label_values,
             memzone_mngr.global_zone,
             memzone_mngr,
+            preprocessor,
+            ConditionStack(),
+            0,
         )
         self.assertEqual(len(objs2), 2, 'there should be two instructions')
         self.assertIsInstance(objs2[0], LabelLine, 'the first line object should be a label')
@@ -282,6 +301,9 @@ class TestLineObject(unittest.TestCase):
             label_values,
             memzone_mngr.global_zone,
             memzone_mngr,
+            preprocessor,
+            ConditionStack(),
+            0,
         )
         self.assertEqual(len(objs3), 1, 'there should be two instructions')
         self.assertIsInstance(objs3[0], LabelLine, 'the first line object should be a label')
@@ -546,6 +568,9 @@ class TestLineObject(unittest.TestCase):
             label_values,
             memzone_mngr.global_zone,
             memzone_mngr,
+            Preprocessor(),
+            ConditionStack(),
+            0,
         )
         self.assertEqual(len(lo1), 1, 'only one instruction to parse')
         print(lo1[0])
@@ -564,6 +589,7 @@ class TestLineObject(unittest.TestCase):
             )
 
         lineid = LineIdentifier(55, 'test_compound_instruction_line')
+        preprocessor = Preprocessor()
 
         lol1 = LineOjectFactory.parse_line(
             lineid,
@@ -572,6 +598,9 @@ class TestLineObject(unittest.TestCase):
             TestLineObject.label_values,
             memzone_mngr.global_zone,
             memzone_mngr,
+            preprocessor,
+            ConditionStack(),
+            0,
         )
         self.assertEqual(len(lol1), 2, 'There should be two parsed instructions')
         self.assertIsInstance(lol1[0], LabelLine)
@@ -587,6 +616,9 @@ class TestLineObject(unittest.TestCase):
             TestLineObject.label_values,
             memzone_mngr.global_zone,
             memzone_mngr,
+            preprocessor,
+            ConditionStack(),
+            0,
         )
         self.assertEqual(len(lol2), 3, 'There should be 3 parsed instructions')
         self.assertIsInstance(lol2[0], AddressOrgLine)
@@ -605,6 +637,9 @@ class TestLineObject(unittest.TestCase):
             TestLineObject.label_values,
             memzone_mngr.global_zone,
             memzone_mngr,
+            preprocessor,
+            ConditionStack(),
+            0,
         )
         self.assertEqual(len(lol3), 2, 'There should be 2 parsed instructions')
         self.assertIsInstance(lol3[0], InstructionLine)
@@ -619,6 +654,9 @@ class TestLineObject(unittest.TestCase):
             TestLineObject.label_values,
             memzone_mngr.global_zone,
             memzone_mngr,
+            preprocessor,
+            ConditionStack(),
+            0,
         )
         self.assertEqual(len(lol4), 2, 'There should be 2 parsed instructions')
         self.assertIsInstance(lol4[0], InstructionLine)
@@ -635,6 +673,9 @@ class TestLineObject(unittest.TestCase):
             TestLineObject.label_values,
             memzone_mngr.global_zone,
             memzone_mngr,
+            preprocessor,
+            ConditionStack(),
+            0,
         )
         self.assertEqual(len(lol4), 1, 'There should be 2 parsed instructions')
         self.assertIsInstance(lol4[0], InstructionLine)
@@ -646,6 +687,9 @@ class TestLineObject(unittest.TestCase):
             TestLineObject.label_values,
             memzone_mngr.global_zone,
             memzone_mngr,
+            preprocessor,
+            ConditionStack(),
+            0,
         )
         self.assertEqual(len(lol5), 2, 'There should be 2 parsed instructions')
         self.assertIsInstance(lol5[0], LabelLine)
@@ -660,6 +704,9 @@ class TestLineObject(unittest.TestCase):
                     TestLineObject.label_values,
                     memzone_mngr.global_zone,
                     memzone_mngr,
+                    preprocessor,
+                    ConditionStack(),
+                    0,
                 )
 
     def test_unknown_instruction(self):
@@ -681,6 +728,9 @@ class TestLineObject(unittest.TestCase):
                     TestLineObject.label_values,
                     memzone_mngr.global_zone,
                     memzone_mngr,
+                    Preprocessor(),
+                    ConditionStack(),
+                    0,
                 )
 
 

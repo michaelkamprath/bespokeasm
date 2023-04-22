@@ -5,7 +5,7 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithBytes, LineObject, INSTRUCTION_EXPRESSION_PATTERN
 from bespokeasm.assembler.line_object.data_line import DataLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager, GLOBAL_ZONE_NAME
-from bespokeasm.expression import parse_expression, ExpresionType
+from bespokeasm.expression import parse_expression, ExpressionNode
 from bespokeasm.assembler.memory_zone import MEMORY_ZONE_NAME_PATTERN, MemoryZone
 
 # Directives are lines that tell the assembler to do something. Supported directives are:
@@ -194,8 +194,8 @@ class AddressOrgLine(SetMemoryZoneLine):
 
 
 class FillDataLine(LineWithBytes):
-    _count_expr: ExpresionType
-    _value_expr: ExpresionType
+    _count_expr: ExpressionNode
+    _value_expr: ExpressionNode
 
     def __init__(
             self,
@@ -227,8 +227,8 @@ class FillDataLine(LineWithBytes):
 
 
 class FillUntilDataLine(LineWithBytes):
-    _fill_until_addr_expr: ExpresionType
-    _fill_value_expr: ExpresionType
+    _fill_until_addr_expr: ExpressionNode
+    _fill_value_expr: ExpressionNode
     _fill_until_addr: int
     _fill_value: int
 

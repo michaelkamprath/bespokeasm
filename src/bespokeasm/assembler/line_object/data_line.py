@@ -2,14 +2,15 @@ import re
 import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.line_object import LineWithBytes
-from bespokeasm.utilities import parse_numeric_string, is_string_numeric
+from bespokeasm.assembler.line_object import LineWithBytes, INSTRUCTION_EXPRESSION_PATTERN
 from bespokeasm.assembler.memory_zone import MemoryZone
+from bespokeasm.expression import parse_expression, ExpressionNode
 
 
 class DataLine(LineWithBytes):
     PATTERN_DATA_DIRECTIVE = re.compile(
-        r'^(\.byte|\.2byte|\.4byte|\.8byte|\.cstr)\b\s*(?:([\w,$\%\s]+)|(?P<quote>[\"\']{1})((?:\\(?P=quote)|.)*)(?P=quote))',
+        r'^(\.byte|\.2byte|\.4byte|\.8byte|\.cstr)\b\s*(?:(?P<quote>[\"\'])((?:\\(?P=quote)|.)*)(?P=quote)'
+        r'|({0}(?:\s*\,{1})*))'.format(INSTRUCTION_EXPRESSION_PATTERN, INSTRUCTION_EXPRESSION_PATTERN),
         flags=re.IGNORECASE | re.MULTILINE
     )
 
@@ -45,16 +46,16 @@ class DataLine(LineWithBytes):
         # deterine if this is a string or numeric list
         if data_match is not None and len(data_match.groups()) == 4:
             directive_str = data_match.group(1).strip()
-            if data_match.group(4) is None and data_match.group(2) is not None:
+            if data_match.group(3) is None and data_match.group(4) is not None:
                 # check to ensure this isn't a cstr
                 if directive_str == '.cstr':
                     sys.exit(f'ERROR: {line_id} - .cstr data directive used with non-string value')
                 # it's numeric
-                values_list = [x.strip() for x in data_match.group(2).strip().split(',') if x.strip() != '']
-            elif data_match.group(4) is not None:
+                values_list = [x.strip() for x in data_match.group(4).strip().split(',') if x.strip() != '']
+            elif data_match.group(3) is not None:
                 # its a string.
                 # first, convert escapes
-                converted_str = bytes(data_match.group(4), "utf-8").decode("unicode_escape")
+                converted_str = bytes(data_match.group(3), "utf-8").decode("unicode_escape")
                 values_list = [ord(x) for x in list(converted_str)]
                 if directive_str == '.cstr':
                     # Add a 0-value at the end of the string values.
@@ -104,16 +105,18 @@ class DataLine(LineWithBytes):
             if isinstance(arg_item, int):
                 arg_val = arg_item
             elif isinstance(arg_item, str):
-                if is_string_numeric(arg_item):
-                    arg_val = parse_numeric_string(arg_item)
-                else:
-                    label_val = self.label_scope.get_label_value(arg_item, self.line_id)
-                    if label_val is not None:
-                        arg_val = label_val
-                    else:
-                        sys.exit(
-                            f'ERROR: line {self.line_id} - unknown label "{arg_item}" in current scope "{self.label_scope}"'
-                        )
+                e: ExpressionNode = parse_expression(self.line_id, arg_item)
+                arg_val = e.get_value(self.label_scope, self.line_id)
+                # if is_string_numeric(arg_item):
+                #     arg_val = parse_numeric_string(arg_item)
+                # else:
+                #     label_val = self.label_scope.get_label_value(arg_item, self.line_id)
+                #     if label_val is not None:
+                #         arg_val = label_val
+                #     else:
+                #         sys.exit(
+                #             f'ERROR: line {self.line_id} - unknown label "{arg_item}" in current scope "{self.label_scope}"'
+                #         )
             else:
                 sys.exit(f'ERROR: line {self.line_id} - unknown data item "{arg_item}"')
             value_bytes = (arg_val & DataLine.DIRECTIVE_VALUE_MASK[self._directive]).to_bytes(

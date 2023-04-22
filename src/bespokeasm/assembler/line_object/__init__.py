@@ -18,6 +18,7 @@ class LineObject:
         self._address = None
         self._label_scope = None
         self._memzone = memzone
+        self._compilable = True
 
     def __repr__(self):
         return str(self)
@@ -71,6 +72,15 @@ class LineObject:
     @property
     def memory_zone(self) -> MemoryZone:
         return self._memzone
+
+    @property
+    def compilable(self) -> bool:
+        """Returns True if this line object can be compiled to bytecode"""
+        return self._compilable
+
+    @compilable.setter
+    def compilable(self, value: bool):
+        self._compilable = value
 
 
 class LineWithBytes(LineObject):

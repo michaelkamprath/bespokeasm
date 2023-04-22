@@ -11,6 +11,7 @@ from bespokeasm.assembler.line_object.predefined_data import PredefinedDataLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.pretty_printer.factory import PrettyPrinterFactory
+from bespokeasm.assembler.preprocessor import Preprocessor
 
 
 class Assembler:
@@ -28,6 +29,7 @@ class Assembler:
                 pretty_print_output: str,
                 is_verbose: int,
                 include_paths: list[str],
+                predefined: list[str],
             ):
         self._source_file = source_file
         self._output_file = output_file
@@ -42,6 +44,7 @@ class Assembler:
         self._binary_end = binary_end
         self._model = AssemblerModel(self._config_file, self._verbose)
         self._include_paths = include_paths
+        self._predefined_symbols = predefined
 
     def assemble_bytecode(self):
         global_label_scope = self._model.global_label_scope
@@ -50,6 +53,12 @@ class Assembler:
             self._model.default_origin,
             self._model.predefined_memory_zones,
         )
+
+        # create preprocessor
+        preprocessor: Preprocessor = Preprocessor(self._model.predefined_symbols)
+        # add any predefined macros from the command line
+        preprocessor.add_cli_symbols(self._predefined_symbols)
+
         # create the predefined memory blocks
         predefines_lineid = LineIdentifier(0, os.path.basename(self._config_file))
         predefined_line_obs: list[LineObject] = []
@@ -80,14 +89,16 @@ class Assembler:
             self._model,
             include_dirs,
             memzone_manager,
+            preprocessor,
             self._verbose
         )
 
         if self._verbose > 2:
             click.echo(f'Found {len(line_obs)} lines across all source files')
 
+        compilable_line_obs = [lobj for lobj in line_obs if lobj.compilable]
         # First pass: assign addresses to labels
-        for lobj in line_obs:
+        for lobj in compilable_line_obs:
             lobj.set_start_address(lobj.memory_zone.current_address)
             if lobj.address is None:
                 sys.exit(f'ERROR: {lobj.line_id} - INTERNAL line object address is None. Memory zone = {lobj.memory_zone}')
@@ -101,19 +112,20 @@ class Assembler:
                 lobj.label_scope.set_label_value(lobj.get_label(), lobj.get_value(), lobj.line_id)
 
         # now merge prefined line objects and parsed line objects
-        line_obs.extend(predefined_line_obs)
+        compilable_line_obs.extend(predefined_line_obs)
 
         # Sort lines according to their assigned address. This allows for .org directives
-        line_obs.sort(key=lambda x: x.address)
-        max_generated_address = line_obs[-1].address
-        line_dict = {lobj.address: lobj for lobj in line_obs if isinstance(lobj, LineWithBytes)}
+        compilable_line_obs.sort(key=lambda x: x.address)
+        max_generated_address = compilable_line_obs[-1].address
+        line_dict = {lobj.address: lobj for lobj in compilable_line_obs if isinstance(lobj, LineWithBytes)}
 
         # second pass: build the machine code and check for overlaps
         if self._verbose > 2:
             print("\nProcessing lines:")
         bytecode = bytearray()
         last_line = None
-        for lobj in line_obs:
+
+        for lobj in compilable_line_obs:
             if isinstance(lobj, LineWithBytes):
                 lobj.generate_bytes()
             if self._verbose > 2:
@@ -157,7 +169,7 @@ class Assembler:
         if self._enable_pretty_print:
             pprinter = PrettyPrinterFactory.getPrettyPrinter(
                 self._pretty_print_format,
-                line_obs,
+                compilable_line_obs,
                 self._model,
                 self._source_file,
             )

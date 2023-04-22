@@ -108,6 +108,10 @@
                 {
                     "name": "constant.numeric.integer.decimal",
                     "match": "(?<!\\w)(?:\\d+)\\b"
+                },
+                {
+                    "name": "constant.numeric.character",
+                    "match": "(?<!\\w)(?:\\'.\\')\\b"
                 }
             ]
         },
@@ -128,6 +132,10 @@
                 {
                     "name": "keyword.operator.word",
                     "match": "\\b(?:##EXPRESSION_FUNCTIONS##)\\b"
+                },
+                {
+                    "name": "keyword.operator.comparison",
+                    "match": "(?:==|!=|>|>=|<|<=)"
                 }
             ]
         },

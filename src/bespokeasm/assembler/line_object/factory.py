@@ -10,6 +10,9 @@ from bespokeasm.assembler.line_object.directive_line import DirectiveLine
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.memory_zone import MemoryZone
+from bespokeasm.assembler.preprocessor import Preprocessor
+from bespokeasm.assembler.line_object.preprocessor_line.factory import PreprocessorLineFactory
+from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
 
 
 class LineOjectFactory:
@@ -31,6 +34,9 @@ class LineOjectFactory:
                 label_scope: LabelScope,
                 current_memzone: MemoryZone,
                 memzone_manager: MemoryZoneManager,
+                preprocessor: Preprocessor,
+                condition_stack: ConditionStack,
+                log_verbosity: int,
             ) -> list[LineObject]:
         # find comments
         comment_str = ''
@@ -44,54 +50,72 @@ class LineOjectFactory:
         if instruction_match is not None:
             instruction_str = instruction_match.group(1).strip()
 
-        # parse instruction
         line_obj_list: list[LineObject] = []
-        while len(instruction_str) > 0:
-            # try label
-            line_obj = LabelLine.factory(
-                line_id,
-                instruction_str,
-                comment_str,
-                model.registers,
-                label_scope,
-                current_memzone,
-            )
-            if line_obj is not None:
-                line_obj_list.append(line_obj)
-                instruction_str = instruction_str.replace(line_obj.instruction, '', 1).strip()
-                continue
+        # check to see if this is preprocessor directive
+        if instruction_str.startswith('#'):
+            # this is a preprocessor directive
+            line_obj_list.extend(PreprocessorLineFactory.parse_line(
+                    line_id,
+                    instruction_str,
+                    comment_str,
+                    model,
+                    label_scope,
+                    current_memzone,
+                    memzone_manager,
+                    preprocessor,
+                    condition_stack,
+                    log_verbosity,
+                ))
+        else:
+            # resolve proprocessor symbols
+            instruction_str = preprocessor.resolve_symbols(line_id, instruction_str)
+            # parse instruction
+            while len(instruction_str) > 0:
+                # try label
+                line_obj = LabelLine.factory(
+                    line_id,
+                    instruction_str,
+                    comment_str,
+                    model.registers,
+                    label_scope,
+                    current_memzone,
+                )
+                if line_obj is not None:
+                    line_obj_list.append(line_obj)
+                    instruction_str = instruction_str.replace(line_obj.instruction, '', 1).strip()
+                    continue
 
-            # try directives
-            line_obj = DirectiveLine.factory(
-                line_id,
-                instruction_str,
-                comment_str,
-                model.endian,
-                current_memzone,
-                memzone_manager,
-                model.cstr_terminator,
-            )
-            if line_obj is not None:
-                line_obj_list.append(line_obj)
-                instruction_str = instruction_str.replace(line_obj.instruction, '', 1).strip()
-                continue
+                # try directives
+                line_obj = DirectiveLine.factory(
+                    line_id,
+                    instruction_str,
+                    comment_str,
+                    model.endian,
+                    current_memzone,
+                    memzone_manager,
+                    model.cstr_terminator,
+                )
+                if line_obj is not None:
+                    line_obj_list.append(line_obj)
+                    instruction_str = instruction_str.replace(line_obj.instruction, '', 1).strip()
+                    continue
 
-            # try instruction
-            line_obj = InstructionLine.factory(
-                line_id,
-                instruction_str,
-                comment_str,
-                model,
-                current_memzone,
-                memzone_manager,
-            )
-            if line_obj is not None:
-                line_obj_list.append(line_obj)
-                instruction_str = instruction_str.replace(line_obj.instruction, '', 1).strip()
-                continue
+                # try instruction
+                line_obj = InstructionLine.factory(
+                    line_id,
+                    instruction_str,
+                    comment_str,
+                    model,
+                    current_memzone,
+                    memzone_manager,
+                )
+                if line_obj is not None:
+                    line_obj_list.append(line_obj)
+                    instruction_str = instruction_str.replace(line_obj.instruction, '', 1).strip()
+                    continue
 
-            # if we are here, that means nothing was matched. Shouldn't happen, but we will break none the less
-            break
+                # if we are here, that means nothing was matched. Shouldn't happen, but we will break none the less
+                break
 
         if len(line_obj_list) == 0:
             if instruction_str != '':

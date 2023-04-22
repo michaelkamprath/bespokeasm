@@ -15,8 +15,19 @@ Changes that are planned but not implemented yet:
   * unknown labels
 
 ## [Unreleased]
+
+## [0.4.0]
+* Added ability to create preprocessor macros/symbols with `#define` directive. Thes macros can then be used in code. Also added the ability to define preprocessor symbols on the command line and in the instruction set configuration file.
+* Added conditional assembly preprocessor directives tht act on preprocessor symbols:
+  * `#if`
+  * `#elif`
+  * `#else`
+  * `#endif`
+  * `#ifdef`
+  * `#ifndef`
 * Added the ability to set the `cstr` terminating character. It default to `0`, but can be set to another byte value.
-* Added support for using characeter ordinals in numeric expressions. For example, `'a'` is the same as `97`. Only valid for single character strings using single quotes.
+* Added support for using character ordinals in numeric expressions. For example, `'a'` is the same as `97`. Only valid for single character strings using single quotes.
+* Allow expressions to be used in data directives. For example, `.byte 1 + 2` is the same as `.byte 3`.
 
 ## [0.3.3]
 * Improved error messages for a badly configured configuration file.
@@ -122,7 +133,8 @@ First tracked released
 * Enabled the `reverse_argument_order` instruction option be applied to a specific operand configuration. This slightly changed the configuration file format.
 * Added ability for instructions with operands to have a single "empty operand" variant, e.g., `pop`
 
-[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.3.3...v0.4.0
 [0.3.3]: https://github.com/michaelkamprath/bespokeasm/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/michaelkamprath/bespokeasm/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/michaelkamprath/bespokeasm/compare/v0.3.0...v0.3.1

@@ -9,6 +9,7 @@ from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.assembly_file import AssemblyFile
+from bespokeasm.assembler.preprocessor import Preprocessor
 
 
 class TestMemoryZones(unittest.TestCase):
@@ -29,6 +30,7 @@ class TestMemoryZones(unittest.TestCase):
             isa_model.default_origin,
             isa_model.predefined_memory_zones
         )
+        preprocessor = Preprocessor()
         self.assertEqual(memzone_manager.global_zone.start, 0x0100, 'global zone starts at $0100')
         self.assertEqual(memzone_manager.global_zone.end, 0xDFFF, 'global zone ends at $DFFF')
 
@@ -39,10 +41,11 @@ class TestMemoryZones(unittest.TestCase):
                 isa_model,
                 [],
                 memzone_manager,
+                preprocessor,
                 3,
             )
 
-        self.assertEqual(len(line_objs), 9, '9 code lines')
+        self.assertEqual(len(line_objs), 10, '10 code lines')
         self.assertIsNotNone(memzone_manager.zone('variables'), 'variables memory zone should exist')
         self.assertEqual(memzone_manager.zone('variables').start, 0x3000, 'memory zone starts at $3000')
         self.assertEqual(memzone_manager.zone('variables').end, 0x47FF, 'memory zone starts at $3000')

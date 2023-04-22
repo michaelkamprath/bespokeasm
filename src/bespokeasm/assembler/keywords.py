@@ -8,7 +8,8 @@ BYTECODE_DIRECTIVES_SET = set([
 ])
 
 PREPROCESSOR_DIRECTIVES_SET = set([
-    'include', 'require', 'create_memzone'
+    'include', 'require', 'create_memzone',
+    'define', 'if', 'elif', 'else', 'endif', 'ifdef', 'ifndef',
 ])
 
 EXPRESSION_FUNCTIONS_SET = set([
