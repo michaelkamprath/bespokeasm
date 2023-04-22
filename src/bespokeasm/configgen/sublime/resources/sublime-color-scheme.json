@@ -26,6 +26,11 @@
             "foreground": "#fffd80"
         },
         {
+            "name": "Numbers - Character",
+            "scope": "constant.numeric.character",
+            "foreground": "#FFE880"
+        },
+        {
             "name": "Labels",
             "scope": "variable.other.label",
             "foreground": "#278ed8"

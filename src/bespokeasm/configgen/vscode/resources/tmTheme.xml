@@ -54,6 +54,17 @@
         </dict>
         <dict>
             <key>name</key>
+            <string>Numbers - Character</string>
+            <key>scope</key>
+            <string>constant.numeric.character</string>
+            <key>settings</key>
+            <dict>
+                <key>foreground</key>
+                <string>#FFE880</string>
+            </dict>
+        </dict>
+        <dict>
+            <key>name</key>
             <string>Labels</string>
             <key>scope</key>
             <string>variable.other.label</string>

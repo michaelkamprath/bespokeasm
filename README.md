@@ -3,7 +3,7 @@
 # Bespoke ASM
 This is a customizable byte code assembler that allows for the definition of custom instruction set architecture.
 
-**NOTE - This is very much a work in progress**
+**NOTE - This project should be considered to be in "beta" status. It should be stable, but features are subject to change.**
 
 ## Usage
 To install, clone this repository and install using `pip`. Preferably, you have a `python` virtual environment set up and it has `pipenv` installed when you do this.
