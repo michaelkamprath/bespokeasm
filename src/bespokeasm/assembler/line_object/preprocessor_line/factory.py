@@ -9,7 +9,7 @@ from bespokeasm.assembler.line_object.preprocessor_line.required_language import
 from bespokeasm.assembler.line_object.preprocessor_line.create_memzone import CreateMemzoneLine
 from bespokeasm.assembler.line_object.preprocessor_line.define_symbol import DefineSymbolLine
 from bespokeasm.assembler.line_object.preprocessor_line.condition_line import ConditionLine, CONDITIONAL_LINE_PREFIX_LIST
-from bespokeasm.assembler.preprocessor.condition_stack import ConsitionStack
+from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
 
 
 class PreprocessorLineFactory:
@@ -24,7 +24,7 @@ class PreprocessorLineFactory:
         current_memzone: MemoryZone,
         memzone_manager: MemoryZoneManager,
         preprocessor: Preprocessor,
-        condition_stack: ConsitionStack,
+        condition_stack: ConditionStack,
         log_verbosity: int,
     ) -> list[LineObject]:
         '''Parse a preprocessor line.'''

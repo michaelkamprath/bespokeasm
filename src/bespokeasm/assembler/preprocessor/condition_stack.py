@@ -4,7 +4,7 @@ from bespokeasm.assembler.preprocessor.condition import \
 from bespokeasm.assembler.preprocessor import Preprocessor
 
 
-class ConsitionStack:
+class ConditionStack:
     def __init__(self):
         self._stack: list[PreprocessorCondition] = []
 

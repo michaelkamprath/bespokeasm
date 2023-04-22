@@ -16,7 +16,7 @@ from bespokeasm.assembler.line_object.factory import LineOjectFactory
 from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.line_object.preprocessor_line.define_symbol import DefineSymbolLine
 from bespokeasm.assembler.assembly_file import AssemblyFile
-from bespokeasm.assembler.preprocessor.condition_stack import ConsitionStack
+from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
 
 
 class TestPreprocessorSymbols(unittest.TestCase):
@@ -180,7 +180,7 @@ class TestPreprocessorSymbols(unittest.TestCase):
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
-            ConsitionStack(),
+            ConditionStack(),
             0,
         )[0]
         self.assertTrue(isinstance(l1, DefineSymbolLine), 'l1 should be a DefineSymbolLine')
@@ -200,7 +200,7 @@ class TestPreprocessorSymbols(unittest.TestCase):
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
-            ConsitionStack(),
+            ConditionStack(),
             0,
         )[0]
         self.assertTrue(isinstance(l2, DefineSymbolLine), 'l1 should be a DefineSymbolLine')
@@ -223,10 +223,10 @@ class TestPreprocessorSymbols(unittest.TestCase):
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
-            ConsitionStack(),
+            ConditionStack(),
             0,
         )[0]
-        self.assertTrue(isinstance(l3, DefineSymbolLine), 'l1 should be a DefineSymbolLine')
+        self.assertTrue(isinstance(l3, DefineSymbolLine), '3 should be a DefineSymbolLine')
         self.assertEqual(l3.comment, 'my comment', 'comment should be "my comment"')
         dsl3: DefineSymbolLine = l3
         self.assertEqual(dsl3.symbol.name, 'WITH_COMMENT', 'symbol name should be WITH_COMMENT')
@@ -238,6 +238,26 @@ class TestPreprocessorSymbols(unittest.TestCase):
             '(13 + 27)',
             'symbol value should be (13 + 27)'
         )
+
+        l4: LineObject = LineOjectFactory.parse_line(
+            lineid,
+            '#define CODE_SYMBOL push a  ; my comment',
+            isa_model,
+            global_scope,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+            preprocessor,
+            ConditionStack(),
+            0,
+        )[0]
+        self.assertTrue(isinstance(l4, DefineSymbolLine), 'l4 should be a DefineSymbolLine')
+        self.assertEqual(l4.comment, 'my comment', 'comment should be "my comment"')
+        dsl4: DefineSymbolLine = l4
+        self.assertEqual(dsl4.symbol.name, 'CODE_SYMBOL', 'symbol name should be CODE_SYMBOL')
+        self.assertEqual(dsl4.symbol.value, 'push a', 'symbol value should be: push a')
+        self.assertEqual(dsl4.symbol.created_line_id, lineid, 'symbol created line id should be lineid')
+        self.assertTrue(preprocessor.get_symbol('CODE_SYMBOL') is not None, 'CODE_SYMBOL should be defined')
+        self.assertEqual(preprocessor.get_symbol('CODE_SYMBOL').value, 'push a', 'symbol value should be: push a')
 
     def test_compilation_contro_and_symbol_replacement(self):
         with pkg_resources.path(config_files, 'test_compilation_control.yaml') as fp:
@@ -291,7 +311,7 @@ class TestPreprocessorSymbols(unittest.TestCase):
         self.assertEqual(line_objs[18].instruction, 'mov a, 1', 'line 18 should be "mov a, 1"')
 
     def test_condition_stack(self):
-        stack = ConsitionStack()
+        stack = ConditionStack()
         preprocessor = Preprocessor()
         preprocessor.create_symbol('s1', '57')
         preprocessor.create_symbol('s2', 's1*2')

@@ -12,7 +12,7 @@ from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.preprocessor import Preprocessor
-from bespokeasm.assembler.preprocessor.condition_stack import ConsitionStack
+from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
 
 
 class TestInstructionParsing(unittest.TestCase):
@@ -308,7 +308,7 @@ class TestInstructionParsing(unittest.TestCase):
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
-            ConsitionStack(),
+            ConditionStack(),
             0,
         )[0]
         self.assertIsInstance(l1, LabelLine)
@@ -323,7 +323,7 @@ class TestInstructionParsing(unittest.TestCase):
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
-            ConsitionStack(),
+            ConditionStack(),
             0,
         )[0]
         l2.set_start_address(42)
@@ -340,7 +340,7 @@ class TestInstructionParsing(unittest.TestCase):
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
-            ConsitionStack(),
+            ConditionStack(),
             0,
         )[0]
         l3.set_start_address(42)

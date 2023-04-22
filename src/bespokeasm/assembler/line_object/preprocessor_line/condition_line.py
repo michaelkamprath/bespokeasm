@@ -2,7 +2,7 @@ from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone import MemoryZone
 import bespokeasm.assembler.preprocessor.condition as condition
-from bespokeasm.assembler.preprocessor.condition_stack import ConsitionStack
+from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
 
 
 CONDITIONAL_LINE_PREFIX_LIST = ["#if ", "#ifdef ", "#ifndef ", "#elif ", "#else", "#endif"]
@@ -15,7 +15,7 @@ class ConditionLine(PreprocessorLine):
                 instruction: str,
                 comment: str,
                 memzone: MemoryZone,
-                condition_stack: ConsitionStack
+                condition_stack: ConditionStack
             ):
         super().__init__(line_id, instruction, comment, memzone)
 

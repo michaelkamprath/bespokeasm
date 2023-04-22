@@ -20,7 +20,7 @@ from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.preprocessor import Preprocessor
-from bespokeasm.assembler.preprocessor.condition_stack import ConsitionStack
+from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
 from bespokeasm.assembler.line_object.preprocessor_line.condition_line import ConditionLine
 
 
@@ -58,7 +58,7 @@ class AssemblyFile:
                 line_num = 0
                 current_scope = self.label_scope
                 current_memzone = memzone_manager.global_zone
-                condition_stack = ConsitionStack()
+                condition_stack = ConditionStack()
                 for line in f:
                     line_num += 1
                     line_id = LineIdentifier(line_num, filename=self.filename)
