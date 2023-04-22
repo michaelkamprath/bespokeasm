@@ -74,8 +74,15 @@ class TestPreprocessorSymbols(unittest.TestCase):
         c2 = IfPreprocessorCondition('#if s1 == s3', LineIdentifier('test_preprocessor_comparisons', 2))
         self.assertTrue(c2.evaluate(preprocessor), 's1 == s3 should be true')
 
+        # string comparisons
         c3 = IfPreprocessorCondition('#if s4 == s5', LineIdentifier('test_preprocessor_comparisons', 3))
         self.assertFalse(c3.evaluate(preprocessor), 's4 == s5 should be false')
+
+        c3b = IfPreprocessorCondition('#if s4 == "string_value1"', LineIdentifier('test_preprocessor_comparisons', 3))
+        self.assertTrue(c3b.evaluate(preprocessor), 's4 == "string_value1" should be true')
+
+        c3c = IfPreprocessorCondition('#if s4 == 42', LineIdentifier('test_preprocessor_comparisons', 3))
+        self.assertFalse(c3c.evaluate(preprocessor), 's4 == 42 should be false (string != number)')
 
         c4 = IfPreprocessorCondition('#if s4 == s6', LineIdentifier('test_preprocessor_comparisons', 4))
         self.assertTrue(c4.evaluate(preprocessor), 's4 == s6 should be true')
