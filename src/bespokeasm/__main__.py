@@ -64,7 +64,7 @@ def main():
         help='Path to use when searching for included asm files. Multiple paths can be seperately specified.'
     )
 @click.option(
-        '--predefined', '-D', multiple=True, default=[],
+        '--macro-sybol', '-D', multiple=True, default=[],
         help='Predefine name as macro. Assigning name with value may be done with "name=value" syntax. '
              'Multiple can be seperately specified.'
     )

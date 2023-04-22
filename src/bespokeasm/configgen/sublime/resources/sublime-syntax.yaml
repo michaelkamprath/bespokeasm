@@ -83,6 +83,12 @@ contexts:
       scope: constant.numeric.integer.binary
     - match: (?<!\w)(?:\d+)\b
       scope: constant.numeric.integer.decimal
+    - match: (?:\'.\')
+      scope: constant.numeric.character
+
+  comparison_operators:
+    - match: (?:==|!=|>|>=|<|<=)
+      scope: keyword.operator.logical
 
   numerical_expressions:
     - include: numbers
@@ -92,6 +98,7 @@ contexts:
       scope: keyword.operator.arithmetic
     - match: "[\\&\\|\\^]{1}"
       scope: keyword.operator.logical
+    - include: comparison_operators
     - match: (?:>>|<<)
       scope: keyword.operator.bitwise
     - match: \b(?:##EXPRESSION_FUNCTIONS##)\b
