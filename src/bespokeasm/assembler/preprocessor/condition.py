@@ -57,9 +57,12 @@ class PreprocessorCondition:
     def parent(self) -> PreprocessorCondition:
         return self._parent
 
+    def _check_and_set_parent(self, parent: PreprocessorCondition):
+        self._parent = parent
+
     @parent.setter
     def parent(self, parent: PreprocessorCondition):
-        self._parent = parent
+        self._check_and_set_parent(parent)
 
     @property
     def is_dependent(self) -> bool:
@@ -97,6 +100,9 @@ class IfPreprocessorCondition(PreprocessorCondition):
 
     def __repr__(self) -> str:
         return f"IfPreprocessorCondition<#if {self._lhs_expression} {self._operator} {self._rhs_expression}>"
+
+    def _check_and_set_parent(self, parent: PreprocessorCondition):
+        raise ValueError("Cannot set parent of an IfPreprocessorCondition")
 
     def _evaluate_condition(self, preprocessor: Preprocessor) -> bool:
         lhs_resolved = preprocessor.resolve_symbols(self._lhs_expression)
@@ -148,6 +154,12 @@ class ElifPreprocessorCondition(IfPreprocessorCondition):
     def __repr__(self) -> str:
         return f"ElifPreprocessorCondition<#elif {self._lhs_expression} {self._operator} {self._rhs_expression}>"
 
+    def _check_and_set_parent(self, parent: PreprocessorCondition):
+        if isinstance(parent, ElifPreprocessorCondition) or isinstance(parent, IfPreprocessorCondition):
+            self._parent = parent
+        else:
+            raise ValueError("#elif can only have #if or #elif as a parent")
+
     @property
     def is_dependent(self) -> bool:
         return True
@@ -176,6 +188,9 @@ class IfdefPreprocessorCondition(PreprocessorCondition):
     def __repr__(self) -> str:
         return f'IfdefPreprocessorCondition<{"#ifndef" if self._is_ifndef else "#ifdef"} {self._symbol}>'
 
+    def _check_and_set_parent(self, parent: PreprocessorCondition):
+        raise ValueError("Cannot set parent of an IfdefPreprocessorCondition")
+
     def evaluate(self, preprocessor: Preprocessor) -> bool:
         symbol = preprocessor.get_symbol(self._symbol)
         if symbol is None:
@@ -190,6 +205,11 @@ class ElsePreprocessorCondition(PreprocessorCondition):
 
     def __repr__(self) -> str:
         return "ElsePreprocessorCondition<#else>"
+
+    def _check_and_set_parent(self, parent: PreprocessorCondition):
+        if isinstance(parent, ElsePreprocessorCondition) or isinstance(parent, EndifPreprocessorCondition):
+            raise ValueError("#else must have a conditional as a parent")
+        self._parent = parent
 
     @property
     def is_dependent(self) -> bool:
@@ -207,6 +227,11 @@ class EndifPreprocessorCondition(PreprocessorCondition):
 
     def __repr__(self) -> str:
         return "EndifPreprocessorCondition<#endif>"
+
+    def _check_and_set_parent(self, parent: PreprocessorCondition):
+        if isinstance(parent, EndifPreprocessorCondition):
+            raise ValueError("#endif must have a conditional as a parent")
+        self._parent = parent
 
     @property
     def is_dependent(self) -> bool:

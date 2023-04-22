@@ -7,7 +7,7 @@ from test import test_code
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.condition import \
     IfPreprocessorCondition, IfdefPreprocessorCondition, ElifPreprocessorCondition, \
-    ElsePreprocessorCondition, EndifPreprocessorCondition, PreprocessorCondition
+    ElsePreprocessorCondition, EndifPreprocessorCondition
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
@@ -38,9 +38,9 @@ class TestPreprocessorSymbols(unittest.TestCase):
         self.assertEqual(t3, '57 + 57*2 + label1', 's1 + s2 should resolve to 57 + 57*2')
 
     def test_preprocessor_comparisons(self):
-        class MockPreprocessorCondition_True(PreprocessorCondition):
+        class MockPreprocessorCondition_True(IfPreprocessorCondition):
             def __init__(self, line: LineIdentifier):
-                super().__init__('mock-true', line)
+                super().__init__('#if true', line)
 
             def __repr__(self) -> str:
                 return "MockPreprocessorCondition_True"
@@ -48,9 +48,9 @@ class TestPreprocessorSymbols(unittest.TestCase):
             def evaluate(self, preprocessor: Preprocessor) -> bool:
                 return True
 
-        class MockPreprocessorCondition_False(PreprocessorCondition):
+        class MockPreprocessorCondition_False(IfPreprocessorCondition):
             def __init__(self, line: LineIdentifier):
-                super().__init__('mock-false', line)
+                super().__init__('#if false', line)
 
             def __repr__(self) -> str:
                 return "MockPreprocessorCondition_False"
