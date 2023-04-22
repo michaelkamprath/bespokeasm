@@ -28,14 +28,23 @@ class TestPreprocessorSymbols(unittest.TestCase):
         preprocessor.create_symbol('s1', '57')
         preprocessor.create_symbol('s2', 's1*2')
 
-        t1 = preprocessor.resolve_symbols('s1')
+        line_id = LineIdentifier(1, 'test_preprocessor_resolve_symbols')
+
+        t1 = preprocessor.resolve_symbols(line_id, 's1')
         self.assertEqual(t1, '57', 's1 should resolve to 57')
 
-        t2 = preprocessor.resolve_symbols('s2')
+        t2 = preprocessor.resolve_symbols(line_id, 's2')
         self.assertEqual(t2, '57*2', 's2 should resolve to 57*2')
 
-        t3 = preprocessor.resolve_symbols('s1 + s2 + label1')
+        t3 = preprocessor.resolve_symbols(line_id, 's1 + s2 + label1')
         self.assertEqual(t3, '57 + 57*2 + label1', 's1 + s2 should resolve to 57 + 57*2')
+
+        # test infinite recursion detection
+        preprocessor.create_symbol('s3', 's4')
+        preprocessor.create_symbol('s4', '2*s5')
+        preprocessor.create_symbol('s5', 's3')
+        with self.assertRaises(SystemExit):
+            preprocessor.resolve_symbols(line_id, 's3')
 
     def test_preprocessor_comparisons(self):
         class MockPreprocessorCondition_True(IfPreprocessorCondition):

@@ -105,8 +105,8 @@ class IfPreprocessorCondition(PreprocessorCondition):
         raise ValueError("Cannot set parent of an IfPreprocessorCondition")
 
     def _evaluate_condition(self, preprocessor: Preprocessor) -> bool:
-        lhs_resolved = preprocessor.resolve_symbols(self._lhs_expression)
-        rhs_resolved = preprocessor.resolve_symbols(self._rhs_expression)
+        lhs_resolved = preprocessor.resolve_symbols(self._line, self._lhs_expression)
+        rhs_resolved = preprocessor.resolve_symbols(self._line, self._rhs_expression)
 
         lhs_expression: ExpressionNode = parse_expression(self._line, lhs_resolved)
         rhs_expression: ExpressionNode = parse_expression(self._line, rhs_resolved)

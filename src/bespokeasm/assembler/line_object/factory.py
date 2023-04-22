@@ -68,7 +68,7 @@ class LineOjectFactory:
                 ))
         else:
             # resolve proprocessor symbols
-            instruction_str = preprocessor.resolve_symbols(instruction_str)
+            instruction_str = preprocessor.resolve_symbols(line_id, instruction_str)
             # parse instruction
             while len(instruction_str) > 0:
                 # try label

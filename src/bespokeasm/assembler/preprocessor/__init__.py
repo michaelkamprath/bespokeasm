@@ -42,20 +42,37 @@ class Preprocessor:
     def get_symbol(self, name: str) -> PreprocessorSymbol:
         return self._symbols.get(name, None)
 
-    def resolve_symbols(self, line_str: str) -> str:
+    def resolve_symbols(
+                self,
+                line_id: LineIdentifier,
+                line_str: str,
+                resolved_symbols: set[str] = set()
+            ) -> str:
         # Resursively resolve symbols in the line string, stopping when there are no more symbols to resolve.
         # Errors if there are recursion loops caused byt symbols that indirectly refer to themselves.
 
         # to make this fast, all symbol candidates should be identified first, then the symbols should be resolved
         found_symbols: list[str] = re.findall(f'\\b({SYMBOL_PATTERN})\\b', line_str)
-        symbol_replaced: bool = False
+        symbols_replaced: set[str] = set()
+
         for s in found_symbols:
             symbol = self.get_symbol(s)
             if symbol is not None:
-                line_str = line_str.replace(s, symbol.value)
-                symbol_replaced = True
+                if s in resolved_symbols:
+                    sys.exit(
+                        f'ERROR - {line_id}: Preprocessor macro symbol {s} is indirectly referring to itself'
+                    )
+                # first, recurse through this symbol's replacement string to resolve any symbols it may contain
+                local_resolved_symbols = resolved_symbols.copy()
+                local_resolved_symbols.update([s])
+                replacement_str = self.resolve_symbols(line_id, symbol.value, local_resolved_symbols)
+                # now replace the symbol with its replacement string
+                line_str = line_str.replace(s, replacement_str)
+                symbols_replaced.add(s)
 
-        if symbol_replaced:
-            return self.resolve_symbols(line_str)
+        if len(symbols_replaced) > 0:
+            updated_resolved_symbols = resolved_symbols.copy()
+            updated_resolved_symbols.update(symbols_replaced)
+            return self.resolve_symbols(line_id, line_str, updated_resolved_symbols)
         else:
             return line_str
