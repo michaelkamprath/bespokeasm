@@ -154,6 +154,15 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(d11.byte_size, 7, 'byte string has 7 bytes')
         self.assertEqual(d11.get_bytes(), bytearray(d11_values), 'character string matches')
 
+        # test expressions in .byte lists
+        d12 = DataLine.factory(38, '.byte ((PSAV+1) & 0FFH), $22+$44, 1<<4', 'escape reality', 'big', memzone)
+        label_values.set_label_value('PSAV', 0x1234, LineIdentifier(1, 'test_d12'))
+        d12.label_scope = label_values
+        d12.generate_bytes()
+        self.assertIsInstance(d12, DataLine)
+        self.assertEqual(d12.byte_size, 3, 'byte string has 3 bytes')
+        self.assertEqual(d12.get_bytes(), bytearray([0x35, 0x66, 0x10]), 'byte array matches')
+
         with self.assertRaises(SystemExit, msg='this instruction should fail'):
             DataLine.factory(42, ' .cstr 0x42', 'bad cstr usage', 'big', memzone)
 

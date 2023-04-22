@@ -13,7 +13,7 @@ general :
     - sp
     - ij
     - mar
-  min_version: "0.3.4"
+  min_version: "0.4.0"
 predefined:
 operand_sets:
   8_bit_source:

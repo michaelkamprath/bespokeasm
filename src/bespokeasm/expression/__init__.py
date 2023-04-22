@@ -89,9 +89,9 @@ class ExpressionNode:
             # this wasn't a numeric value
             sys.exit(f'ERROR: {line_id} - Label {self.value} is not numeric = {self}')
 
-    def _compute(self, label_scope: LabelScope, line_id: LineIdentifier) -> float:
+    def _compute(self, label_scope: LabelScope, line_id: LineIdentifier) -> int:
         if self.token_type in [TokenType.T_NUM, TokenType.T_LABEL]:
-            return float(self._numeric_value(label_scope, line_id))
+            return self._numeric_value(label_scope, line_id)
         if self.token_type in [TokenType.T_LSB, TokenType.T_BYTE]:
             byte_idx = 0
             if self.token_type == TokenType.T_BYTE:
@@ -113,10 +113,14 @@ class ExpressionNode:
                     ]:
                 left_result = int(left_result)
                 right_result = int(right_result)
+            elif self.token_type in [TokenType.T_DIV, TokenType.T_MOD]:
+                left_result = float(left_result)
+                right_result = float(right_result)
             return operation(left_result, right_result)
 
     def get_value(self, label_scope: LabelScope, line_id: LineIdentifier) -> int:
-        return int(self._compute(label_scope, line_id))
+        calculated_value = self._compute(label_scope, line_id)
+        return int(calculated_value)
 
     def contains_register_labels(self, register_labels: set[str]) -> bool:
         contained_registers = self.contained_labels().intersection(register_labels)
@@ -141,28 +145,29 @@ def parse_expression(line_id: LineIdentifier, expression: str) -> ExpressionNode
     return ast
 
 
-def _lexical_analysis(line_id: LineIdentifier, s: str) -> list[ExpressionNode]:
-    mappings = {
-        '<<': TokenType.T_LEFT_SHIFT,
-        '>>': TokenType.T_RIGHT_SHIFT,
-        '+': TokenType.T_PLUS,
-        '-': TokenType.T_MINUS,
-        '*': TokenType.T_MULT,
-        '/': TokenType.T_DIV,
-        '%': TokenType.T_MOD,
-        '&': TokenType.T_AND,
-        '|': TokenType.T_OR,
-        '^': TokenType.T_XOR,
-        '(': TokenType.T_LPAR,
-        ')': TokenType.T_RPAR,
-        'LSB(': TokenType.T_LSB,
-    }
+TOKEN_MAPPINGS = {
+    '<<': TokenType.T_LEFT_SHIFT,
+    '>>': TokenType.T_RIGHT_SHIFT,
+    '+': TokenType.T_PLUS,
+    '-': TokenType.T_MINUS,
+    '*': TokenType.T_MULT,
+    '/': TokenType.T_DIV,
+    '%': TokenType.T_MOD,
+    '&': TokenType.T_AND,
+    '|': TokenType.T_OR,
+    '^': TokenType.T_XOR,
+    '(': TokenType.T_LPAR,
+    ')': TokenType.T_RPAR,
+    'LSB(': TokenType.T_LSB,
+}
 
+
+def _lexical_analysis(line_id: LineIdentifier, s: str) -> list[ExpressionNode]:
     tokens = []
     expression_parts = re.findall(EXPRESSION_PARTS_PATTERN, s)
     for part in expression_parts:
-        if part in mappings:
-            token_type = mappings[part]
+        if part in TOKEN_MAPPINGS:
+            token_type = TOKEN_MAPPINGS[part]
             token = ExpressionNode(token_type, value=part)
         elif part.startswith('BYTE'):
             token = ExpressionNode(TokenType.T_BYTE, value=part)

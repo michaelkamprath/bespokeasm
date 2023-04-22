@@ -1,5 +1,6 @@
 import io
 import math
+import sys
 
 from bespokeasm.assembler.line_object import LineObject, LineWithBytes
 from bespokeasm.assembler.line_object.label_line import LabelLine
@@ -127,7 +128,10 @@ class ListingPrettyPrinter(PrettyPrinterBase):
 
         # write the machine code
         if line_bytes is not None:
-            output.write(line_bytes[0])
+            try:
+                output.write(line_bytes[0])
+            except IndexError:
+                sys.exit(f'ERROR - internal: line_bytes is empty for line {lobj} at {lobj.line_id}')
         else:
             output.write(' ' * self._bytes_per_line * 3)
         output.write('| ')

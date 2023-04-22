@@ -63,6 +63,11 @@ def main():
         '--include-path', '-I', multiple=True, default=[],
         help='Path to use when searching for included asm files. Multiple paths can be seperately specified.'
     )
+@click.option(
+        '--predefined', '-D', multiple=True, default=[],
+        help='Predefine name as macro. Assigning name with value may be done with "name=value" syntax. '
+             'Multiple can be seperately specified.'
+    )
 def compile(
             asm_file,
             config_file,
@@ -75,7 +80,8 @@ def compile(
             pretty_print_format,
             pretty_print_output,
             verbose,
-            include_path
+            include_path,
+            predefined
         ):
     if output_file is None:
         output_file = os.path.splitext(asm_file)[0] + '.bin'
@@ -95,6 +101,7 @@ def compile(
         binary_fill,
         pretty_print, pretty_print_format, pretty_print_output, verbose,
         include_path,
+        predefined,
     )
     asm.assemble_bytecode()
 

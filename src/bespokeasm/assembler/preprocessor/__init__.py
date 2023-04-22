@@ -23,6 +23,14 @@ class Preprocessor:
                     f'instruction set configuration YAML file.'
                 )
 
+    def add_cli_symbols(self, cli_symbols: list[str]) -> None:
+        for symbol_str in cli_symbols:
+            if '=' in symbol_str:
+                name, value = symbol_str.split('=')
+                self.create_symbol(name.strip(), value.strip())
+            else:
+                self.create_symbol(symbol_str.strip(), None)
+
     def create_symbol(self, name: str, value: str, line_id: LineIdentifier = None) -> PreprocessorSymbol:
         if name not in self._symbols:
             symbol = PreprocessorSymbol(name, value, line_id)

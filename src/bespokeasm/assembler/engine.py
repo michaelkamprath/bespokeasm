@@ -29,6 +29,7 @@ class Assembler:
                 pretty_print_output: str,
                 is_verbose: int,
                 include_paths: list[str],
+                predefined: list[str],
             ):
         self._source_file = source_file
         self._output_file = output_file
@@ -43,6 +44,7 @@ class Assembler:
         self._binary_end = binary_end
         self._model = AssemblerModel(self._config_file, self._verbose)
         self._include_paths = include_paths
+        self._predefined_symbols = predefined
 
     def assemble_bytecode(self):
         global_label_scope = self._model.global_label_scope
@@ -52,7 +54,10 @@ class Assembler:
             self._model.predefined_memory_zones,
         )
 
+        # create preprocessor
         preprocessor: Preprocessor = Preprocessor(self._model.predefined_symbols)
+        # add any predefined macros from the command line
+        preprocessor.add_cli_symbols(self._predefined_symbols)
 
         # create the predefined memory blocks
         predefines_lineid = LineIdentifier(0, os.path.basename(self._config_file))
