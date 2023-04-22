@@ -17,9 +17,9 @@ start:
 #else
     pop j
 #ifdef SYMBOL3      ; nested #ifdef
-    mov a, 0
+    mov a, SYMBOL2
 #else
-    mov a, 1
+    mov a, SYMBOL1
 #endif
 #endif
 

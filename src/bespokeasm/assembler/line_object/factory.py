@@ -67,6 +67,8 @@ class LineOjectFactory:
                     log_verbosity,
                 ))
         else:
+            # resolve proprocessor symbols
+            instruction_str = preprocessor.resolve_symbols(instruction_str)
             # parse instruction
             while len(instruction_str) > 0:
                 # try label

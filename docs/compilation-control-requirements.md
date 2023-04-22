@@ -52,5 +52,8 @@ When a `#ifdef` directive is encountered, the symbol will be checked for a defin
 
 ## In-code Symbol Replacement
 
-* If a symbol is used in the code, it will be replaced with its replacement value string before the line of code is compiled.
-* If a symbol is undefined at the time a line of code is being evaluated, an error will be generated indicating an undefined symbol in code.
+* If a symbol is used in the code, it will be replaced with its replacement value string when the line is first read and evaluated. The replacement value string will be lazily evaluated.
+  * This only applies to non-preprocessor lines. Preprocessor lines will be evaluated when the preprocessor directive is encountered. Generally, preprocessor symbols are only resolved in compilation control processor directives.
+* Preprocessor symbols can be used to define lanel names. However, the resolved symbol value muist be a valid label name.
+* If a symbol is not defined when a line of code is read, it does not get replaced with its replacement value string even if the symbol is defined later in the code.
+* If a symbol is undefined at the time a compilation control preprocessor directive is being evaluated, an error will be generated indicating an undefined symbol in code.

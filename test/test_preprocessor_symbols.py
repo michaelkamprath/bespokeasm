@@ -223,7 +223,7 @@ class TestPreprocessorSymbols(unittest.TestCase):
             'symbol value should be (13 + 27)'
         )
 
-    def test_compilation_control(self):
+    def test_compilation_contro_and_symbol_replacement(self):
         with pkg_resources.path(config_files, 'test_compilation_control.yaml') as fp:
             isa_model = AssemblerModel(str(fp), 0)
         label_scope = GlobalLabelScope(isa_model.registers)
@@ -266,6 +266,13 @@ class TestPreprocessorSymbols(unittest.TestCase):
             if not line_objs[i].compilable:
                 actual_no_compile_lines.append(i)
         self.assertEqual(actual_no_compile_lines, expected_no_compile_lines, 'no compile lines should be 9, 12, 18, 22, 26')
+
+        # symbol replacement
+        #   line 16 is "mov a, SYMBOL2", should become "mov a, 0"
+        #   line 18 is "mov a, SYMBOL1", should become "mov a, 1"
+
+        self.assertEqual(line_objs[16].instruction, 'mov a, 0', 'line 16 should be "mov a, 0"')
+        self.assertEqual(line_objs[18].instruction, 'mov a, 1', 'line 18 should be "mov a, 1"')
 
     def test_condition_stack(self):
         stack = ConsitionStack()
