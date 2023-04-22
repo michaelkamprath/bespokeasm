@@ -81,7 +81,7 @@ def compile(
             pretty_print_output,
             verbose,
             include_path,
-            predefined
+            macro_symbol
         ):
     if output_file is None:
         output_file = os.path.splitext(asm_file)[0] + '.bin'
@@ -101,7 +101,7 @@ def compile(
         binary_fill,
         pretty_print, pretty_print_format, pretty_print_output, verbose,
         include_path,
-        predefined,
+        macro_symbol,
     )
     asm.assemble_bytecode()
 
