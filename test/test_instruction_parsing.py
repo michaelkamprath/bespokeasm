@@ -279,6 +279,16 @@ class TestInstructionParsing(unittest.TestCase):
         ins4.generate_bytes()
         self.assertEqual(list(ins4.get_bytes()), [0xFF, 0x8F, 0], 'instruction byte should match')
 
+        ins5 = InstructionLine.factory(
+            22, 'cmp [hl+[4]],0', 'some comment!',
+            isa_model, memzone_mngr.global_zone, memzone_mngr,
+        )
+        ins5.set_start_address(1212)
+        self.assertIsInstance(ins5, InstructionLine)
+        ins5.label_scope = TestInstructionParsing.label_values
+        ins5.generate_bytes()
+        self.assertEqual(list(ins5.get_bytes()), [0xFF, 0xEF, 4, 0], 'instruction byte should match')
+
         with self.assertRaises(SystemExit, msg='no instruction  should match here'):
             bad1 = InstructionLine.factory(
                 22, '  mov a, [sp+i]', 'some comment!',
