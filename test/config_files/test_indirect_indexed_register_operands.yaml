@@ -41,6 +41,18 @@ operand_sets:
           min: -128
           size: 8
           byte_align: true
+      defered_indexed_hl:
+        type: indirect_indexed_register
+        register: hl
+        bytecode:
+          value: 5
+          size: 3
+        index_operands:
+          indirect_addr:
+            type: indirect_numeric
+            argument:
+              size: 8
+              byte_align: true
       indirect_addr:
         type: indirect_numeric
         bytecode:
