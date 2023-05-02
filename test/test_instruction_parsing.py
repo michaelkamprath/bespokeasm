@@ -287,7 +287,7 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertIsInstance(ins5, InstructionLine)
         ins5.label_scope = TestInstructionParsing.label_values
         ins5.generate_bytes()
-        ins5.assertEqual(list(ins4.get_bytes()), [0xFF, 0xEF, 4, 0], 'instruction byte should match')
+        self.assertEqual(list(ins5.get_bytes()), [0xFF, 0xEF, 4, 0], 'instruction byte should match')
 
         with self.assertRaises(SystemExit, msg='no instruction  should match here'):
             bad1 = InstructionLine.factory(

@@ -21,7 +21,7 @@ class IndirectNumericOperand(NumericExpressionOperand):
 
     @cached_property
     def match_pattern(self) -> str:
-        return r'^\[\s*({0})\s*\]$'.format(super().match_pattern)
+        return r'\[\s*({0})\s*\]'.format(super().match_pattern)
 
     def parse_operand(
         self,
@@ -31,7 +31,7 @@ class IndirectNumericOperand(NumericExpressionOperand):
         memzone_manager: MemoryZoneManager,
     ) -> ParsedOperand:
         # first check that operand is what we expect
-        match = re.match(self.match_pattern, operand.strip())
+        match = re.match(f'^{self.match_pattern}$', operand.strip())
         if match is not None and len(match.groups()) > 0:
             return self._parse_bytecode_parts(
                 line_id,

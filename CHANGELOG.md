@@ -15,6 +15,7 @@ Changes that are planned but not implemented yet:
   * unknown labels
 
 ## [Unreleased]
+* Fixed [reported bug](https://github.com/michaelkamprath/bespokeasm/issues/25) where indirect indexed register operands were not parsed properly.
 
 ## [0.4.0]
 * Added ability to create preprocessor macros/symbols with `#define` directive. Thes macros can then be used in code. Also added the ability to define preprocessor symbols on the command line and in the instruction set configuration file.
