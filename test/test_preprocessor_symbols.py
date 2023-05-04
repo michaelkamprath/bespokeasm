@@ -259,7 +259,7 @@ class TestPreprocessorSymbols(unittest.TestCase):
         self.assertTrue(preprocessor.get_symbol('CODE_SYMBOL') is not None, 'CODE_SYMBOL should be defined')
         self.assertEqual(preprocessor.get_symbol('CODE_SYMBOL').value, 'push a', 'symbol value should be: push a')
 
-    def test_compilation_contro_and_symbol_replacement(self):
+    def test_compilation_control_and_symbol_replacement(self):
         with pkg_resources.path(config_files, 'test_compilation_control.yaml') as fp:
             isa_model = AssemblerModel(str(fp), 0)
         label_scope = GlobalLabelScope(isa_model.registers)
@@ -279,15 +279,12 @@ class TestPreprocessorSymbols(unittest.TestCase):
                 [],
                 memzone_manager,
                 preprocessor,
-                3,
+                0,
             )
         except SystemExit:
             print(isa_model)
             print(f'  instructions = {isa_model.instructions}')
             raise
-
-        for lobj in line_objs:
-            print(f'{lobj} ==> {lobj.compilable}')
 
         # ensure file was assembled as expected
         #   there is one for each preprocessor statement, plus one for the label,
