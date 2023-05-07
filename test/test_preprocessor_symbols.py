@@ -160,13 +160,13 @@ class TestPreprocessorSymbols(unittest.TestCase):
         self.assertTrue(c18.evaluate(preprocessor), 'else should be true when parent is false')
 
     def test_define_symbol_line_objects(self):
-        with pkg_resources.path(config_files, 'test_instructions_with_variants.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
-            memzone_mngr = MemoryZoneManager(
-                isa_model.address_size,
-                isa_model.default_origin,
-                isa_model.predefined_memory_zones,
-            )
+        fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
 
         global_scope = GlobalLabelScope(set())
         lineid = LineIdentifier(12, 'test_define_symbol_line_objects')
@@ -260,8 +260,8 @@ class TestPreprocessorSymbols(unittest.TestCase):
         self.assertEqual(preprocessor.get_symbol('CODE_SYMBOL').value, 'push a', 'symbol value should be: push a')
 
     def test_compilation_control_and_symbol_replacement(self):
-        with pkg_resources.path(config_files, 'test_compilation_control.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
+        fp = pkg_resources.files(config_files).joinpath('test_compilation_control.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
         label_scope = GlobalLabelScope(isa_model.registers)
         memzone_manager = MemoryZoneManager(
             isa_model.address_size,
@@ -270,8 +270,8 @@ class TestPreprocessorSymbols(unittest.TestCase):
         )
         preprocessor = Preprocessor()
 
-        with pkg_resources.path(test_code, 'test_compilation_control.asm') as asm_fp:
-            asm_obj = AssemblyFile(asm_fp, label_scope)
+        asm_fp = pkg_resources.files(test_code).joinpath('test_compilation_control.asm')
+        asm_obj = AssemblyFile(asm_fp, label_scope)
 
         try:
             line_objs: list[LineObject] = asm_obj.load_line_objects(

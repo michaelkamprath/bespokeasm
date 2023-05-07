@@ -44,12 +44,12 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             print(f'  Constructing files into temp dir: {destination_dir}')
 
         # generate syntax file
-        with pkg_resources.path(resources, 'sublime-syntax.yaml') as fp:
-            with open(fp, 'r') as syntax_file:
-                try:
-                    syntax_dict = yaml.safe_load(syntax_file)
-                except yaml.YAMLError as exc:
-                    sys.exit(f'ERROR: {exc}')
+        fp = pkg_resources.files(resources).joinpath('sublime-syntax.yaml')
+        with open(fp, 'r') as syntax_file:
+            try:
+                syntax_dict = yaml.safe_load(syntax_file)
+            except yaml.YAMLError as exc:
+                sys.exit(f'ERROR: {exc}')
 
         # handle instructions
         update_instructions = False
@@ -176,20 +176,20 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
 
         # copy color files over
         color_scheme_fp = os.path.join(destination_dir, self.language_name + '.sublime-color-scheme')
-        with pkg_resources.path(resources, 'sublime-color-scheme.json') as fp:
-            shutil.copy(str(fp), color_scheme_fp)
-            if self.verbose > 1:
-                print(f'  generated {os.path.basename(color_scheme_fp)}')
+        fp = pkg_resources.files(resources).joinpath('sublime-color-scheme.json')
+        shutil.copy(str(fp), color_scheme_fp)
+        if self.verbose > 1:
+            print(f'  generated {os.path.basename(color_scheme_fp)}')
 
         # copy keymap files over
         keymap_fp = os.path.join(destination_dir, 'Default.sublime-keymap')
-        with pkg_resources.path(resources, 'sublime-keymap.json') as fp:
-            shutil.copy(str(fp), keymap_fp)
-            if self.verbose > 1:
-                print(f'  generated {os.path.basename(keymap_fp)}')
+        fp = pkg_resources.files(resources).joinpath('sublime-keymap.json')
+        shutil.copy(str(fp), keymap_fp)
+        if self.verbose > 1:
+            print(f'  generated {os.path.basename(keymap_fp)}')
 
         # copy all snippet, macro, and preference files
-        for filename in pkg_resources.contents(resources):
+        for filename in [path.name for path in pkg_resources.files(resources).iterdir()]:
             if filename.endswith('.sublime-snippet.xml'):
                 file_obj = pkg_resources.files(resources).joinpath(filename)
                 with pkg_resources.as_file(file_obj) as fp:

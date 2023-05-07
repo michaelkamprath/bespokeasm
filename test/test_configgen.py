@@ -28,15 +28,15 @@ class TestConfigurationGeneration(unittest.TestCase):
 
     def test_vscode_configgen_no_registers(self):
         test_dir = tempfile.mkdtemp()
-        with pkg_resources.path(config_files, 'test_instruction_line_creation_little_endian.yaml') as config_file:
-            configgen = VSCodeConfigGenerator(
-                str(config_file),
-                0,
-                str(test_dir),
-                None,
-                None,
-                'asmtest',
-            )
+        config_file = pkg_resources.files(config_files).joinpath('test_instruction_line_creation_little_endian.yaml')
+        configgen = VSCodeConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            None,
+            None,
+            'asmtest',
+        )
 
         self.assertEqual(configgen.model.isa_name, 'bespokeasm-test', 'name should be in ISA config')
 
@@ -113,15 +113,15 @@ class TestConfigurationGeneration(unittest.TestCase):
 
     def test_vscode_configgen_with_registers(self):
         test_dir = tempfile.mkdtemp()
-        with pkg_resources.path(config_files, 'test_indirect_indexed_register_operands.yaml') as config_file:
-            configgen = VSCodeConfigGenerator(
-                str(config_file),
-                0,
-                str(test_dir),
-                None,
-                None,
-                'asmtest',
-            )
+        config_file = pkg_resources.files(config_files).joinpath('test_indirect_indexed_register_operands.yaml')
+        configgen = VSCodeConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            None,
+            None,
+            'asmtest',
+        )
 
         self.assertEqual(configgen.model.isa_name, 'tester-assembly', 'name should be in ISA config')
 
@@ -187,15 +187,15 @@ class TestConfigurationGeneration(unittest.TestCase):
     def test_sublime_configgen_no_registers(self):
         test_destination_dir = tempfile.mkdtemp()
         test_tmp_dir = tempfile.mkdtemp()
-        with pkg_resources.path(config_files, 'test_instruction_line_creation_little_endian.yaml') as config_file:
-            configgen = SublimeConfigGenerator(
-                str(config_file),
-                0,
-                str(test_destination_dir),
-                None,
-                None,
-                'asmtest',
-            )
+        config_file = pkg_resources.files(config_files).joinpath('test_instruction_line_creation_little_endian.yaml')
+        configgen = SublimeConfigGenerator(
+            str(config_file),
+            0,
+            str(test_destination_dir),
+            None,
+            None,
+            'asmtest',
+        )
 
         self.assertEqual(configgen.model.isa_name, 'bespokeasm-test', 'name should be in ISA config')
         # generate the files to inspect their content
@@ -260,15 +260,15 @@ class TestConfigurationGeneration(unittest.TestCase):
     def test_sublime_configgen_with_registers(self):
         test_destination_dir = tempfile.mkdtemp()
         test_tmp_dir = tempfile.mkdtemp()
-        with pkg_resources.path(config_files, 'test_indirect_indexed_register_operands.yaml') as config_file:
-            configgen = SublimeConfigGenerator(
-                str(config_file),
-                0,
-                str(test_destination_dir),
-                None,
-                None,
-                'asmtest',
-            )
+        config_file = pkg_resources.files(config_files).joinpath('test_indirect_indexed_register_operands.yaml')
+        configgen = SublimeConfigGenerator(
+            str(config_file),
+            0,
+            str(test_destination_dir),
+            None,
+            None,
+            'asmtest',
+        )
 
         self.assertEqual(configgen.model.isa_name, 'tester-assembly', 'name should be in ISA config')
         # generate the files to inspect their content

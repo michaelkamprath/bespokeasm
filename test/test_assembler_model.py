@@ -21,8 +21,9 @@ class TestConfigObject(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls._register_argument_config_str = pkg_resources.read_text(config_files, 'register_argument_exmaple_config.yaml')
-        cls._eater_sap1_config_str = pkg_resources.read_text(config_files, 'eater-sap1-isa.yaml')
+        cls._register_argument_config_str = pkg_resources.files(config_files) \
+            .joinpath('register_argument_exmaple_config.yaml').read_text()
+        cls._eater_sap1_config_str = pkg_resources.files(config_files).joinpath('eater-sap1-isa.yaml').read_text()
         cls.label_values = LabelScope(LabelScopeType.GLOBAL, None, 'global')
         cls.label_values.set_label_value('label1', 2, 1)
         cls.label_values.set_label_value('LABEL2', 0xF0, 2)
@@ -45,9 +46,9 @@ class TestConfigObject(unittest.TestCase):
         self.assertTrue('int16' in arg_collection2)
 
     def test_instruction_parsing(self):
-        with pkg_resources.path(config_files, 'eater-sap1-isa.yaml') as fp:
-            model1 = AssemblerModel(str(fp), 0)
-            memzone_mngr = MemoryZoneManager(model1.address_size, model1.default_origin)
+        fp = pkg_resources.files(config_files).joinpath('eater-sap1-isa.yaml')
+        model1 = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(model1.address_size, model1.default_origin)
 
         test_line_id = LineIdentifier(1212, 'test_instruction_parsing')
 
@@ -81,9 +82,9 @@ class TestConfigObject(unittest.TestCase):
             'assembled instruction'
         )
 
-        with pkg_resources.path(config_files, 'register_argument_exmaple_config.yaml') as fp:
-            model2 = AssemblerModel(str(fp), 0)
-            memzone_mngr2 = MemoryZoneManager(model2.address_size, model2.default_origin)
+        fp = pkg_resources.files(config_files).joinpath('register_argument_exmaple_config.yaml')
+        model2 = AssemblerModel(str(fp), 0)
+        memzone_mngr2 = MemoryZoneManager(model2.address_size, model2.default_origin)
 
         piA = InstructioParser.parse_instruction(
             model2, LineIdentifier(1, 'test_mov_a_i'), 'mov a, i', memzone_mngr2,
@@ -229,24 +230,24 @@ class TestConfigObject(unittest.TestCase):
             InstructioParser.parse_instruction(model2, test_line_id, 'mov a', memzone_mngr2)
 
     def test_bad_registers_in_configuratin(self):
-        with pkg_resources.path(config_files, 'test_bad_registers_in_configuratin.yaml') as fp:
-            with self.assertRaises(SystemExit, msg='model configuration should not specify prohibited register names'):
-                AssemblerModel(str(fp), 0)
+        fp = pkg_resources.files(config_files).joinpath('test_bad_registers_in_configuratin.yaml')
+        with self.assertRaises(SystemExit, msg='model configuration should not specify prohibited register names'):
+            AssemblerModel(str(fp), 0)
 
     def test_min_required_version(self):
-        with pkg_resources.path(config_files, 'test_min_required_version_config.yaml') as fp:
-            with self.assertRaises(SystemExit, msg='the min version check should fail'):
-                AssemblerModel(str(fp), 0)
+        fp = pkg_resources.files(config_files).joinpath('test_min_required_version_config.yaml')
+        with self.assertRaises(SystemExit, msg='the min version check should fail'):
+            AssemblerModel(str(fp), 0)
 
     def test_predefined_entities(self):
-        with pkg_resources.path(config_files, 'test_compiler_features.yaml') as fp:
-            model = AssemblerModel(str(fp), 0)
+        fp = pkg_resources.files(config_files).joinpath('test_compiler_features.yaml')
+        model = AssemblerModel(str(fp), 0)
 
         self.assertSetEqual(set(model.predefined_labels), set(['CONST1', 'CONST2', 'buffer']), 'label set should equal')
 
     def test_mnemonic_lists(self):
-        with pkg_resources.path(config_files, 'test_instruction_macros.yaml') as fp:
-            model = AssemblerModel(str(fp), 0)
+        fp = pkg_resources.files(config_files).joinpath('test_instruction_macros.yaml')
+        model = AssemblerModel(str(fp), 0)
 
         self.assertSetEqual(
             model.instruction_mnemonics,

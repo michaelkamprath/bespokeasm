@@ -18,8 +18,8 @@ class TestInstructionMacros(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        with pkg_resources.path(config_files, 'test_instruction_macros.yaml') as fp:
-            cls.isa_model = AssemblerModel(str(fp), 0)
+        fp = pkg_resources.files(config_files).joinpath('test_instruction_macros.yaml')
+        cls.isa_model = AssemblerModel(str(fp), 0)
 
         global_scope = cls.isa_model.global_label_scope
         global_scope.set_label_value('var1', 0x4589, 1)

@@ -89,8 +89,8 @@ class TestLabelScope(unittest.TestCase):
             local_scope.set_label_value('zero', 666, lineid)
 
     def test_line_object_scope_assignment(self):
-        with pkg_resources.path(config_files, 'test_memory_zones.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
+        fp = pkg_resources.files(config_files).joinpath('test_memory_zones.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
         label_scope = GlobalLabelScope(isa_model.registers)
         memzone_manager = MemoryZoneManager(
             isa_model.address_size,
@@ -99,8 +99,8 @@ class TestLabelScope(unittest.TestCase):
         )
         preprocessor = Preprocessor()
 
-        with pkg_resources.path(test_code, 'test_line_object_scope_assignment.asm') as asm_fp:
-            asm_obj = AssemblyFile(asm_fp, label_scope)
+        asm_fp = pkg_resources.files(test_code).joinpath('test_line_object_scope_assignment.asm')
+        asm_obj = AssemblyFile(asm_fp, label_scope)
 
         try:
             line_objs: list[LineObject] = asm_obj.load_line_objects(

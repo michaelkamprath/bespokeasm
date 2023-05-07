@@ -236,13 +236,13 @@ class TestLineObject(unittest.TestCase):
             )
 
     def test_label_line_with_instruction(self):
-        with pkg_resources.path(config_files, 'test_instructions_with_variants.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
-            memzone_mngr = MemoryZoneManager(
-                isa_model.address_size,
-                isa_model.default_origin,
-                isa_model.predefined_memory_zones,
-            )
+        fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
 
         label_values = GlobalLabelScope(isa_model.registers)
         label_values.set_label_value('a_const', 40, 1)
@@ -338,13 +338,13 @@ class TestLineObject(unittest.TestCase):
         self.assertFalse(is_valid_label('final frontier'), 'invalid label: contains space')
 
     def test_instruction_line_creation(self):
-        with pkg_resources.path(config_files, 'test_instruction_list_creation_isa.json') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
-            memzone_mngr = MemoryZoneManager(
-                isa_model.address_size,
-                isa_model.default_origin,
-                isa_model.predefined_memory_zones,
-            )
+        fp = pkg_resources.files(config_files).joinpath('test_instruction_list_creation_isa.json')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
 
         label_values = GlobalLabelScope(isa_model.registers)
         label_values.set_label_value('test1', 0xA, 1)
@@ -429,9 +429,9 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(ins6.get_bytes(), bytearray([0x18]), 'instruction should match')
 
     def test_bad_instruction_lines(self):
-        with pkg_resources.path(config_files, 'register_argument_exmaple_config.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
-            memzone_mngr = MemoryZoneManager(isa_model.address_size, isa_model.default_origin)
+        fp = pkg_resources.files(config_files).joinpath('register_argument_exmaple_config.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(isa_model.address_size, isa_model.default_origin)
 
         # this instruction should fail because register A is not configured to be an
         # indirect register, so the parser assumes this is a indirect numeric expression
@@ -451,13 +451,13 @@ class TestLineObject(unittest.TestCase):
             )
 
     def test_instruction_line_creation_little_endian(self):
-        with pkg_resources.path(config_files, 'test_instruction_line_creation_little_endian.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
-            memzone_mngr = MemoryZoneManager(
-                isa_model.address_size,
-                isa_model.default_origin,
-                isa_model.predefined_memory_zones,
-            )
+        fp = pkg_resources.files(config_files).joinpath('test_instruction_line_creation_little_endian.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
 
         label_values = GlobalLabelScope(isa_model.registers)
         label_values.set_label_value('test1', 0xABCD, 1)
@@ -502,13 +502,13 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(ins3.get_bytes(), bytearray([0xFF, 0x3C]), 'instruction should match')
 
     def test_specifc_configured_operands(self):
-        with pkg_resources.path(config_files, 'register_argument_exmaple_config.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
-            memzone_mngr = MemoryZoneManager(
-                isa_model.address_size,
-                isa_model.default_origin,
-                isa_model.predefined_memory_zones,
-            )
+        fp = pkg_resources.files(config_files).joinpath('register_argument_exmaple_config.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
 
         label_values = GlobalLabelScope(isa_model.registers)
         label_values.set_label_value('test1', 0xABCD, 1)
@@ -557,9 +557,9 @@ class TestLineObject(unittest.TestCase):
         label_values = GlobalLabelScope(set())
         label_values.set_label_value('test1', 0x1234, 1)
         line_id = LineIdentifier(33, 'test_test_line_object_factory')
-        with pkg_resources.path(config_files, 'test_instruction_line_creation_little_endian.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
-            memzone_mngr = MemoryZoneManager(isa_model.address_size, isa_model.default_origin)
+        fp = pkg_resources.files(config_files).joinpath('test_instruction_line_creation_little_endian.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(isa_model.address_size, isa_model.default_origin)
 
         lo1: list[LineObject] = LineOjectFactory.parse_line(
             line_id,
@@ -580,13 +580,13 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(list(dl1.get_bytes()), [0x34, 0x12])
 
     def test_compound_instruction_line(self):
-        with pkg_resources.path(config_files, 'test_operand_features.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
-            memzone_mngr = MemoryZoneManager(
-                isa_model.address_size,
-                isa_model.default_origin,
-                isa_model.predefined_memory_zones,
-            )
+        fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
 
         lineid = LineIdentifier(55, 'test_compound_instruction_line')
         preprocessor = Preprocessor()
@@ -710,13 +710,13 @@ class TestLineObject(unittest.TestCase):
                 )
 
     def test_unknown_instruction(self):
-        with pkg_resources.path(config_files, 'test_operand_features.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
-            memzone_mngr = MemoryZoneManager(
-                isa_model.address_size,
-                isa_model.default_origin,
-                isa_model.predefined_memory_zones,
-            )
+        fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
 
         lineid = LineIdentifier(66, 'test_unknown_instruction')
 

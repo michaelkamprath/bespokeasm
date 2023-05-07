@@ -33,13 +33,13 @@ class TestInstructionParsing(unittest.TestCase):
         InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN = None
 
     def test_instruction_variant_matching(self):
-        with pkg_resources.path(config_files, 'test_instructions_with_variants.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
-            memzone_mngr = MemoryZoneManager(
-                isa_model.address_size,
-                isa_model.default_origin,
-                isa_model.predefined_memory_zones,
-            )
+        fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
 
         # start simple
         ins1 = InstructionLine.factory(
@@ -143,13 +143,13 @@ class TestInstructionParsing(unittest.TestCase):
             )
 
     def test_operand_decorators(self):
-        with pkg_resources.path(config_files, 'test_indirect_indexed_register_operands.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
-            memzone_mngr = MemoryZoneManager(
-                isa_model.address_size,
-                isa_model.default_origin,
-                isa_model.predefined_memory_zones,
-            )
+        fp = pkg_resources.files(config_files).joinpath('test_indirect_indexed_register_operands.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
 
         ins0 = InstructionLine.factory(
             22, 'mov a, +i', 'some comment!',
@@ -185,13 +185,13 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertEqual(list(ins2.get_bytes()), [0xFF, 0x64, 0x1D], 'instruction byte should match')
 
     def test_indexed_regsiter_operands(self):
-        with pkg_resources.path(config_files, 'test_indirect_indexed_register_operands.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
-            memzone_mngr = MemoryZoneManager(
-                isa_model.address_size,
-                isa_model.default_origin,
-                isa_model.predefined_memory_zones,
-            )
+        fp = pkg_resources.files(config_files).joinpath('test_indirect_indexed_register_operands.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
 
         ins0 = InstructionLine.factory(
             22, 'jmp hl+j', 'some comment!',
@@ -216,13 +216,13 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertEqual(list(ins1.get_bytes()), [0xC3, 0x07], 'instruction byte should match')
 
     def test_indirect_indexed_regsiter_operands(self):
-        with pkg_resources.path(config_files, 'test_indirect_indexed_register_operands.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
-            memzone_mngr = MemoryZoneManager(
-                isa_model.address_size,
-                isa_model.default_origin,
-                isa_model.predefined_memory_zones,
-            )
+        fp = pkg_resources.files(config_files).joinpath('test_indirect_indexed_register_operands.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
 
         ins0 = InstructionLine.factory(
             22, 'mov a, [hl+i]', 'some comment!',
@@ -299,13 +299,13 @@ class TestInstructionParsing(unittest.TestCase):
             bad1.generate_bytes()
 
     def test_label_parsing(self):
-        with pkg_resources.path(config_files, 'test_instructions_with_variants.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
-            memzone_mngr = MemoryZoneManager(
-                isa_model.address_size,
-                isa_model.default_origin,
-                isa_model.predefined_memory_zones,
-            )
+        fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
 
         lineid = LineIdentifier(42, 'test_label_parsing')
         preprocessor = Preprocessor()
@@ -360,13 +360,13 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertEqual(l3.get_value(), 0x42, 'value should be right')
 
     def test_operand_bytecode_ordering(self):
-        with pkg_resources.path(config_files, 'test_operand_features.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
-            memzone_mngr = MemoryZoneManager(
-                isa_model.address_size,
-                isa_model.default_origin,
-                isa_model.predefined_memory_zones,
-            )
+        fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
 
         lineid = LineIdentifier(13, 'test_operand_bytecode_ordering')
 
@@ -393,13 +393,13 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertEqual(list(t2.get_bytes()), [0b10011100, 0x20], 'instruction byte should match')
 
     def test_deferred_operands(self):
-        with pkg_resources.path(config_files, 'test_operand_features.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
-            memzone_mngr = MemoryZoneManager(
-                isa_model.address_size,
-                isa_model.default_origin,
-                isa_model.predefined_memory_zones,
-            )
+        fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
 
         lineid = LineIdentifier(13, 'test_deferred_operands')
 
@@ -426,13 +426,13 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertEqual(list(t2.get_bytes()), [0b10011101, 0x08], 'instruction byte should match')
 
     def test_instruction_bytecode_suffixes(self):
-        with pkg_resources.path(config_files, 'test_operand_features.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
-            memzone_mngr = MemoryZoneManager(
-                isa_model.address_size,
-                isa_model.default_origin,
-                isa_model.predefined_memory_zones,
-            )
+        fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
 
         lineid = LineIdentifier(13, 'test_instruction_bytecode_suffixes')
 
@@ -448,13 +448,13 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertEqual(list(t1.get_bytes()), [0b11010101, 0xF0], 'instruction byte should match')
 
     def test_enumeration_operand(self):
-        with pkg_resources.path(config_files, 'test_operand_features.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
-            memzone_mngr = MemoryZoneManager(
-                isa_model.address_size,
-                isa_model.default_origin,
-                isa_model.predefined_memory_zones,
-            )
+        fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
 
         lineid = LineIdentifier(21, 'test_enumeration_operand')
 
@@ -470,13 +470,13 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertEqual(list(t1.get_bytes()), [0b00111001, 0xBB], 'instruction byte should match')
 
     def test_numeric_bytecode_operand(self):
-        with pkg_resources.path(config_files, 'test_operand_features.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
-            memzone_mngr = MemoryZoneManager(
-                isa_model.address_size,
-                isa_model.default_origin,
-                isa_model.predefined_memory_zones,
-            )
+        fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
 
         lineid = LineIdentifier(33, 'test_numeric_bytecode_operand')
 
@@ -530,13 +530,13 @@ class TestInstructionParsing(unittest.TestCase):
             e2.generate_bytes()
 
     def test_numeric_enumeration_operand(self):
-        with pkg_resources.path(config_files, 'test_operand_features.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
-            memzone_mngr = MemoryZoneManager(
-                isa_model.address_size,
-                isa_model.default_origin,
-                isa_model.predefined_memory_zones,
-            )
+        fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
 
         lineid = LineIdentifier(33, 'test_numeric_enumeration_operand')
 
@@ -571,13 +571,13 @@ class TestInstructionParsing(unittest.TestCase):
             e1.generate_bytes()
 
     def test_expressions_in_operations(self):
-        with pkg_resources.path(config_files, 'test_operand_features.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
-            memzone_mngr = MemoryZoneManager(
-                isa_model.address_size,
-                isa_model.default_origin,
-                isa_model.predefined_memory_zones,
-            )
+        fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
 
         lineid = LineIdentifier(42, 'test_expressions_in_operations')
 
@@ -605,13 +605,13 @@ class TestInstructionParsing(unittest.TestCase):
             )
 
     def test_case_insentive_instructions(self):
-        with pkg_resources.path(config_files, 'test_operand_features.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
-            memzone_mngr = MemoryZoneManager(
-                isa_model.address_size,
-                isa_model.default_origin,
-                isa_model.predefined_memory_zones,
-            )
+        fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
 
         lineid = LineIdentifier(42, 'test_case_insentive_instructions')
 
@@ -627,13 +627,13 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertEqual(list(t1.get_bytes()), [0b11010101, 17], 'instruction byte should match')
 
     def test_operand_order(self):
-        with pkg_resources.path(config_files, 'test_instruction_operands.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
-            memzone_mngr = MemoryZoneManager(
-                isa_model.address_size,
-                isa_model.default_origin,
-                isa_model.predefined_memory_zones,
-            )
+        fp = pkg_resources.files(config_files).joinpath('test_instruction_operands.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
 
         lineid = LineIdentifier(42, 'test_operand_order')
 
@@ -671,13 +671,13 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertEqual(list(t3.get_bytes()), [0x81, 0x32, 0x10], 'instruction byte should match')
 
     def test_relative_address_operand(self):
-        with pkg_resources.path(config_files, 'test_instruction_operands.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
-            memzone_mngr = MemoryZoneManager(
-                isa_model.address_size,
-                isa_model.default_origin,
-                isa_model.predefined_memory_zones,
-            )
+        fp = pkg_resources.files(config_files).joinpath('test_instruction_operands.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
 
         lineid = LineIdentifier(66, 'test_relative_address_operand')
 
@@ -745,13 +745,13 @@ class TestInstructionParsing(unittest.TestCase):
             bt2.generate_bytes()
 
     def test_valid_address_operand_enforcement(self):
-        with pkg_resources.path(config_files, 'test_valid_address_enforcement.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
-            memzone_mngr = MemoryZoneManager(
-                isa_model.address_size,
-                isa_model.default_origin,
-                isa_model.predefined_memory_zones,
-            )
+        fp = pkg_resources.files(config_files).joinpath('test_valid_address_enforcement.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
         lineid = LineIdentifier(37, 'test_valid_address_operand_enforcement')
 
         t1 = InstructionLine.factory(

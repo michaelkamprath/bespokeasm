@@ -18,8 +18,8 @@ class TestDirectiveLines(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        with pkg_resources.path(config_files, 'test_instruction_list_creation_isa.json') as fp:
-            TestDirectiveLines.isa_model = AssemblerModel(str(fp), 0)
+        fp = pkg_resources.files(config_files).joinpath('test_instruction_list_creation_isa.json')
+        TestDirectiveLines.isa_model = AssemblerModel(str(fp), 0)
         cls.memory_zone_manager = MemoryZoneManager(
             TestDirectiveLines.isa_model.address_size,
             TestDirectiveLines.isa_model.default_origin,

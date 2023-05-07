@@ -22,8 +22,8 @@ class TestMemoryZones(unittest.TestCase):
         self.assertEqual(z1.end, 0x7FFF, 'end address should be correct')
 
     def test_memory_zone_creation(self):
-        with pkg_resources.path(config_files, 'test_memory_zones.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
+        fp = pkg_resources.files(config_files).joinpath('test_memory_zones.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
         label_scope = GlobalLabelScope(isa_model.registers)
         memzone_manager = MemoryZoneManager(
             isa_model.address_size,
@@ -34,16 +34,16 @@ class TestMemoryZones(unittest.TestCase):
         self.assertEqual(memzone_manager.global_zone.start, 0x0100, 'global zone starts at $0100')
         self.assertEqual(memzone_manager.global_zone.end, 0xDFFF, 'global zone ends at $DFFF')
 
-        with pkg_resources.path(test_code, 'test_memory_zones.asm') as asm_fp:
-            asm_obj = AssemblyFile(asm_fp, label_scope)
+        asm_fp = pkg_resources.files(test_code).joinpath('test_memory_zones.asm')
+        asm_obj = AssemblyFile(asm_fp, label_scope)
 
-            line_objs = asm_obj.load_line_objects(
-                isa_model,
-                [],
-                memzone_manager,
-                preprocessor,
-                3,
-            )
+        line_objs = asm_obj.load_line_objects(
+            isa_model,
+            [],
+            memzone_manager,
+            preprocessor,
+            3,
+        )
 
         self.assertEqual(len(line_objs), 10, '10 code lines')
         self.assertIsNotNone(memzone_manager.zone('variables'), 'variables memory zone should exist')
@@ -61,8 +61,8 @@ class TestMemoryZones(unittest.TestCase):
         self.assertEqual(memzone_manager.zone('predefined_zone').current_address, 0x2000, 'current address')
 
     def test_invalid_memory_zones(self):
-        with pkg_resources.path(config_files, 'test_memory_zones.yaml') as fp:
-            isa_model = AssemblerModel(str(fp), 0)
+        fp = pkg_resources.files(config_files).joinpath('test_memory_zones.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
         memzone_manager = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,

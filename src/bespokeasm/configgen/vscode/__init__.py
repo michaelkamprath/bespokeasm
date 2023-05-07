@@ -33,9 +33,9 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
         Path(extension_dir_path).mkdir(parents=True, exist_ok=True)
         Path(os.path.join(extension_dir_path, 'syntaxes')).mkdir(parents=True, exist_ok=True)
         # generate package.json
-        with pkg_resources.path(resources, 'package.json') as fp:
-            with open(fp, 'r') as json_file:
-                package_json = json.load(json_file)
+        fp = pkg_resources.files(resources).joinpath('package.json')
+        with open(fp, 'r') as json_file:
+            package_json = json.load(json_file)
 
         scope_name = 'source.' + self.language_id
         theme_filename = self.language_id + '.tmTheme'
@@ -56,9 +56,9 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
                 print('  generated package.json')
 
         # generate tmGrammar.json
-        with pkg_resources.path(resources, 'tmGrammar.json') as fp:
-            with open(fp, 'r') as json_file:
-                grammar_json = json.load(json_file)
+        fp = pkg_resources.files(resources).joinpath('tmGrammar.json')
+        with open(fp, 'r') as json_file:
+            grammar_json = json.load(json_file)
 
         grammar_json['scopeName'] = scope_name
         # handle instructions
@@ -150,17 +150,17 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
                 print(f'  generated {os.path.basename(tmGrammar_fp)}')
 
         # copy snippets.json and lanaguage-configuration.json, nothing to modify
-        with pkg_resources.path(resources, 'snippets.json') as fp:
-            shutil.copy(str(fp), extension_dir_path)
-            if self.verbose > 1:
-                print(f'  generated {os.path.basename(str(fp))}')
+        fp = pkg_resources.files(resources).joinpath('snippets.json')
+        shutil.copy(str(fp), extension_dir_path)
+        if self.verbose > 1:
+            print(f'  generated {os.path.basename(str(fp))}')
 
-        with pkg_resources.path(resources, 'language-configuration.json') as fp:
-            shutil.copy(str(fp), extension_dir_path)
-            if self.verbose > 1:
-                print(f'  generated {os.path.basename(str(fp))}')
+        fp = pkg_resources.files(resources).joinpath('language-configuration.json')
+        shutil.copy(str(fp), extension_dir_path)
+        if self.verbose > 1:
+            print(f'  generated {os.path.basename(str(fp))}')
 
-        with pkg_resources.path(resources, 'tmTheme.xml') as fp:
-            shutil.copy(str(fp), os.path.join(extension_dir_path, theme_filename))
-            if self.verbose > 1:
-                print(f'  generated {theme_filename}')
+        fp = pkg_resources.files(resources).joinpath('tmTheme.xml')
+        shutil.copy(str(fp), os.path.join(extension_dir_path, theme_filename))
+        if self.verbose > 1:
+            print(f'  generated {theme_filename}')
