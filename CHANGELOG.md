@@ -15,6 +15,7 @@ Changes that are planned but not implemented yet:
   * unknown labels
 
 ## [Unreleased]
+* added `.asciiz` as an equivalent data directive to `.cstr`
 * Updated Github workflow to add Python 3.11 to the test matrix.
 * Remove usage of deprecated aspects of Python `importlib` library so that the code will work with Python 3.11 without deprecation warnings.
 * Fixed [reported bug](https://github.com/michaelkamprath/bespokeasm/issues/25) where indirect indexed register operands were not parsed properly.

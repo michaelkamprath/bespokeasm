@@ -9,7 +9,7 @@ from bespokeasm.expression import parse_expression, ExpressionNode
 
 class DataLine(LineWithBytes):
     PATTERN_DATA_DIRECTIVE = re.compile(
-        r'^(\.byte|\.2byte|\.4byte|\.8byte|\.cstr)\b\s*(?:(?P<quote>[\"\'])((?:\\(?P=quote)|.)*)(?P=quote)'
+        r'^(\.byte|\.2byte|\.4byte|\.8byte|\.cstr|\.asciiz)\b\s*(?:(?P<quote>[\"\'])((?:\\(?P=quote)|.)*)(?P=quote)'
         r'|({0}(?:\s*\,{1})*))'.format(INSTRUCTION_EXPRESSION_PATTERN, INSTRUCTION_EXPRESSION_PATTERN),
         flags=re.IGNORECASE | re.MULTILINE
     )
@@ -20,6 +20,7 @@ class DataLine(LineWithBytes):
         '.4byte': 4,
         '.8byte': 8,
         '.cstr': 1,
+        '.asciiz': 1,
     }
 
     DIRECTIVE_VALUE_MASK = {
@@ -28,6 +29,7 @@ class DataLine(LineWithBytes):
         '.4byte': 0xFFFFFFFF,
         '.8byte': 0xFFFFFFFFFFFFFFFF,
         '.cstr': 0xFF,
+        '.asciiz': 0xFF,
     }
 
     def factory(
@@ -48,8 +50,8 @@ class DataLine(LineWithBytes):
             directive_str = data_match.group(1).strip()
             if data_match.group(3) is None and data_match.group(4) is not None:
                 # check to ensure this isn't a cstr
-                if directive_str == '.cstr':
-                    sys.exit(f'ERROR: {line_id} - .cstr data directive used with non-string value')
+                if directive_str == '.cstr' or directive_str == '.asciiz':
+                    sys.exit(f'ERROR: {line_id} - {directive_str} data directive used with non-string value')
                 # it's numeric
                 values_list = [x.strip() for x in data_match.group(4).strip().split(',') if x.strip() != '']
             elif data_match.group(3) is not None:
@@ -57,7 +59,7 @@ class DataLine(LineWithBytes):
                 # first, convert escapes
                 converted_str = bytes(data_match.group(3), "utf-8").decode("unicode_escape")
                 values_list = [ord(x) for x in list(converted_str)]
-                if directive_str == '.cstr':
+                if directive_str == '.cstr' or directive_str == '.asciiz':
                     # Add a 0-value at the end of the string values.
                     values_list.extend([cstr_terminator])
             else:

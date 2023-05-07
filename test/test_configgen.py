@@ -233,7 +233,10 @@ class TestConfigurationGeneration(unittest.TestCase):
         )
         self._assert_grouped_item_list(
             syntax_dict['contexts']['data_types_directives'][0]['match'],
-            ['\\.fill', '\\.zero', '\\.zerountil', '\\.byte', '\\.2byte', '\\.4byte', '\\.8byte', '\\.cstr'],
+            [
+                '\\.fill', '\\.zero', '\\.zerountil', '\\.byte', '\\.2byte',
+                '\\.4byte', '\\.8byte', '\\.cstr', '\\.asciiz',
+            ],
             'data type directives'
         )
         item_match_str = 'fail'
@@ -313,7 +316,7 @@ class TestConfigurationGeneration(unittest.TestCase):
             [
                 '\\.fill', '\\.zero', '\\.zerountil',
                 '\\.byte', '\\.2byte', '\\.4byte', '\\.8byte',
-                '\\.cstr'
+                '\\.cstr', '\\.asciiz',
             ],
             'data type directives'
         )

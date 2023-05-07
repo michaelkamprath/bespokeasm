@@ -85,6 +85,15 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(d5a.byte_size, 14, 'character string has 14 bytes')
         self.assertEqual(d5a.get_bytes(), bytearray(d5a_values), 'character string matches')
 
+        d6a_values = [ord(c) for c in test_str]
+        d6a_values.extend([0])
+        d6a = DataLine.factory(42, f' .asciiz "{test_str}"', 'string of bytes', 'big', memzone)
+        d6a.label_scope = label_values
+        d6a.generate_bytes()
+        self.assertIsInstance(d6a, DataLine)
+        self.assertEqual(d6a.byte_size, 14, 'character string has 14 bytes')
+        self.assertEqual(d6a.get_bytes(), bytearray(d6a_values), 'character string matches')
+
         d6 = DataLine.factory(38, ' .2byte test1, 12', '2 byte label mania', 'little', memzone)
         d6.label_scope = label_values
         d6.generate_bytes()
