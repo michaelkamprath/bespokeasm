@@ -18,6 +18,8 @@ predefined:
   constants:
     - name: predefined_value1
       value: 20
+    - name: _mandated_global
+      value: 30
   memory_zones:
     - name: predefined_zone
       start: 0x2000

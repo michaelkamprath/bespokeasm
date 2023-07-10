@@ -11,7 +11,7 @@ from bespokeasm import BESPOKEASM_VERSION_STR, BESPOKEASM_MIN_REQUIRED_STR
 from bespokeasm.assembler.keywords import ASSEMBLER_KEYWORD_SET
 from bespokeasm.assembler.model.instruction_set import InstructionSet
 from bespokeasm.assembler.model.operand_set import OperandSet, OperandSetCollection
-from bespokeasm.assembler.label_scope import LabelScope
+from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType
 from bespokeasm.assembler.line_identifier import LineIdentifier
 
 
@@ -23,10 +23,10 @@ class AssemblerModel:
         self._global_label_scope = None
 
         if config_file_path.endswith('.json'):
-            with open(config_file_path, 'r') as json_file:
+            with open(config_file_path) as json_file:
                 config_dict = json.load(json_file)
         elif config_file_path.endswith('.yaml'):
-            with open(config_file_path, 'r') as yaml_file:
+            with open(config_file_path) as yaml_file:
                 try:
                     config_dict = yaml.safe_load(yaml_file)
                 except yaml.YAMLError as exc:
@@ -237,7 +237,12 @@ class AssemblerModel:
             for predefined_constant in self.predefined_constants:
                 label: str = predefined_constant['name']
                 value: int = predefined_constant['value']
-                self._global_label_scope.set_label_value(label, value, predefines_lineid)
+                self._global_label_scope.set_label_value(
+                    label,
+                    value,
+                    predefines_lineid,
+                    scope=LabelScopeType.GLOBAL,
+                )
         return self._global_label_scope
 
     @property

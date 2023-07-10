@@ -128,8 +128,8 @@ class LabelScope:
         else:
             return None
 
-    def set_label_value(self, label: str, value: int, line_id: LineIdentifier) -> None:
-        label_scope = LabelScopeType.get_label_scope(label)
+    def set_label_value(self, label: str, value: int, line_id: LineIdentifier, scope: LabelScopeType = None) -> None:
+        label_scope = LabelScopeType.get_label_scope(label) if scope is None else scope
         # first check to see if label name is a keyword
         # remove label prefix for checking
         base_label = label[len(label_scope.label_prefix):]

@@ -12,6 +12,7 @@ from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.pretty_printer.factory import PrettyPrinterFactory
 from bespokeasm.assembler.preprocessor import Preprocessor
+from bespokeasm.assembler.label_scope import LabelScopeType
 
 
 class Assembler:
@@ -78,7 +79,12 @@ class Assembler:
             data_obj.set_start_address(address)
             predefined_line_obs.append(data_obj)
             # set data object's label
-            global_label_scope.set_label_value(label, address, predefines_lineid)
+            global_label_scope.set_label_value(
+                label,
+                address,
+                predefines_lineid,
+                scope=LabelScopeType.GLOBAL,
+            )
 
             # add its label to the global scope
         # find base file containing directory
