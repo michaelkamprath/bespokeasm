@@ -23,6 +23,15 @@ operand_sets:
           size: 8
           byte_align: true
           endian: little
+  immediate_16bit:
+    # one byte is interpreted as an immediate value
+    operand_values:
+      int8:
+        type: numeric
+        argument:
+          size: 16
+          byte_align: true
+          endian: little
   absolute_address:
     # two bytes are interpreted as an address
     operand_values:
@@ -50,6 +59,116 @@ operand_sets:
           size: 8
           byte_align: true
           endian: little
+predefined:
+  constants:
+    -  # Start vector of the OS in RAM
+      name: _Start
+      value: 0xb000
+    -  # Hands back control to the input prompt
+      name: _Prompt
+      value: 0xb003
+    -  # Read a command line into _ReadBuffer
+      name: _ReadLine
+      value: 0xb006
+    -  # Skips whitespaces (<= 39) in command line
+      name: _ReadSpace
+      value: 0xb009
+    -  # Parses command line input for a HEX value
+      name: _ReadHex
+      value: 0xb00c
+    -  # Waits for a UART transmission to complete
+      name: _SerialWait
+      value: 0xb00f
+    -  # Transmits a zero-terminated string via UART
+      name: _SerialPrint
+      value: 0xb012
+    -  # Searches for file <name> given by _ReadPtr
+      name: _FindFile
+      value: 0xb015
+    -  # Loads a file <name> given by _ReadPtr
+      name: _LoadFile
+      value: 0xb018
+    -  # Save data to file <name> given by _ReadPtr
+      name: _SaveFile
+      value: 0xb01b
+    -  # Moves memory area
+      name: _MemMove
+      value: 0xb01e
+    -  # Returns a pseudo-random byte
+      name: _Random
+      value: 0xb021
+    -  # Scans the PS/2 register for new input
+      name: _ScanPS2
+      value: 0xb024
+    -  # Reads any input (PS/2 or serial)
+      name: _ReadInput
+      value: 0xb027
+    -  # Waits for any input (PS/2 or serial)
+      name: _WaitInput
+      value: 0xb02a
+    -  # Clears the video RAM
+      name: _ClearVRAM
+      value: 0xb02d
+    -  # Clears the video RAM viewport
+      name: _Clear
+      value: 0xb030
+    -  # Clears a row of video RAM
+      name: _ClearRow
+      value: 0xb033
+    -  # Sets a pixel
+      name: _SetPixel
+      value: 0xb036
+    -  # Clears a pixel
+      name: _ClrPixel
+      value: 0xb039
+    -  # Returns the state of a pixel
+      name: _GetPixel
+      value: 0xb03c
+    -  # Outputs a character at the cursor position
+      name: _Char
+      value: 0xb03f
+    -  # Draws a line
+      name: _Line
+      value: 0xb042
+    -  # Draws a rectangle
+      name: _Rect
+      value: 0xb045
+    -  # Prints a zero-terminated string
+      name: _Print
+      value: 0xb048
+    -  # Prints a character at the cursor position
+      name: _PrintChar
+      value: 0xb04b
+    -  # Prints a HEX number
+      name: _PrintHex
+      value: 0xb04e
+    -  # Scrolls up the viewport by 8 pixels
+      name: _ScrollUp
+      value: 0xb051
+    -  # Scrolls down the viewport by 8 pixels
+      name: _ScrollDn
+      value: 0xb054
+    -  # Resets the state of PS/2 SHIFT, ALTGR, CTRL
+      name: _ResetPS2
+      value: 0xb057
+    -  # Command line parsing pointer
+      name: _ReadPtr
+      value: 0xbf70
+    -  # Number parsed by _ReadHex
+      name: _ReadNum
+      value: 0xbf72
+    -  # 4 bytes defining the seed state of _Random
+      name: _RandomState
+      value: 0xbf84
+    -  # Horizontal cursor position (see _Print)
+      name: _XPos
+      value: 0xbf8c
+    -  # Vertical cursor position (see _Print)
+      name: _YPos
+      value: 0xbf8d
+    -  # Address of the command line input buffer
+      name: _ReadBuffer
+      value: 0xbf8e
 
 instructions:
   nop:
@@ -1072,12 +1191,26 @@ instructions:
       value: 0x7f
       size: 8
 macros:
-  # All Push macros push LSB first to keep with Minimal CPU OS calling convention.
-  # This means multibyte numbers will be in big endian arrangement on the stack.
-  # RAM values are little endian.
   spinit:
     - operands:
         count: 0
       instructions:
         - "ldi 0xfe"
         - "sta 0xffff"
+  phs2:
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - immediate_16bit
+      instructions:
+        - "ldi BYTE1(@ARG(0))"
+        - "phs"
+        - "ldi LSB(@ARG(0))"
+        - "phs"
+  pls2:
+    - operands:
+        count: 0
+      instructions:
+        - "pls"
+        - "pls"
