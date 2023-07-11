@@ -4,9 +4,10 @@
 ;   This simple program simply displays a string to the screen
 ;   and then returns to the OS prompt.
 ;
+#require "slu4-mincpu-asm >= 1.2.0"
 .org 0x8000
 init:
-    ; init the stack init
+    ; init the stack vector
     spinit
 
 start:

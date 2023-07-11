@@ -47,12 +47,19 @@ class AssembledInstruction:
             elif value is None:
                 sys.exit(f'ERROR - assembled instruction "{self}" had a part {p} that produced None for a value')
 
-            packed_bits.append_bits(
-                value,
-                p.value_size,
-                p.byte_align,
-                p.endian,
-            )
+            try:
+                packed_bits.append_bits(
+                    value,
+                    p.value_size,
+                    p.byte_align,
+                    p.endian,
+                )
+            except OverflowError as ofe:
+                sys.exit(
+                    f'ERROR - {self.line_id}: Value could not be converted, possibly due to '
+                    f'improper numeric formating - {ofe}'
+                )
+
         bytes = packed_bits.get_bytes()
         if len(bytes) != self.byte_size:
             # ERROR
