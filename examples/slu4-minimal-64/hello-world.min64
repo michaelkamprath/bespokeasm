@@ -1,0 +1,21 @@
+; Hello World
+;   for the Minimal 64 Home Computer
+;
+;   This simple program simply displays a string to the screen
+;   and then returns to the OS prompt.
+;
+.org 0x8000
+init:
+    ; init the stack init
+    spinit
+
+start:
+    phs2 message_str
+    jps _Print
+    pls2
+
+end:
+    jpa _Prompt
+
+message_str:
+    .cstr "Hello World!\n"

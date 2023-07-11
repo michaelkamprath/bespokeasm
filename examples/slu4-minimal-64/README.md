@@ -10,3 +10,5 @@ The following instruction macros have been added in the ISA confutation file for
 | Macros Instruction | Operand 1 | Operand 2 | Description |
 |:-:|:-:|:-:|:--|
 | `spinit` | - | - | Init the stack popint to a value of `0xFFFE`. Modifies A register. |
+| `phs2` | 2 bytes | - | Pushes a 2 byte value onto the stack. Maintains byte order according to Min64 OS calling convention. |
+| `pls2` | - | - | Pull 2 bytes from stack. Last byte pulled will bein A register. |

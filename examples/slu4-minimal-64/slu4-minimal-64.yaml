@@ -1204,9 +1204,9 @@ macros:
           list:
             - immediate_16bit
       instructions:
-        - "ldi BYTE1(@ARG(0))"
-        - "phs"
         - "ldi LSB(@ARG(0))"
+        - "phs"
+        - "ldi BYTE1(@ARG(0))"
         - "phs"
   pls2:
     - operands:
