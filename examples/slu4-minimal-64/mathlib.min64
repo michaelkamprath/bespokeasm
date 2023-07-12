@@ -1,0 +1,323 @@
+#require "slu4-min64-asm >= 1.2.0"
+
+; compare32
+;   Compares two 32-bit values to determine equality
+;
+;   Arguments
+;       sp+3 : left X value (4 bytes)
+;       sp+7 : right Y value (4 bytes)
+;       sp+11 : results flags placeholder
+;
+;   Returns
+;       sp+11 : results flags:
+;                   bit 0 - Zero Flag (values are equal)
+;                   bit 1 - Carry Flag (X > Y)
+;
+compare32:
+    ; init results
+    ldi 0 sta .flags    ; has to be RAM variable since stack ops alter flags
+    ; first check high bytes, then others in sequence
+    ; values on stack are stored big endian
+    lds (7+0) sta .rval lds (3+0) cpa .rval bne .done
+    lds (7+1) sta .rval lds (3+1) cpa .rval bne .done
+    lds (7+2) sta .rval lds (3+2) cpa .rval bne .done
+    lds (7+3) sta .rval lds (3+3) cpa .rval
+    ; check zero flag. flags still OK because no stack operatrion since CPA
+    bne .done   ldi %00000001 adb .flags    ; note this clears the flags
+.done:
+    ; check carry flag
+    bcc .return ldi %00000010 adb .flags
+.return:
+    lda .flags sts 11
+    rts
+.rval: .byte 0
+.flags: .byte 0
+
+
+; multiply32
+;   multiply 4 byte values X*Y, producing in a 8 byte results
+;
+; Arguments
+;   sp+3 - value X (multiplier) (4 bytes)
+;   sp+7 - value Y (multiplicand) (4 bytes)
+;
+; Return Value
+;   sp+3 - results (8 bytes)
+;
+
+multiply32:
+    ; set counter for 32 bits
+    ldi 32 sta .counter
+    ; set up 8 byte results memory block
+    cpy4ai .working_mem+4,0     ; high word inialized to 0
+    cpy4as .working_mem,3       ; multiplier in low word
+.mult_loop:
+    ; check to see if LSb of working memory is 1
+    lda .working_mem+0 lsr bcc .continue
+    ; add high word of results to multiplicand
+    phs4s 7
+    phs4a .working_mem+4
+    jps add32
+    cpy4as .working_mem+4,1
+    pls4
+    pls4
+.continue:
+    ; shift results right one.
+    jps .mult_lsr64
+    ; decrement counter and stop if 0
+    deb .counter ldi 0 cpa .counter bne .mult_loop
+.end:
+    cpy4sa 3,.working_mem+4
+    cpy4sa 7,.working_mem+0
+    rts
+.counter: .byte 0
+.working_mem: .zero 8
+; .mult_lsr64
+;
+;   local method for shifting .working_mem right 1 bit
+.mult_lsr64:
+    lda .working_mem+7 lsr sta .working_mem+7
+    lda .working_mem+6 ror sta .working_mem+6
+    lda .working_mem+5 ror sta .working_mem+5
+    lda .working_mem+4 ror sta .working_mem+4
+    lda .working_mem+3 ror sta .working_mem+3
+    lda .working_mem+2 ror sta .working_mem+2
+    lda .working_mem+1 ror sta .working_mem+1
+    lda .working_mem+0 ror sta .working_mem+0
+    rts
+
+
+; divide32
+;   Divides X by Y
+;
+;   Arguments:
+;       sp+3 : value X dividend (4 bytes)
+;       sp+7 : value Y divisor (4 bytes)
+;
+;   Return Value:
+;       sp+3 : the quotient (replaces X)
+;       sp+7 : the remainder (replaces Y)
+;
+divide32:
+    ; first check values for 0
+    phsi 0
+    phs4i 0
+    phs4s (7+5)
+    jps compare32
+    pls4
+    lds 5 cpi 1 beq .divide_by_zero
+    phs4s (3+5)
+    jps compare32
+    pls4
+    pls4
+    lds 1 pls cpi 1 beq .return_zero
+    ; check if divisor > dividend
+    phsi 0
+    phs4s (3+1)
+    phs4s (7+5)
+    jps compare32
+    pls4
+    pls4
+    lds 1 pls cpi 2 beq .divisor_too_large
+.start_division:
+    ; set up working stack:
+    ;   little endian
+    ;   0 : low word (4 bytes)  --> becomes quotient
+    ;   4 : high word (4 bytes) --> becomes remainder
+    ldi 0 sta .carry_bit        ; init carry bit
+    cpy4ai .working_mem+4, 0    ; init high word
+    cpy4as .working_mem+0, 3    ; init low word with dividend
+    ldi 32 sta .counter         ; init loop counter
+.div_loop:
+    ; shift working memory and add carry bit to the right side
+    jps .div_lsl64
+    lda .working_mem+0
+    ada .carry_bit
+    sta .working_mem+0
+    ldi 0 sta .carry_bit
+    ; determine if we can do subtraction
+    phsi 0                 ; compare results
+    phs4s 7+1              ; divisor
+    phs4a .working_mem+4   ; working value high word
+    jps compare32
+    lds 9 cpi 0 beq .div_loop_continue
+.div_loop_subtraction:
+    ; working value is equal to or larger than divsior
+    ; do the subtraction
+    jps subtract32
+    ; save subtraction results to high word and set carry bit
+    cpy4as .working_mem+4, 1
+    ldi 1 sta .carry_bit
+.div_loop_continue:
+    ; clear stack
+    pls4
+    pls4
+    pls
+    ; decrement counter and check for 0
+    deb .counter
+    lda .counter cpi 0 bne .div_loop
+.division_done:
+    ; at this point we have the remainder in the high word, save it
+    cpy4sa 7,.working_mem+4
+    ; and then we left shift one more time to get the quotient
+    jps .div_lsl64
+    lda .working_mem+0
+    ada .carry_bit
+    sta .working_mem+0
+    cpy4sa 3,.working_mem+0
+    rts
+.divisor_too_large:
+    ; quotient = 0, remander = dividend
+    cpy4ss 7, 3
+    cpy4si 3, 0
+    rts
+.divide_by_zero:
+    ; for now, just return 0
+    pls4
+    pls
+    cpy4si 7, 0
+.return_zero:
+    cpy4si 3, 0
+    rts
+.working_mem: .zero 8
+.carry_bit: .byte 0
+.counter: .byte 0
+; .div_lsl64
+;
+;   local method for shifting .working_mem left 1 bit
+.div_lsl64:
+    lda .working_mem+0 lsl sta .working_mem+0
+    lda .working_mem+1 rol sta .working_mem+1
+    lda .working_mem+2 rol sta .working_mem+2
+    lda .working_mem+3 rol sta .working_mem+3
+    lda .working_mem+4 rol sta .working_mem+4
+    lda .working_mem+5 rol sta .working_mem+5
+    lda .working_mem+6 rol sta .working_mem+6
+    lda .working_mem+7 rol sta .working_mem+7
+    rts
+
+
+
+; add32
+;   adds Y value to X (X+Y)
+;
+;   Arguments
+;       sp+3 - value X, 4 byte value
+;       sp+7 - value Y, 4 byte value
+;
+;   Return Value
+;       sp+2 - replace the original 4 byte value with the sum
+;
+add32:
+    ; since interacting with the stack has an undefined impact
+    ; on the carry flags, we need to copy the values to local
+    ; variables first.
+    ; stack is big endian, save locally little endian
+    cpy4as .xval, 3
+    cpy4as .yval, 7
+    ; star subtractiosn with LSB
+    lda .xval+0 ada .yval+0 sta .xval+0
+    lda .xval+1 aca .yval+1 sta .xval+1
+    lda .xval+2 aca .yval+2 sta .xval+2
+    lda .xval+3 aca .yval+3 sta .xval+3
+    ; save results back to stack
+    cpy4sa 3, .xval
+    ; end return
+    rts
+.xval: .4byte 0
+.yval: .4byte 0
+
+
+; subtract32
+;   subtracts Y value from X (X-Y)
+;
+;   Arguments
+;       sp+3 - value X, 4 byte value
+;       sp+7 - value Y, 4 byte value
+;
+;   Return Value
+;       sp+3 - replace the original 4 byte value with the difference
+;
+;
+subtract32:
+    ; since interacting with the stack has an undefined impact
+    ; on the carry flags, we need to copy the values to local
+    ; variables first.
+    ; stack is big endian, save locally little endian
+    cpy4as .xval, 3
+    cpy4as .yval, 7
+    ; star subtractiosn with LSB
+    lda .xval+0 sba .yval+0 sta .xval+0
+    lda .xval+1 sca .yval+1 sta .xval+1
+    lda .xval+2 sca .yval+2 sta .xval+2
+    lda .xval+3 sca .yval+3 sta .xval+3
+    ; save results back to stack
+    cpy4sa 3, .xval
+    ; end return
+    rts
+.xval: .4byte 0
+.yval: .4byte 0
+
+
+;
+; 8-bit Random Number Generator
+;
+;   Based on algorithm listed here:
+;       https://www.electro-tech-online.com/threads/ultra-fast-pseudorandom-number-generator-for-8-bit.124249/
+;
+
+; init_random8:
+;
+;   Arguments
+;       sp+3 : A value (1 byte)
+;       sp+4 : B value (1 byte)
+;       sp+5 : C value (1 byte)
+;
+;   Returns
+;       nothing
+;
+init_random8:
+    lds 3
+    xra _random_seed_a
+    sta _random_seed_a
+    lds 4
+    xra _random_seed_b
+    sta _random_seed_b
+    lds 5
+    xra _random_seed_c
+    sta _random_seed_c
+    phsi 0                     ; dummy value
+    jps random8
+    pls
+    rts
+
+; random8
+;
+;   Arguments
+;       sp+3 - Place holder for return value
+;
+;   Returns
+;       sp+3 - 8 bit random value
+;
+random8:
+    ; x++
+    ldi 1 adb _random_seed_x
+    ; a = (a^c^x)
+    lda _random_seed_a
+    xra _random_seed_c
+    xra _random_seed_x
+    sta _random_seed_a
+    ; b = (b+a)
+    adb _random_seed_b                      ; register A is still new A value
+    ; c = (c+(b>>1)^a)
+    lda _random_seed_b
+    lsr                                     ; register A is new B value
+    xra _random_seed_a
+    adb _random_seed_c lda _random_seed_c
+    sts 3
+    rts
+
+_random_seed_a: .byte 0
+_random_seed_b: .byte 0
+_random_seed_c: .byte 0
+_random_seed_x: .byte 0

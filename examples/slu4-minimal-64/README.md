@@ -30,10 +30,27 @@ The following instruction macros have been added in the ISA confutation file for
 
 | Macros Instruction | Operand 1 | Operand 2 | Description |
 |:-:|:-:|:-:|:--|
-| `spinit` | - | - | Init the stack popint to a value of `0xFFFE`. Modifies A register. |
-| `phs2` | 2 bytes | - | Pushes a 2 byte value onto the stack. . |
+| `spinit` | - | - | Init the stack popint to a value of `0xFFFE`. |
+| `phsi` | 1 byte | - | Pushes a 1 byte immediate value onto the stack. |
+| `phs2i` | 2 bytes | - | Pushes a 2 byte immediate value onto the stack. |
+| `phs4i` | 4 bytes | - | Pushes a 4 byte immediate value onto the stack. |
+| `phsa` | absolute address | - | Push onto stack 1 byte found at absolute address |
+| `phs2a` | absolute address | - | Push onto stack 2 bytes found at absolute address |
+| `phs4a` | absolute address | - | Push onto stack 4 bytes found at absolute address |
+| `phss` | stack offset | - | Push onto stack 1 byte value currently found at indicated stack offset |
+| `phs2s` | stack offset | - | Push onto stack 2 byte value currently found at indicated stack offset |
+| `phs4s` | stack offset | - | Push onto stack 4 byte value currently found at indicated stack offset |
 | `pls2` | - | - | Pull 2 bytes from stack. Last byte pulled will be in A register. |
+| `pls4` | - | - | Pull 4 bytes from stack. Last byte pulled will be in A register. |
+| `cpy2as` | absolute address | stack offset | Copy 2 bytes of data sourced from indicated stack offset to memory starting at indicated absolute address. Convert from stack big endian ordering to RAM little endian ordering. |
+| `cpy2sa` | stack offset | absolute address | Copy 2 bytes of data sourced from absolute address to stack at indicated offset. Convert from RAM little endian to stack big endian ordering ordering. |
+| `cpy4as` | absolute address | stack offset | Copy 4 bytes of data sourced from indicated stack offset to memory starting at indicated absolute address. Convert from stack big endian ordering to RAM little endian ordering. |
+| `cpy4sa` | stack offset | absolute address | Copy 4 bytes of data sourced from absolute address to stack at indicated offset. Convert from RAM little endian to stack big endian ordering ordering. |
+| `cpy4ai` | absolute address | immediate | Copy 4 bytes of immediate value to memory starting at indicated absolute address. Preserves endian ordering. |
+| `cpy4si` | stack offset | immediate | Copy 4 bytes of immediate value to stack at indicated offset. Convert from RAM little endian to stack big endian ordering ordering. |
+| `cpy4ss` | stack offset | stack offset | Copy 4 bytes of data from stack starting at indicated offset (2nd operand) to another location in stack starting at indicated offset (1rst operand). Byte ordering is preserved. |
 
+The operand descriptions use the definitions provided by documentation for Minimal 64. You should assume the accumulator (register `A`) is not preserved across any of these macros.
 
 ### Assembly Syntax
 **BespokeASM**'s syntax is close to the syntax that Carsten used for the Minimal CPU's assembly language. However, there are some differences:

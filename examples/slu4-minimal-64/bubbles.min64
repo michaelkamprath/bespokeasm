@@ -4,7 +4,7 @@
 ;
 ; ported to BespokeASM syntax by Michael Kamprath
 ; ---------------------------------------
-#require "slu4-mincpu-asm >= 1.2.0"
+#require "slu4-min64-asm >= 1.2.0"
 .org 0x8000
 
 start:          LDI 0xfe STA 0xffff

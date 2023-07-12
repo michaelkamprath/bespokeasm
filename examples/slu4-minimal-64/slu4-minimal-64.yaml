@@ -9,7 +9,7 @@ general:
     - bank
   origin: 0x0000
   identifier:
-    name: slu4-mincpu-asm
+    name: slu4-min64-asm
     version: "1.2.0"
     extension: min64
   min_version: 0.4.0
@@ -24,12 +24,21 @@ operand_sets:
           byte_align: true
           endian: little
   immediate_16bit:
-    # one byte is interpreted as an immediate value
+    # 2 bytes is interpreted as an immediate value
     operand_values:
       int8:
         type: numeric
         argument:
           size: 16
+          byte_align: true
+          endian: little
+  immediate_32bit:
+    # 4 bytea is interpreted as an immediate value
+    operand_values:
+      int8:
+        type: numeric
+        argument:
+          size: 32
           byte_align: true
           endian: little
   absolute_address:
@@ -1197,7 +1206,16 @@ macros:
       instructions:
         - "ldi 0xfe"
         - "sta 0xffff"
-  phs2:
+  phsi:
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - immediate_8bit
+      instructions:
+        - "ldi @ARG(0)"
+        - "phs"
+  phs2i:
     - operands:
         count: 1
         operand_sets:
@@ -1208,9 +1226,218 @@ macros:
         - "phs"
         - "ldi BYTE1(@ARG(0))"
         - "phs"
+  phs4i:
+    - operands:
+        count: 1
+        specific_operands:
+          immediate:
+            list:
+              uint32:
+                type: numeric
+                argument:
+                  size: 32
+                  byte_align: true
+      instructions:
+        - "ldi BYTE0(@ARG(0))"
+        - "phs"
+        - "ldi BYTE1(@ARG(0))"
+        - "phs"
+        - "ldi BYTE2(@ARG(0))"
+        - "phs"
+        - "ldi BYTE3(@ARG(0))"
+        - "phs"
+  phsa:
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - absolute_address
+      instructions:
+        - "lda @ARG(0)"
+        - "phs"
+  phs2a:
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - absolute_address
+      instructions:
+        - "lda @ARG(0)+0"
+        - "phs"
+        - "lda @ARG(0)+1"
+        - "phs"
+  phs4a:
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - absolute_address
+      instructions:
+        - "lda @ARG(0)+0"
+        - "phs"
+        - "lda @ARG(0)+1"
+        - "phs"
+        - "lda @ARG(0)+2"
+        - "phs"
+        - "lda @ARG(0)+3"
+        - "phs"
+  phss:
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - immediate_8bit
+      instructions:
+        - "lds @ARG(0)"
+        - "phs"
+  phs2s:
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - immediate_8bit
+      instructions:
+        # value on stack is big endian, start with LSB
+        - "lds @ARG(0)+(1+0)"
+        - "phs"
+        - "lds @ARG(0)+(0+1)"
+        - "phs"
+  phs4s:
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - immediate_8bit
+      instructions:
+        # value on stack is big endian, start with LSB
+        - "lds @ARG(0)+(3+0)"
+        - "phs"
+        - "lds @ARG(0)+(2+1)"
+        - "phs"
+        - "lds @ARG(0)+(1+2)"
+        - "phs"
+        - "lds @ARG(0)+(0+3)"
+        - "phs"
   pls2:
     - operands:
         count: 0
       instructions:
         - "pls"
         - "pls"
+  pls4:
+    - operands:
+        count: 0
+      instructions:
+        - "pls"
+        - "pls"
+        - "pls"
+        - "pls"
+  cpy2as:
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - absolute_address
+            - immediate_8bit
+      instructions:
+        # stack is big endian, memory is little endian
+        - "lds @ARG(1)+1"
+        - "sta @ARG(0)+0"
+        - "lds @ARG(1)+0"
+        - "sta @ARG(0)+1"
+  cpy2sa:
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - immediate_8bit
+            - absolute_address
+      instructions:
+        # stack is big endian, memory is little endian
+        - "lda @ARG(1)+0"
+        - "sts @ARG(0)+1"
+        - "lda @ARG(1)+1"
+        - "sts @ARG(0)+0"
+  cpy4as:
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - absolute_address
+            - immediate_8bit
+      instructions:
+        # stack is big endian, memory is little endian
+        - "lds @ARG(1)+3"
+        - "sta @ARG(0)+0"
+        - "lds @ARG(1)+2"
+        - "sta @ARG(0)+1"
+        - "lds @ARG(1)+1"
+        - "sta @ARG(0)+2"
+        - "lds @ARG(1)+0"
+        - "sta @ARG(0)+3"
+  cpy4sa:
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - immediate_8bit
+            - absolute_address
+      instructions:
+        # stack is big endian, memory is little endian
+        - "lda @ARG(1)+0"
+        - "sts @ARG(0)+3"
+        - "lda @ARG(1)+1"
+        - "sts @ARG(0)+2"
+        - "lda @ARG(1)+2"
+        - "sts @ARG(0)+1"
+        - "lda @ARG(1)+3"
+        - "sts @ARG(0)+0"
+  cpy4ai:
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - absolute_address
+            - immediate_32bit
+      instructions:
+        # Copies in little endian order
+        - "ldi BYTE0(@ARG(1))"
+        - "sta @ARG(0)+0"
+        - "ldi BYTE1(@ARG(1))"
+        - "sta @ARG(0)+1"
+        - "ldi BYTE2(@ARG(1))"
+        - "sta @ARG(0)+2"
+        - "ldi BYTE3(@ARG(1))"
+        - "sta @ARG(0)+3"
+  cpy4si:
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - immediate_8bit
+            - immediate_32bit
+      instructions:
+        - "ldi BYTE0(@ARG(1))"
+        - "sts @ARG(0)+0"
+        - "ldi BYTE1(@ARG(1))"
+        - "sts @ARG(0)+1"
+        - "ldi BYTE2(@ARG(1))"
+        - "sts @ARG(0)+2"
+        - "ldi BYTE3(@ARG(1))"
+        - "sts @ARG(0)+3"
+  cpy4ss:
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - immediate_8bit
+            - immediate_8bit
+      instructions:
+        - "lds @ARG(1)+0"
+        - "sts @ARG(0)+0"
+        - "lds @ARG(1)+1"
+        - "sts @ARG(0)+1"
+        - "lds @ARG(1)+2"
+        - "sts @ARG(0)+2"
+        - "lds @ARG(1)+3"
+        - "sts @ARG(0)+3"
