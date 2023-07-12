@@ -12,7 +12,7 @@ general:
     name: slu4-min64-asm
     version: "1.2.0"
     extension: min64
-  min_version: 0.4.0
+  min_version: 0.4.1
 operand_sets:
   immediate_8bit:
     # one byte is interpreted as an immediate value
