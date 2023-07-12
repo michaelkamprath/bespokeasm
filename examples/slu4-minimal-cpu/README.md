@@ -1,16 +1,16 @@
 # Minimal UART CPU System
 *Current as of v1.5.x of the Minimal UART CPU System*
 
-The Minimal UART CPU System (Minimal CPU) is TTL CPU designed by Carsten Herting (slu4). Carsten has made his [MinCPU design open and available to others](https://github.com/slu4coder/Minimal-UART-CPU-System/) to build. The MinCPU is is well documented, and even has [a MinCPU YouTube video series](https://youtube.com/playlist?list=PLYlQj5cfIcBU5SqFe6Uz4Q31_6VZyZ8h5) dedicated to it. 
+The Minimal UART CPU System (Minimal CPU) is TTL CPU designed by Carsten Herting (slu4). Carsten has made his [MinCPU design open and available to others](https://github.com/slu4coder/Minimal-UART-CPU-System/) to build. The MinCPU is is well documented, and even has [a MinCPU YouTube video series](https://youtube.com/playlist?list=PLYlQj5cfIcBU5SqFe6Uz4Q31_6VZyZ8h5) dedicated to it.
 
-As part of his effort to demonstrate the "minimal effort" needed to make a working computer, Cartsen has already implemented a simple yet solid assembler for the Minimal CPU. So the question might be asked, "Why port the Minimal CPU to BespokeASM?" Simply put, to have a more robust assembly for the Minimal CPU. The instruction set for the Minimal CPU is simple (no overly complex instructions), an so actions like pushing a value on the stack takes at least two instructions to complete. In scenarios like this, BespokeASM's instruction macros can simplify the code needed to accomplish common tasks.
+As part of his effort to demonstrate the "minimal effort" needed to make a working computer, Carsten has already implemented a simple yet solid assembler for the Minimal CPU. So the question might be asked, "Why port the Minimal CPU to BespokeASM?" Simply put, to have a more robust assembly for the Minimal CPU. The instruction set for the Minimal CPU is simple (no overly complex instructions), an so actions like pushing a value on the stack takes at least two instructions to complete. In scenarios like this, BespokeASM's instruction macros can simplify the code needed to accomplish common tasks.
 
-So the goal of this port to **BespokeASM** is to first support the basic instruction set of the Minimal CPU in its original form, but then build on that with richer features such as instruction macros to make assembly coding for the Minimal CPU more productive. 
+So the goal of this port to **BespokeASM** is to first support the basic instruction set of the Minimal CPU in its original form, but then build on that with richer features such as instruction macros to make assembly coding for the Minimal CPU more productive.
 
 ## Minimal CPU Assembly
 
 ### Instruction Set
-Carsten Heating thorough documents [the instruction set for the Minimal CPU in his user guide](https://docs.google.com/document/d/1c2ZHtLd1BBAwcBAjBZZJmCA3AXpbpv80dlAtsMYpuF4/edit?usp=sharing). All of the documented instructions in their original syntax are implemented in in this **BespokeASM** port. However, **BespokeASM** will be case insensitive when matching instruction mnemonics.
+Carsten Herting thorough documents [the instruction set for the Minimal CPU in his user guide](https://docs.google.com/document/d/1c2ZHtLd1BBAwcBAjBZZJmCA3AXpbpv80dlAtsMYpuF4/edit?usp=sharing). All of the documented instructions in their original syntax are implemented in in this **BespokeASM** port. However, **BespokeASM** will be case insensitive when matching instruction mnemonics.
 
 ### Instruction Macros
 The following instruction macros have been added in the ISA confutation file for the Minimal CPU:
@@ -68,4 +68,4 @@ Where each option means:
 * `-p` - Tells **BespokeASM** to pretty print the results to a human usable format.
 * `-t minhex` - Configured the format of the pretty printing. In this case, the `minhex` format is the same as the format that the Minimal CPU assembler emits, and can be directly copy/pasted into a terminal session with the Minimal CPU for uploading.
 * `--no-binary` - Tells **BespokeASM** to not emit a binary file containing the byte code. For the most part, the Minimal CPU does not use binary files in its day-to-day usage.
-* `path/to/source.min-asm` - The assembly source file to compile. By convention for **BespokeASM**, Minimal CPU assembly files have the extension of `*.min-cpu`. The only impact of this file extension is to signal to various editors what [syntax highlighting to be used](https://github.com/michaelkamprath/bespokeasm/wiki/Installation-and-Usage#installing-language-extensions). 
+* `path/to/source.min-asm` - The assembly source file to compile. By convention for **BespokeASM**, Minimal CPU assembly files have the extension of `*.min-cpu`. The only impact of this file extension is to signal to various editors what [syntax highlighting to be used](https://github.com/michaelkamprath/bespokeasm/wiki/Installation-and-Usage#installing-language-extensions).
