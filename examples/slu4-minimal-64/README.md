@@ -26,7 +26,7 @@ The arguments to the command above are:
 Carsten Herting thoroughly documents [the instruction set for the Minimal 64 in his user guide](https://docs.google.com/document/d/1e4hL9Z7BLIoUlErWgJOngnSMYLXjfnsZB9BtlwhTC6U/edit?usp=sharing). All of the documented instructions in their original syntax are implemented in in this **BespokeASM** port. However, **BespokeASM** will be case insensitive when matching instruction mnemonics.
 
 ### Instruction Macros
-The following instruction macros have been added in the ISA confutation file for the Minimal 64. All macros that interact with the stack maintain byte order according to Min64 OS calling convention, which pushes the LSB of the value first despite the system otherwise using little endian byte ordering. Not that this means multibyte values on the stack cannot be used directly art their stack memory address and must be "pulled" from the stack to another memory location where they can be represented in little endian byte ordering.
+The following instruction macros have been added in the ISA configuration file for the Minimal 64. All macros that interact with the stack maintain byte order according to the Minimal 64 OS calling convention, which pushes the LSB of the value first despite the system otherwise using little endian byte ordering. Not that this means multibyte values on the stack cannot be used directly art their stack memory address and must be "pulled" from the stack to another memory location where they can be represented in little endian byte ordering.
 
 | Macros Instruction | Operand 1 | Operand 2 | Description |
 |:-:|:-:|:-:|:--|
