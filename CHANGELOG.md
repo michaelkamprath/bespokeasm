@@ -15,10 +15,15 @@ Changes that are planned but not implemented yet:
   * unknown labels
 
 ## [Unreleased]
+
+## [0.4.1]
 * added `.asciiz` as an equivalent data directive to `.cstr`
 * Updated Github workflow to add Python 3.11 to the test matrix.
 * Remove usage of deprecated aspects of Python `importlib` library so that the code will work with Python 3.11 without deprecation warnings.
 * Fixed [reported bug](https://github.com/michaelkamprath/bespokeasm/issues/25) where indirect indexed register operands were not parsed properly.
+* Fixed bug that did not sanely handle an instructions operand configuration indicating 0 operands
+* Allow predefined constants to labels starting with `_`, which also indicates file scope for code defined labels
+* Added MThe Minimal 64 Home Computer example
 
 ## [0.4.0]
 * Added ability to create preprocessor macros/symbols with `#define` directive. Thes macros can then be used in code. Also added the ability to define preprocessor symbols on the command line and in the instruction set configuration file.
@@ -137,7 +142,8 @@ First tracked released
 * Enabled the `reverse_argument_order` instruction option be applied to a specific operand configuration. This slightly changed the configuration file format.
 * Added ability for instructions with operands to have a single "empty operand" variant, e.g., `pop`
 
-[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/michaelkamprath/bespokeasm/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.3.3...v0.4.0
 [0.3.3]: https://github.com/michaelkamprath/bespokeasm/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/michaelkamprath/bespokeasm/compare/v0.3.1...v0.3.2

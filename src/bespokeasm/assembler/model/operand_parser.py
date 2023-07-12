@@ -230,7 +230,7 @@ class OperandParser:
             self._specific_operands_model = SpecificOperandsModel(self._config['specific_operands'], default_endian, registers)
         else:
             self._specific_operands_model = None
-        # Sey Up Operant Sets
+        # Set Up Operant Sets
         if 'operand_sets' in self._config:
             self._operand_sets_model = OperandSetsModel(instruction, self._config['operand_sets'], operand_set_collection)
         else:
@@ -270,6 +270,9 @@ class OperandParser:
         this operand profile did not match.
         '''
         matched_operands: list[ParsedOperand] = []
+
+        if self.operand_count == 0 and len(operands) == 0:
+            return MatchedOperandSet([], False, False)
 
         # Step 1 - Look for specific operand matches
         if self._specific_operands_model is not None:

@@ -1,0 +1,1443 @@
+---
+description: slu4 Minimal 64 Home Computer
+general:
+  address_size: 16
+  endian: little
+  registers:
+    - a
+    - b
+    - bank
+  origin: 0x0000
+  identifier:
+    name: slu4-min64-asm
+    version: "1.2.0"
+    extension: min64
+  min_version: 0.4.1
+operand_sets:
+  immediate_8bit:
+    # one byte is interpreted as an immediate value
+    operand_values:
+      int8:
+        type: numeric
+        argument:
+          size: 8
+          byte_align: true
+          endian: little
+  immediate_16bit:
+    # 2 bytes is interpreted as an immediate value
+    operand_values:
+      int8:
+        type: numeric
+        argument:
+          size: 16
+          byte_align: true
+          endian: little
+  immediate_32bit:
+    # 4 bytea is interpreted as an immediate value
+    operand_values:
+      int8:
+        type: numeric
+        argument:
+          size: 32
+          byte_align: true
+          endian: little
+  absolute_address:
+    # two bytes are interpreted as an address
+    operand_values:
+      address:
+        type: numeric
+        argument:
+          size: 16
+          byte_align: true
+          endian: little
+  relative_address:
+    # two byte is interpreted as a relative address
+    operand_values:
+      address:
+        type: numeric
+        argument:
+          size: 16
+          byte_align: true
+          endian: little
+  offset:
+    # one byte is interpreted as an offset
+    operand_values:
+      int8:
+        type: numeric
+        argument:
+          size: 8
+          byte_align: true
+          endian: little
+predefined:
+  constants:
+    -  # Start vector of the OS in RAM
+      name: _Start
+      value: 0xb000
+    -  # Hands back control to the input prompt
+      name: _Prompt
+      value: 0xb003
+    -  # Read a command line into _ReadBuffer
+      name: _ReadLine
+      value: 0xb006
+    -  # Skips whitespaces (<= 39) in command line
+      name: _ReadSpace
+      value: 0xb009
+    -  # Parses command line input for a HEX value
+      name: _ReadHex
+      value: 0xb00c
+    -  # Waits for a UART transmission to complete
+      name: _SerialWait
+      value: 0xb00f
+    -  # Transmits a zero-terminated string via UART
+      name: _SerialPrint
+      value: 0xb012
+    -  # Searches for file <name> given by _ReadPtr
+      name: _FindFile
+      value: 0xb015
+    -  # Loads a file <name> given by _ReadPtr
+      name: _LoadFile
+      value: 0xb018
+    -  # Save data to file <name> given by _ReadPtr
+      name: _SaveFile
+      value: 0xb01b
+    -  # Moves memory area
+      name: _MemMove
+      value: 0xb01e
+    -  # Returns a pseudo-random byte
+      name: _Random
+      value: 0xb021
+    -  # Scans the PS/2 register for new input
+      name: _ScanPS2
+      value: 0xb024
+    -  # Reads any input (PS/2 or serial)
+      name: _ReadInput
+      value: 0xb027
+    -  # Waits for any input (PS/2 or serial)
+      name: _WaitInput
+      value: 0xb02a
+    -  # Clears the video RAM
+      name: _ClearVRAM
+      value: 0xb02d
+    -  # Clears the video RAM viewport
+      name: _Clear
+      value: 0xb030
+    -  # Clears a row of video RAM
+      name: _ClearRow
+      value: 0xb033
+    -  # Sets a pixel
+      name: _SetPixel
+      value: 0xb036
+    -  # Clears a pixel
+      name: _ClrPixel
+      value: 0xb039
+    -  # Returns the state of a pixel
+      name: _GetPixel
+      value: 0xb03c
+    -  # Outputs a character at the cursor position
+      name: _Char
+      value: 0xb03f
+    -  # Draws a line
+      name: _Line
+      value: 0xb042
+    -  # Draws a rectangle
+      name: _Rect
+      value: 0xb045
+    -  # Prints a zero-terminated string
+      name: _Print
+      value: 0xb048
+    -  # Prints a character at the cursor position
+      name: _PrintChar
+      value: 0xb04b
+    -  # Prints a HEX number
+      name: _PrintHex
+      value: 0xb04e
+    -  # Scrolls up the viewport by 8 pixels
+      name: _ScrollUp
+      value: 0xb051
+    -  # Scrolls down the viewport by 8 pixels
+      name: _ScrollDn
+      value: 0xb054
+    -  # Resets the state of PS/2 SHIFT, ALTGR, CTRL
+      name: _ResetPS2
+      value: 0xb057
+    -  # Command line parsing pointer
+      name: _ReadPtr
+      value: 0xbf70
+    -  # Number parsed by _ReadHex
+      name: _ReadNum
+      value: 0xbf72
+    -  # 4 bytes defining the seed state of _Random
+      name: _RandomState
+      value: 0xbf84
+    -  # Horizontal cursor position (see _Print)
+      name: _XPos
+      value: 0xbf8c
+    -  # Vertical cursor position (see _Print)
+      name: _YPos
+      value: 0xbf8d
+    -  # Address of the command line input buffer
+      name: _ReadBuffer
+      value: 0xbf8e
+
+instructions:
+  nop:
+    # No Operation
+    bytecode:
+      value: 0x00
+      size: 8
+  bnk:
+    # Set SSD bank (BANK = A register)
+    bytecode:
+      value: 0x01
+      size: 8
+  bff:
+    # Switch off SSD (BANK = 0xff)
+    bytecode:
+      value: 0x02
+      size: 8
+  win:
+    # Wait for UART or PS/2 input
+    bytecode:
+      value: 0x03
+      size: 8
+  inp:
+    # UART Input & Clear
+    bytecode:
+      value: 0x04
+      size: 8
+  ink:
+    # PS/2 Input and Clear
+    bytecode:
+      value: 0x05
+      size: 8
+  out:
+    # UART Output (from A regisgter)
+    bytecode:
+      value: 0x06
+      size: 8
+  not:
+    # Bitwise NOT (of A register)
+    bytecode:
+      value: 0x07
+      size: 8
+  neg:
+    # Two's Complement (of A register)
+    bytecode:
+      value: 0x08
+      size: 8
+  inc:
+    # Increment (A register)
+    bytecode:
+      value: 0x09
+      size: 8
+  dec:
+    # Decrement (A register)
+    bytecode:
+      value: 0x0a
+      size: 8
+  clc:
+    # Clear Carry Flag
+    bytecode:
+      value: 0x0b
+      size: 8
+  sec:
+    # Set Carry Flag
+    bytecode:
+      value: 0x0c
+      size: 8
+  lsl:
+    # Logical Shift Left (A register) (Cin = 0)
+    bytecode:
+      value: 0x0d
+      size: 8
+  ll2:
+    # Logical Shift Left 2 (A register) (Cin = 0)
+    bytecode:
+      value: 0x0e
+      size: 8
+  ll3:
+    # Logical Shift Left 3 (A register) (Cin = 0)
+    bytecode:
+      value: 0x0f
+      size: 8
+  ll4:
+    # Logical Shift Left 4 (A register) (Cin = 0)
+    bytecode:
+      value: 0x10
+      size: 8
+  ll5:
+    # Logical Shift Left 5 (A register) (Cin = 0)
+    bytecode:
+      value: 0x11
+      size: 8
+  ll6:
+    # Logical Shift Left 6 (A register) (Cin = 0)
+    bytecode:
+      value: 0x12
+      size: 8
+  ll7:
+    # Logical Shift Left 7 (A register) (Cin = 0)
+    bytecode:
+      value: 0x13
+      size: 8
+  lsr:
+    # Logical Shift Right (A register) (Cin = 0)
+    bytecode:
+      value: 0x14
+      size: 8
+  rol:
+    # Rotate Left (A register) (via C)
+    bytecode:
+      value: 0x15
+      size: 8
+  rl2:
+    # Rotate Left 2 (A register) (via C)
+    bytecode:
+      value: 0x16
+      size: 8
+  rl3:
+    # Rotate Left 3 (A register) (via C)
+    bytecode:
+      value: 0x17
+      size: 8
+  rl4:
+    # Rotate Left 4 (A register) (via C)
+    bytecode:
+      value: 0x18
+      size: 8
+  rl5:
+    # Rotate Left 5 (A register) (via C)
+    bytecode:
+      value: 0x19
+      size: 8
+  rl6:
+    # Rotate Left 6 (A register) (via C)
+    bytecode:
+      value: 0x1a
+      size: 8
+  rl7:
+    # Rotate Left 7 (A register) (via C)
+    bytecode:
+      value: 0x1b
+      size: 8
+  ror:
+    # Rotate Right (A register) (via C)
+    bytecode:
+      value: 0x1c
+      size: 8
+  ldi:
+    # Load Immediate (A register)
+    bytecode:
+      value: 0x1d
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate_8bit
+  adi:
+    # Add Immediate (A register)
+    bytecode:
+      value: 0x1e
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate_8bit
+  sbi:
+    # Subtract Immediate (A register)
+    bytecode:
+      value: 0x1f
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate_8bit
+  aci:
+    # Add Immediate with Carry (A register)
+    bytecode:
+      value: 0x20
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate_8bit
+  sci:
+    # Subtract Immediate with Carry (A register)
+    bytecode:
+      value: 0x21
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate_8bit
+  cpi:
+    # Compare Immediate (A register)
+    bytecode:
+      value: 0x22
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate_8bit
+  ani:
+    # Bitwise AND Immediate (A register)
+    bytecode:
+      value: 0x23
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate_8bit
+  ori:
+    # Bitwise OR Immediate (A register)
+    bytecode:
+      value: 0x24
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate_8bit
+  xri:
+    # Bitwise XOR Immediate (A register)
+    bytecode:
+      value: 0x25
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate_8bit
+  jpa:
+    # Jump to Absolute Address
+    bytecode:
+      value: 0x26
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  lda:
+    # Load from memory at Absolute Address (into A register)
+    bytecode:
+      value: 0x27
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  sta:
+    # Store to memory at Absolute Address (from A register)
+    bytecode:
+      value: 0x28
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  ada:
+    # Add memory at Absolute Address (to A register)
+    bytecode:
+      value: 0x29
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  sba:
+    # Subtract memory at Absolute Address (from A register)
+    bytecode:
+      value: 0x2a
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  aca:
+    # Add memory at Absolute Address with Carry (to A register)
+    bytecode:
+      value: 0x2b
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  sca:
+    # Subtract memory at Absolute Address with Carry (from A register)
+    bytecode:
+      value: 0x2c
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  cpa:
+    # Compare memory at Absolute Address (with A register)
+    bytecode:
+      value: 0x2d
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  ana:
+    # Bitwise AND memory at Absolute Address (with A register)
+    bytecode:
+      value: 0x2e
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  ora:
+    # Bitwise OR memory at Absolute Address (with A register)
+    bytecode:
+      value: 0x2f
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  xra:
+    # Bitwise XOR memory at Absolute Address (with A register)
+    bytecode:
+      value: 0x30
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  jpr:
+    # Jump to Relative Address
+    bytecode:
+      value: 0x31
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  ldr:
+    # Load from memory at Relative Address (into A register)
+    bytecode:
+      value: 0x32
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  str:
+    # Store to memory at Relative Address (from A register)
+    bytecode:
+      value: 0x33
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  adr:
+    # Add memory at Relative Address (to A register)
+    bytecode:
+      value: 0x34
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  sbr:
+    # Subtract memory at Relative Address (from A register)
+    bytecode:
+      value: 0x35
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  acr:
+    # Add memory at Relative Address with Carry (to A register)
+    bytecode:
+      value: 0x36
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  scr:
+    # Subtract memory at Relative Address with Carry (from A register)
+    bytecode:
+      value: 0x37
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  cpr:
+    # Compare memory at Relative Address (with A register)
+    bytecode:
+      value: 0x38
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  anr:
+    # Bitwise AND memory at Relative Address (with A register)
+    bytecode:
+      value: 0x39
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  orr:
+    # Bitwise OR memory at Relative Address (with A register)
+    bytecode:
+      value: 0x3a
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  clb:
+    # clear byte at absolute address
+    bytecode:
+      value: 0x3b
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  nob:
+    # Bitwise NOT of byte at Absolute Address with results in A register
+    bytecode:
+      value: 0x3c
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  neb:
+    # Negate byte at Absolute Address with results in A register
+    bytecode:
+      value: 0x3d
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  inb:
+    # Increment byte at Absolute Address with results in A register
+    bytecode:
+      value: 0x3e
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  deb:
+    # Decrement byte at Absolute Address with results in A register
+    bytecode:
+      value: 0x3f
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  adb:
+    # Add byte at Absolute Address to A register
+    bytecode:
+      value: 0x40
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  sbb:
+    # Subtract byte at Absolute Address from A register
+    bytecode:
+      value: 0x41
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  acb:
+    # Add byte at Absolute Address to A register with Carry
+    bytecode:
+      value: 0x42
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  scb:
+    # Subtract byte at Absolute Address from A register with Carry
+    bytecode:
+      value: 0x43
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  anb:
+    # Bitwise AND byte at Absolute Address with A register
+    bytecode:
+      value: 0x44
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  orb:
+    # Bitwise OR byte at Absolute Address with A register
+    bytecode:
+      value: 0x45
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  llb:
+    # logical shift left of byte at absolute address with result
+    # in A register (Cin = 0)
+    bytecode:
+      value: 0x46
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  lrb:
+    # logical shift right of byte at absolute address with result
+    # in A register (Cin = 0)
+    bytecode:
+      value: 0x47
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  rlb:
+    # rotate left (via Carry) of byte at absolute address with
+    # result in A register
+    bytecode:
+      value: 0x48
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  rrb:
+    # rotate right (via Carry) of byte at absolute address with
+    # result in A register
+    bytecode:
+      value: 0x49
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  clw:
+    # Clear word at absolute address
+    bytecode:
+      value: 0x4a
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  now:
+    # Bitwise NOT of word at Absolute Address with results in memory
+    # (A register has MSB of result)
+    bytecode:
+      value: 0x4b
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  new:
+    # Negate word at Absolute Address with results in memory
+    # (A register has MSB of result)
+    bytecode:
+      value: 0x4c
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  inw:
+    # Increment word at absolute address with result in memory
+    # (A register has MSB of result)
+    bytecode:
+      value: 0x4d
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  dew:
+    # Decrement word at absolute address with result in memory
+    # (A register has MSB of result)
+    bytecode:
+      value: 0x4e
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  adw:
+    # Add register A to word at Absolute Address with result in memory
+    # (A register has MSB of result)
+    bytecode:
+      value: 0x4f
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  sbw:
+    # Subtract register A from word at Absolute Address with result in
+    # memory (A register has MSB of result)
+    bytecode:
+      value: 0x50
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  acw:
+    # Add register A with Carry to word at Absolute Address with result in
+    # memory (A register has MSB of result)
+    bytecode:
+      value: 0x51
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  scw:
+    # Subtract register A with Carry from word at Absolute Address
+    # with result in memory (A register has MSB of result)
+    bytecode:
+      value: 0x52
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  llw:
+    # logical shift left of word at absolute address with result
+    # in memory (A register has MSB of result) (Cin = 0)
+    bytecode:
+      value: 0x53
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  rlw:
+    # logical shift right of word at absolute address with result
+    # in memory  (A register has MSB of result) (Cin = 0)
+    bytecode:
+      value: 0x54
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  jps:
+    # Jump to Subroutine at Absolute Address
+    bytecode:
+      value: 0x55
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  rts:
+    # Return from Subroutine
+    bytecode:
+      value: 0x56
+      size: 8
+  phs:
+    # push A register onto stack
+    bytecode:
+      value: 0x57
+      size: 8
+  pls:
+    # pull top of stack into A regsister
+    bytecode:
+      value: 0x58
+      size: 8
+  lds:
+    # load into A register value at offset into stack
+    bytecode:
+      value: 0x59
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - offset
+  sts:
+    # store A register value at offset into stack
+    bytecode:
+      value: 0x5a
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - offset
+  bne:
+    # branch on non-zero (not equal)
+    bytecode:
+      value: 0x5b
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  beq:
+    # branch on zero (equal)
+    bytecode:
+      value: 0x5c
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  bcc:
+    # branch on carry clear
+    bytecode:
+      value: 0x5d
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  bcs:
+    # branch on carry set
+    bytecode:
+      value: 0x5e
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  bpl:
+    # branch on plus
+    bytecode:
+      value: 0x5f
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  bmi:
+    # branch on minus
+    bytecode:
+      value: 0x60
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  ble:
+    # branch on less than or equal
+    bytecode:
+      value: 0x61
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  bgt:
+    # branch on greater than
+    bytecode:
+      value: 0x62
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  tax:
+    # transfer A to X (= 0xFF00)
+    bytecode:
+      value: 0x63
+      size: 8
+  txa:
+    # transfer X to A
+    bytecode:
+      value: 0x64
+      size: 8
+  txy:
+    # transfer X to Y
+    bytecode:
+      value: 0x65
+      size: 8
+  lxi:
+    # load X with immediate value
+    bytecode:
+      value: 0x66
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate_8bit
+  lxa:
+    # load X with memory value at absolute address
+    bytecode:
+      value: 0x67
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  lax:
+    # load register A with memory value at (absolute address + X)
+    bytecode:
+      value: 0x68
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  inx:
+    # increment X
+    bytecode:
+      value: 0x69
+      size: 8
+  dex:
+    # decrement X
+    bytecode:
+      value: 0x6a
+      size: 8
+  adx:
+    # add X to A
+    bytecode:
+      value: 0x6b
+      size: 8
+  sbx:
+    # subtract X from A
+    bytecode:
+      value: 0x6c
+      size: 8
+  cpx:
+    # compare X to A
+    bytecode:
+      value: 0x6d
+      size: 8
+  anx:
+    # and X with A
+    bytecode:
+      value: 0x6e
+      size: 8
+  orx:
+    # or X with A
+    bytecode:
+      value: 0x6f
+      size: 8
+  xrx:
+    # xor X with A
+    bytecode:
+      value: 0x70
+      size: 8
+  tay:
+    # transfer A to Y (= 0xFF01)
+    bytecode:
+      value: 0x71
+      size: 8
+  tya:
+    # transfer Y to A
+    bytecode:
+      value: 0x72
+      size: 8
+  tyx:
+    # transfer Y to X
+    bytecode:
+      value: 0x73
+      size: 8
+  lyi:
+    # load Y with immediate
+    bytecode:
+      value: 0x74
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate_8bit
+  lya:
+    # load Y with memory at absolute address
+    bytecode:
+      value: 0x75
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  lay:
+    # load A with memory at (absolute address + Y)
+    bytecode:
+      value: 0x76
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  iny:
+    # increment Y
+    bytecode:
+      value: 0x77
+      size: 8
+  dey:
+    # decrement Y
+    bytecode:
+      value: 0x78
+      size: 8
+  ady:
+    # add Y to A
+    bytecode:
+      value: 0x79
+      size: 8
+  sby:
+    # subtract Y from A
+    bytecode:
+      value: 0x7a
+      size: 8
+  cpy:
+    # compare Y to A
+    bytecode:
+      value: 0x7b
+      size: 8
+  any:
+    # and Y with A
+    bytecode:
+      value: 0x7c
+      size: 8
+  ory:
+    # or Y with A
+    bytecode:
+      value: 0x7d
+      size: 8
+  xry:
+    # xor Y with A
+    bytecode:
+      value: 0x7e
+      size: 8
+  hlt:
+    # halt
+    bytecode:
+      value: 0x7f
+      size: 8
+macros:
+  spinit:
+    - operands:
+        count: 0
+      instructions:
+        - "ldi 0xfe"
+        - "sta 0xffff"
+  phsi:
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - immediate_8bit
+      instructions:
+        - "ldi @ARG(0)"
+        - "phs"
+  phs2i:
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - immediate_16bit
+      instructions:
+        - "ldi LSB(@ARG(0))"
+        - "phs"
+        - "ldi BYTE1(@ARG(0))"
+        - "phs"
+  phs4i:
+    - operands:
+        count: 1
+        specific_operands:
+          immediate:
+            list:
+              uint32:
+                type: numeric
+                argument:
+                  size: 32
+                  byte_align: true
+      instructions:
+        - "ldi BYTE0(@ARG(0))"
+        - "phs"
+        - "ldi BYTE1(@ARG(0))"
+        - "phs"
+        - "ldi BYTE2(@ARG(0))"
+        - "phs"
+        - "ldi BYTE3(@ARG(0))"
+        - "phs"
+  phsa:
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - absolute_address
+      instructions:
+        - "lda @ARG(0)"
+        - "phs"
+  phs2a:
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - absolute_address
+      instructions:
+        - "lda @ARG(0)+0"
+        - "phs"
+        - "lda @ARG(0)+1"
+        - "phs"
+  phs4a:
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - absolute_address
+      instructions:
+        - "lda @ARG(0)+0"
+        - "phs"
+        - "lda @ARG(0)+1"
+        - "phs"
+        - "lda @ARG(0)+2"
+        - "phs"
+        - "lda @ARG(0)+3"
+        - "phs"
+  phss:
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - immediate_8bit
+      instructions:
+        - "lds @ARG(0)"
+        - "phs"
+  phs2s:
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - immediate_8bit
+      instructions:
+        # value on stack is big endian, start with LSB
+        - "lds @ARG(0)+(1+0)"
+        - "phs"
+        - "lds @ARG(0)+(0+1)"
+        - "phs"
+  phs4s:
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - immediate_8bit
+      instructions:
+        # value on stack is big endian, start with LSB
+        - "lds @ARG(0)+(3+0)"
+        - "phs"
+        - "lds @ARG(0)+(2+1)"
+        - "phs"
+        - "lds @ARG(0)+(1+2)"
+        - "phs"
+        - "lds @ARG(0)+(0+3)"
+        - "phs"
+  pls2:
+    - operands:
+        count: 0
+      instructions:
+        - "pls"
+        - "pls"
+  pls4:
+    - operands:
+        count: 0
+      instructions:
+        - "pls"
+        - "pls"
+        - "pls"
+        - "pls"
+  cpy2as:
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - absolute_address
+            - immediate_8bit
+      instructions:
+        # stack is big endian, memory is little endian
+        - "lds @ARG(1)+1"
+        - "sta @ARG(0)+0"
+        - "lds @ARG(1)+0"
+        - "sta @ARG(0)+1"
+  cpy2sa:
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - immediate_8bit
+            - absolute_address
+      instructions:
+        # stack is big endian, memory is little endian
+        - "lda @ARG(1)+0"
+        - "sts @ARG(0)+1"
+        - "lda @ARG(1)+1"
+        - "sts @ARG(0)+0"
+  cpy4as:
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - absolute_address
+            - immediate_8bit
+      instructions:
+        # stack is big endian, memory is little endian
+        - "lds @ARG(1)+3"
+        - "sta @ARG(0)+0"
+        - "lds @ARG(1)+2"
+        - "sta @ARG(0)+1"
+        - "lds @ARG(1)+1"
+        - "sta @ARG(0)+2"
+        - "lds @ARG(1)+0"
+        - "sta @ARG(0)+3"
+  cpy4sa:
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - immediate_8bit
+            - absolute_address
+      instructions:
+        # stack is big endian, memory is little endian
+        - "lda @ARG(1)+0"
+        - "sts @ARG(0)+3"
+        - "lda @ARG(1)+1"
+        - "sts @ARG(0)+2"
+        - "lda @ARG(1)+2"
+        - "sts @ARG(0)+1"
+        - "lda @ARG(1)+3"
+        - "sts @ARG(0)+0"
+  cpy4ai:
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - absolute_address
+            - immediate_32bit
+      instructions:
+        # Copies in little endian order
+        - "ldi BYTE0(@ARG(1))"
+        - "sta @ARG(0)+0"
+        - "ldi BYTE1(@ARG(1))"
+        - "sta @ARG(0)+1"
+        - "ldi BYTE2(@ARG(1))"
+        - "sta @ARG(0)+2"
+        - "ldi BYTE3(@ARG(1))"
+        - "sta @ARG(0)+3"
+  cpy4si:
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - immediate_8bit
+            - immediate_32bit
+      instructions:
+        - "ldi BYTE0(@ARG(1))"
+        - "sts @ARG(0)+0"
+        - "ldi BYTE1(@ARG(1))"
+        - "sts @ARG(0)+1"
+        - "ldi BYTE2(@ARG(1))"
+        - "sts @ARG(0)+2"
+        - "ldi BYTE3(@ARG(1))"
+        - "sts @ARG(0)+3"
+  cpy4ss:
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - immediate_8bit
+            - immediate_8bit
+      instructions:
+        - "lds @ARG(1)+0"
+        - "sts @ARG(0)+0"
+        - "lds @ARG(1)+1"
+        - "sts @ARG(0)+1"
+        - "lds @ARG(1)+2"
+        - "sts @ARG(0)+2"
+        - "lds @ARG(1)+3"
+        - "sts @ARG(0)+3"

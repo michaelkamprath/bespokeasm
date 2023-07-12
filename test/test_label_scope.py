@@ -45,6 +45,7 @@ class TestLabelScope(unittest.TestCase):
         ls4.set_label_value('_file2', 14, 5)
         ls4.set_label_value('.local2', 88, 6)
         ls2.set_label_value('_file3', 66, 7)
+        ls1.set_label_value('_required_global', 77, 8, scope=LabelScopeType.GLOBAL)
 
         self.assertEqual(ls3.get_label_value('global1', 1), 12)
         self.assertEqual(ls2.get_label_value('global1', 2), 12)
@@ -63,8 +64,25 @@ class TestLabelScope(unittest.TestCase):
         self.assertEqual(ls4.get_label_value('_file1', 12), 24, 'file value vailable at other locals')
         self.assertEqual(ls3.get_label_value('_file2', 13), 14, 'file value vailable at other locals')
 
+        self.assertEqual(
+            ls1.get_label_value(
+                '_required_global',
+                LineIdentifier(14, 'test_multilayer_scopes')
+            ),
+            77,
+            'global scope value'
+        )
+        self.assertEqual(
+            ls3.get_label_value(
+                '_required_global',
+                LineIdentifier(15, 'test_multilayer_scopes')
+            ),
+            77,
+            'global scope value'
+        )
+
     def test_illegal_labels(self):
-        global_scope = GlobalLabelScope(set(['a', 'b']))
+        global_scope = GlobalLabelScope({'a', 'b'})
         file_scope = LabelScope(LabelScopeType.FILE, global_scope, 'mycode.py')
         local_scope = LabelScope(LabelScopeType.LOCAL, file_scope, 'my_label')
         lineid = LineIdentifier(42, 'test_illegal_labels')

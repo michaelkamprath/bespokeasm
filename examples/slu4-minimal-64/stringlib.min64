@@ -1,0 +1,149 @@
+#require "slu4-min64-asm >= 1.2.0"
+
+; cstr_reverse
+;   Reverses the ordering of all characters in the cstr.
+;
+;   Arguments
+;       sp+3 : buffer address to cstr. Should be mutable, and less than 255 characters.
+;
+;   Returns
+;       sp+3 : The contents of the buffer are reverse.
+;
+;
+cstr_reverse:
+    lds 3+0 sta .buffer_ptr1+1
+    lds 3+1 sta .buffer_ptr1+0
+    lda .buffer_ptr1+0 sta .buffer_ptr2+0
+    lda .buffer_ptr1+1 sta .buffer_ptr2+1
+    ldi 0 sta .counter
+.push_loop:
+    ldr .buffer_ptr1
+    cpi 0 beq .init_pop_loop
+    ldr .buffer_ptr1 phs
+    inb .counter
+    inw .buffer_ptr1
+    jpa .push_loop
+.init_pop_loop:
+.pop_loop:
+    lda .counter cpi 0 beq .end
+    pls str .buffer_ptr2
+    inw .buffer_ptr2
+    deb .counter
+    jpa .pop_loop
+.end:
+    rts
+.buffer_ptr1: .2byte 0
+.buffer_ptr2: .2byte 0
+.counter: .byte 0
+
+; uint32_to_decimal_cstr
+;
+;   converts the passed uint64 value to a decimal formatted cstr.
+;
+;   Arguments
+;       sp+3 : the uint64 value (4 byte)
+;       sp+7 : buffer address (2 bytes)
+;       sp+9 : buffer size (1 byte)
+;
+;   Returns
+;       writes binary string to buffer. Will reset all other values in buffer to null (0)
+;       updates sp+9 top the character length of the decimal string
+;       resets sp+7 to the buffer address that the null char was written to
+;
+
+uint32_to_decimal_cstr:
+    ; set up working stack:
+    ;   little endian
+    ;   0 : low word (4 bytes)  --> value
+    ;   4 : high word (4 bytes) --> becomes remainder
+    ; init carry bit
+    ldi 0 sta .carry_bit
+    ; init working memory
+    cpy4as .working_mem,3
+    ldi 0 sta .working_mem+4
+    ; init digit counter
+    ldi 0 sta .digit_counter
+    ; init buffer pointer
+    lds 7+0 sta .buffer_ptr+1
+    lds 7+1 sta .buffer_ptr+0
+.outer_loop:
+    ; first check to see if we are done
+    lda .working_mem+3 cpi 0 bne .greater_than_10
+    lda .working_mem+2 cpi 0 bne .greater_than_10
+    lda .working_mem+1 cpi 0 bne .greater_than_10
+    lda .working_mem+0 cpi 10 bcc .last_digit
+.greater_than_10:
+.outer_loop_continue:
+    ldi 32 sta .div_counter     ; init loop counter
+.div_loop:
+    ; shift working stack left 1 bit and add in carry bit
+    jps .div_lsl40
+    lda .working_mem+0
+    ada .carry_bit
+    sta .working_mem+0
+    ldi 0 sta .carry_bit
+    ; check to see if upper word by is >= 10. Assume high word won't be >255.
+    ; if 10 is subtractable from high byte, proceed with subtraction, otherwise continue loop
+    lda .working_mem+4 cpi 10 bcc .div_loop_continue
+.div_loop_subtraction:
+    ; just need to subtract one byte
+    lda .working_mem+4 sbi 10 sta .working_mem+4
+    ldi 1 sta .carry_bit          ; set carry bit flag
+.div_loop_continue:
+    deb .div_counter
+    lda .div_counter cpi 0 bne .div_loop
+.div_loop_remainder:
+    ; we are done with this digit. High byte is the /10 remainder, or the current digit
+    ldi $30 ada .working_mem+4  ; get character of remainder by adding value to '0' ($30)
+    str .buffer_ptr             ; set next buffer position to character
+    ; do one more rotation before next loop
+    jps .div_lsl40
+    lda .working_mem+0
+    ada .carry_bit
+    sta .working_mem+0
+    ldi 0 sta .carry_bit sta .working_mem+4
+    ; prepare for next noop
+    inb .digit_counter
+    lds 9 cpa .digit_counter beq .err_buffer_size
+    inw .buffer_ptr
+    jpa .outer_loop
+.last_digit:
+    ; get character of remainder
+    ldi $30 ada .working_mem+0
+    str .buffer_ptr
+    inb .digit_counter
+    lds 9 cpa .digit_counter beq .err_buffer_size
+    inw .buffer_ptr
+    ; set the null terminating character
+    ldi 0 str .buffer_ptr
+    ; finally need to reverse digits
+    phs2s 7        ; push buffer address on stack
+    jps cstr_reverse
+    pls2
+.end:
+    lda .digit_counter sts 9            ; move character count to return size
+    cpy2sa 7,.buffer_ptr                ; set return buffer address to where the null is
+    rts
+
+.working_mem: .zero 5
+.carry_bit: .byte 0
+.div_counter: .byte 0
+.digit_counter: .byte 0
+.buffer_ptr: .2byte 0
+; .div_lsl40
+;
+;   local method for shifting .working_mem left 1 bit
+.div_lsl40:
+    lda .working_mem+0 lsl sta .working_mem+0
+    lda .working_mem+1 rol sta .working_mem+1
+    lda .working_mem+2 rol sta .working_mem+2
+    lda .working_mem+3 rol sta .working_mem+3
+    lda .working_mem+4 rol sta .working_mem+4
+    rts
+.err_buffer_size:
+    ; print error message
+    phs2i .err_buffer_size_str
+    jps _Print
+    pls2
+    jpa _Prompt
+.err_buffer_size_str: .cstr "\nERROR: buffer too small for decimal conversion\n\n"
