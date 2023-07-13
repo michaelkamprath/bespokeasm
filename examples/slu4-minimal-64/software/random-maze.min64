@@ -16,16 +16,10 @@ RIGHT_WALL_CHAR = $1F
 init:
     ldi 0xfe sta 0xffff         ; initialize stack pointer
     ldi 0 sta _char_buffer+1    ; initialize char buffer terminator
-    ; Initialize the random number generator
-    phsi $42
-    phsi 42
-    phsi 2
-    jps init_random8
-    pls pls pls
     phs2i _start_maze_str jps _Print pls2
 start:
     ; get a random 8-bit number, place in register A
-    phsi 0 jps random8 pls
+    jps _Random
     ; see if random value in A LSB is 1
     lsr bcs .right_wall
 .left_wall:
@@ -40,5 +34,3 @@ start:
 
 _char_buffer: .zero 2
 _start_maze_str: .cstr 'Random Maze!\n'
-
-#include "mathlib.min64"
