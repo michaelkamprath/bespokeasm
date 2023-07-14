@@ -175,10 +175,18 @@ class TestLineObject(unittest.TestCase):
         with self.assertRaises(SystemExit, msg='this instruction should fail'):
             DataLine.factory(42, ' .cstr 0x42', 'bad cstr usage', 'big', memzone)
 
+        # test initialiation with negative numbers
+        d13 = DataLine.factory(38, '.4byte -5', 'neg five', 'big', memzone)
+        d13.label_scope = label_values
+        d13.generate_bytes()
+        self.assertIsInstance(d13, DataLine)
+        self.assertEqual(d13.byte_size, 4, 'byte string has 3 bytes')
+        self.assertEqual(d13.get_bytes(), bytearray([0xFF, 0xFF, 0xFF, 0xFB]), 'byte array matches')
+
     def test_label_line_creation(self):
         label_values = GlobalLabelScope(set())
         label_values.set_label_value('test1', 0x1234, 1)
-        register_set = set(['a', 'b', 'sp', 'mar'])
+        register_set = {'a', 'b', 'sp', 'mar'}
         memzone = MemoryZone(16, 0, 2**16 - 1, 'GLOBAL')
 
         l1 = LabelLine.factory(13, 'my_label:', 'cool comment', register_set, label_values, memzone)
@@ -243,6 +251,15 @@ class TestLineObject(unittest.TestCase):
                 13, 'sp:', 'bad label', register_set, label_values,
                 memzone
             )
+
+        # negative contants
+        l6: LabelLine = LabelLine.factory(13, 'my_constant = -1945', 'cool comment', register_set, label_values, memzone)
+        l6.set_start_address(1212)
+        self.assertIsInstance(l6, LabelLine)
+        self.assertEqual(l6.byte_size, 0, 'has no bytes')
+        self.assertEqual(l6.get_value(), -1945, 'constant value is assigned')
+        self.assertEqual(l6.address, 1212, 'address value is address')
+        self.assertEqual(l6.get_label(), 'my_constant', 'label string')
 
     def test_label_line_with_instruction(self):
         fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')

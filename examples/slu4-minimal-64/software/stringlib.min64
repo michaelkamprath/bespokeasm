@@ -38,10 +38,10 @@ cstr_reverse:
 
 ; uint32_to_decimal_cstr
 ;
-;   converts the passed uint64 value to a decimal formatted cstr.
+;   converts the passed uint32 value to a decimal formatted cstr.
 ;
 ;   Arguments
-;       sp+3 : the uint64 value (4 byte)
+;       sp+3 : the uint32 value (4 byte)
 ;       sp+7 : buffer address (2 bytes)
 ;       sp+9 : buffer size (1 byte)
 ;
@@ -147,3 +147,86 @@ uint32_to_decimal_cstr:
     pls2
     jpa _Prompt
 .err_buffer_size_str: .cstr "\nERROR: buffer too small for decimal conversion\n\n"
+
+
+; int32_to_decimal_cstr
+;
+;   converts the passed signed int32 value to a decimal formatted cstr.
+;
+;   Arguments
+;       sp+3 : the signed int32 value (4 byte)
+;       sp+7 : buffer address (2 bytes)
+;       sp+9 : buffer size (1 byte)
+;
+;   Returns
+;       writes binary string to buffer. Will reset all other values in buffer to null (0)
+;       updates sp+9 top the character length of the decimal string
+;       resets sp+7 to the buffer address that the null char was written to
+;
+
+int32_to_decimal_cstr:
+    ; now remove sign, and call uint32_to_decimal_cstr
+    phss 9+0            ; push buffer size onto stack
+    phs2s 7+1           ; push buffer address onto stack
+    phs4s 3+3           ; push passed value onto stack
+    ; if value is signed, perform 2's complement on value
+    ; first determine if value is signed, remember stack is in big endian
+    lds 1 ani %10000000 sta .is_signed
+    cpi 0 beq .cacluate_str
+    lds 1 not sts 1
+    lds 2 not sts 2
+    lds 3 not sts 3
+    lds 4 not sts 4
+    ; now add 1, remember stack is in big endian
+    lds 4 adi 1 sts 4
+    lds 3 aci 0 sts 3
+    lds 2 aci 0 sts 2
+    lds 1 aci 0 sts 1
+.cacluate_str:
+    jps uint32_to_decimal_cstr
+    pls4                ; remove pushed value
+    pls2                ; remove pushed address
+    pls                 ; remove pushed buffer size
+
+    ; now prepend with negative sign if needed
+    lda .is_signed cpi 0
+    beq .finished
+    ; need to make room for negative sign
+    ; set up buffer pointer
+    lds 7+0 sta .buffer_ptr+1
+    lds 7+1 sta .buffer_ptr+0
+    ldi 1 sta .counter
+    ; scann through to find the end
+.buffer_scan:
+    ldr .buffer_ptr
+    cpi 0
+    beq .found_buffer_end
+    inw .buffer_ptr
+    inb .counter
+    jpa .buffer_scan
+.found_buffer_end:
+    ; TODO should check that buffer has enough room
+    ; copy buffer pinter
+    lda .buffer_ptr+0 sta .destination_ptr+0
+    lda .buffer_ptr+1 sta .destination_ptr+1
+    ; increment destination buffer pointer
+    inw .destination_ptr
+    ; now copy characters backwords for .count
+.copy_loop:
+    ldr .buffer_ptr
+    str .destination_ptr
+    dew .buffer_ptr
+    dew .destination_ptr
+    deb .counter
+    bne .copy_loop          ; if .counter goes to zero, we are done. If not, loop.
+    ; now add minus sign at begining of string. Conveniently, .destination_ptr points at it
+    ldi '-' str .destination_ptr
+.finished:
+    rts
+
+.is_signed:
+    .byte 0
+.counter:
+    .byte 0
+.buffer_ptr: .2byte 0
+.destination_ptr: .2byte 0

@@ -10,7 +10,7 @@ from bespokeasm.expression import parse_expression, ExpressionNode
 class DataLine(LineWithBytes):
     PATTERN_DATA_DIRECTIVE = re.compile(
         r'^(\.byte|\.2byte|\.4byte|\.8byte|\.cstr|\.asciiz)\b\s*(?:(?P<quote>[\"\'])((?:\\(?P=quote)|.)*)(?P=quote)'
-        r'|({0}(?:\s*\,{1})*))'.format(INSTRUCTION_EXPRESSION_PATTERN, INSTRUCTION_EXPRESSION_PATTERN),
+        r'|({}(?:\s*\,{})*))'.format(INSTRUCTION_EXPRESSION_PATTERN, INSTRUCTION_EXPRESSION_PATTERN),
         flags=re.IGNORECASE | re.MULTILINE
     )
 
@@ -109,22 +109,20 @@ class DataLine(LineWithBytes):
             elif isinstance(arg_item, str):
                 e: ExpressionNode = parse_expression(self.line_id, arg_item)
                 arg_val = e.get_value(self.label_scope, self.line_id)
-                # if is_string_numeric(arg_item):
-                #     arg_val = parse_numeric_string(arg_item)
-                # else:
-                #     label_val = self.label_scope.get_label_value(arg_item, self.line_id)
-                #     if label_val is not None:
-                #         arg_val = label_val
-                #     else:
-                #         sys.exit(
-                #             f'ERROR: line {self.line_id} - unknown label "{arg_item}" in current scope "{self.label_scope}"'
-                #         )
             else:
                 sys.exit(f'ERROR: line {self.line_id} - unknown data item "{arg_item}"')
-            value_bytes = (arg_val & DataLine.DIRECTIVE_VALUE_MASK[self._directive]).to_bytes(
-                DataLine.DIRECTIVE_VALUE_BYTE_SIZE[self._directive],
-                byteorder=self._endian,
-                signed=(arg_val < 0)
-            )
+            try:
+                value_bytes = (arg_val & DataLine.DIRECTIVE_VALUE_MASK[self._directive]).to_bytes(
+                    DataLine.DIRECTIVE_VALUE_BYTE_SIZE[self._directive],
+                    byteorder=self._endian,
+                    # since we are masking the value to a specific byte size, the signed
+                    # argument should always be False
+                    signed=False,
+                )
+            except OverflowError as oe:
+                sys.exit(
+                    f'ERROR - {self.line_id}: Overflow error when converting value ({arg_val}) to '
+                    f'bytes on dataline. Error = {oe}'
+                )
             for b in value_bytes:
                 self._append_byte(b)

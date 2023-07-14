@@ -109,7 +109,7 @@ class TestExpression(unittest.TestCase):
         )
 
     def test_register_detection(self):
-        registers = set(['a', 'b', 'sp', 'mar'])
+        registers = {'a', 'b', 'sp', 'mar'}
 
         e1 = parse_expression(1212, '(label1+3)*5')
         self.assertFalse(e1.contains_register_labels(registers), 'does not contain registers')
@@ -190,6 +190,23 @@ class TestExpression(unittest.TestCase):
             2, 'BYTE2( MAX_N*MAX_N*MAX_N*MAX_N ) = BYTE2( 0x027100 ) = 2'
         )
 
+        self.assertEqual(
+            parse_expression(
+                line_id,
+                'BYTE0( -15 )'
+            ).get_value(TestExpression.label_values, 1),
+            0xF1,
+            'BYTE0( -15 ) = BYTE0( 0xFFFFFFF1 ) = 0xF1'
+        )
+        self.assertEqual(
+            parse_expression(
+                line_id,
+                'BYTE1( 1000 - 2000 )'
+            ).get_value(TestExpression.label_values, 1),
+            0xFC,
+            'BYTE1( 1000 - 2000 ) = BYTE1( 0xFFFFFC18 ) = 0xFC'
+        )
+
     def test_character_ordinals_in_expressions(self):
         line_id = LineIdentifier(888, 'test_character_ordinals_in_expressions')
         self.assertEqual(
@@ -207,6 +224,27 @@ class TestExpression(unittest.TestCase):
         self.assertEqual(
             parse_expression(line_id, "(' ' + ' ')").get_value(TestExpression.label_values, 1),
             64, "(' ' + ' ') = 64"
+        )
+
+    def test_negative_values(self):
+        line_id = LineIdentifier(1927, 'test_character_ordinals_in_expressions')
+
+        self.assertEqual(
+            parse_expression(line_id, "-21").get_value(TestExpression.label_values, 1),
+            -21,
+            "negative 21"
+        )
+
+        self.assertEqual(
+            parse_expression(line_id, "5 * ( -6 )").get_value(TestExpression.label_values, 1),
+            -30,
+            "negative 30"
+        )
+
+        self.assertEqual(
+            parse_expression(line_id, "10 + -(5*2)").get_value(TestExpression.label_values, 1),
+            0,
+            "0"
         )
 
 

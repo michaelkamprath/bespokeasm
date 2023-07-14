@@ -91,7 +91,7 @@ is_prime32:
     phsi 0         ; push placeholder on stack for later compare
     phs4a .current_i_val
     phs4a .current_i_val
-    jps multiply32
+    jps multiply_uint32
     ; high 4 bytes of result should be 0 since we are only doing 32 bit N
     lds 1 cpi 0 bne .iteration_loop_done
     lds 2 cpi 0 bne .iteration_loop_done
@@ -157,5 +157,5 @@ is_prime32:
 .temp_val: .4byte 0
 
 
-#include "mathlib.min64"
+#include "math32lib.min64"
 #include "stringlib.min64"

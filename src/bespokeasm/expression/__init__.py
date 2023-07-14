@@ -18,7 +18,7 @@ from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.utilities import is_valid_label
 
 EXPRESSION_PARTS_PATTERN = \
-    r'(?:(?:\%|b)[01]+|{0}|\d+|[\+\-\*\/\&\|\^\(\)]|>>|<<|%|LSB\(|BYTE\d\(|(?:\.|_)?\w+|\'.\')'.format(
+    r'(?:(?:\%|b)[01]+|{}|\d+|[\+\-\*\/\&\|\^\(\)]|>>|<<|%|LSB\(|BYTE\d\(|(?:\.|_)?\w+|\'.\')'.format(
         PATTERN_HEX
     )
 
@@ -26,16 +26,17 @@ EXPRESSION_PARTS_PATTERN = \
 class TokenType(enum.Enum):
     T_NUM = 0
     T_LABEL = 1
-    T_RIGHT_SHIFT = 2
-    T_LEFT_SHIFT = 3
-    T_PLUS = 4
-    T_MINUS = 5
-    T_MULT = 6
-    T_DIV = 7
-    T_MOD = 8
-    T_AND = 9
-    T_OR = 10
-    T_XOR = 11
+    T_NEGATION = 2
+    T_RIGHT_SHIFT = 3
+    T_LEFT_SHIFT = 4
+    T_PLUS = 5
+    T_MINUS = 6
+    T_MULT = 7
+    T_DIV = 8
+    T_MOD = 9
+    T_AND = 10
+    T_OR = 11
+    T_XOR = 12
     T_LSB = 13
     T_BYTE = 14
     T_LPAR = 15
@@ -55,13 +56,14 @@ class ExpressionNode:
         TokenType.T_XOR: operator.xor,
         TokenType.T_RIGHT_SHIFT: operator.rshift,
         TokenType.T_LEFT_SHIFT: operator.lshift,
+        TokenType.T_NEGATION: operator.neg,
     }
 
     def __init__(self, token_type: TokenType, value=None):
         self.token_type = token_type
         self.value = value
-        self.left_child = None
-        self.right_child = None
+        self.left_child: ExpressionNode = None
+        self.right_child: ExpressionNode = None
         self._is_unary = token_type in [TokenType.T_BYTE, TokenType.T_LSB]
 
     def __repr__(self):
@@ -72,7 +74,11 @@ class ExpressionNode:
 
     @property
     def is_unary(self) -> bool:
-        return self._is_unary
+        return self.token_type in [
+            TokenType.T_BYTE,
+            TokenType.T_LSB,
+            TokenType.T_NEGATION,
+        ]
 
     def _numeric_value(self, label_scope: LabelScope, line_id: LineIdentifier) -> int:
         if self.token_type == TokenType.T_NUM:
@@ -97,9 +103,19 @@ class ExpressionNode:
             if self.token_type == TokenType.T_BYTE:
                 byte_idx = int(self.value[4])
             arg_value = int(self.left_child._compute(label_scope, line_id))
-            byte_count = max(((arg_value.bit_length() + 7) // 8), byte_idx+1)
-            arg_value_bytes = arg_value.to_bytes(byte_count, 'little')
+            byte_count = max(((abs(arg_value).bit_length() + 7) // 8), byte_idx+1)
+            masked_arg = arg_value & (2**(8 * byte_count) - 1)
+            try:
+                arg_value_bytes = masked_arg.to_bytes(byte_count, byteorder='little', signed=False)
+            except OverflowError as oe:
+                sys.exit(
+                    f'ERROR - {line_id}: Cound not conver value "{arg_value}" to bytes. masked value = {masked_arg}, {oe}'
+                )
             return arg_value_bytes[byte_idx]
+        elif self.token_type == TokenType.T_NEGATION:
+            arg_value = self.left_child._compute(label_scope, line_id)
+            operation = ExpressionNode._operations[self.token_type]
+            return operation(arg_value)
         else:
             left_result = self.left_child._compute(label_scope, line_id)
             right_result = self.right_child._compute(label_scope, line_id)
@@ -128,7 +144,7 @@ class ExpressionNode:
 
     def contained_labels(self) -> set[str]:
         if self.token_type == TokenType.T_LABEL:
-            return set([self.value])
+            return {self.value}
         elif self.token_type in [TokenType.T_NUM]:
             return set()
         left_result: set[str] = self.left_child.contained_labels()
@@ -231,6 +247,12 @@ def _parse_e4(line_id: LineIdentifier, tokens: list[ExpressionNode]) -> Expressi
         node.left_child = _parse_e(line_id, tokens)
         _match(line_id, tokens, TokenType.T_RPAR)
         return node
+    elif tokens[0].token_type == TokenType.T_MINUS:
+        # if we are here, this should be a negation
+        node = ExpressionNode(TokenType.T_NEGATION, value=tokens[0].value)
+        tokens.pop(0)
+        node.left_child = _parse_e(line_id, tokens)
+        return node
     else:
         _match(line_id, tokens, TokenType.T_LPAR)
         expression = _parse_e(line_id, tokens)
@@ -242,4 +264,4 @@ def _match(line_id: LineIdentifier, tokens: list[ExpressionNode], token: TokenTy
     if tokens[0].token_type == token:
         return tokens.pop(0)
     else:
-        raise SyntaxError(f'ERROR: {line_id} - Invalid syntax on token: {tokens}')
+        raise SyntaxError(f'ERROR: {line_id} - Invalid syntax on token: {tokens}. Expected {token}')
