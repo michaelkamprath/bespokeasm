@@ -15,6 +15,7 @@ Changes that are planned but not implemented yet:
   * unknown labels
 
 ## [Unreleased]
+* Added support for negative values in numeric expressions, data type initializations, and constant values
 
 ## [0.4.1]
 * added `.asciiz` as an equivalent data directive to `.cstr`

@@ -34,8 +34,9 @@ compare32:
 .flags: .byte 0
 
 
-; multiply32
-;   multiply 4 byte values X*Y, producing in a 8 byte results
+
+; multiply_uint32
+;   multiply unsigned 4 byte values X*Y, producing in a 8 byte results
 ;
 ; Arguments
 ;   sp+3 - value X (multiplier) (4 bytes)
@@ -45,7 +46,7 @@ compare32:
 ;   sp+3 - results (8 bytes)
 ;
 
-multiply32:
+multiply_uint32:
     ; set counter for 32 bits
     ldi 32 sta .counter
     ; set up 8 byte results memory block
@@ -76,6 +77,7 @@ multiply32:
 ;
 ;   local method for shifting .working_mem right 1 bit
 .mult_lsr64:
+    ; save MSB to do a arithmetic shift right
     lda .working_mem+7 lsr sta .working_mem+7
     lda .working_mem+6 ror sta .working_mem+6
     lda .working_mem+5 ror sta .working_mem+5
@@ -85,6 +87,63 @@ multiply32:
     lda .working_mem+1 ror sta .working_mem+1
     lda .working_mem+0 ror sta .working_mem+0
     rts
+.sign_bit: .byte 0
+
+; multiply_int32
+;   multiply signed 4 byte values X*Y, producing in a 8 byte results
+;
+; Arguments
+;   sp+3 - value X (multiplier) (4 bytes)
+;   sp+7 - value Y (multiplicand) (4 bytes)
+;
+; Return Value
+;   sp+3 - results (8 bytes)
+;
+
+multiply_int32:
+    ; set counter for 32 bits
+    ldi 32 sta .counter
+    ; set up 8 byte results memory block
+    cpy4ai .working_mem+4,0     ; high word inialized to 0
+    cpy4as .working_mem,3       ; multiplier in low word
+.mult_loop:
+    ; check to see if LSb of working memory is 1
+    lda .working_mem+0 lsr bcc .continue
+    ; add high word of results to multiplicand
+    phs4s 7
+    phs4a .working_mem+4
+    jps add32
+    cpy4as .working_mem+4,1
+    pls4
+    pls4
+.continue:
+    ; shift results right one.
+    jps .mult_lsr64
+    ; decrement counter and stop if 0
+    deb .counter ldi 0 cpa .counter bne .mult_loop
+.end:
+    cpy4sa 3,.working_mem+4
+    cpy4sa 7,.working_mem+0
+    rts
+.counter: .byte 0
+.working_mem: .zero 8
+; .mult_lsr64
+;
+;   local method for shifting .working_mem right 1 bit
+.mult_lsr64:
+    ; save MSB to do a arithmetic shift right
+    lda .working_mem+7 ani %10000000 sta .sign_bit
+    lda .working_mem+7 lsr sta .working_mem+7
+    lda .working_mem+6 ror sta .working_mem+6
+    lda .working_mem+5 ror sta .working_mem+5
+    lda .working_mem+4 ror sta .working_mem+4
+    lda .working_mem+3 ror sta .working_mem+3
+    lda .working_mem+2 ror sta .working_mem+2
+    lda .working_mem+1 ror sta .working_mem+1
+    lda .working_mem+0 ror sta .working_mem+0
+    lda .sign_bit adb .working_mem+7 sta .working_mem+7
+    rts
+.sign_bit: .byte 0
 
 
 ; divide32
@@ -259,12 +318,14 @@ subtract32:
 .yval: .4byte 0
 
 
+#if 0
 ;
 ; 8-bit Random Number Generator
 ;
 ;   Based on algorithm listed here:
 ;       https://www.electro-tech-online.com/threads/ultra-fast-pseudorandom-number-generator-for-8-bit.124249/
 ;
+
 
 ; init_random8:
 ;
@@ -321,3 +382,4 @@ _random_seed_a: .byte 0
 _random_seed_b: .byte 0
 _random_seed_c: .byte 0
 _random_seed_x: .byte 0
+#endif
