@@ -1461,12 +1461,9 @@ macros:
           list:
             - absolute_address
       instructions:
-        - "lda @ARG(0)+0"
-        - "inc"
-        - "sta @ARG(0)+0"
-        - "lda @ARG(0)+1"
-        - "aci 0"
-        - "sta @ARG(0)+1"
+        - "inb @ARG(0)+0"
+        - "ldi 0"
+        - "acb @ARG(0)+1"
   inc32a:
     - operands:
         count: 1
@@ -1474,15 +1471,10 @@ macros:
           list:
             - absolute_address
       instructions:
-        - "lda @ARG(0)+0"
-        - "inc"
-        - "sta @ARG(0)+0"
-        - "lda @ARG(0)+1"
-        - "aci 0"
-        - "sta @ARG(0)+1"
-        - "lda @ARG(0)+2"
-        - "aci 0"
-        - "sta @ARG(0)+2"
-        - "lda @ARG(0)+3"
-        - "aci 0"
-        - "sta @ARG(0)+3"
+        - "inb @ARG(0)+0"
+        - "ldi 0"
+        - "acb @ARG(0)+1"
+        - "ldi 0"
+        - "acb @ARG(0)+2"
+        - "ldi 0"
+        - "acb @ARG(0)+3"
