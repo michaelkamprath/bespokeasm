@@ -2,36 +2,26 @@
 
 ; compare32
 ;   Compares two 32-bit values to determine equality
+;       X ? Y
 ;
 ;   Arguments
-;       sp+3 : left X value (4 bytes)
-;       sp+7 : right Y value (4 bytes)
-;       sp+11 : results flags placeholder
+;       sp+3 : right Y value (4 bytes)
+;       sp+7 : left X value (4 bytes)
 ;
 ;   Returns
-;       sp+11 : results flags:
-;                   bit 0 - Zero Flag (values are equal)
-;                   bit 1 - Carry Flag (X > Y)
+;       flags will be set per comparison
 ;
 compare32:
-    ; init results
-    ldi 0 sta .flags    ; has to be RAM variable since stack ops alter flags
     ; first check high bytes, then others in sequence
     ; values on stack are stored big endian
-    lds (7+0) sta .rval lds (3+0) cpa .rval bne .done
-    lds (7+1) sta .rval lds (3+1) cpa .rval bne .done
-    lds (7+2) sta .rval lds (3+2) cpa .rval bne .done
-    lds (7+3) sta .rval lds (3+3) cpa .rval
-    ; check zero flag. flags still OK because no stack operatrion since CPA
-    bne .done   ldi %00000001 adb .flags    ; note this clears the flags
+    lds (3+0) sta .rval lds (7+0) cpa .rval bne .done
+    lds (3+1) sta .rval lds (7+1) cpa .rval bne .done
+    lds (3+2) sta .rval lds (7+2) cpa .rval bne .done
+    lds (3+3) sta .rval lds (7+3) cpa .rval
 .done:
-    ; check carry flag
-    bcc .return ldi %00000010 adb .flags
-.return:
-    lda .flags sts 11
     rts
 .rval: .byte 0
-.flags: .byte 0
+
 
 
 
@@ -159,25 +149,23 @@ multiply_int32:
 ;
 divide32:
     ; first check values for 0
-    phsi 0
     phs4i 0
-    phs4s (7+5)
+    phs4s (7+4)
     jps compare32
     pls4
-    lds 5 cpi 1 beq .divide_by_zero
-    phs4s (3+5)
+    beq .divide_by_zero
+    phs4s (3+4)
     jps compare32
     pls4
     pls4
-    lds 1 pls cpi 1 beq .return_zero
+    beq .return_zero
     ; check if divisor > dividend
-    phsi 0
-    phs4s (3+1)
-    phs4s (7+5)
+    phs4s (7+0)
+    phs4s (3+4)
     jps compare32
     pls4
     pls4
-    lds 1 pls cpi 2 beq .divisor_too_large
+    bgt .divisor_too_large
 .start_division:
     ; set up working stack:
     ;   little endian
@@ -195,11 +183,10 @@ divide32:
     sta .working_mem+0
     ldi 0 sta .carry_bit
     ; determine if we can do subtraction
-    phsi 0                 ; compare results
-    phs4s 7+1              ; divisor
-    phs4a .working_mem+4   ; working value high word
+    phs4s 7                ; divisor (left)
+    phs4a .working_mem+4   ; working value high word (right)
     jps compare32
-    lds 9 cpi 0 beq .div_loop_continue
+    bgt .div_loop_continue
 .div_loop_subtraction:
     ; working value is equal to or larger than divsior
     ; do the subtraction
@@ -211,7 +198,6 @@ divide32:
     ; clear stack
     pls4
     pls4
-    pls
     ; decrement counter and check for 0
     deb .counter
     lda .counter cpi 0 bne .div_loop
@@ -265,25 +251,18 @@ divide32:
 ;       sp+7 - value Y, 4 byte value
 ;
 ;   Return Value
-;       sp+2 - replace the original 4 byte value with the sum
+;       sp+3 - replace the original 4 byte value with the sum
 ;
 add32:
-    ; since interacting with the stack has an undefined impact
-    ; on the carry flags, we need to copy the values to local
-    ; variables first.
     ; stack is big endian, save locally little endian
-    cpy4as .xval, 3
     cpy4as .yval, 7
-    ; star subtractiosn with LSB
-    lda .xval+0 ada .yval+0 sta .xval+0
-    lda .xval+1 aca .yval+1 sta .xval+1
-    lda .xval+2 aca .yval+2 sta .xval+2
-    lda .xval+3 aca .yval+3 sta .xval+3
-    ; save results back to stack
-    cpy4sa 3, .xval
+    ; start addition with LSB, Remember, stack is big endian
+    lds 3+3 ada .yval+0 sts 3+3
+    lds 3+2 aca .yval+1 sts 3+2
+    lds 3+1 aca .yval+2 sts 3+1
+    lds 3+0 aca .yval+3 sts 3+0
     ; end return
     rts
-.xval: .4byte 0
 .yval: .4byte 0
 
 
@@ -299,22 +278,15 @@ add32:
 ;
 ;
 subtract32:
-    ; since interacting with the stack has an undefined impact
-    ; on the carry flags, we need to copy the values to local
-    ; variables first.
-    ; stack is big endian, save locally little endian
-    cpy4as .xval, 3
+    ; stack is big endian, save Y locally little endian
     cpy4as .yval, 7
     ; star subtractiosn with LSB
-    lda .xval+0 sba .yval+0 sta .xval+0
-    lda .xval+1 sca .yval+1 sta .xval+1
-    lda .xval+2 sca .yval+2 sta .xval+2
-    lda .xval+3 sca .yval+3 sta .xval+3
-    ; save results back to stack
-    cpy4sa 3, .xval
+    lds 3+3 sba .yval+0 sts 3+3
+    lds 3+2 sca .yval+1 sts 3+2
+    lds 3+1 sca .yval+2 sts 3+1
+    lds 3+0 sca .yval+3 sts 3+0
     ; end return
     rts
-.xval: .4byte 0
 .yval: .4byte 0
 
 

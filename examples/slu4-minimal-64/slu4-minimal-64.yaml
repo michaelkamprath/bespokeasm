@@ -1004,8 +1004,8 @@ instructions:
       operand_sets:
         list:
           - absolute_address
-  ble:
-    # branch on less than or equal
+  bgt:
+    # branch on greater than
     bytecode:
       value: 0x61
       size: 8
@@ -1014,8 +1014,8 @@ instructions:
       operand_sets:
         list:
           - absolute_address
-  bgt:
-    # branch on greater than
+  ble:
+    # branch on less than or equal
     bytecode:
       value: 0x62
       size: 8
@@ -1358,6 +1358,19 @@ macros:
         - "sts @ARG(0)+1"
         - "lda @ARG(1)+1"
         - "sts @ARG(0)+0"
+  cpy2ai:
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - absolute_address
+            - immediate_16bit
+      instructions:
+        # Copies in little endian order
+        - "ldi BYTE0(@ARG(1))"
+        - "sta @ARG(0)+0"
+        - "ldi BYTE1(@ARG(1))"
+        - "sta @ARG(0)+1"
   cpy4as:
     - operands:
         count: 2
@@ -1441,3 +1454,35 @@ macros:
         - "sts @ARG(0)+2"
         - "lds @ARG(1)+3"
         - "sts @ARG(0)+3"
+  inc16a:
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - absolute_address
+      instructions:
+        - "lda @ARG(0)+0"
+        - "inc"
+        - "sta @ARG(0)+0"
+        - "lda @ARG(0)+1"
+        - "aci 0"
+        - "sta @ARG(0)+1"
+  inc32a:
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - absolute_address
+      instructions:
+        - "lda @ARG(0)+0"
+        - "inc"
+        - "sta @ARG(0)+0"
+        - "lda @ARG(0)+1"
+        - "aci 0"
+        - "sta @ARG(0)+1"
+        - "lda @ARG(0)+2"
+        - "aci 0"
+        - "sta @ARG(0)+2"
+        - "lda @ARG(0)+3"
+        - "aci 0"
+        - "sta @ARG(0)+3"
