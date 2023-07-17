@@ -173,6 +173,7 @@ int32_to_decimal_cstr:
     ; first determine if value is signed, remember stack is in big endian
     lds 1 ani %10000000 sta .is_signed
     cpi 0 beq .cacluate_str
+    ; it is negative, take 2's by first doing 1's then adding 1
     lds 1 not sts 1
     lds 2 not sts 2
     lds 3 not sts 3
@@ -218,7 +219,7 @@ int32_to_decimal_cstr:
     dew .buffer_ptr
     dew .destination_ptr
     deb .counter
-    bne .copy_loop          ; if .counter goes to zero, we are done. If not, loop.
+    cpi 0 bne .copy_loop          ; if .counter goes to zero, we are done. If not, loop.
     ; now add minus sign at begining of string. Conveniently, .destination_ptr points at it
     ldi '-' str .destination_ptr
 .finished:
