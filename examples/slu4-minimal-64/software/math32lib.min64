@@ -55,27 +55,27 @@ _shift_right_func:
     jpr _shift_right_ptr
 _lsr64:
     ; save MSB to do a arithmetic shift right
-    lda _multiply_working_mem+7 lsr sta _multiply_working_mem+7
-    lda _multiply_working_mem+6 ror sta _multiply_working_mem+6
-    lda _multiply_working_mem+5 ror sta _multiply_working_mem+5
-    lda _multiply_working_mem+4 ror sta _multiply_working_mem+4
-    lda _multiply_working_mem+3 ror sta _multiply_working_mem+3
-    lda _multiply_working_mem+2 ror sta _multiply_working_mem+2
-    lda _multiply_working_mem+1 ror sta _multiply_working_mem+1
-    lda _multiply_working_mem+0 ror sta _multiply_working_mem+0
+    lrb _multiply_working_mem+7
+    rrb _multiply_working_mem+6
+    rrb _multiply_working_mem+5
+    rrb _multiply_working_mem+4
+    rrb _multiply_working_mem+3
+    rrb _multiply_working_mem+2
+    rrb _multiply_working_mem+1
+    rrb _multiply_working_mem+0
     rts
 _asr64:
     ; save MSB to do a arithmetic shift right
     lda _multiply_working_mem+7 ani %10000000 sta .sign_bit
-    lda _multiply_working_mem+7 lsr sta _multiply_working_mem+7
-    lda _multiply_working_mem+6 ror sta _multiply_working_mem+6
-    lda _multiply_working_mem+5 ror sta _multiply_working_mem+5
-    lda _multiply_working_mem+4 ror sta _multiply_working_mem+4
-    lda _multiply_working_mem+3 ror sta _multiply_working_mem+3
-    lda _multiply_working_mem+2 ror sta _multiply_working_mem+2
-    lda _multiply_working_mem+1 ror sta _multiply_working_mem+1
-    lda _multiply_working_mem+0 ror sta _multiply_working_mem+0
-    lda .sign_bit adb _multiply_working_mem+7 sta _multiply_working_mem+7
+    lrb _multiply_working_mem+7
+    rrb _multiply_working_mem+6
+    rrb _multiply_working_mem+5
+    rrb _multiply_working_mem+4
+    rrb _multiply_working_mem+3
+    rrb _multiply_working_mem+2
+    rrb _multiply_working_mem+1
+    rrb _multiply_working_mem+0
+    lda .sign_bit adb _multiply_working_mem+7
     rts
 .sign_bit: .byte 0
 
@@ -98,7 +98,6 @@ _multiply:
 .continue:
     ; shift results right one.
     jps _shift_right_func
-.shift_right_return_addr:
     ; decrement counter (placing it in A) and stop if 0
     deb .counter cpi 0 bne .mult_loop
 .end:
@@ -203,14 +202,14 @@ divide32:
 ;
 ;   local method for shifting .working_mem left 1 bit
 .div_lsl64:
-    lda .working_mem+0 lsl sta .working_mem+0
-    lda .working_mem+1 rol sta .working_mem+1
-    lda .working_mem+2 rol sta .working_mem+2
-    lda .working_mem+3 rol sta .working_mem+3
-    lda .working_mem+4 rol sta .working_mem+4
-    lda .working_mem+5 rol sta .working_mem+5
-    lda .working_mem+6 rol sta .working_mem+6
-    lda .working_mem+7 rol sta .working_mem+7
+    llb .working_mem+0
+    rlb .working_mem+1
+    rlb .working_mem+2
+    rlb .working_mem+3
+    rlb .working_mem+4
+    rlb .working_mem+5
+    rlb .working_mem+6
+    rlb .working_mem+7
     rts
 
 
