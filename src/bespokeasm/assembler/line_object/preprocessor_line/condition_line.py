@@ -1,3 +1,5 @@
+import sys
+
 from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone import MemoryZone
@@ -32,7 +34,12 @@ class ConditionLine(PreprocessorLine):
         else:
             raise ValueError(f"Invalid condition line: {instruction}")
 
-        condition_stack.process_condition(self._condition)
+        try:
+            condition_stack.process_condition(self._condition)
+        except IndexError:
+            sys.exit(
+                f'ERROR - {line_id}: Preprocessor condition has no matching counterpart'
+            )
 
     def __repr__(self) -> str:
         return f"ConditionLine<{self._line_id}>"
