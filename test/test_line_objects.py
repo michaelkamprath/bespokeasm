@@ -186,6 +186,7 @@ class TestLineObject(unittest.TestCase):
     def test_label_line_creation(self):
         label_values = GlobalLabelScope(set())
         label_values.set_label_value('test1', 0x1234, 1)
+        label_values.set_label_value('MY_VALUE', 20, 1)
         register_set = {'a', 'b', 'sp', 'mar'}
         memzone = MemoryZone(16, 0, 2**16 - 1, 'GLOBAL')
 
@@ -260,6 +261,14 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(l6.get_value(), -1945, 'constant value is assigned')
         self.assertEqual(l6.address, 1212, 'address value is address')
         self.assertEqual(l6.get_label(), 'my_constant', 'label string')
+
+        l7: LabelLine = LabelLine.factory(13, 'my_constant = -2*MY_VALUE', 'cool comment', register_set, label_values, memzone)
+        l7.set_start_address(1313)
+        self.assertIsInstance(l7, LabelLine)
+        self.assertEqual(l7.byte_size, 0, 'has no bytes')
+        self.assertEqual(l7.get_value(), -40, 'constant value is assigned')
+        self.assertEqual(l7.address, 1313, 'address value is address')
+        self.assertEqual(l7.get_label(), 'my_constant', 'label string')
 
     def test_label_line_with_instruction(self):
         fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')

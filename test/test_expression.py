@@ -247,6 +247,12 @@ class TestExpression(unittest.TestCase):
             "0"
         )
 
+        self.assertEqual(
+            parse_expression(line_id, "-2*MAX_N").get_value(TestExpression.label_values, 1),
+            -40,
+            "negative label expression"
+        )
+
 
 if __name__ == '__main__':
     unittest.main()
