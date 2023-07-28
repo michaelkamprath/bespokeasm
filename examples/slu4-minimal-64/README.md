@@ -50,6 +50,8 @@ The following instruction macros have been added in the ISA configuration file f
 | `cpy4si` | stack offset | immediate | Copy 4 bytes of immediate value to stack at indicated offset. Convert from RAM little endian to stack big endian ordering ordering. |
 | `cpy4ss` | stack offset | stack offset | Copy 4 bytes of data from stack starting at indicated offset (2nd operand) to another location in stack starting at indicated offset (1rst operand). Byte ordering is preserved. |
 | `cpy4aa` | absolute address | absolute address | Copy 4 bytes starting at source address (secord operand) to destination address (first operand) |
+| `inc16a` | absolute address | - | Increment the two byte integer value found at the absolute address |
+| `inc32a` | absolute address | - | Increment the two byte integer value found at the absolute address |
 
 The operand descriptions use the definitions provided by documentation for Minimal 64. You should assume the accumulator (register `A`) is not preserved across any of these macros.
 
