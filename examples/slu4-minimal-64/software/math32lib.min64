@@ -1,6 +1,6 @@
 #require "slu4-min64-asm >= 1.2.0"
 
-; compare32
+; compare_uint32
 ;   Compares two unsigned 32-bit values to determine equality
 ;       X ? Y
 ;
@@ -11,7 +11,7 @@
 ;   Returns
 ;       flags will be set per comparison
 ;
-compare32:
+compare_uint32:
     ; first check high bytes, then others in sequence
     ; values on stack are stored big endian
     lds (3+0) sta .rval lds (7+0) cpa .rval bne .done
@@ -22,14 +22,55 @@ compare32:
     rts
 .rval: .byte 0
 
-
+; compare_int32
+;   Compares two signed 32-bit values to determine equality
+;       X ? Y
+;
+;   Arguments
+;       sp+3 : right Y value (4 bytes)
+;       sp+7 : left X value (4 bytes)
+;
+;   Returns
+;       flags will be set per comparison
+;
+compare_int32:
+    ; first check signs. if LHS is negative, check RHS sign
+    lds (7+0) ani %1000000 cpi 0 beq .lhs_positive
+    ; LHS is negative, check RHS
+    lds (3+0) ani %1000000 cpi 0 beq .lhs_negative_rhs_positive
+.lhs_negative_rhs_negative:
+    ; swap LHS and RHS in camparisons so flag sense will be correct
+    lds (7+0) sta .rval lds (3+0) cpa .rval bne .done
+    lds (7+1) sta .rval lds (3+1) cpa .rval bne .done
+    lds (7+2) sta .rval lds (3+2) cpa .rval bne .done
+    lds (7+3) sta .rval lds (3+3) cpa .rval
+    jpa .done
+.lhs_negative_rhs_positive:
+    ; LHS is less than RHS. do comparison of signed bits to get right flags
+    ldi 0 cpi 1
+    jpa .done
+.lhs_positive:
+    ; LHS is positive, check RHS
+    lds (3+0) ani %1000000 cpi 0 beq .lhs_positive_rhs_positive
+.lhs_positive_rhs_negative:
+    ; LHS is greater than RHS. do comparison of signed bits to get right flags
+    ldi 1 cpi 0
+    jpa .done
+.lhs_positive_rhs_positive:
+    lds (3+0) sta .rval lds (7+0) cpa .rval bne .done
+    lds (3+1) sta .rval lds (7+1) cpa .rval bne .done
+    lds (3+2) sta .rval lds (7+2) cpa .rval bne .done
+    lds (3+3) sta .rval lds (7+3) cpa .rval
+.done:
+    rts
+.rval: .byte 0
 
 
 ; multiply_uint32
-;   multiply unsigned 4 byte values X*Y, producing in a 8 byte results
+;   multiply unsigned 4 byte values X*Y, producing an 8 byte unsigned results
 ;
 ; multiply_int32
-;   multiply signed 4 byte values X*Y, producing in a 8 byte results
+;   multiply signed 4 byte values X*Y, producing an 8 byte signed results
 ;
 ; Arguments
 ;   sp+3 - value X (multiplier) (4 bytes)
@@ -108,7 +149,7 @@ _multiply:
 _multiply_working_mem: .zero 8
 
 ; divide32
-;   Divides X by Y
+;   Divides X by Y (note, unsigned only)
 ;
 ;   Arguments:
 ;       sp+3 : value X dividend (4 bytes)
@@ -122,18 +163,18 @@ divide32:
     ; first check values for 0
     phs4i 0
     phs4s (7+4)
-    jps compare32
+    jps compare_uint32
     pls4
     beq .divide_by_zero
     phs4s (3+4)
-    jps compare32
+    jps compare_uint32
     pls4
     pls4
     beq .return_zero
     ; check if divisor > dividend
     phs4s (7+0)
     phs4s (3+4)
-    jps compare32
+    jps compare_uint32
     pls4
     pls4
     bgt .divisor_too_large
@@ -156,7 +197,7 @@ divide32:
     ; determine if we can do subtraction
     phs4s 7                ; divisor (left)
     phs4a .working_mem+4   ; working value high word (right)
-    jps compare32
+    jps compare_uint32
     bgt .div_loop_continue
 .div_loop_subtraction:
     ; working value is equal to or larger than divsior
@@ -218,8 +259,8 @@ divide32:
 ;   adds Y value to X (X+Y)
 ;
 ;   Arguments
-;       sp+3 - value X, 4 byte value
-;       sp+7 - value Y, 4 byte value
+;       sp+3 - value X, 4 byte value, signed or unsigned
+;       sp+7 - value Y, 4 byte value, signed or unsigned
 ;
 ;   Return Value
 ;       sp+3 - replace the original 4 byte value with the sum
@@ -260,69 +301,72 @@ subtract32:
     rts
 .yval: .4byte 0
 
-
-#if 0
-;
-; 8-bit Random Number Generator
-;
-;   Based on algorithm listed here:
-;       https://www.electro-tech-online.com/threads/ultra-fast-pseudorandom-number-generator-for-8-bit.124249/
-;
-
-
-; init_random8:
+; lsr32n
+;   logical shift right N bits for 32 bit values
 ;
 ;   Arguments
-;       sp+3 : A value (1 byte)
-;       sp+4 : B value (1 byte)
-;       sp+5 : C value (1 byte)
+;       sp+3 - count of bits to shift right. 1 byte value, masked to %00011111, if great return zero
+;       sp+4 - value to be shifted right, 4 byte value
 ;
-;   Returns
-;       nothing
-;
-init_random8:
-    lds 3
-    xra _random_seed_a
-    sta _random_seed_a
-    lds 4
-    xra _random_seed_b
-    sta _random_seed_b
-    lds 5
-    xra _random_seed_c
-    sta _random_seed_c
-    phsi 0                     ; dummy value
-    jps random8
-    pls
-    rts
+;   Return Value
+;       sp+4 - replace value with shifted value
 
-; random8
+lsr32n:
+    ; first, save X register
+    txa phs
+    ; set up local variables
+    cpy4as .local_val,4+1
+    lds 3+1 tax
+.lsr_loop:
+    ; right shifts start from the MSB
+    lrb .local_val+3
+    rrb .local_val+2
+    rrb .local_val+1
+    rrb .local_val+0
+    dex
+    bne .lsr_loop           ; if bit count isn't a zero
+
+.done:
+    cpy4sa 4+1,.local_val
+    ; restore X register before returning
+    pls tax
+    rts
+.local_val:
+    .4byte 0
+
+
+; asr32n
+;   arithmetic shift right N bits for 32 bit values
 ;
 ;   Arguments
-;       sp+3 - Place holder for return value
+;       sp+3 - count of bits to shift right. 1 byte value, masked to %00011111, if great return zero
+;       sp+4 - value to be shifted right, 4 byte value
 ;
-;   Returns
-;       sp+3 - 8 bit random value
-;
-random8:
-    ; x++
-    ldi 1 adb _random_seed_x
-    ; a = (a^c^x)
-    lda _random_seed_a
-    xra _random_seed_c
-    xra _random_seed_x
-    sta _random_seed_a
-    ; b = (b+a)
-    adb _random_seed_b                      ; register A is still new A value
-    ; c = (c+(b>>1)^a)
-    lda _random_seed_b
-    lsr                                     ; register A is new B value
-    xra _random_seed_a
-    adb _random_seed_c lda _random_seed_c
-    sts 3
-    rts
+;   Return Value
+;       sp+4 - replace value with shifted value
 
-_random_seed_a: .byte 0
-_random_seed_b: .byte 0
-_random_seed_c: .byte 0
-_random_seed_x: .byte 0
-#endif
+asr32n:
+    ; first, save X register
+    txa phs
+    ; set up local variables
+    cpy4as .local_val,4+1
+    lds 3+1 tax
+.asr_loop:
+    ; right shifts start from the MSB
+    lrb .local_val+3
+    rrb .local_val+2
+    rrb .local_val+1
+    rrb .local_val+0
+    lda .local_val+3 ani %01000000 cpi 0 beq .continue_asl
+    ldi %10000000 orb .local_val+3 sta .local_val+3
+.continue_asl:
+    dex
+    bne .asr_loop           ; if bit count isn't a zero
+
+.done:
+    cpy4sa 4+1,.local_val
+    ; restore X register before returning
+    pls tax
+    rts
+.local_val:
+    .4byte 0
