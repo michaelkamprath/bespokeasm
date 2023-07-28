@@ -39,7 +39,7 @@ compare_int32:
     ; LHS is negative, check RHS
     lds (3+0) ani %1000000 cpi 0 beq .lhs_negative_rhs_positive
 .lhs_negative_rhs_negative:
-    ; swap LHS and RHS in camparisons so flag sense will be correctr
+    ; swap LHS and RHS in camparisons so flag sense will be correct
     lds (7+0) sta .rval lds (3+0) cpa .rval bne .done
     lds (7+1) sta .rval lds (3+1) cpa .rval bne .done
     lds (7+2) sta .rval lds (3+2) cpa .rval bne .done
@@ -67,10 +67,10 @@ compare_int32:
 
 
 ; multiply_uint32
-;   multiply unsigned 4 byte values X*Y, producing in a 8 byte results
+;   multiply unsigned 4 byte values X*Y, producing an 8 byte unsigned results
 ;
 ; multiply_int32
-;   multiply signed 4 byte values X*Y, producing in a 8 byte results
+;   multiply signed 4 byte values X*Y, producing an 8 byte signed results
 ;
 ; Arguments
 ;   sp+3 - value X (multiplier) (4 bytes)
@@ -149,7 +149,7 @@ _multiply:
 _multiply_working_mem: .zero 8
 
 ; divide32
-;   Divides X by Y
+;   Divides X by Y (note, unsigned only)
 ;
 ;   Arguments:
 ;       sp+3 : value X dividend (4 bytes)
@@ -259,8 +259,8 @@ divide32:
 ;   adds Y value to X (X+Y)
 ;
 ;   Arguments
-;       sp+3 - value X, 4 byte value
-;       sp+7 - value Y, 4 byte value
+;       sp+3 - value X, 4 byte value, signed or unsigned
+;       sp+7 - value Y, 4 byte value, signed or unsigned
 ;
 ;   Return Value
 ;       sp+3 - replace the original 4 byte value with the sum

@@ -9,7 +9,6 @@
 ;   Returns
 ;       sp+3 : The contents of the buffer are reverse.
 ;
-;
 cstr_reverse:
     lds 3+0 sta .buffer_ptr1+1
     lds 3+1 sta .buffer_ptr1+0

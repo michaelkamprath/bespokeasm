@@ -5,13 +5,13 @@
 ;
 ;       https://github.com/rahra/intfract
 ;
+#require "slu4-min64-asm >= 1.2.0"
 
 IMAGE_X_PIXELS = 400
 IMAGE_Y_PIXELS = 240
 
 SCALE_BITS = 10
 SCALE_FACTOR = (1 << SCALE_BITS)
-
 
 MANDELBROT_START_X = -2*SCALE_FACTOR
 MANDELBROT_END_X = 1*SCALE_FACTOR
@@ -136,7 +136,6 @@ init:
     pls pls pls                 ; remove pixel coordinates from stack
 .not_in_mandelbrot:
 .mandelbot_pixel_done:
-
 
 .pixel_loop_x_end:
     ; next x pixel

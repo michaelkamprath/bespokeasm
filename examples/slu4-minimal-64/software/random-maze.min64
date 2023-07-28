@@ -7,7 +7,6 @@
 ;
 #require "slu4-min64-asm >= 1.2.0"
 
-
 LEFT_WALL_CHAR = $1E
 RIGHT_WALL_CHAR = $1F
 
