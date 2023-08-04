@@ -81,7 +81,7 @@ is_prime32:
     jps divide32
     pls4
     ; check if remainder is 0
-    phs4i 0 jps compare32 pls4
+    phs4i 0 jps compare_uint32 pls4
     pls4
     beq .is_not_prime
 .loop_init:
@@ -99,7 +99,7 @@ is_prime32:
     cpy4as .isquared,1
     pls4
     ; now compare low 4 bytes of I*I result to N
-    phs4a .isquared phs4s 3+4 jps compare32 pls4 pls4
+    phs4a .isquared phs4s 3+4 jps compare_uint32 pls4 pls4
     ; if I*I > N, we are done
     bgt .loop_done_is_prime
 .n_gte_i_squared:
@@ -110,7 +110,7 @@ is_prime32:
     jps divide32
     pls4                   ; quotient
     phs4i 0
-    jps compare32
+    jps compare_uint32
     pls4
     pls4
     beq .loop_done_is_not_prime
@@ -126,7 +126,7 @@ is_prime32:
     jps divide32
     pls4                   ; quotient
     phs4i 0
-    jps compare32
+    jps compare_uint32
     pls4                   ; zero
     pls4                   ; remainder
     beq .loop_done_is_not_prime
