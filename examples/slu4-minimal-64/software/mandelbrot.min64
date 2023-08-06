@@ -115,7 +115,7 @@ init:
     cpy4as zy,1
     pls4 pls4
 
-    ; zx = zx*zx - zy*zy + scaled_x0, but steo in temp for now
+    ; zx = zx*zx - zy*zy + scaled_x0, but store in temp for now
     phs4a zy_squared        ; Y value
     phs4a zx_squared        ; X value
     jps subtract32          ; X-Y
