@@ -106,8 +106,6 @@ _lsr64:
     rrb _multiply_working_mem+0
     rts
 _asr64:
-    ; save MSB to do a arithmetic shift right
-    lda _multiply_working_mem+7 ani %10000000 sta .sign_bit
     lrb _multiply_working_mem+7
     rrb _multiply_working_mem+6
     rrb _multiply_working_mem+5
@@ -116,7 +114,9 @@ _asr64:
     rrb _multiply_working_mem+2
     rrb _multiply_working_mem+1
     rrb _multiply_working_mem+0
-    lda .sign_bit adb _multiply_working_mem+7
+    ; check if a sign bit needs to be maintained
+    lda _multiply_working_mem+7 ani %01000000 lsl orb _multiply_working_mem+7
+.done:
     rts
 .sign_bit: .byte 0
 
@@ -310,22 +310,37 @@ subtract32:
 ;
 ;   Return Value
 ;       sp+4 - replace value with shifted value
-
+;       * Does not porperly set carry flag
+;
 lsr32n:
     ; first, save X register
     txa phs
     ; set up local variables
     cpy4as .local_val,4+1
     lds 3+1 tax
+
+    ; Now see if we can save iterations by shortcutting the right shift
+.iteration_saver:
+    ldi 7 cpx bgt .lsr_loop ; if the current bit shift count is <=7, then start doing loop
+    ; we need to shift 8 or more bits. Fast track a 8-bit shift by dropping LSB
+    cpyaa .local_val+0,.local_val+1
+    cpyaa .local_val+1,.local_val+2
+    cpyaa .local_val+2,.local_val+3
+    ldi 0 sta .local_val+3
+    ; decrement the shift counter by 8
+    txa sbi 8 tax
+    ; try again
+    jpa .iteration_saver
 .lsr_loop:
+    ; check the iteration counter is > 0, otherwise do a bit shift and decrement counter.
+    ldi 0 cpx beq .done
     ; right shifts start from the MSB
     lrb .local_val+3
     rrb .local_val+2
     rrb .local_val+1
     rrb .local_val+0
     dex
-    bne .lsr_loop           ; if bit count isn't a zero
-
+    jpa .lsr_loop
 .done:
     cpy4sa 4+1,.local_val
     ; restore X register before returning
@@ -344,24 +359,44 @@ lsr32n:
 ;
 ;   Return Value
 ;       sp+4 - replace value with shifted value
-
+;       * Does not porperly set carry flag
+;
 asr32n:
     ; first, save X register
     txa phs
     ; set up local variables
     cpy4as .local_val,4+1
     lds 3+1 tax
+    ; save sign byte for the iteration saver
+    lda .local_val+3 ani %10000000 cpi 0 beq .zero_sign_byte
+    ldi $FF sta .sign_byte
+    jpa .iteration_saver
+.zero_sign_byte:
+    ldi 0 sta .sign_byte
+    ; Now see if we can save iterations by shortcutting the right shift
+.iteration_saver:
+    ldi 7 cpx bgt .asr_loop ; if the current bit shift count is <=7, then start doing loop
+    ; we need to shift 8 or more bits. Fast track a 8-bit shift by dropping LSB
+    cpyaa .local_val+0,.local_val+1
+    cpyaa .local_val+1,.local_val+2
+    cpyaa .local_val+2,.local_val+3
+    cpyaa .local_val+3,.sign_byte
+    ; decrement the shift counter by 8
+    txa sbi 8 tax
+    ; try again
+    jpa .iteration_saver
 .asr_loop:
+    ; check the iteration counter is > 0, otherwise do a bit shift and decrement counter.
+    ldi 0 cpx beq .done
     ; right shifts start from the MSB
     lrb .local_val+3
     rrb .local_val+2
     rrb .local_val+1
     rrb .local_val+0
-    lda .local_val+3 ani %01000000 cpi 0 beq .continue_asl
-    ldi %10000000 orb .local_val+3 sta .local_val+3
+    lda .local_val+3 ani %01000000 lsl orb .local_val+3
 .continue_asl:
     dex
-    bne .asr_loop           ; if bit count isn't a zero
+    jpa .asr_loop
 
 .done:
     cpy4sa 4+1,.local_val
@@ -370,3 +405,5 @@ asr32n:
     rts
 .local_val:
     .4byte 0
+.sign_byte:
+    .byte 0

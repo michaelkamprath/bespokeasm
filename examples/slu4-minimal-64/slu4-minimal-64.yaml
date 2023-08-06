@@ -1332,6 +1332,17 @@ macros:
         - "pls"
         - "pls"
         - "pls"
+  cpyaa:
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - absolute_address
+            - absolute_address
+      instructions:
+        # Copies from source (arg 1) to destination (arg 0)
+        - "lda @ARG(1)+0"
+        - "sta @ARG(0)+0"
   cpy2as:
     - operands:
         count: 2
@@ -1370,6 +1381,19 @@ macros:
         - "ldi BYTE0(@ARG(1))"
         - "sta @ARG(0)+0"
         - "ldi BYTE1(@ARG(1))"
+        - "sta @ARG(0)+1"
+  cpy2aa:
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - absolute_address
+            - absolute_address
+      instructions:
+        # Copies from source (arg 1) to destination (arg 0)
+        - "lda @ARG(1)+0"
+        - "sta @ARG(0)+0"
+        - "lda @ARG(1)+1"
         - "sta @ARG(0)+1"
   cpy4as:
     - operands:
