@@ -1382,6 +1382,31 @@ macros:
         - "sta @ARG(0)+0"
         - "ldi BYTE1(@ARG(1))"
         - "sta @ARG(0)+1"
+  cpy2si:
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - immediate_8bit
+            - immediate_16bit
+      instructions:
+        # stack is big endian
+        - "ldi BYTE0(@ARG(1))"
+        - "sts @ARG(0)+1"
+        - "ldi BYTE1(@ARG(1))"
+        - "sts @ARG(0)+0"
+  cpy2ss:
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - immediate_8bit
+            - immediate_8bit
+      instructions:
+        - "lds @ARG(1)+0"
+        - "sts @ARG(0)+0"
+        - "lds @ARG(1)+1"
+        - "sts @ARG(0)+1"
   cpy2aa:
     - operands:
         count: 2
@@ -1454,14 +1479,15 @@ macros:
             - immediate_8bit
             - immediate_32bit
       instructions:
+        # stack is big endian
         - "ldi BYTE0(@ARG(1))"
-        - "sts @ARG(0)+0"
-        - "ldi BYTE1(@ARG(1))"
-        - "sts @ARG(0)+1"
-        - "ldi BYTE2(@ARG(1))"
-        - "sts @ARG(0)+2"
-        - "ldi BYTE3(@ARG(1))"
         - "sts @ARG(0)+3"
+        - "ldi BYTE1(@ARG(1))"
+        - "sts @ARG(0)+2"
+        - "ldi BYTE2(@ARG(1))"
+        - "sts @ARG(0)+1"
+        - "ldi BYTE3(@ARG(1))"
+        - "sts @ARG(0)+0"
   cpy4ss:
     - operands:
         count: 2
@@ -1519,3 +1545,75 @@ macros:
         - "acb @ARG(0)+2"
         - "ldi 0"
         - "acb @ARG(0)+3"
+
+  twos2s:
+    # calculates the two's complement of the 2 byte value at offset in stack
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - immediate_8bit
+      instructions:
+          - "lds @ARG(0)+1"
+          - "not"
+          - "inc"
+          - "sts @ARG(0)+1"
+          - "lds @ARG(0)+0"
+          - "not"
+          - "aci 0"
+          - "sts @ARG(0)+0"
+  twos2a:
+    # calculates the two's complement of the 2 byte value at absolute address
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - absolute_address
+      instructions:
+          - "nob @ARG(0)+0"
+          - "inb @ARG(0)+0"
+          - "nob @ARG(0)+1"
+          - "acb @ARG(0)+1"
+  twos4s:
+    # calculates the two's complement of the 4 byte value at offset in stack
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - immediate_8bit
+      instructions:
+          - "lds @ARG(0)+3"
+          - "not"
+          - "inc"
+          - "sts @ARG(0)+3"
+          - "lds @ARG(0)+2"
+          - "not"
+          - "aci 0"
+          - "sts @ARG(0)+2"
+          - "lds @ARG(0)+1"
+          - "not"
+          - "aci 0"
+          - "sts @ARG(0)+1"
+          - "lds @ARG(0)+0"
+          - "not"
+          - "aci 0"
+          - "sts @ARG(0)+0"
+  twos4a:
+    # calculates the two's complement of the 4 byte value at absolute address
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - absolute_address
+      instructions:
+          - "nob @ARG(0)+0"
+          - "inb @ARG(0)+0"
+          - "nob @ARG(0)+1"
+          - "ldi 0"
+          - "acb @ARG(0)+1"
+          - "nob @ARG(0)+2"
+          - "ldi 0"
+          - "acb @ARG(0)+2"
+          - "nob @ARG(0)+3"
+          - "ldi 0"
+          - "acb @ARG(0)+3"

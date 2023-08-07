@@ -42,8 +42,13 @@ The following instruction macros have been added in the ISA configuration file f
 | `phs4s` | stack offset | - | Push onto stack 4 byte value currently found at indicated stack offset |
 | `pls2` | - | - | Pull 2 bytes from stack. Last byte pulled will be in A register. |
 | `pls4` | - | - | Pull 4 bytes from stack. Last byte pulled will be in A register. |
+| `cpyaa` | absolute address | absolute address | Copies a single byte value from one absolute address (second operand) to another (first operand).
 | `cpy2as` | absolute address | stack offset | Copy 2 bytes of data sourced from indicated stack offset to memory starting at indicated absolute address. Convert from stack big endian ordering to RAM little endian ordering. |
 | `cpy2sa` | stack offset | absolute address | Copy 2 bytes of data sourced from absolute address to stack at indicated offset. Convert from RAM little endian to stack big endian ordering ordering. |
+| `cpy2ai` | absolute address | immediate | Copy 2 bytes of immediate value to memory starting at indicated absolute address. Preserves endian ordering. |
+| `cpy2si` | stack offset | immediate | Copy 2 bytes of immediate value to stack at indicated offset. Convert from RAM little endian to stack big endian ordering ordering. |
+| `cpy2ss` | stack offset | stack offset | Copy 2 bytes of data from stack starting at indicated offset (2nd operand) to another location in stack starting at indicated offset (1rst operand). Byte ordering is preserved. |
+| `cpy2aa` | absolute address | absolute address | Copy 2 bytes starting at source address (secord operand) to destination address (first operand) |
 | `cpy4as` | absolute address | stack offset | Copy 4 bytes of data sourced from indicated stack offset to memory starting at indicated absolute address. Convert from stack big endian ordering to RAM little endian ordering. |
 | `cpy4sa` | stack offset | absolute address | Copy 4 bytes of data sourced from absolute address to stack at indicated offset. Convert from RAM little endian to stack big endian ordering ordering. |
 | `cpy4ai` | absolute address | immediate | Copy 4 bytes of immediate value to memory starting at indicated absolute address. Preserves endian ordering. |
@@ -52,6 +57,11 @@ The following instruction macros have been added in the ISA configuration file f
 | `cpy4aa` | absolute address | absolute address | Copy 4 bytes starting at source address (secord operand) to destination address (first operand) |
 | `inc16a` | absolute address | - | Increment the two byte integer value found at the absolute address |
 | `inc32a` | absolute address | - | Increment the two byte integer value found at the absolute address |
+| `twos2s` | stack offset | - | Calculates the two's complement of a 2 byte value at a given offset into the stack and updates it in place. |
+| `twos2a` | absolute address | - | Calculates the two's complement of a 2 byte value at indicated absolute address and updates it in place. |
+| `twos4s` | stack offset | - | Calculates the two's complement of a 4 byte value at a given offset into the stack and updates it in place. |
+| `twos4a` | absolute address | - | Calculates the two's complement of a 4 byte value at indicated absolute address and updates it in place. |
+
 
 The operand descriptions use the definitions provided by documentation for Minimal 64. You should assume the accumulator (register `A`) is not preserved across any of these macros.
 

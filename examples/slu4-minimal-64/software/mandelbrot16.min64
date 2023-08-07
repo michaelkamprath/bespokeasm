@@ -1,0 +1,183 @@
+; Mandelbrot for the Minimal 64 Home Computer
+;
+; Approach is to used fixed point math to only use integer operations. A detailed
+; explanation of this approach can be found here:
+;
+;       https://github.com/rahra/intfract
+;
+#require "slu4-min64-asm >= 1.2.0"
+
+IMAGE_X_PIXELS = 400
+IMAGE_Y_PIXELS = 240
+
+SCALE_BITS = 9
+SCALE_FACTOR = (1 << SCALE_BITS)
+
+MANDELBROT_START_X = -2*SCALE_FACTOR
+MANDELBROT_END_X = 1*SCALE_FACTOR
+MANDELBROT_STEP_X = (MANDELBROT_END_X - MANDELBROT_START_X)/IMAGE_X_PIXELS
+
+MANDELBROT_START_Y = -1*SCALE_FACTOR
+MANDELBROT_END_Y = 1*SCALE_FACTOR
+MANDELBROT_STEP_Y = (MANDELBROT_END_Y - MANDELBROT_START_Y)/IMAGE_Y_PIXELS
+
+MAX_ITERATIONS = $FF
+
+
+.org $8000
+init:
+    spinit              ; init stack
+    jps _Clear
+    cpy2ai cur_pixel_x,0
+    cpy2ai cur_pixel_y,0
+
+.pixel_loop_y:
+    ; calculate scaled y0
+    phs2a cur_pixel_y
+    phs2i MANDELBROT_STEP_Y
+    jps multiply_int16          ; results are 32 bit
+    pls2
+    phs2i MANDELBROT_START_Y
+    jps add16
+    cpy2as scaled_y0,1          ; fetch results
+    pls2 pls2                   ; discard upper 32 bits of multiplications
+
+.pixel_loop_x:
+    ; calcualted scaled x0
+    phs2a cur_pixel_x
+    phs2i MANDELBROT_STEP_X
+    jps multiply_int16          ; results are 32 bit
+    pls2
+    phs2i MANDELBROT_START_X
+    jps add16
+    cpy2as scaled_x0,1          ; fetch results
+    pls2 pls2                   ;
+
+    ; check if in mandelbrot set
+.init_mandelbrot:
+    ; start interations
+    ldi 0 sta iteration_count
+    ; initialize zx and zy
+    cpy2aa zx,scaled_x0
+    cpy2aa zy,scaled_y0
+
+    ; push pixel coordinates on stack
+    phsa cur_pixel_x+0
+    phsa cur_pixel_x+1
+    phsa cur_pixel_y+0
+    jps _SetPixel
+    pls pls pls
+
+.mandelbrot_loop:
+    ; find zx*zx + zy*zy
+    phs2a zx
+    phs2a zx
+    jps multiply_int16
+    phsi SCALE_BITS jps asr32n pls  ; rescale
+    pls2
+    cpy2as zx_squared,1
+    pls2
+
+    phs2a zy
+    phs2a zy
+    jps multiply_int16
+    phsi SCALE_BITS jps asr32n pls  ; rescale
+    pls2
+    cpy2as zy_squared,1
+    phs2a zx_squared
+    jps add16
+    cpy2as temp_int16,1
+    pls2 pls2
+
+    ; check if value is greater than NOT_MANDELBROT_THRESHOLD
+    phs2a temp_int16        ; left value
+    phs2i 4*SCALE_FACTOR    ; right value
+    jps compare_uint16
+    pls2 pls2
+    bgt .not_in_mandelbrot
+
+    ; increment counter and check count
+    inb iteration_count
+    lda iteration_count cpi MAX_ITERATIONS
+    beq .in_mandelbrot          ; if we are at max iterations, point is in set
+
+    ; set up for next mandelbrot iteration
+
+    ; zy = 2*zx*zy + scaled_y0
+    phs2a zx
+    phs2a zy
+    jps multiply_int16
+    phsi (SCALE_BITS-1) jps asr32n pls  ; rescale
+    pls2                                ; remove top 4 bytes
+    ; stack now contains 2*zx*zy
+    phs2a scaled_y0
+    jps add16
+    cpy2as zy,1
+    pls2 pls2
+
+    ; zx = zx*zx - zy*zy + scaled_x0, but store in temp for now
+    phs2a zy_squared        ; Y value
+    phs2a zx_squared        ; X value
+    jps subtract16          ; X-Y
+    phs2a scaled_x0
+    jps add16
+    cpy2as zx,1             ; the new zx value
+    pls2 pls2 pls2
+
+    ; next loop
+    jpa .mandelbrot_loop
+
+.in_mandelbrot:
+    ; push pixel coordinates on stack
+    phsa cur_pixel_x+0
+    phsa cur_pixel_x+1
+    phsa cur_pixel_y+0
+    jps _ClrPixel
+    pls pls pls                 ; remove pixel coordinates from stack
+.not_in_mandelbrot:
+.mandelbot_pixel_done:
+
+.pixel_loop_x_end:
+    ; next x pixel
+    inc16a cur_pixel_x
+    ; check to see if we are done with current x row
+    phs2i IMAGE_X_PIXELS
+    phs2a cur_pixel_x
+    jps compare_uint16
+    pls2 pls2
+    bne .pixel_loop_x
+    cpy2ai cur_pixel_x,0
+
+.pixel_loop_y_end:
+    ; next y pixel
+    inc16a cur_pixel_y
+    ; check to see if we are done overall
+    phs2i IMAGE_Y_PIXELS
+    phs2a cur_pixel_y
+    jps compare_uint16
+    pls2 pls2
+    bne .pixel_loop_y
+
+.looping_done:
+    ldi 0 sta _XPos ldi 29 sta _YPos
+    jps _ScrollUp
+    jpa _Prompt
+
+;
+; Variables
+;
+
+cur_pixel_x:        .2byte 0
+cur_pixel_y:        .2byte 0
+scaled_x0:          .2byte 0
+scaled_y0:          .2byte 0
+zx:                 .2byte 0
+zy:                 .2byte 0
+zx_squared:         .2byte 0
+zy_squared:         .2byte 0
+temp_int16:         .2byte 0
+iteration_count:    .byte 0
+
+#include "math16lib.min64"
+#include "math32lib.min64"
+#include "stringlib.min64"

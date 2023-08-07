@@ -1,49 +1,45 @@
 #require "slu4-min64-asm >= 1.2.0"
 
-; compare_uint32
-;   Compares two unsigned 32-bit values to determine equality
+; compare_uint16
+;   Compares two unsigned 16-bit values to determine equality
 ;       X ? Y
 ;
 ;   Arguments
-;       sp+3 : right Y value (4 bytes)
-;       sp+7 : left X value (4 bytes)
+;       sp+3 : right Y value (2 bytes)
+;       sp+5 : left X value (2 bytes)
 ;
 ;   Returns
 ;       flags will be set per comparison
 ;
-compare_uint32:
+compare_uint16:
     ; first check high bytes, then others in sequence
     ; values on stack are stored big endian
-    lds (3+0) sta .rval lds (7+0) cpa .rval bne .done
-    lds (3+1) sta .rval lds (7+1) cpa .rval bne .done
-    lds (3+2) sta .rval lds (7+2) cpa .rval bne .done
-    lds (3+3) sta .rval lds (7+3) cpa .rval
+    lds (3+0) sta .rval lds (5+0) cpa .rval bne .done
+    lds (3+1) sta .rval lds (5+1) cpa .rval
 .done:
     rts
 .rval: .byte 0
 
-; compare_int32
-;   Compares two signed 32-bit values to determine equality
+; compare_int16
+;   Compares two signed 16-bit values to determine equality
 ;       X ? Y
 ;
 ;   Arguments
-;       sp+3 : right Y value (4 bytes)
-;       sp+7 : left X value (4 bytes)
+;       sp+3 : right Y value (2 bytes)
+;       sp+5 : left X value (2 bytes)
 ;
 ;   Returns
 ;       flags will be set per comparison
 ;
-compare_int32:
+compare_int16:
     ; first check signs. if LHS is negative, check RHS sign
-    lds (7+0) ani %1000000 cpi 0 beq .lhs_positive
+    lds (5+0) ani %1000000 cpi 0 beq .lhs_positive
     ; LHS is negative, check RHS
     lds (3+0) ani %1000000 cpi 0 beq .lhs_negative_rhs_positive
 .lhs_negative_rhs_negative:
     ; swap LHS and RHS in camparisons so flag sense will be correct
-    lds (7+0) sta .rval lds (3+0) cpa .rval bne .done
-    lds (7+1) sta .rval lds (3+1) cpa .rval bne .done
-    lds (7+2) sta .rval lds (3+2) cpa .rval bne .done
-    lds (7+3) sta .rval lds (3+3) cpa .rval
+    lds (5+0) sta .rval lds (3+0) cpa .rval bne .done
+    lds (5+1) sta .rval lds (3+1) cpa .rval
     jpa .done
 .lhs_negative_rhs_positive:
     ; LHS is less than RHS. do comparison of signed bits to get right flags
@@ -57,72 +53,68 @@ compare_int32:
     ldi 1 cpi 0
     jpa .done
 .lhs_positive_rhs_positive:
-    lds (3+0) sta .rval lds (7+0) cpa .rval bne .done
-    lds (3+1) sta .rval lds (7+1) cpa .rval bne .done
-    lds (3+2) sta .rval lds (7+2) cpa .rval bne .done
-    lds (3+3) sta .rval lds (7+3) cpa .rval
+    lds (3+0) sta .rval lds (5+0) cpa .rval bne .done
+    lds (3+1) sta .rval lds (5+1) cpa .rval
 .done:
     rts
 .rval: .byte 0
 
 
-; multiply_uint32
-;   multiply unsigned 4 byte values X*Y, producing an 8 byte unsigned results
+; multiply_uint16
+;   multiply unsigned 2 byte values X*Y, producing an 4 byte unsigned results
 ;
 ; multiply_int32
-;   multiply signed 4 byte values X*Y, producing an 8 byte signed results
+;   multiply signed 2 byte values X*Y, producing an 4 byte signed results
 ;
 ; Arguments
-;   sp+3 - value X (multiplier) (4 bytes)
-;   sp+7 - value Y (multiplicand) (4 bytes)
+;   sp+3 - value X (multiplier) (2 bytes)
+;   sp+5 - value Y (multiplicand) (2 bytes)
 ;
 ; Return Value
-;   sp+3 - results (8 bytes)
+;   sp+3 - results (4 bytes)
 ;
 
-multiply_uint32:
+multiply_uint16:
     ; return is always positive
     ldi 0 sta _multiply_sign_byte
     jpa _multiply
 
-multiply_int32:
+multiply_int16:
     ; determine if result is going to be negative
     lds 3 ani %10000000 sta _multiply_sign_byte cpi 0 beq .check_multiplicand
     ; negate mutiplier (stack is big endian)
-    twos4s 3
+    twos2s 3
 .check_multiplicand:
-    lds 7 ani %10000000 xra _multiply_sign_byte sta _multiply_sign_byte
-    lds 7 ani %10000000 cpi 0 beq .done
+    lds 5 ani %10000000 xra _multiply_sign_byte sta _multiply_sign_byte
+    lds 5 ani %10000000 cpi 0 beq .done
     ; negate mutiplicand (stack is big endian)
-    twos4s 7
+    twos2s 5
 .done:
     jpa _multiply
-
 _multiply_sign_byte:
     .byte 0
 _multiply:
     ; set counter for 32 bits
-    ldi 32 sta .counter
+    ldi 16 sta .counter
     ; set up 8 byte results memory block
-    cpy4ai .multiply_working_mem+4,0     ; high word inialized to 0
-    cpy4as .multiply_working_mem,3       ; multiplier in low word
+    cpy2ai .multiply_working_mem+2,0     ; high word inialized to 0
+    cpy2as .multiply_working_mem,3       ; multiplier in low word
+    ; ; check to see if multiplier is negative
+    lda .multiply_working_mem+1 ani %10000000 cpi 0 beq .mult_loop
+    cpy2ai .multiply_working_mem+2,$FFFF ; set high word to negative
 .mult_loop:
     ; check to see if LSb of working memory is 1
     lda .multiply_working_mem+0 lsr bcc .continue
     ; add high word of results to multiplicand
-    phs4s 7
-    phs4a .multiply_working_mem+4
-    jps add32
-    cpy4as .multiply_working_mem+4,1
-    pls4
-    pls4
+    phs2s 5
+    phs2a .multiply_working_mem+2
+    jps add16
+    cpy2as .multiply_working_mem+2,1
+    pls2
+    pls2
 .continue:
     ; shift results right one.
-    lrb .multiply_working_mem+7
-    rrb .multiply_working_mem+6
-    rrb .multiply_working_mem+5
-    rrb .multiply_working_mem+4
-    rrb .multiply_working_mem+3
+    lrb .multiply_working_mem+3
     rrb .multiply_working_mem+2
     rrb .multiply_working_mem+1
     rrb .multiply_working_mem+0
@@ -131,192 +123,179 @@ _multiply:
 .set_sign:
     ; check to see if result is negative:
     lda _multiply_sign_byte cpi 0 beq .positive_results
-    lda .multiply_working_mem+0 not inc sts 3+7
-    lda .multiply_working_mem+1 not aci 0 sts 3+6
-    lda .multiply_working_mem+2 not aci 0 sts 3+5
-    lda .multiply_working_mem+3 not aci 0 sts 3+4
-    lda .multiply_working_mem+4 not aci 0 sts 3+3
-    lda .multiply_working_mem+5 not aci 0 sts 3+2
-    lda .multiply_working_mem+6 not aci 0 sts 3+1
-    lda .multiply_working_mem+7 not aci 0 sts 3+0
+    lda .multiply_working_mem+0 not inc sts 3+3
+    lda .multiply_working_mem+1 not aci 0 sts 3+2
+    lda .multiply_working_mem+2 not aci 0 sts 3+1
+    lda .multiply_working_mem+3 not aci 0 sts 3+0
     rts
 .positive_results:
-    ; the entire working memory is the 64-bit results
-    cpy4sa 3+0,.multiply_working_mem+4
-    cpy4sa 3+4,.multiply_working_mem+0
+    ; the entire working memory is the 32-bit results
+    cpy4sa 3,.multiply_working_mem
     rts
 .counter: .byte 0
-.multiply_working_mem: .zero 8
+.multiply_working_mem: .zero 4
 
-; divide32
+; divide16
 ;   Divides X by Y (note, unsigned only)
 ;
 ;   Arguments:
-;       sp+3 : value X dividend (4 bytes)
-;       sp+7 : value Y divisor (4 bytes)
+;       sp+3 : value X dividend (2 bytes)
+;       sp+5 : value Y divisor (2 bytes)
 ;
 ;   Return Value:
 ;       sp+3 : the quotient (replaces X)
-;       sp+7 : the remainder (replaces Y)
+;       sp+5 : the remainder (replaces Y)
 ;
-divide32:
+divide16:
     ; first check values for 0
-    phs4i 0
-    phs4s (7+4)
-    jps compare_uint32
-    pls4
+    phs2i 0
+    phs2s (5+2)
+    jps compare_uint16
+    pls2
     beq .divide_by_zero
-    phs4s (3+4)
-    jps compare_uint32
-    pls4
-    pls4
+    phs2s (3+2)
+    jps compare_uint16
+    pls2
+    pls2
     beq .return_zero
     ; check if divisor > dividend
-    phs4s (7+0)
-    phs4s (3+4)
-    jps compare_uint32
-    pls4
-    pls4
+    phs2s (5+0)
+    phs2s (3+2)
+    jps compare_uint16
+    pls2
+    pls2
     bgt .divisor_too_large
 .start_division:
     ; set up working stack:
     ;   little endian
-    ;   0 : low word (4 bytes)  --> becomes quotient
-    ;   4 : high word (4 bytes) --> becomes remainder
+    ;   0 : low word (2 bytes)  --> becomes quotient
+    ;   2 : high word (2 bytes) --> becomes remainder
     ldi 0 sta .carry_bit        ; init carry bit
-    cpy4ai .working_mem+4, 0    ; init high word
-    cpy4as .working_mem+0, 3    ; init low word with dividend
-    ldi 32 sta .counter         ; init loop counter
+    cpy2ai .working_mem+2, 0    ; init high word
+    cpy2as .working_mem+0, 3    ; init low word with dividend
+    ldi 16 sta .counter         ; init loop counter
 .div_loop:
     ; shift working memory and add carry bit to the right side
-    jps .div_lsl64
+    jps .div_lsl32
     lda .working_mem+0
     ada .carry_bit
     sta .working_mem+0
     ldi 0 sta .carry_bit
     ; determine if we can do subtraction
-    phs4s 7                ; divisor (left)
-    phs4a .working_mem+4   ; working value high word (right)
-    jps compare_uint32
+    phs2s 5                ; divisor (left)
+    phs2a .working_mem+2   ; working value high word (right)
+    jps compare_uint16
     bgt .div_loop_continue
 .div_loop_subtraction:
     ; working value is equal to or larger than divsior
     ; do the subtraction
-    jps subtract32
+    jps subtract16
     ; save subtraction results to high word and set carry bit
-    cpy4as .working_mem+4, 1
+    cpy2as .working_mem+2, 1
     ldi 1 sta .carry_bit
 .div_loop_continue:
     ; clear stack
-    pls4
-    pls4
+    pls2
+    pls2
     ; decrement counter and check for 0
     deb .counter
     lda .counter cpi 0 bne .div_loop
 .division_done:
     ; at this point we have the remainder in the high word, save it
-    cpy4sa 7,.working_mem+4
+    cpy2sa 5,.working_mem+2
     ; and then we left shift one more time to get the quotient
-    jps .div_lsl64
+    jps .div_lsl32
     lda .working_mem+0
     ada .carry_bit
     sta .working_mem+0
-    cpy4sa 3,.working_mem+0
+    cpy2sa 3,.working_mem+0
     rts
 .divisor_too_large:
     ; quotient = 0, remander = dividend
-    cpy4ss 7, 3
-    cpy4si 3, 0
+    cpy2ss 5, 3
+    cpy2si 3, 0
     rts
 .divide_by_zero:
     ; for now, just return 0
-    pls4
+    pls2
     pls
-    cpy4si 7, 0
+    cpy2si 5, 0
 .return_zero:
-    cpy4si 3, 0
+    cpy2si 3, 0
     rts
-.working_mem: .zero 8
+.working_mem: .zero 4
 .carry_bit: .byte 0
 .counter: .byte 0
 ; .div_lsl64
 ;
 ;   local method for shifting .working_mem left 1 bit
-.div_lsl64:
+.div_lsl32:
     llb .working_mem+0
     rlb .working_mem+1
     rlb .working_mem+2
     rlb .working_mem+3
-    rlb .working_mem+4
-    rlb .working_mem+5
-    rlb .working_mem+6
-    rlb .working_mem+7
     rts
 
 
 
-; add32
+; add16
 ;   adds Y value to X (X+Y)
 ;
 ;   Arguments
-;       sp+3 - value X, 4 byte value, signed or unsigned
-;       sp+7 - value Y, 4 byte value, signed or unsigned
+;       sp+3 - value X, 2 byte value, signed or unsigned
+;       sp+5 - value Y, 2 byte value, signed or unsigned
 ;
 ;   Return Value
-;       sp+3 - replace the original 4 byte value with the sum
+;       sp+3 - replace the original 2 byte value with the sum
 ;
-add32:
+add16:
     ; stack is big endian, save locally little endian
-    cpy4as .yval, 7
+    cpy2as .yval, 5
     ; start addition with LSB, Remember, stack is big endian
-    lds 3+3 ada .yval+0 sts 3+3
-    lds 3+2 aca .yval+1 sts 3+2
-    lds 3+1 aca .yval+2 sts 3+1
-    lds 3+0 aca .yval+3 sts 3+0
+    lds 3+1 ada .yval+0 sts 3+1
+    lds 3+0 aca .yval+1 sts 3+0
     ; end return
     rts
-.yval: .4byte 0
+.yval: .2byte 0
 
 
-; subtract32
+; subtract16
 ;   subtracts Y value from X (X-Y)
 ;
 ;   Arguments
-;       sp+3 - value X, 4 byte value
-;       sp+7 - value Y, 4 byte value
+;       sp+3 - value X, 2 byte value
+;       sp+5 - value Y, 2 byte value
 ;
 ;   Return Value
 ;       sp+3 - replace the original 4 byte value with the difference
 ;
 ;
-subtract32:
+subtract16:
     ; stack is big endian, save Y locally little endian
-    cpy4as .yval, 7
+    cpy2as .yval, 5
     ; star subtractiosn with LSB
-    lds 3+3 sba .yval+0 sts 3+3
-    lds 3+2 sca .yval+1 sts 3+2
-    lds 3+1 sca .yval+2 sts 3+1
-    lds 3+0 sca .yval+3 sts 3+0
+    lds 3+1 sba .yval+0 sts 3+1
+    lds 3+0 sca .yval+1 sts 3+0
     ; end return
     rts
-.yval: .4byte 0
+.yval: .2byte 0
 
-; lsr32n
+; lsr16n
 ;   logical shift right N bits for 32 bit values
 ;
 ;   Arguments
-;       sp+3 - count of bits to shift right. 1 byte value, masked to %00011111, if great return zero
-;       sp+4 - value to be shifted right, 4 byte value
+;       sp+3 - count of bits to shift right. 1 byte value, masked to %00001111, if great return zero
+;       sp+4 - value to be shifted right, 2 byte value
 ;
 ;   Return Value
 ;       sp+4 - replace value with shifted value
 ;       * Does not porperly set carry flag
 ;
-lsr32n:
+lsr16n:
     ; first, save X register
     txa phs
     ; set up local variables
-    cpy4as .local_val,4+1
+    cpy2as .local_val,4+1
     lds 3+1 tax
 
     ; Now see if we can save iterations by shortcutting the right shift
@@ -324,82 +303,68 @@ lsr32n:
     ldi 7 cpx bgt .lsr_loop ; if the current bit shift count is <=7, then start doing loop
     ; we need to shift 8 or more bits. Fast track a 8-bit shift by dropping LSB
     cpyaa .local_val+0,.local_val+1
-    cpyaa .local_val+1,.local_val+2
-    cpyaa .local_val+2,.local_val+3
-    ldi 0 sta .local_val+3
+    ldi 0 sta .local_val+1
     ; decrement the shift counter by 8
     txa sbi 8 tax
-    ; try again
-    jpa .iteration_saver
 .lsr_loop:
     ; check the iteration counter is > 0, otherwise do a bit shift and decrement counter.
     ldi 0 cpx beq .done
     ; right shifts start from the MSB
-    lrb .local_val+3
-    rrb .local_val+2
-    rrb .local_val+1
+    lrb .local_val+1
     rrb .local_val+0
     dex
     jpa .lsr_loop
 .done:
-    cpy4sa 4+1,.local_val
+    cpy2sa 4+1,.local_val
     ; restore X register before returning
     pls tax
     rts
 .local_val:
-    .4byte 0
+    .2byte 0
 
 
-; asr32n
+; asr16n
 ;   arithmetic shift right N bits for 32 bit values
 ;
 ;   Arguments
-;       sp+3 - count of bits to shift right. 1 byte value, masked to %00011111, if great return zero
-;       sp+4 - value to be shifted right, 4 byte value
+;       sp+3 - count of bits to shift right. 1 byte value, masked to %00001111, if great return zero
+;       sp+4 - value to be shifted right, 2 byte value
 ;
 ;   Return Value
 ;       sp+4 - replace value with shifted value
 ;       * Does not porperly set carry flag
 ;
-asr32n:
+asr16n:
     ; first, save X register
     txa phs
     ; set up local variables
-    cpy4as .local_val,4+1
+    cpy2as .local_val,4+1
     lds 3+1 tax
-    ; save sign byte for the iteration saver
-    lda .local_val+3 ani %10000000 cpi 0 beq .zero_sign_byte
-    ldi $FF sta .sign_byte
-    jpa .iteration_saver
-.zero_sign_byte:
-    ldi 0 sta .sign_byte
     ; Now see if we can save iterations by shortcutting the right shift
 .iteration_saver:
     ldi 7 cpx bgt .asr_loop ; if the current bit shift count is <=7, then start doing loop
-    ; we need to shift 8 or more bits. Fast track a 8-bit shift by dropping LSB
-    cpyaa .local_val+0,.local_val+1
-    cpyaa .local_val+1,.local_val+2
-    cpyaa .local_val+2,.local_val+3
-    cpyaa .local_val+3,.sign_byte
     ; decrement the shift counter by 8
     txa sbi 8 tax
-    ; try again
-    jpa .iteration_saver
+    ; we need to shift 8 or more bits. Fast track a 8-bit shift by dropping LSB
+    cpyaa .local_val+0,.local_val+1
+    lda .local_val+1 ani %10000000 cpi 0 beq .zero_sign_byte
+    ldi $FF sta .local_val+1
+    jpa .asr_loop
+.zero_sign_byte:
+    ldi 0 sta .local_val+1
 .asr_loop:
     ; check the iteration counter is > 0, otherwise do a bit shift and decrement counter.
     ldi 0 cpx beq .done
     ; right shifts start from the MSB
-    lrb .local_val+3
-    rrb .local_val+2
-    rrb .local_val+1
+    lrb .local_val+1
     rrb .local_val+0
-    lda .local_val+3 ani %01000000 lsl orb .local_val+3
+    lda .local_val+1 ani %01000000 lsl orb .local_val+1
 .continue_asl:
     dex
     jpa .asr_loop
 
 .done:
-    cpy4sa 4+1,.local_val
+    cpy2sa 4+1,.local_val
     ; restore X register before returning
     pls tax
     rts
