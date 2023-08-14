@@ -172,16 +172,8 @@ int32_to_decimal_cstr:
     ; first determine if value is signed, remember stack is in big endian
     lds 1 ani %10000000 sta .is_signed
     cpi 0 beq .cacluate_str
-    ; it is negative, take 2's by first doing 1's then adding 1
-    lds 1 not sts 1
-    lds 2 not sts 2
-    lds 3 not sts 3
-    lds 4 not sts 4
-    ; now add 1, remember stack is in big endian
-    lds 4 adi 1 sts 4
-    lds 3 aci 0 sts 3
-    lds 2 aci 0 sts 2
-    lds 1 aci 0 sts 1
+    ; it is negative, take 2's
+    twos4s 1
 .cacluate_str:
     jps uint32_to_decimal_cstr
     pls4                ; remove pushed value
