@@ -10,7 +10,7 @@ general:
   origin: 0x0000
   identifier:
     name: slu4-min64-asm
-    version: "1.2.0"
+    version: "1.2.1"
     extension: min64
   min_version: 0.4.1
 operand_sets:
@@ -1060,7 +1060,17 @@ instructions:
         list:
           - absolute_address
   lax:
-    # load register A with memory value at (absolute address + X)
+    # load register A with memory value at (absolute address + X) (v1)
+    bytecode:
+      value: 0x68
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  ltx:
+    # load register A with memory value at (absolute address + X) (v2)
     bytecode:
       value: 0x68
       size: 8
@@ -1144,8 +1154,8 @@ instructions:
       operand_sets:
         list:
           - absolute_address
-  lay:
-    # load A with memory at (absolute address + Y)
+  lta:
+    # load A with memory at (absolute address + A)
     bytecode:
       value: 0x76
       size: 8
