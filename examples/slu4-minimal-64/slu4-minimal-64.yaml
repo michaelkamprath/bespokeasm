@@ -10,7 +10,7 @@ general:
   origin: 0x0000
   identifier:
     name: slu4-min64-asm
-    version: "1.2.1"
+    version: "1.2.2"
     extension: min64
   min_version: 0.4.1
 operand_sets:
@@ -162,22 +162,22 @@ predefined:
       value: 0xb057
     -  # Command line parsing pointer
       name: _ReadPtr
-      value: 0xbf70
+      value: 0xbcb0
     -  # Number parsed by _ReadHex
       name: _ReadNum
-      value: 0xbf72
+      value: 0xbcb2
     -  # 4 bytes defining the seed state of _Random
       name: _RandomState
-      value: 0xbf84
+      value: 0xbcc4
     -  # Horizontal cursor position (see _Print)
       name: _XPos
-      value: 0xbf8c
+      value: 0xbccc
     -  # Vertical cursor position (see _Print)
       name: _YPos
-      value: 0xbf8d
+      value: 0xbccd
     -  # Address of the command line input buffer
       name: _ReadBuffer
-      value: 0xbf8e
+      value: 0xbccd
 
 instructions:
   nop:
