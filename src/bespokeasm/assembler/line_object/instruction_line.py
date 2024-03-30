@@ -10,7 +10,7 @@ from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 
 
 class InstructionLine(LineWithBytes):
-    COMMAND_EXTRACT_PATTERN = re.compile(r'^\s*(\w+)', flags=re.IGNORECASE | re.MULTILINE)
+    COMMAND_EXTRACT_PATTERN = re.compile(r'^\s*(\w[\w\._]*)', flags=re.IGNORECASE | re.MULTILINE)
 
     _INSTRUCTUION_EXTRACTION_PATTERN = None
 
@@ -26,8 +26,10 @@ class InstructionLine(LineWithBytes):
         # first, extract evertything up to the next extruction
         if InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN is None:
             instructions_regex = '\\b' + '\\b|\\b'.join(isa_model.operation_mnemonics) + '\\b'
+            # replace any period characters in instructions with escaped period characters
+            instructions_regex = instructions_regex.replace('.', '\\.')
             InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN = re.compile(
-                r'(?i)(?:((?:{0})\b.*?)(?:(?={1})|\;|$))'.format(instructions_regex, instructions_regex),
+                r'(?i)(?:((?:{})\b.*?)(?:(?={})|\;|$))'.format(instructions_regex, instructions_regex),
                 flags=re.IGNORECASE | re.MULTILINE,
             )
         instruction_match = re.search(InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN, line_str)

@@ -32,6 +32,31 @@ class TestInstructionParsing(unittest.TestCase):
     def setUp(self):
         InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN = None
 
+    def test_instruction_character_set_parsing(self):
+        # test instructions with periods in them
+        fp = pkg_resources.files(config_files).joinpath('test_instructions_with_periods.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones
+        )
+
+        ins1 = InstructionLine.factory(
+            22,
+            '  ma.hl a,[hl+2]',
+            'some comment!',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+        ins1.set_start_address(1212)
+        self.assertIsInstance(ins1, InstructionLine)
+        self.assertEqual(ins1.byte_size, 2, 'has 2 bytes')
+        ins1.label_scope = TestInstructionParsing.label_values
+        ins1.generate_bytes()
+        self.assertEqual(ins1.get_bytes(), bytearray([0x45, 0x02]), 'instruction should match')
+
     def test_instruction_variant_matching(self):
         fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')
         isa_model = AssemblerModel(str(fp), 0)
@@ -184,7 +209,7 @@ class TestInstructionParsing(unittest.TestCase):
         ins2.generate_bytes()
         self.assertEqual(list(ins2.get_bytes()), [0xFF, 0x64, 0x1D], 'instruction byte should match')
 
-    def test_indexed_regsiter_operands(self):
+    def test_indexed_register_operands(self):
         fp = pkg_resources.files(config_files).joinpath('test_indirect_indexed_register_operands.yaml')
         isa_model = AssemblerModel(str(fp), 0)
         memzone_mngr = MemoryZoneManager(
