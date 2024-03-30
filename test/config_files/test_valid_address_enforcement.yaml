@@ -16,6 +16,9 @@ predefined:
     - name: GLOBAL
       start: 0x2000
       end: 0xBFFF
+    - name: TEST1
+      start: 0x5000
+      end: 0x5FFF
 operand_sets:
   register:
     operand_values:
@@ -51,7 +54,7 @@ operand_sets:
   addresses:
     operand_values:
       address:
-        type: numeric
+        type: address
         bytecode:
           value: 5
           size: 4
@@ -148,3 +151,49 @@ instructions:
                 byte_align: true
                 max: 128
                 min: -127
+  jmp_local:
+    bytecode:
+      value: 0xE0
+      size: 8
+    operands:
+      count: 1
+      specific_operands:
+        local_addr:
+          list:
+            local_addr:
+              type: address
+              argument:
+                size: 8
+                byte_align: true
+                slice_lsb: true
+  jmpa:
+    bytecode:
+      value: 0xE1
+      size: 8
+    operands:
+      count: 1
+      specific_operands:
+        address:
+          list:
+            address:
+              type: address
+              argument:
+                size: 16
+                byte_align: true
+                valid_address: true
+  jmp_test1:
+    bytecode:
+      value: 0xE2
+      size: 8
+    operands:
+      count: 1
+      specific_operands:
+        address:
+          list:
+            address:
+              type: address
+              argument:
+                size: 16
+                byte_align: true
+                valid_address: true
+                memory_zone: TEST1

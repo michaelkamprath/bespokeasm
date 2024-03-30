@@ -813,3 +813,111 @@ class TestInstructionParsing(unittest.TestCase):
             self.assertIsInstance(e2, InstructionLine)
             self.assertEqual(e2.byte_size, 3, 'has 3 bytes')
             e2.generate_bytes()
+
+    def test_address_operands(self):
+        from bespokeasm.assembler.model.operand.types.address import AddressByteCodePart
+
+        fp = pkg_resources.files(config_files).joinpath('test_valid_address_enforcement.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size, isa_model.default_origin, isa_model.predefined_memory_zones,
+        )
+        memzone_32bit_mngr = MemoryZoneManager(32, 0,)
+        lineid = LineIdentifier(42, 'test_address_operands')
+
+        # first, test argument value generation with no LSB slicing
+        bc1 = AddressByteCodePart(
+            '$2020',
+            16,
+            True,
+            'little',
+            lineid,
+            memzone_mngr.global_zone,
+            False,
+        )
+        value1 = bc1.get_value(TestInstructionParsing.label_values, 0x2010, 32)
+        self.assertEqual(value1, 0x2020, 'byte code should match')
+
+        # now, test argument value generation with LSB slicing
+        bc2 = AddressByteCodePart(
+            '$2045',
+            8,
+            True,
+            'little',
+            lineid,
+            memzone_mngr.global_zone,
+            True,
+        )
+        value2 = bc2.get_value(TestInstructionParsing.label_values, 0x2010, 32)
+        self.assertEqual(value2, 0x45, 'byte code should match')
+
+        with self.assertRaises(ValueError, msg="address MSBs don't match"):
+            bc2.get_value(TestInstructionParsing.label_values, 0x2250, 32)
+
+        # test 16-bit slize with a 32-bit address
+        bc3 = AddressByteCodePart(
+            '$19458899',
+            16,
+            True,
+            'little',
+            lineid,
+            memzone_32bit_mngr.global_zone,
+            True,
+        )
+        value3 = bc3.get_value(TestInstructionParsing.label_values, 0x19451000, 32)
+        self.assertEqual(value3, 0x8899, 'byte code should match')
+        with self.assertRaises(ValueError, msg="address MSBs don't match"):
+            bc3.get_value(TestInstructionParsing.label_values, 0x20241000, 32)
+
+        # Test byte code generation for sliced addresses
+        t1 = InstructionLine.factory(
+            lineid, 'jmp_local $2FF8', 'comment',
+            isa_model, memzone_mngr.global_zone, memzone_mngr,
+        )
+        t1.set_start_address(0x2F10)
+        t1.label_scope = TestInstructionParsing.label_values
+        self.assertIsInstance(t1, InstructionLine)
+        self.assertEqual(t1.byte_size, 2, 'has 2 bytes')
+        t1.generate_bytes()
+        self.assertEqual(list(t1.get_bytes()), [0xE0, 0xF8], 'instruction byte should match')
+
+        # ensure MSBs match
+        t1.set_start_address(0x3350)
+        with self.assertRaises(ValueError, msg="address MSBs don't match"):
+            t1.generate_bytes()
+
+        # Test bye code generation for unsliced addresses
+        t2 = InstructionLine.factory(
+            lineid, 'jmpa $2FF8', 'comment',
+            isa_model, memzone_mngr.global_zone, memzone_mngr,
+        )
+        t2.set_start_address(0x2F10)
+        t2.label_scope = TestInstructionParsing.label_values
+        self.assertIsInstance(t2, InstructionLine)
+        self.assertEqual(t2.byte_size, 3, 'has 3 bytes')
+        t2.generate_bytes()
+        self.assertEqual(list(t2.get_bytes()), [0xE1, 0xF8, 0x2F], 'instruction byte should match')
+
+        # test operand address is in target memory zone
+        t3 = InstructionLine.factory(
+            lineid, 'jmp_test1 $5150', 'comment',
+            isa_model, memzone_mngr.global_zone, memzone_mngr,
+        )
+        t3.set_start_address(0x2F10)
+        t3.label_scope = TestInstructionParsing.label_values
+        self.assertIsInstance(t3, InstructionLine)
+        self.assertEqual(t3.byte_size, 3, 'has 3 bytes')
+        t3.generate_bytes()
+        self.assertEqual(list(t3.get_bytes()), [0xE2, 0x50, 0x51], 'instruction byte should match')
+
+        # enforce operand address is in target memory zone
+        t4 = InstructionLine.factory(
+            lineid, 'jmp_test1 $4425', 'comment',
+            isa_model, memzone_mngr.global_zone, memzone_mngr,
+        )
+        t4.set_start_address(0x2F10)
+        t4.label_scope = TestInstructionParsing.label_values
+        self.assertIsInstance(t4, InstructionLine)
+        self.assertEqual(t4.byte_size, 3, 'has 3 bytes')
+        with self.assertRaises(SystemExit, msg="address not in target memory zone"):
+            t4.generate_bytes()

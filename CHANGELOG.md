@@ -15,6 +15,7 @@ Changes that are planned but not implemented yet:
   * unknown labels
 
 ## [Unreleased]
+*  Added support for The Minimal 64x4 Home Computer with an example and updated assembler functionality to support it.
 
 ## [0.4.1]
 * added `.asciiz` as an equivalent data directive to `.cstr`
