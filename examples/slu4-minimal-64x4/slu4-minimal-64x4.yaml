@@ -2,6 +2,7 @@
 description: slu4 Minimal 64x4 Home Computer
 general:
   address_size: 16
+  page_size: 256
   endian: little
   registers:
     - a
@@ -11,7 +12,7 @@ general:
   identifier:
     name: slu4-min64x4-asm
     version: "1.1.0"
-    extension: min64
+    extension: min64x4
   min_version: "0.4.2"
 operand_sets:
   immediate_8bit:
@@ -60,7 +61,8 @@ operand_sets:
           byte_align: true
           endian: little
   address_lsb:
-    # one byte is interpreted as an address's LSB and the address MSB is taken from the current instruction address
+    # one byte is interpreted as an address's LSB and the address MSB
+    # is taken from the current instruction address
     operand_values:
       address:
         type: address
@@ -90,7 +92,8 @@ operand_sets:
           slice_lsb: true
           memory_zone: ZERO_PAGE
   relative_zero_page:
-    # one byte is interpreted as a zero page address to a word that in turn is used as a relative address
+    # one byte is interpreted as a zero page address to a word that
+    # in turn is used as a relative address
     operand_values:
       address:
         type: address
@@ -166,7 +169,7 @@ predefined:
     -  # Scrolls up the viewport by 8 pixels
       name: _ScrollUp
       value: 0xf039
-    - # Scrolls down the viewport by 8 pixels
+    -  # Scrolls down the viewport by 8 pixels
       name: _ScrollDn
       value: 0xf03c
     -  # Outputs a char at the cursor pos (non-advancing)
@@ -196,7 +199,7 @@ predefined:
     -  # Clears a pixel at position (x, y)
       name: _ClearPixel
       value: 0xf057
-    - # Horizontal cursor position (see _Print)
+    -  # Horizontal cursor position (see _Print)
       name: _XPos
       value: 0x00c0
     -  # Vertical cursor position (see _Print)
@@ -2306,7 +2309,8 @@ instructions:
           - absolute_address
           - zero_page
   sbb:
-    # Subtract byte at abs address from byte at abs address: *addr2 = *addr2 - *addr1
+    # Subtract byte at abs address from byte at abs
+    # address: *addr2 = *addr2 - *addr1
     bytecode:
       value: 0xdf
       size: 8
@@ -2328,7 +2332,8 @@ instructions:
           - absolute_address
           - zero_page
   sbw:
-    # Subtract byte at abs address from word at abs address: *addr2 = *addr2 - *addr1
+    # Subtract byte at abs address from word at abs
+    # address: *addr2 = *addr2 - *addr1
     bytecode:
       value: 0xe1
       size: 8
@@ -2638,3 +2643,9 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+macros:
+  spinit:
+    - operands:
+        count: 0
+      instructions:
+        - "mib 0xfe,0xffff"
