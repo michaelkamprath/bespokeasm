@@ -14,7 +14,7 @@ import sys
 from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
-from bespokeasm.assembler.line_object.directive_line import SetMemoryZoneLine
+from bespokeasm.assembler.line_object.directive_line.factory import SetMemoryZoneLine
 from bespokeasm.assembler.line_object.factory import LineOjectFactory
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.model import AssemblerModel
@@ -53,7 +53,7 @@ class AssemblyFile:
         line_objects = []
 
         try:
-            with open(self.filename, 'r') as f:
+            with open(self.filename) as f:
                 assembly_files_used.add(self.filename)
                 line_num = 0
                 current_scope = self.label_scope

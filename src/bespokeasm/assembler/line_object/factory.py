@@ -6,7 +6,7 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object.label_line import LabelLine
-from bespokeasm.assembler.line_object.directive_line import DirectiveLine
+from bespokeasm.assembler.line_object.directive_line.factory import DirectiveLine
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.memory_zone import MemoryZone
@@ -93,7 +93,7 @@ class LineOjectFactory:
                     model.endian,
                     current_memzone,
                     memzone_manager,
-                    model.cstr_terminator,
+                    model,
                 )
                 if line_obj is not None:
                     line_obj_list.append(line_obj)

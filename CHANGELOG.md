@@ -16,6 +16,7 @@ Changes that are planned but not implemented yet:
 
 ## [Unreleased]
 *  Added support for The Minimal 64x4 Home Computer with an example and updated assembler functionality to support it.
+*  Added `.align` directive to align the current address to a multiple of a given value.
 
 ## [0.4.1]
 * added `.asciiz` as an equivalent data directive to `.cstr`

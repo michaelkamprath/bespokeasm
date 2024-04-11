@@ -345,6 +345,3 @@ class TestPreprocessorSymbols(unittest.TestCase):
         c5 = EndifPreprocessorCondition('#endif', LineIdentifier('test_condition_stack', 5))
         stack.process_condition(c5)
         self.assertTrue(stack.currently_active(preprocessor), 'condition should be True')
-
-    def test_page_align_line(self):
-        raise NotImplementedError('PageAlignLine is not implemented')

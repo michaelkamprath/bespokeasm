@@ -1,14 +1,20 @@
 import unittest
 import importlib.resources as pkg_resources
+import copy
 
 from test import config_files
 
 from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType
-from bespokeasm.assembler.line_object.directive_line import DirectiveLine, AddressOrgLine, FillDataLine, FillUntilDataLine
+from bespokeasm.assembler.line_object import LineObject
+from bespokeasm.assembler.line_object.directive_line.fill_data import FillDataLine, FillUntilDataLine
+from bespokeasm.assembler.line_object.directive_line.factory import DirectiveLine
+from bespokeasm.assembler.line_object.directive_line.address import AddressOrgLine
+from bespokeasm.assembler.line_object.directive_line.page_align import PageAlignLine
 from bespokeasm.assembler.line_object import LineWithBytes
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.line_identifier import LineIdentifier
 
 
 class TestDirectiveLines(unittest.TestCase):
@@ -39,6 +45,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
+            TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o1, AddressOrgLine)
         self.assertEqual(o1.address, 1)
@@ -53,6 +60,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
+            TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o2, AddressOrgLine)
         self.assertEqual(o2.address, 8)
@@ -64,6 +72,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
+            TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o3, AddressOrgLine)
         self.assertEqual(o3.address, 4)
@@ -75,6 +84,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
+            TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o4, AddressOrgLine)
         self.assertEqual(o4.address, 15)
@@ -86,6 +96,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
+            TestDirectiveLines.isa_model,
         )
         o5.label_scope = label_values
         self.assertIsInstance(o5, AddressOrgLine)
@@ -99,6 +110,7 @@ class TestDirectiveLines(unittest.TestCase):
                 TestDirectiveLines.isa_model.endian,
                 TestDirectiveLines.memzone,
                 TestDirectiveLines.memory_zone_manager,
+                TestDirectiveLines.isa_model,
             )
             e1.label_scope = label_values
             e1.address
@@ -111,6 +123,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
+            TestDirectiveLines.isa_model,
         )
         o6.label_scope = label_values
         self.assertIsInstance(o6, AddressOrgLine)
@@ -123,6 +136,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
+            TestDirectiveLines.isa_model,
         )
         o7.label_scope = label_values
         self.assertIsInstance(o7, AddressOrgLine)
@@ -143,6 +157,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
+            TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o1, FillDataLine)
         o1.label_scope = label_values
@@ -157,6 +172,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
+            TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o2, FillDataLine)
         o2.label_scope = label_values
@@ -171,6 +187,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
+            TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o2b, FillDataLine)
         o2b.label_scope = label_values
@@ -185,6 +202,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
+            TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o3, FillDataLine)
         o3.label_scope = label_values
@@ -200,6 +218,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
+            TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o4, FillDataLine)
         o4.label_scope = label_values
@@ -214,6 +233,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
+            TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o5, FillDataLine)
         o5.label_scope = label_values
@@ -228,6 +248,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
+            TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o6, FillDataLine)
         o6.label_scope = label_values
@@ -242,6 +263,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
+            TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o6, FillDataLine)
         o6.label_scope = label_values
@@ -256,6 +278,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
+            TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o7, FillDataLine)
         o7.label_scope = label_values
@@ -274,6 +297,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
+            TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o1, FillUntilDataLine)
         o1.set_start_address(0x42)
@@ -290,6 +314,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
+            TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o2, FillUntilDataLine)
         o2.set_start_address(0xF)
@@ -305,6 +330,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
+            TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o3, FillUntilDataLine)
         o3.set_start_address(0xF)
@@ -316,15 +342,17 @@ class TestDirectiveLines(unittest.TestCase):
     def test_cstr_directive(self):
         label_values = LabelScope(LabelScopeType.GLOBAL, None, 'global')
         label_values.set_label_value('my_label', 0x80, 1)
+        local_isa_model = copy.deepcopy(TestDirectiveLines.isa_model)
 
-        t1 = DirectiveLine.factory(
+        local_isa_model._config['general']['cstr_terminator'] = 0
+        t1: LineObject = DirectiveLine.factory(
             1234,
             '.cstr "this is a test"',
             'that str',
             TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
-            0,
+            local_isa_model
         )
         self.assertIsInstance(t1, LineWithBytes)
         t1.set_start_address(0xF)
@@ -333,6 +361,7 @@ class TestDirectiveLines(unittest.TestCase):
         t1.generate_bytes()
         self.assertEqual(list(t1.get_bytes())[-1], 0, 'terminating character must match')
 
+        local_isa_model._config['general']['cstr_terminator'] = 3
         t2 = DirectiveLine.factory(
             1234,
             '.cstr "this is a test"',
@@ -340,7 +369,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
-            3,
+            local_isa_model
         )
         self.assertIsInstance(t1, LineWithBytes)
         t2.set_start_address(0xF)
@@ -348,6 +377,65 @@ class TestDirectiveLines(unittest.TestCase):
         self.assertEqual(t2.byte_size, 15, 'must have the right number of bytes')
         t2.generate_bytes()
         self.assertEqual(list(t2.get_bytes())[-1], 3, 'terminating character must match')
+
+    def test_page_align_line(self):
+        t1: LineObject = DirectiveLine.factory(
+            1234,
+            '.align',
+            'page align',
+            TestDirectiveLines.isa_model.endian,
+            TestDirectiveLines.memzone,
+            TestDirectiveLines.memory_zone_manager,
+            TestDirectiveLines.isa_model
+        )
+        self.assertIsInstance(t1, PageAlignLine)
+        t1.set_start_address(3)
+        self.assertEqual(t1.address, 3)
+
+        t2: LineObject = DirectiveLine.factory(
+            1234,
+            '.align 4',
+            'page align',
+            TestDirectiveLines.isa_model.endian,
+            TestDirectiveLines.memzone,
+            TestDirectiveLines.memory_zone_manager,
+            TestDirectiveLines.isa_model
+        )
+        self.assertIsInstance(t2, PageAlignLine)
+        t2.set_start_address(3)
+        self.assertEqual(t2.address, 4)
+
+        local_isa_model = copy.deepcopy(TestDirectiveLines.isa_model)
+        local_isa_model._config['general']['page_size'] = 8
+        t3: LineObject = DirectiveLine.factory(
+            1234,
+            '.align',
+            'page align',
+            TestDirectiveLines.isa_model.endian,
+            TestDirectiveLines.memzone,
+            TestDirectiveLines.memory_zone_manager,
+            local_isa_model
+        )
+        self.assertIsInstance(t3, PageAlignLine)
+        t3.set_start_address(3)
+        self.assertEqual(t3.address, 8)
+
+        # test using an expression for the page size
+        label_values = GlobalLabelScope(['a', 'b', 'sp', 'mar'])
+        label_values.set_label_value('eight', 8, LineIdentifier(1))
+        t4: LineObject = DirectiveLine.factory(
+            1234,
+            '.align (eight >> 1)',
+            'page align',
+            TestDirectiveLines.isa_model.endian,
+            TestDirectiveLines.memzone,
+            TestDirectiveLines.memory_zone_manager,
+            local_isa_model
+        )
+        t4.label_scope = label_values
+        self.assertIsInstance(t4, PageAlignLine)
+        t4.set_start_address(3)
+        self.assertEqual(t4.address, 4)
 
 
 if __name__ == '__main__':

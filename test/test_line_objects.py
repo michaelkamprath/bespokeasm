@@ -8,7 +8,7 @@ from bespokeasm.assembler.line_object.factory import LineOjectFactory
 from bespokeasm.assembler.line_object.data_line import DataLine
 from bespokeasm.assembler.line_object.label_line import LabelLine, is_valid_label
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
-from bespokeasm.assembler.line_object.directive_line import AddressOrgLine
+from bespokeasm.assembler.line_object.directive_line.address import AddressOrgLine
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.memory_zone import MemoryZone

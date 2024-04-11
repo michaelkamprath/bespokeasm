@@ -4,7 +4,7 @@ import sys
 
 from bespokeasm.assembler.line_object import LineObject, LineWithBytes
 from bespokeasm.assembler.line_object.label_line import LabelLine
-from bespokeasm.assembler.line_object.directive_line import SetMemoryZoneLine
+from bespokeasm.assembler.line_object.directive_line.memzone import SetMemoryZoneLine
 from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.pretty_printer import PrettyPrinterBase

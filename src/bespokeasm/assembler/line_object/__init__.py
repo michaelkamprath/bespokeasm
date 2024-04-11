@@ -4,7 +4,7 @@ from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.expression import EXPRESSION_PARTS_PATTERN
 
 PATTERN_LABEL_DEFINITION = r'\s*(?:\.?\w+:)'
-INSTRUCTION_EXPRESSION_PATTERN = r'(?:{0}|(?:[ \t]*)(?!(?:[ \t]*\;|[ \t]*\v)|{1}))+'.format(
+INSTRUCTION_EXPRESSION_PATTERN = r'(?:{}|(?:[ \t]*)(?!(?:[ \t]*\;|[ \t]*\v)|{}))+'.format(
     EXPRESSION_PARTS_PATTERN,
     PATTERN_LABEL_DEFINITION,
 )
@@ -32,15 +32,17 @@ class LineObject:
         return self._line_id
 
     def set_start_address(self, address: int):
-        """Sets the address for this line object.
+        """Sets the initial address for this line object.
 
         If this object consists of multiple bytes, address pertains to first byte.
+
+        The finalized address reported in the `address` property might be different from this value.
         """
         self._address = address
 
     @property
     def address(self) -> int:
-        """Returns the address for this line object.
+        """Returns the finalized address for this line object.
 
         If this object consists of multiple bytes, address pertains to first byte.
         """

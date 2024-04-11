@@ -85,6 +85,14 @@ class AssemblerModel:
                 'Memory blocks have been deprecated and replaced with "data" blocks.'
             )
 
+        # ensure there is a general section
+        if 'general' not in self._config:
+            sys.exit('ERROR - ISA configuration file does not contain a "general" section.')
+
+        # what's the point if there is no instruction set?
+        if 'instructions' not in self._config:
+            sys.exit('ERROR - ISA configuration file does not contain an "instructions" section.')
+
         # check for min required BespokeASM version
         if 'min_version' in self._config['general']:
             required_version = self._config['general']['min_version']
@@ -160,6 +168,11 @@ class AssemblerModel:
     def address_size(self) -> int:
         '''The number of bits used to rerpesent a memory address'''
         return self._config['general']['address_size']
+
+    @property
+    def page_size(self) -> int:
+        '''The number of bytes in a memory page'''
+        return self._config['general'].get('page_size', 1)
 
     @property
     def registers(self) -> set[str]:
