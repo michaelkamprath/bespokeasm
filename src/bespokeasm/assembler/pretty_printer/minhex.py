@@ -3,7 +3,7 @@ import io
 from bespokeasm.assembler.line_object import LineWithBytes, LineObject
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.pretty_printer import PrettyPrinterBase
-from bespokeasm.assembler.line_object.directive_line import AddressOrgLine
+from bespokeasm.assembler.line_object.directive_line.address import AddressOrgLine
 
 
 class MinHexPrettyPrinter(PrettyPrinterBase):
