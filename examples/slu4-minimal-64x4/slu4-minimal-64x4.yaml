@@ -977,7 +977,7 @@ instructions:
       count: 1
       operand_sets:
         list:
-          - address
+          - absolute_address
   beq:
     # Branch on zero
     bytecode:
@@ -987,7 +987,7 @@ instructions:
       count: 1
       operand_sets:
         list:
-          - address
+          - absolute_address
   bcc:
     # Branch on carry clear
     bytecode:
@@ -997,7 +997,7 @@ instructions:
       count: 1
       operand_sets:
         list:
-          - address
+          - absolute_address
   bcs:
     # Branch on carry set
     bytecode:
@@ -1007,7 +1007,7 @@ instructions:
       count: 1
       operand_sets:
         list:
-          - address
+          - absolute_address
   bpl:
     # Branch on plus
     bytecode:
@@ -1017,7 +1017,7 @@ instructions:
       count: 1
       operand_sets:
         list:
-          - address
+          - absolute_address
   bmi:
     # Branch on minus
     bytecode:
@@ -1027,7 +1027,7 @@ instructions:
       count: 1
       operand_sets:
         list:
-          - address
+          - absolute_address
   bgt:
     # Branch on greater
     bytecode:
@@ -1037,7 +1037,7 @@ instructions:
       count: 1
       operand_sets:
         list:
-          - address
+          - absolute_address
   ble:
     # Branch on less or equal
     bytecode:
@@ -1047,7 +1047,7 @@ instructions:
       count: 1
       operand_sets:
         list:
-          - address
+          - absolute_address
   jpa:
     # Jump to address
     bytecode:
@@ -1057,7 +1057,7 @@ instructions:
       count: 1
       operand_sets:
         list:
-          - address
+          - absolute_address
   jpr:
     # Jump to relative address
     bytecode:
@@ -1087,7 +1087,7 @@ instructions:
       count: 1
       operand_sets:
         list:
-          - address
+          - absolute_address
   jas:
     # Jump to subroutine conserving A
     bytecode:
@@ -1097,7 +1097,7 @@ instructions:
       count: 1
       operand_sets:
         list:
-          - address
+          - absolute_address
   rts:
     # Return from subroutine
     bytecode:
@@ -2649,3 +2649,43 @@ macros:
         count: 0
       instructions:
         - "mib 0xfe,0xffff"
+  phsi:
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - immediate_8bit
+      instructions:
+        - "ldi @ARG(0)"
+        - "phs"
+  phs2i:
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - immediate_16bit
+      instructions:
+        - "ldi LSB(@ARG(0))"
+        - "phs"
+        - "ldi BYTE1(@ARG(0))"
+        - "phs"
+  phs4i:
+    - operands:
+        count: 1
+        specific_operands:
+          immediate:
+            list:
+              uint32:
+                type: numeric
+                argument:
+                  size: 32
+                  byte_align: true
+      instructions:
+        - "ldi BYTE0(@ARG(0))"
+        - "phs"
+        - "ldi BYTE1(@ARG(0))"
+        - "phs"
+        - "ldi BYTE2(@ARG(0))"
+        - "phs"
+        - "ldi BYTE3(@ARG(0))"
+        - "phs"
