@@ -40,7 +40,10 @@ class OperandSetsModel:
             if opset is not None:
                 self._operand_sets.append(opset)
             else:
-                sys.exit(f'ERROR: instuction set configuration file makes reference to unknow operand set "{k}"')
+                sys.exit(
+                    f'ERROR: instuction set configuration file makes reference to unknow operand set "{k}"'
+                    f' in definition of instruction "{instruction}"'
+                )
 
     def __repr__(self) -> str:
         return str(self)

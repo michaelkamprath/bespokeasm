@@ -52,13 +52,16 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         return output.getvalue()
 
     def _print_file_header(self, output: io.StringIO, filename: str) -> None:
+        COMMENT_HEADER = 'comment'
+        comment_header_width = len(COMMENT_HEADER) if len(COMMENT_HEADER) > self.max_comment_width else self.max_comment_width
+
         output.write(f'\n\nFile: {filename}\n')
         output.write(
             '-'*(self.max_line_num_width + 2) + '+' +
             '-'*(self._address_size + 2) + '+' +
             '-'*(self._bytes_per_line*3 + 1) + '+' +
             '-'*(self.max_instruction_width + 2) + '+' +
-            '-'*(self.max_comment_width + 2) + '\n'
+            '-'*(comment_header_width + 2) + '\n'
         )
 
         if self._address_size >= 8:
@@ -68,16 +71,16 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         else:
             address_header = 'a'
 
-        if self._bytes_per_line >= 4:
+        if self._bytes_per_line >= 5:
             bytes_header = 'machine code'
         elif self._bytes_per_line >= 2:
             bytes_header = 'bytes'
         else:
             bytes_header = 'b'
 
-        if self.max_instruction_width >= 10:
+        if self.max_instruction_width >= 11:
             instruction_header = ' instruction'
-        elif self.max_instruction_width >= 5:
+        elif self.max_instruction_width >= 6:
             instruction_header = ' instr'
         else:
             instruction_header = ' i'
@@ -87,7 +90,7 @@ class ListingPrettyPrinter(PrettyPrinterBase):
             address_header.center(self._address_size + 2) + '|' +
             bytes_header.center(self._bytes_per_line*3 + 1) + '|' +
             instruction_header.ljust(self.max_instruction_width + 2) + '|' +
-            ' comment\n'
+            f' {COMMENT_HEADER}\n'
         )
 
         output.write(
@@ -95,7 +98,7 @@ class ListingPrettyPrinter(PrettyPrinterBase):
             '-'*(self._address_size + 2) + '+' +
             '-'*(self._bytes_per_line*3 + 1) + '+' +
             '-'*(self.max_instruction_width + 2) + '+' +
-            '-'*(self.max_comment_width + 2) + '\n'
+            '-'*(comment_header_width + 2) + '\n'
         )
 
     def _print_line_object(self, output: io.StringIO, lobj: LineObject) -> None:
