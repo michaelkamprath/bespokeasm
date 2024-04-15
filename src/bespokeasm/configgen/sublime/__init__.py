@@ -169,7 +169,7 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         with open(syntax_fp) as f:
             file_txt = f.read()
         updated_file_txt = '%YAML 1.2\n---\n' + file_txt
-        with open(syntax_fp, "w") as f:
+        with open(syntax_fp, 'w') as f:
             f.write(updated_file_txt)
             if self.verbose > 1:
                 print(f'  generated {os.path.basename(syntax_fp)}')

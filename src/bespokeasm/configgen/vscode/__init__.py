@@ -166,7 +166,7 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
         with open(fp) as theme_template_file:
             color_theme_xml = theme_template_file.read()
         color_theme_xml.replace('##LANGUAGE_ID##', self.language_id)
-        with open(os.path.join(extension_dir_path, theme_filename), "w") as theme_file:
+        with open(os.path.join(extension_dir_path, theme_filename), 'w') as theme_file:
             theme_file.write(color_theme_xml)
             if self.verbose > 1:
                 print(f'  generated {theme_filename}')

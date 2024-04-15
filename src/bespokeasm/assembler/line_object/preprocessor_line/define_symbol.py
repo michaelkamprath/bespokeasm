@@ -45,7 +45,7 @@ class DefineSymbolLine(PreprocessorLine):
             sys.exit(f'ERROR - {line_id}: Invalid preprocessor symbol definition: {instruction}')
 
     def __repr__(self) -> str:
-        return f"DefineSymbolLine<{self._symbol}>"
+        return f'DefineSymbolLine<{self._symbol}>'
 
     @property
     def symbol(self) -> PreprocessorSymbol:

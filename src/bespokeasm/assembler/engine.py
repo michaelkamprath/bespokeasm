@@ -127,7 +127,7 @@ class Assembler:
 
         # second pass: build the machine code and check for overlaps
         if self._verbose > 2:
-            print("\nProcessing lines:")
+            print('\nProcessing lines:')
         bytecode = bytearray()
         last_line = None
 
@@ -152,7 +152,7 @@ class Assembler:
 
         if self._generate_binary:
             if self._verbose > 2:
-                print("\nGenerating byte code:")
+                print('\nGenerating byte code:')
             while addr <= (max_generated_address if self._binary_end is None else self._binary_end):
                 lobj = line_dict.get(addr, None)
                 insertion_bytes = fill_bytes
@@ -161,7 +161,7 @@ class Assembler:
                     if line_bytes is not None:
                         insertion_bytes = line_bytes
                         if self._verbose > 2:
-                            line_bytes_str = binascii.hexlify(line_bytes, sep=' ').decode("utf-8")
+                            line_bytes_str = binascii.hexlify(line_bytes, sep=' ').decode('utf-8')
                             click.echo(f'Address ${addr:x} : {lobj} bytes = {line_bytes_str}')
                 bytecode.extend(insertion_bytes)
                 addr += len(insertion_bytes)

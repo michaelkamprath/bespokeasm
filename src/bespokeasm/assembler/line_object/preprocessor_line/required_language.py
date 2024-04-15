@@ -91,4 +91,4 @@ class RequiredLanguageLine(PreprocessorLine):
                 )
 
     def __repr__(self) -> str:
-        return f"RequiredLanguageLine<{self._language} {self._operator_str} {self._version_obj}>"
+        return f'RequiredLanguageLine<{self._language} {self._operator_str} {self._version_obj}>'

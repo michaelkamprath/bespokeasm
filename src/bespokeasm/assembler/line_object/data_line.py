@@ -57,7 +57,7 @@ class DataLine(LineWithBytes):
             elif data_match.group(3) is not None:
                 # its a string.
                 # first, convert escapes
-                converted_str = bytes(data_match.group(3), "utf-8").decode("unicode_escape")
+                converted_str = bytes(data_match.group(3), 'utf-8').decode('unicode_escape')
                 values_list = [ord(x) for x in list(converted_str)]
                 if directive_str == '.cstr' or directive_str == '.asciiz':
                     # Add a 0-value at the end of the string values.

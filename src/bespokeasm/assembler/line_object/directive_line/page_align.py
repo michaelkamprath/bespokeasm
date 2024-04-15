@@ -46,7 +46,7 @@ class PageAlignLine(LineObject):
             raise ValueError(f'Invalid page align directive "{instruction}"')
 
     def __repr__(self) -> str:
-        return f"PageAlignLine<page_size={self._page_size}>"
+        return f'PageAlignLine<page_size={self._page_size}>'
 
     def set_start_address(self, address: int):
         """Sets the finalized address to the next page boundary.

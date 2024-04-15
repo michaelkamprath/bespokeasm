@@ -56,4 +56,4 @@ class CreateMemzoneLine(PreprocessorLine):
             sys.exit(f'ERROR: {line_id} - Syntax error when creating memory zone')
 
     def __repr__(self) -> str:
-        return f"CreateMemzoneLine<{self._name}: {self._start_addr} -> {self._end_addr}>"
+        return f'CreateMemzoneLine<{self._name}: {self._start_addr} -> {self._end_addr}>'

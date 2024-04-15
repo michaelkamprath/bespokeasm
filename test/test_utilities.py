@@ -35,7 +35,7 @@ class TestUtilities(unittest.TestCase):
         self.assertTrue(is_string_numeric('08FH'), 'string is numeric (hexadecimal)')
         self.assertTrue(is_string_numeric("'1'"), 'string is numeric (character ordinal)')
         self.assertFalse(is_string_numeric("'12'"), 'character ordinal can only be one character long')
-        self.assertFalse(is_string_numeric("0b10011001"), 'binary numbers do not strt with "0b"')
+        self.assertFalse(is_string_numeric('0b10011001'), 'binary numbers do not strt with "0b"')
 
     def test_PackedBits(self):
         ib1 = PackedBits()

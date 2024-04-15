@@ -337,7 +337,7 @@ class TestInstructionParsing(unittest.TestCase):
 
         l1: LineObject = LineOjectFactory.parse_line(
             lineid,
-            "LABEL = %00001111",
+            'LABEL = %00001111',
             isa_model,
             TestInstructionParsing.label_values,
             memzone_mngr.global_zone,
@@ -352,7 +352,7 @@ class TestInstructionParsing(unittest.TestCase):
 
         l2: LineObject = LineOjectFactory.parse_line(
             lineid,
-            ".local_label:",
+            '.local_label:',
             isa_model,
             TestInstructionParsing.label_values,
             memzone_mngr.global_zone,
@@ -369,7 +369,7 @@ class TestInstructionParsing(unittest.TestCase):
 
         l3: LineObject = LineOjectFactory.parse_line(
             lineid,
-            "old_style EQU 42H",
+            'old_style EQU 42H',
             isa_model,
             TestInstructionParsing.label_values,
             memzone_mngr.global_zone,
@@ -381,7 +381,7 @@ class TestInstructionParsing(unittest.TestCase):
         l3.set_start_address(42)
         l3.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(l3, LabelLine)
-        self.assertTrue(l3.is_constant, "label should be a constant")
+        self.assertTrue(l3.is_constant, 'label should be a constant')
         self.assertEqual(l3.get_value(), 0x42, 'value should be right')
 
     def test_operand_bytecode_ordering(self):
@@ -919,5 +919,5 @@ class TestInstructionParsing(unittest.TestCase):
         t4.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t4, InstructionLine)
         self.assertEqual(t4.byte_size, 3, 'has 3 bytes')
-        with self.assertRaises(SystemExit, msg="address not in target memory zone"):
+        with self.assertRaises(SystemExit, msg='address not in target memory zone'):
             t4.generate_bytes()

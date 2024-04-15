@@ -45,7 +45,7 @@ class AssemblerModel:
             self._file_extension = self._config['general']['identifier'].get('extension', 'asm')
             # enforce semantic versioning
             version_match = re.match(
-                r"^\s*" + version.VERSION_PATTERN + r"\s*$",
+                r'^\s*' + version.VERSION_PATTERN + r'\s*$',
                 self._isa_version,
                 flags=re.IGNORECASE | re.VERBOSE,
             )

@@ -52,7 +52,7 @@ class TestPreprocessorSymbols(unittest.TestCase):
                 super().__init__('#if true', line)
 
             def __repr__(self) -> str:
-                return "MockPreprocessorCondition_True"
+                return 'MockPreprocessorCondition_True'
 
             def evaluate(self, preprocessor: Preprocessor) -> bool:
                 return True
@@ -62,7 +62,7 @@ class TestPreprocessorSymbols(unittest.TestCase):
                 super().__init__('#if false', line)
 
             def __repr__(self) -> str:
-                return "MockPreprocessorCondition_False"
+                return 'MockPreprocessorCondition_False'
 
             def evaluate(self, preprocessor: Preprocessor) -> bool:
                 return False
@@ -174,7 +174,7 @@ class TestPreprocessorSymbols(unittest.TestCase):
 
         l1: LineObject = LineOjectFactory.parse_line(
             lineid,
-            "#define TEST_SYMBOL 0x1234",
+            '#define TEST_SYMBOL 0x1234',
             isa_model,
             global_scope,
             memzone_mngr.global_zone,

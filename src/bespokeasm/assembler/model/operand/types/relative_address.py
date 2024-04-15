@@ -97,7 +97,7 @@ class RelativeAddressOperand(OperandWithArgument):
         if match is None or len(match.groups()) != 1:
             return None
         # do not match if expression contains square bracks
-        if "[" in operand or "]" in operand:
+        if '[' in operand or ']' in operand:
             return None
         bytecode_part = NumericByteCodePart(
             self.bytecode_value,

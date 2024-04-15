@@ -4,7 +4,7 @@ from bespokeasm.utilities import is_string_numeric, parse_numeric_string
 from bespokeasm.assembler.line_identifier import LineIdentifier
 
 
-SYMBOL_PATTERN = r"[\w_][\w\d_]+"
+SYMBOL_PATTERN = r'[\w_][\w\d_]+'
 
 
 class PreprocessorSymbol:
@@ -14,7 +14,7 @@ class PreprocessorSymbol:
         self._line_id = line_id
 
     def __repr__(self) -> str:
-        return f"PrerocessorSymbol({self.name} = {self.value})"
+        return f'PrerocessorSymbol({self.name} = {self.value})'
 
     def __eq__(self, other) -> bool:
         return self.name == other.name and self.value == other.value

@@ -55,7 +55,7 @@ class InstructionMacroVariant(InstructionBase):
         return 0
 
     def __str__(self) -> str:
-        operand_str = str(self._operand_parser) if self._operand_parser is not None else "NO_OPERANDS"
+        operand_str = str(self._operand_parser) if self._operand_parser is not None else 'NO_OPERANDS'
         return f'InstrutionMacroVariant<{self._mnemonic, operand_str}>'
 
 

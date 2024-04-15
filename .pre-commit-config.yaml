@@ -9,9 +9,12 @@ repos:
     -   id: check-yaml
     -   id: check-json
     -   id: check-toml
+    -   id: check-xml
     -   id: check-added-large-files
         args: ['--maxkb=10000']
     -   id: mixed-line-ending
+    -   id: check-docstring-first
+    -   id: double-quote-string-fixer
 -   repo: https://github.com/pycqa/flake8
     rev: '6.0.0'
     hooks:

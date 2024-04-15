@@ -18,7 +18,7 @@ class TestConfigurationGeneration(unittest.TestCase):
 
     def assertIsFile(self, path):
         if not pl.Path(path).resolve().is_file():
-            raise AssertionError("File does not exist: %s" % str(path))
+            raise AssertionError('File does not exist: %s' % str(path))
 
     def _assert_grouped_item_list(self, item_str: str, target_list: list[str], test_name: str) -> None:
         match = re.search(r'^.*(?<=[\w\)])?\((?:\?\:)?(.*)\)', item_str, re.IGNORECASE)

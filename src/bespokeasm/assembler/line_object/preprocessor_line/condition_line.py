@@ -7,7 +7,7 @@ import bespokeasm.assembler.preprocessor.condition as condition
 from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
 
 
-CONDITIONAL_LINE_PREFIX_LIST = ["#if ", "#ifdef ", "#ifndef ", "#elif ", "#else", "#endif"]
+CONDITIONAL_LINE_PREFIX_LIST = ['#if ', '#ifdef ', '#ifndef ', '#elif ', '#else', '#endif']
 
 
 class ConditionLine(PreprocessorLine):
@@ -21,18 +21,18 @@ class ConditionLine(PreprocessorLine):
             ):
         super().__init__(line_id, instruction, comment, memzone)
 
-        if instruction.startswith("#if "):
+        if instruction.startswith('#if '):
             self._condition = condition.IfPreprocessorCondition(instruction, line_id)
-        elif instruction.startswith("#elif "):
+        elif instruction.startswith('#elif '):
             self._condition = condition.ElifPreprocessorCondition(instruction, line_id)
-        elif instruction == "#else":
+        elif instruction == '#else':
             self._condition = condition.ElsePreprocessorCondition(instruction, line_id)
-        elif instruction == "#endif":
+        elif instruction == '#endif':
             self._condition = condition.EndifPreprocessorCondition(instruction, line_id)
-        elif instruction.startswith("#ifdef ") or instruction.startswith("#ifndef "):
+        elif instruction.startswith('#ifdef ') or instruction.startswith('#ifndef '):
             self._condition = condition.IfdefPreprocessorCondition(instruction, line_id)
         else:
-            raise ValueError(f"Invalid condition line: {instruction}")
+            raise ValueError(f'Invalid condition line: {instruction}')
 
         try:
             condition_stack.process_condition(self._condition)
@@ -42,7 +42,7 @@ class ConditionLine(PreprocessorLine):
             )
 
     def __repr__(self) -> str:
-        return f"ConditionLine<{self._line_id}>"
+        return f'ConditionLine<{self._line_id}>'
 
     @property
     def compilable(self) -> bool:
