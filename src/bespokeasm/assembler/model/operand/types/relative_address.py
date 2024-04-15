@@ -63,9 +63,9 @@ class RelativeAddressOperand(OperandWithArgument):
 
     @cached_property
     def match_pattern(self) -> str:
-        base_match_str = r'((?:{0}|\s)+)'.format(EXPRESSION_PARTS_PATTERN)
+        base_match_str = fr'((?:{EXPRESSION_PARTS_PATTERN}|\s)+)'
         if self.uses_curly_braces:
-            return r'\{{\s*{0}\s*\}}'.format(base_match_str)
+            return fr'\{{\s*{base_match_str}\s*\}}'
         else:
             return base_match_str
 

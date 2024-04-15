@@ -31,4 +31,3 @@ done:
     lda result          ; Load final product value
     out                 ; Display product value
     hlt                 ; Halt
-

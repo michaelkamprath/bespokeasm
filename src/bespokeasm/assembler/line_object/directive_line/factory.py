@@ -36,7 +36,7 @@ class DirectiveLine:
     )
 
     PATTERN_SET_MEMZONE_DIRECTIVE = re.compile(
-        r'^(?:\.memzone)\s+({})'.format(MEMORY_ZONE_NAME_PATTERN),
+        fr'^(?:\.memzone)\s+({MEMORY_ZONE_NAME_PATTERN})',
         flags=re.IGNORECASE | re.MULTILINE
     )
 
@@ -48,12 +48,12 @@ class DirectiveLine:
     )
 
     PATTERN_ZERO_DIRECTIVE = re.compile(
-        r'^(?:\.zero)\s+({})'.format(INSTRUCTION_EXPRESSION_PATTERN),
+        fr'^(?:\.zero)\s+({INSTRUCTION_EXPRESSION_PATTERN})',
         flags=re.IGNORECASE | re.MULTILINE
     )
 
     PATTERN_ZEROUNTIL_DIRECTIVE = re.compile(
-        r'^(?:\.zerountil)\s+({})'.format(INSTRUCTION_EXPRESSION_PATTERN),
+        fr'^(?:\.zerountil)\s+({INSTRUCTION_EXPRESSION_PATTERN})',
         flags=re.IGNORECASE | re.MULTILINE
     )
 

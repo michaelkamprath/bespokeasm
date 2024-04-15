@@ -11,7 +11,7 @@ from bespokeasm.assembler.model import AssemblerModel
 
 class RequiredLanguageLine(PreprocessorLine):
     PATTERN_REQUIRE_LANGUAGE = re.compile(
-        r'\#require\s+\"([\w\-\_\.]*)(?:\s*(==|>=|<=|>|<)\s*({0}))?\"'.format(version.VERSION_PATTERN),
+        fr'\#require\s+\"([\w\-\_\.]*)(?:\s*(==|>=|<=|>|<)\s*({version.VERSION_PATTERN}))?\"',
         flags=re.IGNORECASE | re.VERBOSE
     )
 

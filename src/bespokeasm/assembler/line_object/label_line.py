@@ -15,7 +15,7 @@ class LabelLine(LineObject):
         flags=re.IGNORECASE | re.MULTILINE
     )
     PATTERN_CONSTANT = re.compile(
-        r'^\s*(\w+)(?:\s*\=\s*|\s+EQU\s+)({0}|)'.format(INSTRUCTION_EXPRESSION_PATTERN),
+        fr'^\s*(\w+)(?:\s*\=\s*|\s+EQU\s+)({INSTRUCTION_EXPRESSION_PATTERN}|)',
         flags=re.IGNORECASE | re.MULTILINE
     )
 

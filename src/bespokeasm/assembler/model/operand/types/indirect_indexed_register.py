@@ -23,12 +23,12 @@ class IndirectIndexedRegisterOperand(IndexedRegisterOperand):
                 self._index_parse_pattern,
             )
         elif self.decorator_is_prefix:
-            pattern_str = r'(?<!(?:\+|\-|\d|\w)){0}{1}'.format(
+            pattern_str = r'(?<!(?:\+|\-|\d|\w)){}{}'.format(
                 self.decorator_pattern,
                 IndirectIndexedRegisterOperand.OPERAND_PATTERN_TEMPLATE.format(self.register, self._index_parse_pattern),
             )
         else:
-            pattern_str = r'{0}{1}(?!(?:\+|\-|\d|\w))'.format(
+            pattern_str = r'{}{}(?!(?:\+|\-|\d|\w))'.format(
                 IndirectIndexedRegisterOperand.OPERAND_PATTERN_TEMPLATE.format(self.register, self._index_parse_pattern),
                 self.decorator_pattern,
             )

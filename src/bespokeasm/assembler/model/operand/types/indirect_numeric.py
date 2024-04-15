@@ -21,7 +21,7 @@ class IndirectNumericOperand(NumericExpressionOperand):
 
     @cached_property
     def match_pattern(self) -> str:
-        return r'\[\s*({0})\s*\]'.format(super().match_pattern)
+        return fr'\[\s*({super().match_pattern})\s*\]'
 
     def parse_operand(
         self,

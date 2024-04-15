@@ -2,7 +2,7 @@ import re
 
 
 PATTERN_HEX = r'(?:\$|0x)[0-9a-fA-F]+|[0-9a-fA-F]+H\b'
-PATTERN_NUMERIC = r'(?:{0}|(?:b|%)[01]+|\d+|\'.\')'.format(PATTERN_HEX)
+PATTERN_NUMERIC = fr'(?:{PATTERN_HEX}|(?:b|%)[01]+|\d+|\'.\')'
 PATTERN_NUMERIC_COMPILED = re.compile(f'^({PATTERN_NUMERIC})$', flags=re.IGNORECASE | re.MULTILINE)
 PATTERN_CHARACTER_ORDINAL = re.compile(r'\'(.)\'', flags=re.IGNORECASE | re.MULTILINE)
 

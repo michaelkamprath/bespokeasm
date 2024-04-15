@@ -63,7 +63,7 @@ class EnumerationOperand(OperandWithArgument):
     def match_pattern(self) -> str:
         if self._argument_dictionary is not None:
             keys_str = '|'.join(self._argument_dictionary.keys())
-            return r'\b({0})\b'.format(keys_str)
+            return fr'\b({keys_str})\b'
         else:
             return ''
 

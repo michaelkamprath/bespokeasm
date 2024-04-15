@@ -12,7 +12,7 @@ from bespokeasm.assembler.preprocessor.symbol import PreprocessorSymbol, SYMBOL_
 
 class DefineSymbolLine(PreprocessorLine):
     PATTERN_DEFINE_SYMBOL = re.compile(
-            r'^#define\s+({0})(?:\s+(\S.*?))?\s*$'.format(SYMBOL_PATTERN),
+            fr'^#define\s+({SYMBOL_PATTERN})(?:\s+(\S.*?))?\s*$',
         )
 
     def __init__(

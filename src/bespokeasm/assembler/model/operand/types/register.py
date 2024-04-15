@@ -70,11 +70,11 @@ class RegisterOperand(Operand):
     @property
     def match_pattern(self) -> str:
         if not self.has_decorator:
-            return r'\b{0}\b'.format(self.register)
+            return fr'\b{self.register}\b'
         elif self.decorator_is_prefix:
-            return r'(?<!(?:\+|\-|\d|\w)){0}{1}\b'.format(self.decorator_pattern, self.register)
+            return fr'(?<!(?:\+|\-|\d|\w)){self.decorator_pattern}{self.register}\b'
         else:
-            return r'\b{0}{1}(?!(?:\+|\-|\d|\w))'.format(self.register, self.decorator_pattern)
+            return fr'\b{self.register}{self.decorator_pattern}(?!(?:\+|\-|\d|\w))'
 
     def parse_operand(
         self,
@@ -85,7 +85,7 @@ class RegisterOperand(Operand):
     ) -> ParsedOperand:
         # first check that operand is what we expect
         match = re.match(
-            r'^{0}$'.format(self.match_pattern),
+            fr'^{self.match_pattern}$',
             operand.strip(),
             flags=re.IGNORECASE,
         )

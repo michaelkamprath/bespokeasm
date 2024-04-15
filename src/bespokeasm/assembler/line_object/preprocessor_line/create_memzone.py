@@ -12,7 +12,7 @@ from bespokeasm.utilities import PATTERN_NUMERIC, parse_numeric_string
 
 class CreateMemzoneLine(PreprocessorLine):
     PATTERN_CREATE_MEMORY_ZONE = re.compile(
-        r'#create_memzone\s+({0})\s+({1})\s+({2})'.format(
+        r'#create_memzone\s+({})\s+({})\s+({})'.format(
             MEMORY_ZONE_NAME_PATTERN,
             PATTERN_NUMERIC,
             PATTERN_NUMERIC,

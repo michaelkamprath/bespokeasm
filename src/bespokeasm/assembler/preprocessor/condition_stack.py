@@ -1,4 +1,3 @@
-
 from bespokeasm.assembler.preprocessor.condition import \
             PreprocessorCondition, EndifPreprocessorCondition
 from bespokeasm.assembler.preprocessor import Preprocessor

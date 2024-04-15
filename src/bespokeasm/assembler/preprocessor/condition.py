@@ -16,7 +16,7 @@ PREPROCESSOR_CONDITION_IF_PATTERN = re.compile(
 )
 
 PREPROCESSOR_CONDITION_IMPLIED_IF_PATTERN = re.compile(
-    r"^(?:#if)\s+({0})".format(INSTRUCTION_EXPRESSION_PATTERN)
+    fr"^(?:#if)\s+({INSTRUCTION_EXPRESSION_PATTERN})"
 )
 
 PREPROCESSOR_CONDITION_ELIF_PATTERN = re.compile(
@@ -25,11 +25,11 @@ PREPROCESSOR_CONDITION_ELIF_PATTERN = re.compile(
 )
 
 PREPROCESSOR_CONDITION_IMPLIED_ELIF_PATTERN = re.compile(
-    r"^(?:#elif)\s+({0})".format(INSTRUCTION_EXPRESSION_PATTERN)
+    fr"^(?:#elif)\s+({INSTRUCTION_EXPRESSION_PATTERN})"
 )
 
 PREPROCESSOR_CONDITION_IFDEF_PATTERN = re.compile(
-    r"^(#ifdef|#ifndef)\s+({0})\b".format(SYMBOL_PATTERN)
+    fr"^(#ifdef|#ifndef)\s+({SYMBOL_PATTERN})\b"
 )
 
 

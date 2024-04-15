@@ -46,4 +46,3 @@ bespokeasm compile -p -c eater-sap1-isa.yaml my_code.sap1
 
 ### Syntax Highlighting
 BespokeASM has the ability to generate for various popular text editors a syntax highlighting language extension specific to this Ben Easter SAP-1 instruction set. [See the documentation](https://github.com/michaelkamprath/bespokeasm/wiki/Installation-and-Usage#installing-language-extensions) for information for on how to install and use the language extensions.
-

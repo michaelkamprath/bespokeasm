@@ -1,5 +1,4 @@
 import sys
-from typing import Type
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.bytecode.assembled import AssembledInstruction, CompositeAssembledInstruction
@@ -21,7 +20,7 @@ class MacroBytecodeGenerator:
         operands: str,
         isa_model: AssemblerModel,
         memzone_manager: MemoryZoneManager,
-        parser_class: Type[InstructioParserBase],
+        parser_class: type[InstructioParserBase],
     ) -> AssembledInstruction:
         if mnemonic != macro.mnemonic:
             # this shouldn't happen
@@ -51,7 +50,7 @@ class MacroBytecodeGenerator:
         operands: str,
         isa_model: AssemblerModel,
         memzone_manager: MemoryZoneManager,
-        parser_class: Type[InstructioParserBase],
+        parser_class: type[InstructioParserBase],
     ) -> AssembledInstruction:
         if mnemonic != variant.mnemonic:
             # this shouldn't happen
