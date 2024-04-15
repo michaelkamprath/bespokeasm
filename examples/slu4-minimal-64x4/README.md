@@ -2,3 +2,45 @@
 *Current as of v1.1.x of the Minimal 64x4 Home Computer*
 
 The Minimal 64x4 Home Computer (Minimal 64) is TTL CPU designed by Carsten Herting (slu4). Carsten has made his [Minimal 64x4 design open and available to others](https://github.com/slu4coder/Minimal-64x4-Home-Computer) to build. The Minimal 64x4 is an improvedment on The Minimal 64 Home Computer. Carsten has done and amazing job [documenting the Minimal 64x4](https://docs.google.com/document/d/1-nDv_8WEG1FrlO3kEK0icoYo-Z-jlhpCMiCstxGOCjQ/edit?usp=sharing).
+
+## Minimal 64x4 Assembly
+The **BespokeASM** instruction set configration file `slu4-minimal-64x4.yaml` is available in this directory. Assuming that **BespookeASM** is [properly installed in the current python environment](https://github.com/michaelkamprath/bespokeasm/wiki/Installation-and-Usage#installation), to compile Minimal 64x4 assembly into a Intel Hex representation that the Minimal 64x4 OS's `receive` instruction can take, use the following command:
+
+```sh
+bespokeasm compile -n -p -t intel_hex -c /path/to/slu4-minimal-64x4.yaml /path/to/my-code.min64x4
+```
+
+The arguments to the command above are:
+
+* `-n` - Indicates that no binary image should be generated.
+* `-p` - indicates that a textual representation of the assembled code should be emitted.
+* `-t intel_hex` - Specifies the format of the textual rerpesentation of the compiled code, in this case being Intel Hex. If you ommit this option, the default textual representation of an human-readable listing will be used.
+* `-c /path/to/slu4-minimal-64x4.yaml` - The file path to the **BespokeASM** instruction set configuration for the Minimal 64x4.
+* `/path/to/my-code.min64x4` - The file path to the Minimal 64x4 assembly code to be compiled. Here by convention the assembly code has a file extension of `.min64x4`. While **BespokeASM** can work with any file extension for the code, the convention is used so that code editors know what file type they are editing and thus are able to support syntax highlighting specific to the Minimal 64x4 assembly syntax. See [**BespokeASM**'s documentation on syntax highlighting support](https://github.com/michaelkamprath/bespokeasm/wiki/Installation-and-Usage#installing-language-extensions) for more information.
+
+### Instruction Set
+Carsten Herting thoroughly documents [the instruction set for the Minimal 64x4 in his user guide](https://docs.google.com/document/d/1-nDv_8WEG1FrlO3kEK0icoYo-Z-jlhpCMiCstxGOCjQ/edit?usp=sharing). All of the documented instructions in their original syntax are implemented in in this **BespokeASM** port. However, **BespokeASM** will be case insensitive when matching instruction mnemonics.
+
+### Instruction Macros
+The following instruction macros have been added in the ISA configuration file for the Minimal 64. All macros that interact with the stack maintain byte order according to the Minimal 64x4 OS calling convention, which pushes the LSB of the value first despite the system otherwise using little endian byte ordering. Not that this means multibyte values on the stack cannot be used directly art their stack memory address and must be "pulled" from the stack to another memory location where they can be represented in little endian byte ordering.
+
+| Macros Instruction | Operand 1 | Operand 2 | Description |
+|:-:|:-:|:-:|:--|
+| `spinit` | - | - | Init the stack popint to a value of `0xFFFE`. |
+| `phsi` | 1 byte | - | Pushes a 1 byte immediate value onto the stack. |
+| `phs2i` | 2 bytes | - | Pushes a 2 byte immediate value onto the stack. |
+| `phs4i` | 4 bytes | - | Pushes a 4 byte immediate value onto the stack. |
+
+
+### Assembly Syntax
+**BespokeASM**'s syntax is close to the syntax that Carsten used for the Minimal 64x4's assembly language. However, there are some differences:
+
+* **BespokeASM** used a different syntax for some Minimal 64x4 directives:
+  * The `#org` directive, which sets the next byte code address to a specific value, is replicated in **BespokeASM** with the `.org` directive.
+  * The `#page` directive, which aligns the next byte code address to a page boundarry, is replicated in **BespokeASM** with the `.align` directive.
+  * In general **BespokeASM** also has [a richer set of directives available](https://github.com/michaelkamprath/bespokeasm/wiki/Assembly-Language-Syntax#directives).
+* The Minimal 64x4's assembler has no data type directives. Instead, the assembler directly converts numeric values and strings to byte code exactly where it sits in the code. In **BespokeASM** one must declare a data type using [a data directive](https://github.com/michaelkamprath/bespokeasm/wiki/Assembly-Language-Syntax#data) when defining data in the byte code.
+* The Minimal 64x4 assembler emits byte code in the order it was in the original assembly code, while **BespokeASM** emits byte code in address order. For the most part, these two orderings can be pretty much the same, however, differences will show up if multiple `.org` directives are use or multiple additional source files are included.
+* The Minimal 64x4 uses a `<` and `>` to do byte slicing of constant values, with `<` meaning least significant byte and `>` meaning most significant byte (and it assumes a 2 byte value). **BespokeASM** using `BYTE0(..)` and `BYTE1(..)` [to accomplish the same goals](https://github.com/michaelkamprath/bespokeasm/wiki/Assembly-Language-Syntax#numeric-expressions) (respectively).
+
+There are several other features that **BespokeASM** provides over the Minimal 64x4 assembly syntax, such as richer math expressions for constant values and [several preprocessor directives](https://github.com/michaelkamprath/bespokeasm/wiki/Assembly-Language-Syntax#preprocessor), but the differences listed above are the ones that require code written for the Minimal 64 assembler to be altered to be assembled with **BespokeASM**.

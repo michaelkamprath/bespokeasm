@@ -2689,3 +2689,15 @@ macros:
         - "phs"
         - "ldi BYTE3(@ARG(0))"
         - "phs"
+  phsptr:
+    # push an immediate absolute address to the stack per MinOS calling convention
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - absolute_address
+      instructions:
+        - "ldi BYTE0(@ARG(0))"
+        - "phs"
+        - "ldi BYTE1(@ARG(0))"
+        - "phs"
