@@ -16,7 +16,9 @@ Changes that are planned but not implemented yet:
 
 ## [Unreleased]
 *  Added support for The Minimal 64x4 Home Computer with an example and updated assembler functionality to support it.
+*  Added `address` operand type that enables several features specific to absolute addresses, include slicing the address to support "short jump" type instructions.
 *  Added `.align` directive to align the current address to a multiple of a given value.
+*  Changed syntax highlight color theme name to be specific to the language rather than the generic "BespokeASM Theme" name.
 
 ## [0.4.1]
 * added `.asciiz` as an equivalent data directive to `.cstr`

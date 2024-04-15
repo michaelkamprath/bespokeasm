@@ -22,7 +22,7 @@ from .page_align import PageAlignLine
 #   .zero X         - shorthand for ".fill X, 0"
 #   .zerountil X    - fill with 0 value until and including address X
 #   .memzone X      - sets the current memory zone to X
-#   .page [X]       - aligns the current address to the next page boundary
+#   .align [X]      - aligns the current address to the next page boundary
 
 
 class DirectiveLine:

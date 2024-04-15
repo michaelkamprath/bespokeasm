@@ -22,7 +22,7 @@
             "path": "./snippets.json"
         }],
         "themes": [{
-            "label": "BespokeASM Theme",
+            "label": "##LANGUAGE_ID## Theme",
             "uiTheme": "vs-dark",
             "path": "./bespokeasm.tmTheme"
         }]

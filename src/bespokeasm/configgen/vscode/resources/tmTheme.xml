@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>name</key>
-    <string>BespokeASM Color Scheme</string>
+    <string>##LANGUAGE_ID## Color Scheme</string>
     <key>settings</key>
     <array>
         <!-- Global settings -->
@@ -148,7 +148,7 @@
             <key>settings</key>
             <dict>
                 <key>foreground</key>
-                <string>#ff883f</string>
+                <string>#ff770c</string>
             </dict>
         </dict>
         <dict>

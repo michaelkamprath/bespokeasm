@@ -1,16 +1,16 @@
-COMPILER_DIRECTIVES_SET = set([
-    'org', 'memzone',
-])
+COMPILER_DIRECTIVES_SET = {
+    'org', 'memzone', 'align',
+}
 
-BYTECODE_DIRECTIVES_SET = set([
+BYTECODE_DIRECTIVES_SET = {
     'fill', 'zero', 'zerountil',
     'byte', '2byte', '4byte', '8byte', 'cstr', 'asciiz',
-])
+}
 
-PREPROCESSOR_DIRECTIVES_SET = set([
+PREPROCESSOR_DIRECTIVES_SET = {
     'include', 'require', 'create_memzone',
     'define', 'if', 'elif', 'else', 'endif', 'ifdef', 'ifndef',
-])
+}
 
 EXPRESSION_FUNCTIONS_SET = set([
     'LSB',
