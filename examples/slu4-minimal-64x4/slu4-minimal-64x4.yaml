@@ -2701,3 +2701,18 @@ macros:
         - "phs"
         - "ldi BYTE1(@ARG(0))"
         - "phs"
+  pls2:
+    # pull 2 bytes from the stack
+    - operands:
+        count: 0
+      instructions:
+        - "pls"
+        - "pls"
+  pls4:
+    - operands:
+        count: 0
+      instructions:
+        - "pls"
+        - "pls"
+        - "pls"
+        - "pls"

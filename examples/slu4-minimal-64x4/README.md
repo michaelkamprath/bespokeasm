@@ -30,6 +30,9 @@ The following instruction macros have been added in the ISA configuration file f
 | `phsi` | 1 byte | - | Pushes a 1 byte immediate value onto the stack. |
 | `phs2i` | 2 bytes | - | Pushes a 2 byte immediate value onto the stack. |
 | `phs4i` | 4 bytes | - | Pushes a 4 byte immediate value onto the stack. |
+| `phsptr` | 2 bytes | - | Pushes a 2 byte immediate absolute address onto the stack per the Min 64x4 calling convention. Similar to `phs2i` but the operand is validated as an address. |
+| `pls2` | - | - | Pops a 2 byte value from the stack. |
+| `pls4` | - | - | Pops a 4 byte value from the stack. |
 
 
 ### Assembly Syntax

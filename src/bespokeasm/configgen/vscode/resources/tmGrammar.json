@@ -84,7 +84,7 @@
             }
         },
         "constants": {
-            "match": "^\\s*(\\w*)(?:\\s*)?(\\=|EQU)\\b",
+            "match": "^\\s*(\\w*)(?:\\s*)?(\\=|EQU)",
             "captures": {
                 "1": { "name": "variable.other.constant" },
                 "2": { "name": "keyword.operator.assignment" }
