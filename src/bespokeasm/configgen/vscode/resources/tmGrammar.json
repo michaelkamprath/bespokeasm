@@ -23,6 +23,7 @@
         "instructions": {
             "name": "meta.function",
             "patterns": [
+                { "include": "#strings" },
                 { "include": "#registers" },
                 { "include": "#compiler_labels" },
                 { "include": "#numeric-values" },
@@ -45,6 +46,7 @@
         "macros": {
             "name": "meta.function",
             "patterns": [
+                { "include": "#strings" },
                 { "include": "#registers" },
                 { "include": "#compiler_labels" },
                 { "include": "#numeric-values" },

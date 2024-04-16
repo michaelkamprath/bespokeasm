@@ -31,6 +31,7 @@ contexts:
       push:
         - meta_scope: meta.function
         - include: pop_instruction_end
+        - include: strings
         - include: registers
         - include: compiler_labels
         - include: indirect_addressing
@@ -44,6 +45,7 @@ contexts:
       push:
         - meta_scope: meta.function
         - include: pop_instruction_end
+        - include: strings
         - include: registers
         - include: compiler_labels
         - include: indirect_addressing
