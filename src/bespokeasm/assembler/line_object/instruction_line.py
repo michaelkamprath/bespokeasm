@@ -29,10 +29,11 @@ class InstructionLine(LineWithBytes):
             # replace any period characters in instructions with escaped period characters
             instructions_regex = instructions_regex.replace('.', '\\.')
             InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN = re.compile(
-                fr'(?i)(?:((?:{instructions_regex})\b.*?)(?:(?={instructions_regex})|\;|$))',
+                fr'(?i)^((?:{instructions_regex}).*?(?=(?:{instructions_regex})'
+                fr'|\s*\;|\s*$|\s*(?:(?P<quote>[\"\'])(?:\\(?P=quote)|.)*(?P=quote))))',
                 flags=re.IGNORECASE | re.MULTILINE,
             )
-        instruction_match = re.search(InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN, line_str)
+        instruction_match = re.search(InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN, line_str.strip())
         if instruction_match is not None:
             instruction_str = instruction_match.group(0)
 

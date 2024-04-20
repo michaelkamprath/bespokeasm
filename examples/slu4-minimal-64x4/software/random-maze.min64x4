@@ -14,7 +14,6 @@ RIGHT_WALL_CHAR = $1F
 
 init:
     spinit
-    mib 0,_char_buffer+1        ; initialize char buffer terminator
     phsptr _start_maze_str jps _PrintPtr pls2
 start:
     ; get a random 8-bit number, place in register A
@@ -29,5 +28,4 @@ start:
 .end_loop:
     jpa start
 
-_char_buffer: .zero 2
 _start_maze_str: .cstr 'Random Maze!\n'

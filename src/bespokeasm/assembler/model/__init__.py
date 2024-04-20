@@ -264,3 +264,7 @@ class AssemblerModel:
             return self._config['predefined']['symbols']
         else:
             return []
+
+    @property
+    def allow_embedded_strings(self) -> bool:
+        return self._config['general'].get('allow_embedded_strings', False)
