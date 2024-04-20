@@ -19,6 +19,7 @@ Changes that are planned but not implemented yet:
 *  Added `address` operand type that enables several features specific to absolute addresses, include slicing the address to support "short jump" type instructions.
 *  Added `.align` directive to align the current address to a multiple of a given value.
 *  Changed syntax highlight color theme name to be specific to the language rather than the generic "BespokeASM Theme" name.
+*  Added optional support for embedded strings in the assembly code. When enabled, strings can be ebdedded in the code withou a data directive such as `.cstr`. This is enabled by setting the `allow_embedded_strings` option in the `general` section of the configuration file to `true`.
 
 ## [0.4.1]
 * added `.asciiz` as an equivalent data directive to `.cstr`

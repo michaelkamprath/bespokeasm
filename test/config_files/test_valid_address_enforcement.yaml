@@ -166,6 +166,7 @@ instructions:
                 size: 8
                 byte_align: true
                 slice_lsb: true
+                match_address_msb: true
   jmpa:
     bytecode:
       value: 0xE1

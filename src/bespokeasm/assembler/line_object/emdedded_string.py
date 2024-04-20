@@ -10,9 +10,12 @@ from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.line_identifier import LineIdentifier
 
 
+EMBEDDED_STRING_PATTERN = r'(?P<quote>[\"])((?:\\(?P=quote)|.)*)(?P=quote)'
+
+
 class EmbeddedString(LineWithBytes):
     QUOTED_STRING_PATTERN = re.compile(
-        r'^(?P<quote>[\"\'])((?:\\(?P=quote)|.)*)(?P=quote)',
+        rf'^{EMBEDDED_STRING_PATTERN}',
         flags=re.IGNORECASE | re.MULTILINE
     )
 

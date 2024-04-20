@@ -72,6 +72,7 @@ operand_sets:
           byte_align: true
           endian: little
           slice_lsb: true
+          match_address_msb: true
   offset:
     # one byte is interpreted as an offset
     operand_values:

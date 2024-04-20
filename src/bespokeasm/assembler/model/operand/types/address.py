@@ -25,19 +25,25 @@ class AddressByteCodePart(ExpressionByteCodePartInMemoryZone):
         line_id: LineIdentifier,
         memzone: MemoryZone,
         is_lsb_bytes: bool,
+        match_address_msb: bool,
     ) -> None:
         """Creates a new address bytecode part that is bound to a memory zone.
            The address value is sliced into the least significant bit(s) if `is_lsb_bytes` is true,
            ensuring that the MSBs match the current instruction's address MSBs."""
         super().__init__(memzone, value_expression, value_size, byte_align, endian, line_id)
         self._is_lsb_bytes = is_lsb_bytes
+        self._match_address_msb = match_address_msb
+
+    def __str__(self) -> str:
+        return f'AddressByteCodePart<expression="{self._expression}",zone={self._memzone},' \
+               f'slice_lab={self._is_lsb_bytes},match_msb={self._match_address_msb}>'
 
     def get_value(self, label_scope: LabelScope, instruction_address: int, instruction_size: int) -> int:
         if instruction_address is None:
             raise ValueError('AddressByteCodePart.get_value had no instruction_address passed')
         value = super().get_value(label_scope, instruction_address, instruction_size)
 
-        if self._is_lsb_bytes:
+        if self._is_lsb_bytes and self._match_address_msb:
             # mask out the MSBs of the address value. The`value_size` is interpreted as the number of LSB bytes
             mask = (1 << self.value_size) - 1
             final_value = value & mask
@@ -47,7 +53,7 @@ class AddressByteCodePart(ExpressionByteCodePartInMemoryZone):
             if shifted_address != shifted_value:
                 raise ValueError(
                     f'Operand address value 0x{value:x} does not have the same MSBs as '
-                    f'the instruction address 0x{instruction_address:x}'
+                    f'the instruction address 0x{instruction_address:x} as line {self.line_id}'
                 )
         else:
             final_value = value
@@ -89,6 +95,14 @@ class AddressOperand(NumericExpressionOperand):
            bits to slice."""
         return self.config['argument'].get('slice_lsb', False)
 
+    @property
+    def match_address_msb(self) -> bool:
+        """Returns true if the argument value's MSBs should match the MSBs of the current instruction's
+           address. Can only be true if `does_lsb_slice` is also true. Defaults to false."""
+        if self.does_lsb_slice:
+            return self.config['argument'].get('match_address_msb', False)
+        return False
+
     def _parse_bytecode_parts(
         self,
         line_id: LineIdentifier,
@@ -113,6 +127,7 @@ class AddressOperand(NumericExpressionOperand):
             line_id,
             self.valid_memory_zone(memzone_manager),
             self.does_lsb_slice,
+            self.match_address_msb,
         )
         if arg_part.contains_register_labels(register_labels):
             return None

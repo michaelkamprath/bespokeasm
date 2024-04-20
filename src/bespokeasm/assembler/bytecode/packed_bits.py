@@ -8,7 +8,7 @@ class PackedBits:
         self._cur_bit_idx = 7
         self._bytes[0] = 0
 
-    def append_bits(self, value, bit_size, byte_aligned, endian='big') -> None:
+    def append_bits(self, value: int, bit_size: int, byte_aligned: bool, endian: str = 'big') -> None:
         value_bytes = value.to_bytes(math.ceil(bit_size/8), byteorder=endian, signed=(value < 0))
         # there is probably a more efficient way to do this, but for now this works
         if byte_aligned and self._cur_bit_idx < 7:

@@ -834,6 +834,7 @@ class TestInstructionParsing(unittest.TestCase):
             lineid,
             memzone_mngr.global_zone,
             False,
+            False,
         )
         value1 = bc1.get_value(TestInstructionParsing.label_values, 0x2010, 32)
         self.assertEqual(value1, 0x2020, 'byte code should match')
@@ -846,6 +847,7 @@ class TestInstructionParsing(unittest.TestCase):
             'little',
             lineid,
             memzone_mngr.global_zone,
+            True,
             True,
         )
         value2 = bc2.get_value(TestInstructionParsing.label_values, 0x2010, 32)
@@ -862,6 +864,7 @@ class TestInstructionParsing(unittest.TestCase):
             'little',
             lineid,
             memzone_32bit_mngr.global_zone,
+            True,
             True,
         )
         value3 = bc3.get_value(TestInstructionParsing.label_values, 0x19451000, 32)
