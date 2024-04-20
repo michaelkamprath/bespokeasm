@@ -4,11 +4,7 @@
 init:
     spinit                          ; init stack pointer
 main:
-    phsptr message_str              ; push message string pointer onto stack
-    jps _PrintPtr                   ; jump to print function
+    jps _Print "Hello, World!"      ; jump to print function
 
 end:
     jpa _Prompt                     ; jump to prompt function
-
-message_str:
-    .cstr "Hello, World!"

@@ -14,6 +14,7 @@ general:
     version: "1.1.0"
     extension: min64x4
   min_version: "0.4.2"
+  allow_embedded_strings: true
 operand_sets:
   immediate_8bit:
     # one byte is interpreted as an immediate value
