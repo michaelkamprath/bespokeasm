@@ -872,6 +872,20 @@ class TestInstructionParsing(unittest.TestCase):
         with self.assertRaises(ValueError, msg="address MSBs don't match"):
             bc3.get_value(TestInstructionParsing.label_values, 0x20241000, 32)
 
+        #  test error conditions
+        # error case: extraneous comparison operators ignored
+        with self.assertRaises(SystemExit, msg='extraneous comparison operators should be ignored'):
+            AddressByteCodePart(
+                '<$2024',
+                8,
+                True,
+                'little',
+                lineid,
+                memzone_mngr.global_zone,
+                True,
+                False,
+            )
+
         # Test byte code generation for sliced addresses
         t1 = InstructionLine.factory(
             lineid, 'jmp_local $2FF8', 'comment',

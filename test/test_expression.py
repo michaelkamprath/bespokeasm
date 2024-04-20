@@ -253,6 +253,12 @@ class TestExpression(unittest.TestCase):
             'negative label expression'
         )
 
+    def test_unknown_expression_parts(self):
+        line_id = LineIdentifier(1927, 'test_character_ordinals_in_expressions')
+
+        with self.assertRaises(SystemExit, msg='extraneous comparison operator'):
+            parse_expression(line_id, '<$2024').get_value(TestExpression.label_values, 1)
+
 
 if __name__ == '__main__':
     unittest.main()
