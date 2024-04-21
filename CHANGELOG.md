@@ -21,6 +21,7 @@ Changes that are planned but not implemented yet:
 *  Changed syntax highlight color theme name to be specific to the language rather than the generic "BespokeASM Theme" name.
 *  Added optional support for embedded strings in the assembly code. When enabled, strings can be ebdedded in the code withou a data directive such as `.cstr`. This is enabled by setting the `allow_embedded_strings` option in the `general` section of the configuration file to `true`.
 *  Added ability to mute byte code emission with the preprocessor directive `#mute` and unmute with `#unmute`.
+*  Improved handling of include directories  by duplicating and normalizing all search paths.
 
 ## [0.4.1]
 * added `.asciiz` as an equivalent data directive to `.cstr`

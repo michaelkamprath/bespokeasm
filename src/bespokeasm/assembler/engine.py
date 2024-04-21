@@ -88,7 +88,24 @@ class Assembler:
 
             # add its label to the global scope
         # find base file containing directory
-        include_dirs = set([os.path.dirname(self._source_file)]+list(self._include_paths))
+        include_dirs = [os.path.dirname(self._source_file)]+list(self._include_paths)
+        # Deduplicate the include directories.
+        # This search approach will include the last instance of a directory.
+        deduplicated_dirs = list()
+        for i in range(len(include_dirs)):
+            left_path = os.path.realpath(include_dirs[i])
+            is_duplicate = False
+            for j in range(i+1, len(include_dirs)):
+                right_path = os.path.realpath(include_dirs[j])
+                if left_path == right_path:
+                    # these are the same directory
+                    is_duplicate = True
+                    break
+            if not is_duplicate:
+                deduplicated_dirs.append(left_path)
+        include_dirs = set(deduplicated_dirs)
+        if self._verbose > 1:
+            print(f'Source will be searched in the following include directories: {include_dirs}')
 
         asm_file = AssemblyFile(self._source_file, global_label_scope)
         line_obs: list[LineObject] = asm_file.load_line_objects(
