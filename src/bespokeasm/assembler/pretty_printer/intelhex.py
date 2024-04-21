@@ -17,7 +17,7 @@ class IntelHexPrettyPrinter(PrettyPrinterBase):
     def pretty_print(self) -> str:
         output = io.StringIO()
         for lobj in self.line_objects:
-            if isinstance(lobj, LineWithBytes):
+            if isinstance(lobj, LineWithBytes) and not lobj.is_muted:
                 line_bytes = lobj.get_bytes().decode(encoding='latin-')
                 self._intel_hex.puts(lobj.address, line_bytes)
 

@@ -15,7 +15,7 @@ class MinHexPrettyPrinter(PrettyPrinterBase):
         line_byte_count = 0
         address_width = int(self.model.address_size/4)
         for lobj in self.line_objects:
-            if isinstance(lobj, LineWithBytes):
+            if isinstance(lobj, LineWithBytes) and not lobj.is_muted:
                 line_bytes = lobj.get_bytes()
                 for b in line_bytes:
                     if line_byte_count == 0:

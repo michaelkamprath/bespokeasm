@@ -141,6 +141,7 @@ VGA_Fill:       STB vf_loopx+1                                ; save fill value
                   DEZ 1 FNE vf_loopy
                     RTS
 
+#mute
 .org 0x0080
 
 sx:     .2byte  0xffff                                        ; sprite engine

@@ -123,7 +123,11 @@ class Assembler:
         # Sort lines according to their assigned address. This allows for .org directives
         compilable_line_obs.sort(key=lambda x: x.address)
         max_generated_address = compilable_line_obs[-1].address
-        line_dict = {lobj.address: lobj for lobj in compilable_line_obs if isinstance(lobj, LineWithBytes)}
+        line_dict = {
+            lobj.address: lobj
+            for lobj in compilable_line_obs
+            if isinstance(lobj, LineWithBytes) and not lobj.is_muted
+        }
 
         # second pass: build the machine code and check for overlaps
         if self._verbose > 2:
@@ -146,7 +150,7 @@ class Assembler:
                     )
                 last_line = lobj
 
-        # Finally generate the binaey image
+        # Finally generate the binary image
         fill_bytes = bytearray([self._binary_fill_value])
         addr = self._binary_start
 

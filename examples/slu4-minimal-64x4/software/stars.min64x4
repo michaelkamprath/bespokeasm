@@ -109,6 +109,7 @@ UpdateStars:    MIV STARDATA,ptr
 
 STARDATA:                                           ; put star data here
 
+#mute
 .org 0x0080                                         ; zero-page variables and constants
 
 xa:             .2byte 0xffff                       ; MinOS graphics interface (_SetPixel, _ClearPixel)

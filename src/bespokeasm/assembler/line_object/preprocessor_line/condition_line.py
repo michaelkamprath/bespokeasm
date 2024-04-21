@@ -4,10 +4,11 @@ from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone import MemoryZone
 import bespokeasm.assembler.preprocessor.condition as condition
+from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
 
 
-CONDITIONAL_LINE_PREFIX_LIST = ['#if ', '#ifdef ', '#ifndef ', '#elif ', '#else', '#endif']
+CONDITIONAL_LINE_PREFIX_LIST = ['#if ', '#ifdef ', '#ifndef ', '#elif ', '#else', '#endif', '#mute', '#emit', '#unmute']
 
 
 class ConditionLine(PreprocessorLine):
@@ -17,7 +18,8 @@ class ConditionLine(PreprocessorLine):
                 instruction: str,
                 comment: str,
                 memzone: MemoryZone,
-                condition_stack: ConditionStack
+                preprocessor: Preprocessor,
+                condition_stack: ConditionStack,
             ):
         super().__init__(line_id, instruction, comment, memzone)
 
@@ -31,11 +33,15 @@ class ConditionLine(PreprocessorLine):
             self._condition = condition.EndifPreprocessorCondition(instruction, line_id)
         elif instruction.startswith('#ifdef ') or instruction.startswith('#ifndef '):
             self._condition = condition.IfdefPreprocessorCondition(instruction, line_id)
+        elif instruction == '#mute':
+            self._condition = condition.MutePreprocessorCondition(instruction, line_id)
+        elif instruction == '#unmute' or instruction == '#emit':
+            self._condition = condition.UnmutePreprocessorCondition(instruction, line_id)
         else:
             raise ValueError(f'Invalid condition line: {instruction}')
 
         try:
-            condition_stack.process_condition(self._condition)
+            condition_stack.process_condition(self._condition, preprocessor)
         except IndexError:
             sys.exit(
                 f'ERROR - {line_id}: Preprocessor condition has no matching counterpart'

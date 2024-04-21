@@ -7,7 +7,8 @@ from test import test_code
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.condition import \
     IfPreprocessorCondition, IfdefPreprocessorCondition, ElifPreprocessorCondition, \
-    ElsePreprocessorCondition, EndifPreprocessorCondition
+    ElsePreprocessorCondition, EndifPreprocessorCondition, MutePreprocessorCondition, \
+    UnmutePreprocessorCondition
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
@@ -323,25 +324,81 @@ class TestPreprocessorSymbols(unittest.TestCase):
 
         # add an if condition that should be false
         c1 = IfPreprocessorCondition('#if s1 < 50', LineIdentifier('test_condition_stack', 1))
-        stack.process_condition(c1)
+        stack.process_condition(c1, preprocessor)
         self.assertFalse(stack.currently_active(preprocessor), 'condition should be False')
 
         # add an elif condition that should be true
         c2 = ElifPreprocessorCondition('#elif s1 >= 55', LineIdentifier('test_condition_stack', 2))
-        stack.process_condition(c2)
+        stack.process_condition(c2, preprocessor)
         self.assertTrue(stack.currently_active(preprocessor), 'condition should be True')
 
         # add an elif that could be true but is false because it follows a true elif
         c3 = ElifPreprocessorCondition('#elif s1 < 60', LineIdentifier('test_condition_stack', 3))
-        stack.process_condition(c3)
+        stack.process_condition(c3, preprocessor)
         self.assertFalse(stack.currently_active(preprocessor), 'condition should be False')
 
         # add the else condition
         c4 = ElsePreprocessorCondition('#else', LineIdentifier('test_condition_stack', 4))
-        stack.process_condition(c4)
+        stack.process_condition(c4, preprocessor)
         self.assertFalse(stack.currently_active(preprocessor), 'condition should be False')
 
         # add endif
         c5 = EndifPreprocessorCondition('#endif', LineIdentifier('test_condition_stack', 5))
-        stack.process_condition(c5)
+        stack.process_condition(c5, preprocessor)
         self.assertTrue(stack.currently_active(preprocessor), 'condition should be True')
+
+    def test_muting(self):
+        stack = ConditionStack()
+        preprocessor = Preprocessor()
+
+        self.assertFalse(stack.is_muted, 'initial condition should be False')
+        stack.process_condition(MutePreprocessorCondition('#mute', LineIdentifier('test_muting', 1)), preprocessor)
+        self.assertTrue(stack.is_muted, 'condition should be True')
+        stack.process_condition(UnmutePreprocessorCondition('#unmute', LineIdentifier('test_muting', 2)), preprocessor)
+        self.assertFalse(stack.is_muted, 'condition should be False')
+        stack.process_condition(MutePreprocessorCondition('#mute', LineIdentifier('test_muting', 3)), preprocessor)
+        stack.process_condition(MutePreprocessorCondition('#mute', LineIdentifier('test_muting', 4)), preprocessor)
+        stack.process_condition(MutePreprocessorCondition('#mute', LineIdentifier('test_muting', 5)), preprocessor)
+        self.assertTrue(stack.is_muted, 'condition should be True')
+        stack.process_condition(UnmutePreprocessorCondition('#unmute', LineIdentifier('test_muting', 6)), preprocessor)
+        self.assertTrue(stack.is_muted, 'condition should be True')
+        stack.process_condition(UnmutePreprocessorCondition('#unmute', LineIdentifier('test_muting', 7)), preprocessor)
+        self.assertTrue(stack.is_muted, 'condition should be True')
+        stack.process_condition(UnmutePreprocessorCondition('#unmute', LineIdentifier('test_muting', 8)), preprocessor)
+        self.assertFalse(stack.is_muted, 'condition should be False')
+
+    def test_conditional_muting(self):
+        """Demonstrate that conditional compilation controls the mute/unmute preprocessor directives."""
+        # if a #mute is inside a false condition, it should not mute
+        stack = ConditionStack()
+        preprocessor = Preprocessor()
+        preprocessor.create_symbol('s1', '57')
+        preprocessor.create_symbol('s2', 's1*2')
+
+        self.assertTrue(stack.currently_active(preprocessor), 'condition should be True')
+        self.assertFalse(stack.is_muted, 'mute should be False')
+
+        c1 = IfPreprocessorCondition('#if s1 < 50', LineIdentifier('test_condition_stack', 1))
+        stack.process_condition(c1, preprocessor)
+        self.assertFalse(stack.currently_active(preprocessor), 'condition should be False')
+        self.assertFalse(stack.is_muted, 'mute should be False')
+        stack.process_condition(MutePreprocessorCondition('#mute', LineIdentifier('test_muting', 2)), preprocessor)
+        self.assertFalse(stack.currently_active(preprocessor), 'condition should be False')
+        self.assertFalse(stack.is_muted, 'mute should be False')
+
+        # if a #mute is inside a true condition, it should mute
+        c2 = ElsePreprocessorCondition('#else', LineIdentifier('test_condition_stack', 3))
+        stack.process_condition(c2, preprocessor)
+        self.assertTrue(stack.currently_active(preprocessor), 'condition should be True')
+        self.assertFalse(stack.is_muted, 'mute should be False')
+        stack.process_condition(MutePreprocessorCondition('#mute', LineIdentifier('test_muting', 4)), preprocessor)
+        self.assertTrue(stack.currently_active(preprocessor), 'condition should be False')
+        self.assertTrue(stack.is_muted, 'mute should be True')
+
+        c3 = EndifPreprocessorCondition('#endif', LineIdentifier('test_condition_stack', 5))
+        stack.process_condition(c3, preprocessor)
+        self.assertTrue(stack.currently_active(preprocessor), 'condition should be True')
+        self.assertTrue(stack.is_muted, 'mute should be True')
+        stack.process_condition(UnmutePreprocessorCondition('#unmute', LineIdentifier('test_muting', 6)), preprocessor)
+        self.assertTrue(stack.currently_active(preprocessor), 'condition should be True')
+        self.assertFalse(stack.is_muted, 'mute should be False')

@@ -10,6 +10,7 @@ BYTECODE_DIRECTIVES_SET = {
 PREPROCESSOR_DIRECTIVES_SET = {
     'include', 'require', 'create_memzone',
     'define', 'if', 'elif', 'else', 'endif', 'ifdef', 'ifndef',
+    'mute', 'unmute', 'emit',
 }
 
 EXPRESSION_FUNCTIONS_SET = set([

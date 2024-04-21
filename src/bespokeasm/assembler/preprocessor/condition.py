@@ -46,6 +46,7 @@ class PreprocessorCondition:
         return self.__repr__()
 
     def evaluate(self, preprocessor: Preprocessor) -> bool:
+        """Evaluates whether this condition is true or false."""
         raise NotImplementedError()
 
     def is_lineage_true(self, preprocessor: Preprocessor) -> bool:
@@ -236,6 +237,28 @@ class EndifPreprocessorCondition(PreprocessorCondition):
     @property
     def is_dependent(self) -> bool:
         return True
+
+    def evaluate(self, preprocessor: Preprocessor) -> bool:
+        return True
+
+
+class MutePreprocessorCondition(PreprocessorCondition):
+    def __init__(self, line_str: str, line: LineIdentifier):
+        super().__init__(line_str, line)
+
+    def __repr__(self) -> str:
+        return f'MutePreprocessorCondition<{self.self._line_str}>'
+
+    def evaluate(self, preprocessor: Preprocessor) -> bool:
+        return True
+
+
+class UnmutePreprocessorCondition(PreprocessorCondition):
+    def __init__(self, line_str: str, line: LineIdentifier):
+        super().__init__(line_str, line)
+
+    def __repr__(self) -> str:
+        return f'UnmutePreprocessorCondition<{self.self._line_str}>'
 
     def evaluate(self, preprocessor: Preprocessor) -> bool:
         return True

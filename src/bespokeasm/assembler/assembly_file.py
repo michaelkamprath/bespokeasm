@@ -97,6 +97,7 @@ class AssemblyFile:
                         for lobj in lobj_list:
                             if not isinstance(lobj, ConditionLine):
                                 lobj.compilable = condition_stack.currently_active(preprocessor)
+                                lobj.is_muted = condition_stack.is_muted
 
                             if lobj.compilable:
                                 if isinstance(lobj, LabelLine):

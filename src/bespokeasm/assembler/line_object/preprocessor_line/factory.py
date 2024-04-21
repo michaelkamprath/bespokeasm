@@ -60,14 +60,13 @@ class PreprocessorLineFactory:
                         preprocessor,
                         log_verbosity,
                     )]
-        if instruction.startswith('#page'):
-            raise NotImplementedError('PageAlignLine is not implemented')
         if instruction.startswith(tuple(CONDITIONAL_LINE_PREFIX_LIST)):
             return [ConditionLine(
                         line_id,
                         instruction,
                         comment,
                         current_memzone,
+                        preprocessor,
                         condition_stack,
                     )]
         return []

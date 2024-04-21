@@ -245,7 +245,11 @@ class TestConfigurationGeneration(unittest.TestCase):
                 item_match_str = item['match']
         self._assert_grouped_item_list(
             item_match_str,
-            ['include', 'require', 'create_memzone', 'define', 'if', 'elif', 'else', 'endif', 'ifdef', 'ifndef'],
+            [
+                'include', 'require', 'create_memzone', 'define', 'if',
+                'elif', 'else', 'endif', 'ifdef', 'ifndef',
+                'mute', 'unmute', 'emit',
+            ],
             'data type directives'
         )
         self.assertIsFile(os.path.join(test_tmp_dir, 'bespokeasm-test.sublime-color-scheme'))
@@ -326,7 +330,11 @@ class TestConfigurationGeneration(unittest.TestCase):
                 item_match_str = item['match']
         self._assert_grouped_item_list(
             item_match_str,
-            ['include', 'require', 'create_memzone', 'define', 'if', 'elif', 'else', 'endif', 'ifdef', 'ifndef'],
+            [
+                'include', 'require', 'create_memzone', 'define',
+                'if', 'elif', 'else', 'endif', 'ifdef', 'ifndef',
+                'mute', 'unmute', 'emit',
+            ],
             'data type directives'
         )
         self.assertIsFile(os.path.join(test_tmp_dir, 'tester-assembly.sublime-color-scheme'))

@@ -19,6 +19,7 @@ class LineObject:
         self._label_scope = None
         self._memzone = memzone
         self._compilable = True
+        self._is_muted = False
 
     def __repr__(self):
         return str(self)
@@ -83,6 +84,19 @@ class LineObject:
     @compilable.setter
     def compilable(self, value: bool):
         self._compilable = value
+
+    @property
+    def is_muted(self) -> bool:
+        """
+        Returns True if this line object should be ignored during
+        emission of bytecode or certain types of pretty printing
+        """
+        return self._is_muted
+
+    @is_muted.setter
+    def is_muted(self, value: bool):
+        """Sets the muted state of this line object"""
+        self._is_muted = value
 
 
 class LineWithBytes(LineObject):
