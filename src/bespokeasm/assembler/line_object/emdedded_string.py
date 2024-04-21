@@ -16,7 +16,7 @@ EMBEDDED_STRING_PATTERN = r'(?P<quote>[\"])((?:\\(?P=quote)|.)*)(?P=quote)'
 class EmbeddedString(LineWithBytes):
     QUOTED_STRING_PATTERN = re.compile(
         rf'^{EMBEDDED_STRING_PATTERN}',
-        flags=re.IGNORECASE | re.MULTILINE
+        flags=re.IGNORECASE | re.MULTILINE | re.DOTALL
     )
 
     @classmethod
@@ -45,19 +45,18 @@ class EmbeddedString(LineWithBytes):
             cstr_terminator: int = 0,
     ) -> None:
         super().__init__(line_id, instruction, comment, current_memzone)
-        self._quoted_string = quoted_string
-        self._cstr_terminator = cstr_terminator
+        self._string_bytes = \
+            [ord(x) for x in list(bytes(quoted_string, 'utf-8').decode('unicode_escape'))] \
+            + [cstr_terminator]
+
+    def __str__(self):
+        return f'EmbeddedString<{self.instruction}, size={self.byte_size}, chars={self._string_bytes}>'
 
     @property
     def byte_size(self) -> int:
         """Returns the number of bytes this data line will generate"""
-        return len(self._quoted_string) + 1
+        return len(self._string_bytes)
 
     def generate_bytes(self) -> None:
-        # convert the quoted string to bytes
-        converted_str = bytes(self._quoted_string, 'utf-8').decode('unicode_escape')
-        values_list = [ord(x) for x in list(converted_str)]
-        # add the terminator
-        values_list.append(self._cstr_terminator)
         # set the bytes
-        self._bytes.extend(values_list)
+        self._bytes.extend(self._string_bytes)

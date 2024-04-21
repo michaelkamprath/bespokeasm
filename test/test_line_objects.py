@@ -843,6 +843,35 @@ class TestLineObject(unittest.TestCase):
                 0,
             )
 
+    def test_embedded_string_bugs(self):
+        fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        # force embedded strings to be allowed
+        isa_model._config['general']['allow_embedded_strings'] = True
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
+
+        lineid = LineIdentifier(67, 'test_embedded_string_bugs')
+        # test bug where length of embedded string was not being calculated correctly
+        # escapes sequences in code files are double escaped when read in, so the
+        # string "\n" is read as "\\n". The byte conversion that is done will properly
+        # convert the string to the escaped value, but the bug was we were taking the
+        # length of the string before the escape sequences were converted, so the length
+        # of the string was 3 instead of 2.
+        t1 = EmbeddedString.factory(
+            lineid,
+            '"\\n"',
+            'embedded string',
+            memzone_mngr.global_zone,
+            0,
+        )
+        self.assertIsNotNone(t1, 'embedded string object created')
+        self.assertIsInstance(t1, EmbeddedString)
+        self.assertEqual(t1.byte_size, 2, 'string has 2 bytes')
+
 
 if __name__ == '__main__':
     unittest.main()
