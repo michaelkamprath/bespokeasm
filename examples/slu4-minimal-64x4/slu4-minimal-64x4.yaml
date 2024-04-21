@@ -111,6 +111,9 @@ predefined:
       start: 0x0000
       end: 0x00FF
     - name: ZERO_PAGE_APPS
+      start: 0x0000
+      end: 0x007F
+    - name: ZERO_PAGE_OS
       start: 0x0080
       end: 0x00FF
     - name: USER_APPS
@@ -1521,7 +1524,7 @@ instructions:
       operand_sets:
         list:
           - absolute_address
-  cql:
+  clq:
     # Clear zero-page long: *Q = 0
     bytecode:
       value: 0x92
@@ -2724,3 +2727,55 @@ macros:
         - "pls"
         - "pls"
         - "pls"
+  ms4q:
+    # move 4 bytes from stack starting at passed offset to zero-page long
+    # stack is arranged as big-endian, long in zero-page is little-endian
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - offset
+            - zero_page
+      instructions:
+        - "lds @ARG(0)+3"
+        - "stz @ARG(1)+0"
+        - "lds @ARG(0)+2"
+        - "stz @ARG(1)+1"
+        - "lds @ARG(0)+1"
+        - "stz @ARG(1)+2"
+        - "lds @ARG(0)+0"
+        - "stz @ARG(1)+3"
+  mqs4:
+    # move 4 bytes from zero-page long to stack starting at passed offset
+    # stack is arranged as big-endian, long in zero-page is little-endian
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - zero_page
+            - offset
+      instructions:
+        - "ldz @ARG(0)+3"
+        - "sts @ARG(1)+0"
+        - "ldz @ARG(0)+2"
+        - "sts @ARG(1)+1"
+        - "ldz @ARG(0)+1"
+        - "sts @ARG(1)+2"
+        - "ldz @ARG(0)+0"
+        - "sts @ARG(1)+3"
+  aqq:
+    # add two zero-page longs. result in second zero page operand
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - zero_page
+            - zero_page
+      instructions:
+        - "azz @ARG(0)+0,@ARG(1)+0"
+        - "ldz @ARG(0)+1"
+        - "ac.z @ARG(1)+1"
+        - "ldz @ARG(0)+2"
+        - "ac.z @ARG(1)+2"
+        - "ldz @ARG(0)+3"
+        - "ac.z @ARG(1)+3"

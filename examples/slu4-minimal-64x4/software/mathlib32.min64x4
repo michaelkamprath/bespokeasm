@@ -1,0 +1,134 @@
+#require "slu4-min64x4-asm >= 1.1.0"
+; Zero Page Usage
+.memzone ZERO_PAGE_APPS
+#mute
+_temp_byte1:            .byte 0
+_temp_byte2:            .byte 0
+_temp_byte3:            .byte 0
+_temp_byte4:            .byte 0
+_working_mem8:          .zero 8
+_multiply_sign_byte:    .byte 0
+_argX4:                 .zero 4
+_argY4:                 .zero 4
+_counter:               .byte 0
+
+#emit
+.memzone USER_APPS
+; compare_uint32
+;   Compares two unsigned 32-bit values to determine equality
+;       X ? Y
+;
+;   Arguments
+;       sp+3 : right Y value (4 bytes)
+;       sp+7 : left X value (4 bytes)
+;
+;   Returns
+;       flags will be set per comparison
+;
+compare_uint32:
+    ; first check high bytes, then others in sequence
+    ; values on stack are stored big endian
+    lds (3+0) stz _temp_byte1 lds (7+0) cpz _temp_byte1 bne .done
+    lds (3+1) stz _temp_byte1 lds (7+1) cpz _temp_byte1 bne .done
+    lds (3+2) stz _temp_byte1 lds (7+2) cpz _temp_byte1 bne .done
+    lds (3+3) stz _temp_byte1 lds (7+3) cpz _temp_byte1
+.done:
+    rts
+
+; multiply_uint32
+;   multiply unsigned 4 byte values X*Y, producing an 8 byte unsigned results
+;
+; multiply_int32
+;   multiply signed 4 byte values X*Y, producing an 8 byte signed results
+;
+; Arguments
+;   sp+3 - value X (multiplier) (4 bytes)
+;   sp+7 - value Y (multiplicand) (4 bytes)
+;
+; Return Value
+;   sp+3 - results (8 bytes)
+;
+; Zero Page usage
+;  _working_mem8 - 8 bytes of working memory
+;  _multiply_sign_byte - 1 byte to store sign of results
+;  _argY4 - 4 bytes to store X value
+;  _counter - 1 byte counter
+
+multiply_uint32:
+    ; return is always positive
+    clz _multiply_sign_byte
+    ; set up 8 byte results memory block
+    clq _working_mem8+4                 ; high long inialized to 0
+    ms4q 3,_working_mem8+0              ; multiplier in low word
+    ms4q 7,_argY4                       ; multiplicand in zero page variable
+    jpa _multiply
+
+multiply_int32:
+    ; set up 8 byte results memory block
+    clq _working_mem8+4                 ; high long inialized to 0
+    ms4q 3,_working_mem8+0              ; multiplier in low word
+    ms4q 7,_argY4                      ; multiplicand in zero page variable
+    ; determine if result is going to be negative
+    ldz _working_mem8+3 ani %10000000 stz _multiply_sign_byte cpi 0 beq .check_multiplicand
+    ; negate mutiplier (stack is big endian)
+    neq _working_mem8+0
+.check_multiplicand:
+    ldz _argY4+3 ani %10000000 xr.z _multiply_sign_byte
+    ldz _argY4+3 ani %10000000 cpi 0 beq .done
+    ; negate mutiplicand (stack is big endian)
+    neq _argY4+0
+.done:
+    jpa _multiply
+
+_multiply:
+    ; set counter for 32 bits
+    ldi 32 stz _counter
+.mult_loop:
+    ; check to see if LSb of working memory is 1
+    ldz _working_mem8+0 lr1 bcc .continue
+    ; add multiplicand to high word of results
+    aqq _argY4,_working_mem8+4
+.continue:
+    ; shift results right one.
+    lrz _working_mem8+7
+    rrz _working_mem8+6
+    rrz _working_mem8+5
+    rrz _working_mem8+4
+    rrz _working_mem8+3
+    rrz _working_mem8+2
+    rrz _working_mem8+1
+    rrz _working_mem8+0
+    ; decrement counter (placing it in A) and stop if 0
+    dez _counter cpi 0 bne .mult_loop
+.set_sign:
+    ; check to see if result is negative:
+    ciz 0,_multiply_sign_byte beq .copy_results
+    ; take twos complement of 8-byte results
+    noq _working_mem8+0
+    noq _working_mem8+4
+    inw _working_mem8+0 bcc .copy_results       ; if only INQ set the flags :-(
+    inw _working_mem8+2 bcc .copy_results
+    inw _working_mem8+4 bcc .copy_results
+    inw _working_mem8+6
+.copy_results:
+    ; the entire working memory is the 64-bit results
+    mqs4 _working_mem8+4,3+0
+    mqs4 _working_mem8+0,3+4
+    rts
+
+; _print_working_memory
+;   prints the contents of the _working_mem8 8 bytes in hex
+;   used for debugging purposes.
+_print_working_memory:
+    jps _Print "working memory = $"
+    ldz _working_mem8+7 jas _PrintHex
+    ldz _working_mem8+6 jas _PrintHex
+    ldz _working_mem8+5 jas _PrintHex
+    ldz _working_mem8+4 jas _PrintHex
+    jps _Print " "
+    ldz _working_mem8+3 jas _PrintHex
+    ldz _working_mem8+2 jas _PrintHex
+    ldz _working_mem8+1 jas _PrintHex
+    ldz _working_mem8+0 jas _PrintHex
+    jps _Print "\n"
+    rts

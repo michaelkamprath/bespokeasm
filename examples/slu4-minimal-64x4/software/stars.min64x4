@@ -112,8 +112,7 @@ UpdateStars:    MIV STARDATA,ptr
 STARDATA:                                           ; put star data here
 
 #mute
-.memzone ZERO_PAGE_APPS                                         ; zero-page variables and constants
-
+.org 0 "ZERO_PAGE_OS"                               ; zero-page variables and constants
 xa:             .2byte 0xffff                       ; MinOS graphics interface (_SetPixel, _ClearPixel)
 ya:             .byte 0xff
 inta:           .2byte 0xffff                       ; math registers

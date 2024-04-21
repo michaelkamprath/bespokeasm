@@ -143,7 +143,7 @@ VGA_Fill:       STB vf_loopx+1                                ; save fill value
                     RTS
 
 #mute
-.memzone ZERO_PAGE_APPS
+.org 0 "ZERO_PAGE_OS"
 
 sx:     .2byte  0xffff                                        ; sprite engine
 sy:     .byte   0xff
