@@ -2,10 +2,11 @@
 ;
 ; Code modified by Michael Kamprath (michaelkampath) 2024
 ; Adapted to be compiled with BespokeASM
+#require "slu4-min64x4-asm >= 1.1.0"
 
 ViewPort = 0x430c
 
-.org 0x2000
+.org 0 "USER_APPS"
                 MIB 0xfe,0xffff                               ; initialize stack
 
                 CLV _XPos                                     ; reset cursor position
@@ -142,7 +143,7 @@ VGA_Fill:       STB vf_loopx+1                                ; save fill value
                     RTS
 
 #mute
-.org 0x0080
+.memzone ZERO_PAGE_APPS
 
 sx:     .2byte  0xffff                                        ; sprite engine
 sy:     .byte   0xff

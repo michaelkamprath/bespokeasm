@@ -111,9 +111,6 @@ predefined:
       start: 0x0000
       end: 0x00FF
     - name: ZERO_PAGE_APPS
-      start: 0x0000
-      end: 0x007F
-    - name: ZERO_PAGE_KERNEL
       start: 0x0080
       end: 0x00FF
     - name: USER_APPS

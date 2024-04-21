@@ -9,7 +9,9 @@
 ; Code modified by Michael Kamprath (michaelkampath) 2024
 ; Adapted to be compiled with BespokeASM
 ;
-.org 0x2000
+#require "slu4-min64x4-asm >= 1.1.0"
+
+.org 0 "USER_APPS"
                 JPS MakeStars                       ; generate star data
                 JPS _Clear
 
@@ -110,7 +112,7 @@ UpdateStars:    MIV STARDATA,ptr
 STARDATA:                                           ; put star data here
 
 #mute
-.org 0x0080                                         ; zero-page variables and constants
+.memzone ZERO_PAGE_APPS                                         ; zero-page variables and constants
 
 xa:             .2byte 0xffff                       ; MinOS graphics interface (_SetPixel, _ClearPixel)
 ya:             .byte 0xff
