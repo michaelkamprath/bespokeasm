@@ -18,6 +18,8 @@ The arguments to the command above are:
 * `-c /path/to/slu4-minimal-64x4.yaml` - The file path to the **BespokeASM** instruction set configuration for the Minimal 64x4.
 * `/path/to/my-code.min64x4` - The file path to the Minimal 64x4 assembly code to be compiled. Here by convention the assembly code has a file extension of `.min64x4`. While **BespokeASM** can work with any file extension for the code, the convention is used so that code editors know what file type they are editing and thus are able to support syntax highlighting specific to the Minimal 64x4 assembly syntax. See [**BespokeASM**'s documentation on syntax highlighting support](https://github.com/michaelkamprath/bespokeasm/wiki/Installation-and-Usage#installing-language-extensions) for more information.
 
+Once compiled, the intel hex output can be copied and pasted into the Minimal 64x4 OS's terminal window to load the code into the Minimal 64x4's memory using it's `receive` command. Further, the compile code can be run on [the Minimal 64x4's web-based emulator](https://editor.p5js.org/slu4coder/sketches/lRq1gyYR2).
+
 ### Instruction Set
 Carsten Herting thoroughly documents [the instruction set for the Minimal 64x4 in his user guide](https://docs.google.com/document/d/1-nDv_8WEG1FrlO3kEK0icoYo-Z-jlhpCMiCstxGOCjQ/edit?usp=sharing). All of the documented instructions in their original syntax are implemented in in this **BespokeASM** port. However, **BespokeASM** will be case insensitive when matching instruction mnemonics.
 
