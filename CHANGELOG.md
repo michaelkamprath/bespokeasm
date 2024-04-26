@@ -13,6 +13,8 @@ Changes that are planned but not implemented yet:
   * Disallowed operands
   * missing `:` after labels
   * unknown labels
+* Add named label scopes. This would allow a label to be defined in a specific scope that can be shared across files.
+* Create a "align if needed" preprocessor directive paid that generates an `.align` directive is the bytecode in between the paid isn't naturally on the same page and can fit on the same page if aligned. An error would be benerated if the block of code can't fit on the same page regardless of alignment.
 
 ## [Unreleased]
 *  Added support for The Minimal 64x4 Home Computer with an example and updated assembler functionality to support it.

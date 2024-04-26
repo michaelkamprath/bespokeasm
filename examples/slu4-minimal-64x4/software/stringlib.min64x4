@@ -1,3 +1,6 @@
+; String Library
+;   various routines for manipulating strings
+;
 #require "slu4-min64x4-asm >= 1.1.0"
 ; Zero Page Usage
 .memzone ZERO_PAGE_APPS
@@ -23,6 +26,7 @@ _working_mem5:          .zero 5
 ;
 ; TODO - check to see if there is enough rroom in teh stack to do this operation.
 ;
+.align
 cstr_reverse:
     lds 3+0 stz _tmp_Ptr1+1
     lds 3+1 stz _tmp_Ptr1+0
@@ -118,7 +122,6 @@ uint32_to_decimal_cstr:
     inv _tmp_Ptr1
     jpa .outer_loop
 .last_digit:
-    jps _Print "last digit!\n"
     ; get character of remainder
     ldz _working_mem5+0 adi $30
     ; store character in buffer
@@ -156,6 +159,26 @@ uint32_to_decimal_cstr:
     ; print error message
     jps _Print "\nERROR: 32-bit digit conversion overflowed\n\n"
     jpa _Prompt
+
+
+; print_uint32
+;   prints the passed unsigned 4 byte integer in decimal format
+;
+;   Arguments:
+;       sp + 3 : 32-bit value to print (4 bytes) big endian
+;
+BUFFER_SIZE = 32
+print_uint32:
+    phsi BUFFER_SIZE
+    phsptr .buffer
+    phs4s (3+3)
+    jps uint32_to_decimal_cstr
+    pls4
+    pls2
+    pls
+    phs2i .buffer jps _PrintPtr pls2
+    rts
+.buffer: .zero BUFFER_SIZE
 
 
 _print_working_memory:

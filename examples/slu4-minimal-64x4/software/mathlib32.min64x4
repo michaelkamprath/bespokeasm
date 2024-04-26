@@ -1,3 +1,6 @@
+; Math Library 32-bit
+;  This library provides 32-bit math functions for unsigned and signed integers.
+;
 #require "slu4-min64x4-asm >= 1.1.0"
 ; Zero Page Usage
 .memzone ZERO_PAGE_APPS
@@ -118,9 +121,9 @@ _multiply:
     ; take twos complement of 8-byte results
     noq _working_mem8+0
     noq _working_mem8+4
-    inw _working_mem8+0 fcc .copy_results       ; if only INQ set the flags :-(
-    inw _working_mem8+2 fcc .copy_results
-    inw _working_mem8+4 fcc .copy_results
+    inw _working_mem8+0 bcc .copy_results       ; if only INQ set the flags :-(
+    inw _working_mem8+2 bcc .copy_results
+    inw _working_mem8+4 bcc .copy_results
     inw _working_mem8+6
 .copy_results:
     ; the entire working memory is the 64-bit results
