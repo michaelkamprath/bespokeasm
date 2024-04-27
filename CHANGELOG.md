@@ -13,8 +13,17 @@ Changes that are planned but not implemented yet:
   * Disallowed operands
   * missing `:` after labels
   * unknown labels
+* Add named label scopes. This would allow a label to be defined in a specific scope that can be shared across files.
+* Create a "align if needed" preprocessor directive paid that generates an `.align` directive is the bytecode in between the paid isn't naturally on the same page and can fit on the same page if aligned. An error would be benerated if the block of code can't fit on the same page regardless of alignment.
 
 ## [Unreleased]
+*  Added support for The Minimal 64x4 Home Computer with an example and updated assembler functionality to support it.
+*  Added `address` operand type that enables several features specific to absolute addresses, include slicing the address to support "short jump" type instructions.
+*  Added `.align` directive to align the current address to a multiple of a given value.
+*  Changed syntax highlight color theme name to be specific to the language rather than the generic "BespokeASM Theme" name.
+*  Added optional support for embedded strings in the assembly code. When enabled, strings can be ebdedded in the code withou a data directive such as `.cstr`. This is enabled by setting the `allow_embedded_strings` option in the `general` section of the configuration file to `true`.
+*  Added ability to mute byte code emission with the preprocessor directive `#mute` and unmute with `#unmute`.
+*  Improved handling of include directories  by duplicating and normalizing all search paths.
 
 ## [0.4.1]
 * added `.asciiz` as an equivalent data directive to `.cstr`

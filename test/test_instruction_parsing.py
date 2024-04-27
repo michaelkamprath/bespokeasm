@@ -32,6 +32,31 @@ class TestInstructionParsing(unittest.TestCase):
     def setUp(self):
         InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN = None
 
+    def test_instruction_character_set_parsing(self):
+        # test instructions with periods in them
+        fp = pkg_resources.files(config_files).joinpath('test_instructions_with_periods.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones
+        )
+
+        ins1 = InstructionLine.factory(
+            22,
+            '  ma.hl a,[hl+2]',
+            'some comment!',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+        ins1.set_start_address(1212)
+        self.assertIsInstance(ins1, InstructionLine)
+        self.assertEqual(ins1.byte_size, 2, 'has 2 bytes')
+        ins1.label_scope = TestInstructionParsing.label_values
+        ins1.generate_bytes()
+        self.assertEqual(ins1.get_bytes(), bytearray([0x45, 0x02]), 'instruction should match')
+
     def test_instruction_variant_matching(self):
         fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')
         isa_model = AssemblerModel(str(fp), 0)
@@ -184,7 +209,7 @@ class TestInstructionParsing(unittest.TestCase):
         ins2.generate_bytes()
         self.assertEqual(list(ins2.get_bytes()), [0xFF, 0x64, 0x1D], 'instruction byte should match')
 
-    def test_indexed_regsiter_operands(self):
+    def test_indexed_register_operands(self):
         fp = pkg_resources.files(config_files).joinpath('test_indirect_indexed_register_operands.yaml')
         isa_model = AssemblerModel(str(fp), 0)
         memzone_mngr = MemoryZoneManager(
@@ -312,7 +337,7 @@ class TestInstructionParsing(unittest.TestCase):
 
         l1: LineObject = LineOjectFactory.parse_line(
             lineid,
-            "LABEL = %00001111",
+            'LABEL = %00001111',
             isa_model,
             TestInstructionParsing.label_values,
             memzone_mngr.global_zone,
@@ -327,7 +352,7 @@ class TestInstructionParsing(unittest.TestCase):
 
         l2: LineObject = LineOjectFactory.parse_line(
             lineid,
-            ".local_label:",
+            '.local_label:',
             isa_model,
             TestInstructionParsing.label_values,
             memzone_mngr.global_zone,
@@ -344,7 +369,7 @@ class TestInstructionParsing(unittest.TestCase):
 
         l3: LineObject = LineOjectFactory.parse_line(
             lineid,
-            "old_style EQU 42H",
+            'old_style EQU 42H',
             isa_model,
             TestInstructionParsing.label_values,
             memzone_mngr.global_zone,
@@ -356,7 +381,7 @@ class TestInstructionParsing(unittest.TestCase):
         l3.set_start_address(42)
         l3.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(l3, LabelLine)
-        self.assertTrue(l3.is_constant, "label should be a constant")
+        self.assertTrue(l3.is_constant, 'label should be a constant')
         self.assertEqual(l3.get_value(), 0x42, 'value should be right')
 
     def test_operand_bytecode_ordering(self):
@@ -788,3 +813,128 @@ class TestInstructionParsing(unittest.TestCase):
             self.assertIsInstance(e2, InstructionLine)
             self.assertEqual(e2.byte_size, 3, 'has 3 bytes')
             e2.generate_bytes()
+
+    def test_address_operands(self):
+        from bespokeasm.assembler.model.operand.types.address import AddressByteCodePart
+
+        fp = pkg_resources.files(config_files).joinpath('test_valid_address_enforcement.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size, isa_model.default_origin, isa_model.predefined_memory_zones,
+        )
+        memzone_32bit_mngr = MemoryZoneManager(32, 0,)
+        lineid = LineIdentifier(42, 'test_address_operands')
+
+        # first, test argument value generation with no LSB slicing
+        bc1 = AddressByteCodePart(
+            '$2020',
+            16,
+            True,
+            'little',
+            lineid,
+            memzone_mngr.global_zone,
+            False,
+            False,
+        )
+        value1 = bc1.get_value(TestInstructionParsing.label_values, 0x2010, 32)
+        self.assertEqual(value1, 0x2020, 'byte code should match')
+
+        # now, test argument value generation with LSB slicing
+        bc2 = AddressByteCodePart(
+            '$2045',
+            8,
+            True,
+            'little',
+            lineid,
+            memzone_mngr.global_zone,
+            True,
+            True,
+        )
+        value2 = bc2.get_value(TestInstructionParsing.label_values, 0x2010, 32)
+        self.assertEqual(value2, 0x45, 'byte code should match')
+
+        with self.assertRaises(ValueError, msg="address MSBs don't match"):
+            bc2.get_value(TestInstructionParsing.label_values, 0x2250, 32)
+
+        # test 16-bit slize with a 32-bit address
+        bc3 = AddressByteCodePart(
+            '$19458899',
+            16,
+            True,
+            'little',
+            lineid,
+            memzone_32bit_mngr.global_zone,
+            True,
+            True,
+        )
+        value3 = bc3.get_value(TestInstructionParsing.label_values, 0x19451000, 32)
+        self.assertEqual(value3, 0x8899, 'byte code should match')
+        with self.assertRaises(ValueError, msg="address MSBs don't match"):
+            bc3.get_value(TestInstructionParsing.label_values, 0x20241000, 32)
+
+        #  test error conditions
+        # error case: extraneous comparison operators ignored
+        with self.assertRaises(SystemExit, msg='extraneous comparison operators should be ignored'):
+            AddressByteCodePart(
+                '<$2024',
+                8,
+                True,
+                'little',
+                lineid,
+                memzone_mngr.global_zone,
+                True,
+                False,
+            )
+
+        # Test byte code generation for sliced addresses
+        t1 = InstructionLine.factory(
+            lineid, 'jmp_local $2FF8', 'comment',
+            isa_model, memzone_mngr.global_zone, memzone_mngr,
+        )
+        t1.set_start_address(0x2F10)
+        t1.label_scope = TestInstructionParsing.label_values
+        self.assertIsInstance(t1, InstructionLine)
+        self.assertEqual(t1.byte_size, 2, 'has 2 bytes')
+        t1.generate_bytes()
+        self.assertEqual(list(t1.get_bytes()), [0xE0, 0xF8], 'instruction byte should match')
+
+        # ensure MSBs match
+        t1.set_start_address(0x3350)
+        with self.assertRaises(ValueError, msg="address MSBs don't match"):
+            t1.generate_bytes()
+
+        # Test bye code generation for unsliced addresses
+        t2 = InstructionLine.factory(
+            lineid, 'jmpa $2FF8', 'comment',
+            isa_model, memzone_mngr.global_zone, memzone_mngr,
+        )
+        t2.set_start_address(0x2F10)
+        t2.label_scope = TestInstructionParsing.label_values
+        self.assertIsInstance(t2, InstructionLine)
+        self.assertEqual(t2.byte_size, 3, 'has 3 bytes')
+        t2.generate_bytes()
+        self.assertEqual(list(t2.get_bytes()), [0xE1, 0xF8, 0x2F], 'instruction byte should match')
+
+        # test operand address is in target memory zone
+        t3 = InstructionLine.factory(
+            lineid, 'jmp_test1 $5150', 'comment',
+            isa_model, memzone_mngr.global_zone, memzone_mngr,
+        )
+        t3.set_start_address(0x2F10)
+        t3.label_scope = TestInstructionParsing.label_values
+        self.assertIsInstance(t3, InstructionLine)
+        self.assertEqual(t3.byte_size, 3, 'has 3 bytes')
+        t3.generate_bytes()
+        self.assertEqual(list(t3.get_bytes()), [0xE2, 0x50, 0x51], 'instruction byte should match')
+
+        # enforce operand address is in target memory zone
+        t4 = InstructionLine.factory(
+            lineid, 'jmp_test1 $4425', 'comment',
+            isa_model, memzone_mngr.global_zone, memzone_mngr,
+        )
+        t4.set_start_address(0x2F10)
+        t4.label_scope = TestInstructionParsing.label_values
+        self.assertIsInstance(t4, InstructionLine)
+        self.assertEqual(t4.byte_size, 3, 'has 3 bytes')
+        with self.assertRaises(SystemExit, msg='address not in target memory zone'):
+            t4.generate_bytes()

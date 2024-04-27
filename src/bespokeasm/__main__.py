@@ -119,21 +119,21 @@ def generate_extension():
 @click.option('--verbose', '-v', count=True, help='Verbosity of logging')
 @click.option(
         '--editor-config-dir', '-d', default='~/.vscode/',
-        help="The file path the Visual Studo Code configuration directory containing the extensions directory."
+        help='The file path the Visual Studo Code configuration directory containing the extensions directory.'
     )
 @click.option(
         '--language-name', '-l',
-        help="The name of the language in the Visual Studio Code configuration file. Defaults to value "
-             "provide in instruction set configuration file."
+        help='The name of the language in the Visual Studio Code configuration file. Defaults to value '
+             'provide in instruction set configuration file.'
     )
 @click.option(
         '--language-version', '-k',
-        help="The version of the language in the Visual Studio Code configuration file. Defaults to "
-             "value provide in instruction set configuration file."
+        help='The version of the language in the Visual Studio Code configuration file. Defaults to '
+             'value provide in instruction set configuration file.'
     )
 @click.option(
         '--code-extension', '-x',
-        help="The file extension for asssembly code files for this language configuraton."
+        help='The file extension for asssembly code files for this language configuraton.'
     )
 def vscode(config_file, verbose, editor_config_dir, language_name, language_version, code_extension):
     config_file = os.path.abspath(os.path.expanduser(config_file))
@@ -150,21 +150,21 @@ def vscode(config_file, verbose, editor_config_dir, language_name, language_vers
 @click.option('--verbose', '-v', count=True, help='Verbosity of logging')
 @click.option(
         '--editor-config-dir', '-d', default='~/',
-        help="The directory into which the generated configuration file should be saved."
+        help='The directory into which the generated configuration file should be saved.'
     )
 @click.option(
         '--language-name', '-l',
-        help="The name of the language in the Sublime configuration file. Defaults to value "
-             "provide in instruction set configuration file."
+        help='The name of the language in the Sublime configuration file. Defaults to value '
+             'provide in instruction set configuration file.'
     )
 @click.option(
         '--language-version', '-k',
-        help="The version of the language in the Sublime configuration file. Defaults to value "
-             "provide in instruction set configuration file."
+        help='The version of the language in the Sublime configuration file. Defaults to value '
+             'provide in instruction set configuration file.'
     )
 @click.option(
         '--code-extension', '-x',
-        help="The file extension for asssembly code files for this language configuraton."
+        help='The file extension for asssembly code files for this language configuraton.'
     )
 def sublime(config_file, verbose, editor_config_dir, language_name, language_version, code_extension):
     config_file = os.path.abspath(os.path.expanduser(config_file))
@@ -175,8 +175,8 @@ def sublime(config_file, verbose, editor_config_dir, language_name, language_ver
 
 def entry_point():
     args = sys.argv
-    if "--help" in args or len(args) == 1:
-        click.echo("bespokeasm")
+    if '--help' in args or len(args) == 1:
+        click.echo('bespokeasm')
     main(auto_envvar_prefix='BESPOKEASM')
 
 

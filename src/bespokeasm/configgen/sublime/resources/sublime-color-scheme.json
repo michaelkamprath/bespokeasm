@@ -38,7 +38,7 @@
         {
             "name": "String Punctuation",
             "scope": "punctuation.definition.string",
-            "foreground": "#e7ffcd"
+            "foreground": "#ed80a2"
 
         },
         {

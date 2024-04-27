@@ -11,25 +11,25 @@ from bespokeasm.assembler.preprocessor.symbol import SYMBOL_PATTERN
 # NOTE: the order of the RHS expressions is important, as it determines the order of evaluation. Need to parse the
 #       quoted strings first, then the expressions.
 PREPROCESSOR_CONDITION_IF_PATTERN = re.compile(
-    f"^(?:#if)\\s+({INSTRUCTION_EXPRESSION_PATTERN})\\s+(==|!=|>|>=|<|<=)\\s+"
+    f'^(?:#if)\\s+({INSTRUCTION_EXPRESSION_PATTERN})\\s+(==|!=|>|>=|<|<=)\\s+'
     f"(?:(?:\\\')(.+)(?:\\\')|(?:\\\")(.+)(?:\\\")|({INSTRUCTION_EXPRESSION_PATTERN}))"
 )
 
 PREPROCESSOR_CONDITION_IMPLIED_IF_PATTERN = re.compile(
-    r"^(?:#if)\s+({0})".format(INSTRUCTION_EXPRESSION_PATTERN)
+    fr'^(?:#if)\s+({INSTRUCTION_EXPRESSION_PATTERN})'
 )
 
 PREPROCESSOR_CONDITION_ELIF_PATTERN = re.compile(
-    f"^(?:#elif)\\s+({INSTRUCTION_EXPRESSION_PATTERN})\\s+(==|!=|>|>=|<|<=)\\s+"
+    f'^(?:#elif)\\s+({INSTRUCTION_EXPRESSION_PATTERN})\\s+(==|!=|>|>=|<|<=)\\s+'
     f"(?:(?:\\\')(.+)(?:\\\')|(?:\\\")(.+)(?:\\\")|({INSTRUCTION_EXPRESSION_PATTERN}))"
 )
 
 PREPROCESSOR_CONDITION_IMPLIED_ELIF_PATTERN = re.compile(
-    r"^(?:#elif)\s+({0})".format(INSTRUCTION_EXPRESSION_PATTERN)
+    fr'^(?:#elif)\s+({INSTRUCTION_EXPRESSION_PATTERN})'
 )
 
 PREPROCESSOR_CONDITION_IFDEF_PATTERN = re.compile(
-    r"^(#ifdef|#ifndef)\s+({0})\b".format(SYMBOL_PATTERN)
+    fr'^(#ifdef|#ifndef)\s+({SYMBOL_PATTERN})\b'
 )
 
 
@@ -46,6 +46,7 @@ class PreprocessorCondition:
         return self.__repr__()
 
     def evaluate(self, preprocessor: Preprocessor) -> bool:
+        """Evaluates whether this condition is true or false."""
         raise NotImplementedError()
 
     def is_lineage_true(self, preprocessor: Preprocessor) -> bool:
@@ -89,20 +90,20 @@ class IfPreprocessorCondition(PreprocessorCondition):
         if match is None:
             match2 = implied_pattern.match(line_str.strip())
             if match2 is None:
-                raise ValueError(f"Invalid preprocessor condition at line: {line_str}")
+                raise ValueError(f'Invalid preprocessor condition at line: {line_str}')
             self._lhs_expression = match2.group(1)
-            self._operator = "!="
-            self._rhs_expression = "0"
+            self._operator = '!='
+            self._rhs_expression = '0'
         else:
             self._lhs_expression = match.group(1)
             self._operator = match.group(2)
             self._rhs_expression = match.group(3) or match.group(4) or match.group(5)
 
     def __repr__(self) -> str:
-        return f"IfPreprocessorCondition<#if {self._lhs_expression} {self._operator} {self._rhs_expression}>"
+        return f'IfPreprocessorCondition<#if {self._lhs_expression} {self._operator} {self._rhs_expression}>'
 
     def _check_and_set_parent(self, parent: PreprocessorCondition):
-        raise ValueError("Cannot set parent of an IfPreprocessorCondition")
+        raise ValueError('Cannot set parent of an IfPreprocessorCondition')
 
     def _evaluate_condition(self, preprocessor: Preprocessor) -> bool:
         lhs_resolved = preprocessor.resolve_symbols(self._line, self._lhs_expression)
@@ -120,20 +121,20 @@ class IfPreprocessorCondition(PreprocessorCondition):
             lhs_value = lhs_expression.get_value(None, self._line)
             rhs_value = rhs_expression.get_value(None, self._line)
 
-        if self._operator == "==":
+        if self._operator == '==':
             return lhs_value == rhs_value
-        elif self._operator == "!=":
+        elif self._operator == '!=':
             return lhs_value != rhs_value
-        elif self._operator == ">":
+        elif self._operator == '>':
             return lhs_value > rhs_value
-        elif self._operator == ">=":
+        elif self._operator == '>=':
             return lhs_value >= rhs_value
-        elif self._operator == "<":
+        elif self._operator == '<':
             return lhs_value < rhs_value
-        elif self._operator == "<=":
+        elif self._operator == '<=':
             return lhs_value <= rhs_value
         else:
-            raise ValueError(f"Unknown operator {self._operator}")
+            raise ValueError(f'Unknown operator {self._operator}')
 
     def evaluate(self, preprocessor: Preprocessor) -> bool:
         return self._evaluate_condition(preprocessor)
@@ -152,13 +153,13 @@ class ElifPreprocessorCondition(IfPreprocessorCondition):
         )
 
     def __repr__(self) -> str:
-        return f"ElifPreprocessorCondition<#elif {self._lhs_expression} {self._operator} {self._rhs_expression}>"
+        return f'ElifPreprocessorCondition<#elif {self._lhs_expression} {self._operator} {self._rhs_expression}>'
 
     def _check_and_set_parent(self, parent: PreprocessorCondition):
         if isinstance(parent, ElifPreprocessorCondition) or isinstance(parent, IfPreprocessorCondition):
             self._parent = parent
         else:
-            raise ValueError("#elif can only have #if or #elif as a parent")
+            raise ValueError('#elif can only have #if or #elif as a parent')
 
     @property
     def is_dependent(self) -> bool:
@@ -169,7 +170,7 @@ class ElifPreprocessorCondition(IfPreprocessorCondition):
         # if its condition evaluates true. If the parent lineage is false,
         # this should evaluate to true if its condition evaluates true.
         if self.parent is None:
-            sys.exit(f"ERROR - Internal: parent condition not set for {self} at line {self._line}")
+            sys.exit(f'ERROR - Internal: parent condition not set for {self} at line {self._line}')
         if self.parent.is_lineage_true(preprocessor):
             return False
         return self._evaluate_condition(preprocessor)
@@ -181,15 +182,15 @@ class IfdefPreprocessorCondition(PreprocessorCondition):
 
         match = PREPROCESSOR_CONDITION_IFDEF_PATTERN.match(line_str.strip())
         if match is None:
-            raise ValueError(f"Invalid preprocessor condition at line: {line_str}")
-        self._is_ifndef = match.group(1) == "#ifndef"
+            raise ValueError(f'Invalid preprocessor condition at line: {line_str}')
+        self._is_ifndef = match.group(1) == '#ifndef'
         self._symbol = match.group(2)
 
     def __repr__(self) -> str:
         return f'IfdefPreprocessorCondition<{"#ifndef" if self._is_ifndef else "#ifdef"} {self._symbol}>'
 
     def _check_and_set_parent(self, parent: PreprocessorCondition):
-        raise ValueError("Cannot set parent of an IfdefPreprocessorCondition")
+        raise ValueError('Cannot set parent of an IfdefPreprocessorCondition')
 
     def evaluate(self, preprocessor: Preprocessor) -> bool:
         symbol = preprocessor.get_symbol(self._symbol)
@@ -204,11 +205,11 @@ class ElsePreprocessorCondition(PreprocessorCondition):
         super().__init__(line_str, line)
 
     def __repr__(self) -> str:
-        return "ElsePreprocessorCondition<#else>"
+        return 'ElsePreprocessorCondition<#else>'
 
     def _check_and_set_parent(self, parent: PreprocessorCondition):
         if isinstance(parent, ElsePreprocessorCondition) or isinstance(parent, EndifPreprocessorCondition):
-            raise ValueError("#else must have a conditional as a parent")
+            raise ValueError('#else must have a conditional as a parent')
         self._parent = parent
 
     @property
@@ -217,7 +218,7 @@ class ElsePreprocessorCondition(PreprocessorCondition):
 
     def evaluate(self, preprocessor: Preprocessor) -> bool:
         if self.parent is None:
-            sys.exit(f"ERROR - Internal: parent condition not set for {self} at line {self._line}")
+            sys.exit(f'ERROR - Internal: parent condition not set for {self} at line {self._line}')
         return not self.parent.is_lineage_true(preprocessor)
 
 
@@ -226,16 +227,38 @@ class EndifPreprocessorCondition(PreprocessorCondition):
         super().__init__(line_str, line)
 
     def __repr__(self) -> str:
-        return "EndifPreprocessorCondition<#endif>"
+        return 'EndifPreprocessorCondition<#endif>'
 
     def _check_and_set_parent(self, parent: PreprocessorCondition):
         if isinstance(parent, EndifPreprocessorCondition):
-            raise ValueError("#endif must have a conditional as a parent")
+            raise ValueError('#endif must have a conditional as a parent')
         self._parent = parent
 
     @property
     def is_dependent(self) -> bool:
         return True
+
+    def evaluate(self, preprocessor: Preprocessor) -> bool:
+        return True
+
+
+class MutePreprocessorCondition(PreprocessorCondition):
+    def __init__(self, line_str: str, line: LineIdentifier):
+        super().__init__(line_str, line)
+
+    def __repr__(self) -> str:
+        return f'MutePreprocessorCondition<{self.self._line_str}>'
+
+    def evaluate(self, preprocessor: Preprocessor) -> bool:
+        return True
+
+
+class UnmutePreprocessorCondition(PreprocessorCondition):
+    def __init__(self, line_str: str, line: LineIdentifier):
+        super().__init__(line_str, line)
+
+    def __repr__(self) -> str:
+        return f'UnmutePreprocessorCondition<{self.self._line_str}>'
 
     def evaluate(self, preprocessor: Preprocessor) -> bool:
         return True

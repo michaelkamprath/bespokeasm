@@ -1,13 +1,13 @@
 ; Random Maze
 ;   Generates a random sequence of \ and / charcters, creating the
-;   appearance of a maze in the terminal. Reminiscent of the 
+;   appearance of a maze in the terminal. Reminiscent of the
 ;   "10 PRINT" random maze BASIC program from the 1980's. See:
-;       
+;
 ;       https://10print.org
-; 
+;
 ;   Depending on the font used by your terminal program, this may or may not
 ;   look cool.
-; 
+;
 #require "slu4-mincpu-asm >= 1.5.0"
 
 

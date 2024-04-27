@@ -6,6 +6,7 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.bytecode.assembled import AssembledInstruction
 from bespokeasm.assembler.bytecode.generator import BytecodeGenerator
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.model.instruction_base import InstructionBase
 
 
 class InstructioParser(InstructioParserBase):
@@ -24,9 +25,10 @@ class InstructioParser(InstructioParserBase):
         else:
             operands = ''
 
-        instr_obj = isa_model.instructions.get(mnemonic)
+        instr_obj: InstructionBase = isa_model.instructions.get(mnemonic)
         if instr_obj is None:
             sys.exit(f'ERROR: {line_id} - Unrecognized mnemonic "{mnemonic}"')
+
         return BytecodeGenerator.generate_bytecode_parts(
             instr_obj,
             line_id,

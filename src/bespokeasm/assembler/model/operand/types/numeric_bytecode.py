@@ -48,7 +48,7 @@ class NumericBytecode(Operand):
         memzone_manager: MemoryZoneManager,
     ) -> ParsedOperand:
         # do not match if expression contains square bracks
-        if "[" in operand or "]" in operand:
+        if '[' in operand or ']' in operand:
             return None
 
         bytecode_part = ExpressionByteCodePartWithValidation(

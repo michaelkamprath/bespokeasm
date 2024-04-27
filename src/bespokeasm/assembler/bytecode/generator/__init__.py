@@ -1,5 +1,4 @@
 import sys
-from typing import Type
 
 from bespokeasm.assembler.bytecode.generator.instruction import InstructionBytecodeGenerator
 from bespokeasm.assembler.bytecode.generator.macro import MacroBytecodeGenerator
@@ -24,7 +23,7 @@ class BytecodeGenerator:
         operands: str,
         isa_model: AssemblerModel,
         memzone_manager: MemoryZoneManager,
-        parser_class: Type[InstructioParserBase],
+        parser_class: type[InstructioParserBase],
     ) -> AssembledInstruction:
         if isinstance(instruction, Instruction):
             return InstructionBytecodeGenerator.generate_bytecode_parts(

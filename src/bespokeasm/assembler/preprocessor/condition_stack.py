@@ -1,18 +1,25 @@
-
 from bespokeasm.assembler.preprocessor.condition import \
-            PreprocessorCondition, EndifPreprocessorCondition
+            PreprocessorCondition, EndifPreprocessorCondition, \
+            MutePreprocessorCondition, UnmutePreprocessorCondition
 from bespokeasm.assembler.preprocessor import Preprocessor
 
 
 class ConditionStack:
     def __init__(self):
         self._stack: list[PreprocessorCondition] = []
+        self._mute_counter = 0
 
-    def process_condition(self, condition: PreprocessorCondition):
+    def process_condition(self, condition: PreprocessorCondition, preprocessor: Preprocessor):
         if isinstance(condition, EndifPreprocessorCondition):
             popped_consition = self._stack.pop()
             if popped_consition.is_dependent:
                 pass
+        elif isinstance(condition, MutePreprocessorCondition):
+            if self.currently_active(preprocessor):
+                self._increment_mute_counter()
+        elif isinstance(condition, UnmutePreprocessorCondition):
+            if self.currently_active(preprocessor):
+                self._decrement_mute_counter()
         elif condition.is_dependent:
             # a dependent condition pops the current condition and makes it the parent to the new condition.
             # this way the dependent chain is only ever 1-deep in the stack, making nested #if/#else/#endif
@@ -27,3 +34,15 @@ class ConditionStack:
         if len(self._stack) == 0:
             return True
         return self._stack[-1].evaluate(preprocessor)
+
+    def _increment_mute_counter(self):
+        self._mute_counter += 1
+
+    def _decrement_mute_counter(self):
+        if self._mute_counter > 0:
+            self._mute_counter -= 1
+
+    @property
+    def is_muted(self) -> bool:
+        """Returns True if the current condition stack is muted."""
+        return self._mute_counter > 0

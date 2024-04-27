@@ -37,7 +37,7 @@ class TestBytecodeObjects(unittest.TestCase):
 
     def test_composite_bytecode_part(self):
         test_line_id = LineIdentifier(88, 'test_composite_bytecode_part')
-        register_labels = set(['a', 'i'])
+        register_labels = {'a', 'i'}
         label_values = GlobalLabelScope(register_labels)
         label_values.set_label_value('var1', 2, 1)
         label_values.set_label_value('var2', 0xF0, 2)

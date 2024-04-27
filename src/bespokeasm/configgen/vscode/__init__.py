@@ -34,7 +34,7 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
         Path(os.path.join(extension_dir_path, 'syntaxes')).mkdir(parents=True, exist_ok=True)
         # generate package.json
         fp = pkg_resources.files(resources).joinpath('package.json')
-        with open(fp, 'r') as json_file:
+        with open(fp) as json_file:
             package_json = json.load(json_file)
 
         scope_name = 'source.' + self.language_id
@@ -47,6 +47,8 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
         package_json['contributes']['grammars'][0]['language'] = self.language_id
         package_json['contributes']['grammars'][0]['scopeName'] = scope_name
         package_json['contributes']['snippets'][0]['language'] = self.language_id
+        package_json['contributes']['themes'][0]['label'] = \
+            package_json['contributes']['themes'][0]['label'].replace('##LANGUAGE_ID##', self.language_name)
         package_json['contributes']['themes'][0]['path'] = './' + theme_filename
 
         package_fp = os.path.join(extension_dir_path, 'package.json')
@@ -57,7 +59,7 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
 
         # generate tmGrammar.json
         fp = pkg_resources.files(resources).joinpath('tmGrammar.json')
-        with open(fp, 'r') as json_file:
+        with open(fp) as json_file:
             grammar_json = json.load(json_file)
 
         grammar_json['scopeName'] = scope_name
@@ -161,6 +163,10 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             print(f'  generated {os.path.basename(str(fp))}')
 
         fp = pkg_resources.files(resources).joinpath('tmTheme.xml')
-        shutil.copy(str(fp), os.path.join(extension_dir_path, theme_filename))
-        if self.verbose > 1:
-            print(f'  generated {theme_filename}')
+        with open(fp) as theme_template_file:
+            color_theme_xml = theme_template_file.read()
+        color_theme_xml.replace('##LANGUAGE_ID##', self.language_id)
+        with open(os.path.join(extension_dir_path, theme_filename), 'w') as theme_file:
+            theme_file.write(color_theme_xml)
+            if self.verbose > 1:
+                print(f'  generated {theme_filename}')

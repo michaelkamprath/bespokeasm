@@ -1,0 +1,263 @@
+; Math Library 32-bit
+;  This library provides 32-bit math functions for unsigned and signed integers.
+;
+#require "slu4-min64x4-asm >= 1.1.0"
+; Zero Page Usage
+.memzone ZERO_PAGE_APPS
+#mute
+_temp_byte1:            .byte 0
+_temp_long1:            .zero 4
+_working_mem8:          .zero 8
+_multiply_sign_byte:    .byte 0
+_argX4:                 .zero 4
+_argY4:                 .zero 4
+_counter:               .byte 0
+
+#emit
+.memzone USER_APPS
+; compare_uint32
+;   Compares two unsigned 32-bit values to determine equality
+;       X ? Y
+;
+;   Arguments
+;       sp+3 : right Y value (4 bytes)
+;       sp+7 : left X value (4 bytes)
+;
+;   Returns
+;       flags will be set per comparison
+;
+.align
+compare_uint32ss:
+    ; load values into zero page and then use _compare_uint32_XY
+    ms4q 7,_argX4
+    ms4q 3,_argY4
+    jps _compare_uint32_XY
+    rts
+
+;   compares high and low longs (4 byte) in _argX4 and _argY4.
+;       X ? Y
+;
+;   Arguments
+;       X - _argX4
+;       Y - _argY4
+;
+;  Returns
+;     flags will be set per comparison
+_compare_uint32_XY:
+    czz _argY4+3,_argX4+3 fne .done
+    czz _argY4+2,_argX4+2 fne .done
+    czz _argY4+1,_argX4+1 fne .done
+    czz _argY4+0,_argX4+0
+.done:
+    rts
+
+; multiply_uint32
+;   multiply unsigned 4 byte values X*Y, producing an 8 byte unsigned results
+;
+; multiply_int32
+;   multiply signed 4 byte values X*Y, producing an 8 byte signed results
+;
+; Arguments
+;   sp+3 - value X (multiplier) (4 bytes)
+;   sp+7 - value Y (multiplicand) (4 bytes)
+;
+; Return Value
+;   sp+3 - results (8 bytes)
+;
+; Zero Page usage
+;  _working_mem8 - 8 bytes of working memory
+;  _multiply_sign_byte - 1 byte to store sign of results
+;  _argY4 - 4 bytes to store X value
+;  _counter - 1 byte counter
+
+multiply_uint32:
+    ; return is always positive
+    clz _multiply_sign_byte
+    ; set up 8 byte results memory block
+    clq _working_mem8+4                 ; high long inialized to 0
+    ms4q 3,_working_mem8+0              ; multiplier in low word
+    ms4q 7,_argY4                       ; multiplicand in zero page variable
+    jpa _multiply
+
+multiply_int32:
+    ; set up 8 byte results memory block
+    clq _working_mem8+4                 ; high long inialized to 0
+    ms4q 3,_working_mem8+0              ; multiplier in low word
+    ms4q 7,_argY4                      ; multiplicand in zero page variable
+    ; determine if result is going to be negative
+    ldz _working_mem8+3 ani %10000000 stz _multiply_sign_byte cpi 0 beq .check_multiplicand
+    ; negate mutiplier (stack is big endian)
+    neq _working_mem8+0
+.check_multiplicand:
+    ldz _argY4+3 ani %10000000 xr.z _multiply_sign_byte
+    ldz _argY4+3 ani %10000000 cpi 0 beq .done
+    ; negate mutiplicand (stack is big endian)
+    neq _argY4+0
+.done:
+    jpa _multiply
+
+_multiply:
+    ; set counter for 32 bits
+    miz 32,_counter
+.mult_loop:
+    ; check to see if LSb of working memory is 1
+    ldz _working_mem8+0 lr1 bcc .continue
+    ; add multiplicand to high word of results
+    aqq _argY4,_working_mem8+4
+.continue:
+    ; shift results right one.
+    lrz _working_mem8+7
+    rrz _working_mem8+6
+    rrz _working_mem8+5
+    rrz _working_mem8+4
+    rrz _working_mem8+3
+    rrz _working_mem8+2
+    rrz _working_mem8+1
+    rrz _working_mem8+0
+    ; decrement counter (placing it in A) and stop if 0
+    dez _counter ciz 0,_counter bne .mult_loop
+.set_sign:
+    ; check to see if result is negative:
+    ciz 0,_multiply_sign_byte beq .copy_results
+    ; take twos complement of 8-byte results
+    noq _working_mem8+0
+    noq _working_mem8+4
+    inw _working_mem8+0 bcc .copy_results       ; if only INQ set the flags :-(
+    inw _working_mem8+2 bcc .copy_results
+    inw _working_mem8+4 bcc .copy_results
+    inw _working_mem8+6
+.copy_results:
+    ; the entire working memory is the 64-bit results
+    mqs4 _working_mem8+4,3+0
+    mqs4 _working_mem8+0,3+4
+    rts
+
+; divide32
+;   Divides X by Y (note, unsigned only)
+;
+;   Arguments:
+;       sp+3 : value X dividend (4 bytes)
+;       sp+7 : value Y divisor (4 bytes)
+;
+;   Return Value:
+;       sp+3 : the quotient (replaces X)
+;       sp+7 : the remainder (replaces Y)
+;
+divide32:
+    ; first check divisor is not 0
+    ms4q 7,_argX4
+    clq _argY4
+    jps _compare_uint32_XY
+    beq .divide_by_zero
+    ; check if dividend is 0
+    ms4q 3,_argX4
+    jps _compare_uint32_XY
+    beq .return_zero
+    ; check if divisor > dividend
+    ms4q 7,_argX4        ; get divisor
+    ms4q 3,_argY4        ; get dividend
+    jps _compare_uint32_XY
+    bgt .divisor_too_large
+.start_division:
+    ; set up working memory:
+    ;   little endian
+    ;   _working_mem8+0 : init with dividend (4 bytes)  --> becomes quotient
+    ;   _working_mem8+4 : set to zero (4 bytes) --> becomes remainder
+    ;   _temp_long1     : divisor
+    ;   _temp_byte1     : carry bit
+    clz _temp_byte1             ; init carry bit
+    ms4q 3,_working_mem8+0      ; init low word with dividend
+    clq _working_mem8+4         ; init high word
+    ms4q 7,_temp_long1          ; divisor
+    miz 32,_counter             ; init loop counter
+
+.div_loop:
+    ; shift working memory and add carry bit to the right side
+    jps .div_lsl64
+    azz _temp_byte1,_working_mem8+0     ; add carry bit to low byte
+    clz _temp_byte1                     ; clear carry bit
+    ; determine if we can do subtraction if _working_mem8 high long is larger than divisor
+    mqq _temp_long1,_argX4              ; set _argX4 to divisor
+    mqq _working_mem8+4,_argY4          ; set _argY4 to _working_mem8+4 is high word
+    jps _compare_uint32_XY
+    bgt .div_loop_continue
+.div_loop_subtraction:
+    ; working value is equal to or larger than divsior
+    ; do the subtraction
+    sqq _temp_long1,_working_mem8+4     ; subtract divisor from high long
+    miz 1,_temp_byte1                   ; set carry bit
+.div_loop_continue:
+    ; decrement counter and check for 0
+    dez _counter bne .div_loop
+
+
+.division_done:
+    ; at this point we have the remainder in the high word, save it
+    mqs4 _working_mem8+4,7
+    ; and then we left shift one more time to get the quotient
+    jps .div_lsl64
+    azz _temp_byte1,_working_mem8+0     ; add carry bit to low byte
+    ; the quotient is in _working_mem8+0
+    mqs4 _working_mem8+0,3
+    rts
+.divisor_too_large:
+    ; quotient = 0, remander = dividend
+    ms4q 3,_argX4               ; get dividend
+    mqs4 _argX4,7               ; set dividend to remainder
+    clq _argX4                  ; set quotient to 0
+    mqs4 _argX4,3               ; set quotient
+    rts
+.divide_by_zero:
+    ; for now, just return 0
+    mqs4 _argY4,7               ; _argY4 is already 0
+.return_zero:
+    mqs4 _argY4,3               ; _argY4 is already 0
+    rts
+; .div_lsl64
+;
+;   local method for shifting _working_mem8 left 1 bit
+.div_lsl64:
+    llz _working_mem8+0
+    rlz _working_mem8+1
+    rlz _working_mem8+2
+    rlz _working_mem8+3
+    rlz _working_mem8+4
+    rlz _working_mem8+5
+    rlz _working_mem8+6
+    rlz _working_mem8+7
+    rts
+
+
+
+; subtracts 4 byte value in _argY4 from 4 byte value in _argX4
+;   X - Y
+;
+; Arguments
+;   X - _argX4
+;   Y - _argY4
+;
+; Return Value
+;   _argX4 = X - Y
+_subtract32:
+    svv _argY4+0,_argX4+0
+    ldz _argY4+2 sc.z _argX4+2
+    ldz _argY4+3 sc.z _argX4+3
+    rts
+
+
+; _print_working_memory
+;   prints the contents of the _working_mem8 8 bytes in hex
+;   used for debugging purposes.
+_print_working_memory:
+    jps _Print "work mem = $"
+    ldz _working_mem8+7 jas _PrintHex
+    ldz _working_mem8+6 jas _PrintHex
+    ldz _working_mem8+5 jas _PrintHex
+    ldz _working_mem8+4 jas _PrintHex
+    jps _Print " "
+    ldz _working_mem8+3 jas _PrintHex
+    ldz _working_mem8+2 jas _PrintHex
+    ldz _working_mem8+1 jas _PrintHex
+    ldz _working_mem8+0 jas _PrintHex
+    jps _Print "\n"
+    rts

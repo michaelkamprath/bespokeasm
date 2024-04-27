@@ -45,7 +45,7 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
 
         # generate syntax file
         fp = pkg_resources.files(resources).joinpath('sublime-syntax.yaml')
-        with open(fp, 'r') as syntax_file:
+        with open(fp) as syntax_file:
             try:
                 syntax_dict = yaml.safe_load(syntax_file)
             except yaml.YAMLError as exc:
@@ -166,10 +166,10 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             yaml.dump(syntax_dict, f)
         # now reinsert the YAML prefix. This is required due to an odditity in Sublime's package loading.
         # I don't know a better way to do this.
-        with open(syntax_fp, "r") as f:
+        with open(syntax_fp) as f:
             file_txt = f.read()
         updated_file_txt = '%YAML 1.2\n---\n' + file_txt
-        with open(syntax_fp, "w") as f:
+        with open(syntax_fp, 'w') as f:
             f.write(updated_file_txt)
             if self.verbose > 1:
                 print(f'  generated {os.path.basename(syntax_fp)}')

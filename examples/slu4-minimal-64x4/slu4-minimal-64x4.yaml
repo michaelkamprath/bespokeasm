@@ -1,0 +1,3031 @@
+---
+description: slu4 Minimal 64x4 Home Computer
+general:
+  address_size: 16
+  page_size: 256
+  endian: little
+  registers:
+    - a
+    - b
+    - bank
+  origin: 0x0000
+  identifier:
+    name: slu4-min64x4-asm
+    version: "1.1.0"
+    extension: min64x4
+  min_version: "0.4.2"
+  allow_embedded_strings: true
+operand_sets:
+  immediate_8bit:
+    # one byte is interpreted as an immediate value
+    operand_values:
+      int8:
+        type: numeric
+        argument:
+          size: 8
+          byte_align: true
+          endian: little
+  immediate_16bit:
+    # 2 bytes is interpreted as an immediate value
+    operand_values:
+      int16:
+        type: numeric
+        argument:
+          size: 16
+          byte_align: true
+          endian: little
+  immediate_32bit:
+    # 4 bytes is interpreted as an immediate value
+    operand_values:
+      int32:
+        type: numeric
+        argument:
+          size: 32
+          byte_align: true
+          endian: little
+  absolute_address:
+    # two bytes are interpreted as an address
+    operand_values:
+      address:
+        type: address
+        argument:
+          size: 16
+          byte_align: true
+          endian: little
+  relative_address:
+    # two byte is interpreted as a relative address
+    operand_values:
+      address:
+        type: address
+        argument:
+          size: 16
+          byte_align: true
+          endian: little
+  address_lsb:
+    # one byte is interpreted as an address's LSB and the address MSB
+    # is taken from the current instruction address
+    operand_values:
+      address:
+        type: address
+        argument:
+          size: 8
+          byte_align: true
+          endian: little
+          slice_lsb: true
+          match_address_msb: true
+  offset:
+    # one byte is interpreted as an offset
+    operand_values:
+      int8:
+        type: numeric
+        argument:
+          size: 8
+          byte_align: true
+          endian: little
+  zero_page:
+    # one byte is interpreted as a zero page address
+    operand_values:
+      address:
+        type: address
+        argument:
+          size: 8
+          byte_align: true
+          endian: little
+          slice_lsb: true
+          memory_zone: ZERO_PAGE
+  relative_zero_page:
+    # one byte is interpreted as a zero page address to a word that
+    # in turn is used as a relative address
+    operand_values:
+      address:
+        type: address
+        argument:
+          size: 8
+          byte_align: true
+          endian: little
+          slice_lsb: true
+          memory_zone: ZERO_PAGE
+predefined:
+  memory_zones:
+    - name: ZERO_PAGE
+      start: 0x0000
+      end: 0x00FF
+    - name: ZERO_PAGE_APPS
+      start: 0x0000
+      end: 0x007F
+    - name: ZERO_PAGE_OS
+      start: 0x0080
+      end: 0x00FF
+    - name: USER_APPS
+      start: 0x8000
+      end: 0xEFFF
+  constants:
+    -  # Start vector of the OS in RAM
+      name: _Start
+      value: 0xf000
+    -  # Hands back control to the input prompt
+      name: _Prompt
+      value: 0xf003
+    -  # Moves memory area (may be overlapping)
+      name: _MemMove
+      value: 0xf006
+    -  # Returns a pseudo-random byte (see _RandomState)
+      name: _Random
+      value: 0xf009
+    -  # Scans the PS/2 register for new input
+      name: _ScanPS2
+      value: 0xf00c
+    -  # Resets the state of PS/2 SHIFT, ALTGR, CTRL
+      name: _ResetPS2
+      value: 0xf00f
+    -  # Reads any input (PS/2 or serial)
+      name: _ReadInput
+      value: 0xf012
+    -  # Waits for any input (PS/2 or serial)
+      name: _WaitInput
+      value: 0xf015
+    -  # Reads a command line into _ReadBuffer
+      name: _ReadLine
+      value: 0xf018
+    -  # Skips whitespaces (<= 39) in command line
+      name: _SkipSpace
+      value: 0xf01b
+    -  # Parses command line input for a HEX value
+      name: _ReadHex
+      value: 0xf01e
+    -  # Waits for a UART transmission to complete
+      name: _SerialWait
+      value: 0xf021
+    -  # Transmits a zero-terminated string via UART
+      name: _SerialPrint
+      value: 0xf024
+    -  # Searches for file <name> given by _ReadPtr
+      name: _FindFile
+      value: 0xf027
+    -  # Loads a file <name> given by _ReadPtr
+      name: _LoadFile
+      value: 0xf02a
+    -  # Saves data to file <name> defined at _ReadPtr
+      name: _SaveFile
+      value: 0xf02d
+    -  # Clears the video RAM including blanking areas
+      name: _ClearVRAM
+      value: 0xf030
+    -  # Clears the visible video RAM (viewport)
+      name: _Clear
+      value: 0xf033
+    -  # Clears the current row from cursor pos onwards
+      name: _ClearRow
+      value: 0xf036
+    -  # Scrolls up the viewport by 8 pixels
+      name: _ScrollUp
+      value: 0xf039
+    -  # Scrolls down the viewport by 8 pixels
+      name: _ScrollDn
+      value: 0xf03c
+    -  # Outputs a char at the cursor pos (non-advancing)
+      name: _Char
+      value: 0xf03f
+    -  # Prints a char at the cursor pos (advancing)
+      name: _PrintChar
+      value: 0xf042
+    -  # Prints a zero-terminated immediate string
+      name: _Print
+      value: 0xf045
+    -  # Prints a zero-terminated string at an address
+      name: _PrintPtr
+      value: 0xf048
+    -  # Prints a HEX number (advancing)
+      name: _PrintHex
+      value: 0xf04b
+    -  # Sets a pixel at position (x, y)
+      name: _SetPixel
+      value: 0xf04e
+    -  # Draws a line using Bresenham’s algorithm
+      name: _Line
+      value: 0xf051
+    -  # Draws a rectangle at (x, y) of size (w, h)
+      name: _Rect
+      value: 0xf054
+    -  # Clears a pixel at position (x, y)
+      name: _ClearPixel
+      value: 0xf057
+    -  # Horizontal cursor position (see _Print)
+      name: _XPos
+      value: 0x00c0
+    -  # Vertical cursor position (see _Print)
+      name: _YPos
+      value: 0x00c1
+    -  # _Random state seed
+      name: _RandomState
+      value: 0x00c2
+    -  # Number parsed by _ReadHex
+      name: _ReadNum
+      value: 0x00c6
+    -  # Command line parsing pointer
+      name: _ReadPtr
+      value: 0x00c9
+    -  # Address of command line input buffer
+      name: _ReadBuffer
+      value: 0x00cd
+instructions:
+  nop:
+    # No operation
+    bytecode:
+      value: 0x00
+      size: 8
+  out:
+    # Output A to UART: UART = A
+    bytecode:
+      value: 0x01
+      size: 8
+  int:
+    # Read UART input to A: A = UART
+    bytecode:
+      value: 0x02
+      size: 8
+  ink:
+    # Read PS/2 input to A: A = PS2
+    bytecode:
+      value: 0x03
+      size: 8
+  win:
+    # Wait for input
+    bytecode:
+      value: 0x04
+      size: 8
+  sec:
+    # Set carry flag (C=1)
+    bytecode:
+      value: 0x05
+      size: 8
+  clc:
+    # Clear carry flag (C=0)
+    bytecode:
+      value: 0x06
+      size: 8
+  ll0:
+    # Logical left-shift A 0 steps (C=0)
+    bytecode:
+      value: 0x07
+      size: 8
+  ll1:
+    # Logical left-shift A 1 step (C=0)
+    bytecode:
+      value: 0x08
+      size: 8
+  ll2:
+    # Logical left-shift A 2 steps (C=0)
+    bytecode:
+      value: 0x09
+      size: 8
+  ll3:
+    # Logical left-shift A 3 steps (C=0)
+    bytecode:
+      value: 0x0a
+      size: 8
+  ll4:
+    # Logical left-shift A 4 steps (C=0)
+    bytecode:
+      value: 0x0b
+      size: 8
+  ll5:
+    # Logical left-shift A 5 steps (C=0)
+    bytecode:
+      value: 0x0c
+      size: 8
+  ll6:
+    # Logical left-shift A 6 steps (C=0)
+    bytecode:
+      value: 0x0d
+      size: 8
+  ll7:
+    # Logical left-shift A 7 steps (C=0)
+    bytecode:
+      value: 0x0e
+      size: 8
+  rl0:
+    # Rotate left A 0 steps via C (= RR9)
+    bytecode:
+      value: 0x0f
+      size: 8
+  rl1:
+    # Rotate left A 1 step via C (= RR8)
+    bytecode:
+      value: 0x10
+      size: 8
+  rl2:
+    # Rotate left A 2 steps via C (= RR7)
+    bytecode:
+      value: 0x11
+      size: 8
+  rl3:
+    # Rotate left A 3 steps via C (= RR6)
+    bytecode:
+      value: 0x12
+      size: 8
+  rl4:
+    # Rotate left A 4 steps via C (= RR5)
+    bytecode:
+      value: 0x13
+      size: 8
+  rl5:
+    # Rotate left A 5 steps via C (= RR4)
+    bytecode:
+      value: 0x14
+      size: 8
+  rl6:
+    # Rotate left A 6 steps via C (= RR3)
+    bytecode:
+      value: 0x15
+      size: 8
+  rl7:
+    # Rotate left A 7 steps via C (= RR2)
+    bytecode:
+      value: 0x16
+      size: 8
+  rr1:
+    # Rotate right A 1 step via C (= RL8)
+    bytecode:
+      value: 0x17
+      size: 8
+  lr0:
+    # Logical right-shift A 0 steps (C=0) (= RR0, RL9)
+    bytecode:
+      value: 0x18
+      size: 8
+  lr1:
+    # Logical right-shift A 1 step (C=0)
+    bytecode:
+      value: 0x19
+      size: 8
+  lr2:
+    # Logical right-shift A 2 steps (C=0)
+    bytecode:
+      value: 0x1a
+      size: 8
+  lr3:
+    # Logical right-shift A 3 steps (C=0)
+    bytecode:
+      value: 0x1b
+      size: 8
+  lr4:
+    # Logical right-shift A 4 steps (C=0)
+    bytecode:
+      value: 0x1c
+      size: 8
+  lr5:
+    # Logical right-shift A 5 steps (C=0)
+    bytecode:
+      value: 0x1d
+      size: 8
+  lr6:
+    # Logical right-shift A 6 steps (C=0)
+    bytecode:
+      value: 0x1e
+      size: 8
+  lr7:
+    # Logical right-shift A 7 steps (C=0)
+    bytecode:
+      value: 0x1f
+      size: 8
+  llz:
+    # Logical shift left *Z 1 step (C=0)
+    bytecode:
+      value: 0x20
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  llb:
+    # Logical shift byte left 1 step (C=0)
+    bytecode:
+      value: 0x21
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  llv:
+    # Logical shift fast word left 1 step (C=0)
+    bytecode:
+      value: 0x22
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  llw:
+    # Logical shift word left 1 step (C=0)
+    bytecode:
+      value: 0x23
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  llq:
+    # Logical shift fast long left 1 step (C=0)
+    bytecode:
+      value: 0x24
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  lll:
+    # Logical shift long left 1 step (C=0)
+    bytecode:
+      value: 0x25
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  lrz:
+    # Logical shift right zero-page byte 1 step (C=0)
+    bytecode:
+      value: 0x26
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  lrb:
+    # Logical shift right abs byte 1 step (C=0)
+    bytecode:
+      value: 0x27
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  rlz:
+    # Rotate left zero-page byte 1 step via C
+    bytecode:
+      value: 0x28
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  rlb:
+    # Rotate left byte at abs addr 1 step via C
+    bytecode:
+      value: 0x29
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  rlv:
+    # Rotate left zero-page word 1 step via C
+    bytecode:
+      value: 0x2a
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  rlw:
+    # Rotate left word at abs addr 1 step via C
+    bytecode:
+      value: 0x2b
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  rlq:
+    # Rotate left zero-page long 1 step via C
+    bytecode:
+      value: 0x2c
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  rll:
+    # Rotate left abs long 1 step via C
+    bytecode:
+      value: 0x2d
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  rrz:
+    # Rotate right zero-page byte 1 step via C
+    bytecode:
+      value: 0x2e
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  rrb:
+    # Rotate right byte at abs addr 1 step via C
+    bytecode:
+      value: 0x2f
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  not:
+    # Bitwise NOT A: A = ~A
+    bytecode:
+      value: 0x30
+      size: 8
+  noz:
+    # Bitwise NOT Z: *Z = ~(*Z)
+    bytecode:
+      value: 0x31
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  nob:
+    # Bitwise NOT byte: *addr = ~(*addr)
+    bytecode:
+      value: 0x32
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  nov:
+    # Bitwise NOT zero-page word: *V = ~(*V)
+    bytecode:
+      value: 0x33
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  now:
+    # Bitwise NOT word at abs address
+    bytecode:
+      value: 0x34
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  noq:
+    # Bitwise NOT zero-page long
+    bytecode:
+      value: 0x35
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  nol:
+    # Bitwise NOT long at abs address
+    bytecode:
+      value: 0x36
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  neg:
+    # Negate A: A = -A
+    bytecode:
+      value: 0x37
+      size: 8
+  nez:
+    # Negate zero-page byte: *Z = -(*Z)
+    bytecode:
+      value: 0x38
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  neb:
+    # Negate byte at abs address: *addr = -(*addr)
+    bytecode:
+      value: 0x39
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  nev:
+    # Negate zero-page word: *V = -(*V)
+    bytecode:
+      value: 0x3a
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  new:
+    # Negate word at abs address
+    bytecode:
+      value: 0x3b
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  neq:
+    # Negate zero-page long
+    bytecode:
+      value: 0x3c
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  nel:
+    # Negate long at abs address
+    bytecode:
+      value: 0x3d
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  ani:
+    # Bitwise AND immediate: A = A & imm
+    bytecode:
+      value: 0x3e
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate_8bit
+  anz:
+    # Bitwise AND zero-page byte: A = A & *Z
+    bytecode:
+      value: 0x3f
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  anb:
+    # Bitwise AND byte at abs address: A = A & *addr
+    bytecode:
+      value: 0x40
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  ant:
+    # Bitwise AND byte at rel zero-page address: A = A & *(*Z)
+    bytecode:
+      value: 0x41
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_zero_page
+  anr:
+    # Bitwise AND byte at rel address: A = A & *(*addr)
+    bytecode:
+      value: 0x42
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  an.z:
+    # Bitwise AND A to zero-page byte: *Z = *Z & A
+    bytecode:
+      value: 0x43
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  an.b:
+    # Bitwise AND A to byte at abs address: *addr = *addr & A
+    bytecode:
+      value: 0x44
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  ori:
+    # Bitwise OR immediate: A = A | imm
+    bytecode:
+      value: 0x45
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate_8bit
+  orz:
+    # Bitwise OR zero-page byte: A = A | *Z
+    bytecode:
+      value: 0x46
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  orb:
+    # Bitwise OR byte at abs address: A = A | *addr
+    bytecode:
+      value: 0x47
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  ort:
+    # Bitwise OR byte at rel zero-page address: A = A | *(*Z)
+    bytecode:
+      value: 0x48
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_zero_page
+  orr:
+    # Bitwise OR byte at rel address: A = A | *(*addr)
+    bytecode:
+      value: 0x49
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  or.z:
+    # Bitwise OR A to zero-page byte: *Z = *Z | A
+    bytecode:
+      value: 0x4a
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  or.b:
+    # Bitwise OR A to byte at abs address: *addr = *addr | A
+    bytecode:
+      value: 0x4b
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  xri:
+    # Bitwise XOR immediate: A = A ^ imm
+    bytecode:
+      value: 0x4c
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate_8bit
+  xrz:
+    # Bitwise XOR zero-page byte: A = A ^ *Z
+    bytecode:
+      value: 0x4d
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  xrb:
+    # Bitwise XOR byte at abs address: A = A ^ *addr
+    bytecode:
+      value: 0x4e
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  xrt:
+    # Bitwise XOR byte at rel zero-page address: A = A ^ *(*Z)
+    bytecode:
+      value: 0x4f
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_zero_page
+  xrr:
+    # Bitwise XOR byte at rel address: A = A ^ *(*addr)
+    bytecode:
+      value: 0x50
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  xr.z:
+    # Bitwise XOR A to zero-page byte: *Z = *Z ^ A
+    bytecode:
+      value: 0x51
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  xr.b:
+    # Bitwise XOR A to byte at abs address: *addr = *addr ^ A
+    bytecode:
+      value: 0x52
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  fne:
+    # Fast branch on non-zero
+    bytecode:
+      value: 0x53
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - address_lsb
+  feq:
+    # Fast branch on equal
+    bytecode:
+      value: 0x54
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - address_lsb
+  fcc:
+    # Fast branch on carry clear
+    bytecode:
+      value: 0x55
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - address_lsb
+  fcs:
+    # Fast branch on carry set
+    bytecode:
+      value: 0x56
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - address_lsb
+  fpl:
+    # Fast branch on plus
+    bytecode:
+      value: 0x57
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - address_lsb
+  fmi:
+    # Fast branch on minus
+    bytecode:
+      value: 0x58
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - address_lsb
+  fgt:
+    # Fast branch on greater
+    bytecode:
+      value: 0x59
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - address_lsb
+  fle:
+    # Fast branch on less or equal
+    bytecode:
+      value: 0x5a
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - address_lsb
+  fpa:
+    # Fast jump to lsb address
+    bytecode:
+      value: 0x5b
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - address_lsb
+  bne:
+    # Branch on non-zero
+    bytecode:
+      value: 0x5c
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  beq:
+    # Branch on zero
+    bytecode:
+      value: 0x5d
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  bcc:
+    # Branch on carry clear
+    bytecode:
+      value: 0x5e
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  bcs:
+    # Branch on carry set
+    bytecode:
+      value: 0x5f
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  bpl:
+    # Branch on plus
+    bytecode:
+      value: 0x60
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  bmi:
+    # Branch on minus
+    bytecode:
+      value: 0x61
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  bgt:
+    # Branch on greater
+    bytecode:
+      value: 0x62
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  ble:
+    # Branch on less or equal
+    bytecode:
+      value: 0x63
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  jpa:
+    # Jump to address
+    bytecode:
+      value: 0x64
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  jpr:
+    # Jump to relative address
+    bytecode:
+      value: 0x65
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  jar:
+    # Jump A-indexed to rel address: PC = *(addr + A)
+    bytecode:
+      value: 0x66
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  jps:
+    # Jump to subroutine
+    bytecode:
+      value: 0x67
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  jas:
+    # Jump to subroutine conserving A
+    bytecode:
+      value: 0x68
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  rts:
+    # Return from subroutine
+    bytecode:
+      value: 0x69
+      size: 8
+  phs:
+    # Push A to stack
+    bytecode:
+      value: 0x6a
+      size: 8
+  pls:
+    # Pull A from stack
+    bytecode:
+      value: 0x6b
+      size: 8
+  lds:
+    # Load from stack: A = *(0xff00 + SP + off)
+    bytecode:
+      value: 0x6c
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate_8bit
+  sts:
+    # Store to stack: *(0xff00 + SP + off) = A
+    bytecode:
+      value: 0x6d
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate_8bit
+  rdb:
+    # Read FLASH data from abs 3-byte address
+    bytecode:
+      value: 0x6e
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate_16bit   # flash address
+          - immediate_8bit    # bank
+  rdr:
+    # Read FLASH data from rel 3-byte address
+    bytecode:
+      value: 0x6f
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  rap:
+    # Read FLASH data from A-indexed 3-byte address  A = *(pg<<8 + A)
+    bytecode:
+      value: 0x70
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate_8bit  # page
+          - immediate_8bit  # bank
+  rzp:
+    # Read Z-indexed FLASH data: A = *(pg<<8 + *Z)
+    bytecode:
+      value: 0x71
+      size: 8
+    operands:
+      count: 3
+      operand_sets:
+        list:
+          - zero_page
+          - immediate_8bit  # page
+          - immediate_8bit  # bank
+  wdb:
+    # Write FLASH data to abs 3-byte address
+    bytecode:
+      value: 0x72
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate_16bit   # flash address
+          - immediate_8bit    # bank
+  wdr:
+    # Write FLASH data to rel 3-byte address
+    bytecode:
+      value: 0x73
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  ldi:
+    # Load immediate value to A: A = imm
+    bytecode:
+      value: 0x74
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate_8bit
+  ldz:
+    # Load zero-page byte to A: A = *Z
+    bytecode:
+      value: 0x75
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  ldb:
+    # Load byte at abs address to A: A = *addr
+    bytecode:
+      value: 0x76
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  ldt:
+    # Load byte at rel zero-page address to A: A = *(*Z)
+    bytecode:
+      value: 0x77
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_zero_page
+  ldr:
+    # Load byte at rel address to A: A = *(*addr)
+    bytecode:
+      value: 0x78
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  lap:
+    # Load A-indexed byte to A: A = *(pg<<8 + A)
+    bytecode:
+      value: 0x79
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate_8bit  # page
+  lab:
+    # Load A A-indexed from addr: A = *(addr + A)
+    bytecode:
+      value: 0x7a
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  lzp:
+    # Load Z-indexed byte to A: A = *(pg<<8 + *Z)
+    bytecode:
+      value: 0x7b
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - zero_page
+          - immediate_8bit  # page
+  lzb:
+    # Load Z-indexed byte from addr: A = *(addr + *Z)
+    bytecode:
+      value: 0x7c
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - zero_page
+          - absolute_address
+  stz:
+    # Store A to zero-page byte: *Z = A
+    bytecode:
+      value: 0x7d
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  stb:
+    # Store A to byte at abs address: *addr = A
+    bytecode:
+      value: 0x7e
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  stt:
+    # Store A to byte at rel zero-page address: *(*Z) = A
+    bytecode:
+      value: 0x7f
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_zero_page
+  str:
+    # Store A to byte at rel address: *(*addr) = A
+    bytecode:
+      value: 0x80
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  szp:
+    # Store Z-indexed A: *(pg<<8 + *Z) = A
+    bytecode:
+      value: 0x81
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - zero_page
+          - immediate_8bit  # page
+  miz:
+    # Move immediate to zero-page byte: *Z = imm
+    bytecode:
+      value: 0x82
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate_8bit
+          - zero_page
+  mib:
+    # Move immediate to byte at abs address: *addr = imm
+    bytecode:
+      value: 0x83
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate_8bit
+          - absolute_address
+  mit:
+    # Move immediate to byte at rel zero-page address: *(*Z) = imm
+    bytecode:
+      value: 0x84
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate_8bit
+          - relative_zero_page
+  mir:
+    # Move immediate to byte at rel address: *(*addr) = imm
+    bytecode:
+      value: 0x85
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate_8bit
+          - relative_address
+  miv:
+    # Move immediate word to zero-page word: *V = imm
+    bytecode:
+      value: 0x86
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate_16bit
+          - zero_page
+  miw:
+    # Move immediate word to word at abs address: *addr = imm
+    bytecode:
+      value: 0x87
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate_16bit
+          - absolute_address
+  mzz:
+    # Move zero-page byte to zero-page byte: *Z2 = *Z1
+    bytecode:
+      value: 0x88
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - zero_page
+          - zero_page
+  mzb:
+    # Move zero-page byte to byte at abs address: *addr = *Z
+    bytecode:
+      value: 0x89
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - zero_page
+          - absolute_address
+  mbz:
+    # Move byte at abs address to zero-page byte: *Z = *addr
+    bytecode:
+      value: 0x8a
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - absolute_address
+          - zero_page
+  mbb:
+    # Move byte at abs address to byte at abs address: *addr2 = *addr1
+    bytecode:
+      value: 0x8b
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - absolute_address
+          - absolute_address
+  mvv:
+    # Move zero-page word to zero-page word: *V2 = *V1
+    bytecode:
+      value: 0x8c
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - zero_page
+          - zero_page
+  mwv:
+    # Move word at abs address to zero-page word: *V = *addr
+    bytecode:
+      value: 0x8d
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - absolute_address
+          - zero_page
+  clz:
+    # Clear zero-page byte: *Z = 0
+    bytecode:
+      value: 0x8e
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  clb:
+    # Clear byte at abs address: *addr = 0
+    bytecode:
+      value: 0x8f
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  clv:
+    # Clear zero-page word: *V = 0
+    bytecode:
+      value: 0x90
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  clw:
+    # Clear word at abs address: *addr = 0
+    bytecode:
+      value: 0x91
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  clq:
+    # Clear zero-page long: *Q = 0
+    bytecode:
+      value: 0x92
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  cll:
+    # Clear long at abs address: *addr = 0
+    bytecode:
+      value: 0x93
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  inc:
+    # Increment A: A++
+    bytecode:
+      value: 0x94
+      size: 8
+  inz:
+    # Increment zero-page byte: (*Z)++
+    bytecode:
+      value: 0x95
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  inb:
+    # Increment byte at abs address: (*addr)++
+    bytecode:
+      value: 0x96
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  inv:
+    # Increment zero-page word: (*V) += 0x0001
+    bytecode:
+      value: 0x97
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  inw:
+    # Increment word at abs address: (*addr) += 0x0001
+    bytecode:
+      value: 0x98
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  inq:
+    # Increment zero-page long: (*Q) += 0x00000001
+    bytecode:
+      value: 0x99
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  inl:
+    # Increment long at abs address: (*addr) += 0x00000001
+    bytecode:
+      value: 0x9a
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  dec:
+    # Decrement A: A--
+    bytecode:
+      value: 0x9b
+      size: 8
+  dez:
+    # Decrement zero-page byte: (*Z)--
+    bytecode:
+      value: 0x9c
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  deb:
+    # Decrement byte at abs address: (*addr)--
+    bytecode:
+      value: 0x9d
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  dev:
+    # Decrement zero-page word: (*V) -= 0x0001
+    bytecode:
+      value: 0x9e
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  dew:
+    # Decrement word at abs address: (*addr) -= 0x0001
+    bytecode:
+      value: 0x9f
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  deq:
+    # Decrement zero-page long: (*Q) -= 0x00000001
+    bytecode:
+      value: 0xa0
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  del:
+    # Decrement long at abs address: (*addr) -= 0x00000001
+    bytecode:
+      value: 0xa1
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  adi:
+    # Add immediate to A: A += imm
+    bytecode:
+      value: 0xa2
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate_8bit
+  adz:
+    # Add zero-page byte to A: A += *Z
+    bytecode:
+      value: 0xa3
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  adb:
+    # Add byte at abs address to A: A += *addr
+    bytecode:
+      value: 0xa4
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  adt:
+    # Add byte at rel zero-page address to A: A += *(*Z)
+    bytecode:
+      value: 0xa5
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_zero_page
+  adr:
+    # Add byte at rel address to A: A += *(*addr)
+    bytecode:
+      value: 0xa6
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  ad.z:
+    # Add A to zero-page byte: *Z += A
+    bytecode:
+      value: 0xa7
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  ad.b:
+    # Add A to byte at abs address: *addr += A
+    bytecode:
+      value: 0xa8
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  ad.t:
+    # Add A to byte at rel zero-page address: *(*Z) += A
+    bytecode:
+      value: 0xa9
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_zero_page
+  ad.r:
+    # Add A to byte at rel address: *(*addr) += A
+    bytecode:
+      value: 0xaa
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  adv:
+    # Add A to zero-page word: *V = *V + A
+    bytecode:
+      value: 0xab
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  adw:
+    # Add A to word at abs address: *addr = *addr + A
+    bytecode:
+      value: 0xac
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  adq:
+    # Add A to zero-page long: *Q = *Q + A
+    bytecode:
+      value: 0xad
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  adl:
+    # Add A to long at abs address: *addr = *addr + A
+    bytecode:
+      value: 0xae
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  aiz:
+    # Add immediate to zero-page byte: *Z += imm
+    bytecode:
+      value: 0xaf
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate_8bit
+          - zero_page
+  aib:
+    # Add immediate to byte at abs address: *addr += imm
+    bytecode:
+      value: 0xb0
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate_8bit
+          - absolute_address
+  ait:
+    # Add immediate to byte at rel zero-page address: *(*Z) += imm
+    bytecode:
+      value: 0xb1
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate_8bit
+          - relative_zero_page
+  air:
+    # Add immediate to byte at rel address: *(*addr) += imm
+    bytecode:
+      value: 0xb2
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate_8bit
+          - relative_address
+  aiv:
+    # Add immediate byte to zero-page word: *V += imm
+    bytecode:
+      value: 0xb3
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate_8bit
+          - zero_page
+  aiw:
+    # Add immediate byte to word at abs address: *addr += imm
+    bytecode:
+      value: 0xb4
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate_8bit
+          - absolute_address
+  aiq:
+    # Add immediate byte to zero-page long: *Q += imm
+    bytecode:
+      value: 0xb5
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate_8bit
+          - zero_page
+  ail:
+    # Add immediate byte to long at abs address: *addr += imm
+    bytecode:
+      value: 0xb6
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate_8bit
+          - absolute_address
+  azz:
+    # Add zero-page byte to zero-page byte: *Z2 += *Z1
+    bytecode:
+      value: 0xb7
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - zero_page
+          - zero_page
+  azb:
+    # Add zero-page byte to byte at abs address: *addr += *Z
+    bytecode:
+      value: 0xb8
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - zero_page
+          - absolute_address
+  azv:
+    # Add zero-page byte to zero-page word: *V = *V + *Z
+    bytecode:
+      value: 0xb9
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - zero_page   # Z
+          - zero_page   # V
+  azw:
+    # Add zero-page byte to word at abs address: *addr = *addr + *Z
+    bytecode:
+      value: 0xba
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - zero_page
+          - absolute_address
+  azq:
+    # Add zero-page byte to zero-page long: *Q = *Q + *Z
+    bytecode:
+      value: 0xbb
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - zero_page   # Z
+          - zero_page   # Q
+  azl:
+    # Add zero-page byte to long at abs address: *addr = *addr + *Z
+    bytecode:
+      value: 0xbc
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - zero_page
+          - absolute_address
+  abz:
+    # Add byte at abs address to zero-page byte: *Z += *addr
+    bytecode:
+      value: 0xbd
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - absolute_address
+          - zero_page
+  abb:
+    # Add byte at abs address to byte at abs address: *addr2 = *addr2 + *addr1
+    bytecode:
+      value: 0xbe
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - absolute_address  # addr1
+          - absolute_address  # addr2
+  abv:
+    # Add byte at abs address to zero-page word: *V = *V + *addr
+    bytecode:
+      value: 0xbf
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - absolute_address
+          - zero_page
+  abw:
+    # Add byte at abs address to word at abs address: *addr2 = *addr2 + *addr1
+    bytecode:
+      value: 0xc0
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - absolute_address  # addr1
+          - absolute_address  # addr2
+  abq:
+    # Add byte at abs address to zero-page long: *Q = *Q + *addr
+    bytecode:
+      value: 0xc1
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - absolute_address
+          - zero_page
+  avv:
+    # Add zero-page word to zero-page word: *V2 = *V2 + *V1
+    bytecode:
+      value: 0xc2
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - zero_page   # V1
+          - zero_page   # V2
+  sui:
+    # Subtract immediate from A: A -= imm
+    bytecode:
+      value: 0xc3
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate_8bit
+  suz:
+    # Subtract zero-page byte from A: A -= *Z
+    bytecode:
+      value: 0xc4
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  sub:
+    # Subtract byte at abs address from A: A -= *addr
+    bytecode:
+      value: 0xc5
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  sut:
+    # Subtract byte at rel zero-page address from A: A -= *(*Z)
+    bytecode:
+      value: 0xc6
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_zero_page
+  sur:
+    # Subtract byte at rel address from A: A -= *(*addr)
+    bytecode:
+      value: 0xc7
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  su.z:
+    # Subtract A from zero-page byte: *Z -= A
+    bytecode:
+      value: 0xc8
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  su.b:
+    # Subtract A from byte at abs address: *addr -= A
+    bytecode:
+      value: 0xc9
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  su.t:
+    # Subtract A from byte at rel zero-page address: *(*Z) -= A
+    bytecode:
+      value: 0xca
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_zero_page
+  su.r:
+    # Subtract A from byte at rel address: *(*addr) -= A
+    bytecode:
+      value: 0xcb
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  suv:
+    # Subtract A from zero-page word: *V = *V - A
+    bytecode:
+      value: 0xcc
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  suw:
+    # Subtract A from word at abs address: *addr = *addr - A
+    bytecode:
+      value: 0xcd
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  suq:
+    # Subtract A from zero-page long: *Q = *Q - A
+    bytecode:
+      value: 0xce
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  su.l:
+    # Subtract A from long at abs address: *addr = *addr - A
+    bytecode:
+      value: 0xcf
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  siz:
+    # Subtract immediate from zero-page byte: *Z -= imm
+    bytecode:
+      value: 0xd0
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate_8bit
+          - zero_page
+  sib:
+    # Subtract immediate from byte at abs address: *addr -= imm
+    bytecode:
+      value: 0xd1
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate_8bit
+          - absolute_address
+  sit:
+    # Subtract immediate from byte at rel zero-page address: *(*Z) -= imm
+    bytecode:
+      value: 0xd2
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate_8bit
+          - relative_zero_page
+  sir:
+    # Subtract immediate from byte at rel address: *(*addr) -= imm
+    bytecode:
+      value: 0xd3
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate_8bit
+          - relative_address
+  siv:
+    # Subtract immediate byte from zero-page word: *V -= imm
+    bytecode:
+      value: 0xd4
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate_8bit
+          - zero_page
+  siw:
+    # Subtract immediate byte from word at abs address: *addr -= imm
+    bytecode:
+      value: 0xd5
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate_8bit
+          - absolute_address
+  siq:
+    # Subtract immediate byte from zero-page long: *Q -= imm
+    bytecode:
+      value: 0xd6
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate_8bit
+          - zero_page
+  sil:
+    # Subtract immediate byte from long at abs address: *addr -= imm
+    bytecode:
+      value: 0xd7
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate_8bit
+          - absolute_address
+  szz:
+    # Subtract zero-page byte from zero-page byte: *Z2 -= *Z1
+    bytecode:
+      value: 0xd8
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - zero_page   # Z1
+          - zero_page   # Z2
+  szb:
+    # Subtract zero-page byte from byte at abs address: *addr -= *Z
+    bytecode:
+      value: 0xd9
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - zero_page
+          - absolute_address
+  szv:
+    # Subtract zero-page byte from zero-page word: *V = *V - *Z
+    bytecode:
+      value: 0xda
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - zero_page   # Z
+          - zero_page   # V
+  szw:
+    # Subtract zero-page byte from word at abs address: *addr = *addr - *Z
+    bytecode:
+      value: 0xdb
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - zero_page
+          - absolute_address
+  szq:
+    # Subtract zero-page byte from zero-page long: *Q = *Q - *Z
+    bytecode:
+      value: 0xdc
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - zero_page   # Z
+          - zero_page   # Q
+  szl:
+    # Subtract zero-page byte from long at abs address: *addr = *addr - *Z
+    bytecode:
+      value: 0xdd
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - zero_page
+          - absolute_address
+  sbz:
+    # Subtract byte at abs address from zero-page byte: *Z -= *addr
+    bytecode:
+      value: 0xde
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - absolute_address
+          - zero_page
+  sbb:
+    # Subtract byte at abs address from byte at abs
+    # address: *addr2 = *addr2 - *addr1
+    bytecode:
+      value: 0xdf
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - absolute_address  # addr1
+          - absolute_address  # addr2
+  sbv:
+    # Subtract byte at abs address from zero-page word: *V = *V - *addr
+    bytecode:
+      value: 0xe0
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - absolute_address
+          - zero_page
+  sbw:
+    # Subtract byte at abs address from word at abs
+    # address: *addr2 = *addr2 - *addr1
+    bytecode:
+      value: 0xe1
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - absolute_address  # addr1
+          - absolute_address  # addr2
+  sbq:
+    # Subtract byte at abs address from zero-page long: *Q = *Q - *addr
+    bytecode:
+      value: 0xe2
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - absolute_address
+          - zero_page
+  svv:
+    # Subtract zero-page word from zero-page word: *V2 = *V2 - *V1
+    bytecode:
+      value: 0xe3
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - zero_page   # V1
+          - zero_page   # V2
+  cpi:
+    # Compare immediate with A: A - imm
+    bytecode:
+      value: 0xe4
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate_8bit
+  cpz:
+    # Compare zero-page byte with A: A - *Z
+    bytecode:
+      value: 0xe5
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  cpb:
+    # Compare byte at abs address with A: A - *addr
+    bytecode:
+      value: 0xe6
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  cpt:
+    # Compare byte at rel zero-page address with A: A - *(*Z)
+    bytecode:
+      value: 0xe7
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_zero_page
+  cpr:
+    # Compare byte at rel address with A: A - *(*addr)
+    bytecode:
+      value: 0xe8
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - relative_address
+  ciz:
+    # Compare immediate with zero-page byte: *Z - imm
+    bytecode:
+      value: 0xe9
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate_8bit
+          - zero_page
+  cib:
+    # Compare immediate with byte at abs address: *addr - imm
+    bytecode:
+      value: 0xea
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate_8bit
+          - absolute_address
+  cit:
+    # Compare immediate with byte at rel zero-page address: *(*Z) - imm
+    bytecode:
+      value: 0xeb
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate_8bit
+          - relative_zero_page
+  cir:
+    # Compare immediate with byte at rel address: *(*addr) - imm
+    bytecode:
+      value: 0xec
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - immediate_8bit
+          - relative_address
+  czz:
+    # Compare zero-page byte with zero-page byte: *Z2 - *Z1
+    bytecode:
+      value: 0xed
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - zero_page   # Z1
+          - zero_page   # Z2
+  czb:
+    # Compare zero-page byte with byte at abs address: *addr - *Z
+    bytecode:
+      value: 0xee
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - zero_page
+          - absolute_address
+  cbz:
+    # Compare abs byte to zero-page byte: A = *addr - *Z
+    bytecode:
+      value: 0xef
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - absolute_address
+          - zero_page
+  cbb:
+    # Compare byte at abs address with byte at abs address: *addr2 - *addr1
+    bytecode:
+      value: 0xf0
+      size: 8
+    operands:
+      count: 2
+      operand_sets:
+        list:
+          - absolute_address  # addr1
+          - absolute_address  # addr2
+  aci:
+    # Add immediate value to A with C: A = A + imm + C
+    bytecode:
+      value: 0xf1
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate_8bit
+  acz:
+    # Add zero-page byte to A with C: A = A + *Z + C
+    bytecode:
+      value: 0xf2
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  acb:
+    # Add byte at abs address to A with C: A = A + *addr + C
+    bytecode:
+      value: 0xf3
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  ac.z:
+    # Add A to zero-page byte with C: *Z = *Z + A + C
+    bytecode:
+      value: 0xf4
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  ac.b:
+    # Add A to byte at abs address with C: *addr = *addr + A + C
+    bytecode:
+      value: 0xf5
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  acv:
+    # Add A to zero-page word with C: *V = *V + A + C
+    bytecode:
+      value: 0xf6
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  acw:
+    # Add A to word at abs address with C: *addr = *addr + A + C
+    bytecode:
+      value: 0xf7
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  sci:
+    # Sub imm value from A with C: A = A - imm - 1 + C
+    bytecode:
+      value: 0xf8
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - immediate_8bit
+  scz:
+    # Sub zero-page byte from A with C: A = A - *Z - 1 + C
+    bytecode:
+      value: 0xf9
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  scb:
+    # Sub byte at abs address from A with C: A = A - *addr - 1 + C
+    bytecode:
+      value: 0xfa
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  sc.z:
+    # Sub A from zero-page byte with C: *Z = *Z - A - 1 + C
+    bytecode:
+      value: 0xfb
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  sc.b:
+    # Sub A from byte at abs address with C: *addr = *addr - A - 1 + C
+    bytecode:
+      value: 0xfc
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+  scv:
+    # Sub A from zero-page word with C: *V = *V - A - 1 + C
+    bytecode:
+      value: 0xfd
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - zero_page
+  scw:
+    # Sub A from word at abs address with C: *addr = *addr - A - 1 + C
+    bytecode:
+      value: 0xfe
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - absolute_address
+macros:
+  spinit:
+    - operands:
+        count: 0
+      instructions:
+        - "mib 0xfe,0xffff"
+  phsi:
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - immediate_8bit
+      instructions:
+        - "ldi @ARG(0)"
+        - "phs"
+  phs2i:
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - immediate_16bit
+      instructions:
+        - "ldi LSB(@ARG(0))"
+        - "phs"
+        - "ldi BYTE1(@ARG(0))"
+        - "phs"
+  phs4i:
+    - operands:
+        count: 1
+        specific_operands:
+          immediate:
+            list:
+              uint32:
+                type: numeric
+                argument:
+                  size: 32
+                  byte_align: true
+      instructions:
+        - "ldi BYTE0(@ARG(0))"
+        - "phs"
+        - "ldi BYTE1(@ARG(0))"
+        - "phs"
+        - "ldi BYTE2(@ARG(0))"
+        - "phs"
+        - "ldi BYTE3(@ARG(0))"
+        - "phs"
+  phs4a:
+    # push 4 bytes of an absolute address to the stack
+    # stack is arranged as big-endian, address is little-endian
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - absolute_address
+      instructions:
+        - "ldb @ARG(0)+0"
+        - "phs"
+        - "ldb @ARG(0)+1"
+        - "phs"
+        - "ldb @ARG(0)+2"
+        - "phs"
+        - "ldb @ARG(0)+3"
+        - "phs"
+  phsptr:
+    # push an immediate absolute address to the stack per MinOS calling convention
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - absolute_address
+      instructions:
+        - "ldi BYTE0(@ARG(0))"
+        - "phs"
+        - "ldi BYTE1(@ARG(0))"
+        - "phs"
+  phs2s:
+    # push 2 bytes at (current) stack offset to the stack
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - offset
+      instructions:
+        - "lds @ARG(0)+1+0"
+        - "phs"
+        - "lds @ARG(0)+0+1"
+        - "phs"
+  phs4s:
+    # push 4 bytes at (current) stack offset to the stack
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - offset
+      instructions:
+        - "lds @ARG(0)+3+0"
+        - "phs"
+        - "lds @ARG(0)+2+1"
+        - "phs"
+        - "lds @ARG(0)+1+2"
+        - "phs"
+        - "lds @ARG(0)+0+3"
+        - "phs"
+  phsz:
+    # push a zero-page byte to the stack
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - zero_page
+      instructions:
+        - "ldz @ARG(0)"
+        - "phs"
+  phsv:
+    # push a zero-page word to the stack
+    # stack is arranged as big-endian, word in zero-page is little-endian
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - zero_page
+      instructions:
+        - "ldz @ARG(0)+0"
+        - "phs"
+        - "ldz @ARG(0)+1"
+        - "phs"
+  phsq:
+    # push a zero page long to the stack
+    # stack is arranged as big-endian, long in zero-page is little-endian
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - zero_page
+      instructions:
+        - "ldz @ARG(0)+0"
+        - "phs"
+        - "ldz @ARG(0)+1"
+        - "phs"
+        - "ldz @ARG(0)+2"
+        - "phs"
+        - "ldz @ARG(0)+3"
+        - "phs"
+  pls2:
+    # pull 2 bytes from the stack
+    - operands:
+        count: 0
+      instructions:
+        - "pls"
+        - "pls"
+  pls4:
+    - operands:
+        count: 0
+      instructions:
+        - "pls"
+        - "pls"
+        - "pls"
+        - "pls"
+  mws2:
+    # move 2-byte word at absolute address to stack at offset
+    # stack is arranged as big-endian, word at abs address is little-endian
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - absolute_address
+            - offset
+      instructions:
+        - "ldb @ARG(0)+0"
+        - "sts @ARG(1)+1"
+        - "ldb @ARG(0)+1"
+        - "sts @ARG(1)+0"
+  ms2w:
+    # move 2-byte word from stack at offset to absolute address
+    # stack is arranged as big-endian, word at abs address is little-endian
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - offset
+            - absolute_address
+      instructions:
+        - "lds @ARG(0)+1"
+        - "stb @ARG(1)+0"
+        - "lds @ARG(0)+0"
+        - "stb @ARG(1)+1"
+  ms2v:
+    # move 2 bytes from stack to zero-page word
+    # stack is arranged as big-endian, word in zero-page is little-endian
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - offset
+            - zero_page
+      instructions:
+        - "lds @ARG(0)+0"
+        - "stz @ARG(1)+1"
+        - "lds @ARG(0)+1"
+        - "stz @ARG(1)+0"
+  mvs2:
+    # move 4 bytes from zero-page word to stack starting at passed offset
+    # stack is arranged as big-endian, word in zero-page is little-endian
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - zero_page
+            - offset
+      instructions:
+        - "ldz @ARG(0)+1"
+        - "sts @ARG(1)+0"
+        - "ldz @ARG(0)+0"
+        - "sts @ARG(1)+1"
+  ms4q:
+    # move 4 bytes from stack starting at passed offset to zero-page long
+    # stack is arranged as big-endian, long in zero-page is little-endian
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - offset
+            - zero_page
+      instructions:
+        - "lds @ARG(0)+3"
+        - "stz @ARG(1)+0"
+        - "lds @ARG(0)+2"
+        - "stz @ARG(1)+1"
+        - "lds @ARG(0)+1"
+        - "stz @ARG(1)+2"
+        - "lds @ARG(0)+0"
+        - "stz @ARG(1)+3"
+  mqs4:
+    # move 4 bytes from zero-page long to stack starting at passed offset
+    # stack is arranged as big-endian, long in zero-page is little-endian
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - zero_page
+            - offset
+      instructions:
+        - "ldz @ARG(0)+3"
+        - "sts @ARG(1)+0"
+        - "ldz @ARG(0)+2"
+        - "sts @ARG(1)+1"
+        - "ldz @ARG(0)+1"
+        - "sts @ARG(1)+2"
+        - "ldz @ARG(0)+0"
+        - "sts @ARG(1)+3"
+  mls4:
+    # move a long (4 bytes) from abs address to stack starting at passed offset
+    # stack is arranged as big-endian, long at abs address is little-endian
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - absolute_address
+            - offset
+      instructions:
+        - "ldb @ARG(0)+3"
+        - "sts @ARG(1)+0"
+        - "ldb @ARG(0)+2"
+        - "sts @ARG(1)+1"
+        - "ldb @ARG(0)+1"
+        - "sts @ARG(1)+2"
+        - "ldb @ARG(0)+0"
+        - "sts @ARG(1)+3"
+  ms4l:
+    # move a long (4 bytes) from stack starting at passed offset to abs address
+    # stack is arranged as big-endian, long at abs address is little-endian
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - offset
+            - absolute_address
+      instructions:
+        - "lds @ARG(0)+3"
+        - "stb @ARG(1)+0"
+        - "lds @ARG(0)+2"
+        - "stb @ARG(1)+1"
+        - "lds @ARG(0)+1"
+        - "stb @ARG(1)+2"
+        - "lds @ARG(0)+0"
+        - "stb @ARG(1)+3"
+  aqq:
+    # add two zero-page longs. result in second zero page operand
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - zero_page
+            - zero_page
+      instructions:
+        - "azz @ARG(0)+0,@ARG(1)+0"
+        - "ldz @ARG(0)+1"
+        - "ac.z @ARG(1)+1"
+        - "ldz @ARG(0)+2"
+        - "ac.z @ARG(1)+2"
+        - "ldz @ARG(0)+3"
+        - "ac.z @ARG(1)+3"
+  sqq:
+    # subtract two zero-page longs. *Q2 = *Q2 - Q1
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - zero_page
+            - zero_page
+      instructions:
+        - "szz @ARG(0)+0,@ARG(1)+0"
+        - "ldz @ARG(0)+2"
+        - "sc.z @ARG(1)+2"
+        - "ldz @ARG(0)+3"
+        - "sc.z @ARG(1)+3"
+  mqq:
+    # move zero-page long to zero-page long
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - zero_page
+            - zero_page
+      instructions:
+        - "mvv @ARG(0)+0,@ARG(1)+0"
+        - "mvv @ARG(0)+2,@ARG(1)+2"
+  mll:
+    # move long from abs address to abs address
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - absolute_address
+            - absolute_address
+      instructions:
+        - "mbb @ARG(0)+0,@ARG(1)+0"
+        - "mbb @ARG(0)+1,@ARG(1)+1"
+        - "mbb @ARG(0)+2,@ARG(1)+2"
+        - "mbb @ARG(0)+3,@ARG(1)+3"
+  mlq:
+    # move long from abs address to zero-page long
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - absolute_address
+            - zero_page
+      instructions:
+        - "mwv @ARG(0)+0,@ARG(1)+0"
+        - "mwv @ARG(0)+2,@ARG(1)+2"
+  miq:
+    # move 4 bytes long from immediate to zero-page long
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - immediate_16bit
+            - zero_page
+      instructions:
+        - "miv @ARG(0) & $0000FFFF ,@ARG(1)+0"
+        - "miv (@ARG(0) & $FFFF0000) >> 16,@ARG(1)+2"
+  inq_:
+    # increment zero-page long. This macro exists because the built-in instruction INQ has a bug.
+    - operands:
+        count: 1
+        operand_sets:
+          list:
+            - zero_page
+      instructions:
+        - "inv @ARG(0)+0"
+        - "ldi 0"
+        - "ac.z @ARG(0)+2"
+        - "ldi 0"
+        - "ac.z @ARG(0)+3"

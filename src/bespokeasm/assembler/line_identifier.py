@@ -1,4 +1,3 @@
-
 class LineIdentifier:
     def __init__(self, line_num: int, filename: str = None) -> None:
         self._filename = filename

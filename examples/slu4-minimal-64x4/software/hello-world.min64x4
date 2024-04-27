@@ -1,0 +1,10 @@
+#require "slu4-min64x4-asm >= 1.1.0"
+
+.org $8000
+init:
+    spinit                          ; init stack pointer
+main:
+    jps _Print "Hello, World!"      ; jump to print function
+
+end:
+    jpa _Prompt                     ; jump to prompt function

@@ -12,7 +12,7 @@ from bespokeasm.assembler.preprocessor.symbol import PreprocessorSymbol, SYMBOL_
 
 class DefineSymbolLine(PreprocessorLine):
     PATTERN_DEFINE_SYMBOL = re.compile(
-            r'^#define\s+({0})(?:\s+(\S.*?))?\s*$'.format(SYMBOL_PATTERN),
+            fr'^#define\s+({SYMBOL_PATTERN})(?:\s+(\S.*?))?\s*$',
         )
 
     def __init__(
@@ -45,7 +45,7 @@ class DefineSymbolLine(PreprocessorLine):
             sys.exit(f'ERROR - {line_id}: Invalid preprocessor symbol definition: {instruction}')
 
     def __repr__(self) -> str:
-        return f"DefineSymbolLine<{self._symbol}>"
+        return f'DefineSymbolLine<{self._symbol}>'
 
     @property
     def symbol(self) -> PreprocessorSymbol:

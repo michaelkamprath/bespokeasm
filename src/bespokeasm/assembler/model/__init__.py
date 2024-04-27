@@ -45,7 +45,7 @@ class AssemblerModel:
             self._file_extension = self._config['general']['identifier'].get('extension', 'asm')
             # enforce semantic versioning
             version_match = re.match(
-                r"^\s*" + version.VERSION_PATTERN + r"\s*$",
+                r'^\s*' + version.VERSION_PATTERN + r'\s*$',
                 self._isa_version,
                 flags=re.IGNORECASE | re.VERBOSE,
             )
@@ -84,6 +84,14 @@ class AssemblerModel:
                 'ERROR - ISA configuration file defines a predefined "memory" block. '
                 'Memory blocks have been deprecated and replaced with "data" blocks.'
             )
+
+        # ensure there is a general section
+        if 'general' not in self._config:
+            sys.exit('ERROR - ISA configuration file does not contain a "general" section.')
+
+        # what's the point if there is no instruction set?
+        if 'instructions' not in self._config:
+            sys.exit('ERROR - ISA configuration file does not contain an "instructions" section.')
 
         # check for min required BespokeASM version
         if 'min_version' in self._config['general']:
@@ -160,6 +168,11 @@ class AssemblerModel:
     def address_size(self) -> int:
         '''The number of bits used to rerpesent a memory address'''
         return self._config['general']['address_size']
+
+    @property
+    def page_size(self) -> int:
+        '''The number of bytes in a memory page'''
+        return self._config['general'].get('page_size', 1)
 
     @property
     def registers(self) -> set[str]:
@@ -251,3 +264,7 @@ class AssemblerModel:
             return self._config['predefined']['symbols']
         else:
             return []
+
+    @property
+    def allow_embedded_strings(self) -> bool:
+        return self._config['general'].get('allow_embedded_strings', False)

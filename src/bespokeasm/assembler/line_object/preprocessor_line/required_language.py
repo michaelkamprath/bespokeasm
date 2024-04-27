@@ -11,7 +11,7 @@ from bespokeasm.assembler.model import AssemblerModel
 
 class RequiredLanguageLine(PreprocessorLine):
     PATTERN_REQUIRE_LANGUAGE = re.compile(
-        r'\#require\s+\"([\w\-\_\.]*)(?:\s*(==|>=|<=|>|<)\s*({0}))?\"'.format(version.VERSION_PATTERN),
+        fr'\#require\s+\"([\w\-\_\.]*)(?:\s*(==|>=|<=|>|<)\s*({version.VERSION_PATTERN}))?\"',
         flags=re.IGNORECASE | re.VERBOSE
     )
 
@@ -81,14 +81,14 @@ class RequiredLanguageLine(PreprocessorLine):
                 if log_verbosity > 1:
                     print(
                         f'Code file requires language "{require_match.group(1)} {require_match.group(2)} '
-                        f'{require_match.group(3)}". Configurate file declares language "{isa_model.isa_name} '
+                        f'{require_match.group(3)}". Configuration file declares language "{isa_model.isa_name} '
                         f'{isa_model.isa_version}"'
                     )
             elif log_verbosity > 1:
                 print(
                     f'Code file requires language "{require_match.group(1)}". '
-                    f'Configurate file declares language "{isa_model.isa_name} v{isa_model.isa_version}"'
+                    f'Configuration file declares language "{isa_model.isa_name} v{isa_model.isa_version}"'
                 )
 
     def __repr__(self) -> str:
-        return f"RequiredLanguageLine<{self._language} {self._operator_str} {self._version_obj}>"
+        return f'RequiredLanguageLine<{self._language} {self._operator_str} {self._version_obj}>'

@@ -230,28 +230,34 @@ class TestExpression(unittest.TestCase):
         line_id = LineIdentifier(1927, 'test_character_ordinals_in_expressions')
 
         self.assertEqual(
-            parse_expression(line_id, "-21").get_value(TestExpression.label_values, 1),
+            parse_expression(line_id, '-21').get_value(TestExpression.label_values, 1),
             -21,
-            "negative 21"
+            'negative 21'
         )
 
         self.assertEqual(
-            parse_expression(line_id, "5 * ( -6 )").get_value(TestExpression.label_values, 1),
+            parse_expression(line_id, '5 * ( -6 )').get_value(TestExpression.label_values, 1),
             -30,
-            "negative 30"
+            'negative 30'
         )
 
         self.assertEqual(
-            parse_expression(line_id, "10 + -(5*2)").get_value(TestExpression.label_values, 1),
+            parse_expression(line_id, '10 + -(5*2)').get_value(TestExpression.label_values, 1),
             0,
-            "0"
+            '0'
         )
 
         self.assertEqual(
-            parse_expression(line_id, "-2*MAX_N").get_value(TestExpression.label_values, 1),
+            parse_expression(line_id, '-2*MAX_N').get_value(TestExpression.label_values, 1),
             -40,
-            "negative label expression"
+            'negative label expression'
         )
+
+    def test_unknown_expression_parts(self):
+        line_id = LineIdentifier(1928, 'test_unknown_expression_parts')
+
+        with self.assertRaises(SystemExit, msg='extraneous comparison operator'):
+            parse_expression(line_id, '<$2024').get_value(TestExpression.label_values, 1)
 
 
 if __name__ == '__main__':

@@ -18,7 +18,7 @@ class TestConfigurationGeneration(unittest.TestCase):
 
     def assertIsFile(self, path):
         if not pl.Path(path).resolve().is_file():
-            raise AssertionError("File does not exist: %s" % str(path))
+            raise AssertionError('File does not exist: %s' % str(path))
 
     def _assert_grouped_item_list(self, item_str: str, target_list: list[str], test_name: str) -> None:
         match = re.search(r'^.*(?<=[\w\)])?\((?:\?\:)?(.*)\)', item_str, re.IGNORECASE)
@@ -46,7 +46,7 @@ class TestConfigurationGeneration(unittest.TestCase):
 
         package_fp = os.path.join(extension_dirpath, 'bespokeasm-test', 'package.json')
         self.assertIsFile(package_fp)
-        with open(package_fp, 'r') as json_file:
+        with open(package_fp) as json_file:
             package_json = json.load(json_file)
         self.assertEqual(
             package_json['name'],
@@ -86,7 +86,7 @@ class TestConfigurationGeneration(unittest.TestCase):
 
         grammar_fp = os.path.join(extension_dirpath, 'bespokeasm-test', 'syntaxes', 'tmGrammar.json')
         self.assertIsFile(grammar_fp)
-        with open(grammar_fp, 'r') as json_file:
+        with open(grammar_fp) as json_file:
             grammar_json = json.load(json_file)
         self._assert_grouped_item_list(
             grammar_json['repository']['instructions']['begin'],
@@ -131,7 +131,7 @@ class TestConfigurationGeneration(unittest.TestCase):
 
         package_fp = os.path.join(extension_dirpath, 'tester-assembly', 'package.json')
         self.assertIsFile(package_fp)
-        with open(package_fp, 'r') as json_file:
+        with open(package_fp) as json_file:
             package_json = json.load(json_file)
         self.assertEqual(
             package_json['name'],
@@ -166,7 +166,7 @@ class TestConfigurationGeneration(unittest.TestCase):
 
         grammar_fp = os.path.join(extension_dirpath, 'tester-assembly', 'syntaxes', 'tmGrammar.json')
         self.assertIsFile(grammar_fp)
-        with open(grammar_fp, 'r') as json_file:
+        with open(grammar_fp) as json_file:
             grammar_json = json.load(json_file)
         self._assert_grouped_item_list(
             grammar_json['repository']['instructions']['begin'],
@@ -203,7 +203,7 @@ class TestConfigurationGeneration(unittest.TestCase):
 
         syntax_fp = os.path.join(test_tmp_dir, 'bespokeasm-test.sublime-syntax')
         self.assertIsFile(syntax_fp)
-        with open(syntax_fp, 'r') as yaml_file:
+        with open(syntax_fp) as yaml_file:
             syntax_dict = yaml.safe_load(yaml_file)
 
         self.assertListEqual(syntax_dict['file_extensions'], ['asmtest'], 'file extension should be as assigned')
@@ -228,7 +228,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertFalse(('registers' in syntax_dict['contexts']), 'no registers should be found')
         self._assert_grouped_item_list(
             syntax_dict['contexts']['compiler_directives'][0]['match'],
-            ['\\.org', '\\.memzone'],
+            ['\\.org', '\\.memzone', '\\.align',],
             'compiler directives'
         )
         self._assert_grouped_item_list(
@@ -245,7 +245,11 @@ class TestConfigurationGeneration(unittest.TestCase):
                 item_match_str = item['match']
         self._assert_grouped_item_list(
             item_match_str,
-            ['include', 'require', 'create_memzone', 'define', 'if', 'elif', 'else', 'endif', 'ifdef', 'ifndef'],
+            [
+                'include', 'require', 'create_memzone', 'define', 'if',
+                'elif', 'else', 'endif', 'ifdef', 'ifndef',
+                'mute', 'unmute', 'emit',
+            ],
             'data type directives'
         )
         self.assertIsFile(os.path.join(test_tmp_dir, 'bespokeasm-test.sublime-color-scheme'))
@@ -279,7 +283,7 @@ class TestConfigurationGeneration(unittest.TestCase):
 
         syntax_fp = os.path.join(test_tmp_dir, 'tester-assembly.sublime-syntax')
         self.assertIsFile(syntax_fp)
-        with open(syntax_fp, 'r') as yaml_file:
+        with open(syntax_fp) as yaml_file:
             syntax_dict = yaml.safe_load(yaml_file)
 
         self.assertListEqual(syntax_dict['file_extensions'], ['asmtest'], 'file extension should be as assigned')
@@ -308,7 +312,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         )
         self._assert_grouped_item_list(
             syntax_dict['contexts']['compiler_directives'][0]['match'],
-            ['\\.org', '\\.memzone'],
+            ['\\.org', '\\.memzone', '\\.align',],
             'compiler directives'
         )
         self._assert_grouped_item_list(
@@ -326,7 +330,11 @@ class TestConfigurationGeneration(unittest.TestCase):
                 item_match_str = item['match']
         self._assert_grouped_item_list(
             item_match_str,
-            ['include', 'require', 'create_memzone', 'define', 'if', 'elif', 'else', 'endif', 'ifdef', 'ifndef'],
+            [
+                'include', 'require', 'create_memzone', 'define',
+                'if', 'elif', 'else', 'endif', 'ifdef', 'ifndef',
+                'mute', 'unmute', 'emit',
+            ],
             'data type directives'
         )
         self.assertIsFile(os.path.join(test_tmp_dir, 'tester-assembly.sublime-color-scheme'))

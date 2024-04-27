@@ -15,4 +15,4 @@ class DeferredNumericOperand(IndirectNumericOperand):
 
     @cached_property
     def match_pattern(self) -> str:
-        return r'^\[\s*\[\s*({0})\s*\]\s*\]$'.format(super(DeferredNumericOperand.__bases__[0], self).match_pattern)
+        return fr'^\[\s*\[\s*({super(DeferredNumericOperand.__bases__[0], self).match_pattern})\s*\]\s*\]$'

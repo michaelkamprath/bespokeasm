@@ -12,7 +12,7 @@ class OperandType(enum.Enum):
     UNKNOWN = -1
     EMPTY = 1
     NUMERIC = 9
-    NUMERIC_BYTECODE = 11
+    NUMERIC_BYTECODE = 12
     REGISTER = 8
     INDEXED_REGISTER = 6
     DICTIONARY_KEY = 7
@@ -20,7 +20,8 @@ class OperandType(enum.Enum):
     INDIRECT_INDEXED_REGISTER = 3
     INDIRECT_NUMERIC = 4
     DEFERRED_NUMERIC = 5
-    RELATIVE_ADDRESS = 10
+    ADDRESS = 10
+    RELATIVE_ADDRESS = 11
 
 
 class OperandBytecodePositionType(enum.Enum):
@@ -123,6 +124,9 @@ class OperandWithArgument(Operand):
 
     @property
     def argument_size(self) -> int:
+        """Returns the bytecode size of the argument for this operand. Must be configured."""
+        if 'size' not in self._config['argument']:
+            sys.exit(f'ERROR: Operand {self} does not have a configured argument size')
         return self._config['argument']['size']
 
     @property
@@ -131,6 +135,7 @@ class OperandWithArgument(Operand):
 
     @property
     def argument_endian(self) -> str:
+        """Returns the endianess of the argument for this operand. Defaults to the configured default endian."""
         return self._config['argument'].get('endian', self._default_endian)
 
 

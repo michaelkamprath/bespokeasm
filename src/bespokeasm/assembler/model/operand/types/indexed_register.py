@@ -39,7 +39,7 @@ class IndexedRegisterOperand(RegisterOperand):
 
         self._index_parse_pattern = '|'.join(op_match_patterns)
         self._parse_pattern = re.compile(
-            r'^{0}$'.format(self.match_pattern),
+            fr'^{self.match_pattern}$',
             flags=(re.IGNORECASE | re.MULTILINE),
         )
 

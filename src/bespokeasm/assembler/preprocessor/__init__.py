@@ -37,7 +37,7 @@ class Preprocessor:
             self._symbols[name] = symbol
             return symbol
         else:
-            raise ValueError(f"Symbol {name} already exists")
+            raise ValueError(f'Symbol {name} already exists')
 
     def get_symbol(self, name: str) -> PreprocessorSymbol:
         return self._symbols.get(name, None)

@@ -27,14 +27,14 @@ class SourceDetailsPrettyPrinter(PrettyPrinterBase):
         blank_byte_text = ''.join([' '*COL_WIDTH_BYTE])
         blank_binary_text = ''.join([' '*COL_WIDTH_BINARY])
 
-        header_text = ' {0} | {1} | {2} | {3} | {4} | Comment '.format(
+        header_text = ' {} | {} | {} | {} | {} | Comment '.format(
             'Line'.center(COL_WIDTH_LINE),
             'Code'.ljust(self.max_instruction_width + INSTRUCTION_INDENT),
             'Address'.center(COL_WIDTH_ADDRESS),
             'Byte'.center(COL_WIDTH_BYTE),
             'Binary'.center(COL_WIDTH_BINARY),
         )
-        header_line_text = '-{0}-+-{1}-+-{2}-+-{3}-+-{4}-+---------------'.format(
+        header_line_text = '-{}-+-{}-+-{}-+-{}-+-{}-+---------------'.format(
             ''.join('-'*(COL_WIDTH_LINE)),
             ''.join('-'*(self.max_instruction_width)),
             ''.join('-'*(COL_WIDTH_ADDRESS)),

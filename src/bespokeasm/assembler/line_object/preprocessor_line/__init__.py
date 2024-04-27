@@ -8,4 +8,4 @@ class PreprocessorLine(LineObject):
         super().__init__(line_id, instruction, comment, memzone)
 
     def __repr__(self) -> str:
-        return f"PreprocessorLine<{self._line_id}>"
+        return f'PreprocessorLine<{self._line_id}>'

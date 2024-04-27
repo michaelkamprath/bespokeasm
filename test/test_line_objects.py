@@ -8,12 +8,13 @@ from bespokeasm.assembler.line_object.factory import LineOjectFactory
 from bespokeasm.assembler.line_object.data_line import DataLine
 from bespokeasm.assembler.line_object.label_line import LabelLine, is_valid_label
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
-from bespokeasm.assembler.line_object.directive_line import AddressOrgLine
+from bespokeasm.assembler.line_object.directive_line.address import AddressOrgLine
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
+from bespokeasm.assembler.line_object.emdedded_string import EmbeddedString
 
 from test import config_files
 
@@ -767,6 +768,109 @@ class TestLineObject(unittest.TestCase):
                     ConditionStack(),
                     0,
                 )
+
+    def test_embedded_string_lines(self):
+        fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        # force embedded strings to be allowed
+        isa_model._config['general']['allow_embedded_strings'] = True
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
+
+        lineid = LineIdentifier(66, 'test_embedded_string_lines')
+
+        # test creation of embedded string object
+        t1 = EmbeddedString.factory(
+            lineid,
+            '"this is a test" nop',
+            'embedded string',
+            memzone_mngr.global_zone,
+            0,
+        )
+        self.assertIsInstance(t1, EmbeddedString)
+        self.assertEqual(t1.byte_size, 15, 'string has 15 bytes')
+        t1.generate_bytes()
+        self.assertEqual(t1.get_bytes(), bytearray([ord(c) for c in 'this is a test\x00']), 'string matches')
+        self.assertEqual(t1.instruction, '"this is a test"', 'instruction string matches')
+
+        # test the non-creation of an embedded string object
+        t2 = EmbeddedString.factory(
+            lineid,
+            'this is a test',
+            'embedded string',
+            memzone_mngr.global_zone,
+            0,
+        )
+        self.assertIsNone(t2, 'no embedded string object created')
+
+        # test the line object creation for a complext line with an embedded string
+
+        lo1: list[LineObject] = LineOjectFactory.parse_line(
+            lineid,
+            'add 5 "this is a test" nop',
+            isa_model,
+            TestLineObject.label_values,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+            Preprocessor(),
+            ConditionStack(),
+            0,
+        )
+        self.assertEqual(len(lo1), 3, 'There should be 3 parsed instructions')
+        self.assertIsInstance(lo1[0], InstructionLine)
+        self.assertIsInstance(lo1[1], EmbeddedString)
+        self.assertIsInstance(lo1[2], InstructionLine)
+        self.assertEqual(lo1[1].byte_size, 15, 'string has 15 bytes')
+        for lo in lo1:
+            lo.generate_bytes()
+        self.assertEqual(lo1[1].get_bytes(), bytearray([ord(c) for c in 'this is a test\x00']), 'string matches')
+
+        # test that when embedded strings are not allowed, the embedded string is not created
+        isa_model._config['general']['allow_embedded_strings'] = False
+        with self.assertRaises(SystemExit, msg='embedded strings should not be allowed'):
+            LineOjectFactory.parse_line(
+                lineid,
+                'add 5 "this is a test" nop',
+                isa_model,
+                TestLineObject.label_values,
+                memzone_mngr.global_zone,
+                memzone_mngr,
+                Preprocessor(),
+                ConditionStack(),
+                0,
+            )
+
+    def test_embedded_string_bugs(self):
+        fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        # force embedded strings to be allowed
+        isa_model._config['general']['allow_embedded_strings'] = True
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
+
+        lineid = LineIdentifier(67, 'test_embedded_string_bugs')
+        # test bug where length of embedded string was not being calculated correctly
+        # escapes sequences in code files are double escaped when read in, so the
+        # string "\n" is read as "\\n". The byte conversion that is done will properly
+        # convert the string to the escaped value, but the bug was we were taking the
+        # length of the string before the escape sequences were converted, so the length
+        # of the string was 3 instead of 2.
+        t1 = EmbeddedString.factory(
+            lineid,
+            '"\\n"',
+            'embedded string',
+            memzone_mngr.global_zone,
+            0,
+        )
+        self.assertIsNotNone(t1, 'embedded string object created')
+        self.assertIsInstance(t1, EmbeddedString)
+        self.assertEqual(t1.byte_size, 2, 'string has 2 bytes')
 
 
 if __name__ == '__main__':

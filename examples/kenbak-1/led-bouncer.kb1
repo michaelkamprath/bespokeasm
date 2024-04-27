@@ -1,10 +1,10 @@
 ; LED Chaser
 ;
-; This program causes the LEDs on the KENBAK-1 display to "bounce" between the 
+; This program causes the LEDs on the KENBAK-1 display to "bounce" between the
 ; edges or between positions corresponding to pressed input buttons. The
-; bouncing algorithm doesn't handle being too tightly contaied and so 
+; bouncing algorithm doesn't handle being too tightly contaied and so
 ; the boucing will "tunnel" through the barrier in those cases ;-)
-; 
+;
 
 start:
     ld a, 1
@@ -68,7 +68,7 @@ wall_bounce:
 .bounce_right:
     ld a, %01000000             ; load A with new ball position
     ld [ball_position], a       ; update ball position variable
-    jp main_loop 
+    jp main_loop
 
 
 ; toggle_direction
@@ -90,7 +90,7 @@ toggle_direction:
 ; update_display
 ;   Updates the display register to have a combination of the ball poisiton
 ;   and the buttons pressed based on PWM status.
-; 
+;
 PWM_MASK = %00000111
 update_display:
 	.byte 0					   ; return address storage

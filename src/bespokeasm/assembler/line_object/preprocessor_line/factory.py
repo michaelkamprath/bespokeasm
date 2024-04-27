@@ -66,6 +66,7 @@ class PreprocessorLineFactory:
                         instruction,
                         comment,
                         current_memzone,
+                        preprocessor,
                         condition_stack,
                     )]
         return []

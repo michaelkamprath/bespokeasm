@@ -6,13 +6,14 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object.label_line import LabelLine
-from bespokeasm.assembler.line_object.directive_line import DirectiveLine
+from bespokeasm.assembler.line_object.directive_line.factory import DirectiveLine
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.line_object.preprocessor_line.factory import PreprocessorLineFactory
 from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
+from bespokeasm.assembler.line_object.emdedded_string import EmbeddedString
 
 
 class LineOjectFactory:
@@ -72,7 +73,7 @@ class LineOjectFactory:
             # parse instruction
             while len(instruction_str) > 0:
                 # try label
-                line_obj = LabelLine.factory(
+                line_obj: LineObject = LabelLine.factory(
                     line_id,
                     instruction_str,
                     comment_str,
@@ -93,12 +94,26 @@ class LineOjectFactory:
                     model.endian,
                     current_memzone,
                     memzone_manager,
-                    model.cstr_terminator,
+                    model,
                 )
                 if line_obj is not None:
                     line_obj_list.append(line_obj)
                     instruction_str = instruction_str.replace(line_obj.instruction, '', 1).strip()
                     continue
+
+                # try embedded string
+                if model.allow_embedded_strings:
+                    line_obj = EmbeddedString.factory(
+                        line_id,
+                        instruction_str,
+                        comment_str,
+                        current_memzone,
+                        model.cstr_terminator,
+                    )
+                    if line_obj is not None:
+                        line_obj_list.append(line_obj)
+                        instruction_str = instruction_str.replace(line_obj.instruction, '', 1).strip()
+                        continue
 
                 # try instruction
                 line_obj = InstructionLine.factory(
@@ -114,8 +129,8 @@ class LineOjectFactory:
                     instruction_str = instruction_str.replace(line_obj.instruction, '', 1).strip()
                     continue
 
-                # if we are here, that means nothing was matched. Shouldn't happen, but we will break none the less
-                break
+                # if we are here, that means nothing was matched. Shouldn't happen, so let's error out
+                sys.exit(f'ERROR: {line_id} - unknown instruction "{instruction_str.strip()}"')
 
         if len(line_obj_list) == 0:
             if instruction_str != '':
