@@ -27,7 +27,7 @@ start:
     phsptr is_prime_str jps _PrintPtr pls2
     ; jps _WaitInput
 .increment_n:
-    inq_ _n_value
+    inq _n_value
     jpa .n_loop
 
 is_prime_str: .cstr " is prime!\n"

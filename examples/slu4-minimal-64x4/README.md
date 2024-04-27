@@ -53,7 +53,6 @@ The following instruction macros have been added in the ISA configuration file f
 | `mqq` | zero page address | zero page address | Copies a 4 byte long at the first zero page address to the 4 bytes at the second zero page address |
 | `mll` | abs address | abs address | Copies a 4 byte long at the first absolute address to the 4 bytes at the second absolute address |
 | `miq` | immediate | zero page address | Copies an immediate 4-byte long to a zero page long |
-| `inq_` | zero page address | - | Increments a 4 byte long at a zero page address. Fixes the bug with the built-in `INQ` instruction as of v1.1.0 of the Minimal 64x4 OS. |
 
 ### Assembly Syntax
 **BespokeASM**'s syntax is close to the syntax that Carsten used for the Minimal 64x4's assembly language. However, there are some differences:

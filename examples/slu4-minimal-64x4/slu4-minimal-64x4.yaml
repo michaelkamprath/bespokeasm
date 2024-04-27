@@ -3016,16 +3016,3 @@ macros:
       instructions:
         - "miv @ARG(0) & $0000FFFF ,@ARG(1)+0"
         - "miv (@ARG(0) & $FFFF0000) >> 16,@ARG(1)+2"
-  inq_:
-    # increment zero-page long. This macro exists because the built-in instruction INQ has a bug.
-    - operands:
-        count: 1
-        operand_sets:
-          list:
-            - zero_page
-      instructions:
-        - "inv @ARG(0)+0"
-        - "ldi 0"
-        - "ac.z @ARG(0)+2"
-        - "ldi 0"
-        - "ac.z @ARG(0)+3"
