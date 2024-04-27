@@ -14,8 +14,7 @@ _n_value:            .zero 4
 .org 0 "USER_APPS"
 start:
     ; init N-value to 1
-    clq _n_value
-    miz 1,_n_value+0
+    miq 1,_n_value+0
 .n_loop:
     phsi 0
     phsq _n_value
@@ -28,7 +27,7 @@ start:
     phsptr is_prime_str jps _PrintPtr pls2
     ; jps _WaitInput
 .increment_n:
-    inq _n_value
+    inq_ _n_value
     jpa .n_loop
 
 is_prime_str: .cstr " is prime!\n"

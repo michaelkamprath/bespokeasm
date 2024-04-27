@@ -26,6 +26,7 @@ _counter:               .byte 0
 ;   Returns
 ;       flags will be set per comparison
 ;
+.align
 compare_uint32ss:
     ; load values into zero page and then use _compare_uint32_XY
     ms4q 7,_argX4

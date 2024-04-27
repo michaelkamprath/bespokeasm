@@ -29,13 +29,31 @@ The following instruction macros have been added in the ISA configuration file f
 | Macros Instruction | Operand 1 | Operand 2 | Description |
 |:-:|:-:|:-:|:--|
 | `spinit` | - | - | Init the stack popint to a value of `0xFFFE`. |
-| `phsi` | 1 byte | - | Pushes a 1 byte immediate value onto the stack. |
-| `phs2i` | 2 bytes | - | Pushes a 2 byte immediate value onto the stack. |
-| `phs4i` | 4 bytes | - | Pushes a 4 byte immediate value onto the stack. |
-| `phsptr` | 2 bytes | - | Pushes a 2 byte immediate absolute address onto the stack per the Min 64x4 calling convention. Similar to `phs2i` but the operand is validated as an address. |
+| `phsi` |  immediate | - | Pushes a 1 byte immediate byte onto the stack. |
+| `phs2i` | immediate | - | Pushes a 2 byte immediate word onto the stack. |
+| `phs4i` | immediate | - | Pushes a 4 byte immediate long onto the stack. |
+| `phsptr` | abs address | - | Pushes a 2 byte immediate absolute address onto the stack per the Min 64x4 calling convention. Similar to `phs2i` but the operand is validated as an address. |
+| `phs2s` | offset | - | Pushes a 2 byte word from the stack at the given offset onto stack |
+| `phs4s` | offset | - | Pushes a 4 byte long from the stack at the given offset onto stack |
+| `phsz` | zero page address | - | Pushes a 1 byte value from the zero page address onto the stack. |
+| `phsv` | zero page address | - | Pushes a 2 byte word from the zero page address onto the stack. |
+| `phsq` | zero page address | - | Pushes a 4 byte long from the zero page address onto the stack. |
 | `pls2` | - | - | Pops a 2 byte value from the stack. |
 | `pls4` | - | - | Pops a 4 byte value from the stack. |
-
+| `mws2` | abs address | offset | Copies a 2 byte word from an absolute address to a specific offset on the stack. |
+| `ms2w` | offset | abs address | Copies a 2 byte word from a specific offset on the stack to an absolute address. |
+| `mvs2` | zero page address | offset | Copies a 2 byte word from a zero page address to a specific offset on the stack. |
+| `ms2v` | offset | zero page address | Copies a 2 byte word from a specific offset on the stack to a zero page address. |
+| `ms4q` | offset | zero page address | Copies a 4 byte long from a specific offset on the stack to a zero page address. |
+| `mqs4` | zero page address | offset | Copies a 4 byte long from a zero page address to a specific offset on the stack. |
+| `mls4` | abs address | offset | Copies a 4 byte long from an absolute address to a specific offset on the stack. |
+| `ms4l` | offset | abs address | Copies a 4 byte long from a specific offset on the stack to an absolute address. |
+| `aqq` | zero page address | zero page address | Adds two 4 byte longs from zero page addresses and stores the result in the second zero page address. |
+| `sqq` | zero page address | zero page address | Subtracts the first 4 byte long at a zero page address from the second and stores the result in the second zero page address. |
+| `mqq` | zero page address | zero page address | Copies a 4 byte long at the first zero page address to the 4 bytes at the second zero page address |
+| `mll` | abs address | abs address | Copies a 4 byte long at the first absolute address to the 4 bytes at the second absolute address |
+| `miq` | immediate | zero page address | Copies an immediate 4-byte long to a zero page long |
+| `inq_` | zero page address | - | Increments a 4 byte long at a zero page address. Fixes the bug with the built-in `INQ` instruction as of v1.1.0 of the Minimal 64x4 OS. |
 
 ### Assembly Syntax
 **BespokeASM**'s syntax is close to the syntax that Carsten used for the Minimal 64x4's assembly language. However, there are some differences:
