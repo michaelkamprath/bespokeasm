@@ -14,9 +14,11 @@ Changes that are planned but not implemented yet:
   * missing `:` after labels
   * unknown labels
 * Add named label scopes. This would allow a label to be defined in a specific scope that can be shared across files.
-* Create a "align if needed" preprocessor directive paid that generates an `.align` directive is the bytecode in between the paid isn't naturally on the same page and can fit on the same page if aligned. An error would be benerated if the block of code can't fit on the same page regardless of alignment.
+* Create a "align if needed" preprocessor directive paid that generates an `.align` directive if the bytecode in between the pair isn't naturally on the same page and can fit on the same page if aligned. An error would be benerated if the block of code can't fit on the same page regardless of alignment.
 
 ## [Unreleased]
+
+## [0.4.2]
 *  Added support for The Minimal 64x4 Home Computer with an example and updated assembler functionality to support it.
 *  Added `address` operand type that enables several features specific to absolute addresses, include slicing the address to support "short jump" type instructions.
 *  Added `.align` directive to align the current address to a multiple of a given value.
@@ -153,7 +155,8 @@ First tracked released
 * Enabled the `reverse_argument_order` instruction option be applied to a specific operand configuration. This slightly changed the configuration file format.
 * Added ability for instructions with operands to have a single "empty operand" variant, e.g., `pop`
 
-[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/michaelkamprath/bespokeasm/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/michaelkamprath/bespokeasm/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.3.3...v0.4.0
 [0.3.3]: https://github.com/michaelkamprath/bespokeasm/compare/v0.3.2...v0.3.3
