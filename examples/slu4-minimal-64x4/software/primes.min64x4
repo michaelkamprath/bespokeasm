@@ -124,5 +124,5 @@ is_prime32:
 .temp_val: .4byte 0
 .isquared: .4byte 0
 
-#include "mathlib32.min64x4"
+#include "math32lib.min64x4"
 #include "stringlib.min64x4"
