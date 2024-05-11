@@ -14,7 +14,7 @@ _n_value:            .zero 4
 .org 0 "USER_APPS"
 start:
     ; init N-value to 1
-    miq 1,_n_value+0
+    m4iq 1,_n_value+0
 .n_loop:
     phsi 0
     phsq _n_value

@@ -52,7 +52,7 @@ The following instruction macros have been added in the ISA configuration file f
 | `sqq` | zero page address | zero page address | Subtracts the first 4 byte long at a zero page address from the second and stores the result in the second zero page address. |
 | `mqq` | zero page address | zero page address | Copies a 4 byte long at the first zero page address to the 4 bytes at the second zero page address |
 | `mll` | abs address | abs address | Copies a 4 byte long at the first absolute address to the 4 bytes at the second absolute address |
-| `miq` | immediate | zero page address | Copies an immediate 4-byte long to a zero page long |
+| `m4iq` | immediate | zero page address | Copies an immediate 4-byte long to a zero page long |
 
 ### Assembly Syntax
 **BespokeASM**'s syntax is close to the syntax that Carsten used for the Minimal 64x4's assembly language. However, there are some differences:
