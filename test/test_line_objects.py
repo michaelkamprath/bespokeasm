@@ -24,12 +24,15 @@ class TestLineObject(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        lineid = LineIdentifier(1, 'setUpClass')
         global_scope = GlobalLabelScope(set())
-        global_scope.set_label_value('var1', 12, 1)
-        global_scope.set_label_value('my_val', 8, 2)
-        global_scope.set_label_value('the_two', 2, 3)
+        global_scope.set_label_value('var1', 12, lineid)
+        global_scope.set_label_value('my_val', 8, lineid)
+        global_scope.set_label_value('the_two', 2, lineid)
+        global_scope.set_label_value('VALUE1', 8777773, lineid)
+        global_scope.set_label_value('VALUE2', 139, lineid)
         local_scope = LabelScope(LabelScopeType.LOCAL, global_scope, 'TestInstructionParsing')
-        local_scope.set_label_value('.local_var', 10, 3)
+        local_scope.set_label_value('.local_var', 10, lineid)
         cls.label_values = local_scope
 
     def setUp(self):
@@ -871,6 +874,61 @@ class TestLineObject(unittest.TestCase):
         self.assertIsNotNone(t1, 'embedded string object created')
         self.assertIsInstance(t1, EmbeddedString)
         self.assertEqual(t1.byte_size, 2, 'string has 2 bytes')
+
+        # test single lines of code where the embedded string is in between two statements and
+        # contains a newline character.
+        # for example:
+        #   add 5 "this is a test\n" nop
+        # the embedded string should be parsed as a separate line object
+        lo1: list[LineObject] = LineOjectFactory.parse_line(
+            lineid,
+            'add 5 "this is a test\nof new lines" nop ; comments',
+            isa_model,
+            TestLineObject.label_values,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+            Preprocessor(),
+            ConditionStack(),
+            0,
+        )
+        self.assertEqual(len(lo1), 3, 'There should be 3 parsed instructions')
+        self.assertIsInstance(lo1[0], InstructionLine)
+        self.assertIsInstance(lo1[1], EmbeddedString)
+        self.assertIsInstance(lo1[2], InstructionLine)
+        self.assertEqual(lo1[1].byte_size, 28, 'string has 28 bytes (27 characters + 1 null terminator)')
+
+    def test_multiple_embedded_stringa_bug(self):
+        # ensure that a single line of code can correctly parse multiple embedded strings
+        fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        isa_model._config['general']['allow_embedded_strings'] = True
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
+        lineid = LineIdentifier(88, 'test_multiple_embedded_stringa_bug')
+        # test a more complex case where the embedded string is in the middle of a line
+        # for example:
+        #   add 5 "string 1" nop "string 2" nop
+        # the embedded string should be parsed as a separate line object
+        lo2: list[LineObject] = LineOjectFactory.parse_line(
+            lineid,
+            'add VALUE2 "string 1" nop "string 2" nop',
+            isa_model,
+            TestLineObject.label_values,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+            Preprocessor(),
+            ConditionStack(),
+            0,
+        )
+        self.assertEqual(len(lo2), 5, 'There should be 5 parsed instructions')
+        self.assertIsInstance(lo2[0], InstructionLine)
+        self.assertIsInstance(lo2[1], EmbeddedString)
+        self.assertIsInstance(lo2[2], InstructionLine)
+        self.assertIsInstance(lo2[3], EmbeddedString)
+        self.assertIsInstance(lo2[4], InstructionLine)
 
 
 if __name__ == '__main__':
