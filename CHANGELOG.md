@@ -17,6 +17,8 @@ Changes that are planned but not implemented yet:
 * Create a "align if needed" preprocessor directive paid that generates an `.align` directive if the bytecode in between the pair isn't naturally on the same page and can fit on the same page if aligned. An error would be benerated if the block of code can't fit on the same page regardless of alignment.
 
 ## [Unreleased]
+* Upgrade python version requirements to 3.11
+* Fixed a bug where embedded stringsd weren't properly parsed if they contained a newline character or there were multiple embedded strings per line
 
 ## [0.4.2]
 *  Added support for The Minimal 64x4 Home Computer with an example and updated assembler functionality to support it.

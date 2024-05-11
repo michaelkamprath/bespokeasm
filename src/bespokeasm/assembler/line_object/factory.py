@@ -22,7 +22,7 @@ class LineOjectFactory:
         flags=re.IGNORECASE | re.MULTILINE
     )
     PATTERN_INSTRUCTION_CONTENT = re.compile(
-        r'^([^\;\n]*)',
+        r'^([^;\v]*)(?:;.*)?$',
         flags=re.IGNORECASE | re.MULTILINE
     )
 
@@ -68,7 +68,7 @@ class LineOjectFactory:
                     log_verbosity,
                 ))
         else:
-            # resolve proprocessor symbols
+            # resolve preprocessor symbols
             instruction_str = preprocessor.resolve_symbols(line_id, instruction_str)
             # parse instruction
             while len(instruction_str) > 0:

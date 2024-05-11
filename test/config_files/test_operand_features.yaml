@@ -240,3 +240,18 @@ instructions:
               argument:
                 size: 8
                 byte_align: true
+macros:
+  add_twice:
+    - operands:
+        count: 1
+        specific_operands:
+          numeric_expression:
+            list:
+              numeric_expression:
+                type: numeric
+                argument:
+                  size: 8
+                  byte_align: true
+      instructions:
+        - "add @ARG(0)"
+        - "add @ARG(0)"

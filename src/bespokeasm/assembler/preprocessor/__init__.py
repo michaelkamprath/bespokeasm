@@ -52,6 +52,7 @@ class Preprocessor:
         # Errors if there are recursion loops caused byt symbols that indirectly refer to themselves.
 
         # to make this fast, all symbol candidates should be identified first, then the symbols should be resolved
+        # TODO: ignore tokens that are in quoted strings
         found_symbols: list[str] = re.findall(f'\\b({SYMBOL_PATTERN})\\b', line_str)
         symbols_replaced: set[str] = set()
 

@@ -10,7 +10,7 @@ from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.line_identifier import LineIdentifier
 
 
-EMBEDDED_STRING_PATTERN = r'(?P<quote>[\"])((?:\\(?P=quote)|.)*)(?P=quote)'
+EMBEDDED_STRING_PATTERN = r'(?P<quote>[\"])((?:\\(?P=quote)|.|\n)*?)(?P=quote)'
 
 
 class EmbeddedString(LineWithBytes):

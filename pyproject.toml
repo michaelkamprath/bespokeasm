@@ -4,18 +4,18 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bespokeasm"
-version = "0.4.2"
+version = "0.4.3"
 authors = [
   { name="Michael Kamprath", email="michael@kamprath.net" },
 ]
 description = "A customizable byte code assembler that allows for the definition of custom instruction set architecture"
 readme = "README.md"
 license = {file = "LICENSE"}
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 classifiers = [
     "Development Status :: 4 - Beta",
     "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
-    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.11",
     "Topic :: Software Development :: Assemblers",
 ]
 dependencies = [
