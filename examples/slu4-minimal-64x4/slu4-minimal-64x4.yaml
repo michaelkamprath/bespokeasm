@@ -2965,7 +2965,7 @@ macros:
             - zero_page
             - zero_page
       instructions:
-        - "szz @ARG(0)+0,@ARG(1)+0"
+        - "svv @ARG(0)+0,@ARG(1)+0"
         - "ldz @ARG(0)+2"
         - "sc.z @ARG(1)+2"
         - "ldz @ARG(0)+3"
@@ -3005,13 +3005,13 @@ macros:
       instructions:
         - "mwv @ARG(0)+0,@ARG(1)+0"
         - "mwv @ARG(0)+2,@ARG(1)+2"
-  miq:
+  m4iq:
     # move 4 bytes long from immediate to zero-page long
     - operands:
         count: 2
         operand_sets:
           list:
-            - immediate_16bit
+            - immediate_32bit
             - zero_page
       instructions:
         - "miv @ARG(0) & $0000FFFF ,@ARG(1)+0"
