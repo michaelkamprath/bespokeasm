@@ -695,6 +695,30 @@ class TestInstructionParsing(unittest.TestCase):
         t3.generate_bytes()
         self.assertEqual(list(t3.get_bytes()), [0x81, 0x32, 0x10], 'instruction byte should match')
 
+    def test_operand_expression(self):
+        fp = pkg_resources.files(config_files).joinpath('test_instruction_operands.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
+
+        lineid = LineIdentifier(42, 'test_operand_order')
+
+        t1 = InstructionLine.factory(
+            lineid,
+            'ADI var1w+0',
+            'comment',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+
+        t1.label_scope = TestInstructionParsing.label_values
+        self.assertIsInstance(t1, InstructionLine)
+        self.assertEqual(t1.byte_size, 2, 'has 2 bytes')
+
     def test_relative_address_operand(self):
         fp = pkg_resources.files(config_files).joinpath('test_instruction_operands.yaml')
         isa_model = AssemblerModel(str(fp), 0)

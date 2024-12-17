@@ -185,7 +185,7 @@ def _lexical_analysis(line_id: LineIdentifier, s: str) -> list[ExpressionNode]:
         if part in TOKEN_MAPPINGS:
             token_type = TOKEN_MAPPINGS[part]
             token = ExpressionNode(token_type, value=part)
-        elif part.startswith('BYTE'):
+        elif re.match(r'^BYTE\d\(', part):
             token = ExpressionNode(TokenType.T_BYTE, value=part)
         elif is_string_numeric(part):
             token = ExpressionNode(TokenType.T_NUM, value=parse_numeric_string(part))

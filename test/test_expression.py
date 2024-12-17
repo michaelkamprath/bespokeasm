@@ -11,10 +11,12 @@ class TestExpression(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.label_values = GlobalLabelScope(set())
-        cls.label_values.set_label_value('value_1', 12, 1)
-        cls.label_values.set_label_value('the_8_ball', 8, 2)
-        cls.label_values.set_label_value('MixedCase', 2, 3)
-        cls.label_values.set_label_value('MAX_N', 20, 1)
+        line = LineIdentifier(0, 'setUpClass')
+        cls.label_values.set_label_value('value_1', 12, line)
+        cls.label_values.set_label_value('the_8_ball', 8, line)
+        cls.label_values.set_label_value('MixedCase', 2, line)
+        cls.label_values.set_label_value('MAX_N', 20, line)
+        cls.label_values.set_label_value('BYTECODE_LL0', 0x07, line)
 
     def test_expression_parsing(self):
         line_id = LineIdentifier(1212, 'test_expression_parsing')
@@ -58,6 +60,10 @@ class TestExpression(unittest.TestCase):
         self.assertEqual(
             parse_expression(line_id, '(MAX_N + 3) % %101').get_value(TestExpression.label_values, line_id),
             3, 'test handling of modulo: (MAX_N + 3) % %101 = 3'
+        )
+        self.assertEqual(
+            parse_expression(line_id, 'BYTECODE_LL0').get_value(TestExpression.label_values, line_id),
+            0x07, 'test handling of label with prefix: BYTECODE_LL0'
         )
 
         with self.assertRaises(SyntaxError, msg='only integer numeric values are supported'):

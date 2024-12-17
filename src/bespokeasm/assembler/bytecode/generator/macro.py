@@ -39,7 +39,7 @@ class MacroBytecodeGenerator:
             if assembled_instruction is not None:
                 return assembled_instruction
 
-        sys.exit(f'ERROR: {line_id} - Instruction "{mnemonic}" has no valid operands configured.')
+        sys.exit(f'ERROR: {line_id} - Macro "{mnemonic}" has no valid operands configured.')
 
     @classmethod
     def generate_variant_bytecode_parts(
