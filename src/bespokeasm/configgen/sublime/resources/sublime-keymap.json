@@ -1,42 +1,70 @@
 [
-	{
-        "keys": ["enter"],
-        "context": [
-            { "key": "selector", "operator": "equal", "operand": "source.bespokeasm" },
-            {
-                "key": "preceding_text",
-                "operator": "regex_match",
-                "operand": "^\\;.*$"
-            }
-        ],
-        "command": "insert",
-        "args": {"characters": "\n; "}
+  {
+    "args": {
+      "characters": "\n; "
     },
-	{
-        "keys": ["enter"],
-        "context": [
-            { "key": "selector", "operator": "equal", "operand": "source.bespokeasm" },
-            {
-                "key": "preceding_text",
-                "operator": "regex_match",
-                "operand": "^\\; $"
-            }
-        ],
-        "command": "insert",
-        "args": {"characters": "\n"}
+    "command": "insert",
+    "context": [
+      {
+        "key": "selector",
+        "operand": "source.bespokeasm",
+        "operator": "equal"
+      },
+      {
+        "key": "preceding_text",
+        "operand": "^\\;.*$",
+        "operator": "regex_match"
+      }
+    ],
+    "keys": [
+      "enter"
+    ]
+  },
+  {
+    "args": {
+      "characters": "\n"
     },
-    {
-        "keys": ["enter"],
-        "context": [
-            { "key": "selector", "operator": "equal", "operand": "source.bespokeasm" },
-            { "key": "setting.auto_indent", "operator": "equal", "operand": true },
-            {
-                "key": "preceding_text",
-                "operator": "regex_match",
-                "operand": "^\\s*(?:\\.|_|\\w){1}[\\w\\d_]*(?:\\:)"
-            }
-        ],
-        "command": "insert",
-        "args": {"characters": "\n\t"}
-    }
+    "command": "insert",
+    "context": [
+      {
+        "key": "selector",
+        "operand": "source.bespokeasm",
+        "operator": "equal"
+      },
+      {
+        "key": "preceding_text",
+        "operand": "^\\; $",
+        "operator": "regex_match"
+      }
+    ],
+    "keys": [
+      "enter"
+    ]
+  },
+  {
+    "args": {
+      "characters": "\n\t"
+    },
+    "command": "insert",
+    "context": [
+      {
+        "key": "selector",
+        "operand": "source.bespokeasm",
+        "operator": "equal"
+      },
+      {
+        "key": "setting.auto_indent",
+        "operand": true,
+        "operator": "equal"
+      },
+      {
+        "key": "preceding_text",
+        "operand": "^\\s*(?:\\.|_|\\w){1}[\\w\\d_]*(?:\\:)",
+        "operator": "regex_match"
+      }
+    ],
+    "keys": [
+      "enter"
+    ]
+  }
 ]

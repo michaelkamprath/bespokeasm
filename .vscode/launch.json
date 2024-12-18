@@ -1,24 +1,24 @@
 {
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Python: Min64x4 Example Test",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/bespokeasm/__main__.py",
-            "console": "integratedTerminal",
-            "justMyCode": true,
-            "args": [
-                "compile",
-                "-c",
-                "${workspaceFolder}/examples/slu4-minimal-64x4/slu4-minimal-64x4.yaml",
-                "-n",
-                "-p",
-                "${workspaceFolder}/examples/slu4-minimal-64x4/software/primes.min64x4"
-            ],
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            }
-        }
-    ]
+  "configurations": [
+    {
+      "args": [
+        "compile",
+        "-c",
+        "${workspaceFolder}/examples/slu4-minimal-64x4/slu4-minimal-64x4.yaml",
+        "-n",
+        "-p",
+        "${workspaceFolder}/examples/slu4-minimal-64x4/software/primes.min64x4"
+      ],
+      "console": "integratedTerminal",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "justMyCode": true,
+      "name": "Python: Min64x4 Example Test",
+      "program": "${workspaceFolder}/src/bespokeasm/__main__.py",
+      "request": "launch",
+      "type": "debugpy"
+    }
+  ],
+  "version": "0.2.0"
 }

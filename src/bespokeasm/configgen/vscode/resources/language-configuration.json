@@ -1,41 +1,83 @@
 {
-	"comments": {
-		"lineComment": ";",
-		"blockComment": [ ";", ";" ]
-	},
-    "brackets": [
-        ["[", "]"],
-        ["(", ")"]
-    ],
-    "autoClosingPairs": [
-        { "open": "[", "close": "]" },
-        { "open": "(", "close": ")" },
-        { "open": "'", "close": "'", "notIn": ["string", "comment"] },
-        { "open": "\"", "close": "\"", "notIn": ["string"] }
-    ],
-    "surroundingPairs": [
-        ["[", "]"],
-        ["(", ")"],
-        ["'", "'"],
-        ["\"", "\""]
-    ],
-    "onEnterRules": [
-        {
-            "beforeText": "^\\s*(?:\\.|_|\\w){1}[\\w\\d_]*(?:\\:)",
-            "action": { "indent": "indent" }
-        },
-        {
-            "beforeText": "^\\;.*$",
-            "action": {
-                "indent": "none",
-                "appendText": "; "
-            }
-        }
-    ],
-    "folding": {
-        "markers": {
-            "start": "^(?:\\w|\\_){1}[\\w\\d_]*\\:",
-            "end": "^.*$(?=\\v^(?:(?:\\w|\\_){1}[\\w\\d_]*\\:|\\;))"
-        }
+  "autoClosingPairs": [
+    {
+      "close": "]",
+      "open": "["
+    },
+    {
+      "close": ")",
+      "open": "("
+    },
+    {
+      "close": "'",
+      "notIn": [
+        "string",
+        "comment"
+      ],
+      "open": "'"
+    },
+    {
+      "close": "\"",
+      "notIn": [
+        "string"
+      ],
+      "open": "\""
     }
+  ],
+  "brackets": [
+    [
+      "[",
+      "]"
+    ],
+    [
+      "(",
+      ")"
+    ]
+  ],
+  "comments": {
+    "blockComment": [
+      ";",
+      ";"
+    ],
+    "lineComment": ";"
+  },
+  "folding": {
+    "markers": {
+      "end": "^.*$(?=\\v^(?:(?:\\w|\\_){1}[\\w\\d_]*\\:|\\;))",
+      "start": "^(?:\\w|\\_){1}[\\w\\d_]*\\:"
+    }
+  },
+  "onEnterRules": [
+    {
+      "action": {
+        "indent": "indent"
+      },
+      "beforeText": "^\\s*(?:\\.|_|\\w){1}[\\w\\d_]*(?:\\:)"
+    },
+    {
+      "action": {
+        "appendText": "; ",
+        "indent": "none"
+      },
+      "beforeText": "^\\;.*$"
+    }
+  ],
+  "surroundingPairs": [
+    [
+      "[",
+      "]"
+    ],
+    [
+      "(",
+      ")"
+    ],
+    [
+      "'",
+      "'"
+    ],
+    [
+      "\"",
+      "\""
+    ]
+  ]
 }

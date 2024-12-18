@@ -1,34 +1,44 @@
 {
-    "name": "putey-assembly",
-    "displayName": "BespokeASM Assembly",
-    "version": "0.0.1",
-    "engines": {
-        "vscode": ">=0.9.0-pre.1"
-    },
-    "publisher": "bespokeasm",
-    "contributes": {
-        "languages": [{
-            "id": "putey1-assembly",
-            "extensions": [".asm"],
-            "configuration": "./language-configuration.json"
-        }],
-        "grammars": [{
-            "language": "putey1-assembly",
-            "scopeName": "source.asm",
-            "path": "./syntaxes/tmGrammar.json"
-        }],
-        "snippets": [{
-            "language": "putey1-assembly",
-            "path": "./snippets.json"
-        }],
-        "themes": [{
-            "label": "##LANGUAGE_ID## Theme",
-            "uiTheme": "vs-dark",
-            "path": "./bespokeasm.tmTheme"
-        }]
-    },
-    "categories": [
-        "Snippets",
-        "Programming Languages"
+  "categories": [
+    "Snippets",
+    "Programming Languages"
+  ],
+  "contributes": {
+    "grammars": [
+      {
+        "language": "putey1-assembly",
+        "path": "./syntaxes/tmGrammar.json",
+        "scopeName": "source.asm"
+      }
+    ],
+    "languages": [
+      {
+        "configuration": "./language-configuration.json",
+        "extensions": [
+          ".asm"
+        ],
+        "id": "putey1-assembly"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "putey1-assembly",
+        "path": "./snippets.json"
+      }
+    ],
+    "themes": [
+      {
+        "label": "##LANGUAGE_ID## Theme",
+        "path": "./bespokeasm.tmTheme",
+        "uiTheme": "vs-dark"
+      }
     ]
+  },
+  "displayName": "BespokeASM Assembly",
+  "engines": {
+    "vscode": ">=0.9.0-pre.1"
+  },
+  "name": "putey-assembly",
+  "publisher": "bespokeasm",
+  "version": "0.0.1"
 }

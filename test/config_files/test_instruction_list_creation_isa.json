@@ -1,108 +1,108 @@
 {
-    "description": "test_instruction_list_creation_isa",
-    "general" : {
-        "address_size": 4,
-        "endian": "big"
-    },
-    "registers": [],
-    "operand_sets": {
-        "1byte_value": {
-            "operand_values": {
-                "int8": {
-                    "type": "numeric",
-                    "argument": {
-                        "size": 8,
-                        "byte_align": true
-                    }
-                }
-            }
-        },
-        "address": {
-            "operand_values": {
-                "addr": {
-                    "type": "numeric",
-                    "argument": {
-                        "size": 4,
-                        "byte_align": false
-                    }
-                }
-            }
-        },
-        "2byte_expression": {
-            "operand_values": {
-                "int16": {
-                    "type": "numeric",
-                    "argument": {
-                        "byte_align": true,
-                        "size": 16,
-                        "endian": "little"
-                    }
-                }
-            }
+  "description": "test_instruction_list_creation_isa",
+  "general": {
+    "address_size": 4,
+    "endian": "big"
+  },
+  "instructions": {
+    "add": {
+      "bytecode": {
+        "size": 4,
+        "value": 2
+      },
+      "operands": {
+        "count": 1,
+        "operand_sets": {
+          "list": [
+            "address"
+          ]
         }
+      }
     },
-    "instructions": {
-        "lda": {
-            "operands": {
-                "count": 1,
-                "operand_sets": {
-                    "list": [
-                        "address"
-                    ]
-                }
-            },
-            "bytecode": {
-                "value": 1,
-                "size": 4
-            }
-        },
-        "add": {
-            "operands": {
-                "count": 1,
-                "operand_sets": {
-                    "list": [
-                        "address"
-                    ]
-                }
-            },
-            "bytecode": {
-                "value": 2,
-                "size": 4
-            }
-        },
-        "seta": {
-            "operands": {
-                "count": 1,
-                "operand_sets": {
-                    "list": [
-                        "2byte_expression"
-                    ]
-                }
-            },
-            "bytecode": {
-                "value": 3,
-                "size": 4
-            }
-        },
-        "plus": {
-            "operands": {
-                "count": 1,
-                "operand_sets": {
-                    "list": [
-                        "1byte_value"
-                    ]
-                }
-            },
-            "bytecode": {
-                "value": 4,
-                "size": 4
-            }
-        },
-        "hlt": {
-            "bytecode": {
-                "value": 15,
-                "size": 4
-            }
+    "hlt": {
+      "bytecode": {
+        "size": 4,
+        "value": 15
+      }
+    },
+    "lda": {
+      "bytecode": {
+        "size": 4,
+        "value": 1
+      },
+      "operands": {
+        "count": 1,
+        "operand_sets": {
+          "list": [
+            "address"
+          ]
         }
-   }
+      }
+    },
+    "plus": {
+      "bytecode": {
+        "size": 4,
+        "value": 4
+      },
+      "operands": {
+        "count": 1,
+        "operand_sets": {
+          "list": [
+            "1byte_value"
+          ]
+        }
+      }
+    },
+    "seta": {
+      "bytecode": {
+        "size": 4,
+        "value": 3
+      },
+      "operands": {
+        "count": 1,
+        "operand_sets": {
+          "list": [
+            "2byte_expression"
+          ]
+        }
+      }
+    }
+  },
+  "operand_sets": {
+    "1byte_value": {
+      "operand_values": {
+        "int8": {
+          "argument": {
+            "byte_align": true,
+            "size": 8
+          },
+          "type": "numeric"
+        }
+      }
+    },
+    "2byte_expression": {
+      "operand_values": {
+        "int16": {
+          "argument": {
+            "byte_align": true,
+            "endian": "little",
+            "size": 16
+          },
+          "type": "numeric"
+        }
+      }
+    },
+    "address": {
+      "operand_values": {
+        "addr": {
+          "argument": {
+            "byte_align": false,
+            "size": 4
+          },
+          "type": "numeric"
+        }
+      }
+    }
+  },
+  "registers": []
 }

@@ -1,22 +1,40 @@
 {
-    "cstr": {
-        "prefix": [".cstr", "cstr"],
-        "body": [".cstr \"$1\""],
-        "description": "A null-terminated string"
-    },
-    "fill": {
-        "prefix": [".fill", "fill"],
-        "body": [".fill $1, $2"],
-        "description": "Fill n-bytes with given value"
-    },
-    "include": {
-        "prefix": ["#include"],
-        "body": ["#include \"$1\""],
-        "description": "Include another source file"
-    },
-    "require": {
-        "prefix": ["#require"],
-        "body": ["#require \"$1 >= $2\""],
-        "description": "Require certain language version"
-    }
+  "cstr": {
+    "body": [
+      ".cstr \"$1\""
+    ],
+    "description": "A null-terminated string",
+    "prefix": [
+      ".cstr",
+      "cstr"
+    ]
+  },
+  "fill": {
+    "body": [
+      ".fill $1, $2"
+    ],
+    "description": "Fill n-bytes with given value",
+    "prefix": [
+      ".fill",
+      "fill"
+    ]
+  },
+  "include": {
+    "body": [
+      "#include \"$1\""
+    ],
+    "description": "Include another source file",
+    "prefix": [
+      "#include"
+    ]
+  },
+  "require": {
+    "body": [
+      "#require \"$1 >= $2\""
+    ],
+    "description": "Require certain language version",
+    "prefix": [
+      "#require"
+    ]
+  }
 }

@@ -1,264 +1,418 @@
 {
-    "scopeName": "source.asm",
-    "patterns": [{ "include": "#main" }],
-    "repository": {
-        "main": {
-            "patterns": [
-                { "include": "#instructions" },
-                { "include": "#macros" },
-                { "include": "#registers" },
-                { "include": "#compiler_labels" },
-                { "include": "#labels" },
-                { "include": "#constants" },
-                { "include": "#comments" },
-                { "include": "#numeric-values" },
-                { "include": "#operators" },
-                { "include": "#expressions" },
-                { "include": "#deferred-addressing"},
-                { "include": "#indirect-addressing"},
-                { "include": "#directives" },
-                { "include": "#strings" }
-            ]
-        },
-        "instructions": {
-            "name": "meta.function",
-            "patterns": [
-                { "include": "#strings" },
-                { "include": "#registers" },
-                { "include": "#compiler_labels" },
-                { "include": "#numeric-values" },
-                { "include": "#operators" },
-                { "include": "#expressions" },
-                { "include": "#deferred-addressing"},
-                { "include": "#indirect-addressing" },
-                { "include": "#operands_variables" },
-                {
-                    "name": "punctuation.separator",
-                    "match": "\\,"
-                }
-            ],
-            "begin": "(?i)(##INSTRUCTIONS##)",
-            "end": "(?i)(?=(?:\\s*\\;|\\s*$|##OPERATIONS##))",
-            "beginCaptures": {
-                "0": { "name": "variable.function.instruction" }
-            }
-        },
-        "macros": {
-            "name": "meta.function",
-            "patterns": [
-                { "include": "#strings" },
-                { "include": "#registers" },
-                { "include": "#compiler_labels" },
-                { "include": "#numeric-values" },
-                { "include": "#operators" },
-                { "include": "#expressions" },
-                { "include": "#deferred-addressing"},
-                { "include": "#indirect-addressing" },
-                { "include": "#operands_variables" },
-                {
-                    "name": "punctuation.separator",
-                    "match": "\\,"
-                }
-            ],
-            "begin": "(?i)(##MACROS##)",
-            "end": "(?i)(?=(?:\\s*\\;|\\s*$|##OPERATIONS##))",
-            "beginCaptures": {
-                "0": { "name": "variable.function.macro" }
-            }
-        },
-        "operands_variables": {
-            "name": "variable.parameter.instruction",
-            "match": "(?<!\\w)((?:\\.|_|\\w){1}[\\w\\d_]*)\\b"
-        },
-        "registers": {
-            "name": "variable.language.register",
-            "match": "(?i)(?:##REGISTERS##)"
-        },
-        "compiler_labels": {
-            "name": "constant.language",
-            "match": "\\b(?:##COMPILERCONSTANTS##)\\b"
-        },
-        "labels": {
-            "match": "((?:\\.|_|\\w){1}[\\w\\d_]*)(\\:)",
-            "captures": {
-                "1": { "name": "variable.other.label" },
-                "2": { "name": "punctuation.definition.variable.colon.label" }
-            }
-        },
-        "constants": {
-            "match": "^\\s*(\\w*)(?:\\s*)?(\\=|EQU)",
-            "captures": {
-                "1": { "name": "variable.other.constant" },
-                "2": { "name": "keyword.operator.assignment" }
-            }
-        },
-        "comments": {
-            "name": "comment.line.semicolon",
-            "begin": "\\;",
-            "end": "\\n"
-        },
-        "numeric-values": {
-            "patterns": [
-                {
-                    "name": "constant.numeric.integer.hexadecimal",
-                    "match": "(?<!\\w)(?:\\$[0-9a-fA-F]+|0x[0-9a-fA-F]+|[0-9a-fA-F]+H)\\b"
-                },
-                {
-                    "name": "constant.numeric.integer.binary",
-                    "match": "(?<!\\w)(?:(?:b|%)[01]+)\\b"
-                },
-                {
-                    "name": "constant.numeric.integer.decimal",
-                    "match": "(?<!\\w)(?:\\d+)\\b"
-                },
-                {
-                    "name": "constant.numeric.character",
-                    "match": "(?<!\\w)(?:\\'.\\')\\b"
-                }
-            ]
-        },
-        "operators": {
-            "patterns": [
-                {
-                    "name": "keyword.operator.arithmetic",
-                    "match": "[\\+\\-\\*\\/]{1}"
-                },
-                {
-                    "name": "keyword.operator.logical",
-                    "match": "[\\&\\|\\^]{1}"
-                },
-                {
-                    "name": "keyword.operator.bitwise",
-                    "match": "(?:<<|>>)"
-                },
-                {
-                    "name": "keyword.operator.word",
-                    "match": "\\b(?:##EXPRESSION_FUNCTIONS##)\\b"
-                },
-                {
-                    "name": "keyword.operator.comparison",
-                    "match": "(?:==|!=|>|>=|<|<=)"
-                }
-            ]
-        },
-        "expressions": {
-            "name": "meta.parens",
-             "patterns": [
-                { "include": "#numeric-values" },
-                { "include": "#compiler_labels" },
-                { "include": "#operands_variables" },
-                { "include": "#operators" }
-            ],
-            "begin": "\\(",
-            "end": "\\)",
-            "beginCaptures": {
-                "0": { "name": "punctuation.section.parens.begin" }
-            },
-            "endCaptures": {
-                "0": { "name": "punctuation.section.parens.end" }
-            },
-            "contentName": "expression.group"
-        },
-        "indirect-addressing": {
-            "name": "meta.brackets",
-            "patterns": [
-                { "include": "#registers" },
-                { "include": "#compiler_labels" },
-                { "include": "#numeric-values" },
-                { "include": "#expressions" },
-                { "include": "#deferred-addressing" },
-                { "include": "#indirect-addressing" },
-                { "include": "#operators" },
-                { "include": "#operands_variables" }
-            ],
-            "begin": "(?<!\\[)(\\[{1})(?!\\[)",
-            "end": "([\\]]{1})",
-            "beginCaptures": {
-                "0": { "name": "punctuation.section.brackets.begin" }
-            },
-            "endCaptures": {
-                "0": { "name": "punctuation.section.brackets.end" }
-            },
-            "contentName": "expression.indirect_addressing"
-        },
-        "deferred-addressing": {
-            "name": "meta.double_brackets",
-            "patterns": [
-                { "include": "#registers" },
-                { "include": "#compiler_labels" },
-                { "include": "#numeric-values" },
-                { "include": "#expressions" },
-                { "include": "#deferred-addressing" },
-                { "include": "#indirect-addressing" },
-                { "include": "#operators" },
-                { "include": "#operands_variables" }
-            ],
-            "begin": "(?<!\\[)([\\[]{2})\\b",
-            "end": "([\\]]{2})",
-            "beginCaptures": {
-                "0": { "name": "punctuation.section.double_brackets.begin" }
-            },
-            "endCaptures": {
-                "0": { "name": "punctuation.section.double_brackets.end" }
-            },
-            "contentName": "expression.deferred_addressing"
-        },
-        "directives": {
-            "patterns": [
-                {
-                    "begin": "(?<!\\w)(?:##DIRECTIVES##)\\b",
-                    "beginCaptures": {
-                        "0": { "name": "keyword.other.directive" }
-                    },
-                    "end": "(?=(?:\\s*\\;|\\s*$))",
-                    "name": "meta.directive",
-                    "patterns": [
-                        { "include": "#numeric-values" },
-                        { "include": "#compiler_labels" },
-                        { "include": "#operands_variables" }
-                    ]
-                },
-                {
-                    "name": "storage.type",
-                    "match": "(?<!\\w)(?:##DATATYPES##)\\b"
-                },
-                {
-                    "begin": "^(\\#)",
-                    "beginCaptures": {
-                        "1": { "name": "punctuation.definition.preprocessor" }
-                    },
-                    "end": "(?=(?:\\s*\\;|\\s*$))",
-                    "name": "meta.preprocessor",
-                    "patterns": [
-                        {
-                            "name": "keyword.control.preprocessor",
-                            "match": "(?<=\\#)(?:##PREPROCESSOR##)"
-                        },
-                        { "include": "#strings" },
-                        { "include": "#numeric-values" },
-                        { "include": "#compiler_labels" },
-                        { "include": "#operands_variables" }
-                    ]
-                }
-            ]
-        },
-        "strings": {
-            "name": "meta.string",
-            "begin": "(\\\"|\\')",
-            "beginCaptures": {
-                "0": { "name": "punctuation.definition.string.begin" }
-            },
-            "end": "(?<!\\\\)\\1",
-            "endCaptures": {
-                "0": { "name": "punctuation.definition.string.end" }
-            },
-            "contentName": "string.quoted",
-            "patterns": [
-                {
-                    "name": "constant.character.escape",
-                    "match": "\\\\(?:[\\\\\\'\\\"abfnrtv]|o[0-8]{2}|x[\\da-fA-F]{2})"
-                }
-            ]
-        }
+  "patterns": [
+    {
+      "include": "#main"
     }
+  ],
+  "repository": {
+    "comments": {
+      "begin": "\\;",
+      "end": "\\n",
+      "name": "comment.line.semicolon"
+    },
+    "compiler_labels": {
+      "match": "\\b(?:##COMPILERCONSTANTS##)\\b",
+      "name": "constant.language"
+    },
+    "constants": {
+      "captures": {
+        "1": {
+          "name": "variable.other.constant"
+        },
+        "2": {
+          "name": "keyword.operator.assignment"
+        }
+      },
+      "match": "^\\s*(\\w*)(?:\\s*)?(\\=|EQU)"
+    },
+    "deferred-addressing": {
+      "begin": "(?<!\\[)([\\[]{2})\\b",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.section.double_brackets.begin"
+        }
+      },
+      "contentName": "expression.deferred_addressing",
+      "end": "([\\]]{2})",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.section.double_brackets.end"
+        }
+      },
+      "name": "meta.double_brackets",
+      "patterns": [
+        {
+          "include": "#registers"
+        },
+        {
+          "include": "#compiler_labels"
+        },
+        {
+          "include": "#numeric-values"
+        },
+        {
+          "include": "#expressions"
+        },
+        {
+          "include": "#deferred-addressing"
+        },
+        {
+          "include": "#indirect-addressing"
+        },
+        {
+          "include": "#operators"
+        },
+        {
+          "include": "#operands_variables"
+        }
+      ]
+    },
+    "directives": {
+      "patterns": [
+        {
+          "begin": "(?<!\\w)(?:##DIRECTIVES##)\\b",
+          "beginCaptures": {
+            "0": {
+              "name": "keyword.other.directive"
+            }
+          },
+          "end": "(?=(?:\\s*\\;|\\s*$))",
+          "name": "meta.directive",
+          "patterns": [
+            {
+              "include": "#numeric-values"
+            },
+            {
+              "include": "#compiler_labels"
+            },
+            {
+              "include": "#operands_variables"
+            }
+          ]
+        },
+        {
+          "match": "(?<!\\w)(?:##DATATYPES##)\\b",
+          "name": "storage.type"
+        },
+        {
+          "begin": "^(\\#)",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.definition.preprocessor"
+            }
+          },
+          "end": "(?=(?:\\s*\\;|\\s*$))",
+          "name": "meta.preprocessor",
+          "patterns": [
+            {
+              "match": "(?<=\\#)(?:##PREPROCESSOR##)",
+              "name": "keyword.control.preprocessor"
+            },
+            {
+              "include": "#strings"
+            },
+            {
+              "include": "#numeric-values"
+            },
+            {
+              "include": "#compiler_labels"
+            },
+            {
+              "include": "#operands_variables"
+            }
+          ]
+        }
+      ]
+    },
+    "expressions": {
+      "begin": "\\(",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.section.parens.begin"
+        }
+      },
+      "contentName": "expression.group",
+      "end": "\\)",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.section.parens.end"
+        }
+      },
+      "name": "meta.parens",
+      "patterns": [
+        {
+          "include": "#numeric-values"
+        },
+        {
+          "include": "#compiler_labels"
+        },
+        {
+          "include": "#operands_variables"
+        },
+        {
+          "include": "#operators"
+        }
+      ]
+    },
+    "indirect-addressing": {
+      "begin": "(?<!\\[)(\\[{1})(?!\\[)",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.section.brackets.begin"
+        }
+      },
+      "contentName": "expression.indirect_addressing",
+      "end": "([\\]]{1})",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.section.brackets.end"
+        }
+      },
+      "name": "meta.brackets",
+      "patterns": [
+        {
+          "include": "#registers"
+        },
+        {
+          "include": "#compiler_labels"
+        },
+        {
+          "include": "#numeric-values"
+        },
+        {
+          "include": "#expressions"
+        },
+        {
+          "include": "#deferred-addressing"
+        },
+        {
+          "include": "#indirect-addressing"
+        },
+        {
+          "include": "#operators"
+        },
+        {
+          "include": "#operands_variables"
+        }
+      ]
+    },
+    "instructions": {
+      "begin": "(?i)(##INSTRUCTIONS##)",
+      "beginCaptures": {
+        "0": {
+          "name": "variable.function.instruction"
+        }
+      },
+      "end": "(?i)(?=(?:\\s*\\;|\\s*$|##OPERATIONS##))",
+      "name": "meta.function",
+      "patterns": [
+        {
+          "include": "#strings"
+        },
+        {
+          "include": "#registers"
+        },
+        {
+          "include": "#compiler_labels"
+        },
+        {
+          "include": "#numeric-values"
+        },
+        {
+          "include": "#operators"
+        },
+        {
+          "include": "#expressions"
+        },
+        {
+          "include": "#deferred-addressing"
+        },
+        {
+          "include": "#indirect-addressing"
+        },
+        {
+          "include": "#operands_variables"
+        },
+        {
+          "match": "\\,",
+          "name": "punctuation.separator"
+        }
+      ]
+    },
+    "labels": {
+      "captures": {
+        "1": {
+          "name": "variable.other.label"
+        },
+        "2": {
+          "name": "punctuation.definition.variable.colon.label"
+        }
+      },
+      "match": "((?:\\.|_|\\w){1}[\\w\\d_]*)(\\:)"
+    },
+    "macros": {
+      "begin": "(?i)(##MACROS##)",
+      "beginCaptures": {
+        "0": {
+          "name": "variable.function.macro"
+        }
+      },
+      "end": "(?i)(?=(?:\\s*\\;|\\s*$|##OPERATIONS##))",
+      "name": "meta.function",
+      "patterns": [
+        {
+          "include": "#strings"
+        },
+        {
+          "include": "#registers"
+        },
+        {
+          "include": "#compiler_labels"
+        },
+        {
+          "include": "#numeric-values"
+        },
+        {
+          "include": "#operators"
+        },
+        {
+          "include": "#expressions"
+        },
+        {
+          "include": "#deferred-addressing"
+        },
+        {
+          "include": "#indirect-addressing"
+        },
+        {
+          "include": "#operands_variables"
+        },
+        {
+          "match": "\\,",
+          "name": "punctuation.separator"
+        }
+      ]
+    },
+    "main": {
+      "patterns": [
+        {
+          "include": "#instructions"
+        },
+        {
+          "include": "#macros"
+        },
+        {
+          "include": "#registers"
+        },
+        {
+          "include": "#compiler_labels"
+        },
+        {
+          "include": "#labels"
+        },
+        {
+          "include": "#constants"
+        },
+        {
+          "include": "#comments"
+        },
+        {
+          "include": "#numeric-values"
+        },
+        {
+          "include": "#operators"
+        },
+        {
+          "include": "#expressions"
+        },
+        {
+          "include": "#deferred-addressing"
+        },
+        {
+          "include": "#indirect-addressing"
+        },
+        {
+          "include": "#directives"
+        },
+        {
+          "include": "#strings"
+        }
+      ]
+    },
+    "numeric-values": {
+      "patterns": [
+        {
+          "match": "(?<!\\w)(?:\\$[0-9a-fA-F]+|0x[0-9a-fA-F]+|[0-9a-fA-F]+H)\\b",
+          "name": "constant.numeric.integer.hexadecimal"
+        },
+        {
+          "match": "(?<!\\w)(?:(?:b|%)[01]+)\\b",
+          "name": "constant.numeric.integer.binary"
+        },
+        {
+          "match": "(?<!\\w)(?:\\d+)\\b",
+          "name": "constant.numeric.integer.decimal"
+        },
+        {
+          "match": "(?<!\\w)(?:\\'.\\')\\b",
+          "name": "constant.numeric.character"
+        }
+      ]
+    },
+    "operands_variables": {
+      "match": "(?<!\\w)((?:\\.|_|\\w){1}[\\w\\d_]*)\\b",
+      "name": "variable.parameter.instruction"
+    },
+    "operators": {
+      "patterns": [
+        {
+          "match": "[\\+\\-\\*\\/]{1}",
+          "name": "keyword.operator.arithmetic"
+        },
+        {
+          "match": "[\\&\\|\\^]{1}",
+          "name": "keyword.operator.logical"
+        },
+        {
+          "match": "(?:<<|>>)",
+          "name": "keyword.operator.bitwise"
+        },
+        {
+          "match": "\\b(?:##EXPRESSION_FUNCTIONS##)\\b",
+          "name": "keyword.operator.word"
+        },
+        {
+          "match": "(?:==|!=|>|>=|<|<=)",
+          "name": "keyword.operator.comparison"
+        }
+      ]
+    },
+    "registers": {
+      "match": "(?i)(?:##REGISTERS##)",
+      "name": "variable.language.register"
+    },
+    "strings": {
+      "begin": "(\\\"|\\')",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.begin"
+        }
+      },
+      "contentName": "string.quoted",
+      "end": "(?<!\\\\)\\1",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.end"
+        }
+      },
+      "name": "meta.string",
+      "patterns": [
+        {
+          "match": "\\\\(?:[\\\\\\'\\\"abfnrtv]|o[0-8]{2}|x[\\da-fA-F]{2})",
+          "name": "constant.character.escape"
+        }
+      ]
+    }
+  },
+  "scopeName": "source.asm"
 }
