@@ -348,3 +348,44 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIsFile(package_fp)
 
         shutil.rmtree(test_destination_dir)
+
+    def test_sublime_escaping_of_names(self):
+        # goal of this test is to ensure that entity names sourced from the ISA config are properly escaped
+        # in the generated language configuration files, notablye the syntax highlighting configuration file.
+        # for example, if an instruction mnemonic is 'ad.r', the generated regex should be '\\bad\\.r\\b'
+        # where the '.' is escaped to '\.' and the whole string is wrapped in '\\b' to ensure it is a word boundary.
+        test_destination_dir = tempfile.mkdtemp()
+        test_tmp_dir = tempfile.mkdtemp()
+        config_file = pkg_resources.files(config_files).joinpath('test_instructions_with_periods.yaml')
+        configgen = SublimeConfigGenerator(
+            str(config_file),
+            0,
+            str(test_destination_dir),
+            None,
+            None,
+            'asmtest',
+        )
+        self.assertEqual(configgen.model.isa_name, 'test_instructions_with_periods', 'name should be in ISA config')
+        # generate the files to inspect their content
+        configgen._generate_files_in_dir(test_tmp_dir)
+
+        syntax_fp = os.path.join(test_tmp_dir, 'test_instructions_with_periods.sublime-syntax')
+        self.assertIsFile(syntax_fp)
+        with open(syntax_fp) as yaml_file:
+            syntax_dict = yaml.safe_load(yaml_file)
+
+        for instr_dict in syntax_dict['contexts']['instructions']:
+            if instr_dict['scope'] == 'variable.function.instruction':
+                self._assert_grouped_item_list(
+                    instr_dict['match'],
+                    [
+                        '\\bnop\\b',
+                        '\\bma\\.hl\\b',    # note the escaped '.'
+                    ],
+                    'instructions'
+                )
+            elif instr_dict['scope'] == 'variable.function.macro':
+                self.fail('There should be no macros defined in this list')
+
+        # clean up
+        shutil.rmtree(test_tmp_dir)

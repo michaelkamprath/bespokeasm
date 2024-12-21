@@ -1,3 +1,4 @@
+import re
 from bespokeasm.assembler.model import AssemblerModel
 
 
@@ -50,7 +51,10 @@ class LanguageConfigGenerator:
         self,
         template_str: str,
         token: str,
-        regex_list: list[str]
+        item_list: list[str]
     ) -> str:
+        # first, convert the item list into individual regex strings, which is
+        # mostly escaping any periods or other special characters
+        regex_list = [re.escape(item) for item in item_list]
         regex_str = '\\b' + '\\b|\\b'.join(regex_list) + '\\b'
         return template_str.replace(token, regex_str)

@@ -23,6 +23,7 @@ Changes that are planned but not implemented yet:
 * Upgrade python version requirements to 3.11
 * Fixed a bug where embedded stringsd weren't properly parsed if they contained a newline character or there were multiple embedded strings per line
 * Fixed a bug where parsing properly discriminate between labels starting with `BYTE` string and the `BYTEx()` operator.
+* Fixed a bug in generating the syntax highlighting configuration that caused mnemonics with special characters to not be highlighted properly.
 
 ## [0.4.2]
 *  Added support for The Minimal 64x4 Home Computer with an example and updated assembler functionality to support it.
