@@ -3,7 +3,7 @@
 ;
 #require "slu4-min64x4-asm >= 1.1.0"
 ; Zero Page Usage
-.memzone ZERO_PAGE_APPS
+.memzone ZERO_PAGE_LIBS
 #mute
 _temp_byte1:            .byte 0
 _temp_long1:            .zero 4
