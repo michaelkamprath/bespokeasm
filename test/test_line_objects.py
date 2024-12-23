@@ -748,6 +748,77 @@ class TestLineObject(unittest.TestCase):
                     0,
                 )
 
+    def test_multiple_instuction_lines_with_org(self):
+        fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
+
+        lineid = LineIdentifier(55, 'test_multiple_instuction_lines_with_org')
+        preprocessor = Preprocessor()
+
+        # test .org directive then a label
+        lol1 = LineOjectFactory.parse_line(
+            lineid,
+            '.org $20 prog_start: foo $1234',   # having an instruction follow a lable is OK
+            isa_model,
+            TestLineObject.label_values,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+            preprocessor,
+            ConditionStack(),
+            0,
+        )
+        self.assertEqual(len(lol1), 3, 'There should be 2 parsed instructions')
+        self.assertIsInstance(lol1[0], AddressOrgLine)
+        self.assertIsInstance(lol1[1], LabelLine)
+
+        # this sequence replicates what happens in engine.assemble_bytecode()
+        self.assertEqual(lol1[0].memory_zone.current_address, 0, 'startingh value of current address should be 0')
+        lol1[0].set_start_address(lol1[0].memory_zone.current_address)
+        lol1[0].memory_zone.current_address = lol1[0].address + lol1[0].byte_size
+        lol1[1].set_start_address(lol1[0].memory_zone.current_address)
+        lol1[1].memory_zone.current_address = lol1[1].address + lol1[1].byte_size
+        lol1[2].set_start_address(lol1[1].memory_zone.current_address)
+
+        self.assertEqual(lol1[0].address, 0x20, 'first instruction is .org')
+        self.assertEqual(lol1[1].address, 0x20, 'second instruction is a label')
+        self.assertEqual(lol1[2].address, 0x20, 'second instruction is a label')
+
+        # test label then .org directive
+        memzone_mngr2 = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
+
+        lol2 = LineOjectFactory.parse_line(
+            lineid,
+            'prog_start: .org $20',     # having an instruction follow an org is not supported
+            isa_model,
+            TestLineObject.label_values,
+            memzone_mngr2.global_zone,
+            memzone_mngr2,
+            preprocessor,
+            ConditionStack(),
+            0,
+        )
+
+        self.assertEqual(len(lol2), 2, 'There should be 2 parsed instructions')
+        self.assertIsInstance(lol2[0], LabelLine)
+        self.assertIsInstance(lol2[1], AddressOrgLine)
+        # this sequence replicates what happens in engine.assemble_bytecode()
+        self.assertEqual(lol2[0].memory_zone.current_address, 0, 'startingh value of current address should be 0')
+        lol2[0].set_start_address(lol2[0].memory_zone.current_address)
+        lol2[0].memory_zone.current_address = lol2[0].address + lol2[0].byte_size
+        lol2[1].set_start_address(lol2[0].memory_zone.current_address)
+
+        self.assertEqual(lol2[0].address, 0, 'first instruction is a label')
+        self.assertEqual(lol2[1].address, 0x20, 'second instruction is .org')
+
     def test_unknown_instruction(self):
         fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
         isa_model = AssemblerModel(str(fp), 0)
