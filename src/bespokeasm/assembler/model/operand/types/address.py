@@ -6,7 +6,6 @@
 #   * The expected significant bytes can either be configured to a specific value (e.g., "zero page")
 #     or to the same as the current instruction's address. If the operand's value has a signficant byte(s)
 #     that is not what is expected, the assembler will raise an error.
-import sys
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.model.operand.types.numeric_expression import NumericExpressionOperand
 from bespokeasm.assembler.memory_zone import MemoryZone
@@ -52,9 +51,9 @@ class AddressByteCodePart(ExpressionByteCodePartInMemoryZone):
             shifted_address = instruction_address >> self.value_size
             shifted_value = value >> self.value_size
             if shifted_address != shifted_value:
-                sys.exit(
-                    f'ERROR: {self.line_id} - Operand address value 0x{value:x} does not have the same MSBs as '
-                    f'the instruction address 0x{instruction_address:x}'
+                raise ValueError(
+                    f'Operand address value 0x{value:x} does not have the same MSBs '
+                    f'as the instruction address 0x{instruction_address:x}'
                 )
         else:
             final_value = value
