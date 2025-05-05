@@ -3008,7 +3008,17 @@ macros:
       instructions:
         - "mwv @ARG(0)+0,@ARG(1)+0"
         - "mwv @ARG(0)+2,@ARG(1)+2"
-  miq:
+  m2iv:
+    # move 2 byte word from immediate to zero-page word
+    - operands:
+        count: 2
+        operand_sets:
+          list:
+            - immediate_16bit
+            - zero_page
+      instructions:
+        - "miv @ARG(0) & $FFFF ,@ARG(1)+0"
+  m4iq:
     # move 4 bytes long from immediate to zero-page long
     - operands:
         count: 2
@@ -3017,5 +3027,5 @@ macros:
             - immediate_32bit
             - zero_page
       instructions:
-        - "miv @ARG(0) & $0000FFFF,@ARG(1)+0"
+        - "miv @ARG(0) & $0000FFFF ,@ARG(1)+0"
         - "miv (@ARG(0) & $FFFF0000) >> 16,@ARG(1)+2"
