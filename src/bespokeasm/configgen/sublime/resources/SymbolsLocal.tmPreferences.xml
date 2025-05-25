@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>name</key>
+    <string>Source Local Symbol List</string>
+    <key>scope</key>
+    <string>source.bespokeasm variable.other.label.global, source.bespokeasm variable.other.label.file, source.bespokeasm variable.other.label.local, source.bespokeasm variable.other.constant</string>
+    <key>settings</key>
+    <dict>
+        <key>showInSymbolList</key>
+        <integer>1</integer>
+        <key>symbolTransformation</key>
+        <string>
+            s/^(\.[\w\d_]*)/    $1/g;
+        </string>
+    </dict>
+</dict>
+</plist>
