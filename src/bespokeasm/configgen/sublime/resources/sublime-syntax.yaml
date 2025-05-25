@@ -16,9 +16,17 @@ contexts:
       captures:
         1: variable.other.constant
         2: keyword.operator.assignment
-    - match: ((?:\.|_|\w){1}[\w\d_]*)(\:)
+    - match: (\w{1}[\w\d_]*)(\:)
       captures:
-        1: variable.other.label
+        1: variable.other.label.global
+        2: punctuation.definition.variable.colon.label
+    - match: (\.{1}[\w\d_]*)(\:)
+      captures:
+        1: variable.other.label.local
+        2: punctuation.definition.variable.colon.label
+    - match: (_{1}[\w\d_]*)(\:)
+      captures:
+        1: variable.other.label.file
         2: punctuation.definition.variable.colon.label
     - match: \;
       scope: punctuation.definition.comment
