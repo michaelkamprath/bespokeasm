@@ -5,7 +5,12 @@
     <key>name</key>
     <string>Source Local Symbol List</string>
     <key>scope</key>
-    <string>source.bespokeasm variable.other.label.global, source.bespokeasm variable.other.label.file, source.bespokeasm variable.other.label.local, source.bespokeasm variable.other.constant</string>
+    <string>
+        source.bespokeasm.##FILEEXTENSION## variable.other.label.global,
+        source.bespokeasm.##FILEEXTENSION## variable.other.label.file,
+        source.bespokeasm.##FILEEXTENSION## variable.other.label.local,
+        source.bespokeasm.##FILEEXTENSION## variable.other.constant
+    </string>
     <key>settings</key>
     <dict>
         <key>showInSymbolList</key>

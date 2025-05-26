@@ -2,6 +2,6 @@
     <content><![CDATA[.cstr "$1"]]></content>
 
     <tabTrigger>&#46;cstr</tabTrigger>
-    <scope>source.bespokeasm</scope>
+    <scope>source.bespokeasm.##FILEEXTENSION##</scope>
     <description>Create a cstr data block</description>
 </snippet>

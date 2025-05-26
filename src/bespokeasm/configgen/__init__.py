@@ -58,3 +58,21 @@ class LanguageConfigGenerator:
         regex_list = [re.escape(item) for item in item_list]
         regex_str = '\\b' + '\\b|\\b'.join(regex_list) + '\\b'
         return template_str.replace(token, regex_str)
+
+    def _replace_token_in_file(self, file_path: str, token_to_replace: str, replacement_string: str):
+        """
+        Replaces all instances of a specified token within a text file
+        with a given replacement string, writing the changes back to the same file.
+
+        Args:
+            file_path: The path to the text file.
+            token_to_replace: The string to be replaced.
+            replacement_string: The string to replace the token with.
+        """
+        with open(file_path) as file:
+            content = file.read()
+
+        modified_content = content.replace(token_to_replace, replacement_string)
+
+        with open(file_path, 'w') as file:
+            file.write(modified_content)

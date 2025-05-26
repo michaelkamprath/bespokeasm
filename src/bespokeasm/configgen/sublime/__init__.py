@@ -55,6 +55,7 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         update_instructions = False
         update_macros = False
         syntax_dict['file_extensions'] = [self.code_extension]
+        syntax_dict['scope'] = f'source.bespokeasm.{self.code_extension}'
         for idx, instr_dict in enumerate(syntax_dict['contexts']['instructions']):
             if instr_dict['scope'] == 'variable.function.instruction':
                 instr_dict['match'] = self._replace_token_with_regex_list(
@@ -185,6 +186,8 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         keymap_fp = os.path.join(destination_dir, 'Default.sublime-keymap')
         fp = pkg_resources.files(resources).joinpath('sublime-keymap.json')
         shutil.copy(str(fp), keymap_fp)
+        # replace the file extension name in the keymap file
+        self._replace_token_in_file(keymap_fp, '##FILEEXTENSION##', self.code_extension)
         if self.verbose > 1:
             print(f'  generated {os.path.basename(keymap_fp)}')
 
@@ -196,6 +199,8 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
                     snippet_name = filename.partition('.')[0]
                     snippet_fp = os.path.join(destination_dir, self.language_name + '__' + snippet_name + '.sublime-snippet')
                     shutil.copy(fp, snippet_fp)
+                    # replace the file extension name in the snippet file
+                    self._replace_token_in_file(snippet_fp, '##FILEEXTENSION##', self.code_extension)
                     if self.verbose > 1:
                         print(f'  generated {os.path.basename(snippet_fp)}')
             elif filename.endswith('.sublime-macro.json'):
@@ -212,5 +217,7 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
                     pref_filename = filename.partition('.')[0] + '.tmPreferences'
                     pref_fp = os.path.join(destination_dir, pref_filename)
                     shutil.copy(fp, pref_fp)
+                    # replace the file extension name in the preference file
+                    self._replace_token_in_file(pref_fp, '##FILEEXTENSION##', self.code_extension)
                     if self.verbose > 1:
                         print(f'  generated {os.path.basename(pref_fp)}')

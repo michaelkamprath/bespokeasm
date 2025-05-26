@@ -5,7 +5,7 @@
     <key>name</key>
     <string>Comments</string>
     <key>scope</key>
-    <string>source.bespokeasm</string>
+    <string>source.bespokeasm.##FILEEXTENSION##</string>
     <key>settings</key>
     <dict>
         <key>shellVariables</key>
