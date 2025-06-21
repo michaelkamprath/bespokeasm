@@ -57,7 +57,7 @@ class AssembledInstruction:
             except OverflowError as ofe:
                 sys.exit(
                     f'ERROR - {self.line_id}: Value {value} could not be converted byte code, possibly due to '
-                    f'being to large for allotted bit size of {p.value_size} - {ofe}'
+                    f'being too large for allotted bit size of {p.value_size} - {ofe}'
                 )
 
         bytes = packed_bits.get_bytes()
