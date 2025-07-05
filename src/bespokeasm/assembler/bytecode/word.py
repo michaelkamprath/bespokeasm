@@ -3,7 +3,8 @@ from typing import Literal
 
 class Word:
     """
-    Represents a word in the bytecode.
+    Represents a word in the bytecode. A word is the data bus width of the CPU, which is typically 8, 16, 32, or 64 bits.
+    An address points to a word, and the word is the smallest unit of data that can be read or written.
     """
 
     @staticmethod
@@ -62,17 +63,25 @@ class Word:
         return Word(value, bit_size)
 
     @staticmethod
-    def generateByteArray(words: list['Word'], compact_bytes=False) -> bytes:
+    def generateByteArray(words: list['Word'], compact_bytes=False, byteorder: Literal['little', 'big'] = 'big') -> bytes:
         """
         Generates a byte array representation of a list of Word objects. Word objects
         are not required to have the same bit size. If compact_bytes is True, bits are packed tightly into bytes.
         Otherwise, each Word will start a new byte in the array.
+
+        :param words: List of Word objects to convert to a byte array.
+        :param compact_bytes: If True, pack the bits tightly into bytes. If False,
+                              each Word will start a new byte in the array.
+        :param byteorder: The byte order to use when converting the Word values to bytes. Does not impact
+                          the compact_bytes option, which only affects how bits are packed.
+        :return: A byte array representation of the Word objects.
+        :raises ValueError: If the bit size of any Word is less than or equal to 0, or if there is not enough space
+                            in the byte array for the Word values
         """
         if not words:
             return b''
 
         if compact_bytes:
-            # Need to pack the bits tightly into bytes
             total_bits = sum(word.bit_size for word in words)
             byte_array = bytearray((total_bits + 7) // 8)
             current_bit = 0
@@ -81,11 +90,19 @@ class Word:
                     raise ValueError('Word bit size must be greater than 0')
                 if current_bit + word.bit_size > len(byte_array) * 8:
                     raise ValueError('Not enough space in byte array for the word')
-                # Pack the bits into the byte array
-                for i in range(word.bit_size):
-                    if (word.value >> (word.bit_size - 1 - i)) & 1:
-                        byte_array[current_bit // 8] |= (1 << (7 - (current_bit % 8)))
-                    current_bit += 1
+                # If the word is byte-aligned and we're at a byte boundary, copy bytes directly
+                if word.bit_size % 8 == 0 and current_bit % 8 == 0:
+                    word_bytes = word.to_bytes(byteorder=byteorder)
+                    start = current_bit // 8
+                    end = start + len(word_bytes)
+                    byte_array[start:end] = word_bytes
+                    current_bit += word.bit_size
+                else:
+                    # Otherwise, pack bits one at a time, always MSB first
+                    for bit_index in reversed(range(word.bit_size)):
+                        if (word.value >> bit_index) & 1:
+                            byte_array[current_bit // 8] |= (1 << (7 - (current_bit % 8)))
+                        current_bit += 1
             return bytes(byte_array)
         else:
             # Each Word starts a new byte in the array
@@ -100,7 +117,7 @@ class Word:
                 if current_index + word.byte_size > len(byte_array):
                     raise ValueError('Not enough space in byte array for the word')
                 # Convert the word value to bytes and store it in the byte array
-                word_bytes = word.to_bytes()
+                word_bytes = word.to_bytes(byteorder=byteorder)
                 byte_array[current_index:current_index + word.byte_size] = word_bytes
                 current_index += word.byte_size
             if current_index != len(byte_array):

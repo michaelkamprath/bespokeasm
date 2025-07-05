@@ -70,7 +70,7 @@ class TestWord(unittest.TestCase):
         byte_array_compact = Word.generateByteArray(words, compact_bytes=True)
         self.assertEqual(byte_array_compact, bytes([0x01, 0x23, 0x45, 0x67, ]))
 
-        # test 16 bit words
+        # test 16 bit words default endian (big)
         words = [Word.fromInt(i, bit_size=16) for i in range(8)] + [Word.fromInt(0x1234, bit_size=16)]
         byte_array = Word.generateByteArray(words, compact_bytes=False)
         self.assertEqual(byte_array, bytes([0, 0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0x12, 0x34]))
@@ -79,6 +79,17 @@ class TestWord(unittest.TestCase):
                 0x00, 0x00, 0x00, 0x01, 0x00, 0x02, 0x00, 0x03,
                 0x00, 0x04, 0x00, 0x05, 0x00, 0x06, 0x00, 0x07,
                 0x12, 0x34
+            ]))
+
+        # test 16 bit words little endian
+        words = [Word.fromInt(i, bit_size=16) for i in range(8)] + [Word.fromInt(0x1234, bit_size=16)]
+        byte_array = Word.generateByteArray(words, compact_bytes=False, byteorder='little')
+        self.assertEqual(byte_array, bytes([0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 0x34, 0x12]))
+        byte_array_compact = Word.generateByteArray(words, compact_bytes=True, byteorder='little')
+        self.assertEqual(byte_array_compact, bytes([
+                0x00, 0x00, 0x01, 0x00, 0x02, 0x00, 0x03, 0x00,
+                0x04, 0x00, 0x05, 0x00, 0x06, 0x00, 0x07, 0x00,
+                0x34, 0x12
             ]))
 
         # test 6 bit words
