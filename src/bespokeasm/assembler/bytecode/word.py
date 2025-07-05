@@ -51,16 +51,23 @@ class Word:
             return [Word(byte, bit_size) for byte in byte_array]
 
     @staticmethod
-    def fromInt(value: int, bit_size: int = 8) -> 'Word':
+    def fromInt(value: int, bit_size: int = 8, align_bytes: bool = False) -> 'Word':
         """
         Generates a Word object from an integer value.
-        The value is masked to fit within the specified bit size.
+
+        :param value: The integer value of the word.
+        :param bit_size: The bit size of the word. Must be greater than 0.
+        :param align_bytes: If True, the word will be aligned to byte boundaries when packed by
+                            the Word.generateByteArray method.
+        :raises ValueError: If bit_size is less than or equal to 0, or if the value is out of
+                            range for the specified bit size.
+        :return: A Word object representing the value.
         """
         if bit_size <= 0:
             raise ValueError('bit_size must be greater than 0')
         if value < 0 or value >= (2**bit_size - 1):
             raise ValueError(f'value {value} is out of range for bit size {bit_size}')
-        return Word(value, bit_size)
+        return Word(value, bit_size, align_bytes)
 
     @staticmethod
     def generateByteArray(words: list['Word'], compact_bytes=False, byteorder: Literal['little', 'big'] = 'big') -> bytes:
@@ -70,8 +77,8 @@ class Word:
         Otherwise, each Word will start a new byte in the array.
 
         :param words: List of Word objects to convert to a byte array.
-        :param compact_bytes: If True, pack the bits tightly into bytes. If False,
-                              each Word will start a new byte in the array.
+        :param compact_bytes: If True, pack the bits tightly into bytes, respecting the aliagn_bytes property if
+                              indivdual Word objects. If False, each Word will start a new byte in the array.
         :param byteorder: The byte order to use when converting the Word values to bytes. Does not impact
                           the compact_bytes option, which only affects how bits are packed.
         :return: A byte array representation of the Word objects.
@@ -90,6 +97,9 @@ class Word:
                     raise ValueError('Word bit size must be greater than 0')
                 if current_bit + word.bit_size > len(byte_array) * 8:
                     raise ValueError('Not enough space in byte array for the word')
+                # If align_bytes is set, align to next byte boundary before writing
+                if word.align_bytes and current_bit % 8 != 0:
+                    current_bit += 8 - (current_bit % 8)
                 # If the word is byte-aligned and we're at a byte boundary, copy bytes directly
                 if word.bit_size % 8 == 0 and current_bit % 8 == 0:
                     word_bytes = word.to_bytes(byteorder=byteorder)
@@ -125,23 +135,33 @@ class Word:
 
             return bytes(byte_array)
 
-    def __init__(self, value: int, bit_size: int = 8) -> None:
+    def __init__(self, value: int, bit_size: int = 8, align_bytes: bool = False) -> None:
+        """
+        Initializes a Word object with a value and bit size.
+
+        :param value: The integer value of the word.
+        :param bit_size: The bit size of the word. Must be greater than 0.
+        :param align_bytes: If True, the word will be aligned to byte boundaries when packed by
+                            the Word.generateByteArray method.
+        :raises ValueError: If bit_size is less than or equal to 0, or if the value is out of range for the specified bit size.
+        """
         if bit_size <= 0:
             raise ValueError('bit_size must be greater than 0')
         if value < 0 or value >= (1 << bit_size):
             raise ValueError(f'value {value} is out of range for bit size {bit_size}')
         self._value = value
         self._bit_size = bit_size
+        self._align_bytes = align_bytes
 
     def __repr__(self):
-        return f'Word<{bytes(self).hex()}, bit_size={self.bit_size}>'
+        return f'Word<{bytes(self).hex()}, bit_size={self._bit_size}>'
 
     def __int__(self):
-        return self.value
+        return self._value
 
     def __eq__(self, other):
         if isinstance(other, Word):
-            return self.value == other.value and self.bit_size == other.bit_size
+            return self._value == other._value and self._bit_size == other._bit_size
         return False
 
     def __hash__(self):
@@ -150,7 +170,7 @@ class Word:
         if not isinstance(self, Word):
             return NotImplemented
         if self.bit_size <= 8:
-            return hash((self.value, self.bit_size))
+            return hash((self._value, self._bit_size))
 
     @property
     def value(self) -> int:
@@ -165,6 +185,14 @@ class Word:
         Returns the bit size of the word
         """
         return self._bit_size
+
+    @property
+    def align_bytes(self) -> bool:
+        """
+        Returns whether the word should be aligned to byte boundaries.
+        This is used for packing bits tightly into bytes.
+        """
+        return self._align_bytes
 
     def __bytes__(self):
         """
