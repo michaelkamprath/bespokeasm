@@ -6,12 +6,22 @@ This is a customizable byte code assembler that allows for the definition of cus
 **NOTE - This project should be considered to be in "beta" status. It should be stable, but features are subject to change.**
 
 ## Usage
-To install, clone this repository and install using `pip`. Preferably, you have a `python` virtual environment set up and it has `pipenv` installed when you do this.
+To install, clone this repository and install using `pip`.
+
+```sh
+git clone git@github.com:michaelkamprath/bespokeasm.git
+pip install ./bespokeasm/
+```
+
+Preferably, you use a `python` virtual environment to install BespokeASM into. For example:
 
 ```sh
 git clone git@github.com:michaelkamprath/bespokeasm.git
 cd bespokeasm
+python3 -m venv .venv/bespokeasm
+source .venv/bespokeasm/bin/activate
 pip install .
+bespokeasm —version
 ```
 
 Once installed, assembly code can be compiled in this manner:
