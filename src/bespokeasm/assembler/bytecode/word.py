@@ -73,11 +73,13 @@ class Word:
     def generateByteArray(words: list['Word'], compact_bytes=False, byteorder: Literal['little', 'big'] = 'big') -> bytes:
         """
         Generates a byte array representation of a list of Word objects. Word objects
-        are not required to have the same bit size. If compact_bytes is True, bits are packed tightly into bytes.
+        are not required to have the same bit size. If compact_bytes is True, bits are packed tightly into bytes,
+        respecting the align_bytes property of individual Word objects. This means that the bits will be packed
+        to the left, and if a Word has align_bytes set to True, it will be aligned to the next byte boundary.
         Otherwise, each Word will start a new byte in the array.
 
         :param words: List of Word objects to convert to a byte array.
-        :param compact_bytes: If True, pack the bits tightly into bytes, respecting the aliagn_bytes property if
+        :param compact_bytes: If True, pack the bits tightly into bytes, respecting the align_bytes property if
                               indivdual Word objects. If False, each Word will start a new byte in the array.
         :param byteorder: The byte order to use when converting the Word values to bytes. Does not impact
                           the compact_bytes option, which only affects how bits are packed.
@@ -135,7 +137,13 @@ class Word:
 
             return bytes(byte_array)
 
-    def __init__(self, value: int, bit_size: int = 8, align_bytes: bool = False) -> None:
+    def __init__(
+                self,
+                value: int,
+                bit_size: int = 8,
+                align_bytes: bool = False,
+                byteorder: Literal['little', 'big'] = 'big',
+            ) -> None:
         """
         Initializes a Word object with a value and bit size.
 
@@ -143,6 +151,7 @@ class Word:
         :param bit_size: The bit size of the word. Must be greater than 0.
         :param align_bytes: If True, the word will be aligned to byte boundaries when packed by
                             the Word.generateByteArray method.
+        :param byteorder: The byte order to use when converting the Word value to bytes.
         :raises ValueError: If bit_size is less than or equal to 0, or if the value is out of range for the specified bit size.
         """
         if bit_size <= 0:
@@ -152,6 +161,7 @@ class Word:
         self._value = value
         self._bit_size = bit_size
         self._align_bytes = align_bytes
+        self._byteorder = byteorder
 
     def __repr__(self):
         return f'Word<{bytes(self).hex()}, bit_size={self._bit_size}>'
@@ -202,12 +212,35 @@ class Word:
         """
         return self.to_bytes()
 
-    def to_bytes(self, byteorder: Literal['little', 'big'] = 'big') -> bytes:
+    def to_bytes(self, byteorder: Literal['little', 'big'] = None) -> bytes:
         """
-        Returns the word value as a byte array.
+        Returns the word value as a byte array. The value will be "left packed" into the byte array,
+        meaning that the highest bits of the value will be in the highest bits of the first byte.
         The byte array will be of length 1 if bit_size is <=8, or larger for other bit sizes.
+
+        For bit sizes greater than 8, the byte array will be left-packked with zeros to fill the byte size.
+        For example, a 12-bite value of 0x123 will be represented as bytes([0x12, 0x30]),
+        which is 2 bytes long, with the first byte containing the high bits and the second
+        byte containing the low bits. Firthermore, for a 4-bit value of 0b1010, the byte array will be
+        bytes([0b10100000]), which is 1 byte long, with the high nibble containing the value and the low nibble
+        filled with zeros. This behavior is intended to work with the Word.generateByteArray method,
+        which expects the bits to be packed tightly into bytes.
+
+        :param byteorder: The byte order to use when converting the Word value to bytes. If None, uses the
+                          byte order specified during initialization of the Word object.
+        :return: A byte array representation of the Word value.
         """
-        return self.value.to_bytes((self.bit_size + 7) // 8, byteorder=byteorder)
+        if byteorder is None:
+            byteorder = self._byteorder
+        byte_len = (self.bit_size + 7) // 8
+        value = self.value
+
+        # Left-pack the bits: shift value so the highest bits are in the highest bits of the first byte
+        total_bits = byte_len * 8
+        shift = total_bits - self.bit_size
+        packed_value = value << shift
+
+        return packed_value.to_bytes(byte_len, byteorder=byteorder)
 
     @property
     def byte_size(self) -> int:
