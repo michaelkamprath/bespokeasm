@@ -1,17 +1,20 @@
 from __future__ import annotations
 from functools import reduce
 import sys
+from typing import Literal
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.expression import parse_expression
+from bespokeasm.assembler.bytecode.word import Word
 
 from .packed_bits import PackedBits
 
 
 class ByteCodePart:
-    def __init__(self, value_size: int, byte_align: bool, endian: str, line_id: LineIdentifier) -> None:
+    def __init__(self, value_size: int, byte_align: bool, endian: Literal['little', 'big'], line_id: LineIdentifier) -> None:
+        self._word = Word.fromInt(0, bit_size=value_size, align_bytes=byte_align, byteorder=endian)
         self._value_size = value_size
         self._byte_align = byte_align
         self._endian = endian
@@ -53,12 +56,27 @@ class ByteCodePart:
         # this should be overridden
         raise NotImplementedError
 
+    def get_words(self, label_scope: LabelScope, instruction_address: int, instruction_size: int) -> list[Word]:
+        """
+        Returns a list of Word objects representing the bytecode part.
+        This is used for generating the bytecode representation.
+        """
+        value = self.get_value(label_scope, instruction_address, instruction_size)
+        return [Word.fromInt(value, bit_size=self.value_size, align_bytes=self.byte_align, byteorder=self.endian)]
+
     def contains_register_labels(self, register_labels: set[str]) -> bool:
         return False
 
 
 class NumericByteCodePart(ByteCodePart):
-    def __init__(self, value: int, value_size: int, byte_align: bool, endian: str, line_id: LineIdentifier) -> None:
+    def __init__(
+                self,
+                value: int,
+                value_size: int,
+                byte_align: bool,
+                endian: Literal['little', 'big'],
+                line_id: LineIdentifier
+            ) -> None:
         super().__init__(value_size, byte_align, endian, line_id)
         self._value = value
 
@@ -79,7 +97,7 @@ class ExpressionByteCodePart(ByteCodePart):
         value_expression: str,
         value_size: int,
         byte_align: bool,
-        endian: str,
+        endian: Literal['little', 'big'],
         line_id: LineIdentifier,
     ) -> None:
         super().__init__(value_size, byte_align, endian, line_id)
@@ -102,6 +120,10 @@ class ExpressionByteCodePart(ByteCodePart):
     def contains_register_labels(self, register_labels: set[str]) -> bool:
         return self._parsed_expression.contains_register_labels(register_labels)
 
+    def get_words(self, label_scope: LabelScope, instruction_address: int, instruction_size: int) -> list[Word]:
+        value = self.get_value(label_scope, instruction_address, instruction_size)
+        return [Word.fromInt(value, bit_size=self.value_size, align_bytes=self.byte_align, byteorder=self.endian)]
+
 
 class ExpressionByteCodePartWithValidation(ExpressionByteCodePart):
     def __init__(
@@ -111,7 +133,7 @@ class ExpressionByteCodePartWithValidation(ExpressionByteCodePart):
                 value_expression: str,
                 value_size: int,
                 byte_align: bool,
-                endian: str,
+                endian: Literal['little', 'big'],
                 line_id: LineIdentifier
             ) -> None:
         super().__init__(value_expression, value_size, byte_align, endian, line_id)
@@ -137,7 +159,7 @@ class ExpressionByteCodePartInMemoryZone(ExpressionByteCodePart):
         value_expression: str,
         value_size: int,
         byte_align: bool,
-        endian: str,
+        endian: Literal['little', 'big'],
         line_id: LineIdentifier,
     ) -> None:
         super().__init__(value_expression, value_size, byte_align, endian, line_id)
@@ -169,7 +191,7 @@ class ExpressionEnumerationByteCodePart(ExpressionByteCodePart):
                 value_expression: str,
                 value_size: int,
                 byte_align: bool,
-                endian: str,
+                endian: Literal['little', 'big'],
                 line_id: LineIdentifier
             ) -> None:
         super().__init__(value_expression, value_size, byte_align, endian, line_id)
@@ -191,7 +213,13 @@ class ExpressionEnumerationByteCodePart(ExpressionByteCodePart):
 class CompositeByteCodePart(ByteCodePart):
     _parts_list: list[ByteCodePart]
 
-    def __init__(self, bytecode_parts: list[ByteCodePart], byte_align: bool, endian: str, line_id: LineIdentifier) -> None:
+    def __init__(
+                self,
+                bytecode_parts: list[ByteCodePart],
+                byte_align: bool,
+                endian: Literal['little', 'big'],
+                line_id: LineIdentifier,
+            ) -> None:
         total_size = reduce(lambda a, b: a+b.value_size, bytecode_parts, 0)
         super().__init__(total_size, byte_align, endian, line_id)
         self._parts_list = bytecode_parts
@@ -217,3 +245,9 @@ class CompositeByteCodePart(ByteCodePart):
             shift_count = 8 - (self.value_size % 8)
             value = value >> shift_count
         return value
+
+    def get_words(self, label_scope: LabelScope, instruction_address: int, instruction_size: int) -> list[Word]:
+        words = []
+        for p in self._parts_list:
+            words.extend(p.get_words(label_scope, instruction_address, instruction_size))
+        return words

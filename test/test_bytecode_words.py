@@ -35,13 +35,22 @@ class TestWord(unittest.TestCase):
 
         # Test with 4-bit word
         word = Word(value=0b1010, bit_size=4)
-        byte_array = word.to_bytes()
+        byte_array = word.to_bytes(compact_bytes=True)
         self.assertEqual(byte_array, bytes([0b10100000]))
+        byte_array = word.to_bytes(compact_bytes=False)
+        self.assertEqual(byte_array, bytes([0b00001010]))
 
         # test with 12-bit word
         word = Word(value=0x123, bit_size=12,)
-        byte_array = word.to_bytes()
+        byte_array = word.to_bytes(compact_bytes=True)
         self.assertEqual(byte_array, bytes([0x12, 0x30]))
+        byte_array = word.to_bytes(compact_bytes=False)
+        self.assertEqual(byte_array, bytes([0x01, 0x23]))
+
+        # test conversion bug #1
+        word = Word(value=4386, bit_size=16, align_bytes=True, byteorder='big')
+        byte_array = word.to_bytes()
+        self.assertEqual(byte_array, bytes([0x11, 0x22]))
 
     def test_fromByteArray(self):
         # Test with compact_bytes = False
@@ -105,7 +114,7 @@ class TestWord(unittest.TestCase):
         # test 4 bit words
         words = [Word.fromInt(i, bit_size=4) for i in range(8)]
         byte_array = Word.generateByteArray(words, compact_bytes=False)
-        self.assertEqual(byte_array, bytes([0x00, 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70]))
+        self.assertEqual(byte_array, bytes([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]))
         byte_array_compact = Word.generateByteArray(words, compact_bytes=True)
         self.assertEqual(byte_array_compact, bytes([0x01, 0x23, 0x45, 0x67, ]))
 
@@ -134,7 +143,7 @@ class TestWord(unittest.TestCase):
         # test 6 bit words
         words = [Word.fromInt(i, bit_size=6) for i in range(8)]
         byte_array = Word.generateByteArray(words, compact_bytes=False)
-        self.assertEqual(byte_array, bytes([0, 1 << 2, 2 << 2, 3 << 2, 4 << 2, 5 << 2, 6 << 2, 7 << 2]))
+        self.assertEqual(byte_array, bytes([0, 1, 2, 3, 4, 5, 6, 7]))
         byte_array = Word.generateByteArray(words, compact_bytes=True)
         self.assertEqual(byte_array, bytes([0x00, 0x10, 0x83, 0x10, 0x51, 0x87]))
 
@@ -147,12 +156,12 @@ class TestWord(unittest.TestCase):
             Word.fromInt(0x7, bit_size=4),
         ]
         byte_array = Word.generateByteArray(words, compact_bytes=False)
-        self.assertEqual(byte_array, bytes([0x12, 0x34, 0x56, 0x70, 0x89, 0x70]))
+        self.assertEqual(byte_array, bytes([0x12, 0x34, 0x56, 0x07, 0x89, 0x07]))
         byte_array_compact = Word.generateByteArray(words, compact_bytes=True)
         self.assertEqual(byte_array_compact, bytes([0x12, 0x34, 0x56, 0x78, 0x97]))
         # test mixed Word sizes with little endian
         byte_array = Word.generateByteArray(words, compact_bytes=False, byteorder='little')
-        self.assertEqual(byte_array, bytes([0x12, 0x56, 0x34, 0x70, 0x89, 0x70]))
+        self.assertEqual(byte_array, bytes([0x12, 0x56, 0x34, 0x07, 0x89, 0x07]))
         byte_array_compact = Word.generateByteArray(words, compact_bytes=True, byteorder='little')
         self.assertEqual(byte_array_compact, bytes([0x12, 0x56, 0x34, 0x78, 0x97]))
 
@@ -163,7 +172,7 @@ class TestWord(unittest.TestCase):
             Word.fromInt(0xbe, bit_size=8),
         ]
         byte_array = Word.generateByteArray(words, compact_bytes=False)
-        self.assertEqual(byte_array, bytes([0b10100000, 0b11010000, 0, 0xbe]))
+        self.assertEqual(byte_array, bytes([0b00000101, 0b00001101, 0, 0xbe]))
         byte_array_compact = Word.generateByteArray(words, compact_bytes=True)
         self.assertEqual(byte_array_compact, bytes([0b10111010, 0xbe]))
 
@@ -174,9 +183,20 @@ class TestWord(unittest.TestCase):
             Word.fromInt(0xbe, bit_size=8, align_bytes=True),
         ]
         byte_array = Word.generateByteArray(words, compact_bytes=False)
-        self.assertEqual(byte_array, bytes([0b10100000, 0b11010000, 0xbe]))
+        self.assertEqual(byte_array, bytes([0b00000101, 0b001101, 0xbe]))
         byte_array_compact = Word.generateByteArray(words, compact_bytes=True)
         self.assertEqual(byte_array_compact, bytes([0b10111010, 0xbe]))
+
+        words = [
+            Word.fromInt(8, 4, align_bytes=True, byteorder='big'),
+            Word.fromInt(0x1122, 16, align_bytes=True, byteorder='big'),
+            Word.fromInt(0x11223344, 32, align_bytes=True, byteorder='little'),
+            Word.fromInt(0x8, 4, align_bytes=False, byteorder='big'),
+        ]
+        byte_array = Word.generateByteArray(words, compact_bytes=False)
+        self.assertEqual(byte_array, bytes([0x08, 0x11, 0x22, 0x44, 0x33, 0x22, 0x11, 0x08]))
+        byte_array_compact = Word.generateByteArray(words, compact_bytes=True)
+        self.assertEqual(byte_array_compact, bytes([0x80, 0x11, 0x22, 0x44, 0x33, 0x22, 0x11, 0x80]))
 
     def test_invalid_cases(self):
         # Test fromInt with invalid bit size

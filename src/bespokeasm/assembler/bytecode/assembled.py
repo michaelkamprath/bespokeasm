@@ -1,10 +1,9 @@
 import math
-import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.bytecode.parts import ByteCodePart
-from bespokeasm.assembler.bytecode.packed_bits import PackedBits
 from bespokeasm.assembler.label_scope import LabelScope
+from bespokeasm.assembler.bytecode.word import Word
 
 
 class AssembledInstruction:
@@ -39,31 +38,14 @@ class AssembledInstruction:
         return self._parts
 
     def get_bytes(self, label_scope: LabelScope, instruction_address: int, instruction_size: int) -> bytearray:
-        packed_bits = PackedBits()
+        words: list[Word] = []
         for p in self._parts:
-            value = p.get_value(label_scope, instruction_address, instruction_size)
-            if isinstance(value, str):
-                sys.exit(f'ERROR - assembled instruction "{self}" had a part {p} that did not resolve to an int, got: {value}')
-            elif value is None:
-                sys.exit(f'ERROR - assembled instruction "{self}" had a part {p} that produced None for a value')
+            words.extend(p.get_words(label_scope, instruction_address, instruction_size))
 
-            try:
-                packed_bits.append_bits(
-                    value,
-                    p.value_size,
-                    p.byte_align,
-                    p.endian,
-                )
-            except OverflowError as ofe:
-                sys.exit(
-                    f'ERROR - {self.line_id}: Value {value} could not be converted byte code, possibly due to '
-                    f'being too large for allotted bit size of {p.value_size} - {ofe}'
-                )
-
-        bytes = packed_bits.get_bytes()
-        if len(bytes) != self.byte_size:
-            # ERROR
-            return None
+        bytes = Word.generateByteArray(
+                words,
+                compact_bytes=True,
+            )
         return bytes
 
 
