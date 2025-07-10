@@ -220,3 +220,13 @@ class TestWord(unittest.TestCase):
         self.assertNotEqual(word1, word3)
         self.assertNotEqual(word1, 'not a word')
         self.assertNotEqual(word1, word4)
+
+    def test_byte_size(self):
+        word8 = Word.fromInt(42, bit_size=8)
+        word16 = Word.fromInt(42, bit_size=16)
+        word17 = Word.fromInt(42, bit_size=17)
+        word4 = Word.fromInt(4, bit_size=4)
+        self.assertEqual(word8.byte_size, 1)
+        self.assertEqual(word16.byte_size, 2)
+        self.assertEqual(word17.byte_size, 3)
+        self.assertEqual(word4.byte_size, 1)

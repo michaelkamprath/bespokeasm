@@ -68,12 +68,6 @@ class Word:
                             range for the specified bit size.
         :return: A Word object representing the value.
         """
-        if bit_size < 0:
-            raise ValueError('bit_size must be greater or equal to 0')
-        if bit_size == 0 and value != 0:
-            raise ValueError('bit_size is 0, but value is not 0')
-        if value < (-2**(bit_size-1)) or value >= (2**bit_size):
-            raise ValueError(f'value {value} is out of range for bit size {bit_size}')
         return Word(value, bit_size, align_bytes, byteorder)
 
     @staticmethod
@@ -109,10 +103,6 @@ class Word:
             byte_array = bytearray((total_bits + 7) // 8)
             current_bit = 0
             for word in words:
-                if word.bit_size < 0:
-                    raise ValueError('Word bit size must be greater than 0')
-                if word.bit_size == 0 and word.value != 0:
-                    raise ValueError('Word bit size is 0, but value is not 0')
                 if current_bit + word.bit_size > len(byte_array) * 8:
                     raise ValueError('Not enough space in byte array for the word')
                 # If align_bytes is set, align to next byte boundary before writing
@@ -176,6 +166,7 @@ class Word:
             raise ValueError('bit_size is 0, but value is not 0')
         if value < (-2**(bit_size-1)) or value >= (1 << bit_size):
             raise ValueError(f'value {value} is out of range for bit size {bit_size}')
+
         self._value = value
         self._bit_size = bit_size
         self._align_bytes = align_bytes
