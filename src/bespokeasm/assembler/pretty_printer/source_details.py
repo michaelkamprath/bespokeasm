@@ -1,6 +1,7 @@
 import io
 import math
 
+from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.line_object import LineWithWords, LineObject
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.model import AssemblerModel
@@ -52,7 +53,7 @@ class SourceDetailsPrettyPrinter(PrettyPrinterBase):
             instruction_str = instruction_str.ljust(self.max_instruction_width + INSTRUCTION_INDENT)
 
             if isinstance(lobj, LineWithWords):
-                line_bytes = lobj.get_words()
+                line_bytes = Word.words_to_bytes(lobj.get_words(), False, 'big')
             else:
                 line_bytes = None
             if line_bytes is not None:
