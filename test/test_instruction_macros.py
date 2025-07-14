@@ -48,7 +48,7 @@ class TestInstructionMacros(unittest.TestCase):
         )
         ins0.set_start_address(1212)
         self.assertIsInstance(ins0, InstructionLine)
-        self.assertEqual(ins0.byte_size, 4, 'has 4 bytes')
+        self.assertEqual(ins0.word_count, 4, 'has 4 words')
         ins0.label_scope = TestInstructionMacros.label_values
         ins0.generate_words()
         self.assertEqual(
@@ -65,7 +65,7 @@ class TestInstructionMacros(unittest.TestCase):
         ins1 = InstructionLine.factory(line_id, 'mov2 [$2000],[$1234]', 'some comment!', isa_model, memzone, memzone_mngr)
         ins1.set_start_address(1212)
         self.assertIsInstance(ins1, InstructionLine)
-        self.assertEqual(ins1.byte_size, 10, 'has 10 bytes')
+        self.assertEqual(ins1.word_count, 10, 'has 10 words')
         ins1.label_scope = TestInstructionMacros.label_values
         ins1.generate_words()
         self.assertEqual(
@@ -88,7 +88,7 @@ class TestInstructionMacros(unittest.TestCase):
         ins2 = InstructionLine.factory(line_id, 'add16 [$1234], $5678', 'some comment!', isa_model, memzone, memzone_mngr)
         ins2.set_start_address(1212)
         self.assertIsInstance(ins2, InstructionLine)
-        self.assertEqual(ins2.byte_size, 16, 'has 16 bytes')
+        self.assertEqual(ins2.word_count, 16, 'has 16 words')
         ins2.label_scope = TestInstructionMacros.label_values
         ins2.generate_words()
         self.assertEqual(
@@ -117,7 +117,7 @@ class TestInstructionMacros(unittest.TestCase):
         ins3 = InstructionLine.factory(line_id, 'add16 [$1234], [var1+7]', 'some comment!', isa_model, memzone, memzone_mngr)
         ins3.set_start_address(1212)
         self.assertIsInstance(ins3, InstructionLine)
-        self.assertEqual(ins3.byte_size, 18, 'has 18 bytes')
+        self.assertEqual(ins3.word_count, 18, 'has 18 words')
         ins3.label_scope = TestInstructionMacros.label_values
         ins3.generate_words()
         self.assertEqual(
@@ -155,7 +155,7 @@ class TestInstructionMacros(unittest.TestCase):
         ins4 = InstructionLine.factory(line_id, 'push2 [ij + 4]', 'some comment!', isa_model, memzone, memzone_mngr)
         ins4.set_start_address(1212)
         self.assertIsInstance(ins4, InstructionLine)
-        self.assertEqual(ins4.byte_size, 4, 'has 4 bytes')
+        self.assertEqual(ins4.word_count, 4, 'has 4 words')
         ins4.label_scope = TestInstructionMacros.label_values
         ins4.generate_words()
         self.assertEqual(
@@ -172,7 +172,7 @@ class TestInstructionMacros(unittest.TestCase):
         ins5 = InstructionLine.factory(line_id, 'push2 [sp + 8]', 'some comment!', isa_model, memzone, memzone_mngr)
         ins5.set_start_address(1212)
         self.assertIsInstance(ins5, InstructionLine)
-        self.assertEqual(ins5.byte_size, 4, 'has 4 bytes')
+        self.assertEqual(ins5.word_count, 4, 'has 4 words')
         ins5.label_scope = TestInstructionMacros.label_values
         ins5.generate_words()
         self.assertEqual(
@@ -196,7 +196,7 @@ class TestInstructionMacros(unittest.TestCase):
         ins1 = InstructionLine.factory(line_id, 'swap a,j', 'some comment!', isa_model, memzone, memzone_mngr)
         ins1.set_start_address(1212)
         self.assertIsInstance(ins1, InstructionLine)
-        self.assertEqual(ins1.byte_size, 3, 'has 3 bytes')
+        self.assertEqual(ins1.word_count, 3, 'has 3 words')
         ins1.label_scope = TestInstructionMacros.label_values
         ins1.generate_words()
         self.assertEqual(
@@ -212,7 +212,7 @@ class TestInstructionMacros(unittest.TestCase):
         ins2 = InstructionLine.factory(line_id, 'swap i,j', 'some comment!', isa_model, memzone, memzone_mngr)
         ins2.set_start_address(1212)
         self.assertIsInstance(ins2, InstructionLine)
-        self.assertEqual(ins2.byte_size, 3, 'has 3 bytes')
+        self.assertEqual(ins2.word_count, 3, 'has 3 words')
         ins2.label_scope = TestInstructionMacros.label_values
         ins2.generate_words()
         self.assertEqual(
@@ -228,7 +228,7 @@ class TestInstructionMacros(unittest.TestCase):
         ins3 = InstructionLine.factory(line_id, 'swap a,[ij + 4]', 'some comment!', isa_model, memzone, memzone_mngr)
         ins3.set_start_address(1212)
         self.assertIsInstance(ins3, InstructionLine)
-        self.assertEqual(ins3.byte_size, 5, 'has 5 bytes')
+        self.assertEqual(ins3.word_count, 5, 'has 5 words')
         ins3.label_scope = TestInstructionMacros.label_values
         ins3.generate_words()
         self.assertEqual(
@@ -246,7 +246,7 @@ class TestInstructionMacros(unittest.TestCase):
         ins4 = InstructionLine.factory(line_id, 'swap [sp+10],[ij + 4]', 'some comment!', isa_model, memzone, memzone_mngr)
         ins4.set_start_address(1212)
         self.assertIsInstance(ins4, InstructionLine)
-        self.assertEqual(ins4.byte_size, 7, 'has 7 bytes')
+        self.assertEqual(ins4.word_count, 7, 'has 7 words')
         ins4.label_scope = TestInstructionMacros.label_values
         ins4.generate_words()
         self.assertEqual(
@@ -269,7 +269,7 @@ class TestInstructionMacros(unittest.TestCase):
         )
         ins5.set_start_address(1212)
         self.assertIsInstance(ins5, InstructionLine)
-        self.assertEqual(ins5.byte_size, 7, 'has 7 bytes')
+        self.assertEqual(ins5.word_count, 7, 'has 7 words')
         ins5.label_scope = TestInstructionMacros.label_values
         ins5.generate_words()
         self.assertEqual(
@@ -289,7 +289,7 @@ class TestInstructionMacros(unittest.TestCase):
         ins6 = InstructionLine.factory(line_id, 'mov2 [$8008],$1234', 'some comment!', isa_model, memzone, memzone_mngr)
         ins6.set_start_address(1212)
         self.assertIsInstance(ins6, InstructionLine)
-        self.assertEqual(ins6.byte_size, 8, 'has 8 bytes')
+        self.assertEqual(ins6.word_count, 8, 'has 8 words')
         ins6.label_scope = TestInstructionMacros.label_values
         ins6.generate_words()
         self.assertEqual(
@@ -317,7 +317,7 @@ class TestInstructionMacros(unittest.TestCase):
         ins1 = InstructionLine.factory(line_id, 'incs sp', 'some comment!', isa_model, memzone, memzone_mngr)
         ins1.set_start_address(1212)
         self.assertIsInstance(ins1, InstructionLine)
-        self.assertEqual(ins1.byte_size, 1, 'has 1 bytes')
+        self.assertEqual(ins1.word_count, 1, 'has 1 words')
         ins1.label_scope = TestInstructionMacros.label_values
         ins1.generate_words()
         self.assertEqual(
@@ -331,7 +331,7 @@ class TestInstructionMacros(unittest.TestCase):
         ins2 = InstructionLine.factory(line_id, 'incs 3', 'some comment!', isa_model, memzone, memzone_mngr)
         ins2.set_start_address(1212)
         self.assertIsInstance(ins2, InstructionLine)
-        self.assertEqual(ins2.byte_size, 1, 'has 1 bytes')
+        self.assertEqual(ins2.word_count, 1, 'has 1 words')
         ins2.label_scope = TestInstructionMacros.label_values
         ins2.generate_words()
         self.assertEqual(

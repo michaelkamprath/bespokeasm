@@ -21,14 +21,14 @@ class AssembledInstruction:
         self._word_size = word_size
         self._segment_size = segment_size
         self._endian = endian
-        # calculate total bytes
+        # calculate word count
         total_bits = 0
         for bcp in self._parts:
             if bcp.word_align:
-                if total_bits % 8 != 0:
-                    total_bits += 8 - total_bits % 8
+                if total_bits % self._word_size != 0:
+                    total_bits += self._word_size - total_bits % self._word_size
             total_bits += bcp.value_size
-        self._byte_size = math.ceil(total_bits/8)
+        self._word_count = math.ceil(total_bits/self._word_size)
 
     def __repr__(self) -> str:
         return str(self)
@@ -37,8 +37,9 @@ class AssembledInstruction:
         return f'AssembledInstruction{self._parts}'
 
     @property
-    def byte_size(self):
-        return self._byte_size
+    def word_count(self):
+        '''Returns the number of words this instruction will generate'''
+        return self._word_count
 
     @property
     def line_id(self):
@@ -49,6 +50,14 @@ class AssembledInstruction:
         return self._parts
 
     def get_words(self, label_scope: LabelScope, instruction_address: int, instruction_size: int) -> list[Word]:
+        '''
+        Returns a list of words that represent the assembled instruction.
+
+        :param label_scope: The label scope to use for resolving label values.
+        :param instruction_address: The address of the instruction.
+        :param instruction_size: The size of the instruction in words.
+        :returns: A list of words that represent the assembled instruction.
+        '''
         words: list[Word] = ByteCodePart.compact_parts_to_words(
             self._parts,
             self._word_size,

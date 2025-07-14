@@ -56,9 +56,9 @@ class TestConfigObject(unittest.TestCase):
         pi1 = InstructioParser.parse_instruction(
             model1, test_line_id, 'LDA $f', memzone_mngr,
         )
-        self.assertEqual(pi1.byte_size, 1, 'assembled instruciton is 1 byte')
+        self.assertEqual(pi1.word_count, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(
-            pi1.get_words(TestConfigObject.label_values, 0x8000, pi1.byte_size),
+            pi1.get_words(TestConfigObject.label_values, 0x8000, pi1.word_count),
             [Word(0x1F, model1.word_size, model1.word_segment_size, model1.intra_word_endianness)],
             'assembled instruction',
         )
@@ -66,9 +66,9 @@ class TestConfigObject(unittest.TestCase):
         pi2 = InstructioParser.parse_instruction(
             model1, test_line_id, 'add label1+5', memzone_mngr,
         )
-        self.assertEqual(pi2.byte_size, 1, 'assembled instruciton is 1 byte')
+        self.assertEqual(pi2.word_count, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(
-            pi2.get_words(TestConfigObject.label_values, 0x8000, pi2.byte_size),
+            pi2.get_words(TestConfigObject.label_values, 0x8000, pi2.word_count),
             [Word(0x27, model1.word_size, model1.word_segment_size, model1.intra_word_endianness)],
             'assembled instruction',
         )
@@ -76,9 +76,9 @@ class TestConfigObject(unittest.TestCase):
         pi3 = InstructioParser.parse_instruction(
             model1, test_line_id, 'out', memzone_mngr,
         )
-        self.assertEqual(pi3.byte_size, 1, 'assembled instruciton is 1 byte')
+        self.assertEqual(pi3.word_count, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(
-            pi3.get_words(TestConfigObject.label_values, 0x8000, pi3.byte_size),
+            pi3.get_words(TestConfigObject.label_values, 0x8000, pi3.word_count),
             [Word(0xE0, model1.word_size, model1.word_segment_size, model1.intra_word_endianness)],
             'assembled instruction'
         )
@@ -90,7 +90,7 @@ class TestConfigObject(unittest.TestCase):
         piA = InstructioParser.parse_instruction(
             model2, LineIdentifier(1, 'test_mov_a_i'), 'mov a, i', memzone_mngr2,
         )
-        self.assertEqual(piA.byte_size, 1, 'assembled instruciton is 1 byte')
+        self.assertEqual(piA.word_count, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(
             piA.get_words(TestConfigObject.label_values, 0x8000, 1),
             [Word(0b01000010, model2.word_size, model2.word_segment_size, model2.intra_word_endianness)],
@@ -100,7 +100,7 @@ class TestConfigObject(unittest.TestCase):
         piB = InstructioParser.parse_instruction(
             model2, test_line_id, 'mov a,[$1120 + label1]', memzone_mngr2,
         )
-        self.assertEqual(piB.byte_size, 3, 'assembled instruciton is 3 byte')
+        self.assertEqual(piB.word_count, 3, 'assembled instruciton is 3 byte')
         self.assertEqual(
             piB.get_words(TestConfigObject.label_values, 0x8000, 3),
             [
@@ -114,7 +114,7 @@ class TestConfigObject(unittest.TestCase):
         piC = InstructioParser.parse_instruction(
             model2, test_line_id, 'add i', memzone_mngr2,
         )
-        self.assertEqual(piC.byte_size, 1, 'assembled instruciton is 1 byte')
+        self.assertEqual(piC.word_count, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(
             piC.get_words(TestConfigObject.label_values, 0x8000, 1),
             [Word(0b10111010, model2.word_size, model2.word_segment_size, model2.intra_word_endianness)],
@@ -124,7 +124,7 @@ class TestConfigObject(unittest.TestCase):
         piD = InstructioParser.parse_instruction(
             model2, test_line_id, 'mov [$110D + (label1 + LABEL2)] , 0x88', memzone_mngr2,
         )
-        self.assertEqual(piD.byte_size, 4, 'assembled instruciton is 4 byte')
+        self.assertEqual(piD.word_count, 4, 'assembled instruciton is 4 byte')
         self.assertEqual(
             piD.get_words(TestConfigObject.label_values, 0x8000, 4),
             [
@@ -139,7 +139,7 @@ class TestConfigObject(unittest.TestCase):
         piE = InstructioParser.parse_instruction(
             model2, test_line_id, 'mov [sp - label1] , 0x88', memzone_mngr2,
         )
-        self.assertEqual(piE.byte_size, 3, 'assembled instruciton is 3 byte')
+        self.assertEqual(piE.word_count, 3, 'assembled instruciton is 3 byte')
         self.assertEqual(
             piE.get_words(TestConfigObject.label_values, 0x8000, 3),
             [
@@ -153,7 +153,7 @@ class TestConfigObject(unittest.TestCase):
         piF = InstructioParser.parse_instruction(
             model2, test_line_id, 'mov [sp+label1] , 0x88', memzone_mngr2,
         )
-        self.assertEqual(piF.byte_size, 3, 'assembled instruciton is 3 byte')
+        self.assertEqual(piF.word_count, 3, 'assembled instruciton is 3 byte')
         self.assertEqual(
             piF.get_words(TestConfigObject.label_values, 0x8000, 3),
             [
@@ -167,7 +167,7 @@ class TestConfigObject(unittest.TestCase):
         piG = InstructioParser.parse_instruction(
             model2, test_line_id, 'mov [sp] , 0x88', memzone_mngr2,
         )
-        self.assertEqual(piG.byte_size, 3, 'assembled instruciton is 3 byte')
+        self.assertEqual(piG.word_count, 3, 'assembled instruciton is 3 byte')
         self.assertEqual(
             piG.get_words(TestConfigObject.label_values, 0x8000, 3),
             [
@@ -181,7 +181,7 @@ class TestConfigObject(unittest.TestCase):
         piH = InstructioParser.parse_instruction(
             model2, test_line_id, 'mov [$8000], [label1]', memzone_mngr2,
         )
-        self.assertEqual(piH.byte_size, 5, 'assembled instruciton is 5 byte')
+        self.assertEqual(piH.word_count, 5, 'assembled instruciton is 5 byte')
         self.assertEqual(
             piH.get_words(TestConfigObject.label_values, 0x8000, 5),
             [
@@ -197,7 +197,7 @@ class TestConfigObject(unittest.TestCase):
         piI = InstructioParser.parse_instruction(
             model2, test_line_id, 'mov [mar], [label1]', memzone_mngr2,
         )
-        self.assertEqual(piI.byte_size, 3, 'assembled instruciton is 3 byte')
+        self.assertEqual(piI.word_count, 3, 'assembled instruciton is 3 byte')
         self.assertEqual(
             piI.get_words(TestConfigObject.label_values, 0x8000, 3),
             [
@@ -211,7 +211,7 @@ class TestConfigObject(unittest.TestCase):
         piJ = InstructioParser.parse_instruction(
             model2, test_line_id, 'swap [$8000], [label1]', memzone_mngr2,
         )
-        self.assertEqual(piJ.byte_size, 5, 'assembled instruciton is 3 byte')
+        self.assertEqual(piJ.word_count, 5, 'assembled instruciton is 3 byte')
         self.assertEqual(
             piJ.get_words(TestConfigObject.label_values, 0x8000, 5),
             [
@@ -227,7 +227,7 @@ class TestConfigObject(unittest.TestCase):
         piK = InstructioParser.parse_instruction(
             model2, test_line_id, 'mov [sp+2], [sp+4]', memzone_mngr2,
         )
-        self.assertEqual(piK.byte_size, 3, 'assembled instruciton is 3 byte')
+        self.assertEqual(piK.word_count, 3, 'assembled instruciton is 3 byte')
         self.assertEqual(
             piK.get_words(TestConfigObject.label_values, 0x8000, 3),
             [
@@ -241,7 +241,7 @@ class TestConfigObject(unittest.TestCase):
         piL = InstructioParser.parse_instruction(
             model2, test_line_id, 'pop i', memzone_mngr2,
         )
-        self.assertEqual(piL.byte_size, 1, 'assembled instruciton is 1 byte')
+        self.assertEqual(piL.word_count, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(
             piL.get_words(TestConfigObject.label_values, 0x8000, 1),
             [Word(0b00001010, model2.word_size, model2.word_segment_size, model2.intra_word_endianness)],
@@ -251,7 +251,7 @@ class TestConfigObject(unittest.TestCase):
         piM = InstructioParser.parse_instruction(
             model2, LineIdentifier(158, 'test_pop_empty_arg'), 'pop', memzone_mngr2,
         )
-        self.assertEqual(piM.byte_size, 1, 'assembled instruciton is 1 byte')
+        self.assertEqual(piM.word_count, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(
             piM.get_words(TestConfigObject.label_values, 0x8000, 1),
             [Word(0b00001111, model2.word_size, model2.word_segment_size, model2.intra_word_endianness)],
@@ -261,7 +261,7 @@ class TestConfigObject(unittest.TestCase):
         piN = InstructioParser.parse_instruction(
             model2, test_line_id, 'mov a, [sp+2]', memzone_mngr2,
         )
-        self.assertEqual(piN.byte_size, 2, 'assembled instruciton is 2 byte')
+        self.assertEqual(piN.word_count, 2, 'assembled instruciton is 2 byte')
         self.assertEqual(
             piN.get_words(TestConfigObject.label_values, 0x8000, 2),
             [

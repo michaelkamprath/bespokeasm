@@ -53,7 +53,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
         ins1.set_start_address(1212)
         self.assertIsInstance(ins1, InstructionLine)
-        self.assertEqual(ins1.byte_size, 2, 'has 2 bytes')
+        self.assertEqual(ins1.word_count, 2, 'has 2 words')
         ins1.label_scope = TestInstructionParsing.label_values
         ins1.generate_words()
         self.assertEqual(
@@ -82,7 +82,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
         ins1.set_start_address(1212)
         self.assertIsInstance(ins1, InstructionLine)
-        self.assertEqual(ins1.byte_size, 1, 'has 1 byte')
+        self.assertEqual(ins1.word_count, 1, 'has 1 word')
         ins1.label_scope = TestInstructionParsing.label_values
         ins1.generate_words()
         self.assertEqual(
@@ -102,7 +102,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
         ins2.set_start_address(1212)
         self.assertIsInstance(ins2, InstructionLine)
-        self.assertEqual(ins2.byte_size, 2, 'has 2 byte')
+        self.assertEqual(ins2.word_count, 2, 'has 2 words')
         ins2.label_scope = TestInstructionParsing.label_values
         ins2.generate_words()
         self.assertEqual(
@@ -122,7 +122,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
         ins3.set_start_address(1212)
         self.assertIsInstance(ins3, InstructionLine)
-        self.assertEqual(ins3.byte_size, 2, 'has 2 byte')
+        self.assertEqual(ins3.word_count, 2, 'has 2 words')
         ins3.label_scope = TestInstructionParsing.label_values
         ins3.generate_words()
         self.assertEqual(
@@ -142,7 +142,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
         ins4.set_start_address(1212)
         self.assertIsInstance(ins4, InstructionLine)
-        self.assertEqual(ins4.byte_size, 1, 'has 1 byte')
+        self.assertEqual(ins4.word_count, 1, 'has 1 word')
         ins4.label_scope = TestInstructionParsing.label_values
         ins4.generate_words()
         self.assertEqual(
@@ -162,7 +162,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
         ins5.set_start_address(1212)
         self.assertIsInstance(ins5, InstructionLine)
-        self.assertEqual(ins5.byte_size, 2, 'has 2 byte')
+        self.assertEqual(ins5.word_count, 2, 'has 2 words')
         ins5.label_scope = TestInstructionParsing.label_values
         ins5.generate_words()
         self.assertEqual(
@@ -207,7 +207,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
         ins0.set_start_address(1212)
         self.assertIsInstance(ins0, InstructionLine)
-        self.assertEqual(ins0.byte_size, 2, 'has 2 bytes')
+        self.assertEqual(ins0.word_count, 2, 'has 2 words')
         ins0.label_scope = TestInstructionParsing.label_values
         ins0.generate_words()
         self.assertEqual(
@@ -222,7 +222,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
         ins1.set_start_address(1212)
         self.assertIsInstance(ins1, InstructionLine)
-        self.assertEqual(ins1.byte_size, 3, 'has 3 bytes')
+        self.assertEqual(ins1.word_count, 3, 'has 3 words')
         ins1.label_scope = TestInstructionParsing.label_values
         ins1.generate_words()
         self.assertEqual(
@@ -237,7 +237,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
         ins2.set_start_address(1212)
         self.assertIsInstance(ins2, InstructionLine)
-        self.assertEqual(ins2.byte_size, 3, 'has 3 bytes')
+        self.assertEqual(ins2.word_count, 3, 'has 3 words')
         ins2.label_scope = TestInstructionParsing.label_values
         ins2.generate_words()
         self.assertEqual(
@@ -261,7 +261,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
         ins0.set_start_address(1212)
         self.assertIsInstance(ins0, InstructionLine)
-        self.assertEqual(ins0.byte_size, 1, 'has 1 bytes')
+        self.assertEqual(ins0.word_count, 1, 'has 1 words')
         ins0.label_scope = TestInstructionParsing.label_values
         ins0.generate_words()
         self.assertEqual(
@@ -276,7 +276,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
         ins1.set_start_address(1212)
         self.assertIsInstance(ins1, InstructionLine)
-        self.assertEqual(ins1.byte_size, 2, 'has 2 bytes')
+        self.assertEqual(ins1.word_count, 2, 'has 2 words')
         ins1.label_scope = TestInstructionParsing.label_values
         ins1.generate_words()
         self.assertEqual(
@@ -300,7 +300,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
         ins0.set_start_address(1212)
         self.assertIsInstance(ins0, InstructionLine)
-        self.assertEqual(ins0.byte_size, 1, 'has 1 bytes')
+        self.assertEqual(ins0.word_count, 1, 'has 1 words')
         ins0.label_scope = TestInstructionParsing.label_values
         ins0.generate_words()
         self.assertEqual(
@@ -315,7 +315,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
         ins1.set_start_address(1212)
         self.assertIsInstance(ins1, InstructionLine)
-        self.assertEqual(ins1.byte_size, 3, 'has 3 bytes')
+        self.assertEqual(ins1.word_count, 3, 'has 3 words')
         ins1.label_scope = TestInstructionParsing.label_values
         ins1.generate_words()
         self.assertEqual(
@@ -330,7 +330,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
         ins2.set_start_address(1212)
         self.assertIsInstance(ins2, InstructionLine)
-        self.assertEqual(ins2.byte_size, 4, 'has 4 bytes')
+        self.assertEqual(ins2.word_count, 4, 'has 4 words')
         ins2.label_scope = TestInstructionParsing.label_values
         ins2.generate_words()
         self.assertEqual(
@@ -350,7 +350,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
         ins2.set_start_address(1212)
         self.assertIsInstance(ins2, InstructionLine)
-        self.assertEqual(ins2.byte_size, 4, 'has 4 bytes')
+        self.assertEqual(ins2.word_count, 4, 'has 4 words')
         ins2.label_scope = TestInstructionParsing.label_values
         ins2.generate_words()
         self.assertEqual(
@@ -370,7 +370,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
         ins4.set_start_address(1212)
         self.assertIsInstance(ins4, InstructionLine)
-#        self.assertEqual(ins4.byte_size, 3, 'has 3 bytes')
+#        self.assertEqual(ins4.word_count, 3, 'has 3 words')
         ins4.label_scope = TestInstructionParsing.label_values
         ins4.generate_words()
         self.assertEqual(
@@ -490,7 +490,7 @@ class TestInstructionParsing(unittest.TestCase):
         t1.set_start_address(1)
         t1.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
-        self.assertEqual(t1.byte_size, 2, 'has 2 bytes')
+        self.assertEqual(t1.word_count, 2, 'has 2 words')
         t1.generate_words()
         self.assertEqual(
             t1.get_words(),
@@ -505,7 +505,7 @@ class TestInstructionParsing(unittest.TestCase):
         t2.set_start_address(1)
         t2.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t2, InstructionLine)
-        self.assertEqual(t2.byte_size, 2, 'has 2 bytes')
+        self.assertEqual(t2.word_count, 2, 'has 2 words')
         t2.generate_words()
         self.assertEqual(
             t2.get_words(),
@@ -531,7 +531,7 @@ class TestInstructionParsing(unittest.TestCase):
         t1.set_start_address(1)
         t1.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
-        self.assertEqual(t1.byte_size, 2, 'has 2 bytes')
+        self.assertEqual(t1.word_count, 2, 'has 2 words')
         t1.generate_words()
         self.assertEqual(
             t1.get_words(),
@@ -546,7 +546,7 @@ class TestInstructionParsing(unittest.TestCase):
         t2.set_start_address(1)
         t2.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t2, InstructionLine)
-        self.assertEqual(t2.byte_size, 2, 'has 2 bytes')
+        self.assertEqual(t2.word_count, 2, 'has 2 words')
         t2.generate_words()
         self.assertEqual(
             t2.get_words(),
@@ -572,7 +572,7 @@ class TestInstructionParsing(unittest.TestCase):
         t1.set_start_address(1)
         t1.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
-        self.assertEqual(t1.byte_size, 2, 'has 2 bytes')
+        self.assertEqual(t1.word_count, 2, 'has 2 words')
         t1.generate_words()
         self.assertEqual(
             t1.get_words(),
@@ -598,7 +598,7 @@ class TestInstructionParsing(unittest.TestCase):
         t1.set_start_address(1)
         t1.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
-        self.assertEqual(t1.byte_size, 2, 'has 2 bytes')
+        self.assertEqual(t1.word_count, 2, 'has 2 words')
         t1.generate_words()
         self.assertEqual(
             t1.get_words(),
@@ -624,7 +624,7 @@ class TestInstructionParsing(unittest.TestCase):
         t1.set_start_address(1)
         t1.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
-        self.assertEqual(t1.byte_size, 1, 'has 1 bytes')
+        self.assertEqual(t1.word_count, 1, 'has 1 words')
         t1.generate_words()
         self.assertEqual(
             t1.get_words(),
@@ -639,7 +639,7 @@ class TestInstructionParsing(unittest.TestCase):
         t2.set_start_address(1)
         t2.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t2, InstructionLine)
-        self.assertEqual(t2.byte_size, 1, 'has 1 bytes')
+        self.assertEqual(t2.word_count, 1, 'has 1 words')
         t2.generate_words()
         self.assertEqual(
             t2.get_words(),
@@ -654,7 +654,7 @@ class TestInstructionParsing(unittest.TestCase):
         t3.set_start_address(1)
         t3.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t3, InstructionLine)
-        self.assertEqual(t3.byte_size, 2, 'has 2 bytes')
+        self.assertEqual(t3.word_count, 2, 'has 2 words')
         t3.generate_words()
         self.assertEqual(
             t3.get_words(),
@@ -696,7 +696,7 @@ class TestInstructionParsing(unittest.TestCase):
         t1.set_start_address(1)
         t1.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
-        self.assertEqual(t1.byte_size, 1, 'has 1 bytes')
+        self.assertEqual(t1.word_count, 1, 'has 1 words')
         t1.generate_words()
         self.assertEqual(
             t1.get_words(),
@@ -711,7 +711,7 @@ class TestInstructionParsing(unittest.TestCase):
         t2.set_start_address(1)
         t2.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t2, InstructionLine)
-        self.assertEqual(t2.byte_size, 1, 'has 1 bytes')
+        self.assertEqual(t2.word_count, 1, 'has 1 words')
         t2.generate_words()
         self.assertEqual(
             t2.get_words(),
@@ -745,7 +745,7 @@ class TestInstructionParsing(unittest.TestCase):
         t1.set_start_address(1)
         t1.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
-        self.assertEqual(t1.byte_size, 2, 'has 2 bytes')
+        self.assertEqual(t1.word_count, 2, 'has 2 words')
         t1.generate_words()
         self.assertEqual(
             t1.get_words(),
@@ -783,7 +783,7 @@ class TestInstructionParsing(unittest.TestCase):
         t1.set_start_address(1)
         t1.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
-        self.assertEqual(t1.byte_size, 2, 'has 2 bytes')
+        self.assertEqual(t1.word_count, 2, 'has 2 words')
         t1.generate_words()
         self.assertEqual(
             t1.get_words(),
@@ -809,7 +809,7 @@ class TestInstructionParsing(unittest.TestCase):
         t1.set_start_address(1)
         t1.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
-        self.assertEqual(t1.byte_size, 3, 'has 3 bytes')
+        self.assertEqual(t1.word_count, 3, 'has 3 words')
         t1.generate_words()
         self.assertEqual(
             list(t1.get_words()),
@@ -824,7 +824,7 @@ class TestInstructionParsing(unittest.TestCase):
         t2.set_start_address(1)
         t2.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t2, InstructionLine)
-        self.assertEqual(t2.byte_size, 3, 'has 3 bytes')
+        self.assertEqual(t2.word_count, 3, 'has 3 words')
         t2.generate_words()
         self.assertEqual(
             list(t2.get_words()),
@@ -839,7 +839,7 @@ class TestInstructionParsing(unittest.TestCase):
         t3.set_start_address(1)
         t3.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t3, InstructionLine)
-        self.assertEqual(t3.byte_size, 3, 'has 3 bytes')
+        self.assertEqual(t3.word_count, 3, 'has 3 words')
         t3.generate_words()
         self.assertEqual(
             list(t3.get_words()),
@@ -869,7 +869,7 @@ class TestInstructionParsing(unittest.TestCase):
 
         t1.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
-        self.assertEqual(t1.byte_size, 2, 'has 2 bytes')
+        self.assertEqual(t1.word_count, 2, 'has 2 words')
 
     def test_relative_address_operand(self):
         fp = pkg_resources.files(config_files).joinpath('test_instruction_operands.yaml')
@@ -889,7 +889,7 @@ class TestInstructionParsing(unittest.TestCase):
         t1.set_start_address(0x8000)
         t1.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
-        self.assertEqual(t1.byte_size, 3, 'has 3 bytes')
+        self.assertEqual(t1.word_count, 3, 'has 3 words')
         t1.generate_words()
         self.assertEqual(
             list(t1.get_words()),
@@ -904,7 +904,7 @@ class TestInstructionParsing(unittest.TestCase):
         t2.set_start_address(0x8000)
         t2.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t2, InstructionLine)
-        self.assertEqual(t2.byte_size, 2, 'has 2 bytes')
+        self.assertEqual(t2.word_count, 2, 'has 2 words')
         t2.generate_words()
         self.assertEqual(
             list(t2.get_words()),
@@ -919,7 +919,7 @@ class TestInstructionParsing(unittest.TestCase):
         t3.set_start_address(0x8000)
         t3.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t3, InstructionLine)
-        self.assertEqual(t3.byte_size, 2, 'has 2 bytes')
+        self.assertEqual(t3.word_count, 2, 'has 2 words')
         t3.generate_words()
         self.assertEqual(
             list(t3.get_words()),
@@ -934,7 +934,7 @@ class TestInstructionParsing(unittest.TestCase):
         t4.set_start_address(0x8000)
         t4.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t4, InstructionLine)
-        self.assertEqual(t4.byte_size, 2, 'has 2 bytes')
+        self.assertEqual(t4.word_count, 2, 'has 2 words')
         t4.generate_words()
         self.assertEqual(
             list(t4.get_words()),
@@ -978,7 +978,7 @@ class TestInstructionParsing(unittest.TestCase):
         t1.set_start_address(0x3000)
         t1.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
-        self.assertEqual(t1.byte_size, 2, 'has 2 bytes')
+        self.assertEqual(t1.word_count, 2, 'has 2 words')
         t1.generate_words()
         self.assertEqual(
             list(t1.get_words()),
@@ -995,7 +995,7 @@ class TestInstructionParsing(unittest.TestCase):
             t1.set_start_address(memzone_mngr.global_zone.start)
             t1.label_scope = TestInstructionParsing.label_values
             self.assertIsInstance(t1, InstructionLine)
-            self.assertEqual(t1.byte_size, 2, 'has 2 bytes')
+            self.assertEqual(t1.word_count, 2, 'has 2 words')
             t1.generate_words()
 
         with self.assertRaises(SystemExit, msg='address out of range'):
@@ -1007,7 +1007,7 @@ class TestInstructionParsing(unittest.TestCase):
             e2.set_start_address(memzone_mngr.global_zone.start)
             e2.label_scope = TestInstructionParsing.label_values
             self.assertIsInstance(e2, InstructionLine)
-            self.assertEqual(e2.byte_size, 3, 'has 3 bytes')
+            self.assertEqual(e2.word_count, 3, 'has 3 words')
             e2.generate_words()
 
     def test_address_operands(self):
@@ -1098,7 +1098,7 @@ class TestInstructionParsing(unittest.TestCase):
         t1.set_start_address(0x2F10)
         t1.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
-        self.assertEqual(t1.byte_size, 2, 'has 2 bytes')
+        self.assertEqual(t1.word_count, 2, 'has 2 words')
         t1.generate_words()
         self.assertEqual(
             list(t1.get_words()),
@@ -1119,7 +1119,7 @@ class TestInstructionParsing(unittest.TestCase):
         t2.set_start_address(0x2F10)
         t2.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t2, InstructionLine)
-        self.assertEqual(t2.byte_size, 3, 'has 3 bytes')
+        self.assertEqual(t2.word_count, 3, 'has 3 words')
         t2.generate_words()
         self.assertEqual(
             list(t2.get_words()),
@@ -1135,7 +1135,7 @@ class TestInstructionParsing(unittest.TestCase):
         t3.set_start_address(0x2F10)
         t3.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t3, InstructionLine)
-        self.assertEqual(t3.byte_size, 3, 'has 3 bytes')
+        self.assertEqual(t3.word_count, 3, 'has 3 words')
         t3.generate_words()
         self.assertEqual(
             list(t3.get_words()),
@@ -1151,6 +1151,6 @@ class TestInstructionParsing(unittest.TestCase):
         t4.set_start_address(0x2F10)
         t4.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t4, InstructionLine)
-        self.assertEqual(t4.byte_size, 3, 'has 3 bytes')
+        self.assertEqual(t4.word_count, 3, 'has 3 words')
         with self.assertRaises(SystemExit, msg='address not in target memory zone'):
             t4.generate_words()

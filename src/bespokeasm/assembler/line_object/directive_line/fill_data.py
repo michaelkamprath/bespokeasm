@@ -39,7 +39,7 @@ class FillDataLine(LineWithWords):
         self._value = None
 
     @property
-    def byte_size(self) -> int:
+    def word_count(self) -> int:
         if self._count is None:
             self._count = self._count_expr.get_value(self.label_scope, self.line_id)
         return self._count
@@ -91,7 +91,7 @@ class FillUntilDataLine(LineWithWords):
         self._fill_value = None
 
     @property
-    def byte_size(self) -> int:
+    def word_count(self) -> int:
         if self._fill_until_addr is None:
             self._fill_until_addr = self._fill_until_addr_expr.get_value(self.label_scope, self.line_id)
         if self._fill_until_addr >= self.address:
@@ -106,9 +106,9 @@ class FillUntilDataLine(LineWithWords):
             self._fill_until_addr = self._fill_until_addr_expr.get_value(self.label_scope, self.line_id)
         if self._fill_value is None:
             self._fill_value = self._fill_value_expr.get_value(self.label_scope, self.line_id)
-        if self.byte_size > 0 and len(self._words) == 0:
+        if self.word_count > 0 and len(self._words) == 0:
             value_mask = (1 << self._word_size) - 1
             self._words.extend([
                 Word(self._fill_value & value_mask, self._word_size, self._word_segment_size, self._intra_word_endianness)
-                for _ in range(self.byte_size)
+                for _ in range(self.word_count)
             ])

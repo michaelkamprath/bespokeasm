@@ -3,6 +3,7 @@
 # embedded string feature must be enabled in the ISA configuration file, whether there is a
 # termination character or not to be included in the bytecode.
 from __future__ import annotations
+import math
 import re
 from typing import Literal
 
@@ -86,6 +87,11 @@ class EmbeddedString(LineWithWords):
     def byte_size(self) -> int:
         """Returns the number of bytes this data line will generate"""
         return len(self._string_bytes)
+
+    @property
+    def word_count(self) -> int:
+        # TODO: reconcile this to final rules for data compilation
+        return math.ceil(self.byte_size*8 / self._word_size)
 
     def generate_words(self) -> None:
         # set the bytes

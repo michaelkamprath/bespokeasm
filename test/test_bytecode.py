@@ -24,7 +24,7 @@ class TestBytecodeObjects(unittest.TestCase):
         ]
 
         ai1 = AssembledInstruction(123, parts1, 8, 8, 'big')
-        self.assertEqual(ai1.byte_size, 1)
+        self.assertEqual(ai1.word_count, 1)
         words1 = ai1.get_words(label_values, 0x8000, 1)
         self.assertEqual(words1, [Word(0xff, 8, 8, 'big')], 'generated words should match')
 
@@ -36,7 +36,7 @@ class TestBytecodeObjects(unittest.TestCase):
         ]
 
         ai2 = AssembledInstruction(456, parts2, 8, 8, 'big')
-        self.assertEqual(ai2.byte_size, 8)
+        self.assertEqual(ai2.word_count, 8)
         words2 = ai2.get_words(label_values, 0x8000, 8)
         self.assertEqual(
             words2,

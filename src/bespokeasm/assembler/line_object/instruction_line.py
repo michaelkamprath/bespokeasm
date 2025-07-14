@@ -84,10 +84,10 @@ class InstructionLine(LineWithWords):
         return f'InstructionLine<{self.instruction.strip()} -> {self._assembled_instruction}>'
 
     @property
-    def byte_size(self) -> int:
-        """Returns the number of bytes this instruction will generate"""
-        return self._assembled_instruction.byte_size
+    def word_count(self) -> int:
+        """Returns the number of words this instruction will generate"""
+        return self._assembled_instruction.word_count
 
     def generate_words(self) -> bytearray:
         """Finalize the bytes for this line with the label assignemnts"""
-        self._words.extend(self._assembled_instruction.get_words(self.label_scope, self.address, self.byte_size))
+        self._words.extend(self._assembled_instruction.get_words(self.label_scope, self.address, self.word_count))

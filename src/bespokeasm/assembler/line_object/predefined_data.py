@@ -1,3 +1,4 @@
+import math
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.assembler.memory_zone import MemoryZone
@@ -23,6 +24,11 @@ class PredefinedDataLine(LineWithWords):
     def byte_size(self) -> int:
         """Returns the number of bytes this data line will generate"""
         return self._byte_length
+
+    @property
+    def word_count(self) -> int:
+        # TODO: reconcile this to final rules for data compilation
+        return math.ceil(self.byte_size*8 / self._word_size)
 
     def generate_words(self):
         self._bytes.extend([(self._byte_value) & 0xFF]*self._byte_length)

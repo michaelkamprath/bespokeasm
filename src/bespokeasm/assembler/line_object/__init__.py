@@ -52,8 +52,8 @@ class LineObject:
         return self._address
 
     @property
-    def byte_size(self) -> int:
-        """Returns the number of bytes this line will generate"""
+    def word_count(self) -> int:
+        """Returns the number of words this line will generate"""
         return 0
 
     @property

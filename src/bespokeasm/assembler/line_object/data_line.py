@@ -1,3 +1,4 @@
+import math
 import re
 import sys
 from typing import Literal
@@ -123,6 +124,11 @@ class DataLine(LineWithWords):
     def byte_size(self) -> int:
         """Returns the number of bytes this data line will generate"""
         return len(self._arg_value_list)*DataLine.DIRECTIVE_VALUE_BYTE_SIZE[self._directive]
+
+    @property
+    def word_count(self) -> int:
+        # TODO: reconcile this to final rules for data compilation
+        return math.ceil(self.byte_size*8 / self._word_size)
 
     def generate_words(self):
         """Finalize the data bytes for this line with the label assignemnts"""

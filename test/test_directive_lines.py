@@ -52,7 +52,7 @@ class TestDirectiveLines(unittest.TestCase):
         self.assertEqual(o1.address, 1)
         o1.set_start_address(10)
         self.assertEqual(o1.address, 1, '.org address values cannot be directly set')
-        self.assertEqual(o1.byte_size, 0, '.org directives have 0 bytes')
+        self.assertEqual(o1.word_count, 0, '.org directives have 0 words')
 
         o2 = DirectiveLine.factory(
             5678,
@@ -162,7 +162,7 @@ class TestDirectiveLines(unittest.TestCase):
         )
         self.assertIsInstance(o1, FillDataLine)
         o1.label_scope = label_values
-        self.assertEqual(o1.byte_size, 32, 'has 32 bytes')
+        self.assertEqual(o1.word_count, 32, 'has 32 words')
         o1.generate_words()
         self.assertEqual(o1.get_words(), [
                 Word(
@@ -186,7 +186,7 @@ class TestDirectiveLines(unittest.TestCase):
         )
         self.assertIsInstance(o2, FillDataLine)
         o2.label_scope = label_values
-        self.assertEqual(o2.byte_size, 255, 'has 255 bytes')
+        self.assertEqual(o2.word_count, 255, 'has 255 words')
         o2.generate_words()
         self.assertEqual(o2.get_words(), [
             Word(
@@ -208,7 +208,7 @@ class TestDirectiveLines(unittest.TestCase):
         )
         self.assertIsInstance(o2b, FillDataLine)
         o2b.label_scope = label_values
-        self.assertEqual(o2b.byte_size, 161, 'has 161 bytes')
+        self.assertEqual(o2b.word_count, 161, 'has 161 words')
         o2b.generate_words()
         self.assertEqual(o2b.get_words(), [
             Word(
@@ -230,7 +230,7 @@ class TestDirectiveLines(unittest.TestCase):
         )
         self.assertIsInstance(o3, FillDataLine)
         o3.label_scope = label_values
-        self.assertEqual(o3.byte_size, 4, 'has 4 bytes')
+        self.assertEqual(o3.word_count, 4, 'has 4 words')
         o3.generate_words()
         self.assertEqual(o3.get_words(), [
             Word(
@@ -253,7 +253,7 @@ class TestDirectiveLines(unittest.TestCase):
         )
         self.assertIsInstance(o4, FillDataLine)
         o4.label_scope = label_values
-        self.assertEqual(o4.byte_size, 40, 'has 40 bytes')
+        self.assertEqual(o4.word_count, 40, 'has 40 words')
         o4.generate_words()
         self.assertEqual(o4.get_words(), [
             Word(
@@ -275,7 +275,7 @@ class TestDirectiveLines(unittest.TestCase):
         )
         self.assertIsInstance(o5, FillDataLine)
         o5.label_scope = label_values
-        self.assertEqual(o5.byte_size, 15, 'has 15 bytes')
+        self.assertEqual(o5.word_count, 15, 'has 15 words')
         o5.generate_words()
         self.assertEqual(o5.get_words(), [
             Word(
@@ -297,7 +297,7 @@ class TestDirectiveLines(unittest.TestCase):
         )
         self.assertIsInstance(o6, FillDataLine)
         o6.label_scope = label_values
-        self.assertEqual(o6.byte_size, 30, 'has 30 bytes')
+        self.assertEqual(o6.word_count, 30, 'has 30 words')
         o6.generate_words()
         self.assertEqual(o6.get_words(), [
             Word(
@@ -319,7 +319,7 @@ class TestDirectiveLines(unittest.TestCase):
         )
         self.assertIsInstance(o6, FillDataLine)
         o6.label_scope = label_values
-        self.assertEqual(o6.byte_size, 42, 'has 42 bytes')
+        self.assertEqual(o6.word_count, 42, 'has 42 words')
         o6.generate_words()
         self.assertEqual(o6.get_words(), [
             Word(
@@ -341,7 +341,7 @@ class TestDirectiveLines(unittest.TestCase):
         )
         self.assertIsInstance(o7, FillDataLine)
         o7.label_scope = label_values
-        self.assertEqual(o7.byte_size, 168, 'has 168 bytes')
+        self.assertEqual(o7.word_count, 168, 'has 168 words')
         o7.generate_words()
         self.assertEqual(o7.get_words(), [
             Word(
@@ -368,7 +368,7 @@ class TestDirectiveLines(unittest.TestCase):
         self.assertIsInstance(o1, FillUntilDataLine)
         o1.set_start_address(0x42)
         o1.label_scope = label_values
-        self.assertEqual(o1.byte_size, (0x100-0x42+1), 'must have the right number of bytes')
+        self.assertEqual(o1.word_count, (0x100-0x42+1), 'must have the right number of words')
         o1.generate_words()
         self.assertEqual(o1.get_words(), [
             Word(
@@ -392,7 +392,7 @@ class TestDirectiveLines(unittest.TestCase):
         self.assertIsInstance(o2, FillUntilDataLine)
         o2.set_start_address(0xF)
         o2.label_scope = label_values
-        self.assertEqual(o2.byte_size, 1, 'must have the right number of bytes')
+        self.assertEqual(o2.word_count, 1, 'must have the right number of words')
         o2.generate_words()
         self.assertEqual(o2.get_words(), [
             Word(
@@ -415,7 +415,7 @@ class TestDirectiveLines(unittest.TestCase):
         self.assertIsInstance(o3, FillUntilDataLine)
         o3.set_start_address(0xF)
         o3.label_scope = label_values
-        self.assertEqual(o3.byte_size, 0x81, 'must have the right number of bytes')
+        self.assertEqual(o3.word_count, 0x81, 'must have the right number of words')
         o3.generate_words()
         self.assertEqual(o3.get_words(), [
             Word(
@@ -445,6 +445,7 @@ class TestDirectiveLines(unittest.TestCase):
         t1.set_start_address(0xF)
         t1.label_scope = label_values
         self.assertEqual(t1.byte_size, 15, 'must have the right number of bytes')
+        self.assertEqual(t1.word_count, 15, 'must have the right number of words for 8-bit words')
         t1.generate_words()
         self.assertEqual(t1.get_words()[-1].value, 0, 'terminating character must match')
 
@@ -462,6 +463,7 @@ class TestDirectiveLines(unittest.TestCase):
         t2.set_start_address(0xF)
         t2.label_scope = label_values
         self.assertEqual(t2.byte_size, 15, 'must have the right number of bytes')
+        self.assertEqual(t2.word_count, 15, 'must have the right number of words for 8-bit words')
         t2.generate_words()
         self.assertEqual(t2.get_words()[-1].value, 3, 'terminating character must match')
 
