@@ -1,5 +1,6 @@
 import re
 import sys
+from typing import Literal
 
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.line_identifier import LineIdentifier
@@ -39,6 +40,10 @@ class DataLine(LineWithWords):
             comment: str,
             endian: str,
             current_memzone: MemoryZone,
+            word_size: int,
+            word_segment_size: int,
+            intra_word_endianness: Literal['little', 'big'],
+            multi_word_endianness: Literal['little', 'big'],
             cstr_terminator: int = 0,
     ) -> LineWithWords:
         """Tries to match the passed line string to the data directive pattern.
@@ -75,6 +80,10 @@ class DataLine(LineWithWords):
                 comment,
                 endian,
                 current_memzone,
+                word_size,
+                word_segment_size,
+                intra_word_endianness,
+                multi_word_endianness,
             )
         else:
             return None
@@ -88,8 +97,21 @@ class DataLine(LineWithWords):
             comment: str,
             endian: str,
             current_memzone: MemoryZone,
+            word_size: int,
+            word_segment_size: int,
+            intra_word_endianness: Literal['little', 'big'],
+            multi_word_endianness: Literal['little', 'big'],
     ) -> None:
-        super().__init__(line_id, instruction, comment, current_memzone)
+        super().__init__(
+            line_id,
+            instruction,
+            comment,
+            current_memzone,
+            word_size,
+            word_segment_size,
+            intra_word_endianness,
+            multi_word_endianness,
+        )
         self._arg_value_list = value_list
         self._directive = directive_str
         self._endian = endian

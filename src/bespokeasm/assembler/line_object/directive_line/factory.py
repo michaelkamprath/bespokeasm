@@ -131,4 +131,15 @@ class DirectiveLine:
             return PageAlignLine(line_id, cleaned_line_str, comment, current_memzone, isa_model.page_size)
 
         # nothing was matched here. pass to data directive
-        return DataLine.factory(line_id, line_str, comment, endian, current_memzone, isa_model.cstr_terminator)
+        return DataLine.factory(
+            line_id,
+            line_str,
+            comment,
+            endian,
+            current_memzone,
+            isa_model.word_size,
+            isa_model.word_segment_size,
+            isa_model.intra_word_endianness,
+            isa_model.multi_word_endianness,
+            isa_model.cstr_terminator,
+        )
