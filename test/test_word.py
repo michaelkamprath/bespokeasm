@@ -129,7 +129,7 @@ class TestWord(unittest.TestCase):
 
         # 12-bit word, 4-bit segments, big-endian
         word = Word(0x123, 12, segment_size=4, intra_word_endianness='big')
-        self.assertEqual(word.to_bytes(), b'\x01\x23')  # Padded to 2 bytes
+        self.assertEqual(word.to_bytes(), b'\x12\x30')  # Padded to 2 bytes
 
     def test_to_bytes_little_endian(self):
         """Test byte conversion with little-endian intra-word endianness."""

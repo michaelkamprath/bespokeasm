@@ -1,4 +1,5 @@
 import math
+from typing import Literal
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.bytecode.parts import ByteCodePart
@@ -7,9 +8,19 @@ from bespokeasm.assembler.bytecode.word import Word
 
 
 class AssembledInstruction:
-    def __init__(self, line_id: LineIdentifier, parts: list[ByteCodePart]):
+    def __init__(
+        self,
+        line_id: LineIdentifier,
+        parts: list[ByteCodePart],
+        word_size: int,
+        segment_size: int,
+        endian: Literal['little', 'big'],
+    ):
         self._parts = parts
         self._line_id = line_id
+        self._word_size = word_size
+        self._segment_size = segment_size
+        self._endian = endian
         # calculate total bytes
         total_bits = 0
         for bcp in self._parts:
@@ -37,16 +48,17 @@ class AssembledInstruction:
     def parts(self):
         return self._parts
 
-    def get_bytes(self, label_scope: LabelScope, instruction_address: int, instruction_size: int) -> bytearray:
-        words: list[Word] = []
-        for p in self._parts:
-            words.extend(p.get_words(label_scope, instruction_address, instruction_size))
-
-        bytes = Word.generateByteArray(
-                words,
-                compact_bytes=True,
-            )
-        return bytes
+    def get_words(self, label_scope: LabelScope, instruction_address: int, instruction_size: int) -> list[Word]:
+        words: list[Word] = ByteCodePart.compact_parts_to_words(
+            self._parts,
+            self._word_size,
+            self._segment_size,
+            self._endian,
+            label_scope,
+            instruction_address,
+            instruction_size,
+        )
+        return words
 
 
 class CompositeAssembledInstruction(AssembledInstruction):

@@ -599,6 +599,28 @@ class TestValue(unittest.TestCase):
         self.assertEqual(words[0].value, 0x12)  # 0x1 << 4 + 0x2
         self.assertEqual(words[1].value, 0x34)  # 0x3 << 4 + 0x4
 
+    def test_from_word_slice_large_bit_size(self):
+        """Test construction from WordSlices with a large bit size."""
+        slice1 = WordSlice(0x12345678, 32)
 
-if __name__ == '__main__':
-    unittest.main()
+        value = Value.from_word_slices(
+            [slice1],
+            word_bit_size=8,
+            segment_size=8,
+            intra_word_endianness='big',
+            multi_word_endianness='little',
+        )
+
+        self.assertEqual(value.value, 0x12345678)
+        self.assertEqual(value.word_count, 4)
+        words = value.get_words_ordered()
+        self.assertEqual(
+            words,
+            [
+                Word(0x78, 8, 8, 'big'),
+                Word(0x56, 8, 8, 'big'),
+                Word(0x34, 8, 8, 'big'),
+                Word(0x12, 8, 8, 'big'),
+            ],
+            'words should be in little-endian order'
+        )

@@ -218,7 +218,7 @@ class Word:
 
     def __repr__(self) -> str:
         return f'Word<value=0x{self._value:x}, bit_size={self._bit_size}, ' \
-               f'segment_size={self._segment_size}, endian={self._intra_word_endianness}>'
+               f'segment_size={self._segment_size}, intra_word_endianness={self._intra_word_endianness}>'
 
     def __str__(self) -> str:
         return f'Word<{self._value} ({self._bit_size} bits, {self._segment_size}-bit segments, {self._intra_word_endianness})>'

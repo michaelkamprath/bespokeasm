@@ -92,24 +92,129 @@ class ByteCodePart:
         # this should be overridden
         raise NotImplementedError
 
-    def word_slice(self, label_scope: LabelScope, instruction_address: int, instruction_size: int) -> WordSlice:
+    def get_value_representation(
+        self,
+        label_scope: LabelScope,
+        instruction_address: int,
+        instruction_size: int,
+    ) -> WordSlice | Value:
         return WordSlice(
             self.get_value(label_scope, instruction_address, instruction_size),
             self._value_size,
         )
 
-    def get_words(self, label_scope: LabelScope, instruction_address: int, instruction_size: int) -> list:
-        value = Value.from_word_slices(
-            [self.word_slice(label_scope, instruction_address, instruction_size)],
-            self._word_size,
-            self._segment_size,
-            self._endian,
-            self._endian
-        )
-        return value.words
+    def get_words(self, label_scope: LabelScope, instruction_address: int, instruction_size: int) -> list[Word]:
+        value_representation = self.get_value_representation(label_scope, instruction_address, instruction_size)
+        if isinstance(value_representation, WordSlice):
+            return [Word.from_word_slices([value_representation], self._word_size, self._segment_size, self._endian)]
+        elif isinstance(value_representation, Value):
+            return value_representation.get_words_ordered()
+        else:
+            sys.exit(
+                f'ERROR: INTERNAL - get_words received unexpected value representation type: {type(value_representation)}'
+            )
 
     def contains_register_labels(self, register_labels: set[str]) -> bool:
         return False
+
+    @classmethod
+    def compact_parts_to_words(
+        cls,
+        parts: list[ByteCodePart],
+        word_size: int,
+        segment_size: int,
+        multi_word_endianness: Literal['little', 'big'],
+        label_scope: LabelScope,
+        instruction_address: int,
+        instruction_size: int,
+    ) -> list[Word]:
+        """
+        Compact a list of ByteCodePart objects into a list of Word objects.
+        The rules of compaction are:
+        - A ByteCodePArt is represented by either a WordSlice or a Value and is processed
+          in the order they are encountered
+        - Consecutive WordSlices are packed into a single value until a ByteCodePart is encountered
+          that is either word-aligned or a Value
+        - Values are then emitted as a list of Word objects
+        - The final list of Word objects is returned
+        """
+        words = []
+        current_word_slices: list[(WordSlice, Literal['little', 'big'])] = []
+        # current_bit_position = 0
+
+        def flush_word_slices(
+            word_size: int,
+            segment_size: int,
+            multi_word_endianness: Literal['little', 'big'],
+        ) -> list[Word]:
+            nonlocal current_word_slices
+            result = []
+            if current_word_slices:
+                # Pack accumulated WordSlices into a single word if they fit
+                total_bits = sum(slice_obj.bit_size for (slice_obj, _) in current_word_slices)
+                if total_bits <= word_size:
+                    # Pack into a single word
+                    packed_value = 0
+                    bit_position = word_size - 1  # Start from MSB
+                    for (slice_obj, endian) in current_word_slices:
+                        slice_bits = slice_obj.get_raw_bits()
+                        for i in range(slice_obj.bit_size - 1, -1, -1):
+                            if (slice_bits >> i) & 1:
+                                packed_value |= (1 << bit_position)
+                            bit_position -= 1
+                    result.append(Word(packed_value, word_size, segment_size, endian))
+                else:
+                    # Use Value for larger combinations
+                    word_slices = [slice_obj for (slice_obj, _) in current_word_slices]
+                    endian = current_word_slices[0][1]
+                    new_value = Value.from_word_slices(
+                        word_slices,
+                        word_size,
+                        segment_size,
+                        endian,
+                        multi_word_endianness,
+                    )
+                    result.extend(new_value.get_words_ordered())
+                current_word_slices = []
+                # current_bit_position = 0
+            return result
+
+        for part in parts:
+            if isinstance(part, CompositeByteCodePart):
+                # Flush any accumulated WordSlices before processing composite part
+                if current_word_slices:
+                    words.extend(flush_word_slices(word_size, segment_size, multi_word_endianness))
+
+                words.extend(part.get_words(label_scope, instruction_address, instruction_size))
+            else:
+                value_representation = part.get_value_representation(label_scope, instruction_address, instruction_size)
+                if isinstance(value_representation, WordSlice):
+                    if part.word_align:
+                        # Flush accumulated WordSlices before word-aligned part
+                        if current_word_slices:
+                            words.extend(flush_word_slices(word_size, segment_size, multi_word_endianness))
+                    if value_representation.bit_size % word_size == 0:
+                        value = Value.from_word_slices(
+                            [value_representation],
+                            word_size,
+                            segment_size,
+                            part.endian,
+                            part.endian,
+                        )
+                        words.extend(value.get_words_ordered())
+                    else:
+                        current_word_slices.append((value_representation, part.endian))
+                elif isinstance(value_representation, Value):
+                    # Flush accumulated WordSlices before Values
+                    if current_word_slices:
+                        words.extend(flush_word_slices(word_size, segment_size, multi_word_endianness))
+                    words.extend(value_representation.get_words_ordered())
+
+        # Flush any remaining word slices
+        if current_word_slices:
+            words.extend(flush_word_slices(word_size, segment_size, multi_word_endianness))
+
+        return words
 
 
 class NumericByteCodePart(ByteCodePart):
@@ -320,112 +425,12 @@ class CompositeByteCodePart(ByteCodePart):
         Returns a list of Word objects representing the composite bytecode part.
         Implements compaction rules for WordSlices and Values.
         """
-        words = []
-        current_word_slices = []
-        current_bit_position = 0
-
-        for part in self._parts_list:
-            if isinstance(part, CompositeByteCodePart):
-                # Flush any accumulated WordSlices before processing composite part
-                if current_word_slices:
-                    # Pack accumulated WordSlices into a single word if they fit
-                    total_bits = sum(slice_obj.bit_size for slice_obj in current_word_slices)
-                    if total_bits <= 8:
-                        # Pack into a single byte
-                        packed_value = 0
-                        bit_position = 7  # Start from MSB
-                        for slice_obj in current_word_slices:
-                            slice_bits = slice_obj.get_raw_bits()
-                            for i in range(slice_obj.bit_size - 1, -1, -1):
-                                if (slice_bits >> i) & 1:
-                                    packed_value |= (1 << bit_position)
-                                bit_position -= 1
-                        words.append(Word(packed_value, 8, 8, self.endian))
-                    else:
-                        # Use Value for larger combinations
-                        new_value = Value.from_word_slices(
-                            current_word_slices,
-                            self.word_size,
-                            self.segment_size,
-                            self.endian,
-                            self.endian
-                        )
-                        words.extend(new_value.words)
-                    current_word_slices = []
-                    current_bit_position = 0
-
-                words.extend(part.get_words(label_scope, instruction_address, instruction_size))
-            else:
-                part_slice = part.word_slice(label_scope, instruction_address, instruction_size)
-
-                if part.word_align:
-                    # Flush accumulated WordSlices before word-aligned part
-                    if current_word_slices:
-                        # Pack accumulated WordSlices into a single word if they fit
-                        total_bits = sum(slice_obj.bit_size for slice_obj in current_word_slices)
-                        if total_bits <= 8:
-                            # Pack into a single byte
-                            packed_value = 0
-                            bit_position = 7  # Start from MSB
-                            for slice_obj in current_word_slices:
-                                slice_bits = slice_obj.get_raw_bits()
-                                for i in range(slice_obj.bit_size - 1, -1, -1):
-                                    if (slice_bits >> i) & 1:
-                                        packed_value |= (1 << bit_position)
-                                    bit_position -= 1
-                            words.append(Word(packed_value, 8, 8, self.endian))
-                        else:
-                            # Use Value for larger combinations
-                            new_value = Value.from_word_slices(
-                                current_word_slices,
-                                self.word_size,
-                                self.segment_size,
-                                self.endian,
-                                self.endian
-                            )
-                            words.extend(new_value.words)
-                        current_word_slices = []
-                        current_bit_position = 0
-
-                    # Add padding if needed to align to byte boundary
-                    if current_bit_position % 8 != 0:
-                        padding_bits = 8 - (current_bit_position % 8)
-                        padding_slice = WordSlice(0, padding_bits)
-                        current_word_slices.append(padding_slice)
-                        current_bit_position += padding_bits
-
-                    # Add the word-aligned part
-                    current_word_slices.append(part_slice)
-                    current_bit_position += part_slice.bit_size
-                else:
-                    # Non-aligned part, just add to current accumulation
-                    current_word_slices.append(part_slice)
-                    current_bit_position += part_slice.bit_size
-
-        # Flush any remaining word slices
-        if current_word_slices:
-            # Pack accumulated WordSlices into a single word if they fit
-            total_bits = sum(slice_obj.bit_size for slice_obj in current_word_slices)
-            if total_bits <= 8:
-                # Pack into a single byte
-                packed_value = 0
-                bit_position = 7  # Start from MSB
-                for slice_obj in current_word_slices:
-                    slice_bits = slice_obj.get_raw_bits()
-                    for i in range(slice_obj.bit_size - 1, -1, -1):
-                        if (slice_bits >> i) & 1:
-                            packed_value |= (1 << bit_position)
-                        bit_position -= 1
-                words.append(Word(packed_value, 8, 8, self.endian))
-            else:
-                # Use Value for larger combinations
-                new_value = Value.from_word_slices(
-                    current_word_slices,
-                    self.word_size,
-                    self.segment_size,
-                    self.endian,
-                    self.endian
-                )
-                words.extend(new_value.words)
-
-        return words
+        return ByteCodePart.compact_parts_to_words(
+            self._parts_list,
+            self.word_size,
+            self.segment_size,
+            self.endian,
+            label_scope,
+            instruction_address,
+            instruction_size,
+        )

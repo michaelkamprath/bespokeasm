@@ -113,7 +113,7 @@ class TestWordEndianness(unittest.TestCase):
         self.assertIn('Word<', repr_str)
         self.assertIn('bit_size=16', repr_str)
         self.assertIn('segment_size=4', repr_str)
-        self.assertIn('endian=little', repr_str)
+        self.assertIn('intra_word_endianness=little', repr_str)
 
     def test_int_conversion(self):
         """Test integer conversion."""
