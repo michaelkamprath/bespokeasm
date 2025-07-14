@@ -2,6 +2,7 @@ import io
 
 from intelhex import IntelHex
 
+from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.line_object import LineWithWords, LineObject
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.pretty_printer import PrettyPrinterBase
@@ -18,7 +19,7 @@ class IntelHexPrettyPrinter(PrettyPrinterBase):
         output = io.StringIO()
         for lobj in self.line_objects:
             if isinstance(lobj, LineWithWords) and not lobj.is_muted:
-                line_bytes = lobj.get_words().decode(encoding='latin-')
+                line_bytes = Word.words_to_bytes(lobj.get_words()).decode(encoding='latin-')
                 self._intel_hex.puts(lobj.address, line_bytes)
 
             elif isinstance(lobj, AddressOrgLine):

@@ -295,7 +295,7 @@ class Word:
         return self._value
 
     @classmethod
-    def generateByteArray(
+    def words_to_bytes(
         cls,
         words: list,
         compact_bytes: bool = False,

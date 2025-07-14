@@ -2,6 +2,7 @@ import io
 import math
 import sys
 
+from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.line_object import LineObject, LineWithWords
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.line_object.directive_line.memzone import SetMemoryZoneLine
@@ -117,7 +118,14 @@ class ListingPrettyPrinter(PrettyPrinterBase):
 
         # first, get the line bytes, if any
         line_bytes = None if not isinstance(lobj, LineWithWords) \
-                        else ListingPrettyPrinter._generate_bytecode_line_string(lobj.get_words(), self._bytes_per_line)
+                        else ListingPrettyPrinter._generate_bytecode_line_string(
+                            Word.words_to_bytes(
+                                lobj.get_words(),
+                                False,
+                                'big',
+                            ),
+                            self._bytes_per_line,
+                        )
 
         # write the line number
         output.write(f' {lobj.line_id.line_num:{self.max_line_num_width}d} | ')

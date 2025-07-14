@@ -4,6 +4,7 @@ import os
 import sys
 
 from bespokeasm.assembler.assembly_file import AssemblyFile
+from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithWords, LineObject
 from bespokeasm.assembler.line_object.label_line import LabelLine
@@ -119,7 +120,7 @@ class Assembler:
         if self._verbose > 2:
             click.echo(f'Found {len(line_obs)} lines across all source files')
 
-        compilable_line_obs = [lobj for lobj in line_obs if lobj.compilable]
+        compilable_line_obs: list[LineObject] = [lobj for lobj in line_obs if lobj.compilable]
         # First pass: assign addresses to labels
         for lobj in compilable_line_obs:
             lobj.set_start_address(lobj.memory_zone.current_address)
@@ -127,7 +128,7 @@ class Assembler:
                 sys.exit(f'ERROR: {lobj.line_id} - INTERNAL line object address is None. Memory zone = {lobj.memory_zone}')
 
             try:
-                lobj.memory_zone.current_address = lobj.address + lobj.byte_size
+                lobj.memory_zone.current_address = lobj.address + lobj.word_count
             except ValueError as e:
                 sys.exit(f'ERROR: {lobj.line_id} - {str(e)}')
 
@@ -158,7 +159,7 @@ class Assembler:
             if self._verbose > 2:
                 click.echo(f'Processing {lobj.line_id} = {lobj} at address ${lobj.address:x}')
             if isinstance(lobj, LineWithWords):
-                if last_line is not None and (last_line.address + last_line.byte_size) > lobj.address:
+                if last_line is not None and (last_line.address + last_line.word_count) > lobj.address:
                     sys.exit(
                         f'ERROR: {lobj.line_id} - Address of byte code at this line overlaps with bytecode from '
                         f'line <{last_line.line_id}> at address {hex(lobj.address)}\n'
@@ -169,24 +170,15 @@ class Assembler:
 
         # Finally generate the binary image
         fill_bytes = bytearray([self._binary_fill_value])
-        addr = self._binary_start
 
         if self._generate_binary:
-            if self._verbose > 2:
-                print('\nGenerating byte code:')
-            while addr <= (max_generated_address if self._binary_end is None else self._binary_end):
-                lobj = line_dict.get(addr, None)
-                insertion_bytes = fill_bytes
-                if lobj is not None:
-                    line_bytes = lobj.get_words()
-                    if line_bytes is not None:
-                        insertion_bytes = line_bytes
-                        if self._verbose > 2:
-                            line_bytes_str = binascii.hexlify(line_bytes, sep=' ').decode('utf-8')
-                            click.echo(f'Address ${addr:x} : {lobj} bytes = {line_bytes_str}')
-                bytecode.extend(insertion_bytes)
-                addr += len(insertion_bytes)
-
+            bytecode = Assembler._generate_bytes(
+                line_dict,
+                max_generated_address,
+                fill_bytes,
+                self._binary_start,
+                self._binary_end,
+            )
             click.echo(f'Writing {len(bytecode)} bytes of byte code to {self._output_file}')
             with open(self._output_file, 'wb') as f:
                 f.write(bytecode)
@@ -206,3 +198,32 @@ class Assembler:
             else:
                 with open(self._pretty_print_output, 'w') as f:
                     f.write(pretty_str)
+
+    @classmethod
+    def _generate_bytes(
+        cls,
+        line_dict: dict[int, LineObject],
+        max_generated_address: int,
+        fill_bytes: bytearray,
+        start_address: int,
+        end_address: int,
+        log_level: int,
+    ) -> bytearray:
+        bytecode = bytearray()
+        addr = start_address
+        if log_level > 2:
+            print('\nGenerating byte code:')
+        while addr <= (max_generated_address if end_address is None else end_address):
+            lobj = line_dict.get(addr, None)
+            insertion_bytes = fill_bytes
+            if lobj is not None:
+                line_bytes = Word.words_to_bytes(lobj.get_words(), False, 'big')
+                if line_bytes is not None:
+                    insertion_bytes = line_bytes
+                    if log_level > 2:
+                        line_bytes_str = binascii.hexlify(line_bytes, sep=' ').decode('utf-8')
+                        click.echo(f'Address ${addr:x} : {lobj} bytes = {line_bytes_str}')
+            bytecode.extend(insertion_bytes)
+            addr += lobj.word_count
+
+        return bytecode
