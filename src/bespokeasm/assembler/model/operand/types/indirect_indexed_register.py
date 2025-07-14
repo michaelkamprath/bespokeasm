@@ -5,8 +5,16 @@ from .indexed_register import IndexedRegisterOperand
 class IndirectIndexedRegisterOperand(IndexedRegisterOperand):
     OPERAND_PATTERN_TEMPLATE = r'\[\s*({0})\s*(\+|\-)\s*({1})\s*\]'
 
-    def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str, regsiters: set[str]) -> None:
-        super().__init__(operand_id, arg_config_dict, default_endian, regsiters)
+    def __init__(
+        self,
+        operand_id: str,
+        arg_config_dict: dict,
+        default_endian: str,
+        regsiters: set[str],
+        word_size: int,
+        word_segment_size: int,
+    ) -> None:
+        super().__init__(operand_id, arg_config_dict, default_endian, regsiters, word_size, word_segment_size)
 
     def __str__(self):
         return f'IndirectIndexedRegisterOperand<{self.id}, register={self.register}, match_pattern={self.match_pattern}>'

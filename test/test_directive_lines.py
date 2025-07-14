@@ -11,7 +11,7 @@ from bespokeasm.assembler.line_object.directive_line.fill_data import FillDataLi
 from bespokeasm.assembler.line_object.directive_line.factory import DirectiveLine
 from bespokeasm.assembler.line_object.directive_line.address import AddressOrgLine
 from bespokeasm.assembler.line_object.directive_line.page_align import PageAlignLine
-from bespokeasm.assembler.line_object import LineWithBytes
+from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
@@ -354,7 +354,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.memory_zone_manager,
             local_isa_model
         )
-        self.assertIsInstance(t1, LineWithBytes)
+        self.assertIsInstance(t1, LineWithWords)
         t1.set_start_address(0xF)
         t1.label_scope = label_values
         self.assertEqual(t1.byte_size, 15, 'must have the right number of bytes')
@@ -371,7 +371,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.memory_zone_manager,
             local_isa_model
         )
-        self.assertIsInstance(t1, LineWithBytes)
+        self.assertIsInstance(t1, LineWithWords)
         t2.set_start_address(0xF)
         t2.label_scope = label_values
         self.assertEqual(t2.byte_size, 15, 'must have the right number of bytes')

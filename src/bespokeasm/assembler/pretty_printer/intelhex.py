@@ -2,7 +2,7 @@ import io
 
 from intelhex import IntelHex
 
-from bespokeasm.assembler.line_object import LineWithBytes, LineObject
+from bespokeasm.assembler.line_object import LineWithWords, LineObject
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.pretty_printer import PrettyPrinterBase
 from bespokeasm.assembler.line_object.directive_line.address import AddressOrgLine
@@ -17,8 +17,8 @@ class IntelHexPrettyPrinter(PrettyPrinterBase):
     def pretty_print(self) -> str:
         output = io.StringIO()
         for lobj in self.line_objects:
-            if isinstance(lobj, LineWithBytes) and not lobj.is_muted:
-                line_bytes = lobj.get_bytes().decode(encoding='latin-')
+            if isinstance(lobj, LineWithWords) and not lobj.is_muted:
+                line_bytes = lobj.get_words().decode(encoding='latin-')
                 self._intel_hex.puts(lobj.address, line_bytes)
 
             elif isinstance(lobj, AddressOrgLine):

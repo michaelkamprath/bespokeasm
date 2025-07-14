@@ -1,13 +1,14 @@
 import re
 import sys
 
+from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.line_object import LineWithBytes, INSTRUCTION_EXPRESSION_PATTERN
+from bespokeasm.assembler.line_object import LineWithWords, INSTRUCTION_EXPRESSION_PATTERN
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.expression import parse_expression, ExpressionNode
 
 
-class DataLine(LineWithBytes):
+class DataLine(LineWithWords):
     PATTERN_DATA_DIRECTIVE = re.compile(
         r'^(\.byte|\.2byte|\.4byte|\.8byte|\.cstr|\.asciiz)\b\s*(?:(?P<quote>[\"\'])((?:\\(?P=quote)|.)*)(?P=quote)'
         r'|({}(?:\s*\,{})*))'.format(INSTRUCTION_EXPRESSION_PATTERN, INSTRUCTION_EXPRESSION_PATTERN),
@@ -39,7 +40,7 @@ class DataLine(LineWithBytes):
             endian: str,
             current_memzone: MemoryZone,
             cstr_terminator: int = 0,
-    ) -> LineWithBytes:
+    ) -> LineWithWords:
         """Tries to match the passed line string to the data directive pattern.
         If succcessful, returns a constructed DataLine object. If not, None is
         returned.
@@ -101,7 +102,7 @@ class DataLine(LineWithBytes):
         """Returns the number of bytes this data line will generate"""
         return len(self._arg_value_list)*DataLine.DIRECTIVE_VALUE_BYTE_SIZE[self._directive]
 
-    def generate_bytes(self):
+    def generate_words(self):
         """Finalize the data bytes for this line with the label assignemnts"""
         for arg_item in self._arg_value_list:
             if isinstance(arg_item, int):
@@ -124,5 +125,10 @@ class DataLine(LineWithBytes):
                     f'ERROR - {self.line_id}: Overflow error when converting value ({arg_val}) to '
                     f'bytes on dataline. Error = {oe}'
                 )
-            for b in value_bytes:
-                self._append_byte(b)
+            words = Word.from_bytes(
+                value_bytes,
+                self._word_size,
+                self._word_segment_size,
+                self._intra_word_endianness,
+            )
+            self._words.extend(words)

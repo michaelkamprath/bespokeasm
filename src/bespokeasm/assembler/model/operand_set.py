@@ -9,12 +9,27 @@ from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 class OperandSet:
     _ordered_operand_list: list[Operand]
 
-    def __init__(self, name: str, config_dict: dict, default_endian: str, regsiters: set[str]):
+    def __init__(
+        self,
+        name: str,
+        config_dict: dict,
+        default_endian: str,
+        regsiters: set[str],
+        word_size: int,
+        word_segment_size: int,
+    ) -> None:
         self._name = name
         self._config = config_dict
         self._ordered_operand_list = []
         for arg_type_id, arg_type_conf in self._config['operand_values'].items():
-            operand = OperandFactory.factory(arg_type_id, arg_type_conf, default_endian, regsiters)
+            operand = OperandFactory.factory(
+                arg_type_id,
+                arg_type_conf,
+                default_endian,
+                regsiters,
+                word_size,
+                word_segment_size,
+            )
             if operand.null_operand:
                 # null operands not supported in operand sets. must use specific operand configuration.
                 sys.exit(
@@ -67,10 +82,10 @@ class OperandSet:
 
 
 class OperandSetCollection(dict):
-    def __init__(self, config_dict: dict, default_endian: str, registers: set[str]):
+    def __init__(self, config_dict: dict, default_endian: str, registers: set[str], word_size: int, word_segment_size: int):
         super().__init__(self)
         for set_name, set_config in config_dict.items():
-            self[set_name] = OperandSet(set_name, set_config, default_endian, registers)
+            self[set_name] = OperandSet(set_name, set_config, default_endian, registers, word_size, word_segment_size)
 
     def __repr__(self) -> str:
         return str(self)

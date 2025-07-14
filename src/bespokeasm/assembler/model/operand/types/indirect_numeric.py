@@ -9,8 +9,15 @@ from .numeric_expression import NumericExpressionOperand
 
 
 class IndirectNumericOperand(NumericExpressionOperand):
-    def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str):
-        super().__init__(operand_id, arg_config_dict, default_endian)
+    def __init__(
+        self,
+        operand_id: str,
+        arg_config_dict: dict,
+        default_endian: str,
+        word_size: int,
+        word_segment_size: int,
+    ):
+        super().__init__(operand_id, arg_config_dict, default_endian, word_size, word_segment_size)
 
     def __str__(self):
         return f'IndirectNumericOperand<{self.id},arg_size={self.argument_size}>'

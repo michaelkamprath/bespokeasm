@@ -1,11 +1,12 @@
 import unittest
 import importlib.resources as pkg_resources
 
+from bespokeasm.assembler.bytecode.word import Word
 from test import config_files
 
 from bespokeasm.assembler.label_scope import GlobalLabelScope, LabelScope, LabelScopeType
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.line_object import LineObject
+from bespokeasm.assembler.line_object import LineObject, LineWithWords
 from bespokeasm.assembler.line_object.factory import LineOjectFactory
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.line_object.label_line import LabelLine
@@ -54,8 +55,12 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertIsInstance(ins1, InstructionLine)
         self.assertEqual(ins1.byte_size, 2, 'has 2 bytes')
         ins1.label_scope = TestInstructionParsing.label_values
-        ins1.generate_bytes()
-        self.assertEqual(ins1.get_bytes(), bytearray([0x45, 0x02]), 'instruction should match')
+        ins1.generate_words()
+        self.assertEqual(
+            ins1.get_words(),
+            [Word(0x45, 8, 8, 'little'), Word(0x02, 8, 8, 'little')],
+            'instruction should match',
+        )
 
     def test_instruction_variant_matching(self):
         fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')
@@ -79,8 +84,12 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertIsInstance(ins1, InstructionLine)
         self.assertEqual(ins1.byte_size, 1, 'has 1 byte')
         ins1.label_scope = TestInstructionParsing.label_values
-        ins1.generate_bytes()
-        self.assertEqual(ins1.get_bytes(), bytearray([0x00]), 'instruction should match')
+        ins1.generate_words()
+        self.assertEqual(
+            ins1.get_words(),
+            [Word(0x00, 8, 8, 'little')],
+            'instruction should match',
+        )
 
         # match default variant operand sets
         ins2 = InstructionLine.factory(
@@ -95,8 +104,12 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertIsInstance(ins2, InstructionLine)
         self.assertEqual(ins2.byte_size, 2, 'has 2 byte')
         ins2.label_scope = TestInstructionParsing.label_values
-        ins2.generate_bytes()
-        self.assertEqual(ins2.get_bytes(), bytearray([0x44, 0x02]), 'instruction should match')
+        ins2.generate_words()
+        self.assertEqual(
+            ins2.get_words(),
+            [Word(0x44, 8, 8, 'little'), Word(0x02, 8, 8, 'little')],
+            'instruction should match',
+        )
 
         # match default variant specific operand
         ins3 = InstructionLine.factory(
@@ -111,8 +124,12 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertIsInstance(ins3, InstructionLine)
         self.assertEqual(ins3.byte_size, 2, 'has 2 byte')
         ins3.label_scope = TestInstructionParsing.label_values
-        ins3.generate_bytes()
-        self.assertEqual(ins3.get_bytes(), bytearray([0x45, 0x06]), 'instruction should match')
+        ins3.generate_words()
+        self.assertEqual(
+            ins3.get_words(),
+            [Word(0x45, 8, 8, 'little'), Word(0x06, 8, 8, 'little')],
+            'instruction should match',
+        )
 
         # match first variant
         ins4 = InstructionLine.factory(
@@ -127,8 +144,12 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertIsInstance(ins4, InstructionLine)
         self.assertEqual(ins4.byte_size, 1, 'has 1 byte')
         ins4.label_scope = TestInstructionParsing.label_values
-        ins4.generate_bytes()
-        self.assertEqual(ins4.get_bytes(), bytearray([0x81]), 'instruction should match')
+        ins4.generate_words()
+        self.assertEqual(
+            ins4.get_words(),
+            [Word(0x81, 8, 8, 'little')],
+            'instruction should match',
+        )
 
         # match second variant
         ins5 = InstructionLine.factory(
@@ -143,8 +164,12 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertIsInstance(ins5, InstructionLine)
         self.assertEqual(ins5.byte_size, 2, 'has 2 byte')
         ins5.label_scope = TestInstructionParsing.label_values
-        ins5.generate_bytes()
-        self.assertEqual(ins5.get_bytes(), bytearray([0x9F, 0x88]), 'instruction should match')
+        ins5.generate_words()
+        self.assertEqual(
+            ins5.get_words(),
+            [Word(0x9F, 8, 8, 'little'), Word(0x88, 8, 8, 'little')],
+            'instruction should match',
+        )
 
         # match no variant
         with self.assertRaises(SystemExit, msg='no instruction variant should match here'):
@@ -184,8 +209,12 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertIsInstance(ins0, InstructionLine)
         self.assertEqual(ins0.byte_size, 2, 'has 2 bytes')
         ins0.label_scope = TestInstructionParsing.label_values
-        ins0.generate_bytes()
-        self.assertEqual(list(ins0.get_bytes()), [0xFF, 0x42], 'instruction byte should match')
+        ins0.generate_words()
+        self.assertEqual(
+            ins0.get_words(),
+            [Word(0xFF, 8, 8, 'big'), Word(0x42, 8, 8, 'big')],
+            'instruction byte should match',
+        )
 
         ins1 = InstructionLine.factory(
             22, 'mov [hl+7]+,i', 'some comment!',
@@ -195,8 +224,12 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertIsInstance(ins1, InstructionLine)
         self.assertEqual(ins1.byte_size, 3, 'has 3 bytes')
         ins1.label_scope = TestInstructionParsing.label_values
-        ins1.generate_bytes()
-        self.assertEqual(list(ins1.get_bytes()), [0xFF, 0x81, 0x07], 'instruction byte should match')
+        ins1.generate_words()
+        self.assertEqual(
+            ins1.get_words(),
+            [Word(0xFF, 8, 8, 'big'), Word(0x81, 8, 8, 'big'), Word(0x07, 8, 8, 'little')],
+            'instruction byte should match',
+        )
 
         ins2 = InstructionLine.factory(
             22, 'mov [sp+$1D],[mar+a]++', 'some comment!',
@@ -206,8 +239,12 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertIsInstance(ins2, InstructionLine)
         self.assertEqual(ins2.byte_size, 3, 'has 3 bytes')
         ins2.label_scope = TestInstructionParsing.label_values
-        ins2.generate_bytes()
-        self.assertEqual(list(ins2.get_bytes()), [0xFF, 0x64, 0x1D], 'instruction byte should match')
+        ins2.generate_words()
+        self.assertEqual(
+            ins2.get_words(),
+            [Word(0xFF, 8, 8, 'big'), Word(0x64, 8, 8, 'big'), Word(0x1D, 8, 8, 'little')],
+            'instruction byte should match',
+        )
 
     def test_indexed_register_operands(self):
         fp = pkg_resources.files(config_files).joinpath('test_indirect_indexed_register_operands.yaml')
@@ -226,8 +263,12 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertIsInstance(ins0, InstructionLine)
         self.assertEqual(ins0.byte_size, 1, 'has 1 bytes')
         ins0.label_scope = TestInstructionParsing.label_values
-        ins0.generate_bytes()
-        self.assertEqual(list(ins0.get_bytes()), [0xC2], 'instruction byte should match')
+        ins0.generate_words()
+        self.assertEqual(
+            ins0.get_words(),
+            [Word(0xC2, 8, 8, 'little')],
+            'instruction byte should match',
+        )
 
         ins1 = InstructionLine.factory(
             22, 'jmp hl+[sp+7]', 'some comment!',
@@ -237,8 +278,12 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertIsInstance(ins1, InstructionLine)
         self.assertEqual(ins1.byte_size, 2, 'has 2 bytes')
         ins1.label_scope = TestInstructionParsing.label_values
-        ins1.generate_bytes()
-        self.assertEqual(list(ins1.get_bytes()), [0xC3, 0x07], 'instruction byte should match')
+        ins1.generate_words()
+        self.assertEqual(
+            ins1.get_words(),
+            [Word(0xC3, 8, 8, 'little'), Word(0x07, 8, 8, 'little')],
+            'instruction byte should match',
+        )
 
     def test_indirect_indexed_regsiter_operands(self):
         fp = pkg_resources.files(config_files).joinpath('test_indirect_indexed_register_operands.yaml')
@@ -257,8 +302,12 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertIsInstance(ins0, InstructionLine)
         self.assertEqual(ins0.byte_size, 1, 'has 1 bytes')
         ins0.label_scope = TestInstructionParsing.label_values
-        ins0.generate_bytes()
-        self.assertEqual(list(ins0.get_bytes()), [0x81], 'instruction byte should match')
+        ins0.generate_words()
+        self.assertEqual(
+            ins0.get_words(),
+            [Word(0x81, 8, 8, 'little')],
+            'instruction byte should match',
+        )
 
         ins1 = InstructionLine.factory(
             22, 'mov [$2000], [hl+i]', 'some comment!',
@@ -268,10 +317,14 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertIsInstance(ins1, InstructionLine)
         self.assertEqual(ins1.byte_size, 3, 'has 3 bytes')
         ins1.label_scope = TestInstructionParsing.label_values
-        ins1.generate_bytes()
-        self.assertEqual(list(ins1.get_bytes()), [0xB1, 0x00, 0x20], 'instruction byte should match')
+        ins1.generate_words()
+        self.assertEqual(
+            ins1.get_words(),
+            [Word(0xB1, 8, 8, 'little'), Word(0x00, 8, 8, 'little'), Word(0x20, 8, 8, 'little')],
+            'instruction byte should match',
+        )
 
-        ins2 = InstructionLine.factory(
+        ins2: LineWithWords = InstructionLine.factory(
             22, 'mov [$2000], [hl+[sp+2]]', 'some comment!',
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
@@ -279,10 +332,19 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertIsInstance(ins2, InstructionLine)
         self.assertEqual(ins2.byte_size, 4, 'has 4 bytes')
         ins2.label_scope = TestInstructionParsing.label_values
-        ins2.generate_bytes()
-        self.assertEqual(list(ins2.get_bytes()), [0xB3, 0x00, 0x20, 0x02], 'instruction byte should match')
+        ins2.generate_words()
+        self.assertEqual(
+            ins2.get_words(),
+            [
+                Word(0xB3, 8, 8, 'little'),
+                Word(0x00, 8, 8, 'little'),
+                Word(0x20, 8, 8, 'little'),
+                Word(0x02, 8, 8, 'little'),
+            ],
+            'instruction byte should match',
+        )
 
-        ins2 = InstructionLine.factory(
+        ins2: LineWithWords = InstructionLine.factory(
             22, 'mov [mar + $44], [$8020]', 'some comment!',
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
@@ -290,10 +352,19 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertIsInstance(ins2, InstructionLine)
         self.assertEqual(ins2.byte_size, 4, 'has 4 bytes')
         ins2.label_scope = TestInstructionParsing.label_values
-        ins2.generate_bytes()
-        self.assertEqual(list(ins2.get_bytes()), [0xFE, 0x20, 0x80, 0x44], 'instruction byte should match, operands reversed')
+        ins2.generate_words()
+        self.assertEqual(
+            ins2.get_words(),
+            [
+                Word(0xFE, 8, 8, 'little'),
+                Word(0x20, 8, 8, 'little'),
+                Word(0x80, 8, 8, 'little'),
+                Word(0x44, 8, 8, 'little'),
+            ],
+            'instruction byte should match, operands reversed',
+        )
 
-        ins4 = InstructionLine.factory(
+        ins4: LineWithWords = InstructionLine.factory(
             22, 'cmp [hl+i],0', 'some comment!',
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
@@ -301,18 +372,35 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertIsInstance(ins4, InstructionLine)
 #        self.assertEqual(ins4.byte_size, 3, 'has 3 bytes')
         ins4.label_scope = TestInstructionParsing.label_values
-        ins4.generate_bytes()
-        self.assertEqual(list(ins4.get_bytes()), [0xFF, 0x8F, 0], 'instruction byte should match')
+        ins4.generate_words()
+        self.assertEqual(
+            ins4.get_words(),
+            [
+                Word(0xFF, 8, 8, 'big'),
+                Word(0x8F, 8, 8, 'big'),
+                Word(0x00, 8, 8, 'little'),
+            ],
+            'instruction byte should match',
+        )
 
-        ins5 = InstructionLine.factory(
+        ins5: LineWithWords = InstructionLine.factory(
             22, 'cmp [hl+[4]],0', 'some comment!',
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
         ins5.set_start_address(1212)
         self.assertIsInstance(ins5, InstructionLine)
         ins5.label_scope = TestInstructionParsing.label_values
-        ins5.generate_bytes()
-        self.assertEqual(list(ins5.get_bytes()), [0xFF, 0xEF, 4, 0], 'instruction byte should match')
+        ins5.generate_words()
+        self.assertEqual(
+            ins5.get_words(),
+            [
+                Word(0xFF, 8, 8, 'big'),
+                Word(0xEF, 8, 8, 'big'),
+                Word(0x04, 8, 8, 'little'),
+                Word(0x00, 8, 8, 'little'),
+            ],
+            'instruction byte should match',
+        )
 
         with self.assertRaises(SystemExit, msg='no instruction  should match here'):
             bad1 = InstructionLine.factory(
@@ -321,7 +409,7 @@ class TestInstructionParsing(unittest.TestCase):
             )
             bad1.set_start_address(666)
             bad1.label_scope = TestInstructionParsing.label_values
-            bad1.generate_bytes()
+            bad1.generate_words()
 
     def test_label_parsing(self):
         fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')
@@ -403,8 +491,12 @@ class TestInstructionParsing(unittest.TestCase):
         t1.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
         self.assertEqual(t1.byte_size, 2, 'has 2 bytes')
-        t1.generate_bytes()
-        self.assertEqual(list(t1.get_bytes()), [0b00010011, 0xF0], 'instruction byte should match')
+        t1.generate_words()
+        self.assertEqual(
+            t1.get_words(),
+            [Word(0b00010011, 8, 8, 'big'), Word(0xF0, 8, 8, 'big')],
+            'instruction byte should match',
+        )
 
         t2 = InstructionLine.factory(
             lineid, '  ld [$20], x', 'comment',
@@ -414,8 +506,12 @@ class TestInstructionParsing(unittest.TestCase):
         t2.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t2, InstructionLine)
         self.assertEqual(t2.byte_size, 2, 'has 2 bytes')
-        t2.generate_bytes()
-        self.assertEqual(list(t2.get_bytes()), [0b10011100, 0x20], 'instruction byte should match')
+        t2.generate_words()
+        self.assertEqual(
+            t2.get_words(),
+            [Word(0b10011100, 8, 8, 'big'), Word(0x20, 8, 8, 'big')],
+            'instruction byte should match',
+        )
 
     def test_deferred_operands(self):
         fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
@@ -436,8 +532,12 @@ class TestInstructionParsing(unittest.TestCase):
         t1.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
         self.assertEqual(t1.byte_size, 2, 'has 2 bytes')
-        t1.generate_bytes()
-        self.assertEqual(list(t1.get_bytes()), [0b00010101, 0xF0], 'instruction byte should match')
+        t1.generate_words()
+        self.assertEqual(
+            t1.get_words(),
+            [Word(0b00010101, 8, 8, 'big'), Word(0xF0, 8, 8, 'big')],
+            'instruction byte should match',
+        )
 
         t2 = InstructionLine.factory(
             lineid, '  ld [[my_val]],x', 'comment',
@@ -447,8 +547,12 @@ class TestInstructionParsing(unittest.TestCase):
         t2.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t2, InstructionLine)
         self.assertEqual(t2.byte_size, 2, 'has 2 bytes')
-        t2.generate_bytes()
-        self.assertEqual(list(t2.get_bytes()), [0b10011101, 0x08], 'instruction byte should match')
+        t2.generate_words()
+        self.assertEqual(
+            t2.get_words(),
+            [Word(0b10011101, 8, 8, 'big'), Word(0x08, 8, 8, 'big')],
+            'instruction byte should match',
+        )
 
     def test_instruction_bytecode_suffixes(self):
         fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
@@ -469,8 +573,12 @@ class TestInstructionParsing(unittest.TestCase):
         t1.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
         self.assertEqual(t1.byte_size, 2, 'has 2 bytes')
-        t1.generate_bytes()
-        self.assertEqual(list(t1.get_bytes()), [0b11010101, 0xF0], 'instruction byte should match')
+        t1.generate_words()
+        self.assertEqual(
+            t1.get_words(),
+            [Word(0b11010101, 8, 8, 'big'), Word(0xF0, 8, 8, 'big')],
+            'instruction byte should match',
+        )
 
     def test_enumeration_operand(self):
         fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
@@ -491,8 +599,12 @@ class TestInstructionParsing(unittest.TestCase):
         t1.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
         self.assertEqual(t1.byte_size, 2, 'has 2 bytes')
-        t1.generate_bytes()
-        self.assertEqual(list(t1.get_bytes()), [0b00111001, 0xBB], 'instruction byte should match')
+        t1.generate_words()
+        self.assertEqual(
+            t1.get_words(),
+            [Word(0b00111001, 8, 8, 'big'), Word(0xBB, 8, 8, 'big')],
+            'instruction byte should match',
+        )
 
     def test_numeric_bytecode_operand(self):
         fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
@@ -513,8 +625,12 @@ class TestInstructionParsing(unittest.TestCase):
         t1.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
         self.assertEqual(t1.byte_size, 1, 'has 1 bytes')
-        t1.generate_bytes()
-        self.assertEqual(list(t1.get_bytes()), [0b10011011], 'instruction byte should match')
+        t1.generate_words()
+        self.assertEqual(
+            t1.get_words(),
+            [Word(0b10011011, 8, 8, 'big')],
+            'instruction byte should match',
+        )
 
         t2 = InstructionLine.factory(
             lineid, '  tstb a, 7', 'comment',
@@ -524,8 +640,12 @@ class TestInstructionParsing(unittest.TestCase):
         t2.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t2, InstructionLine)
         self.assertEqual(t2.byte_size, 1, 'has 1 bytes')
-        t2.generate_bytes()
-        self.assertEqual(list(t2.get_bytes()), [0b00011111], 'instruction byte should match')
+        t2.generate_words()
+        self.assertEqual(
+            t2.get_words(),
+            [Word(0b00011111, 8, 8, 'big')],
+            'instruction byte should match',
+        )
 
         t3 = InstructionLine.factory(
             lineid, '  enumarg 6', 'comment',
@@ -535,8 +655,12 @@ class TestInstructionParsing(unittest.TestCase):
         t3.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t3, InstructionLine)
         self.assertEqual(t3.byte_size, 2, 'has 2 bytes')
-        t3.generate_bytes()
-        self.assertEqual(list(t3.get_bytes()), [254, 64], 'instruction byte should match')
+        t3.generate_words()
+        self.assertEqual(
+            t3.get_words(),
+            [Word(0xFE, 8, 8, 'big'), Word(0x40, 8, 8, 'big')],
+            'instruction byte should match',
+        )
 
         with self.assertRaises(SystemExit, msg='test bounds'):
             e1 = InstructionLine.factory(
@@ -544,7 +668,7 @@ class TestInstructionParsing(unittest.TestCase):
                 isa_model, memzone_mngr.global_zone, memzone_mngr,
             )
             e1.label_scope = TestInstructionParsing.label_values
-            e1.generate_bytes()
+            e1.generate_words()
 
         with self.assertRaises(SystemExit, msg='test invalid enumerations'):
             e2 = InstructionLine.factory(
@@ -552,7 +676,7 @@ class TestInstructionParsing(unittest.TestCase):
                 isa_model, memzone_mngr.global_zone, memzone_mngr,
             )
             e2.label_scope = TestInstructionParsing.label_values
-            e2.generate_bytes()
+            e2.generate_words()
 
     def test_numeric_enumeration_operand(self):
         fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
@@ -573,8 +697,12 @@ class TestInstructionParsing(unittest.TestCase):
         t1.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
         self.assertEqual(t1.byte_size, 1, 'has 1 bytes')
-        t1.generate_bytes()
-        self.assertEqual(list(t1.get_bytes()), [0b10101000], 'instruction byte should match')
+        t1.generate_words()
+        self.assertEqual(
+            t1.get_words(),
+            [Word(0b10101000, 8, 8, 'big')],
+            'instruction byte should match',
+        )
 
         t2 = InstructionLine.factory(
             lineid, 'sftl a, 1', 'comment',
@@ -584,8 +712,12 @@ class TestInstructionParsing(unittest.TestCase):
         t2.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t2, InstructionLine)
         self.assertEqual(t2.byte_size, 1, 'has 1 bytes')
-        t2.generate_bytes()
-        self.assertEqual(list(t2.get_bytes()), [0b10001001], 'instruction byte should match')
+        t2.generate_words()
+        self.assertEqual(
+            t2.get_words(),
+            [Word(0b10001001, 8, 8, 'big')],
+            'instruction byte should match',
+        )
 
         with self.assertRaises(SystemExit, msg='test invalid enumeration values'):
             e1 = InstructionLine.factory(
@@ -593,7 +725,7 @@ class TestInstructionParsing(unittest.TestCase):
                 isa_model, memzone_mngr.global_zone, memzone_mngr,
             )
             e1.label_scope = TestInstructionParsing.label_values
-            e1.generate_bytes()
+            e1.generate_words()
 
     def test_expressions_in_operations(self):
         fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
@@ -614,8 +746,12 @@ class TestInstructionParsing(unittest.TestCase):
         t1.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
         self.assertEqual(t1.byte_size, 2, 'has 2 bytes')
-        t1.generate_bytes()
-        self.assertEqual(list(t1.get_bytes()), [0b11010101, 17], 'instruction byte should match')
+        t1.generate_words()
+        self.assertEqual(
+            t1.get_words(),
+            [Word(0b11010101, 8, 8, 'big'), Word(0x11, 8, 8, 'big')],
+            'instruction byte should match',
+        )
 
         # no addressing punction for numeric expression operands
         with self.assertRaises(SystemExit, msg='there should be no addressing punctuation in numeric expression operands'):
@@ -648,8 +784,12 @@ class TestInstructionParsing(unittest.TestCase):
         t1.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
         self.assertEqual(t1.byte_size, 2, 'has 2 bytes')
-        t1.generate_bytes()
-        self.assertEqual(list(t1.get_bytes()), [0b11010101, 17], 'instruction byte should match')
+        t1.generate_words()
+        self.assertEqual(
+            t1.get_words(),
+            [Word(0b11010101, 8, 8, 'big'), Word(0x11, 8, 8, 'big')],
+            'instruction byte should match',
+        )
 
     def test_operand_order(self):
         fp = pkg_resources.files(config_files).joinpath('test_instruction_operands.yaml')
@@ -670,8 +810,12 @@ class TestInstructionParsing(unittest.TestCase):
         t1.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
         self.assertEqual(t1.byte_size, 3, 'has 3 bytes')
-        t1.generate_bytes()
-        self.assertEqual(list(t1.get_bytes()), [0x80, 0x12, 0x30], 'instruction byte should match')
+        t1.generate_words()
+        self.assertEqual(
+            list(t1.get_words()),
+            [Word(0x80, 8, 8, 'little'), Word(0x12, 8, 8, 'big'), Word(0x30, 8, 8, 'big')],
+            'instruction byte should match',
+        )
 
         t2 = InstructionLine.factory(
             lineid, 'ed aa,bb,cc', 'comment',
@@ -681,8 +825,12 @@ class TestInstructionParsing(unittest.TestCase):
         t2.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t2, InstructionLine)
         self.assertEqual(t2.byte_size, 3, 'has 3 bytes')
-        t2.generate_bytes()
-        self.assertEqual(list(t2.get_bytes()), [0x88, 0x32, 0x10], 'instruction byte should match')
+        t2.generate_words()
+        self.assertEqual(
+            list(t2.get_words()),
+            [Word(0x88, 8, 8, 'little'), Word(0x32, 8, 8, 'little'), Word(0x10, 8, 8, 'little')],
+            'instruction byte should match',
+        )
 
         t3 = InstructionLine.factory(
             lineid, 'mv a,b,c', 'comment',
@@ -692,8 +840,12 @@ class TestInstructionParsing(unittest.TestCase):
         t3.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t3, InstructionLine)
         self.assertEqual(t3.byte_size, 3, 'has 3 bytes')
-        t3.generate_bytes()
-        self.assertEqual(list(t3.get_bytes()), [0x81, 0x32, 0x10], 'instruction byte should match')
+        t3.generate_words()
+        self.assertEqual(
+            list(t3.get_words()),
+            [Word(0x81, 8, 8, 'little'), Word(0x32, 8, 8, 'big'), Word(0x10, 8, 8, 'big')],
+            'instruction byte should match',
+        )
 
     def test_operand_expression(self):
         fp = pkg_resources.files(config_files).joinpath('test_instruction_operands.yaml')
@@ -738,8 +890,12 @@ class TestInstructionParsing(unittest.TestCase):
         t1.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
         self.assertEqual(t1.byte_size, 3, 'has 3 bytes')
-        t1.generate_bytes()
-        self.assertEqual(list(t1.get_bytes()), [0xE5, 0x20, 0x80], 'instruction byte should match')
+        t1.generate_words()
+        self.assertEqual(
+            list(t1.get_words()),
+            [Word(0xE5, 8, 8, 'little'), Word(0x20, 8, 8, 'little'), Word(0x80, 8, 8, 'little')],
+            'instruction byte should match',
+        )
 
         t2 = InstructionLine.factory(
             lineid, 'jmp {.loop}', 'comment',
@@ -749,8 +905,12 @@ class TestInstructionParsing(unittest.TestCase):
         t2.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t2, InstructionLine)
         self.assertEqual(t2.byte_size, 2, 'has 2 bytes')
-        t2.generate_bytes()
-        self.assertEqual(list(t2.get_bytes()), [0xE6, 0x20], 'instruction byte should match')
+        t2.generate_words()
+        self.assertEqual(
+            list(t2.get_words()),
+            [Word(0xE6, 8, 8, 'little'), Word(0x20, 8, 8, 'little')],
+            'instruction byte should match',
+        )
 
         t3 = InstructionLine.factory(
             lineid, 'jmpr .loop', 'comment',
@@ -760,8 +920,12 @@ class TestInstructionParsing(unittest.TestCase):
         t3.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t3, InstructionLine)
         self.assertEqual(t3.byte_size, 2, 'has 2 bytes')
-        t3.generate_bytes()
-        self.assertEqual(list(t3.get_bytes()), [0xEE, 0x20], 'instruction byte should match')
+        t3.generate_words()
+        self.assertEqual(
+            list(t3.get_words()),
+            [Word(0xEE, 8, 8, 'little'), Word(0x20, 8, 8, 'little')],
+            'instruction byte should match',
+        )
 
         t4 = InstructionLine.factory(
             lineid, 'jmpre .loop', 'comment',
@@ -771,8 +935,12 @@ class TestInstructionParsing(unittest.TestCase):
         t4.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t4, InstructionLine)
         self.assertEqual(t4.byte_size, 2, 'has 2 bytes')
-        t4.generate_bytes()
-        self.assertEqual(list(t4.get_bytes()), [0xEF, 0x1F], 'instruction byte should match')
+        t4.generate_words()
+        self.assertEqual(
+            list(t4.get_words()),
+            [Word(0xEF, 8, 8, 'little'), Word(0x1F, 8, 8, 'little')],
+            'instruction byte should match',
+        )
 
         # test offsets that are too large or too small
         with self.assertRaises(SystemExit, msg='offset out of range'):
@@ -782,7 +950,7 @@ class TestInstructionParsing(unittest.TestCase):
             )
             bt1.set_start_address(0x7000)
             bt1.label_scope = TestInstructionParsing.label_values
-            bt1.generate_bytes()
+            bt1.generate_words()
 
         with self.assertRaises(SystemExit, msg='offset out of range'):
             bt2 = InstructionLine.factory(
@@ -791,7 +959,7 @@ class TestInstructionParsing(unittest.TestCase):
             )
             bt2.set_start_address(0x9000)
             bt2.label_scope = TestInstructionParsing.label_values
-            bt2.generate_bytes()
+            bt2.generate_words()
 
     def test_valid_address_operand_enforcement(self):
         fp = pkg_resources.files(config_files).joinpath('test_valid_address_enforcement.yaml')
@@ -811,8 +979,12 @@ class TestInstructionParsing(unittest.TestCase):
         t1.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
         self.assertEqual(t1.byte_size, 2, 'has 2 bytes')
-        t1.generate_bytes()
-        self.assertEqual(list(t1.get_bytes()), [0xEE, 0xF8], 'instruction byte should match')
+        t1.generate_words()
+        self.assertEqual(
+            list(t1.get_words()),
+            [Word(0xEE, 8, 8, 'little'), Word(0xF8, 8, 8, 'little')],
+            'instruction byte should match',
+        )
 
         with self.assertRaises(SystemExit, msg='address out of range'):
             # the GLOBAL memory zone starts at $2000. Relative jumping before it should fail.
@@ -824,7 +996,7 @@ class TestInstructionParsing(unittest.TestCase):
             t1.label_scope = TestInstructionParsing.label_values
             self.assertIsInstance(t1, InstructionLine)
             self.assertEqual(t1.byte_size, 2, 'has 2 bytes')
-            t1.generate_bytes()
+            t1.generate_words()
 
         with self.assertRaises(SystemExit, msg='address out of range'):
             # the GLOBAL memory zone starts at $2000. Relative jumping before it should fail.
@@ -836,7 +1008,7 @@ class TestInstructionParsing(unittest.TestCase):
             e2.label_scope = TestInstructionParsing.label_values
             self.assertIsInstance(e2, InstructionLine)
             self.assertEqual(e2.byte_size, 3, 'has 3 bytes')
-            e2.generate_bytes()
+            e2.generate_words()
 
     def test_address_operands(self):
         from bespokeasm.assembler.model.operand.types.address import AddressByteCodePart
@@ -859,6 +1031,8 @@ class TestInstructionParsing(unittest.TestCase):
             memzone_mngr.global_zone,
             False,
             False,
+            isa_model.word_size,
+            isa_model.word_segment_size,
         )
         value1 = bc1.get_value(TestInstructionParsing.label_values, 0x2010, 32)
         self.assertEqual(value1, 0x2020, 'byte code should match')
@@ -873,6 +1047,8 @@ class TestInstructionParsing(unittest.TestCase):
             memzone_mngr.global_zone,
             True,
             True,
+            isa_model.word_size,
+            isa_model.word_segment_size,
         )
         value2 = bc2.get_value(TestInstructionParsing.label_values, 0x2010, 32)
         self.assertEqual(value2, 0x45, 'byte code should match')
@@ -890,6 +1066,8 @@ class TestInstructionParsing(unittest.TestCase):
             memzone_32bit_mngr.global_zone,
             True,
             True,
+            isa_model.word_size,
+            isa_model.word_segment_size,
         )
         value3 = bc3.get_value(TestInstructionParsing.label_values, 0x19451000, 32)
         self.assertEqual(value3, 0x8899, 'byte code should match')
@@ -908,6 +1086,8 @@ class TestInstructionParsing(unittest.TestCase):
                 memzone_mngr.global_zone,
                 True,
                 False,
+                isa_model.word_size,
+                isa_model.word_segment_size,
             )
 
         # Test byte code generation for sliced addresses
@@ -919,13 +1099,17 @@ class TestInstructionParsing(unittest.TestCase):
         t1.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
         self.assertEqual(t1.byte_size, 2, 'has 2 bytes')
-        t1.generate_bytes()
-        self.assertEqual(list(t1.get_bytes()), [0xE0, 0xF8], 'instruction byte should match')
+        t1.generate_words()
+        self.assertEqual(
+            list(t1.get_words()),
+            [Word(0xE0, 8, 8, 'little'), Word(0xF8, 8, 8, 'little')],
+            'instruction byte should match',
+        )
 
         # ensure MSBs match
         t1.set_start_address(0x3350)
         with self.assertRaises(ValueError, msg="address MSBs don't match"):
-            t1.generate_bytes()
+            t1.generate_words()
 
         # Test bye code generation for unsliced addresses
         t2 = InstructionLine.factory(
@@ -936,8 +1120,12 @@ class TestInstructionParsing(unittest.TestCase):
         t2.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t2, InstructionLine)
         self.assertEqual(t2.byte_size, 3, 'has 3 bytes')
-        t2.generate_bytes()
-        self.assertEqual(list(t2.get_bytes()), [0xE1, 0xF8, 0x2F], 'instruction byte should match')
+        t2.generate_words()
+        self.assertEqual(
+            list(t2.get_words()),
+            [Word(0xE1, 8, 8, 'little'), Word(0xF8, 8, 8, 'little'), Word(0x2F, 8, 8, 'little')],
+            'instruction byte should match',
+        )
 
         # test operand address is in target memory zone
         t3 = InstructionLine.factory(
@@ -948,8 +1136,12 @@ class TestInstructionParsing(unittest.TestCase):
         t3.label_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t3, InstructionLine)
         self.assertEqual(t3.byte_size, 3, 'has 3 bytes')
-        t3.generate_bytes()
-        self.assertEqual(list(t3.get_bytes()), [0xE2, 0x50, 0x51], 'instruction byte should match')
+        t3.generate_words()
+        self.assertEqual(
+            list(t3.get_words()),
+            [Word(0xE2, 8, 8, 'little'), Word(0x50, 8, 8, 'little'), Word(0x51, 8, 8, 'little')],
+            'instruction byte should match',
+        )
 
         # enforce operand address is in target memory zone
         t4 = InstructionLine.factory(
@@ -961,4 +1153,4 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertIsInstance(t4, InstructionLine)
         self.assertEqual(t4.byte_size, 3, 'has 3 bytes')
         with self.assertRaises(SystemExit, msg='address not in target memory zone'):
-            t4.generate_bytes()
+            t4.generate_words()

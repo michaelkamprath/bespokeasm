@@ -27,6 +27,8 @@ class InstructionVariant(InstructionBase):
                 default_endian: str,
                 registers: set[str],
                 variant_num: int,
+                word_size: int,
+                word_segment_size: int,
             ) -> None:
         super().__init__(mnemonic, default_endian, registers)
         self._variant_config = instruction_variant_config
@@ -47,6 +49,8 @@ class InstructionVariant(InstructionBase):
                     operand_set_collection,
                     default_endian,
                     registers,
+                    word_size,
+                    word_segment_size,
                 )
             except TypeError as e:
                 sys.exit(f'ERROR: Operand configuration for instruction "{mnemonic}" is invalid: {e}')
@@ -100,7 +104,9 @@ class Instruction(InstructionBase):
                 instruction_config: dict,
                 operand_set_collection: OperandSetCollection,
                 default_endian: str,
-                registers: set[str]
+                registers: set[str],
+                word_size: int,
+                word_segment_size: int,
             ) -> None:
         super().__init__(mnemonic, default_endian, registers)
         self._config = instruction_config
@@ -115,7 +121,9 @@ class Instruction(InstructionBase):
                     operand_set_collection,
                     default_endian,
                     registers,
-                    variant_num
+                    variant_num,
+                    word_size,
+                    word_segment_size,
                 )
             )
 
@@ -129,7 +137,9 @@ class Instruction(InstructionBase):
                         operand_set_collection,
                         default_endian,
                         registers,
-                        variant_num
+                        variant_num,
+                        word_size,
+                        word_segment_size,
                     )
                 )
         if len(self._variants) == 0:

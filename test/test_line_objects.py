@@ -615,8 +615,8 @@ class TestLineObject(unittest.TestCase):
         print(lo1[0])
         self.assertIsInstance(lo1[0], DataLine, 'instruction is a DataLine')
         dl1: DataLine = lo1[0]
-        dl1.generate_bytes()
-        self.assertEqual(list(dl1.get_bytes()), [0x34, 0x12])
+        dl1.generate_words()
+        self.assertEqual(list(dl1.get_words()), [0x34, 0x12])
 
     def test_compound_instruction_line(self):
         fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
@@ -866,8 +866,8 @@ class TestLineObject(unittest.TestCase):
         )
         self.assertIsInstance(t1, EmbeddedString)
         self.assertEqual(t1.byte_size, 15, 'string has 15 bytes')
-        t1.generate_bytes()
-        self.assertEqual(t1.get_bytes(), bytearray([ord(c) for c in 'this is a test\x00']), 'string matches')
+        t1.generate_words()
+        self.assertEqual(t1.get_words(), bytearray([ord(c) for c in 'this is a test\x00']), 'string matches')
         self.assertEqual(t1.instruction, '"this is a test"', 'instruction string matches')
 
         # test the non-creation of an embedded string object

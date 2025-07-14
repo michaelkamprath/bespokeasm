@@ -79,3 +79,21 @@ class TestBytecodeObjects(unittest.TestCase):
         c4 = CompositeByteCodePart([p1, p2, p1], False, 'big', test_line_id, 8, 8)
         self.assertEqual(8, c4.value_size, 'bit size should match')
         self.assertEqual(57, c4.get_value(label_values, 0x8000, 8), 'value should match')
+
+    def test_compact_parts_to_words(self):
+        test_line_id = LineIdentifier(88, 'test_composite_bytecode_part')
+        register_labels = {'a', 'i'}
+        label_values = GlobalLabelScope(register_labels)
+
+        parts = [
+            NumericByteCodePart(1, 4, False, 'big', test_line_id, 8, 8),
+            NumericByteCodePart(2, 4, False, 'big', test_line_id, 8, 8),
+            NumericByteCodePart(3, 4, False, 'big', test_line_id, 8, 8),
+        ]
+
+        words = CompositeByteCodePart.compact_parts_to_words(parts, 8, 8, 'big', label_values, 0x8000, 1)
+        self.assertEqual(
+            words,
+            [Word(0x12, 8, 8, 'big'), Word(0x30, 8, 8, 'big')],
+            'words should match',
+        )

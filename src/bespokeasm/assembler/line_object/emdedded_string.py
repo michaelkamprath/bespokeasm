@@ -5,7 +5,7 @@
 from __future__ import annotations
 import re
 
-from bespokeasm.assembler.line_object import LineWithBytes
+from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.line_identifier import LineIdentifier
 
@@ -13,7 +13,7 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 EMBEDDED_STRING_PATTERN = r'(?P<quote>[\"])((?:\\(?P=quote)|.|\n)*?)(?P=quote)'
 
 
-class EmbeddedString(LineWithBytes):
+class EmbeddedString(LineWithWords):
     QUOTED_STRING_PATTERN = re.compile(
         rf'^{EMBEDDED_STRING_PATTERN}',
         flags=re.IGNORECASE | re.MULTILINE | re.DOTALL
@@ -57,6 +57,6 @@ class EmbeddedString(LineWithBytes):
         """Returns the number of bytes this data line will generate"""
         return len(self._string_bytes)
 
-    def generate_bytes(self) -> None:
+    def generate_words(self) -> None:
         # set the bytes
         self._bytes.extend(self._string_bytes)

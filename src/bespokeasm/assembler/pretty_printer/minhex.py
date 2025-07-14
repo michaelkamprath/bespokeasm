@@ -1,6 +1,6 @@
 import io
 
-from bespokeasm.assembler.line_object import LineWithBytes, LineObject
+from bespokeasm.assembler.line_object import LineWithWords, LineObject
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.pretty_printer import PrettyPrinterBase
 from bespokeasm.assembler.line_object.directive_line.address import AddressOrgLine
@@ -15,8 +15,8 @@ class MinHexPrettyPrinter(PrettyPrinterBase):
         line_byte_count = 0
         address_width = int(self.model.address_size/4)
         for lobj in self.line_objects:
-            if isinstance(lobj, LineWithBytes) and not lobj.is_muted:
-                line_bytes = lobj.get_bytes()
+            if isinstance(lobj, LineWithWords) and not lobj.is_muted:
+                line_bytes = lobj.get_words()
                 for b in line_bytes:
                     if line_byte_count == 0:
                         output.write(':')

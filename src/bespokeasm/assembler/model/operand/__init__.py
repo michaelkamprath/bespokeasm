@@ -30,10 +30,12 @@ class OperandBytecodePositionType(enum.Enum):
 
 
 class Operand:
-    def __init__(self, operand_id, arg_config_dict, default_endian):
+    def __init__(self, operand_id, arg_config_dict, default_endian, word_size, word_segment_size):
         self._id = operand_id
         self._config = arg_config_dict
         self._default_endian = default_endian
+        self._word_size = word_size
+        self._word_segment_size = word_segment_size
 
     def __repr__(self):
         return str(self)
@@ -107,14 +109,24 @@ class Operand:
         operand: str,
         register_labels: set[str],
         memzone_manager: MemoryZoneManager,
+        word_size: int,
+        word_segment_size: int,
     ) -> ParsedOperand:
         # this should be overridden
         raise NotImplementedError
 
 
 class OperandWithArgument(Operand):
-    def __init__(self, operand_id, arg_config_dict, default_endian, require_arg: bool = True) -> None:
-        super().__init__(operand_id, arg_config_dict, default_endian)
+    def __init__(
+        self,
+        operand_id,
+        arg_config_dict,
+        default_endian,
+        word_size,
+        word_segment_size,
+        require_arg: bool = True,
+    ) -> None:
+        super().__init__(operand_id, arg_config_dict, default_endian, word_size, word_segment_size)
         if require_arg and 'argument' not in self._config:
             sys.exit(f'ERROR: configuration for numeric operand {self} does not have an argument configuration')
 
@@ -141,11 +153,21 @@ class OperandWithArgument(Operand):
 
 class ParsedOperand:
     '''A structure class to contain the results of a operand parsing.'''
-    def __init__(self, operand: Operand, bytecode: ByteCodePart, argument: ByteCodePart, operand_str: str):
+    def __init__(
+        self,
+        operand: Operand,
+        bytecode: ByteCodePart,
+        argument: ByteCodePart,
+        operand_str: str,
+        word_size: int,
+        word_segment_size: int,
+    ):
         self._operand = operand
         self._bytecode = bytecode
         self._argument = argument
         self._operand_str = operand_str
+        self._word_size = word_size
+        self._word_segment_size = word_segment_size
 
     def __repr__(self):
         return str(self)

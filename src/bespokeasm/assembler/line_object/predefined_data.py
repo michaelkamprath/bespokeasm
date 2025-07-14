@@ -1,9 +1,9 @@
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.line_object import LineWithBytes
+from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.assembler.memory_zone import MemoryZone
 
 
-class PredefinedDataLine(LineWithBytes):
+class PredefinedDataLine(LineWithWords):
     def __init__(
             self,
             line_id: LineIdentifier,
@@ -24,5 +24,5 @@ class PredefinedDataLine(LineWithBytes):
         """Returns the number of bytes this data line will generate"""
         return self._byte_length
 
-    def generate_bytes(self):
+    def generate_words(self):
         self._bytes.extend([(self._byte_value) & 0xFF]*self._byte_length)

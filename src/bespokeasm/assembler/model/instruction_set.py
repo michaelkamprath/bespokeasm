@@ -14,7 +14,9 @@ class InstructionSet(dict[str, InstructionBase]):
                 macros_config: dict,
                 operand_set_collection: OperandSetCollection,
                 default_endian: str,
-                registers: set[str]
+                registers: set[str],
+                word_size: int,
+                word_segment_size: int,
             ):
         self._instructions_config = instructions_config
         self._macros_config = macros_config
@@ -27,7 +29,15 @@ class InstructionSet(dict[str, InstructionBase]):
             mnemonic = mnemonic.lower()
             if mnemonic in lower_keywords:
                 sys.exit(f'ERROR - ISA configuration defined instruction "{mnemonic}" which is also a BespokeASM keyword')
-            self[mnemonic] = Instruction(mnemonic, instr_config, operand_set_collection, default_endian, registers)
+            self[mnemonic] = Instruction(
+                mnemonic,
+                instr_config,
+                operand_set_collection,
+                default_endian,
+                registers,
+                word_size,
+                word_segment_size,
+            )
             self._instruction_mnemonics.add(mnemonic)
 
         if self._macros_config is not None:
@@ -41,7 +51,15 @@ class InstructionSet(dict[str, InstructionBase]):
                 if mnemonic in self:
                     sys.exit(f'ERROR - Macro "{mnemonic}" has same mnemonic as a configured instruction.')
                 macro_list.append(
-                    InstructionMacro(mnemonic, macro_config_list, operand_set_collection, default_endian, registers)
+                    InstructionMacro(
+                        mnemonic,
+                        macro_config_list,
+                        operand_set_collection,
+                        default_endian,
+                        registers,
+                        word_size,
+                        word_segment_size,
+                    )
                 )
             for macro in macro_list:
                 self[macro.mnemonic] = macro

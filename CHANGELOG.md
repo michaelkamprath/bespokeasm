@@ -26,6 +26,7 @@ Changes that are planned but not implemented yet:
 * Fixed a bug where parsing properly discriminate between labels starting with `BYTE` string and the `BYTEx()` operator.
 * Fixed a bug in generating the syntax highlighting configuration that caused mnemonics with special characters to not be highlighted properly.
 * Added support for symbol definitions in Sublime Text. Symbols defined are labels and constants.
+* Implemented support for data words sized other than 8 bits. Address values point to data words, which can be any bit size greater than 0. The default is 8 bits, but this can be changed in the `general` section of the configuration file with the `data_word_size` option.
 
 ## [0.4.2]
 *  Added support for The Minimal 64x4 Home Computer with an example and updated assembler functionality to support it.

@@ -25,6 +25,8 @@ class InstructionMacroVariant(InstructionBase):
                 default_endian: str,
                 registers: set[str],
                 variant_num: int,
+                word_size: int,
+                word_segment_size: int,
             ) -> None:
         super().__init__(mnemonic, default_endian, registers)
         self._variant_config = macro_variant_config
@@ -37,6 +39,8 @@ class InstructionMacroVariant(InstructionBase):
                 operand_set_collection,
                 default_endian,
                 registers,
+                word_size,
+                word_segment_size,
             )
             self._operand_parser.validate(mnemonic)
         else:
@@ -69,7 +73,9 @@ class InstructionMacro(InstructionBase):
                 macro_config: list[dict],
                 operand_set_collection: OperandSetCollection,
                 default_endian: str,
-                registers: set[str]
+                registers: set[str],
+                word_size: int,
+                word_segment_size: int,
             ) -> None:
         super().__init__(mnemonic, default_endian, registers)
         self._config = macro_config
@@ -85,7 +91,9 @@ class InstructionMacro(InstructionBase):
                     operand_set_collection,
                     default_endian,
                     registers,
-                    variant_num
+                    variant_num,
+                    word_size,
+                    word_segment_size,
                 )
             )
 

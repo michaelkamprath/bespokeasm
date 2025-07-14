@@ -5,7 +5,7 @@ import sys
 
 from bespokeasm.assembler.assembly_file import AssemblyFile
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.line_object import LineWithBytes, LineObject
+from bespokeasm.assembler.line_object import LineWithWords, LineObject
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.line_object.predefined_data import PredefinedDataLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
@@ -143,7 +143,7 @@ class Assembler:
         line_dict = {
             lobj.address: lobj
             for lobj in compilable_line_obs
-            if isinstance(lobj, LineWithBytes) and not lobj.is_muted
+            if isinstance(lobj, LineWithWords) and not lobj.is_muted
         }
 
         # second pass: build the machine code and check for overlaps
@@ -153,11 +153,11 @@ class Assembler:
         last_line = None
 
         for lobj in compilable_line_obs:
-            if isinstance(lobj, LineWithBytes):
-                lobj.generate_bytes()
+            if isinstance(lobj, LineWithWords):
+                lobj.generate_words()
             if self._verbose > 2:
                 click.echo(f'Processing {lobj.line_id} = {lobj} at address ${lobj.address:x}')
-            if isinstance(lobj, LineWithBytes):
+            if isinstance(lobj, LineWithWords):
                 if last_line is not None and (last_line.address + last_line.byte_size) > lobj.address:
                     sys.exit(
                         f'ERROR: {lobj.line_id} - Address of byte code at this line overlaps with bytecode from '
@@ -178,7 +178,7 @@ class Assembler:
                 lobj = line_dict.get(addr, None)
                 insertion_bytes = fill_bytes
                 if lobj is not None:
-                    line_bytes = lobj.get_bytes()
+                    line_bytes = lobj.get_words()
                     if line_bytes is not None:
                         insertion_bytes = line_bytes
                         if self._verbose > 2:

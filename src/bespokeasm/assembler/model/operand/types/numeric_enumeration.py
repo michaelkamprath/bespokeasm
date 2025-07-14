@@ -12,8 +12,16 @@ class NumericEnumerationOperand(NumericExpressionOperand):
     _bytecode_dictionary: dict[int, int]
     _argument_dictionary: dict[int, int]
 
-    def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str, registers: set[str]):
-        super().__init__(operand_id, arg_config_dict, default_endian, False)
+    def __init__(
+        self,
+        operand_id: str,
+        arg_config_dict: dict,
+        default_endian: str,
+        registers: set[str],
+        word_size: int,
+        word_segment_size: int,
+    ) -> None:
+        super().__init__(operand_id, arg_config_dict, default_endian, word_size, word_segment_size, False)
         self._bytecode_dictionary = None
         if self.has_bytecode:
             self._bytecode_dictionary = self._config['bytecode'].get('value_dict', None)
@@ -66,7 +74,9 @@ class NumericEnumerationOperand(NumericExpressionOperand):
                     self.bytecode_size,
                     False,
                     'big',
-                    line_id
+                    line_id,
+                    self._word_size,
+                    self._word_segment_size,
                 )
             arg_part = None
             if self.has_argument_value_dict:
@@ -76,9 +86,11 @@ class NumericEnumerationOperand(NumericExpressionOperand):
                     self.argument_size,
                     self.argument_byte_align,
                     self.argument_endian,
-                    line_id
+                    line_id,
+                    self._word_size,
+                    self._word_segment_size,
                 )
             if bytecode_part is None and arg_part is None:
                 return None
-            return ParsedOperand(self, bytecode_part, arg_part, operand)
+            return ParsedOperand(self, bytecode_part, arg_part, operand, self._word_size, self._word_segment_size)
         return None

@@ -29,8 +29,17 @@ from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 class OperandSetsModel:
     _operand_sets: list[OperandSet]
 
-    def __init__(self, instruction: str, config: dict, operand_set_collection: OperandSetCollection):
+    def __init__(
+        self,
+        instruction: str,
+        config: dict,
+        operand_set_collection: OperandSetCollection,
+        word_size: int,
+        word_segment_size: int,
+    ):
         self._config = config
+        self._word_size = word_size
+        self._word_segment_size = word_segment_size
         if 'list' not in self._config:
             sys.exit(f'ERROR - Operand Set configuration dictionary is missing "list" key for instruction "{instruction}"')
         operand_sets = self._config['list']
@@ -86,7 +95,12 @@ class OperandSetsModel:
             return None
         matched_operands: list[ParsedOperand] = []
         for i in range(self.operand_count):
-            operand = self._operand_sets[i].parse_operand(line_id, operands[i], register_labels, memzone_manager)
+            operand = self._operand_sets[i].parse_operand(
+                line_id,
+                operands[i],
+                register_labels,
+                memzone_manager,
+            )
             if operand is not None:
                 matched_operands.append(operand)
             else:
@@ -104,12 +118,14 @@ class OperandSetsModel:
 
 class SpecificOperandsModel:
     class SpecificOperandConfig:
-        def __init__(self, config: dict, default_endian: str, registers: set[str]):
+        def __init__(self, config: dict, default_endian: str, registers: set[str], word_size: int, word_segment_size: int):
             self._config = config
             self._operands = [
-                OperandFactory.factory(arg_type_id, arg_type_conf, default_endian, registers)
+                OperandFactory.factory(arg_type_id, arg_type_conf, default_endian, registers, word_size, word_segment_size)
                 for arg_type_id, arg_type_conf in self._config.get('list', {}).items()
             ]
+            self._word_size = word_size
+            self._word_segment_size = word_segment_size
 
         def __repr__(self) -> str:
             return str(self)
@@ -144,11 +160,19 @@ class SpecificOperandsModel:
 
     _specific_operands: list[SpecificOperandsModel.SpecificOperandConfig]
 
-    def __init__(self, config: dict, default_endian: str, registers: set[str]):
+    def __init__(self, config: dict, default_endian: str, registers: set[str], word_size: int, word_segment_size: int):
         self._specific_operands = [
-            SpecificOperandsModel.SpecificOperandConfig(arg_confing_dict, default_endian, registers)
+            SpecificOperandsModel.SpecificOperandConfig(
+                arg_confing_dict,
+                default_endian,
+                registers,
+                word_size,
+                word_segment_size,
+            )
             for arg_confing_dict in config.values()
         ]
+        self._word_size = word_size
+        self._word_segment_size = word_segment_size
 
     def __repr__(self) -> str:
         return str(self)
@@ -180,7 +204,14 @@ class SpecificOperandsModel:
             matched_operands: list[ParsedOperand] = []
             for i in range(configured_operands.operand_count):
                 if configured_operands[i].null_operand:
-                    operand = configured_operands[i].parse_operand(line_id, '', register_labels, memzone_manager)
+                    operand = configured_operands[i].parse_operand(
+                        line_id,
+                        '',
+                        register_labels,
+                        memzone_manager,
+                        self._word_size,
+                        self._word_segment_size,
+                    )
                     null_operand_count += 1
                 else:
                     if operand_index >= len(operands):
@@ -220,7 +251,9 @@ class OperandParser:
                 instruction_operands_config: dict,
                 operand_set_collection: OperandSetCollection,
                 default_endian: str,
-                registers: set[str]
+                registers: set[str],
+                word_size: int,
+                word_segment_size: int,
             ):
         if instruction_operands_config is not None:
             self._config = instruction_operands_config
@@ -230,12 +263,24 @@ class OperandParser:
             self._config = {'count': 0}
         # Set up Specific Operand
         if 'specific_operands' in self._config:
-            self._specific_operands_model = SpecificOperandsModel(self._config['specific_operands'], default_endian, registers)
+            self._specific_operands_model = SpecificOperandsModel(
+                self._config['specific_operands'],
+                default_endian,
+                registers,
+                word_size,
+                word_segment_size,
+            )
         else:
             self._specific_operands_model = None
         # Set Up Operant Sets
         if 'operand_sets' in self._config:
-            self._operand_sets_model = OperandSetsModel(instruction, self._config['operand_sets'], operand_set_collection)
+            self._operand_sets_model = OperandSetsModel(
+                instruction,
+                self._config['operand_sets'],
+                operand_set_collection,
+                word_size,
+                word_segment_size,
+            )
         else:
             self._operand_sets_model = None
 

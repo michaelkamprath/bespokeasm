@@ -229,6 +229,31 @@ class TestWord(unittest.TestCase):
         word = Word(-50, 8)
         self.assertEqual(int(word), -50)
 
+    def test_from_bytes(self):
+        """Test from_bytes method."""
+        bytes = b'\x12\x34'
+        words = Word.from_bytes(bytes, 16, 8, 'big')
+        self.assertEqual(len(words), 1)
+        self.assertEqual(words[0].value, 0x1234)
+        self.assertEqual(words[0].bit_size, 16)
+        self.assertEqual(words[0].segment_size, 8)
 
-if __name__ == '__main__':
-    unittest.main()
+        bytes = b'\x12\x34'
+        words = Word.from_bytes(bytes, 8, 8, 'big')
+        self.assertEqual(len(words), 2)
+        self.assertEqual(words[0].value, 0x12)
+        self.assertEqual(words[1].value, 0x34)
+        self.assertEqual(words[0].bit_size, 8)
+        self.assertEqual(words[1].bit_size, 8)
+        self.assertEqual(words[0].segment_size, 8)
+        self.assertEqual(words[1].segment_size, 8)
+
+        bytes = b'\x12\x34'
+        words = Word.from_bytes(bytes, 8, 4, 'little')
+        self.assertEqual(len(words), 2)
+        self.assertEqual(words[0].value, 0x21)
+        self.assertEqual(words[1].value, 0x43)
+        self.assertEqual(words[0].bit_size, 8)
+        self.assertEqual(words[1].bit_size, 8)
+        self.assertEqual(words[0].segment_size, 4)
+        self.assertEqual(words[1].segment_size, 4)

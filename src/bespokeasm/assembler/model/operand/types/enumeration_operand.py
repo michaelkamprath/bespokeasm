@@ -13,8 +13,16 @@ class EnumerationOperand(OperandWithArgument):
     _bytecode_dictionary: dict[str, int]
     _argument_dictionary: dict[str, int]
 
-    def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str, registers: set[str]):
-        super().__init__(operand_id, arg_config_dict, default_endian)
+    def __init__(
+        self,
+        operand_id: str,
+        arg_config_dict: dict,
+        default_endian: str,
+        registers: set[str],
+        word_size: int,
+        word_segment_size: int,
+    ):
+        super().__init__(operand_id, arg_config_dict, default_endian, word_size, word_segment_size)
         self._bytecode_dictionary = None
         if self.has_bytecode:
             self._bytecode_dictionary = self._config['bytecode'].get('value_dict', None)
@@ -81,7 +89,15 @@ class EnumerationOperand(OperandWithArgument):
             if self.has_bytecode_value_dict:
                 bytecode_value = self.bytecode_value_dict.get(matched_key, None)
                 if bytecode_value is not None:
-                    bytecode_part = NumericByteCodePart(bytecode_value, self.bytecode_size, False, 'big', line_id)
+                    bytecode_part = NumericByteCodePart(
+                        bytecode_value,
+                        self.bytecode_size,
+                        False,
+                        'big',
+                        line_id,
+                        self._word_size,
+                        self._word_segment_size,
+                    )
             arg_part = None
             if self.has_argument_value_dict:
                 arg_value = self.argument_value_dict.get(matched_key, None)
@@ -91,9 +107,18 @@ class EnumerationOperand(OperandWithArgument):
                         self.argument_size,
                         self.argument_byte_align,
                         self.argument_endian,
-                        line_id
+                        line_id,
+                        self._word_size,
+                        self._word_segment_size,
                     )
             if bytecode_part is None and arg_part is None:
                 return None
-            return ParsedOperand(self, bytecode_part, arg_part, operand)
+            return ParsedOperand(
+                self,
+                bytecode_part,
+                arg_part,
+                operand,
+                self._word_size,
+                self._word_segment_size,
+            )
         return None

@@ -150,42 +150,41 @@ class ByteCodePart:
             nonlocal current_word_slices
             result = []
             if current_word_slices:
-                # Pack accumulated WordSlices into a single word if they fit
                 total_bits = sum(slice_obj.bit_size for (slice_obj, _) in current_word_slices)
-                if total_bits <= word_size:
-                    # Pack into a single word
-                    packed_value = 0
-                    bit_position = word_size - 1  # Start from MSB
-                    for (slice_obj, endian) in current_word_slices:
-                        slice_bits = slice_obj.get_raw_bits()
-                        for i in range(slice_obj.bit_size - 1, -1, -1):
-                            if (slice_bits >> i) & 1:
-                                packed_value |= (1 << bit_position)
-                            bit_position -= 1
-                    result.append(Word(packed_value, word_size, segment_size, endian))
-                else:
-                    # Use Value for larger combinations
-                    word_slices = [slice_obj for (slice_obj, _) in current_word_slices]
-                    endian = current_word_slices[0][1]
-                    new_value = Value.from_word_slices(
-                        word_slices,
-                        word_size,
-                        segment_size,
-                        endian,
-                        multi_word_endianness,
-                    )
-                    result.extend(new_value.get_words_ordered())
+                first_endian = current_word_slices[0][1]
+                packed_value = 0
+                for slice_obj, _ in current_word_slices:
+                    packed_value = (packed_value << slice_obj.bit_size) | slice_obj.get_raw_bits()
+                num_words = (total_bits + word_size - 1) // word_size
+                for i in range(num_words):
+                    bits_left = total_bits - i * word_size
+                    if bits_left >= word_size:
+                        shift = bits_left - word_size
+                        word_bits = (packed_value >> shift) & ((1 << word_size) - 1)
+                    else:
+                        # Fewer than word_size bits left, left-align them
+                        word_bits = (packed_value & ((1 << bits_left) - 1)) << (word_size - bits_left)
+                    result.append(Word(word_bits, word_size, segment_size, first_endian))
                 current_word_slices = []
-                # current_bit_position = 0
             return result
 
         for part in parts:
             if isinstance(part, CompositeByteCodePart):
-                # Flush any accumulated WordSlices before processing composite part
-                if current_word_slices:
-                    words.extend(flush_word_slices(word_size, segment_size, multi_word_endianness))
-
-                words.extend(part.get_words(label_scope, instruction_address, instruction_size))
+                # if the CompositeByteCodePart is word-aligned, then we flush the word slices and
+                # add the part's words. Otherwise, we get the WordSlice from the part.
+                if part.word_align:
+                    if current_word_slices:
+                        words.extend(flush_word_slices(word_size, segment_size, multi_word_endianness))
+                    words.extend(part.get_words(label_scope, instruction_address, instruction_size))
+                else:
+                    value_representation = part.get_value_representation(label_scope, instruction_address, instruction_size)
+                    if isinstance(value_representation, WordSlice):
+                        current_word_slices.append((value_representation, part.endian))
+                    else:
+                        # this should never happen
+                        sys.exit(
+                            f'ERROR: INTERNAL - CompositeByteCodePart received Value representation: {value_representation}'
+                        )
             else:
                 value_representation = part.get_value_representation(label_scope, instruction_address, instruction_size)
                 if isinstance(value_representation, WordSlice):
@@ -419,6 +418,20 @@ class CompositeByteCodePart(ByteCodePart):
             shift_count = 8 - (self.value_size % 8)
             value = value >> shift_count
         return value
+
+    def get_value_representation(
+        self,
+        label_scope: LabelScope,
+        instruction_address: int,
+        instruction_size: int,
+    ) -> WordSlice | Value:
+        '''
+        For a CompositeByteCodePart, we will return a compacted WordSlice based on the compacted value
+        '''
+        return WordSlice(
+            self.get_value(label_scope, instruction_address, instruction_size),
+            self.value_size,
+        )
 
     def get_words(self, label_scope: LabelScope, instruction_address: int, instruction_size: int) -> list[Word]:
         """

@@ -1,10 +1,10 @@
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.line_object import LineWithBytes
+from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.expression import parse_expression, ExpressionNode
 from bespokeasm.assembler.memory_zone import MemoryZone
 
 
-class FillDataLine(LineWithBytes):
+class FillDataLine(LineWithWords):
     _count_expr: ExpressionNode
     _value_expr: ExpressionNode
 
@@ -29,7 +29,7 @@ class FillDataLine(LineWithBytes):
             self._count = self._count_expr.get_value(self.label_scope, self.line_id)
         return self._count
 
-    def generate_bytes(self):
+    def generate_words(self):
         if self._count is None:
             self._count = self._count_expr.get_value(self.label_scope, self.line_id)
         if self._value is None:
@@ -37,7 +37,7 @@ class FillDataLine(LineWithBytes):
         self._bytes.extend([(self._value) & 0xFF]*self._count)
 
 
-class FillUntilDataLine(LineWithBytes):
+class FillUntilDataLine(LineWithWords):
     _fill_until_addr_expr: ExpressionNode
     _fill_value_expr: ExpressionNode
     _fill_until_addr: int
@@ -67,7 +67,7 @@ class FillUntilDataLine(LineWithBytes):
         else:
             return 0
 
-    def generate_bytes(self):
+    def generate_words(self):
         """Finalize the bytes for this fill until line.
         """
         if self._fill_until_addr is None:

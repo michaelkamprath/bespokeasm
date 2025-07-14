@@ -113,6 +113,61 @@ class Word:
 
         return cls(value, bit_size, segment_size, intra_word_endianness)
 
+    @classmethod
+    def from_bytes(
+        cls,
+        bytes: bytes,
+        word_bit_size: int,
+        word_segment_size: int,
+        intra_word_endianness: Literal['little', 'big'],
+    ) -> list['Word']:
+        '''
+        Convert a list of bytes into a list of words with each word having the indicated bit size and segment size.
+
+        :param bytes: The bytes to convert
+        :param word_bit_size: The total number of bits in the word
+        :param word_segment_size: The size of segments within the word
+        :param intra_word_endianness: The endianness of segments when converting to bytes
+        :return: A list of Word objects
+        '''
+        if word_bit_size <= 0:
+            raise ValueError('word_bit_size must be greater than 0')
+        if word_segment_size <= 0:
+            raise ValueError('word_segment_size must be greater than 0')
+        if word_bit_size % word_segment_size != 0:
+            raise ValueError(f'word_bit_size {word_bit_size} must be divisible by word_segment_size {word_segment_size}')
+        if word_segment_size > word_bit_size:
+            raise ValueError(f'word_segment_size {word_segment_size} cannot be greater than word_bit_size {word_bit_size}')
+
+        total_bits = len(bytes) * 8
+        word_count = total_bits // word_bit_size
+        if total_bits % word_bit_size != 0:
+            raise ValueError('Input bytes do not align to an integer number of words')
+
+        words = []
+        # Convert bytes to a single integer (big-endian)
+        big_int = int.from_bytes(bytes, byteorder='big')
+        for i in range(word_count):
+            # Extract the bits for this word
+            shift = (word_count - 1 - i) * word_bit_size
+            word_value = (big_int >> shift) & ((1 << word_bit_size) - 1)
+
+            # For little-endian intra-word, reverse the segments
+            if intra_word_endianness == 'little' and word_segment_size != word_bit_size:
+                segment_count = word_bit_size // word_segment_size
+                segments = []
+                for s in range(segment_count):
+                    seg_shift = (segment_count - 1 - s) * word_segment_size
+                    seg_val = (word_value >> seg_shift) & ((1 << word_segment_size) - 1)
+                    segments.append(seg_val)
+                segments = list(reversed(segments))
+                # Recombine segments into a value
+                word_value = 0
+                for idx, seg in enumerate(segments):
+                    word_value |= seg << ((segment_count - 1 - idx) * word_segment_size)
+            words.append(cls(word_value, word_bit_size, word_segment_size, intra_word_endianness))
+        return words
+
     @property
     def value(self) -> int:
         """Returns the integer value of the word."""

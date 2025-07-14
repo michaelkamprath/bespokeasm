@@ -2,7 +2,7 @@ import re
 import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.line_object import LineWithBytes
+from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.model.instruction_parser import InstructioParser
 from bespokeasm.assembler.memory_zone import MemoryZone
@@ -10,7 +10,7 @@ from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.line_object.emdedded_string import EMBEDDED_STRING_PATTERN
 
 
-class InstructionLine(LineWithBytes):
+class InstructionLine(LineWithWords):
     COMMAND_EXTRACT_PATTERN = re.compile(r'^\s*(\w[\w\._]*)', flags=re.IGNORECASE | re.MULTILINE)
 
     _INSTRUCTUION_EXTRACTION_PATTERN = None
@@ -22,7 +22,7 @@ class InstructionLine(LineWithBytes):
             isa_model: AssemblerModel,
             current_memzone: MemoryZone,
             memzone_manager: MemoryZoneManager,
-    ) -> LineWithBytes:
+    ) -> LineWithWords:
         """Tries to contruct a instruction line object from the passed instruction line"""
         # first, extract evertything up to the next extruction
         if InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN is None:
@@ -66,7 +66,13 @@ class InstructionLine(LineWithBytes):
             comment: str,
             current_memzone: MemoryZone,
     ):
-        super().__init__(line_id, instruction, comment, current_memzone)
+        super().__init__(
+            line_id, instruction, comment, current_memzone,
+            isa_model.word_size,
+            isa_model.word_segment_size,
+            isa_model.intra_word_endianness,
+            isa_model.multi_word_endianness,
+        )
         self._command = command_str
         self._argument_str = argument_str
         self._isa_model = isa_model
@@ -82,6 +88,6 @@ class InstructionLine(LineWithBytes):
         """Returns the number of bytes this instruction will generate"""
         return self._assembled_instruction.byte_size
 
-    def generate_bytes(self) -> bytearray:
+    def generate_words(self) -> bytearray:
         """Finalize the bytes for this line with the label assignemnts"""
-        self._bytes.extend(self._assembled_instruction.get_bytes(self.label_scope, self.address, self.byte_size))
+        self._words.extend(self._assembled_instruction.get_words(self.label_scope, self.address, self.byte_size))

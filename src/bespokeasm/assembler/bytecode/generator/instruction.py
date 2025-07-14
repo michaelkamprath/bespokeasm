@@ -65,6 +65,8 @@ class InstructionBytecodeGenerator:
             False,
             instruction_endian,
             line_id,
+            isa_model.word_size,
+            isa_model.word_segment_size,
         )
         base_bytecode_suffix = None
         if variant.has_bytecode_suffix:
@@ -74,6 +76,8 @@ class InstructionBytecodeGenerator:
                 False,
                 instruction_endian,
                 line_id,
+                isa_model.word_size,
+                isa_model.word_segment_size,
             )
 
         if variant._operand_parser is not None:
@@ -90,4 +94,10 @@ class InstructionBytecodeGenerator:
         else:
             machine_code = [base_bytecode]
 
-        return AssembledInstruction(line_id, machine_code)
+        return AssembledInstruction(
+            line_id,
+            machine_code,
+            isa_model.word_size,
+            isa_model.word_segment_size,
+            instruction_endian,
+        )

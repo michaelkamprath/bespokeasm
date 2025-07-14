@@ -19,8 +19,16 @@ class RegisterOperand(Operand):
 
     _OPERAND_PATTERN_TEMPLATE = r'{0}{1}'
 
-    def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str, regsiters: set[str]):
-        super().__init__(operand_id, arg_config_dict, default_endian)
+    def __init__(
+        self,
+        operand_id: str,
+        arg_config_dict: dict,
+        default_endian: str,
+        regsiters: set[str],
+        word_size: int,
+        word_segment_size: int,
+    ):
+        super().__init__(operand_id, arg_config_dict, default_endian, word_size, word_segment_size)
         if self.register not in regsiters:
             sys.exit(f'ERROR - ISA configation declares register based operand {self} but the '
                      f'register label "{self.register}" is not a declared register.')
@@ -95,8 +103,17 @@ class RegisterOperand(Operand):
                 self.bytecode_size,
                 False,
                 'big',
-                line_id
+                line_id,
+                self._word_size,
+                self._word_segment_size,
             ) if self.bytecode_value is not None else None
             arg_part = None
-            return ParsedOperand(self, bytecode_part, arg_part, operand)
+            return ParsedOperand(
+                self,
+                bytecode_part,
+                arg_part,
+                operand,
+                self._word_size,
+                self._word_segment_size,
+            )
         return None

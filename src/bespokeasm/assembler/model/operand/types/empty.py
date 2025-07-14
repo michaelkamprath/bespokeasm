@@ -5,8 +5,8 @@ from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 
 
 class EmptyOperand(Operand):
-    def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str):
-        super().__init__(operand_id, arg_config_dict, default_endian)
+    def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str, word_size: int, word_segment_size: int):
+        super().__init__(operand_id, arg_config_dict, default_endian, word_size, word_segment_size)
 
     def __str__(self):
         return f'EmptyOperand<{self.id}>'
@@ -31,6 +31,8 @@ class EmptyOperand(Operand):
             self.bytecode_size,
             False,
             'big',
-            line_id
+            line_id,
+            self._word_size,
+            self._word_segment_size,
         ) if self.bytecode_value is not None else None
-        return ParsedOperand(self, bytecode_part, None, operand)
+        return ParsedOperand(self, bytecode_part, None, operand, self._word_size, self._word_segment_size)

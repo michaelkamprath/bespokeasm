@@ -1,7 +1,7 @@
 import io
 import math
 
-from bespokeasm.assembler.line_object import LineWithBytes, LineObject
+from bespokeasm.assembler.line_object import LineWithWords, LineObject
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.pretty_printer import PrettyPrinterBase
@@ -51,8 +51,8 @@ class SourceDetailsPrettyPrinter(PrettyPrinterBase):
                 instruction_str = ' '*INSTRUCTION_INDENT + instruction_str
             instruction_str = instruction_str.ljust(self.max_instruction_width + INSTRUCTION_INDENT)
 
-            if isinstance(lobj, LineWithBytes):
-                line_bytes = lobj.get_bytes()
+            if isinstance(lobj, LineWithWords):
+                line_bytes = lobj.get_words()
             else:
                 line_bytes = None
             if line_bytes is not None:
