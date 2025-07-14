@@ -1,3 +1,4 @@
+from typing import Literal
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.expression import parse_expression, ExpressionNode
@@ -16,8 +17,21 @@ class FillDataLine(LineWithWords):
             fill_count_expression: str,
             fill_value_expression: str,
             current_memzone: MemoryZone,
+            word_size: int,
+            word_segment_size: int,
+            intra_word_endianness: Literal['little', 'big'],
+            multi_word_endianness: Literal['little', 'big'],
     ) -> None:
-        super().__init__(line_id, instruction, comment, current_memzone)
+        super().__init__(
+            line_id,
+            instruction,
+            comment,
+            current_memzone,
+            word_size,
+            word_segment_size,
+            intra_word_endianness,
+            multi_word_endianness,
+        )
         self._count_expr = parse_expression(line_id, fill_count_expression)
         self._value_expr = parse_expression(line_id, fill_value_expression)
         self._count = None

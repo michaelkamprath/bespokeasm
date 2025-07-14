@@ -2,6 +2,7 @@ import importlib.resources as pkg_resources
 import unittest
 import yaml
 
+from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType
 import bespokeasm.assembler.model.operand_set as AS
@@ -30,14 +31,14 @@ class TestConfigObject(unittest.TestCase):
 
     def test_argument_set_construction(self):
         conf1 = yaml.safe_load(self._eater_sap1_config_str)
-        arg_collection1 = AS.OperandSetCollection(conf1['operand_sets'], 'big', set())
+        arg_collection1 = AS.OperandSetCollection(conf1['operand_sets'], 'big', set(), 8, 8,)
         self.assertEqual(len(arg_collection1), 2, 'there are 2 argument sets')
         self.assertTrue('integer' in arg_collection1)
         self.assertTrue('address' in arg_collection1)
 
         conf2 = yaml.safe_load(self._register_argument_config_str)
         arg_collection2 = AS.OperandSetCollection(
-            conf2['operand_sets'], 'little', {'a', 'i', 'j', 'sp', 'ij', 'mar'}
+            conf2['operand_sets'], 'little', {'a', 'i', 'j', 'sp', 'ij', 'mar'}, 8, 8,
         )
         self.assertEqual(len(arg_collection2), 4, 'there are 4 argument sets')
         self.assertTrue('8_bit_source' in arg_collection2)
@@ -57,8 +58,8 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(pi1.byte_size, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(
-            pi1.get_bytes(TestConfigObject.label_values, 0x8000, pi1.byte_size),
-            bytearray([0x1F]),
+            pi1.get_words(TestConfigObject.label_values, 0x8000, pi1.byte_size),
+            [Word(0x1F, model1.word_size, model1.word_segment_size, model1.intra_word_endianness)],
             'assembled instruction',
         )
 
@@ -67,8 +68,8 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(pi2.byte_size, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(
-            pi2.get_bytes(TestConfigObject.label_values, 0x8000, pi2.byte_size),
-            bytearray([0x27]),
+            pi2.get_words(TestConfigObject.label_values, 0x8000, pi2.byte_size),
+            [Word(0x27, model1.word_size, model1.word_segment_size, model1.intra_word_endianness)],
             'assembled instruction',
         )
 
@@ -77,8 +78,8 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(pi3.byte_size, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(
-            pi3.get_bytes(TestConfigObject.label_values, 0x8000, pi3.byte_size),
-            bytearray([0xE0]),
+            pi3.get_words(TestConfigObject.label_values, 0x8000, pi3.byte_size),
+            [Word(0xE0, model1.word_size, model1.word_segment_size, model1.intra_word_endianness)],
             'assembled instruction'
         )
 
@@ -91,8 +92,8 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(piA.byte_size, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(
-            list(piA.get_bytes(TestConfigObject.label_values, 0x8000, 1)),
-            [0b01000010],
+            piA.get_words(TestConfigObject.label_values, 0x8000, 1),
+            [Word(0b01000010, model2.word_size, model2.word_segment_size, model2.intra_word_endianness)],
             'assembled instruction'
         )
 
@@ -101,8 +102,12 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(piB.byte_size, 3, 'assembled instruciton is 3 byte')
         self.assertEqual(
-            piB.get_bytes(TestConfigObject.label_values, 0x8000, 3),
-            bytearray([0b01000110, 0x22, 0x11]),
+            piB.get_words(TestConfigObject.label_values, 0x8000, 3),
+            [
+                Word(0b01000110, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+                Word(0x22, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+                Word(0x11, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+            ],
             'assembled instruction'
         )
 
@@ -111,8 +116,8 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(piC.byte_size, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(
-            piC.get_bytes(TestConfigObject.label_values, 0x8000, 1),
-            bytearray([0b10111010]),
+            piC.get_words(TestConfigObject.label_values, 0x8000, 1),
+            [Word(0b10111010, model2.word_size, model2.word_segment_size, model2.intra_word_endianness)],
             'assembled instruction'
         )
 
@@ -121,8 +126,13 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(piD.byte_size, 4, 'assembled instruciton is 4 byte')
         self.assertEqual(
-            piD.get_bytes(TestConfigObject.label_values, 0x8000, 4),
-            bytearray([0b01110111,  0x88, 0xFF, 0x11]),
+            piD.get_words(TestConfigObject.label_values, 0x8000, 4),
+            [
+                Word(0b01110111, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+                Word(0x88, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+                Word(0xFF, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+                Word(0x11, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+            ],
             'arguments should be in reverse order'
         )
 
@@ -131,8 +141,12 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(piE.byte_size, 3, 'assembled instruciton is 3 byte')
         self.assertEqual(
-            piE.get_bytes(TestConfigObject.label_values, 0x8000, 3),
-            bytearray([0b01101111, 0x88, 0b11111110]),
+            piE.get_words(TestConfigObject.label_values, 0x8000, 3),
+            [
+                Word(0b01101111, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+                Word(0x88, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+                Word(0b11111110, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+            ],
             'arguments should be in reverse order'
         )
 
@@ -141,8 +155,12 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(piF.byte_size, 3, 'assembled instruciton is 3 byte')
         self.assertEqual(
-            piF.get_bytes(TestConfigObject.label_values, 0x800, 3),
-            bytearray([0b01101111, 0x88, 2]),
+            piF.get_words(TestConfigObject.label_values, 0x8000, 3),
+            [
+                Word(0b01101111, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+                Word(0x88, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+                Word(0x02, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+            ],
             'arguments should be in reverse order'
         )
 
@@ -151,8 +169,12 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(piG.byte_size, 3, 'assembled instruciton is 3 byte')
         self.assertEqual(
-            piG.get_bytes(TestConfigObject.label_values, 0x8000, 3),
-            bytearray([0b01101111, 0x88, 0]),
+            piG.get_words(TestConfigObject.label_values, 0x8000, 3),
+            [
+                Word(0b01101111, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+                Word(0x88, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+                Word(0x00, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+            ],
             'arguments should be in reverse order'
         )
 
@@ -161,8 +183,14 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(piH.byte_size, 5, 'assembled instruciton is 5 byte')
         self.assertEqual(
-            piH.get_bytes(TestConfigObject.label_values, 0x8000, 5),
-            bytearray([0b01110110, 2, 0, 0, 0x80]),
+            piH.get_words(TestConfigObject.label_values, 0x8000, 5),
+            [
+                Word(0b01110110, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+                Word(0x02, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+                Word(0x00, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+                Word(0x00, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+                Word(0x80, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+            ],
             'arguments should be in reverse order'
         )
 
@@ -171,8 +199,12 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(piI.byte_size, 3, 'assembled instruciton is 3 byte')
         self.assertEqual(
-            piI.get_bytes(TestConfigObject.label_values, 0x8000, 3),
-            bytearray([0b01100110, 2, 0]),
+            piI.get_words(TestConfigObject.label_values, 0x8000, 3),
+            [
+                Word(0b01100110, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+                Word(0x02, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+                Word(0x00, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+            ],
             'no offset should be emitted for [mar]'
         )
 
@@ -180,9 +212,15 @@ class TestConfigObject(unittest.TestCase):
             model2, test_line_id, 'swap [$8000], [label1]', memzone_mngr2,
         )
         self.assertEqual(piJ.byte_size, 5, 'assembled instruciton is 3 byte')
-        self.assertEqual(piJ.get_bytes(
-            TestConfigObject.label_values, 0x8000, 3),
-            bytearray([0b11110110, 0, 0x80, 2, 0]),
+        self.assertEqual(
+            piJ.get_words(TestConfigObject.label_values, 0x8000, 5),
+            [
+                Word(0b11110110, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+                Word(0x00, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+                Word(0x80, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+                Word(0x02, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+                Word(0x00, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+            ],
             'arguments should NOT be in reverse order'
         )
 
@@ -191,8 +229,12 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(piK.byte_size, 3, 'assembled instruciton is 3 byte')
         self.assertEqual(
-            piK.get_bytes(TestConfigObject.label_values, 0x8000, 3),
-            bytearray([0b01101101, 4, 2]),
+            piK.get_words(TestConfigObject.label_values, 0x8000, 3),
+            [
+                Word(0b01101101, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+                Word(0x04, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+                Word(0x02, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+            ],
             'arguments should be in reverse order'
         )
 
@@ -200,21 +242,32 @@ class TestConfigObject(unittest.TestCase):
             model2, test_line_id, 'pop i', memzone_mngr2,
         )
         self.assertEqual(piL.byte_size, 1, 'assembled instruciton is 1 byte')
-        self.assertEqual(list(piL.get_bytes(TestConfigObject.label_values, 0x8000, 1)), [0b00001010], 'pop to i')
+        self.assertEqual(
+            piL.get_words(TestConfigObject.label_values, 0x8000, 1),
+            [Word(0b00001010, model2.word_size, model2.word_segment_size, model2.intra_word_endianness)],
+            'pop to i'
+        )
 
         piM = InstructioParser.parse_instruction(
             model2, LineIdentifier(158, 'test_pop_empty_arg'), 'pop', memzone_mngr2,
         )
         self.assertEqual(piM.byte_size, 1, 'assembled instruciton is 1 byte')
-        self.assertEqual(piM.get_bytes(TestConfigObject.label_values, 0x8000, 1), bytearray([0b00001111]), 'just pop')
+        self.assertEqual(
+            piM.get_words(TestConfigObject.label_values, 0x8000, 1),
+            [Word(0b00001111, model2.word_size, model2.word_segment_size, model2.intra_word_endianness)],
+            'just pop'
+        )
 
         piN = InstructioParser.parse_instruction(
             model2, test_line_id, 'mov a, [sp+2]', memzone_mngr2,
         )
         self.assertEqual(piN.byte_size, 2, 'assembled instruciton is 2 byte')
         self.assertEqual(
-            piN.get_bytes(TestConfigObject.label_values, 0x8000, 2),
-            bytearray([0b01000101, 2]),
+            piN.get_words(TestConfigObject.label_values, 0x8000, 2),
+            [
+                Word(0b01000101, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+                Word(0x02, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
+            ],
             'just move [sp+2] into a'
         )
 

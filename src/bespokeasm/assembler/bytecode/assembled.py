@@ -62,12 +62,19 @@ class AssembledInstruction:
 
 
 class CompositeAssembledInstruction(AssembledInstruction):
-    def __init__(self, line_id: LineIdentifier, instructions: list[AssembledInstruction]):
+    def __init__(
+        self,
+        line_id: LineIdentifier,
+        instructions: list[AssembledInstruction],
+        word_size: int,
+        segment_size: int,
+        endian: Literal['little', 'big'],
+    ):
         # turn instruction list into byte code parts list
         parts: list[ByteCodePart] = [
             p for instr in instructions for p in instr.parts
         ]
-        super().__init__(line_id, parts)
+        super().__init__(line_id, parts, word_size, segment_size, endian)
         self._instructions = instructions
 
     @property

@@ -209,8 +209,6 @@ class SpecificOperandsModel:
                         '',
                         register_labels,
                         memzone_manager,
-                        self._word_size,
-                        self._word_segment_size,
                     )
                     null_operand_count += 1
                 else:

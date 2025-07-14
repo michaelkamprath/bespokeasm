@@ -128,5 +128,11 @@ class MacroBytecodeGenerator:
             assembled_instructions.append(instruction)
 
         # finally, pack it all together into one assembled instruction
-        composite_instruction = CompositeAssembledInstruction(line_id, assembled_instructions)
+        composite_instruction = CompositeAssembledInstruction(
+            line_id,
+            assembled_instructions,
+            isa_model.word_size,
+            isa_model.word_segment_size,
+            isa_model.intra_word_endianness,
+        )
         return composite_instruction
