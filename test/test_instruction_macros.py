@@ -36,6 +36,9 @@ class TestInstructionMacros(unittest.TestCase):
         )
         cls.memzone = cls.memory_zone_manager.global_zone
 
+    def setUp(self) -> None:
+        InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN = None
+
     def test_macro_parsing_numeric_args(self):
         isa_model = self.isa_model
         memzone = self.memzone
@@ -152,7 +155,9 @@ class TestInstructionMacros(unittest.TestCase):
 
         line_id = LineIdentifier(1, 'test_macro_parsing_registers')
 
-        ins4 = InstructionLine.factory(line_id, 'push2 [ij + 4]', 'some comment!', isa_model, memzone, memzone_mngr)
+        ins4: LineWithWords = InstructionLine.factory(
+            line_id, 'push2 [ij + 4]', 'some comment!', isa_model, memzone, memzone_mngr,
+        )
         ins4.set_start_address(1212)
         self.assertIsInstance(ins4, InstructionLine)
         self.assertEqual(ins4.word_count, 4, 'has 4 words')
@@ -169,7 +174,9 @@ class TestInstructionMacros(unittest.TestCase):
             'instruction words should match'
         )
 
-        ins5 = InstructionLine.factory(line_id, 'push2 [sp + 8]', 'some comment!', isa_model, memzone, memzone_mngr)
+        ins5: LineWithWords = InstructionLine.factory(
+            line_id, 'push2 [sp + 8]', 'some comment!', isa_model, memzone, memzone_mngr,
+        )
         ins5.set_start_address(1212)
         self.assertIsInstance(ins5, InstructionLine)
         self.assertEqual(ins5.word_count, 4, 'has 4 words')
@@ -193,7 +200,7 @@ class TestInstructionMacros(unittest.TestCase):
 
         line_id = LineIdentifier(1, 'test_macro_parsing_operands')
 
-        ins1 = InstructionLine.factory(line_id, 'swap a,j', 'some comment!', isa_model, memzone, memzone_mngr)
+        ins1: LineWithWords = InstructionLine.factory(line_id, 'swap a,j', 'some comment!', isa_model, memzone, memzone_mngr)
         ins1.set_start_address(1212)
         self.assertIsInstance(ins1, InstructionLine)
         self.assertEqual(ins1.word_count, 3, 'has 3 words')
@@ -209,7 +216,7 @@ class TestInstructionMacros(unittest.TestCase):
             'instruction words should match'
         )
 
-        ins2 = InstructionLine.factory(line_id, 'swap i,j', 'some comment!', isa_model, memzone, memzone_mngr)
+        ins2: LineWithWords = InstructionLine.factory(line_id, 'swap i,j', 'some comment!', isa_model, memzone, memzone_mngr)
         ins2.set_start_address(1212)
         self.assertIsInstance(ins2, InstructionLine)
         self.assertEqual(ins2.word_count, 3, 'has 3 words')
@@ -225,7 +232,9 @@ class TestInstructionMacros(unittest.TestCase):
             'instruction words should match'
         )
 
-        ins3 = InstructionLine.factory(line_id, 'swap a,[ij + 4]', 'some comment!', isa_model, memzone, memzone_mngr)
+        ins3: LineWithWords = InstructionLine.factory(
+            line_id, 'swap a,[ij + 4]', 'some comment!', isa_model, memzone, memzone_mngr,
+        )
         ins3.set_start_address(1212)
         self.assertIsInstance(ins3, InstructionLine)
         self.assertEqual(ins3.word_count, 5, 'has 5 words')
@@ -243,7 +252,9 @@ class TestInstructionMacros(unittest.TestCase):
             'instruction words should match'
         )
 
-        ins4 = InstructionLine.factory(line_id, 'swap [sp+10],[ij + 4]', 'some comment!', isa_model, memzone, memzone_mngr)
+        ins4: LineWithWords = InstructionLine.factory(
+            line_id, 'swap [sp+10],[ij + 4]', 'some comment!', isa_model, memzone, memzone_mngr,
+        )
         ins4.set_start_address(1212)
         self.assertIsInstance(ins4, InstructionLine)
         self.assertEqual(ins4.word_count, 7, 'has 7 words')
@@ -263,7 +274,7 @@ class TestInstructionMacros(unittest.TestCase):
             'instruction words should match'
         )
 
-        ins5 = InstructionLine.factory(
+        ins5: LineWithWords = InstructionLine.factory(
             line_id, 'swap [sp+10],[sp+predefined_value1]', 'some comment!',
             isa_model, memzone, memzone_mngr,
         )
@@ -286,7 +297,9 @@ class TestInstructionMacros(unittest.TestCase):
             'instruction words should match'
         )
 
-        ins6 = InstructionLine.factory(line_id, 'mov2 [$8008],$1234', 'some comment!', isa_model, memzone, memzone_mngr)
+        ins6: LineWithWords = InstructionLine.factory(
+            line_id, 'mov2 [$8008],$1234', 'some comment!', isa_model, memzone, memzone_mngr,
+        )
         ins6.set_start_address(1212)
         self.assertIsInstance(ins6, InstructionLine)
         self.assertEqual(ins6.word_count, 8, 'has 8 words')
@@ -314,7 +327,7 @@ class TestInstructionMacros(unittest.TestCase):
 
         line_id = LineIdentifier(1, 'test_macro_with_variants')
 
-        ins1 = InstructionLine.factory(line_id, 'incs sp', 'some comment!', isa_model, memzone, memzone_mngr)
+        ins1: LineWithWords = InstructionLine.factory(line_id, 'incs sp', 'some comment!', isa_model, memzone, memzone_mngr)
         ins1.set_start_address(1212)
         self.assertIsInstance(ins1, InstructionLine)
         self.assertEqual(ins1.word_count, 1, 'has 1 words')
@@ -328,7 +341,7 @@ class TestInstructionMacros(unittest.TestCase):
             'instruction words should match'
         )
 
-        ins2 = InstructionLine.factory(line_id, 'incs 3', 'some comment!', isa_model, memzone, memzone_mngr)
+        ins2: LineWithWords = InstructionLine.factory(line_id, 'incs 3', 'some comment!', isa_model, memzone, memzone_mngr)
         ins2.set_start_address(1212)
         self.assertIsInstance(ins2, InstructionLine)
         self.assertEqual(ins2.word_count, 1, 'has 1 words')

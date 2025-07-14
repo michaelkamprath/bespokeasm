@@ -15,7 +15,7 @@ from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
 from test import config_files
 
 
-class TestExpression(unittest.TestCase):
+class TestAssemblerEngine(unittest.TestCase):
     def test_generate_bytes_from_line_objects_8bit_words(self):
         fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')
         isa_model = AssemblerModel(str(fp), 0)

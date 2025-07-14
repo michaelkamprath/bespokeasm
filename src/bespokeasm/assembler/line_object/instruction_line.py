@@ -15,7 +15,9 @@ class InstructionLine(LineWithWords):
 
     _INSTRUCTUION_EXTRACTION_PATTERN = None
 
+    @classmethod
     def factory(
+            cls,
             line_id: LineIdentifier,
             line_str: str,
             comment: str,
@@ -25,21 +27,21 @@ class InstructionLine(LineWithWords):
     ) -> LineWithWords:
         """Tries to contruct a instruction line object from the passed instruction line"""
         # first, extract evertything up to the next extruction
-        if InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN is None:
+        if cls._INSTRUCTUION_EXTRACTION_PATTERN is None:
             instructions_regex = '\\b' + '\\b|\\b'.join(isa_model.operation_mnemonics) + '\\b'
             # replace any period characters in instructions with escaped period characters
             instructions_regex = instructions_regex.replace('.', '\\.')
-            InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN = re.compile(
+            cls._INSTRUCTUION_EXTRACTION_PATTERN = re.compile(
                 fr'(?i)^((?:{instructions_regex}).*?(?=(?:{instructions_regex})'
                 fr'|\s*\;|\s*$|\s*{EMBEDDED_STRING_PATTERN}))',
                 flags=re.IGNORECASE | re.MULTILINE,
             )
-        instruction_match = re.search(InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN, line_str.strip())
+        instruction_match = re.search(cls._INSTRUCTUION_EXTRACTION_PATTERN, line_str.strip())
         if instruction_match is not None:
             instruction_str = instruction_match.group(0)
 
             # extract the instruction command
-            command_match = re.search(InstructionLine.COMMAND_EXTRACT_PATTERN, instruction_str)
+            command_match = re.search(cls.COMMAND_EXTRACT_PATTERN, instruction_str)
             if command_match is None or len(command_match.groups()) != 1:
                 sys.exit(f'ERROR: {line_id} - Wrongly formatted instruction: {instruction_str}')
             command_str = command_match.group(1).strip().lower()
