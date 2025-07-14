@@ -1,7 +1,7 @@
 import re
 
 PATTERN_ALLOWED_LABELS = re.compile(
-        r'^(?!__|\.\.)(?:(?:\.|_|[a-zA-Z])[a-zA-Z0-9_]*)$',
+        r'^(?!__|\.\.)(?:[a-zA-Z](?:[a-zA-Z0-9_]*)|[._][a-zA-Z0-9_]+)$',
         flags=re.IGNORECASE | re.MULTILINE
     )
 

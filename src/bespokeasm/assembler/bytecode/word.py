@@ -1,270 +1,302 @@
 from typing import Literal
+from .word_slice import WordSlice
 
 
 class Word:
     """
-    Represents a word in the bytecode. A word is the data bus width of the CPU, which is typically 8, 16, 32, or 64 bits.
-    An address points to a word, and the word is the smallest unit of data that can be read or written.
+    Represents a word in the bytecode. A word is the smallest unit a memory address points to.
+
+    A Word has:
+    - A bit size (total number of bits)
+    - A segment size (size of segments within the word, must divide bit size evenly)
+    - A value (integer value of the word)
+    - Intra-word endianness ('big' or 'little') indicating segment order when emitting bytes
+
+    Words can be constructed from:
+    - A list of WordSlice objects (packed in order from MSB to LSB)
+    - An integer value (if it fits within the bit size)
     """
 
-    @staticmethod
-    def fromByteArray(byte_array: bytes, bit_size: int = 8, compact_bytes=False) -> list['Word']:
+    def __init__(
+        self,
+        value: int,
+        bit_size: int,
+        segment_size: int = 8,
+        intra_word_endianness: Literal['little', 'big'] = 'big'
+    ):
         """
-        Generates a list of Word objects from a byte array.
-        Each byte in the array is treated as a separate Word.
-        If compact_bytes is True, the byte array is treated as a sequence of bits. Otherwise, each
-        byte is treated as a separate word.
+        Initialize a Word with a value and bit size.
+
+        :param value: The integer value of the word
+        :param bit_size: The total number of bits in the word (must be > 0)
+        :param segment_size: The size of segments within the word (must be > 0 and divide bit_size evenly)
+        :param intra_word_endianness: The endianness of segments when converting to bytes
+        :raises ValueError: If parameters are invalid or value doesn't fit in bit_size
         """
         if bit_size <= 0:
             raise ValueError('bit_size must be greater than 0')
-        if compact_bytes:
-            # Need to treat the byte array like a bit stream and pop off bit_size bits at a time.
-            # if bit_size is 4, we will extract 4 bits at a time from the byte array.
-            if bit_size == 4:
-                # Special case for 4 bits, we can extract 4 bits at a time from the byte array
-                word_count = len(byte_array) * 2
-                words = []
-                for byte in byte_array:
-                    words.append(Word((byte >> 4) & 0x0F, bit_size))
-                    words.append(Word(byte & 0x0F, bit_size))
-            elif bit_size == 8:
-                # Special case for 8 bits, each byte is a word
-                words = [Word(byte, bit_size) for byte in byte_array]
-            elif bit_size % 8 == 0:
-                # For bit sizes that are multiples of 8, we can extract the bits directly
-                byte_size = bit_size // 8
-                word_count = len(byte_array) // byte_size
-                words = []
-                for i in range(word_count):
-                    start_index = i * byte_size
-                    end_index = start_index + byte_size
-                    words.append(Word(int.from_bytes(byte_array[start_index:end_index], 'big'), bit_size))
-            else:
-                # For other bit sizes, we need to extract bits one by one
-                # This is not implemented yet, as it requires more complex bit manipulation.
-                # For now, we will raise an error.
-                raise NotImplementedError(
-                    'Compact byte extraction for bit sizes other than 4, 8, or multiples of 8 is not implemented yet.'
-                )
-            return words
-        else:
-            return [Word(byte, bit_size) for byte in byte_array]
 
-    @staticmethod
-    def fromInt(
-                value: int,
-                bit_size: int = 8,
-                align_bytes: bool = False,
-                byteorder: Literal['little', 'big'] = 'big'
-            ) -> 'Word':
-        """
-        Generates a Word object from an integer value.
+        if segment_size <= 0:
+            raise ValueError('segment_size must be greater than 0')
 
-        :param value: The integer value of the word.
-        :param bit_size: The bit size of the word. Must be greater than 0.
-        :param align_bytes: If True, the word will be aligned to byte boundaries when packed by
-                            the Word.generateByteArray method.
-        :raises ValueError: If bit_size is less than or equal to 0, or if the value is out of
-                            range for the specified bit size.
-        :return: A Word object representing the value.
-        """
-        return Word(value, bit_size, align_bytes, byteorder)
+        if bit_size % segment_size != 0:
+            raise ValueError(f'bit_size {bit_size} must be divisible by segment_size {segment_size}')
 
-    @staticmethod
-    def generateByteArray(words: list['Word'], compact_bytes=False, byteorder: Literal['little', 'big'] = None) -> bytes:
-        """
-        Generates a byte array representation of a list of Word objects. Word objects
-        are not required to have the same bit size. If compact_bytes is True, bits are packed tightly into bytes,
-        respecting the align_bytes property of individual Word objects. This means that the bits will be packed
-        to the left, and if a Word has align_bytes set to True, it will be aligned to the next byte boundary.
-        Otherwise, each Word will start a new byte in the array.
+        if segment_size > bit_size:
+            raise ValueError(f'segment_size {segment_size} cannot be greater than bit_size {bit_size}')
 
-        :param words: List of Word objects to convert to a byte array.
-        :param compact_bytes: If True, pack the bits tightly into bytes, respecting the align_bytes property if
-                              indivdual Word objects. If False, each Word will start a new byte in the array.
-        :param byteorder: The byte order to use when converting the Word values to bytes. Does not impact
-                          the compact_bytes option, which only affects how bits are packed. None means to use the
-                          byte order specified during initialization of the Word objects for that Word.
-        :return: A byte array representation of the Word objects.
-        :raises ValueError: If the bit size of any Word is less than or equal to 0, or if there is not enough space
-                            in the byte array for the Word values
-        """
-        if not words:
-            return b''
+        # Calculate valid range for the given bit size
+        min_value = -(1 << (bit_size - 1))  # -2^(bit_size-1) for signed
+        max_value = (1 << bit_size) - 1  # 2^bit_size - 1 for unsigned
 
-        if compact_bytes:
-            # the total bits calculation needs to account for any byte alignment that causeds
-            # the bits to be padded to the next byte boundary
-            total_bits = 0
-            for word in words:
-                if word.align_bytes and total_bits % 8 != 0:
-                    total_bits += 8 - (total_bits % 8)
-                total_bits += word.bit_size
-            byte_array = bytearray((total_bits + 7) // 8)
-            current_bit = 0
-            for word in words:
-                if current_bit + word.bit_size > len(byte_array) * 8:
-                    raise ValueError('Not enough space in byte array for the word')
-                # If align_bytes is set, align to next byte boundary before writing
-                if word.align_bytes and current_bit % 8 != 0:
-                    current_bit += 8 - (current_bit % 8)
-                # If the word is byte-aligned and we're at a byte boundary, copy bytes directly
-                if word.bit_size % 8 == 0 and current_bit % 8 == 0:
-                    word_bytes = word.to_bytes(compact_bytes=True, byteorder=byteorder)
-                    start = current_bit // 8
-                    end = start + len(word_bytes)
-                    byte_array[start:end] = word_bytes
-                    current_bit += word.bit_size
-                else:
-                    # Otherwise, pack bits one at a time, always MSB first
-                    for bit_index in reversed(range(word.bit_size)):
-                        if (word.value >> bit_index) & 1:
-                            byte_array[current_bit // 8] |= (1 << (7 - (current_bit % 8)))
-                        current_bit += 1
-            return bytes(byte_array)
-        else:
-            # Each Word starts a new byte in the array
-            total_bytes = sum(word.byte_size for word in words)
-            if total_bytes == 0:
-                return b''
-            if any(word.bit_size <= 0 for word in words):
-                raise ValueError('Word bit size must be greater than 0')
-            byte_array = bytearray(total_bytes)
-            current_index = 0
-            for word in words:
-                if current_index + word.byte_size > len(byte_array):
-                    raise ValueError('Not enough space in byte array for the word')
-                # Convert the word value to bytes and store it in the byte array
-                word_bytes = word.to_bytes(compact_bytes=False, byteorder=byteorder)
-                byte_array[current_index:current_index + word.byte_size] = word_bytes
-                current_index += word.byte_size
-            if current_index != len(byte_array):
-                raise ValueError('Mismatch in byte array size')
+        if value < min_value or value > max_value:
+            raise ValueError(f'value {value} is out of range for bit_size {bit_size} (range: {min_value} to {max_value})')
 
-            return bytes(byte_array)
-
-    def __init__(
-                self,
-                value: int,
-                bit_size: int = 8,
-                align_bytes: bool = False,
-                byteorder: Literal['little', 'big'] = 'big',
-            ) -> None:
-        """
-        Initializes a Word object with a value and bit size.
-
-        :param value: The integer value of the word.
-        :param bit_size: The bit size of the word. Must be greater than 0.
-        :param align_bytes: If True, the word will be aligned to byte boundaries when packed by
-                            the Word.generateByteArray method.
-        :param byteorder: The byte order to use when converting the Word value to bytes.
-        :raises ValueError: If bit_size is less than or equal to 0, or if the value is out of range for the specified bit size.
-        """
-        if bit_size < 0:
-            raise ValueError('bit_size must be greater than 0')
-        if bit_size == 0 and value != 0:
-            raise ValueError('bit_size is 0, but value is not 0')
-        if value < (-2**(bit_size-1)) or value >= (1 << bit_size):
-            raise ValueError(f'value {value} is out of range for bit size {bit_size}')
+        if intra_word_endianness not in ['little', 'big']:
+            raise ValueError('intra_word_endianness must be "little" or "big"')
 
         self._value = value
         self._bit_size = bit_size
-        self._align_bytes = align_bytes
-        self._byteorder = byteorder
+        self._segment_size = segment_size
+        self._intra_word_endianness = intra_word_endianness
 
-    def __repr__(self):
-        return f'Word<{bytes(self).hex()}, bit_size={self._bit_size}>'
+    @classmethod
+    def from_word_slices(
+        cls,
+        word_slices: list[WordSlice],
+        bit_size: int,
+        segment_size: int = 8,
+        intra_word_endianness: Literal['little', 'big'] = 'big'
+    ) -> 'Word':
+        """
+        Create a Word from a list of WordSlice objects.
 
-    def __int__(self):
-        return self._value
+        The WordSlices are packed in order from most significant bit to least significant bit.
+        If the total bits from WordSlices is less than bit_size, the remaining bits are filled with 0.
 
-    def __eq__(self, other):
-        if isinstance(other, Word):
-            return self._value == other._value and self._bit_size == other._bit_size
-        return False
+        :param word_slices: List of WordSlice objects to pack into the word
+        :param bit_size: The total number of bits in the word
+        :param segment_size: The size of segments within the word
+        :param intra_word_endianness: The endianness of segments when converting to bytes
+        :return: A new Word object
+        :raises ValueError: If parameters are invalid or total bits exceed bit_size
+        """
+        if bit_size <= 0:
+            raise ValueError('bit_size must be greater than 0')
 
-    def __hash__(self):
-        # this is a hash of both the value and the bit size to ensure that two words with the
-        # same value but different bit sizes are not considered equal
-        if not isinstance(self, Word):
-            return NotImplemented
-        if self.bit_size <= 8:
-            return hash((self._value, self._bit_size))
+        if segment_size <= 0:
+            raise ValueError('segment_size must be greater than 0')
+
+        if bit_size % segment_size != 0:
+            raise ValueError(f'bit_size {bit_size} must be divisible by segment_size {segment_size}')
+
+        if segment_size > bit_size:
+            raise ValueError(f'segment_size {segment_size} cannot be greater than bit_size {bit_size}')
+
+        # Calculate total bits from WordSlices
+        total_slice_bits = sum(slice_obj.bit_size for slice_obj in word_slices)
+
+        if total_slice_bits > bit_size:
+            raise ValueError(f'Total bits from WordSlices ({total_slice_bits}) exceeds word bit_size ({bit_size})')
+
+        # Pack WordSlices into the word value
+        value = 0
+        current_bit_position = bit_size - 1  # Start from MSB
+
+        for slice_obj in word_slices:
+            # Get the raw bits from the WordSlice
+            slice_bits = slice_obj.get_raw_bits()
+
+            # Place the bits at the current position
+            value |= slice_bits << (current_bit_position - slice_obj.bit_size + 1)
+            current_bit_position -= slice_obj.bit_size
+
+        return cls(value, bit_size, segment_size, intra_word_endianness)
 
     @property
     def value(self) -> int:
-        """
-        Returns the value of the word
-        """
+        """Returns the integer value of the word."""
         return self._value
 
     @property
     def bit_size(self) -> int:
-        """
-        Returns the bit size of the word
-        """
+        """Returns the total number of bits in the word."""
         return self._bit_size
 
     @property
-    def align_bytes(self) -> bool:
-        """
-        Returns whether the word should be aligned to byte boundaries.
-        This is used for packing bits tightly into bytes.
-        """
-        return self._align_bytes
+    def segment_size(self) -> int:
+        """Returns the size of segments within the word."""
+        return self._segment_size
 
     @property
-    def byteorder(self) -> Literal['little', 'big']:
-        """
-        Returns the byte order used when converting the Word value to bytes.
-        This is either 'little' or 'big'.
-        """
-        return self._byteorder
+    def intra_word_endianness(self) -> Literal['little', 'big']:
+        """Returns the endianness of segments when converting to bytes."""
+        return self._intra_word_endianness
 
-    def __bytes__(self):
-        """
-        Returns the word value as a byte array in big-endian order. If you need little-endian order, use
-        the to_bytes method with byteorder='little'. The byte array will be of length 1 if bit_size is
-        <=8, or larger for other bit sizes.
-        """
-        return self.to_bytes()
+    @property
+    def segment_count(self) -> int:
+        """Returns the number of segments in the word."""
+        return self._bit_size // self._segment_size
 
-    def to_bytes(self, compact_bytes: bool = False, byteorder: Literal['little', 'big'] = None) -> bytes:
+    def to_bytes(self) -> bytes:
         """
-        Returns the word value as a byte array. The value will be "left packed" into the byte array,
-        meaning that the highest bits of the value will be in the highest bits of the first byte.
-        The byte array will be of length 1 if bit_size is <=8, or larger for other bit sizes.
+        Convert the word to bytes according to the intra-word endianness.
 
-        For bit sizes greater than 8, the byte array will be left-packked with zeros to fill the byte size.
-        if the compact_bytes parameter is True. For example, a 12-bite value of 0x123 will be represented
-        as bytes([0x12, 0x30]), which is 2 bytes long, with the first byte containing the high bits and the second
-        byte containing the low bits. Furthermore, for a 4-bit value of 0b1010, the byte array will be
-        bytes([0b10100000]), which is 1 byte long, with the high nibble containing the value and the low nibble
-        filled with zeros. This behavior is intended to work with the Word.generateByteArray method,
-        which expects the bits to be packed tightly into bytes when compact_bytes is True.
+        The word is divided into segments based on segment_size, and the segments
+        are ordered according to intra_word_endianness when converting to bytes.
 
-        :param compact_bytes: If True, the bits will be packed tightly to the left into bytes.
-        :param byteorder: The byte order to use when converting the Word value to bytes. If None, uses the
-                          byte order specified during initialization of the Word object.
-        :return: A byte array representation of the Word value.
+        :return: Bytes representation of the word
         """
-        if byteorder is None:
-            byteorder = self._byteorder
-        byte_len = (self.bit_size + 7) // 8
-        value = self.value
+        # Calculate number of bytes needed
+        byte_count = (self._bit_size + 7) // 8
+
+        # Handle negative values by converting to two's complement
+        if self._value < 0:
+            # Convert to two's complement: invert bits and add 1
+            positive_value = (1 << self._bit_size) + self._value
+        else:
+            positive_value = self._value
+
+        # Extract segments from the positive value
+        segments = self._extract_segments_from_value(positive_value)
+
+        # Apply intra-word endianness
+        if self._intra_word_endianness == 'little':
+            segments = list(reversed(segments))
+
+        # Combine segments back into a value
+        combined_value = self._combine_segments(segments)
+
+        # Left-align the value within the byte array (MSB first)
+        total_bits = byte_count * 8
+        shift = total_bits - self._bit_size
+        aligned_value = combined_value << shift
+
+        # Convert to bytes using big-endian (since we've already handled endianness)
+        return aligned_value.to_bytes(byte_count, byteorder='big', signed=False)
+
+    def _extract_segments(self) -> list[int]:
+        """
+        Extract segments from the word value based on segment_size.
+
+        :return: List of segment values, ordered from most significant to least significant
+        """
+        return self._extract_segments_from_value(self._value)
+
+    def _extract_segments_from_value(self, value: int) -> list[int]:
+        """
+        Extract segments from a given value based on segment_size.
+
+        :param value: The value to extract segments from
+        :return: List of segment values, ordered from most significant to least significant
+        """
+        segments = []
+        segment_mask = (1 << self._segment_size) - 1
+
+        for i in range(self.segment_count):
+            # Extract segment starting from MSB
+            segment_value = (value >> (self._bit_size - (i + 1) * self._segment_size)) & segment_mask
+            segments.append(segment_value)
+
+        return segments
+
+    def _combine_segments(self, segments: list[int]) -> int:
+        """
+        Combine segments back into a word value.
+
+        :param segments: List of segment values, ordered from most significant to least significant
+        :return: The combined word value
+        """
+        if len(segments) != self.segment_count:
+            raise ValueError(f'Expected {self.segment_count} segments, got {len(segments)}')
+
+        value = 0
+        for i, segment in enumerate(segments):
+            value |= segment << (self._bit_size - (i + 1) * self._segment_size)
+
+        return value
+
+    def __repr__(self) -> str:
+        return f'Word<value=0x{self._value:x}, bit_size={self._bit_size}, ' \
+               f'segment_size={self._segment_size}, endian={self._intra_word_endianness}>'
+
+    def __str__(self) -> str:
+        return f'Word<{self._value} ({self._bit_size} bits, {self._segment_size}-bit segments, {self._intra_word_endianness})>'
+
+    def __eq__(self, other) -> bool:
+        if isinstance(other, Word):
+            return (
+                    self._value == other._value and
+                    self._bit_size == other._bit_size and
+                    self._segment_size == other._segment_size and
+                    self._intra_word_endianness == other._intra_word_endianness
+                )
+        return False
+
+    def __hash__(self) -> int:
+        return hash((self._value, self._bit_size, self._segment_size, self._intra_word_endianness))
+
+    def __int__(self) -> int:
+        return self._value
+
+    @classmethod
+    def generateByteArray(
+        cls,
+        words: list,
+        compact_bytes: bool = False,
+        multi_word_endianness: Literal['little', 'big'] = 'big'
+    ) -> bytearray:
+        """
+        Generate a byte array from a list of Word or WordSlice objects.
+        If compact_bytes is True, pack bits tightly in the order given, ignoring per-Word endianness.
+        """
+        if not words:
+            return bytearray()
 
         if compact_bytes:
-            # Left-pack the bits: shift value so the highest bits are in the highest bits of the first byte
-            total_bits = byte_len * 8
-            shift = total_bits - self.bit_size
-            value = value << shift
+            # For compact packing, we need to handle each word's endianness properly
+            # and pack them in sequence
+            byte_array = bytearray()
+            current_byte = 0
+            current_bit_position = 7  # Start from MSB of current byte
 
-        return value.to_bytes(byte_len, byteorder=byteorder, signed=(self.value < 0))
+            for word in words:
+                if hasattr(word, 'bit_size') and hasattr(word, 'value'):
+                    value = word.value
+                    bit_size = word.bit_size
+                else:
+                    continue
 
-    @property
-    def byte_size(self) -> int:
-        """
-        Returns the byte size of the word.
-        This is the number of bytes needed to represent the word value.
-        """
-        return (self.bit_size + 7) // 8
+                # Handle negative values by converting to two's complement
+                if value < 0:
+                    positive_value = (1 << bit_size) + value
+                else:
+                    positive_value = value
+
+                # Pack bits from MSB to LSB
+                for bit_index in range(bit_size - 1, -1, -1):
+                    bit_value = (positive_value >> bit_index) & 1
+
+                    if bit_value:
+                        current_byte |= (1 << current_bit_position)
+
+                    current_bit_position -= 1
+
+                    # If we've filled a byte, add it to the array and start a new one
+                    if current_bit_position < 0:
+                        byte_array.append(current_byte)
+                        current_byte = 0
+                        current_bit_position = 7
+
+            # Add the last byte if it has any bits set
+            if current_bit_position < 7:
+                byte_array.append(current_byte)
+
+            return byte_array
+        else:
+            # Convert each word to bytes and concatenate
+            byte_array = bytearray()
+            for word in words:
+                word_bytes = word.to_bytes()
+                byte_array.extend(word_bytes)
+            return byte_array

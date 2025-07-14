@@ -13,7 +13,7 @@ class AssembledInstruction:
         # calculate total bytes
         total_bits = 0
         for bcp in self._parts:
-            if bcp.byte_align:
+            if bcp.word_align:
                 if total_bits % 8 != 0:
                     total_bits += 8 - total_bits % 8
             total_bits += bcp.value_size
