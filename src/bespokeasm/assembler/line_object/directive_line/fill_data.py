@@ -1,4 +1,5 @@
 from typing import Literal
+from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.expression import parse_expression, ExpressionNode
@@ -48,7 +49,11 @@ class FillDataLine(LineWithWords):
             self._count = self._count_expr.get_value(self.label_scope, self.line_id)
         if self._value is None:
             self._value = self._value_expr.get_value(self.label_scope, self.line_id)
-        self._bytes.extend([(self._value) & 0xFF]*self._count)
+        value_mask = (1 << self._word_size) - 1
+        self._words.extend([
+            Word(self._value & value_mask, self._word_size, self._word_segment_size, self._intra_word_endianness)
+            for _ in range(self._count)
+        ])
 
 
 class FillUntilDataLine(LineWithWords):
@@ -65,8 +70,21 @@ class FillUntilDataLine(LineWithWords):
             fill_until_address_expresion: str,
             fill_value_expression: str,
             current_memzone: MemoryZone,
+            word_size: int,
+            word_segment_size: int,
+            intra_word_endianness: Literal['little', 'big'],
+            multi_word_endianness: Literal['little', 'big'],
     ) -> None:
-        super().__init__(line_id, instruction, comment, current_memzone)
+        super().__init__(
+            line_id,
+            instruction,
+            comment,
+            current_memzone,
+            word_size,
+            word_segment_size,
+            intra_word_endianness,
+            multi_word_endianness,
+        )
         self._fill_until_addr_expr = parse_expression(line_id, fill_until_address_expresion)
         self._fill_value_expr = parse_expression(line_id, fill_value_expression)
         self._fill_until_addr = None
@@ -88,5 +106,9 @@ class FillUntilDataLine(LineWithWords):
             self._fill_until_addr = self._fill_until_addr_expr.get_value(self.label_scope, self.line_id)
         if self._fill_value is None:
             self._fill_value = self._fill_value_expr.get_value(self.label_scope, self.line_id)
-        if self.byte_size > 0 and len(self._bytes) == 0:
-            self._bytes.extend([self._fill_value & 0xFF]*self.byte_size)
+        if self.byte_size > 0 and len(self._words) == 0:
+            value_mask = (1 << self._word_size) - 1
+            self._words.extend([
+                Word(self._fill_value & value_mask, self._word_size, self._word_segment_size, self._intra_word_endianness)
+                for _ in range(self.byte_size)
+            ])

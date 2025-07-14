@@ -95,6 +95,10 @@ class DirectiveLine:
                 count_str,
                 value_str,
                 current_memzone,
+                isa_model.word_size,
+                isa_model.word_segment_size,
+                isa_model.intra_word_endianness,
+                isa_model.multi_word_endianness,
             )
 
         # .zero
@@ -110,6 +114,10 @@ class DirectiveLine:
                 count_str,
                 '0',
                 current_memzone,
+                isa_model.word_size,
+                isa_model.word_segment_size,
+                isa_model.intra_word_endianness,
+                isa_model.multi_word_endianness,
             )
 
         # .zerountil
@@ -123,6 +131,10 @@ class DirectiveLine:
                 address_str,
                 '0',
                 current_memzone,
+                isa_model.word_size,
+                isa_model.word_segment_size,
+                isa_model.intra_word_endianness,
+                isa_model.multi_word_endianness,
             )
 
         # .page
