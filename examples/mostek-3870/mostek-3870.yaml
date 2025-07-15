@@ -1,7 +1,7 @@
 description: MOSTEK 3870
 general:
   address_size: 12
-  endian: big
+  multi_word_endianness: big
   registers:
     # accumulator
     - a
@@ -34,7 +34,7 @@ general:
     name: mostek-3870-asm
     version: "0.1.0"
     extension: af8
-  min_version: 0.3.0
+  min_version: 0.5.0
 operand_sets:
   nval3:
     operand_values:
@@ -42,28 +42,28 @@ operand_sets:
         type: numeric
         argument:
           size: 3
-          byte_align: false
+          word_align: false
   nval4:
     operand_values:
       uint8:
         type: numeric
         argument:
           size: 4
-          byte_align: false
+          word_align: false
   nval8:
     operand_values:
       uint8:
         type: numeric
         argument:
           size: 8
-          byte_align: true
+          word_align: true
   nval16:
     operand_values:
       uint8:
         type: numeric
         argument:
           size: 16
-          byte_align: true
+          word_align: true
           endian: big
   sreg:
     operand_values:
@@ -81,7 +81,7 @@ operand_sets:
         offset_from_instruction_end: true
         argument:
           size: 8
-          byte_align: true
+          word_align: true
           max: 128
           min: -127
   absolute_addr:
@@ -90,7 +90,7 @@ operand_sets:
         type: numeric
         argument:
           size: 16
-          byte_align: true
+          word_align: true
           valid_address: true
           endian: big
 instructions:
@@ -311,7 +311,7 @@ instructions:
               use_curly_braces: false
               argument:
                 size: 8
-                byte_align: true
+                word_align: true
                 max: 128
                 min: -127
   BM:
@@ -395,7 +395,7 @@ instructions:
               use_curly_braces: false
               argument:
                 size: 8
-                byte_align: true
+                word_align: true
                 max: 128
                 min: -127
   BZ:
@@ -468,7 +468,7 @@ instructions:
               type: numeric
               argument:
                 size: 4
-                byte_align: false
+                word_align: false
   LM:
     # LOAD ACCUMULATOR FROM MEMORY
     bytecode:
@@ -1012,7 +1012,7 @@ macros:
                 type: numeric
                 argument:
                   size: 8
-                  byte_align: true
+                  word_align: true
       instructions:
         - "li (@ARG(0)+0)"
         - "lr is,a"
@@ -1072,7 +1072,7 @@ macros:
                 type: numeric
                 argument:
                   size: 8
-                  byte_align: true
+                  word_align: true
       instructions:
         - "li @OP(1)"
         - "lr is,a"
@@ -1089,12 +1089,12 @@ macros:
                 type: numeric
                 argument:
                   size: 8
-                  byte_align: true
+                  word_align: true
               immediate_value:
                 type: numeric
                 argument:
                   size: 8
-                  byte_align: true
+                  word_align: true
       instructions:
         - "li @OP(0)"
         - "lr is,a"

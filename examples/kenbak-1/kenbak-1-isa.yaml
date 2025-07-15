@@ -1,7 +1,7 @@
 description: KENBAK-1 ISA
 general:
   address_size: 8
-  endian: big
+  multi_word_endianness: big
   registers:
     - a
     - b
@@ -11,7 +11,7 @@ general:
     name: kenbak-1
     version: "1.0.2"
     extension: kb1
-  min_version: 0.3.0
+  min_version: 0.5.0
 predefined:
   data:
     - name: A_REG
@@ -83,7 +83,7 @@ operand_sets:
           size: 3
         argument:
           size: 8
-          byte_align: true
+          word_align: true
       indirect_addr:
         type: indirect_numeric
         bytecode:
@@ -91,7 +91,7 @@ operand_sets:
           size: 3
         argument:
           size: 8
-          byte_align: true
+          word_align: true
       deferred_addr:
         type: deferred_numeric
         bytecode:
@@ -99,7 +99,7 @@ operand_sets:
           size: 3
         argument:
           size: 8
-          byte_align: true
+          word_align: true
       indexed_x:
         type: indirect_register
         register: x
@@ -110,7 +110,7 @@ operand_sets:
           max: 255
           min: 0
           size: 8
-          byte_align: true
+          word_align: true
       defered_indexed_x:
         type: indirect_indexed_register
         register: x
@@ -122,28 +122,28 @@ operand_sets:
             type: indirect_numeric
             argument:
               size: 8
-              byte_align: true
+              word_align: true
   direct_memory_no_bc:
     operand_values:
       immediate:
         type: numeric
         argument:
           size: 8
-          byte_align: true
+          word_align: true
   indirect_memory_no_bc:
     operand_values:
       immediate:
         type: indirect_numeric
         argument:
           size: 8
-          byte_align: true
+          word_align: true
   deferred_memory_no_bc:
     operand_values:
       deferred_addr:
         type: deferred_numeric
         argument:
           size: 8
-          byte_align: true
+          word_align: true
   bit_indexes:
     operand_values:
       bit_index:
