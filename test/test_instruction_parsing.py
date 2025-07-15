@@ -59,8 +59,8 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertEqual(
             ins1.get_words(),
             [
-                Word(0x45, 8, 8, 'little'),
-                Word(0x02, 8, 8, 'little')
+                Word(0x45, 8, 8, 'big'),
+                Word(0x02, 8, 8, 'big')
             ],
             'instruction should match',
         )
@@ -90,7 +90,7 @@ class TestInstructionParsing(unittest.TestCase):
         ins1.generate_words()
         self.assertEqual(
             ins1.get_words(),
-            [Word(0x00, 8, 8, 'little')],
+            [Word(0x00, 8, 8, 'big')],
             'instruction should match',
         )
 
@@ -110,7 +110,7 @@ class TestInstructionParsing(unittest.TestCase):
         ins2.generate_words()
         self.assertEqual(
             ins2.get_words(),
-            [Word(0x44, 8, 8, 'little'), Word(0x02, 8, 8, 'little')],
+            [Word(0x44, 8, 8, 'big'), Word(0x02, 8, 8, 'big')],
             'instruction should match',
         )
 
@@ -130,7 +130,7 @@ class TestInstructionParsing(unittest.TestCase):
         ins3.generate_words()
         self.assertEqual(
             ins3.get_words(),
-            [Word(0x45, 8, 8, 'little'), Word(0x06, 8, 8, 'little')],
+            [Word(0x45, 8, 8, 'big'), Word(0x06, 8, 8, 'big')],
             'instruction should match',
         )
 
@@ -150,7 +150,7 @@ class TestInstructionParsing(unittest.TestCase):
         ins4.generate_words()
         self.assertEqual(
             ins4.get_words(),
-            [Word(0x81, 8, 8, 'little')],
+            [Word(0x81, 8, 8, 'big')],
             'instruction should match',
         )
 
@@ -170,7 +170,7 @@ class TestInstructionParsing(unittest.TestCase):
         ins5.generate_words()
         self.assertEqual(
             ins5.get_words(),
-            [Word(0x9F, 8, 8, 'little'), Word(0x88, 8, 8, 'little')],
+            [Word(0x9F, 8, 8, 'big'), Word(0x88, 8, 8, 'big')],
             'instruction should match',
         )
 
@@ -280,7 +280,7 @@ class TestInstructionParsing(unittest.TestCase):
         ins0.generate_words()
         self.assertEqual(
             ins0.get_words(),
-            [Word(0xC2, 8, 8, 'little')],
+            [Word(0xC2, 8, 8, 'big')],
             'instruction byte should match',
         )
 
@@ -295,7 +295,7 @@ class TestInstructionParsing(unittest.TestCase):
         ins1.generate_words()
         self.assertEqual(
             ins1.get_words(),
-            [Word(0xC3, 8, 8, 'little'), Word(0x07, 8, 8, 'little')],
+            [Word(0xC3, 8, 8, 'big'), Word(0x07, 8, 8, 'big')],
             'instruction byte should match',
         )
 
@@ -319,7 +319,7 @@ class TestInstructionParsing(unittest.TestCase):
         ins0.generate_words()
         self.assertEqual(
             ins0.get_words(),
-            [Word(0x81, 8, 8, 'little')],
+            [Word(0x81, 8, 8, 'big')],
             'instruction byte should match',
         )
 
@@ -334,7 +334,7 @@ class TestInstructionParsing(unittest.TestCase):
         ins1.generate_words()
         self.assertEqual(
             ins1.get_words(),
-            [Word(0xB1, 8, 8, 'little'), Word(0x00, 8, 8, 'little'), Word(0x20, 8, 8, 'little')],
+            [Word(0xB1, 8, 8, 'big'), Word(0x00, 8, 8, 'big'), Word(0x20, 8, 8, 'big')],
             'instruction byte should match',
         )
 
@@ -350,10 +350,10 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertEqual(
             ins2.get_words(),
             [
-                Word(0xB3, 8, 8, 'little'),
-                Word(0x00, 8, 8, 'little'),
-                Word(0x20, 8, 8, 'little'),
-                Word(0x02, 8, 8, 'little'),
+                Word(0xB3, 8, 8, 'big'),
+                Word(0x00, 8, 8, 'big'),
+                Word(0x20, 8, 8, 'big'),
+                Word(0x02, 8, 8, 'big'),
             ],
             'instruction byte should match',
         )
@@ -370,10 +370,10 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertEqual(
             ins2.get_words(),
             [
-                Word(0xFE, 8, 8, 'little'),
-                Word(0x20, 8, 8, 'little'),
-                Word(0x80, 8, 8, 'little'),
-                Word(0x44, 8, 8, 'little'),
+                Word(0xFE, 8, 8, 'big'),
+                Word(0x20, 8, 8, 'big'),
+                Word(0x80, 8, 8, 'big'),
+                Word(0x44, 8, 8, 'big'),
             ],
             'instruction byte should match, operands reversed',
         )
@@ -846,7 +846,7 @@ class TestInstructionParsing(unittest.TestCase):
         t2.generate_words()
         self.assertEqual(
             list(t2.get_words()),
-            [Word(0x88, 8, 8, 'little'), Word(0x32, 8, 8, 'little'), Word(0x10, 8, 8, 'little')],
+            [Word(0x88, 8, 8, 'big'), Word(0x32, 8, 8, 'big'), Word(0x10, 8, 8, 'big')],
             'instruction byte should match',
         )
 
@@ -934,7 +934,7 @@ class TestInstructionParsing(unittest.TestCase):
         t2.generate_words()
         self.assertEqual(
             list(t2.get_words()),
-            [Word(0xE6, 8, 8, 'little'), Word(0x20, 8, 8, 'little')],
+            [Word(0xE6, 8, 8, 'big'), Word(0x20, 8, 8, 'big')],
             'instruction byte should match',
         )
 
@@ -949,7 +949,7 @@ class TestInstructionParsing(unittest.TestCase):
         t3.generate_words()
         self.assertEqual(
             list(t3.get_words()),
-            [Word(0xEE, 8, 8, 'little'), Word(0x20, 8, 8, 'little')],
+            [Word(0xEE, 8, 8, 'big'), Word(0x20, 8, 8, 'big')],
             'instruction byte should match',
         )
 
@@ -964,7 +964,7 @@ class TestInstructionParsing(unittest.TestCase):
         t4.generate_words()
         self.assertEqual(
             list(t4.get_words()),
-            [Word(0xEF, 8, 8, 'little'), Word(0x1F, 8, 8, 'little')],
+            [Word(0xEF, 8, 8, 'big'), Word(0x1F, 8, 8, 'big')],
             'instruction byte should match',
         )
 
@@ -1008,7 +1008,10 @@ class TestInstructionParsing(unittest.TestCase):
         t1.generate_words()
         self.assertEqual(
             list(t1.get_words()),
-            [Word(0xEE, 8, 8, 'little'), Word(0xF8, 8, 8, 'little')],
+            [
+                Word(0xEE, 8, 8, 'big'),
+                Word(0xF8, 8, 8, 'big'),
+            ],
             'instruction byte should match',
         )
 

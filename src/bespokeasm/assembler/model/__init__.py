@@ -182,7 +182,7 @@ class AssemblerModel:
         if 'intra_word_endianness' in self._config['general']:
             return self._config['general']['intra_word_endianness']
         else:
-            return self.multi_word_endianness
+            return 'big'
 
     @property
     def multi_word_endianness(self) -> Literal['little', 'big']:
