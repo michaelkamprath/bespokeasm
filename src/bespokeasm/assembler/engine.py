@@ -76,6 +76,10 @@ class Assembler:
                 value,
                 label,
                 memzone_manager.global_zone,
+                self._model.word_size,
+                self._model.word_segment_size,
+                self._model.intra_word_endianness,
+                self._model.multi_word_endianness,
             )
             data_obj.set_start_address(address)
             predefined_line_obs.append(data_obj)

@@ -330,6 +330,10 @@ class TestConfigObject(unittest.TestCase):
         self.assertEqual(model.intra_word_endianness, 'big', 'intra-word endianness should match')
         self.assertEqual(model.multi_word_endianness, 'big', 'multi-word endianness should match')
 
+    def test_predefined_data_creation(self):
+        # TODO: add test for predefined data creation
+        pass
+
 
 if __name__ == '__main__':
     unittest.main()
