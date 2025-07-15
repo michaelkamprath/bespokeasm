@@ -1,6 +1,6 @@
 general :
   address_size: 16
-  endian: little
+  multi_word_endianness: little
   min_version: 1000.0.0
 registers:
 operand_sets:
@@ -9,7 +9,7 @@ operand_sets:
       int16:
         type: numeric
         argument:
-          byte_align: true
+          word_align: true
           size: 16
           endian: big
   address:
@@ -17,14 +17,14 @@ operand_sets:
       addr:
         type: numeric
         argument:
-          byte_align: true
+          word_align: true
           size: 16
   4bit:
     operand_values:
       little_int:
         type: numeric
         argument:
-          byte_align: false
+          word_align: false
           size: 4
 instructions:
   lda:

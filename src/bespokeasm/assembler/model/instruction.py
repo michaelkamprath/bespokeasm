@@ -1,4 +1,5 @@
 import sys
+from typing import Literal
 
 from bespokeasm.assembler.model.operand_parser import OperandParser
 from bespokeasm.assembler.model.operand_set import OperandSetCollection
@@ -24,13 +25,14 @@ class InstructionVariant(InstructionBase):
                 mnemonic: str,
                 instruction_variant_config: dict,
                 operand_set_collection: OperandSetCollection,
-                default_endian: str,
+                default_multi_word_endian: Literal['big', 'little'],
+                default_intra_word_endian: Literal['big', 'little'],
                 registers: set[str],
                 variant_num: int,
                 word_size: int,
                 word_segment_size: int,
             ) -> None:
-        super().__init__(mnemonic, default_endian, registers)
+        super().__init__(mnemonic, default_multi_word_endian, default_intra_word_endian, registers)
         self._variant_config = instruction_variant_config
         # validate config
         if 'bytecode' not in self._variant_config:
@@ -47,7 +49,8 @@ class InstructionVariant(InstructionBase):
                     mnemonic,
                     self._variant_config.get('operands', None),
                     operand_set_collection,
-                    default_endian,
+                    default_multi_word_endian,
+                    default_intra_word_endian,
                     registers,
                     word_size,
                     word_segment_size,
@@ -103,12 +106,13 @@ class Instruction(InstructionBase):
                 mnemonic: str,
                 instruction_config: dict,
                 operand_set_collection: OperandSetCollection,
-                default_endian: str,
+                default_multi_word_endian: Literal['big', 'little'],
+                default_intra_word_endian: Literal['big', 'little'],
                 registers: set[str],
                 word_size: int,
                 word_segment_size: int,
             ) -> None:
-        super().__init__(mnemonic, default_endian, registers)
+        super().__init__(mnemonic, default_multi_word_endian, default_intra_word_endian, registers)
         self._config = instruction_config
 
         variant_num = 0
@@ -119,7 +123,8 @@ class Instruction(InstructionBase):
                     mnemonic,
                     instruction_config,
                     operand_set_collection,
-                    default_endian,
+                    default_multi_word_endian,
+                    default_intra_word_endian,
                     registers,
                     variant_num,
                     word_size,
@@ -135,7 +140,8 @@ class Instruction(InstructionBase):
                         mnemonic,
                         variant_config,
                         operand_set_collection,
-                        default_endian,
+                        default_multi_word_endian,
+                        default_intra_word_endian,
                         registers,
                         variant_num,
                         word_size,

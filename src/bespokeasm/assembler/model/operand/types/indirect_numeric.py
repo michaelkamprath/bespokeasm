@@ -13,11 +13,19 @@ class IndirectNumericOperand(NumericExpressionOperand):
         self,
         operand_id: str,
         arg_config_dict: dict,
-        default_endian: str,
+        default_multi_word_endian: str,
+        default_intra_word_endian: str,
         word_size: int,
         word_segment_size: int,
     ):
-        super().__init__(operand_id, arg_config_dict, default_endian, word_size, word_segment_size)
+        super().__init__(
+            operand_id,
+            arg_config_dict,
+            default_multi_word_endian,
+            default_intra_word_endian,
+            word_size,
+            word_segment_size,
+        )
 
     def __str__(self):
         return f'IndirectNumericOperand<{self.id},arg_size={self.argument_size}>'

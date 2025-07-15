@@ -1,7 +1,7 @@
 description: Eater SAP-1 ISA
 general:
   address_size: 4
-  endian: big
+  multi_word_endianness: big
   registers:
     - a
     - b
@@ -15,14 +15,14 @@ operand_sets:
         type: numeric
         argument:
           size: 4
-          byte_align: false
+          word_align: false
   address:
     operand_values:
       addr:
         type: numeric
         argument:
           size: 4
-          byte_align: false
+          word_align: false
 instructions:
   nop:
     bytecode:

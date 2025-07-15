@@ -58,12 +58,14 @@ class InstructionBytecodeGenerator:
             operand_list = []
 
         # generate the machine code parts
-        instruction_endian = variant._variant_config['bytecode'].get('endian', isa_model.endian)
+        multi_word_endian = variant._variant_config['bytecode'].get('multi_word_endian', isa_model.multi_word_endianness)
+        intra_word_endian = variant._variant_config['bytecode'].get('intra_word_endian', isa_model.intra_word_endianness)
         base_bytecode = NumericByteCodePart(
             variant.base_bytecode_value,
             variant.base_bytecode_size,
             False,
-            instruction_endian,
+            multi_word_endian,
+            intra_word_endian,
             line_id,
             isa_model.word_size,
             isa_model.word_segment_size,
@@ -74,7 +76,8 @@ class InstructionBytecodeGenerator:
                 variant.suffix_bytecode_value,
                 variant.suffix_bytecode_size,
                 False,
-                instruction_endian,
+                multi_word_endian,
+                intra_word_endian,
                 line_id,
                 isa_model.word_size,
                 isa_model.word_segment_size,
@@ -99,5 +102,6 @@ class InstructionBytecodeGenerator:
             machine_code,
             isa_model.word_size,
             isa_model.word_segment_size,
-            instruction_endian,
+            multi_word_endian,
+            intra_word_endian,
         )

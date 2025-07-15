@@ -1,4 +1,5 @@
 import sys
+from typing import Literal
 
 from bespokeasm.assembler.model.instruction import Instruction
 from bespokeasm.assembler.model.instruction_macro import InstructionMacro
@@ -13,7 +14,8 @@ class InstructionSet(dict[str, InstructionBase]):
                 instructions_config: dict,
                 macros_config: dict,
                 operand_set_collection: OperandSetCollection,
-                default_endian: str,
+                default_multi_word_endian: Literal['big', 'little'],
+                default_intra_word_endian: Literal['big', 'little'],
                 registers: set[str],
                 word_size: int,
                 word_segment_size: int,
@@ -33,7 +35,8 @@ class InstructionSet(dict[str, InstructionBase]):
                 mnemonic,
                 instr_config,
                 operand_set_collection,
-                default_endian,
+                default_multi_word_endian,
+                default_intra_word_endian,
                 registers,
                 word_size,
                 word_segment_size,
@@ -55,7 +58,8 @@ class InstructionSet(dict[str, InstructionBase]):
                         mnemonic,
                         macro_config_list,
                         operand_set_collection,
-                        default_endian,
+                        default_multi_word_endian,
+                        default_intra_word_endian,
                         registers,
                         word_size,
                         word_segment_size,

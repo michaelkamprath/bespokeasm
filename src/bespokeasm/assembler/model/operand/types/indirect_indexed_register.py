@@ -9,12 +9,21 @@ class IndirectIndexedRegisterOperand(IndexedRegisterOperand):
         self,
         operand_id: str,
         arg_config_dict: dict,
-        default_endian: str,
+        default_multi_word_endian: str,
+        default_intra_word_endian: str,
         regsiters: set[str],
         word_size: int,
         word_segment_size: int,
     ) -> None:
-        super().__init__(operand_id, arg_config_dict, default_endian, regsiters, word_size, word_segment_size)
+        super().__init__(
+            operand_id,
+            arg_config_dict,
+            default_multi_word_endian,
+            default_intra_word_endian,
+            regsiters,
+            word_size,
+            word_segment_size,
+        )
 
     def __str__(self):
         return f'IndirectIndexedRegisterOperand<{self.id}, register={self.register}, match_pattern={self.match_pattern}>'

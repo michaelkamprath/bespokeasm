@@ -1,7 +1,7 @@
 description: Test 16 Bit Bytecode Words
 general:
   address_size: 16
-  bytecode_word_size: 16
+  word_size: 16
   endian: big
   registers:
     - a
@@ -12,61 +12,65 @@ general:
   identifier:
     name: test_16bit_data_words
     version: "0.1.0"
-  operand_sets:
-    16_bit_source:
-      operand_values:
-        register_a:
-          type: register
-          register: a
-          bytecode:
-            value: 0
-            size: 4
-        indirect_sp:
-          type: indirect_register
-          register: sp
-          bytecode:
-            value: 1
-            size: 4
-          offset:
-            max: 32767
-            min: -32768
-            size: 16
-            byte_align: true
-        indirect_addr:
-          type: indirect_numeric
-          bytecode:
-            value: 2
-            size: 4
-          argument:
-            size: 16
-            byte_align: true
-        immediate_value:
-          type: numeric
-          bytecode:
-            value: 3
-            size: 4
-          argument:
-            size: 16
-            byte_align: true
-    16_bit_destination:
-      operand_values:
-        register_a:
-          type: register
-          register: a
-          bytecode:
-            value: 0
-            size: 4
-        indirect_sp:
-          type: indirect_register
-          register: sp
-          bytecode:
-            value: 1
-            size: 4
-        indirect_addr:
-          type: indirect_numeric
-          bytecode:
-            value: 2
-            size: 4
+  min_version: "0.5.0"
+operand_sets:
+  16_bit_source:
+    operand_values:
+      register_a:
+        type: register
+        register: a
+        bytecode:
+          value: 0
+          size: 4
+      indirect_sp:
+        type: indirect_register
+        register: sp
+        bytecode:
+          value: 1
+          size: 4
+        offset:
+          max: 32767
+          min: -32768
+          size: 16
+          word_align: true
+      indirect_addr:
+        type: indirect_numeric
+        bytecode:
+          value: 2
+          size: 4
+        argument:
+          size: 16
+          word_align: true
+      immediate_value:
+        type: numeric
+        bytecode:
+          value: 3
+          size: 4
+        argument:
+          size: 16
+          word_align: true
+  16_bit_destination:
+    operand_values:
+      register_a:
+        type: register
+        register: a
+        bytecode:
+          value: 0
+          size: 4
+      indirect_sp:
+        type: indirect_register
+        register: sp
+        bytecode:
+          value: 1
+          size: 4
+      indirect_addr:
+        type: indirect_numeric
+        bytecode:
+          value: 2
+          size: 4
+        argument:
+          size: 16
+          word_align: true
 instructions:
   nop:
     variants:

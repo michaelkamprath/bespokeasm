@@ -1,6 +1,7 @@
 from __future__ import annotations
 import enum
 import sys
+import warnings
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.bytecode.parts import ByteCodePart
@@ -30,10 +31,19 @@ class OperandBytecodePositionType(enum.Enum):
 
 
 class Operand:
-    def __init__(self, operand_id, arg_config_dict, default_endian, word_size, word_segment_size):
+    def __init__(
+        self,
+        operand_id,
+        arg_config_dict,
+        default_multi_word_endian,
+        default_intra_word_endian,
+        word_size,
+        word_segment_size,
+    ):
         self._id = operand_id
         self._config = arg_config_dict
-        self._default_endian = default_endian
+        self._default_multi_word_endian = default_multi_word_endian
+        self._default_intra_word_endian = default_intra_word_endian
         self._word_size = word_size
         self._word_segment_size = word_segment_size
 
@@ -121,12 +131,20 @@ class OperandWithArgument(Operand):
         self,
         operand_id,
         arg_config_dict,
-        default_endian,
+        default_multi_word_endian,
+        default_intra_word_endian,
         word_size,
         word_segment_size,
         require_arg: bool = True,
     ) -> None:
-        super().__init__(operand_id, arg_config_dict, default_endian, word_size, word_segment_size)
+        super().__init__(
+            operand_id,
+            arg_config_dict,
+            default_multi_word_endian,
+            default_intra_word_endian,
+            word_size,
+            word_segment_size,
+        )
         if require_arg and 'argument' not in self._config:
             sys.exit(f'ERROR: configuration for numeric operand {self} does not have an argument configuration')
 
@@ -142,13 +160,36 @@ class OperandWithArgument(Operand):
         return self._config['argument']['size']
 
     @property
-    def argument_byte_align(self) -> bool:
-        return self._config['argument']['byte_align']
+    def argument_word_align(self) -> bool:
+        if 'word_align' not in self._config['argument']:
+            warnings.warn(
+                f"The 'byte_align' option for argument configuration in operand configuration {self} is "
+                f"deprecated and will be removed in a future version. Replace with 'word_align'.",
+                DeprecationWarning,
+                stacklevel=2
+            )
+            return self._config['argument']['byte_align']
+        return self._config['argument']['word_align']
 
     @property
     def argument_endian(self) -> str:
+        warnings.warn(
+            f"The 'endian' option for argument configuration in operand configuration {self} is "
+            f'deprecated and will be removed in a future version. '
+            f"Replace with 'multi_word_endian' and 'intra_word_endian'.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        return self.argument_multi_word_endian
+
+    @property
+    def argument_multi_word_endian(self) -> str:
+        return self._config['argument'].get('multi_word_endian', self._default_multi_word_endian)
+
+    @property
+    def argument_intra_word_endian(self) -> str:
         """Returns the endianess of the argument for this operand. Defaults to the configured default endian."""
-        return self._config['argument'].get('endian', self._default_endian)
+        return self._config['argument'].get('intra_word_endian', self._default_intra_word_endian)
 
 
 class ParsedOperand:

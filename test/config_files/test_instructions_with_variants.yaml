@@ -2,7 +2,7 @@
 description: Test Instructions with Variants
 general:
   address_size: 16
-  endian: little
+  multi_word_endianness: little
   registers:
     - a
     - h
@@ -31,7 +31,7 @@ operand_sets:
           max: 127
           min: -128
           size: 8
-          byte_align: true
+          word_align: true
       indirect_addr:
         type: indirect_numeric
         bytecode:
@@ -39,7 +39,7 @@ operand_sets:
           size: 3
         argument:
           size: 16
-          byte_align: true
+          word_align: true
       direct_value:
         type: numeric
         bytecode:
@@ -47,7 +47,7 @@ operand_sets:
           size: 3
         argument:
           size: 8
-          byte_align: true
+          word_align: true
   8_bit_destination:
     operand_values:
       register_a:
@@ -66,7 +66,7 @@ operand_sets:
           max: 127
           min: -128
           size: 8
-          byte_align: true
+          word_align: true
       indirect_addr:
         type: indirect_numeric
         bytecode:
@@ -74,7 +74,7 @@ operand_sets:
           size: 3
         argument:
           size: 16
-          byte_align: true
+          word_align: true
   hl_subregisters:
     operand_values:
       subregister_h:
@@ -123,7 +123,7 @@ instructions:
                 max: 127
                 min: -128
                 size: 8
-                byte_align: true
+                word_align: true
     variants:
       - bytecode:
           value: 8

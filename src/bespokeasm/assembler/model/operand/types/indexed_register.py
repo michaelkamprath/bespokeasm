@@ -20,16 +20,33 @@ class IndexedRegisterOperand(RegisterOperand):
         self,
         operand_id: str,
         arg_config_dict: dict,
-        default_endian: str,
+        default_multi_word_endian: str,
+        default_intra_word_endian: str,
         regsiters: set[str],
         word_size: int,
         word_segment_size: int,
     ) -> None:
-        super().__init__(operand_id, arg_config_dict, default_endian, regsiters, word_size, word_segment_size)
+        super().__init__(
+            operand_id,
+            arg_config_dict,
+            default_multi_word_endian,
+            default_intra_word_endian,
+            regsiters,
+            word_size,
+            word_segment_size,
+        )
         self._index_operand_list = []
         op_match_patterns = []
         for op_id, op_config in self._config['index_operands'].items():
-            op = OF.OperandFactory.factory(op_id, op_config, default_endian, regsiters, word_size, word_segment_size)
+            op = OF.OperandFactory.factory(
+                op_id,
+                op_config,
+                default_multi_word_endian,
+                default_intra_word_endian,
+                regsiters,
+                word_size,
+                word_segment_size,
+            )
             if op.null_operand:
                 sys.exit(f'ERROR: indirect indexed register operand "{operand_id}" configured with a empty index "{op_id}".')
             self._index_operand_list.append(op)
@@ -87,7 +104,8 @@ class IndexedRegisterOperand(RegisterOperand):
                 self.bytecode_value,
                 self.bytecode_size,
                 False,
-                self._default_endian,
+                self._default_multi_word_endian,
+                self._default_intra_word_endian,
                 line_id,
                 self._word_size,
                 self._word_segment_size,
@@ -113,7 +131,8 @@ class IndexedRegisterOperand(RegisterOperand):
                         composit_bytecode = CompositeByteCodePart(
                             [bytecode_part, parsed_index.bytecode],
                             bytecode_part.word_align,
-                            bytecode_part.endian,
+                            bytecode_part.multi_word_endian,
+                            bytecode_part.intra_word_endian,
                             line_id,
                             self._word_size,
                             self._word_segment_size,

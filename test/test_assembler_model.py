@@ -31,14 +31,14 @@ class TestConfigObject(unittest.TestCase):
 
     def test_argument_set_construction(self):
         conf1 = yaml.safe_load(self._eater_sap1_config_str)
-        arg_collection1 = AS.OperandSetCollection(conf1['operand_sets'], 'big', set(), 8, 8,)
+        arg_collection1 = AS.OperandSetCollection(conf1['operand_sets'], 'big', 'big', set(), 8, 8,)
         self.assertEqual(len(arg_collection1), 2, 'there are 2 argument sets')
         self.assertTrue('integer' in arg_collection1)
         self.assertTrue('address' in arg_collection1)
 
         conf2 = yaml.safe_load(self._register_argument_config_str)
         arg_collection2 = AS.OperandSetCollection(
-            conf2['operand_sets'], 'little', {'a', 'i', 'j', 'sp', 'ij', 'mar'}, 8, 8,
+            conf2['operand_sets'], 'little', 'little', {'a', 'i', 'j', 'sp', 'ij', 'mar'}, 8, 8,
         )
         self.assertEqual(len(arg_collection2), 4, 'there are 4 argument sets')
         self.assertTrue('8_bit_source' in arg_collection2)
@@ -321,6 +321,14 @@ class TestConfigObject(unittest.TestCase):
             ],
             'instruction + macro mnomonics should match'
         )
+
+    def test_word_size_and_segment_size(self):
+        fp = pkg_resources.files(config_files).joinpath('test_16bit_data_words.yaml')
+        model = AssemblerModel(str(fp), 0)
+        self.assertEqual(model.word_size, 16, 'word size should match')
+        self.assertEqual(model.word_segment_size, 16, 'word segment size should match')
+        self.assertEqual(model.intra_word_endianness, 'big', 'intra-word endianness should match')
+        self.assertEqual(model.multi_word_endianness, 'big', 'multi-word endianness should match')
 
 
 if __name__ == '__main__':

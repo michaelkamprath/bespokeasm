@@ -19,14 +19,16 @@ class ByteCodePart:
         self,
         value_size: int,
         word_align: bool,
-        endian: Literal['little', 'big'],
+        multi_word_endian: Literal['little', 'big'],
+        intra_word_endian: Literal['little', 'big'],
         line_id: LineIdentifier,
         word_size: int,
         segment_size: int,
     ) -> None:
         self._value_size = value_size
         self._word_align = word_align
-        self._endian = endian
+        self._multi_word_endian = multi_word_endian
+        self._intra_word_endian = intra_word_endian
         self._line_id = line_id
         self._word_size = word_size
         self._segment_size = segment_size
@@ -51,8 +53,12 @@ class ByteCodePart:
         return self._word_align
 
     @property
-    def endian(self) -> str:
-        return self._endian
+    def multi_word_endian(self) -> Literal['little', 'big']:
+        return self._multi_word_endian
+
+    @property
+    def intra_word_endian(self) -> Literal['little', 'big']:
+        return self._intra_word_endian
 
     @property
     def line_id(self) -> LineIdentifier:
@@ -106,7 +112,14 @@ class ByteCodePart:
     def get_words(self, label_scope: LabelScope, instruction_address: int, instruction_size: int) -> list[Word]:
         value_representation = self.get_value_representation(label_scope, instruction_address, instruction_size)
         if isinstance(value_representation, WordSlice):
-            return [Word.from_word_slices([value_representation], self._word_size, self._segment_size, self._endian)]
+            return [
+                Word.from_word_slices(
+                    [value_representation],
+                    self._word_size,
+                    self._segment_size,
+                    self._intra_word_endian,
+                )
+            ]
         elif isinstance(value_representation, Value):
             return value_representation.get_words_ordered()
         else:
@@ -131,7 +144,7 @@ class ByteCodePart:
         """
         Compact a list of ByteCodePart objects into a list of Word objects.
         The rules of compaction are:
-        - A ByteCodePArt is represented by either a WordSlice or a Value and is processed
+        - A ByteCodePart is represented by either a WordSlice or a Value and is processed
           in the order they are encountered
         - Consecutive WordSlices are packed into a single value until a ByteCodePart is encountered
           that is either word-aligned or a Value
@@ -179,7 +192,7 @@ class ByteCodePart:
                 else:
                     value_representation = part.get_value_representation(label_scope, instruction_address, instruction_size)
                     if isinstance(value_representation, WordSlice):
-                        current_word_slices.append((value_representation, part.endian))
+                        current_word_slices.append((value_representation, part.intra_word_endian))
                     else:
                         # this should never happen
                         sys.exit(
@@ -197,12 +210,12 @@ class ByteCodePart:
                             [value_representation],
                             word_size,
                             segment_size,
-                            part.endian,
-                            part.endian,
+                            part.multi_word_endian,
+                            part.intra_word_endian,
                         )
                         words.extend(value.get_words_ordered())
                     else:
-                        current_word_slices.append((value_representation, part.endian))
+                        current_word_slices.append((value_representation, part.intra_word_endian))
                 elif isinstance(value_representation, Value):
                     # Flush accumulated WordSlices before Values
                     if current_word_slices:
@@ -222,12 +235,13 @@ class NumericByteCodePart(ByteCodePart):
                 value: int,
                 value_size: int,
                 word_align: bool,
-                endian: Literal['little', 'big'],
+                multi_word_endian: Literal['little', 'big'],
+                intra_word_endian: Literal['little', 'big'],
                 line_id: LineIdentifier,
                 word_size: int,
                 segment_size: int,
             ) -> None:
-        super().__init__(value_size, word_align, endian, line_id, word_size, segment_size)
+        super().__init__(value_size, word_align, multi_word_endian, intra_word_endian, line_id, word_size, segment_size)
         self._value = value
 
     @property
@@ -247,12 +261,21 @@ class ExpressionByteCodePart(ByteCodePart):
         value_expression: str,
         value_size: int,
         word_align: bool,
-        endian: Literal['little', 'big'],
+        multi_word_endian: Literal['little', 'big'],
+        intra_word_endian: Literal['little', 'big'],
         line_id: LineIdentifier,
         word_size: int,
         segment_size: int,
     ) -> None:
-        super().__init__(value_size, word_align, endian, line_id, word_size, segment_size)
+        super().__init__(
+            value_size,
+            word_align,
+            multi_word_endian,
+            intra_word_endian,
+            line_id,
+            word_size,
+            segment_size,
+        )
         self._expression = value_expression
         self._parsed_expression = parse_expression(self.line_id, self._expression)
 
@@ -281,12 +304,22 @@ class ExpressionByteCodePartWithValidation(ExpressionByteCodePart):
                 value_expression: str,
                 value_size: int,
                 word_align: bool,
-                endian: Literal['little', 'big'],
+                multi_word_endian: Literal['little', 'big'],
+                intra_word_endian: Literal['little', 'big'],
                 line_id: LineIdentifier,
                 word_size: int,
                 segment_size: int,
             ) -> None:
-        super().__init__(value_expression, value_size, word_align, endian, line_id, word_size, segment_size)
+        super().__init__(
+            value_expression,
+            value_size,
+            word_align,
+            multi_word_endian,
+            intra_word_endian,
+            line_id,
+            word_size,
+            segment_size,
+        )
         self._max = max_value
         self._min = min_value
 
@@ -309,12 +342,22 @@ class ExpressionByteCodePartInMemoryZone(ExpressionByteCodePart):
         value_expression: str,
         value_size: int,
         word_align: bool,
-        endian: Literal['little', 'big'],
+        multi_word_endian: Literal['little', 'big'],
+        intra_word_endian: Literal['little', 'big'],
         line_id: LineIdentifier,
         word_size: int,
         segment_size: int,
     ) -> None:
-        super().__init__(value_expression, value_size, word_align, endian, line_id, word_size, segment_size)
+        super().__init__(
+            value_expression,
+            value_size,
+            word_align,
+            multi_word_endian,
+            intra_word_endian,
+            line_id,
+            word_size,
+            segment_size,
+        )
         self._memzone = memzone
 
     def __str__(self) -> str:
@@ -343,12 +386,22 @@ class ExpressionEnumerationByteCodePart(ExpressionByteCodePart):
                 value_expression: str,
                 value_size: int,
                 word_align: bool,
-                endian: Literal['little', 'big'],
+                multi_word_endian: Literal['little', 'big'],
+                intra_word_endian: Literal['little', 'big'],
                 line_id: LineIdentifier,
                 word_size: int,
                 segment_size: int,
             ) -> None:
-        super().__init__(value_expression, value_size, word_align, endian, line_id, word_size, segment_size)
+        super().__init__(
+            value_expression,
+            value_size,
+            word_align,
+            multi_word_endian,
+            intra_word_endian,
+            line_id,
+            word_size,
+            segment_size,
+        )
         self._value_dict = value_dict
 
     def __str__(self) -> str:
@@ -371,13 +424,14 @@ class CompositeByteCodePart(ByteCodePart):
                 self,
                 bytecode_parts: list[ByteCodePart],
                 word_align: bool,
-                endian: Literal['little', 'big'],
+                multi_word_endian: Literal['little', 'big'],
+                intra_word_endian: Literal['little', 'big'],
                 line_id: LineIdentifier,
                 word_size: int,
                 segment_size: int,
             ) -> None:
         total_size = reduce(lambda a, b: a+b.value_size, bytecode_parts, 0)
-        super().__init__(total_size, word_align, endian, line_id, word_size, segment_size)
+        super().__init__(total_size, word_align, multi_word_endian, intra_word_endian, line_id, word_size, segment_size)
         self._parts_list = bytecode_parts
 
         # Validate that all Value-based ByteCodePart objects have consistent word and segment sizes
@@ -411,11 +465,10 @@ class CompositeByteCodePart(ByteCodePart):
                 ),
                 p.value_size,
                 False,
-                self.endian,
             )
-        value = int.from_bytes(bits.get_bytes(), self.endian)
-        if self.value_size % 8 != 0:
-            shift_count = 8 - (self.value_size % 8)
+        value = int.from_bytes(bits.get_bytes(), 'big')
+        if self.value_size % self.word_size != 0:
+            shift_count = self.word_size - (self.value_size % self.word_size)
             value = value >> shift_count
         return value
 

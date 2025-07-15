@@ -17,7 +17,8 @@ class RelativeAddressByteCodePart(ExpressionByteCodePartInMemoryZone):
                 value_expression: str,
                 value_size: int,
                 byte_align: bool,
-                endian: str,
+                multi_word_endian: str,
+                intra_word_endian: str,
                 line_id: LineIdentifier,
                 min_relative_value: int,
                 max_relative_value: int,
@@ -26,7 +27,17 @@ class RelativeAddressByteCodePart(ExpressionByteCodePartInMemoryZone):
                 word_size: int,
                 word_segment_size: int,
             ) -> None:
-        super().__init__(memzone, value_expression, value_size, byte_align, endian, line_id, word_size, word_segment_size)
+        super().__init__(
+            memzone,
+            value_expression,
+            value_size,
+            byte_align,
+            multi_word_endian,
+            intra_word_endian,
+            line_id,
+            word_size,
+            word_segment_size,
+        )
         self._min_relative_value = min_relative_value
         self._max_relative_value = max_relative_value
         self._offset_from_instruction_end = offset_from_instruction_end
@@ -113,7 +124,8 @@ class RelativeAddressOperand(OperandWithArgument):
             self.bytecode_value,
             self.bytecode_size,
             False,
-            'big',
+            self._default_multi_word_endian,
+            self._default_intra_word_endian,
             line_id,
             self._word_size,
             self._word_segment_size,
@@ -121,8 +133,9 @@ class RelativeAddressOperand(OperandWithArgument):
         arg_part = RelativeAddressByteCodePart(
             match.group(1).strip(),
             self.argument_size,
-            self.argument_byte_align,
-            self.argument_endian,
+            self.argument_word_align,
+            self.argument_multi_word_endian,
+            self.argument_intra_word_endian,
             line_id,
             self.min_offset,
             self.max_offset,

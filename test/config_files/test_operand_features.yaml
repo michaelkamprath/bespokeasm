@@ -6,7 +6,7 @@
 description: Test Instructions Bytecode Ordering
 general:
   address_size: 8
-  endian: big
+  multi_word_endianness: big
   registers:
     - a
     - b
@@ -44,7 +44,7 @@ operand_sets:
           size: 3
         argument:
           size: 8
-          byte_align: true
+          word_align: true
       indirect_addr:
         type: indirect_numeric
         bytecode:
@@ -52,7 +52,7 @@ operand_sets:
           size: 3
         argument:
           size: 8
-          byte_align: true
+          word_align: true
       deferred_addr:
         type: deferred_numeric
         bytecode:
@@ -60,7 +60,7 @@ operand_sets:
           size: 3
         argument:
           size: 8
-          byte_align: true
+          word_align: true
   bit_indexes:
     operand_values:
       bit_index:
@@ -86,7 +86,7 @@ operand_sets:
         type: numeric_enumeration
         argument:
           size: 8
-          byte_align: true
+          word_align: true
           value_dict:
             0: 0
             1: 2
@@ -173,7 +173,7 @@ instructions:
                   cee: 0xCC
                   dee: 0xDD
                 size: 8
-                byte_align: true
+                word_align: true
   tstb:
     bytecode:
       value: 3
@@ -239,7 +239,7 @@ instructions:
                 size: 3
               argument:
                 size: 8
-                byte_align: true
+                word_align: true
 macros:
   add_twice:
     - operands:
@@ -251,7 +251,7 @@ macros:
                 type: numeric
                 argument:
                   size: 8
-                  byte_align: true
+                  word_align: true
       instructions:
         - "add @ARG(0)"
         - "add @ARG(0)"

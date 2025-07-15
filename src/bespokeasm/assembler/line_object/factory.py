@@ -91,7 +91,6 @@ class LineOjectFactory:
                     line_id,
                     instruction_str,
                     comment_str,
-                    model.endian,
                     current_memzone,
                     memzone_manager,
                     model,

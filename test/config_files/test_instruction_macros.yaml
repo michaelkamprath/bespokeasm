@@ -1,7 +1,7 @@
 description: Test Macro Creation
 general :
   address_size: 16
-  endian: little
+  multi_word_endianness: little
   identifier:
     name: bespokeasm-test
     version: "0.2.0"
@@ -12,7 +12,7 @@ general :
     - sp
     - ij
     - mar
-  min_version: "0.3.0"
+  min_version: "0.5.0"
 predefined:
   constants:
     - name: predefined_value1
@@ -48,7 +48,7 @@ operand_sets:
           max: 127
           min: -128
           size: 8
-          byte_align: true
+          word_align: true
       sp:
         type: indirect_register
         register: sp
@@ -59,7 +59,7 @@ operand_sets:
           max: 127
           min: -128
           size: 8
-          byte_align: true
+          word_align: true
       indirect_addr:
         type: indirect_numeric
         bytecode:
@@ -67,7 +67,7 @@ operand_sets:
           size: 3
         argument:
           size: 16
-          byte_align: true
+          word_align: true
       direct_value:
         type: numeric
         bytecode:
@@ -75,7 +75,7 @@ operand_sets:
           size: 3
         argument:
           size: 8
-          byte_align: true
+          word_align: true
   8_bit_destination:
     operand_values:
       a:
@@ -106,7 +106,7 @@ operand_sets:
           max: 127
           min: -128
           size: 8
-          byte_align: true
+          word_align: true
       sp:
         type: indirect_register
         register: sp
@@ -117,7 +117,7 @@ operand_sets:
           max: 127
           min: -128
           size: 8
-          byte_align: true
+          word_align: true
       indirect_addr:
         type: indirect_numeric
         bytecode:
@@ -125,21 +125,21 @@ operand_sets:
           size: 3
         argument:
           size: 16
-          byte_align: true
+          word_align: true
   int8:
     operand_values:
       int8:
         type: numeric
         argument:
           size: 8
-          byte_align: true
+          word_align: true
   int16:
     operand_values:
       int16:
         type: numeric
         argument:
           size: 16
-          byte_align: true
+          word_align: true
   stack_pointer:
     operand_values:
       sp:
@@ -152,7 +152,7 @@ operand_sets:
           max: 127
           min: -128
           size: 8
-          byte_align: true
+          word_align: true
   direct_bytecode:
     operand_values:
       scratchpad_regs:
@@ -251,7 +251,7 @@ macros:
                 type: numeric
                 argument:
                   size: 16
-                  byte_align: true
+                  word_align: true
       instructions:
         - "push ((@ARG(0)) >> 8)"
         - "push ((@ARG(0)) & 0x00FF)"
@@ -267,7 +267,7 @@ macros:
                   max: 127
                   min: -128
                   size: 8
-                  byte_align: true
+                  word_align: true
       instructions:
         - "push [@REG(0) + (@ARG(0)+1)]"
         - "push [@REG(0) + (@ARG(0))]"
@@ -283,7 +283,7 @@ macros:
                   max: 127
                   min: -128
                   size: 8
-                  byte_align: true
+                  word_align: true
       instructions:
         - "push [@REG(0) + (@ARG(0)+1)]"
         - "push [@REG(0) + (@ARG(0)+1)]"
@@ -297,12 +297,12 @@ macros:
                 type: indirect_numeric
                 argument:
                   size: 16
-                  byte_align: true
+                  word_align: true
               iaddr2:
                 type: indirect_numeric
                 argument:
                   size: 16
-                  byte_align: true
+                  word_align: true
       instructions:
         - "mov [@ARG(0)],[@ARG(1)]"
         - "mov [@ARG(0) + 1],[@ARG(1) + 1]"
@@ -315,12 +315,12 @@ macros:
                 type: indirect_numeric
                 argument:
                   size: 16
-                  byte_align: true
+                  word_align: true
               iaddr2:
                 type: numeric
                 argument:
                   size: 16
-                  byte_align: true
+                  word_align: true
       instructions:
         - "mov [@ARG(0)],BYTE0(@ARG(1))"
         - "mov [@ARG(0) + 1],BYTE1(@ARG(1))"
@@ -334,12 +334,12 @@ macros:
                 type: indirect_numeric
                 argument:
                   size: 16
-                  byte_align: true
+                  word_align: true
               immediate_y:
                 type: numeric
                 argument:
                   size: 16
-                  byte_align: true
+                  word_align: true
       instructions:
         - "mov a,[@ARG(0)]"
         - "add (@ARG(1) & $00FF)"
@@ -356,12 +356,12 @@ macros:
                 type: indirect_numeric
                 argument:
                   size: 16
-                  byte_align: true
+                  word_align: true
               iaddr_y:
                 type: indirect_numeric
                 argument:
                   size: 16
-                  byte_align: true
+                  word_align: true
       instructions:
         - "mov a,[@ARG(0)]"
         - "add [@ARG(1)]"

@@ -14,7 +14,8 @@ class OperandFactory:
         cls,
         operand_id: str,
         arg_config_dict: dict,
-        default_endian: str,
+        default_multi_word_endian: str,
+        default_intra_word_endian: str,
         registers: set[str],
         word_size: int,
         word_segment_size: int,
@@ -24,7 +25,8 @@ class OperandFactory:
             return numeric_expression.NumericExpressionOperand(
                 operand_id,
                 arg_config_dict,
-                default_endian,
+                default_multi_word_endian,
+                default_intra_word_endian,
                 word_size,
                 word_segment_size,
             )
@@ -32,7 +34,8 @@ class OperandFactory:
             return register.RegisterOperand(
                 operand_id,
                 arg_config_dict,
-                default_endian,
+                default_multi_word_endian,
+                default_intra_word_endian,
                 registers,
                 word_size,
                 word_segment_size
@@ -41,7 +44,8 @@ class OperandFactory:
             return indexed_register.IndexedRegisterOperand(
                 operand_id,
                 arg_config_dict,
-                default_endian,
+                default_multi_word_endian,
+                default_intra_word_endian,
                 registers,
                 word_size,
                 word_segment_size,
@@ -50,7 +54,8 @@ class OperandFactory:
             return indirect_register.IndirectRegisterOperand(
                 operand_id,
                 arg_config_dict,
-                default_endian,
+                default_multi_word_endian,
+                default_intra_word_endian,
                 registers,
                 word_size,
                 word_segment_size,
@@ -59,7 +64,8 @@ class OperandFactory:
             return indirect_indexed_register.IndirectIndexedRegisterOperand(
                 operand_id,
                 arg_config_dict,
-                default_endian,
+                default_multi_word_endian,
+                default_intra_word_endian,
                 registers,
                 word_size,
                 word_segment_size,
@@ -68,7 +74,8 @@ class OperandFactory:
             return indirect_numeric.IndirectNumericOperand(
                 operand_id,
                 arg_config_dict,
-                default_endian,
+                default_multi_word_endian,
+                default_intra_word_endian,
                 word_size,
                 word_segment_size,
             )
@@ -76,7 +83,8 @@ class OperandFactory:
             return deferred_numeric.DeferredNumericOperand(
                 operand_id,
                 arg_config_dict,
-                default_endian,
+                default_multi_word_endian,
+                default_intra_word_endian,
                 word_size,
                 word_segment_size,
             )
@@ -84,7 +92,8 @@ class OperandFactory:
             return enumeration_operand.EnumerationOperand(
                 operand_id,
                 arg_config_dict,
-                default_endian,
+                default_multi_word_endian,
+                default_intra_word_endian,
                 registers,
                 word_size,
                 word_segment_size,
@@ -93,7 +102,8 @@ class OperandFactory:
             return numeric_enumeration.NumericEnumerationOperand(
                 operand_id,
                 arg_config_dict,
-                default_endian,
+                default_multi_word_endian,
+                default_intra_word_endian,
                 registers,
                 word_size,
                 word_segment_size,
@@ -102,7 +112,8 @@ class OperandFactory:
             return numeric_bytecode.NumericBytecode(
                 operand_id,
                 arg_config_dict,
-                default_endian,
+                default_multi_word_endian,
+                default_intra_word_endian,
                 word_size,
                 word_segment_size,
             )
@@ -110,7 +121,8 @@ class OperandFactory:
             return address.AddressOperand(
                 operand_id,
                 arg_config_dict,
-                default_endian,
+                default_multi_word_endian,
+                default_intra_word_endian,
                 word_size,
                 word_segment_size,
             )
@@ -118,7 +130,8 @@ class OperandFactory:
             return relative_address.RelativeAddressOperand(
                 operand_id,
                 arg_config_dict,
-                default_endian,
+                default_multi_word_endian,
+                default_intra_word_endian,
                 word_size,
                 word_segment_size,
             )
@@ -126,7 +139,8 @@ class OperandFactory:
             return empty.EmptyOperand(
                 operand_id,
                 arg_config_dict,
-                default_endian,
+                default_multi_word_endian,
+                default_intra_word_endian,
                 word_size,
                 word_segment_size,
             )

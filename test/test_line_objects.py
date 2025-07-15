@@ -44,7 +44,7 @@ class TestLineObject(unittest.TestCase):
         label_values.set_label_value('test1', 0x1234, 1)
         memzone = MemoryZone(16, 0, 2**16 - 1, 'GLOBAL')
 
-        d1 = DataLine.factory(27, ' .byte $de, $ad, 0xbe, $ef', 'steak', 'big', memzone, 8, 8, 'big', 'big', '\0',)
+        d1 = DataLine.factory(27, ' .byte $de, $ad, 0xbe, $ef', 'steak', memzone, 8, 8, 'big', 'big', '\0',)
         d1.label_scope = label_values
         d1.generate_words()
         self.assertIsInstance(d1, DataLine)
@@ -61,7 +61,7 @@ class TestLineObject(unittest.TestCase):
             '$deadbeef',
         )
 
-        d2 = DataLine.factory(38, ' .byte test1, 12', 'label mania', 'big', memzone, 8, 8, 'big', 'big', '\0',)
+        d2 = DataLine.factory(38, ' .byte test1, 12', 'label mania', memzone, 8, 8, 'big', 'big', '\0',)
         d2.label_scope = label_values
         d2.generate_words()
         self.assertIsInstance(d2, DataLine)
@@ -73,7 +73,7 @@ class TestLineObject(unittest.TestCase):
             'should slice first byte',
         )
 
-        d3 = DataLine.factory(38, ' .byte test1, , 12', 'label mania', 'big', memzone, 8, 8, 'big', 'big', '\0',)
+        d3 = DataLine.factory(38, ' .byte test1, , 12', 'label mania', memzone, 8, 8, 'big', 'big', '\0',)
         d3.label_scope = label_values
         d3.generate_words()
         self.assertIsInstance(d3, DataLine)
@@ -85,7 +85,7 @@ class TestLineObject(unittest.TestCase):
             'should slice first byte, ignore bad argument',
         )
 
-        d4 = DataLine.factory(38, ' .byte b1110', 'label mania', 'big', memzone, 8, 8, 'big', 'big', '\0',)
+        d4 = DataLine.factory(38, ' .byte b1110', 'label mania', memzone, 8, 8, 'big', 'big', '\0',)
         d4.label_scope = label_values
         d4.generate_words()
         self.assertIsInstance(d4, DataLine)
@@ -99,7 +99,7 @@ class TestLineObject(unittest.TestCase):
 
         test_str = 'that\'s a test'
         d5_values = [ord(c) for c in test_str]
-        d5 = DataLine.factory(42, f' .byte "{test_str}"', 'string of bytes', 'big', memzone, 8, 8, 'big', 'big', 0,)
+        d5 = DataLine.factory(42, f' .byte "{test_str}"', 'string of bytes', memzone, 8, 8, 'big', 'big', 0,)
         d5.label_scope = label_values
         d5.generate_words()
         self.assertIsInstance(d5, DataLine)
@@ -113,7 +113,7 @@ class TestLineObject(unittest.TestCase):
 
         d5a_values = [ord(c) for c in test_str]
         d5a_values.extend([0])
-        d5a = DataLine.factory(42, f' .cstr "{test_str}"', 'string of bytes', 'big', memzone, 8, 8, 'big', 'big', 0,)
+        d5a = DataLine.factory(42, f' .cstr "{test_str}"', 'string of bytes', memzone, 8, 8, 'big', 'big', 0,)
         d5a.label_scope = label_values
         d5a.generate_words()
         self.assertIsInstance(d5a, DataLine)
@@ -127,7 +127,7 @@ class TestLineObject(unittest.TestCase):
 
         d6a_values = [ord(c) for c in test_str]
         d6a_values.extend([0])
-        d6a = DataLine.factory(42, f' .asciiz "{test_str}"', 'string of bytes', 'big', memzone, 8, 8, 'big', 'big', 0,)
+        d6a = DataLine.factory(42, f' .asciiz "{test_str}"', 'string of bytes', memzone, 8, 8, 'big', 'big', 0,)
         d6a.label_scope = label_values
         d6a.generate_words()
         self.assertIsInstance(d6a, DataLine)
@@ -139,7 +139,7 @@ class TestLineObject(unittest.TestCase):
             'character string matches',
         )
 
-        d6 = DataLine.factory(38, ' .2byte test1, 12', '2 byte label mania', 'little', memzone, 8, 8, 'big', 'little', 0,)
+        d6 = DataLine.factory(38, ' .2byte test1, 12', '2 byte label mania', memzone, 8, 8, 'big', 'little', 0,)
         d6.label_scope = label_values
         d6.generate_words()
         self.assertIsInstance(d6, DataLine)
@@ -153,7 +153,7 @@ class TestLineObject(unittest.TestCase):
 
         d7 = DataLine.factory(
             38, '.4byte %11110111011001010100001100100001, $1945', '4 byte label mania',
-            'little', memzone, 8, 8, 'big', 'little', 0,
+            memzone, 8, 8, 'big', 'little', 0,
         )
         d7.label_scope = label_values
         d7.generate_words()
@@ -177,7 +177,7 @@ class TestLineObject(unittest.TestCase):
 
         d8 = DataLine.factory(
             38, '.4byte %11110111011001010100001100100001, $1945', '4 byte label mania',
-            'big', memzone, 8, 8, 'big', 'big', '\0',
+            memzone, 8, 8, 'big', 'big', '\0',
         )
         d8.label_scope = label_values
         d8.generate_words()
@@ -199,7 +199,7 @@ class TestLineObject(unittest.TestCase):
             'should have each 4 byte numbe in big endian'
         )
 
-        d9 = DataLine.factory(38, '.4byte 0x0123456789abcdef', 'data masked!', 'little', memzone, 8, 8, 'big', 'little', '\0',)
+        d9 = DataLine.factory(38, '.4byte 0x0123456789abcdef', 'data masked!', memzone, 8, 8, 'big', 'little', '\0',)
         d9.label_scope = label_values
         d9.generate_words()
         self.assertIsInstance(d9, DataLine)
@@ -220,7 +220,6 @@ class TestLineObject(unittest.TestCase):
             38,
             '.8byte 0x0123456789abcdef',
             'data masked!',
-            'little',
             memzone,
             8,
             8,
@@ -251,7 +250,7 @@ class TestLineObject(unittest.TestCase):
         # ensure spaces in strings aren't truncated
         test_str2 = ' space '
         d10_values = [ord(c) for c in test_str2]
-        d10 = DataLine.factory(42, f' .byte "{test_str2}"', 'string of bytes', 'big', memzone, 8, 8, 'big', 'big', 0,)
+        d10 = DataLine.factory(42, f' .byte "{test_str2}"', 'string of bytes', memzone, 8, 8, 'big', 'big', 0,)
         d10.label_scope = label_values
         d10.generate_words()
         self.assertIsInstance(d10, DataLine)
@@ -266,7 +265,7 @@ class TestLineObject(unittest.TestCase):
         # test escapes in strings
         d11_values = [0x20, 0x01, 0x20, 0x09, 0x20, 0x0A, 0x00]
         # must double escape escape sequences here because this is in python
-        d11 = DataLine.factory(38, '.cstr " \\x01 \\t \\n"', 'escape reality', 'big', memzone, 8, 8, 'big', 'big', 0,)
+        d11 = DataLine.factory(38, '.cstr " \\x01 \\t \\n"', 'escape reality', memzone, 8, 8, 'big', 'big', 0,)
         d11.label_scope = label_values
         d11.generate_words()
         self.assertIsInstance(d11, DataLine)
@@ -283,7 +282,6 @@ class TestLineObject(unittest.TestCase):
             38,
             '.byte ((PSAV+1) & 0FFH), $22+$44, 1<<4',
             'escape reality',
-            'big',
             memzone,
             8,
             8,
@@ -304,10 +302,10 @@ class TestLineObject(unittest.TestCase):
         )
 
         with self.assertRaises(SystemExit, msg='this instruction should fail'):
-            DataLine.factory(42, ' .cstr 0x42', 'bad cstr usage', 'big', memzone, 8, 8, 'big', 'big', 0,)
+            DataLine.factory(42, ' .cstr 0x42', 'bad cstr usage', memzone, 8, 8, 'big', 'big', 0,)
 
         # test initialiation with negative numbers
-        d13 = DataLine.factory(38, '.4byte -5', 'neg five', 'big', memzone, 8, 8, 'big', 'big', 0,)
+        d13 = DataLine.factory(38, '.4byte -5', 'neg five', memzone, 8, 8, 'big', 'big', 0,)
         d13.label_scope = label_values
         d13.generate_words()
         self.assertIsInstance(d13, DataLine)
@@ -581,8 +579,8 @@ class TestLineObject(unittest.TestCase):
             ins3.get_words(),
             [
                 Word(0x30, 8, 8, isa_model.intra_word_endianness),
-                Word(0xAD, 8, 8, 'little'),
-                Word(0xDE, 8, 8, 'little'),
+                Word(0xDE, 8, 8, isa_model.intra_word_endianness),
+                Word(0xAD, 8, 8, isa_model.intra_word_endianness),
             ],
             'instruction should match',
         )
@@ -690,8 +688,8 @@ class TestLineObject(unittest.TestCase):
             ins1.get_words(),
             [
                 Word(0x10, 8, 8, isa_model.intra_word_endianness),
-                Word(0xCD, 8, 8, 'little'),
-                Word(0xAB, 8, 8, 'little'),
+                Word(0xCD, 8, 8, isa_model.intra_word_endianness),
+                Word(0xAB, 8, 8, isa_model.intra_word_endianness),
             ],
             'instruction should match',
         )
@@ -711,8 +709,8 @@ class TestLineObject(unittest.TestCase):
             ins2.get_words(),
             [
                 Word(0x30, 8, 8, isa_model.intra_word_endianness),
-                Word(0xAB, 8, 8, 'big'),
-                Word(0xCD, 8, 8, 'big'),
+                Word(0xAB, 8, 8, isa_model.intra_word_endianness),  # "set" has multi-word big endian arguments
+                Word(0xCD, 8, 8, isa_model.intra_word_endianness),
             ],
             'instruction should match',
         )
@@ -731,8 +729,8 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(
             ins3.get_words(),
             [
-                Word(0xFF, 8, 8, 'big'),
-                Word(0x3C, 8, 8, 'big'),
+                Word(0xFF, 8, 8, isa_model.intra_word_endianness),
+                Word(0x3C, 8, 8, isa_model.intra_word_endianness),
             ],
             'instruction should match',
         )
@@ -833,7 +831,10 @@ class TestLineObject(unittest.TestCase):
         dl1.generate_words()
         self.assertEqual(
             dl1.get_words(),
-            [Word(0x34, 8, 8, isa_model.intra_word_endianness), Word(0x12, 8, 8, isa_model.intra_word_endianness)],
+            [
+                Word(0x34, 8, 8, isa_model.intra_word_endianness),
+                Word(0x12, 8, 8, isa_model.intra_word_endianness),
+            ],
         )
 
     def test_compound_instruction_line(self):

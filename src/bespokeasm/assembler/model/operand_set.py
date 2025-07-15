@@ -13,7 +13,8 @@ class OperandSet:
         self,
         name: str,
         config_dict: dict,
-        default_endian: str,
+        default_multi_word_endian: str,
+        default_intra_word_endian: str,
         regsiters: set[str],
         word_size: int,
         word_segment_size: int,
@@ -25,7 +26,8 @@ class OperandSet:
             operand = OperandFactory.factory(
                 arg_type_id,
                 arg_type_conf,
-                default_endian,
+                default_multi_word_endian,
+                default_intra_word_endian,
                 regsiters,
                 word_size,
                 word_segment_size,
@@ -82,10 +84,26 @@ class OperandSet:
 
 
 class OperandSetCollection(dict):
-    def __init__(self, config_dict: dict, default_endian: str, registers: set[str], word_size: int, word_segment_size: int):
+    def __init__(
+        self,
+        config_dict: dict,
+        default_multi_word_endian: str,
+        default_intra_word_endian: str,
+        registers: set[str],
+        word_size: int,
+        word_segment_size: int,
+    ):
         super().__init__(self)
         for set_name, set_config in config_dict.items():
-            self[set_name] = OperandSet(set_name, set_config, default_endian, registers, word_size, word_segment_size)
+            self[set_name] = OperandSet(
+                set_name,
+                set_config,
+                default_multi_word_endian,
+                default_intra_word_endian,
+                registers,
+                word_size,
+                word_segment_size,
+            )
 
     def __repr__(self) -> str:
         return str(self)

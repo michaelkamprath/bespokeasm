@@ -39,7 +39,6 @@ class DataLine(LineWithWords):
             line_id: LineIdentifier,
             line_str: str,
             comment: str,
-            endian: str,
             current_memzone: MemoryZone,
             word_size: int,
             word_segment_size: int,
@@ -79,7 +78,6 @@ class DataLine(LineWithWords):
                 values_list,
                 line_str,
                 comment,
-                endian,
                 current_memzone,
                 word_size,
                 word_segment_size,
@@ -96,7 +94,6 @@ class DataLine(LineWithWords):
             value_list: list,
             instruction: str,
             comment: str,
-            endian: str,
             current_memzone: MemoryZone,
             word_size: int,
             word_segment_size: int,
@@ -115,7 +112,6 @@ class DataLine(LineWithWords):
         )
         self._arg_value_list = value_list
         self._directive = directive_str
-        self._endian = endian
 
     def __str__(self):
         return f'DataLine<{self._directive}: {self._arg_value_list}>'
@@ -143,7 +139,7 @@ class DataLine(LineWithWords):
             try:
                 value_bytes = (arg_val & DataLine.DIRECTIVE_VALUE_MASK[self._directive]).to_bytes(
                     DataLine.DIRECTIVE_VALUE_BYTE_SIZE[self._directive],
-                    byteorder=self._endian,
+                    byteorder=self._multi_word_endianness,
                     # since we are masking the value to a specific byte size, the signed
                     # argument should always be False
                     signed=False,

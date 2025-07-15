@@ -21,7 +21,8 @@ class AddressByteCodePart(ExpressionByteCodePartInMemoryZone):
         value_expression: str,
         value_size: int,
         byte_align: bool,
-        endian: str,
+        multi_word_endian: str,
+        intra_word_endian: str,
         line_id: LineIdentifier,
         memzone: MemoryZone,
         is_lsb_bytes: bool,
@@ -32,7 +33,17 @@ class AddressByteCodePart(ExpressionByteCodePartInMemoryZone):
         """Creates a new address bytecode part that is bound to a memory zone.
            The address value is sliced into the least significant bit(s) if `is_lsb_bytes` is true,
            ensuring that the MSBs match the current instruction's address MSBs."""
-        super().__init__(memzone, value_expression, value_size, byte_align, endian, line_id, word_size, word_segment_size)
+        super().__init__(
+            memzone,
+            value_expression,
+            value_size,
+            byte_align,
+            multi_word_endian,
+            intra_word_endian,
+            line_id,
+            word_size,
+            word_segment_size,
+        )
         self._is_lsb_bytes = is_lsb_bytes
         self._match_address_msb = match_address_msb
 
@@ -67,11 +78,19 @@ class AddressOperand(NumericExpressionOperand):
         self,
         operand_id: str,
         arg_config_dict: dict,
-        default_endian: str,
+        default_multi_word_endian: str,
+        default_intra_word_endian: str,
         word_size: int,
         word_segment_size: int,
     ) -> None:
-        super().__init__(operand_id, arg_config_dict, default_endian, word_size, word_segment_size)
+        super().__init__(
+            operand_id,
+            arg_config_dict,
+            default_multi_word_endian,
+            default_intra_word_endian,
+            word_size,
+            word_segment_size,
+        )
 
     def __str__(self):
         return f'AddressOperand<{self.id}>'
@@ -125,7 +144,8 @@ class AddressOperand(NumericExpressionOperand):
             self.bytecode_value,
             self.bytecode_size,
             False,
-            'big',
+            self._default_multi_word_endian,
+            self._default_intra_word_endian,
             line_id,
             self._word_size,
             self._word_segment_size,
@@ -133,8 +153,9 @@ class AddressOperand(NumericExpressionOperand):
         arg_part = AddressByteCodePart(
             operand,
             self.argument_size,
-            self.argument_byte_align,
-            self.argument_endian,
+            self.argument_word_align,
+            self.argument_multi_word_endian,
+            self.argument_intra_word_endian,
             line_id,
             self.valid_memory_zone(memzone_manager),
             self.does_lsb_slice,

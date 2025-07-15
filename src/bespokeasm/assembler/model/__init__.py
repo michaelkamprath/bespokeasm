@@ -1,4 +1,5 @@
 from typing import Literal
+import warnings
 import click
 import json
 import os
@@ -70,7 +71,8 @@ class AssemblerModel:
                 sys.exit(f'ERROR: the instruction set configuration file specified an unallowed register name: {reg}')
         self._operand_sets = OperandSetCollection(
             self._config['operand_sets'],
-            self.endian,
+            self.multi_word_endianness,
+            self.intra_word_endianness,
             self.registers,
             self.word_size,
             self.word_segment_size,
@@ -79,7 +81,8 @@ class AssemblerModel:
                 self._config['instructions'],
                 self._config.get('macros', None),
                 self._operand_sets,
-                self.endian,
+                self.multi_word_endianness,
+                self.intra_word_endianness,
                 self.registers,
                 self.word_size,
                 self.word_segment_size,
@@ -163,6 +166,12 @@ class AssemblerModel:
 
     @property
     def endian(self) -> Literal['little', 'big']:
+        warnings.warn(
+            "The 'endian' general configuration option is deprecated and will be removed in a "
+            "future version. Replace with 'multi_word_endianness'.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         if 'endian' in self._config['general']:
             return self._config['general']['endian']
         else:
@@ -173,14 +182,14 @@ class AssemblerModel:
         if 'intra_word_endianness' in self._config['general']:
             return self._config['general']['intra_word_endianness']
         else:
-            return self.endian
+            return self.multi_word_endianness
 
     @property
     def multi_word_endianness(self) -> Literal['little', 'big']:
         if 'multi_word_endianness' in self._config['general']:
             return self._config['general']['multi_word_endianness']
         else:
-            return self.endian
+            return 'big'
 
     @property
     def cstr_terminator(self) -> int:
@@ -201,15 +210,13 @@ class AssemblerModel:
 
     @property
     def word_size(self) -> int:
-        '''The number of bits in a word'''
-        # TODO: this is a placeholder for now
-        return 8
+        '''The number of bits in a word. defaults to 8 bits.'''
+        return self._config['general'].get('word_size', 8)
 
     @property
     def word_segment_size(self) -> int:
-        '''The number of bits in a word segment'''
-        # TODO: this is a placeholder for now
-        return 8
+        '''The number of bits in a word segment. Defaults to the word size.'''
+        return self._config['general'].get('word_segment_size', self.word_size)
 
     @property
     def registers(self) -> set[str]:

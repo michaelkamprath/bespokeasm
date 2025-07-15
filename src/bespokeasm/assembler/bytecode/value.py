@@ -139,8 +139,8 @@ class Value:
         word_slices: list['WordSlice'],
         word_bit_size: int,
         segment_size: int = 8,
+        multi_word_endianness: Literal['little', 'big'] = 'big',
         intra_word_endianness: Literal['little', 'big'] = 'big',
-        multi_word_endianness: Literal['little', 'big'] = 'big'
     ) -> 'Value':
         """
         Create a Value from a list of WordSlice objects.

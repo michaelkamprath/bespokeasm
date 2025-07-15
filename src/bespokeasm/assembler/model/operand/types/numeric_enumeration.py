@@ -16,12 +16,21 @@ class NumericEnumerationOperand(NumericExpressionOperand):
         self,
         operand_id: str,
         arg_config_dict: dict,
-        default_endian: str,
+        default_multi_word_endian: str,
+        default_intra_word_endian: str,
         registers: set[str],
         word_size: int,
         word_segment_size: int,
     ) -> None:
-        super().__init__(operand_id, arg_config_dict, default_endian, word_size, word_segment_size, False)
+        super().__init__(
+            operand_id,
+            arg_config_dict,
+            default_multi_word_endian,
+            default_intra_word_endian,
+            word_size,
+            word_segment_size,
+            False,
+        )
         self._bytecode_dictionary = None
         if self.has_bytecode:
             self._bytecode_dictionary = self._config['bytecode'].get('value_dict', None)
@@ -73,7 +82,8 @@ class NumericEnumerationOperand(NumericExpressionOperand):
                     operand,
                     self.bytecode_size,
                     False,
-                    'big',
+                    self._default_multi_word_endian,
+                    self._default_intra_word_endian,
                     line_id,
                     self._word_size,
                     self._word_segment_size,
@@ -84,8 +94,9 @@ class NumericEnumerationOperand(NumericExpressionOperand):
                     self.argument_value_dict,
                     operand,
                     self.argument_size,
-                    self.argument_byte_align,
-                    self.argument_endian,
+                    self.argument_word_align,
+                    self.argument_multi_word_endian,
+                    self.argument_intra_word_endian,
                     line_id,
                     self._word_size,
                     self._word_segment_size,

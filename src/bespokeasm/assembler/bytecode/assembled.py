@@ -14,13 +14,15 @@ class AssembledInstruction:
         parts: list[ByteCodePart],
         word_size: int,
         segment_size: int,
-        endian: Literal['little', 'big'],
+        multi_word_endian: Literal['little', 'big'],
+        intra_word_endian: Literal['little', 'big'],
     ):
         self._parts = parts
         self._line_id = line_id
         self._word_size = word_size
         self._segment_size = segment_size
-        self._endian = endian
+        self._multi_word_endian = multi_word_endian
+        self._intra_word_endian = intra_word_endian
         # calculate word count
         total_bits = 0
         for bcp in self._parts:
@@ -62,7 +64,7 @@ class AssembledInstruction:
             self._parts,
             self._word_size,
             self._segment_size,
-            self._endian,
+            self._multi_word_endian,
             label_scope,
             instruction_address,
             instruction_size,
@@ -77,13 +79,14 @@ class CompositeAssembledInstruction(AssembledInstruction):
         instructions: list[AssembledInstruction],
         word_size: int,
         segment_size: int,
-        endian: Literal['little', 'big'],
+        multi_word_endian: Literal['little', 'big'],
+        intra_word_endian: Literal['little', 'big'],
     ):
         # turn instruction list into byte code parts list
         parts: list[ByteCodePart] = [
             p for instr in instructions for p in instr.parts
         ]
-        super().__init__(line_id, parts, word_size, segment_size, endian)
+        super().__init__(line_id, parts, word_size, segment_size, multi_word_endian, intra_word_endian)
         self._instructions = instructions
 
     @property

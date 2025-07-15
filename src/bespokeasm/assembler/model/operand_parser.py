@@ -1,5 +1,6 @@
 from __future__ import annotations
 import sys
+from typing import Literal
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.bytecode.parts import ByteCodePart
@@ -118,10 +119,26 @@ class OperandSetsModel:
 
 class SpecificOperandsModel:
     class SpecificOperandConfig:
-        def __init__(self, config: dict, default_endian: str, registers: set[str], word_size: int, word_segment_size: int):
+        def __init__(
+            self,
+            config: dict,
+            default_multi_word_endian: Literal['big', 'little'],
+            default_intra_word_endian: Literal['big', 'little'],
+            registers: set[str],
+            word_size: int,
+            word_segment_size: int,
+        ):
             self._config = config
             self._operands = [
-                OperandFactory.factory(arg_type_id, arg_type_conf, default_endian, registers, word_size, word_segment_size)
+                OperandFactory.factory(
+                    arg_type_id,
+                    arg_type_conf,
+                    default_multi_word_endian,
+                    default_intra_word_endian,
+                    registers,
+                    word_size,
+                    word_segment_size,
+                )
                 for arg_type_id, arg_type_conf in self._config.get('list', {}).items()
             ]
             self._word_size = word_size
@@ -160,11 +177,20 @@ class SpecificOperandsModel:
 
     _specific_operands: list[SpecificOperandsModel.SpecificOperandConfig]
 
-    def __init__(self, config: dict, default_endian: str, registers: set[str], word_size: int, word_segment_size: int):
+    def __init__(
+        self,
+        config: dict,
+        default_multi_word_endian: str,
+        default_intra_word_endian: str,
+        registers: set[str],
+        word_size: int,
+        word_segment_size: int,
+    ):
         self._specific_operands = [
             SpecificOperandsModel.SpecificOperandConfig(
                 arg_confing_dict,
-                default_endian,
+                default_multi_word_endian,
+                default_intra_word_endian,
                 registers,
                 word_size,
                 word_segment_size,
@@ -248,7 +274,8 @@ class OperandParser:
                 instruction: str,
                 instruction_operands_config: dict,
                 operand_set_collection: OperandSetCollection,
-                default_endian: str,
+                default_multi_word_endian: str,
+                default_intra_word_endian: str,
                 registers: set[str],
                 word_size: int,
                 word_segment_size: int,
@@ -263,7 +290,8 @@ class OperandParser:
         if 'specific_operands' in self._config:
             self._specific_operands_model = SpecificOperandsModel(
                 self._config['specific_operands'],
-                default_endian,
+                default_multi_word_endian,
+                default_intra_word_endian,
                 registers,
                 word_size,
                 word_segment_size,

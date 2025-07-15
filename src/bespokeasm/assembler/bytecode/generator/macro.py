@@ -133,6 +133,7 @@ class MacroBytecodeGenerator:
             assembled_instructions,
             isa_model.word_size,
             isa_model.word_segment_size,
+            isa_model.multi_word_endianness,
             isa_model.intra_word_endianness,
         )
         return composite_instruction

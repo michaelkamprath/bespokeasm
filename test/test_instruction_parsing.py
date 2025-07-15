@@ -58,7 +58,10 @@ class TestInstructionParsing(unittest.TestCase):
         ins1.generate_words()
         self.assertEqual(
             ins1.get_words(),
-            [Word(0x45, 8, 8, 'little'), Word(0x02, 8, 8, 'little')],
+            [
+                Word(0x45, 8, 8, 'little'),
+                Word(0x02, 8, 8, 'little')
+            ],
             'instruction should match',
         )
 
@@ -212,7 +215,10 @@ class TestInstructionParsing(unittest.TestCase):
         ins0.generate_words()
         self.assertEqual(
             ins0.get_words(),
-            [Word(0xFF, 8, 8, 'big'), Word(0x42, 8, 8, 'big')],
+            [
+                Word(0xFF, 8, 8, isa_model.intra_word_endianness),
+                Word(0x42, 8, 8, isa_model.intra_word_endianness)
+            ],
             'instruction byte should match',
         )
 
@@ -227,7 +233,11 @@ class TestInstructionParsing(unittest.TestCase):
         ins1.generate_words()
         self.assertEqual(
             ins1.get_words(),
-            [Word(0xFF, 8, 8, 'big'), Word(0x81, 8, 8, 'big'), Word(0x07, 8, 8, 'little')],
+            [
+                Word(0xFF, 8, 8, isa_model.intra_word_endianness),
+                Word(0x81, 8, 8, isa_model.intra_word_endianness),
+                Word(0x07, 8, 8, isa_model.intra_word_endianness),
+            ],
             'instruction byte should match',
         )
 
@@ -242,7 +252,11 @@ class TestInstructionParsing(unittest.TestCase):
         ins2.generate_words()
         self.assertEqual(
             ins2.get_words(),
-            [Word(0xFF, 8, 8, 'big'), Word(0x64, 8, 8, 'big'), Word(0x1D, 8, 8, 'little')],
+            [
+                Word(0xFF, 8, 8, isa_model.intra_word_endianness),
+                Word(0x64, 8, 8, isa_model.intra_word_endianness),
+                Word(0x1D, 8, 8, isa_model.intra_word_endianness),
+            ],
             'instruction byte should match',
         )
 
@@ -376,9 +390,9 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertEqual(
             ins4.get_words(),
             [
-                Word(0xFF, 8, 8, 'big'),
-                Word(0x8F, 8, 8, 'big'),
-                Word(0x00, 8, 8, 'little'),
+                Word(0xFF, 8, 8, isa_model.intra_word_endianness),
+                Word(0x8F, 8, 8, isa_model.intra_word_endianness),
+                Word(0x00, 8, 8, isa_model.intra_word_endianness),
             ],
             'instruction byte should match',
         )
@@ -394,10 +408,10 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertEqual(
             ins5.get_words(),
             [
-                Word(0xFF, 8, 8, 'big'),
-                Word(0xEF, 8, 8, 'big'),
-                Word(0x04, 8, 8, 'little'),
-                Word(0x00, 8, 8, 'little'),
+                Word(0xFF, 8, 8, isa_model.intra_word_endianness),
+                Word(0xEF, 8, 8, isa_model.intra_word_endianness),
+                Word(0x04, 8, 8, isa_model.intra_word_endianness),
+                Word(0x00, 8, 8, isa_model.intra_word_endianness),
             ],
             'instruction byte should match',
         )
@@ -813,7 +827,11 @@ class TestInstructionParsing(unittest.TestCase):
         t1.generate_words()
         self.assertEqual(
             list(t1.get_words()),
-            [Word(0x80, 8, 8, 'little'), Word(0x12, 8, 8, 'big'), Word(0x30, 8, 8, 'big')],
+            [
+                Word(0x80, 8, 8, isa_model.intra_word_endianness),
+                Word(0x12, 8, 8, isa_model.intra_word_endianness),
+                Word(0x30, 8, 8, isa_model.intra_word_endianness),
+            ],
             'instruction byte should match',
         )
 
@@ -843,7 +861,11 @@ class TestInstructionParsing(unittest.TestCase):
         t3.generate_words()
         self.assertEqual(
             list(t3.get_words()),
-            [Word(0x81, 8, 8, 'little'), Word(0x32, 8, 8, 'big'), Word(0x10, 8, 8, 'big')],
+            [
+                Word(0x81, 8, 8, isa_model.intra_word_endianness),
+                Word(0x32, 8, 8, isa_model.intra_word_endianness),
+                Word(0x10, 8, 8, isa_model.intra_word_endianness),
+            ],
             'instruction byte should match',
         )
 
@@ -893,7 +915,11 @@ class TestInstructionParsing(unittest.TestCase):
         t1.generate_words()
         self.assertEqual(
             list(t1.get_words()),
-            [Word(0xE5, 8, 8, 'little'), Word(0x20, 8, 8, 'little'), Word(0x80, 8, 8, 'little')],
+            [
+                Word(0xE5, 8, 8, isa_model.intra_word_endianness),
+                Word(0x20, 8, 8, isa_model.intra_word_endianness),
+                Word(0x80, 8, 8, isa_model.intra_word_endianness),
+            ],
             'instruction byte should match',
         )
 
@@ -1026,7 +1052,8 @@ class TestInstructionParsing(unittest.TestCase):
             '$2020',
             16,
             True,
-            'little',
+            isa_model.multi_word_endianness,    # little endian
+            isa_model.intra_word_endianness,
             lineid,
             memzone_mngr.global_zone,
             False,
@@ -1042,7 +1069,8 @@ class TestInstructionParsing(unittest.TestCase):
             '$2045',
             8,
             True,
-            'little',
+            isa_model.multi_word_endianness,    # little endian
+            isa_model.intra_word_endianness,
             lineid,
             memzone_mngr.global_zone,
             True,
@@ -1061,7 +1089,8 @@ class TestInstructionParsing(unittest.TestCase):
             '$19458899',
             16,
             True,
-            'little',
+            isa_model.multi_word_endianness,    # little endian
+            isa_model.intra_word_endianness,
             lineid,
             memzone_32bit_mngr.global_zone,
             True,
@@ -1081,7 +1110,8 @@ class TestInstructionParsing(unittest.TestCase):
                 '<$2024',
                 8,
                 True,
-                'little',
+                isa_model.multi_word_endianness,    # little endian
+                isa_model.intra_word_endianness,
                 lineid,
                 memzone_mngr.global_zone,
                 True,
@@ -1102,7 +1132,10 @@ class TestInstructionParsing(unittest.TestCase):
         t1.generate_words()
         self.assertEqual(
             list(t1.get_words()),
-            [Word(0xE0, 8, 8, 'little'), Word(0xF8, 8, 8, 'little')],
+            [
+                Word(0xE0, 8, 8, isa_model.intra_word_endianness),
+                Word(0xF8, 8, 8, isa_model.intra_word_endianness),
+            ],
             'instruction byte should match',
         )
 
@@ -1123,7 +1156,11 @@ class TestInstructionParsing(unittest.TestCase):
         t2.generate_words()
         self.assertEqual(
             list(t2.get_words()),
-            [Word(0xE1, 8, 8, 'little'), Word(0xF8, 8, 8, 'little'), Word(0x2F, 8, 8, 'little')],
+            [
+                Word(0xE1, 8, 8, isa_model.intra_word_endianness),
+                Word(0xF8, 8, 8, isa_model.intra_word_endianness),
+                Word(0x2F, 8, 8, isa_model.intra_word_endianness),
+            ],
             'instruction byte should match',
         )
 
@@ -1139,7 +1176,11 @@ class TestInstructionParsing(unittest.TestCase):
         t3.generate_words()
         self.assertEqual(
             list(t3.get_words()),
-            [Word(0xE2, 8, 8, 'little'), Word(0x50, 8, 8, 'little'), Word(0x51, 8, 8, 'little')],
+            [
+                Word(0xE2, 8, 8, isa_model.intra_word_endianness),
+                Word(0x50, 8, 8, isa_model.intra_word_endianness),
+                Word(0x51, 8, 8, isa_model.intra_word_endianness),
+            ],
             'instruction byte should match',
         )
 
@@ -1154,3 +1195,31 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertEqual(t4.word_count, 3, 'has 3 words')
         with self.assertRaises(SystemExit, msg='address not in target memory zone'):
             t4.generate_words()
+
+    def test_instruction_parsing_16bit_word(self):
+        fp = pkg_resources.files(config_files).joinpath('test_16bit_data_words.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
+        lineid = LineIdentifier(1, 'test_instruction_parsing_16bit_word')
+
+        t1 = InstructionLine.factory(
+            lineid, 'mov a,[$1234]', 'comment',
+            isa_model, memzone_mngr.global_zone, memzone_mngr,
+        )
+        t1.set_start_address(1)
+        t1.label_scope = TestInstructionParsing.label_values
+        self.assertIsInstance(t1, InstructionLine)
+        self.assertEqual(t1.word_count, 2, 'has 2 words')
+        t1.generate_words()
+        self.assertEqual(
+            t1.get_words(),
+            [
+                Word(0x0802, 16, 16, 'big'),
+                Word(0x1234, 16, 16, 'big'),
+            ],
+            'instruction byte should match',
+        )
