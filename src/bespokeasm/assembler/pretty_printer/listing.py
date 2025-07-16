@@ -78,9 +78,15 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         if self._bytes_per_line >= 5:
             bytes_header = 'machine code'
         elif self._bytes_per_line >= 2:
-            bytes_header = 'bytes'
+            if self._word_size == 8:
+                bytes_header = 'bytes'
+            else:
+                bytes_header = 'words'
         else:
-            bytes_header = 'b'
+            if self._word_size == 8:
+                bytes_header = 'b'
+            else:
+                bytes_header = 'w'
 
         if self.max_instruction_width >= 11:
             instruction_header = ' instruction'
