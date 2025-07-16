@@ -71,12 +71,23 @@ operand_sets:
         argument:
           size: 16
           word_align: true
+  addresses:
+    operand_values:
+      absolute_addr:
+        type: address
+        bytecode:
+          value: 0x01
+          size: 8
+        argument:
+          size: 16
+          word_align: true
+          valid_address: true
 instructions:
   nop:
     variants:
       - bytecode:
           value: 0
-          size: 8
+          size: 16
         operands:
           count: 0
   mov:
@@ -90,13 +101,34 @@ instructions:
             list:
               - 16_bit_destination
               - 16_bit_source
+            reverse_argument_order: true
   push:
     variants:
       - bytecode:
-          value: 4
-          size: 8
+          value: 0x040
+          size: 12
         operands:
           count: 1
           operand_sets:
             list:
               - 16_bit_source
+  pull:
+    variants:
+      - bytecode:
+          value: 0x050
+          size: 12
+        operands:
+          count: 1
+          operand_sets:
+            list:
+              - 16_bit_destination
+  jmp:
+    variants:
+      - bytecode:
+          value: 0x80
+          size: 8
+        operands:
+          count: 1
+          operand_sets:
+            list:
+              - addresses
