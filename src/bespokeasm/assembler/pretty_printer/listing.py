@@ -25,6 +25,7 @@ class ListingPrettyPrinter(PrettyPrinterBase):
             ListingPrettyPrinter.MAX_NUM_BYTES_PER_LINE,
             self.max_byte_count,
         )
+        self._word_size = model.word_size
 
     def pretty_print(self) -> str:
         if len(self.line_objects) < 1:
@@ -119,12 +120,9 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         # first, get the line bytes, if any
         line_bytes = None if not isinstance(lobj, LineWithWords) \
                         else ListingPrettyPrinter._generate_bytecode_line_string(
-                            Word.words_to_bytes(
-                                lobj.get_words(),
-                                False,
-                                'big',
-                            ),
+                            lobj.get_words(),
                             self._bytes_per_line,
+                            self._word_size,
                         )
 
         # write the line number
@@ -169,7 +167,12 @@ class ListingPrettyPrinter(PrettyPrinterBase):
                 )
 
     @classmethod
-    def _generate_bytecode_line_string(cls, line_bytes: bytearray, bytes_per_str: int) -> list[str]:
+    def _generate_bytecode_line_string(
+        cls,
+        line_words: list[Word],
+        words_per_str: int,
+        word_size: int,
+    ) -> list[str]:
         # convert the line_bytes to a list of strings, each string being a hex representation of a byte.
         # Each line should contain at most 6 bytes. There should be as many strings in the return list
         # as needed for each string to contain up to 6 bytes of line_bytes. The first byt through 6th byte
@@ -189,13 +192,14 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         #
         results: list[str] = []
         cur_str = None
-        for b in line_bytes:
+        hex_width = Word(0, word_size).ideal_hex_width
+        for w in line_words:
             if cur_str is None:
                 cur_str = ''
-            cur_str += f'{b:02x} '
-            if len(cur_str) == bytes_per_str*3:
+            cur_str += f'{w:x} '
+            if len(cur_str) == words_per_str*(hex_width+1):
                 results.append(cur_str)
                 cur_str = None
         if cur_str is not None:
-            results.append(f'{cur_str:<{bytes_per_str*3}}')
+            results.append(f'{cur_str:<{words_per_str*(hex_width+1)}}')
         return results

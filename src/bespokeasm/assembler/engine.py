@@ -40,7 +40,7 @@ class Assembler:
         self._enable_pretty_print = enable_pretty_print
         self._pretty_print_format = pretty_print_format
         self._pretty_print_output = pretty_print_output
-        self._binary_fill_value = binary_fill_value & 0xff
+        self._binary_fill_value = binary_fill_value
         self._verbose = is_verbose
         self._binary_start = binary_start
         self._binary_end = binary_end
@@ -68,11 +68,11 @@ class Assembler:
             label: str = predefined_memory['name']
             address: int = predefined_memory['address']
             value: int = predefined_memory['value']
-            byte_length: int = predefined_memory['size']
+            word_length: int = predefined_memory['size']
             # create data object
             data_obj = PredefinedDataLine(
                 predefines_lineid,
-                byte_length,
+                word_length,
                 value,
                 label,
                 memzone_manager.global_zone,
@@ -173,13 +173,18 @@ class Assembler:
                 last_line = lobj
 
         # Finally generate the binary image
-        fill_bytes = bytearray([self._binary_fill_value])
+        fill_word = Word(
+            self._binary_fill_value & ((1 << self._model.word_size) - 1),
+            self._model.word_size,
+            self._model.word_segment_size,
+            self._model.intra_word_endianness,
+        )
 
         if self._generate_binary:
             bytecode = Assembler._generate_bytes(
                 line_dict,
                 max_generated_address,
-                fill_bytes,
+                fill_word,
                 self._binary_start,
                 self._binary_end,
             )
@@ -208,13 +213,14 @@ class Assembler:
         cls,
         line_dict: dict[int, LineObject],
         max_generated_address: int,
-        fill_bytes: bytearray,
+        fill_word: Word,
         start_address: int,
         end_address: int,
         log_level: int,
     ) -> bytearray:
         bytecode = bytearray()
         addr = start_address
+        fill_bytes = bytearray(fill_word.to_bytes())
         if log_level > 2:
             print('\nGenerating byte code:')
         while addr <= (max_generated_address if end_address is None else end_address):

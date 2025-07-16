@@ -257,3 +257,105 @@ class TestWord(unittest.TestCase):
         self.assertEqual(words[1].bit_size, 8)
         self.assertEqual(words[0].segment_size, 4)
         self.assertEqual(words[1].segment_size, 4)
+
+    def test_ideal_hex_width(self):
+        """Test ideal_hex_width property for various bit sizes."""
+        self.assertEqual(Word(0, 8).ideal_hex_width, 2)
+        self.assertEqual(Word(0, 12, segment_size=12).ideal_hex_width, 3)
+        self.assertEqual(Word(0, 16).ideal_hex_width, 4)
+        self.assertEqual(Word(0, 20, segment_size=4).ideal_hex_width, 5)
+        self.assertEqual(Word(0, 32).ideal_hex_width, 8)
+        self.assertEqual(Word(0, 1, segment_size=1).ideal_hex_width, 1)
+
+    def test_format_hex_default_width(self):
+        """Test __format__ for hex with default (ideal) width."""
+        w8 = Word(0xA, 8)
+        w12 = Word(0xABC, 12, segment_size=4)
+        w16 = Word(0x1234, 16)
+        w32 = Word(0x1A2B3C4D, 32)
+        self.assertEqual(f'{w8:x}', '0a')
+        self.assertEqual(f'{w12:x}', 'abc')
+        self.assertEqual(f'{w16:x}', '1234')
+        self.assertEqual(f'{w32:x}', '1a2b3c4d')
+        self.assertEqual(f'{w8:X}', '0A')
+        self.assertEqual(f'{w12:X}', 'ABC')
+        self.assertEqual(f'{w16:X}', '1234'.upper())
+        self.assertEqual(f'{w32:X}', '1A2B3C4D')
+
+    def test_format_hex_explicit_width(self):
+        """Test __format__ for hex with explicit width."""
+        w8 = Word(0xA, 8)
+        w16 = Word(0x1234, 16)
+        w32 = Word(0x1A2B3C4D, 32)
+        self.assertEqual(f'{w8:04x}', '000a')
+        self.assertEqual(f'{w16:06x}', '001234')
+        self.assertEqual(f'{w32:02x}', '1a2b3c4d')  # width less than ideal, no truncation
+        self.assertEqual(f'{w32:010x}', '001a2b3c4d')  # width more than ideal, zero-padded
+        self.assertEqual(f'{w8:04X}', '000A')
+        self.assertEqual(f'{w16:06X}', '001234')
+        self.assertEqual(f'{w32:010X}', '001A2B3C4D')
+
+    def test_format_octal_default_width(self):
+        """Test __format__ for octal with default (ideal) width."""
+        w8 = Word(0o12, 8)
+        w12 = Word(0o765, 12, segment_size=12)
+        w16 = Word(0o12345, 16)
+        w32 = Word(0o123456701, 32)
+        self.assertEqual(f'{w8:o}', '12')
+        self.assertEqual(f'{w12:o}', '765')
+        self.assertEqual(f'{w16:o}', '12345')
+        self.assertEqual(f'{w32:o}', '123456701')
+        # Uppercase 'O' is not supported
+
+    def test_format_octal_explicit_width(self):
+        """Test __format__ for octal with explicit width."""
+        w8 = Word(0o12, 8)
+        w16 = Word(0o12345, 16)
+        w32 = Word(0o123456701, 32)
+        self.assertEqual(f'{w8:04o}', '0012')
+        self.assertEqual(f'{w16:07o}', '0012345')
+        self.assertEqual(f'{w32:012o}', '000123456701')
+        # Uppercase 'O' is not supported
+
+    def test_format_binary_default_width(self):
+        """Test __format__ for binary with default (ideal) width."""
+        w4 = Word(0b1010, 4, segment_size=4)
+        w8 = Word(0b10101010, 8)
+        w12 = Word(0b101010101010, 12, segment_size=12)
+        self.assertEqual(f'{w4:b}', '1010')
+        self.assertEqual(f'{w8:b}', '10101010')
+        self.assertEqual(f'{w12:b}', '101010101010')
+        # Uppercase 'B' is not supported
+
+    def test_format_binary_explicit_width(self):
+        """Test __format__ for binary with explicit width."""
+        w4 = Word(0b1010, 4, segment_size=4)
+        w8 = Word(0b10101010, 8)
+        w12 = Word(0b101010101010, 12, segment_size=12)
+        self.assertEqual(f'{w4:08b}', '00001010')
+        self.assertEqual(f'{w8:12b}', '    10101010')
+        self.assertEqual(f'{w12:16b}', '    101010101010')
+        # Uppercase 'B' is not supported
+
+    def test_format_decimal_default_width(self):
+        w = Word(42, 8)
+        self.assertEqual(f'{w:d}', '42')
+        w_neg = Word(-42, 8)
+        self.assertEqual(f'{w_neg:d}', '-42')
+
+    def test_format_decimal_explicit_width(self):
+        w = Word(42, 8)
+        self.assertEqual(f'{w:04d}', '0042')
+        w_neg = Word(-42, 8)
+        self.assertEqual(f'{w_neg:04d}', '-042')
+
+    def test_format_unsupported_type_raises(self):
+        w = Word(42, 8)
+        with self.assertRaises(ValueError):
+            format(w, 'f')
+        with self.assertRaises(ValueError):
+            format(w, 'e')
+        with self.assertRaises(ValueError):
+            format(w, 'g')
+        with self.assertRaises(ValueError):
+            format(w, 's')

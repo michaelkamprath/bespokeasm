@@ -1,6 +1,7 @@
 import unittest
 import importlib.resources as pkg_resources
 
+from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.engine import Assembler
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject, LineWithWords
@@ -97,7 +98,7 @@ class TestAssemblerEngine(unittest.TestCase):
         bytecode = Assembler._generate_bytes(
             line_dict,
             max_generated_address,
-            bytearray([0x00]),
+            Word(0, 8, 8, 'big'),
             memzone_mngr.global_zone.start,
             None,
             2,
@@ -200,7 +201,7 @@ class TestAssemblerEngine(unittest.TestCase):
         bytecode = Assembler._generate_bytes(
             line_dict,
             max_generated_address,
-            bytearray([0x00]),
+            Word(0, 16, 16, 'big'),
             memzone_mngr.global_zone.start,
             None,
             2,
@@ -212,8 +213,8 @@ class TestAssemblerEngine(unittest.TestCase):
             bytearray([
                 0, 0,  # address 0
                 8, 0x22, 0x88, 0x99, 0x12, 0x34,  # address 1, 2, 3
-                0x04, 0x02, 0x12, 0x34,  # address 4
-                0x80, 0x01, 0x00, 0x04,  # address 5
+                0x04, 0x02, 0x12, 0x34,  # address 4, 5
+                0x80, 0x01, 0x00, 0x04,  # address 6, 7
             ]),
             'the bytecode should match',
         )

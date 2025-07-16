@@ -1,5 +1,6 @@
 from typing import Literal
 from .word_slice import WordSlice
+import math
 
 
 class Word:
@@ -193,6 +194,21 @@ class Word:
         """Returns the number of segments in the word."""
         return self._bit_size // self._segment_size
 
+    @property
+    def ideal_hex_width(self) -> int:
+        """Returns the ideal width in hex digits for this word's bit size."""
+        return math.ceil(self.bit_size / 4)
+
+    @property
+    def ideal_octal_width(self) -> int:
+        """Returns the ideal width in octal digits for this word's bit size."""
+        return math.ceil(self.bit_size / 3)
+
+    @property
+    def ideal_binary_width(self) -> int:
+        """Returns the ideal width in binary digits for this word's bit size."""
+        return self.bit_size
+
     def to_bytes(self) -> bytes:
         """
         Convert the word to bytes according to the intra-word endianness.
@@ -277,6 +293,22 @@ class Word:
 
     def __str__(self) -> str:
         return f'Word<{self._value} ({self._bit_size} bits, {self._segment_size}-bit segments, {self._intra_word_endianness})>'
+
+    def __format__(self, format_spec):
+        if not format_spec:
+            return str(self.value)
+        type_char = format_spec[-1]
+        width_part = format_spec[:-1]
+        # Only special-case hex for ideal width
+        if type_char in ('x', 'X'):
+            if not width_part:
+                return format(self.value, f'0{self.ideal_hex_width}{type_char}')
+            return format(self.value, format_spec)
+        # For o, b, d: just use int's formatting
+        if type_char in ('o', 'b', 'd'):
+            return format(self.value, format_spec)
+        # If not supported, raise ValueError
+        raise ValueError(f"Unknown format code '{type_char}' for object of type 'Word' = {self}")
 
     def __eq__(self, other) -> bool:
         if isinstance(other, Word):

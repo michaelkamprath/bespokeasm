@@ -40,7 +40,7 @@ def main():
     )
 @click.option(
         '--binary-fill', '-f', default=0,
-        help='The byte value that should be used to fill empty addresses when generating binary image of '
+        help='The word value that should be used to fill empty addresses when generating binary image of '
              'a specific size.'
     )
 @click.option(
