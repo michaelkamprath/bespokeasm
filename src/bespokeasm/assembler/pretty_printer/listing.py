@@ -43,17 +43,19 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         )
 
         cur_filename = None
+        hex_width = Word(0, self._word_size).ideal_hex_width
         for lo in lobjs:
-            # detect a new file
+            # detect a new file and print the file header
             if lo.line_id.filename != cur_filename:
                 # print new file header
                 cur_filename = lo.line_id.filename
-                self._print_file_header(output, cur_filename)
+                self._print_file_header(output, cur_filename, hex_width)
 
-            self._print_line_object(output, lo)
+            # print the line object
+            self._print_line_object(output, lo, hex_width)
         return output.getvalue()
 
-    def _print_file_header(self, output: io.StringIO, filename: str) -> None:
+    def _print_file_header(self, output: io.StringIO, filename: str, hex_width: int) -> None:
         COMMENT_HEADER = 'comment'
         comment_header_width = len(COMMENT_HEADER) if len(COMMENT_HEADER) > self.max_comment_width else self.max_comment_width
 
@@ -61,7 +63,7 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         output.write(
             '-'*(self.max_line_num_width + 2) + '+' +
             '-'*(self._address_size + 2) + '+' +
-            '-'*(self._bytes_per_line*3 + 1) + '+' +
+            '-'*(self._bytes_per_line*(hex_width+1) + 1) + '+' +
             '-'*(self.max_instruction_width + 2) + '+' +
             '-'*(comment_header_width + 2) + '\n'
         )
@@ -90,7 +92,7 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         output.write(
             'line'.center(self.max_line_num_width + 2) + '|' +
             address_header.center(self._address_size + 2) + '|' +
-            bytes_header.center(self._bytes_per_line*3 + 1) + '|' +
+            bytes_header.center(self._bytes_per_line*(hex_width+1) + 1) + '|' +
             instruction_header.ljust(self.max_instruction_width + 2) + '|' +
             f' {COMMENT_HEADER}\n'
         )
@@ -98,12 +100,12 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         output.write(
             '-'*(self.max_line_num_width + 2) + '+' +
             '-'*(self._address_size + 2) + '+' +
-            '-'*(self._bytes_per_line*3 + 1) + '+' +
+            '-'*(self._bytes_per_line*(hex_width+1) + 1) + '+' +
             '-'*(self.max_instruction_width + 2) + '+' +
             '-'*(comment_header_width + 2) + '\n'
         )
 
-    def _print_line_object(self, output: io.StringIO, lobj: LineObject) -> None:
+    def _print_line_object(self, output: io.StringIO, lobj: LineObject, hex_width: int) -> None:
         # wite the lobj details to output using the following format:
         #    line number in decimal | address in hex | machine code in hex (6 bytes wide) | instruction text | comment text
         #     1 | 0000 | 00 00 00 00 00 00 | nop | this is a comment
@@ -142,7 +144,7 @@ class ListingPrettyPrinter(PrettyPrinterBase):
             except IndexError:
                 sys.exit(f'ERROR - internal: line_bytes is empty for line {lobj} at {lobj.line_id}')
         else:
-            output.write(' ' * self._bytes_per_line * 3)
+            output.write(' ' * (self._bytes_per_line * (hex_width+1)))
         output.write('| ')
 
         # write the instruction

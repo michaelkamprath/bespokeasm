@@ -1247,5 +1247,8 @@ class TestLineObject(unittest.TestCase):
         self.assertIsInstance(lo2[4], InstructionLine)
 
 
+# TestDataLineWordSizes has been moved to test/test_data_line_word_sizes.py
+
+
 if __name__ == '__main__':
     unittest.main()

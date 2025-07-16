@@ -123,11 +123,20 @@ class DataLine(LineWithWords):
 
     @property
     def word_count(self) -> int:
-        # TODO: reconcile this to final rules for data compilation
-        return math.ceil(self.byte_size*8 / self._word_size)
+        """Returns the number of words this data line will generate, matching generate_words logic."""
+        word_size_bytes = self._word_size // 8
+        count = 0
+        for arg_item in self._arg_value_list:
+            value_size = DataLine.DIRECTIVE_VALUE_BYTE_SIZE[self._directive]
+            if value_size <= word_size_bytes:
+                count += 1
+            else:
+                # Value is larger than word size, split across multiple words
+                count += math.ceil(value_size / word_size_bytes)
+        return count
 
     def generate_words(self):
-        """Finalize the data bytes for this line with the label assignemnts"""
+        """Finalize the data bytes for this line with the label assignments, matching documentation rules."""
         for arg_item in self._arg_value_list:
             if isinstance(arg_item, int):
                 arg_val = arg_item
@@ -136,23 +145,28 @@ class DataLine(LineWithWords):
                 arg_val = e.get_value(self.label_scope, self.line_id)
             else:
                 sys.exit(f'ERROR: line {self.line_id} - unknown data item "{arg_item}"')
-            try:
-                value_bytes = (arg_val & DataLine.DIRECTIVE_VALUE_MASK[self._directive]).to_bytes(
-                    DataLine.DIRECTIVE_VALUE_BYTE_SIZE[self._directive],
-                    byteorder=self._multi_word_endianness,
-                    # since we are masking the value to a specific byte size, the signed
-                    # argument should always be False
-                    signed=False,
+            value_size = DataLine.DIRECTIVE_VALUE_BYTE_SIZE[self._directive]
+            value_mask = DataLine.DIRECTIVE_VALUE_MASK[self._directive]
+            masked_val = arg_val & value_mask
+            # If value size <= word size, put in its own word, zero-extended
+            if value_size <= self._word_size // 8:
+                # Place in least significant bits, zero-extended
+                self._words.append(
+                    Word(masked_val, self._word_size, self._word_segment_size, self._intra_word_endianness)
                 )
-            except OverflowError as oe:
-                sys.exit(
-                    f'ERROR - {self.line_id}: Overflow error when converting value ({arg_val}) to '
-                    f'bytes on dataline. Error = {oe}'
-                )
-            words = Word.from_bytes(
-                value_bytes,
-                self._word_size,
-                self._word_segment_size,
-                self._intra_word_endianness,
-            )
-            self._words.extend(words)
+            else:
+                # Value is larger than word size, split across multiple words
+                total_bytes = value_size
+                word_bytes = self._word_size // 8
+                value_bytes = masked_val.to_bytes(total_bytes, byteorder=self._multi_word_endianness, signed=False)
+                # Split into word-sized chunks
+                for i in range(0, total_bytes, word_bytes):
+                    chunk = value_bytes[i:i+word_bytes]
+                    # Pad chunk if not full word
+                    if len(chunk) < word_bytes:
+                        chunk = (b'\x00' * (word_bytes - len(chunk))) + chunk if self._multi_word_endianness == 'big' \
+                            else chunk + (b'\x00' * (word_bytes - len(chunk)))
+                    wval = int.from_bytes(chunk, byteorder=self._multi_word_endianness)
+                    self._words.append(
+                        Word(wval, self._word_size, self._word_segment_size, self._intra_word_endianness)
+                    )
