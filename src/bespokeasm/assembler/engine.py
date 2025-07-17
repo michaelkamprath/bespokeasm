@@ -187,6 +187,7 @@ class Assembler:
                 fill_word,
                 self._binary_start,
                 self._binary_end,
+                self._verbose,
             )
             click.echo(f'Writing {len(bytecode)} bytes of byte code to {self._output_file}')
             with open(self._output_file, 'wb') as f:
