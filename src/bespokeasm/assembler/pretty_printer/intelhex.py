@@ -1,4 +1,5 @@
 import io
+import sys
 
 from intelhex import IntelHex
 
@@ -12,6 +13,9 @@ from bespokeasm.assembler.line_object.directive_line.address import AddressOrgLi
 class IntelHexPrettyPrinter(PrettyPrinterBase):
     def __init__(self, line_objs:  list[LineObject], model: AssemblerModel, as_intel_hex: bool) -> None:
         super().__init__(line_objs, model)
+        if model.word_size != 8:
+            sys.exit(f'ERROR - {"Intel " if as_intel_hex else ""}Hex Pretty '
+                     f'Printer only supports 8-bit words')
         self._intel_hex = IntelHex()
         self._as_intel_hex = as_intel_hex
 

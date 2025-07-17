@@ -1,4 +1,5 @@
 import io
+import sys
 
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.line_object import LineWithWords, LineObject
@@ -9,6 +10,8 @@ from bespokeasm.assembler.line_object.directive_line.address import AddressOrgLi
 
 class MinHexPrettyPrinter(PrettyPrinterBase):
     def __init__(self, line_objs:  list[LineObject], model: AssemblerModel) -> None:
+        if model.word_size != 8:
+            sys.exit('ERROR - Min Hex Pretty Printer only supports 8-bit words')
         super().__init__(line_objs, model)
 
     def pretty_print(self) -> str:
