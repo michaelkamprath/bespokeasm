@@ -68,6 +68,10 @@ class TestValue(unittest.TestCase):
         value = Value(0, word_bit_size=8, segment_size=3)
         self.assertEqual(value.segment_size, 8)  # Should be adjusted to word_bit_size
 
+        # Test case: segment_size is not a divisor of word_bit_size (16-bit word, segment_size=5)
+        value = Value(0, word_bit_size=16, segment_size=5)
+        self.assertEqual(value.segment_size, 16)  # Adjusted to word_bit_size
+
         # Segment size greater than word bit size
         with self.assertRaises(ValueError):
             Value(0, word_bit_size=4, segment_size=8)

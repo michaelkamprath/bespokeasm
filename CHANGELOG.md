@@ -20,13 +20,17 @@ Changes that are planned but not implemented yet:
 * Allow multiple `cstr` defininitions on the same line
 
 ## [Unreleased]
+
+## [0.5.0]
+* Major refactoring of the code base the enables support for data words of any size. See [Data Words and Endianness](https://github.com/michaelkamprath/bespokeasm/wiki/Instruction-Set-Configuration-File#data-words-and-endianness) for more information.This is a **BREAKING CHANGE** for the configuration file.
+  * The `endian` general configuration option is deprecated and replaced with `multi_word_endianness` and `intra_word_endianness`.
+  * The `byte_size` configuration options used in many places is deprecated and replaced with `word_size`. Similarly, the `byte_align` configuration option is deprecated and replaced with `word_align`.
 * Upgrade python version requirements to 3.11
 * Improved several error messages
 * Fixed a bug where embedded strings weren't properly parsed if they contained a newline character or there were multiple embedded strings per line
 * Fixed a bug where parsing properly discriminate between labels starting with `BYTE` string and the `BYTEx()` operator.
 * Fixed a bug in generating the syntax highlighting configuration that caused mnemonics with special characters to not be highlighted properly.
 * Added support for symbol definitions in Sublime Text. Symbols defined are labels and constants.
-* Implemented support for data words sized other than 8 bits. Address values point to data words, which can be any bit size greater than 0. The default is 8 bits, but this can be changed in the `general` section of the configuration file with the `data_word_size` option.
 
 ## [0.4.2]
 *  Added support for The Minimal 64x4 Home Computer with an example and updated assembler functionality to support it.
@@ -165,7 +169,8 @@ First tracked released
 * Enabled the `reverse_argument_order` instruction option be applied to a specific operand configuration. This slightly changed the configuration file format.
 * Added ability for instructions with operands to have a single "empty operand" variant, e.g., `pop`
 
-[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/michaelkamprath/bespokeasm/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/michaelkamprath/bespokeasm/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.3.3...v0.4.0
