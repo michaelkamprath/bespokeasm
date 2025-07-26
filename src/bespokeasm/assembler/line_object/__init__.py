@@ -1,3 +1,5 @@
+from typing import Literal
+from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.memory_zone import MemoryZone
@@ -50,8 +52,8 @@ class LineObject:
         return self._address
 
     @property
-    def byte_size(self) -> int:
-        """Returns the number of bytes this line will generate"""
+    def word_count(self) -> int:
+        """Returns the number of words this line will generate"""
         return 0
 
     @property
@@ -99,23 +101,37 @@ class LineObject:
         self._is_muted = value
 
 
-class LineWithBytes(LineObject):
-    def __init__(self, line_id: LineIdentifier, instruction: str, comment: str, memzone: MemoryZone):
+class LineWithWords(LineObject):
+    def __init__(
+        self,
+        line_id: LineIdentifier,
+        instruction: str,
+        comment: str,
+        memzone: MemoryZone,
+        word_size: int,
+        word_segment_size: int,
+        intra_word_endianness: Literal['little', 'big'],
+        multi_word_endianness: Literal['little', 'big'],
+    ) -> None:
         super().__init__(line_id, instruction, comment, memzone)
-        self._bytes = bytearray()
+        self._words: list[Word] = []
+        self._word_size = word_size
+        self._word_segment_size = word_segment_size
+        self._intra_word_endianness = intra_word_endianness
+        self._multi_word_endianness = multi_word_endianness
 
-    def generate_bytes(self) -> None:
-        """Finalize the bytes for this line with the label assignemnts
+    def generate_words(self) -> None:
+        """Finalize the words for this line with the label assignemnts
 
         Must be overriden by subclass to extend the self._bytes instance variable or
         use the self._append_byte() method.
         """
         raise NotImplementedError
 
-    def get_bytes(self) -> bytearray:
+    def get_words(self) -> list[Word]:
         """Returns current state of constructed bytes"""
-        return self._bytes
+        return self._words
 
-    def _append_byte(self, byte_value: int):
+    def _append_word(self, word: Word):
         """appends the passed byte value to this objects bytes"""
-        self._bytes.append(byte_value & 0xFF)
+        self._words.append(word)

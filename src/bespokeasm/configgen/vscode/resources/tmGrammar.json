@@ -240,15 +240,41 @@
       ]
     },
     "labels": {
-      "captures": {
-        "1": {
-          "name": "variable.other.label"
+      "patterns": [
+        {
+          "captures": {
+            "1": {
+              "name": "variable.other.label.global"
+            },
+            "2": {
+              "name": "punctuation.definition.variable.colon.label"
+            }
+          },
+          "match": "([a-zA-Z]{1}[\\w\\d_]*)(\\:)"
         },
-        "2": {
-          "name": "punctuation.definition.variable.colon.label"
+        {
+          "captures": {
+            "1": {
+              "name": "variable.other.label.local"
+            },
+            "2": {
+              "name": "punctuation.definition.variable.colon.label"
+            }
+          },
+          "match": "(\\.{1}[\\w\\d_]*)(\\:)"
+        },
+        {
+          "captures": {
+            "1": {
+              "name": "variable.other.label.file"
+            },
+            "2": {
+              "name": "punctuation.definition.variable.colon.label"
+            }
+          },
+          "match": "(_{1}[\\w\\d_]*)(\\:)"
         }
-      },
-      "match": "((?:\\.|_|\\w){1}[\\w\\d_]*)(\\:)"
+      ]
     },
     "macros": {
       "begin": "(?i)(##MACROS##)",

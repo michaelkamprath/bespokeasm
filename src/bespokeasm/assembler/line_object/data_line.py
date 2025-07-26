@@ -1,13 +1,16 @@
+import math
 import re
 import sys
+from typing import Literal
 
+from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.line_object import LineWithBytes, INSTRUCTION_EXPRESSION_PATTERN
+from bespokeasm.assembler.line_object import LineWithWords, INSTRUCTION_EXPRESSION_PATTERN
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.expression import parse_expression, ExpressionNode
 
 
-class DataLine(LineWithBytes):
+class DataLine(LineWithWords):
     PATTERN_DATA_DIRECTIVE = re.compile(
         r'^(\.byte|\.2byte|\.4byte|\.8byte|\.cstr|\.asciiz)\b\s*(?:(?P<quote>[\"\'])((?:\\(?P=quote)|.)*)(?P=quote)'
         r'|({}(?:\s*\,{})*))'.format(INSTRUCTION_EXPRESSION_PATTERN, INSTRUCTION_EXPRESSION_PATTERN),
@@ -36,10 +39,13 @@ class DataLine(LineWithBytes):
             line_id: LineIdentifier,
             line_str: str,
             comment: str,
-            endian: str,
             current_memzone: MemoryZone,
+            word_size: int,
+            word_segment_size: int,
+            intra_word_endianness: Literal['little', 'big'],
+            multi_word_endianness: Literal['little', 'big'],
             cstr_terminator: int = 0,
-    ) -> LineWithBytes:
+    ) -> LineWithWords:
         """Tries to match the passed line string to the data directive pattern.
         If succcessful, returns a constructed DataLine object. If not, None is
         returned.
@@ -72,8 +78,11 @@ class DataLine(LineWithBytes):
                 values_list,
                 line_str,
                 comment,
-                endian,
                 current_memzone,
+                word_size,
+                word_segment_size,
+                intra_word_endianness,
+                multi_word_endianness,
             )
         else:
             return None
@@ -85,13 +94,24 @@ class DataLine(LineWithBytes):
             value_list: list,
             instruction: str,
             comment: str,
-            endian: str,
             current_memzone: MemoryZone,
+            word_size: int,
+            word_segment_size: int,
+            intra_word_endianness: Literal['little', 'big'],
+            multi_word_endianness: Literal['little', 'big'],
     ) -> None:
-        super().__init__(line_id, instruction, comment, current_memzone)
+        super().__init__(
+            line_id,
+            instruction,
+            comment,
+            current_memzone,
+            word_size,
+            word_segment_size,
+            intra_word_endianness,
+            multi_word_endianness,
+        )
         self._arg_value_list = value_list
         self._directive = directive_str
-        self._endian = endian
 
     def __str__(self):
         return f'DataLine<{self._directive}: {self._arg_value_list}>'
@@ -101,8 +121,22 @@ class DataLine(LineWithBytes):
         """Returns the number of bytes this data line will generate"""
         return len(self._arg_value_list)*DataLine.DIRECTIVE_VALUE_BYTE_SIZE[self._directive]
 
-    def generate_bytes(self):
-        """Finalize the data bytes for this line with the label assignemnts"""
+    @property
+    def word_count(self) -> int:
+        """Returns the number of words this data line will generate, matching generate_words logic."""
+        word_size_bytes = self._word_size // 8
+        count = 0
+        for arg_item in self._arg_value_list:
+            value_size = DataLine.DIRECTIVE_VALUE_BYTE_SIZE[self._directive]
+            if value_size <= word_size_bytes:
+                count += 1
+            else:
+                # Value is larger than word size, split across multiple words
+                count += math.ceil(value_size / word_size_bytes)
+        return count
+
+    def generate_words(self):
+        """Finalize the data bytes for this line with the label assignments, matching documentation rules."""
         for arg_item in self._arg_value_list:
             if isinstance(arg_item, int):
                 arg_val = arg_item
@@ -111,18 +145,28 @@ class DataLine(LineWithBytes):
                 arg_val = e.get_value(self.label_scope, self.line_id)
             else:
                 sys.exit(f'ERROR: line {self.line_id} - unknown data item "{arg_item}"')
-            try:
-                value_bytes = (arg_val & DataLine.DIRECTIVE_VALUE_MASK[self._directive]).to_bytes(
-                    DataLine.DIRECTIVE_VALUE_BYTE_SIZE[self._directive],
-                    byteorder=self._endian,
-                    # since we are masking the value to a specific byte size, the signed
-                    # argument should always be False
-                    signed=False,
+            value_size = DataLine.DIRECTIVE_VALUE_BYTE_SIZE[self._directive]
+            value_mask = DataLine.DIRECTIVE_VALUE_MASK[self._directive]
+            masked_val = arg_val & value_mask
+            # If value size <= word size, put in its own word, zero-extended
+            if value_size <= self._word_size // 8:
+                # Place in least significant bits, zero-extended
+                self._words.append(
+                    Word(masked_val, self._word_size, self._word_segment_size, self._intra_word_endianness)
                 )
-            except OverflowError as oe:
-                sys.exit(
-                    f'ERROR - {self.line_id}: Overflow error when converting value ({arg_val}) to '
-                    f'bytes on dataline. Error = {oe}'
-                )
-            for b in value_bytes:
-                self._append_byte(b)
+            else:
+                # Value is larger than word size, split across multiple words
+                total_bytes = value_size
+                word_bytes = self._word_size // 8
+                value_bytes = masked_val.to_bytes(total_bytes, byteorder=self._multi_word_endianness, signed=False)
+                # Split into word-sized chunks
+                for i in range(0, total_bytes, word_bytes):
+                    chunk = value_bytes[i:i+word_bytes]
+                    # Pad chunk if not full word
+                    if len(chunk) < word_bytes:
+                        chunk = (b'\x00' * (word_bytes - len(chunk))) + chunk if self._multi_word_endianness == 'big' \
+                            else chunk + (b'\x00' * (word_bytes - len(chunk)))
+                    wval = int.from_bytes(chunk, byteorder=self._multi_word_endianness)
+                    self._words.append(
+                        Word(wval, self._word_size, self._word_segment_size, self._intra_word_endianness)
+                    )

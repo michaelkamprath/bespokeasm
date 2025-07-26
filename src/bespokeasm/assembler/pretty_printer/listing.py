@@ -2,7 +2,8 @@ import io
 import math
 import sys
 
-from bespokeasm.assembler.line_object import LineObject, LineWithBytes
+from bespokeasm.assembler.bytecode.word import Word
+from bespokeasm.assembler.line_object import LineObject, LineWithWords
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.line_object.directive_line.memzone import SetMemoryZoneLine
 from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
@@ -24,6 +25,7 @@ class ListingPrettyPrinter(PrettyPrinterBase):
             ListingPrettyPrinter.MAX_NUM_BYTES_PER_LINE,
             self.max_byte_count,
         )
+        self._word_size = model.word_size
 
     def pretty_print(self) -> str:
         if len(self.line_objects) < 1:
@@ -41,17 +43,19 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         )
 
         cur_filename = None
+        hex_width = Word(0, self._word_size).ideal_hex_width
         for lo in lobjs:
-            # detect a new file
+            # detect a new file and print the file header
             if lo.line_id.filename != cur_filename:
                 # print new file header
                 cur_filename = lo.line_id.filename
-                self._print_file_header(output, cur_filename)
+                self._print_file_header(output, cur_filename, hex_width)
 
-            self._print_line_object(output, lo)
+            # print the line object
+            self._print_line_object(output, lo, hex_width)
         return output.getvalue()
 
-    def _print_file_header(self, output: io.StringIO, filename: str) -> None:
+    def _print_file_header(self, output: io.StringIO, filename: str, hex_width: int) -> None:
         COMMENT_HEADER = 'comment'
         comment_header_width = len(COMMENT_HEADER) if len(COMMENT_HEADER) > self.max_comment_width else self.max_comment_width
 
@@ -59,7 +63,7 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         output.write(
             '-'*(self.max_line_num_width + 2) + '+' +
             '-'*(self._address_size + 2) + '+' +
-            '-'*(self._bytes_per_line*3 + 1) + '+' +
+            '-'*(self._bytes_per_line*(hex_width+1) + 1) + '+' +
             '-'*(self.max_instruction_width + 2) + '+' +
             '-'*(comment_header_width + 2) + '\n'
         )
@@ -74,9 +78,15 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         if self._bytes_per_line >= 5:
             bytes_header = 'machine code'
         elif self._bytes_per_line >= 2:
-            bytes_header = 'bytes'
+            if self._word_size == 8:
+                bytes_header = 'bytes'
+            else:
+                bytes_header = 'words'
         else:
-            bytes_header = 'b'
+            if self._word_size == 8:
+                bytes_header = 'b'
+            else:
+                bytes_header = 'w'
 
         if self.max_instruction_width >= 11:
             instruction_header = ' instruction'
@@ -88,7 +98,7 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         output.write(
             'line'.center(self.max_line_num_width + 2) + '|' +
             address_header.center(self._address_size + 2) + '|' +
-            bytes_header.center(self._bytes_per_line*3 + 1) + '|' +
+            bytes_header.center(self._bytes_per_line*(hex_width+1) + 1) + '|' +
             instruction_header.ljust(self.max_instruction_width + 2) + '|' +
             f' {COMMENT_HEADER}\n'
         )
@@ -96,12 +106,12 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         output.write(
             '-'*(self.max_line_num_width + 2) + '+' +
             '-'*(self._address_size + 2) + '+' +
-            '-'*(self._bytes_per_line*3 + 1) + '+' +
+            '-'*(self._bytes_per_line*(hex_width+1) + 1) + '+' +
             '-'*(self.max_instruction_width + 2) + '+' +
             '-'*(comment_header_width + 2) + '\n'
         )
 
-    def _print_line_object(self, output: io.StringIO, lobj: LineObject) -> None:
+    def _print_line_object(self, output: io.StringIO, lobj: LineObject, hex_width: int) -> None:
         # wite the lobj details to output using the following format:
         #    line number in decimal | address in hex | machine code in hex (6 bytes wide) | instruction text | comment text
         #     1 | 0000 | 00 00 00 00 00 00 | nop | this is a comment
@@ -116,8 +126,12 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         #
 
         # first, get the line bytes, if any
-        line_bytes = None if not isinstance(lobj, LineWithBytes) \
-                        else ListingPrettyPrinter._generate_bytecode_line_string(lobj.get_bytes(), self._bytes_per_line)
+        line_bytes = None if not isinstance(lobj, LineWithWords) \
+                        else ListingPrettyPrinter._generate_bytecode_line_string(
+                            lobj.get_words(),
+                            self._bytes_per_line,
+                            self._word_size,
+                        )
 
         # write the line number
         output.write(f' {lobj.line_id.line_num:{self.max_line_num_width}d} | ')
@@ -136,7 +150,7 @@ class ListingPrettyPrinter(PrettyPrinterBase):
             except IndexError:
                 sys.exit(f'ERROR - internal: line_bytes is empty for line {lobj} at {lobj.line_id}')
         else:
-            output.write(' ' * self._bytes_per_line * 3)
+            output.write(' ' * (self._bytes_per_line * (hex_width+1)))
         output.write('| ')
 
         # write the instruction
@@ -161,7 +175,12 @@ class ListingPrettyPrinter(PrettyPrinterBase):
                 )
 
     @classmethod
-    def _generate_bytecode_line_string(cls, line_bytes: bytearray, bytes_per_str: int) -> list[str]:
+    def _generate_bytecode_line_string(
+        cls,
+        line_words: list[Word],
+        words_per_str: int,
+        word_size: int,
+    ) -> list[str]:
         # convert the line_bytes to a list of strings, each string being a hex representation of a byte.
         # Each line should contain at most 6 bytes. There should be as many strings in the return list
         # as needed for each string to contain up to 6 bytes of line_bytes. The first byt through 6th byte
@@ -181,13 +200,14 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         #
         results: list[str] = []
         cur_str = None
-        for b in line_bytes:
+        hex_width = Word(0, word_size).ideal_hex_width
+        for w in line_words:
             if cur_str is None:
                 cur_str = ''
-            cur_str += f'{b:02x} '
-            if len(cur_str) == bytes_per_str*3:
+            cur_str += f'{w:x} '
+            if len(cur_str) == words_per_str*(hex_width+1):
                 results.append(cur_str)
                 cur_str = None
         if cur_str is not None:
-            results.append(f'{cur_str:<{bytes_per_str*3}}')
+            results.append(f'{cur_str:<{words_per_str*(hex_width+1)}}')
         return results

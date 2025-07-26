@@ -1,7 +1,7 @@
 description: Intel 8085
 general:
   address_size: 16
-  endian: little
+  multi_word_endianness: little
   registers:
     - a
     - b
@@ -21,7 +21,7 @@ general:
     name: intel-8085-asm
     version: "0.1.0"
     extension: a85
-  min_version: 0.3.0
+  min_version: 0.5.0
 operand_sets:
   8_bit_source:
     operand_values:

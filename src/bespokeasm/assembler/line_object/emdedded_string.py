@@ -3,9 +3,12 @@
 # embedded string feature must be enabled in the ISA configuration file, whether there is a
 # termination character or not to be included in the bytecode.
 from __future__ import annotations
+import math
 import re
+from typing import Literal
 
-from bespokeasm.assembler.line_object import LineWithBytes
+from bespokeasm.assembler.bytecode.word import Word
+from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.line_identifier import LineIdentifier
 
@@ -13,7 +16,7 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 EMBEDDED_STRING_PATTERN = r'(?P<quote>[\"])((?:\\(?P=quote)|.|\n)*?)(?P=quote)'
 
 
-class EmbeddedString(LineWithBytes):
+class EmbeddedString(LineWithWords):
     QUOTED_STRING_PATTERN = re.compile(
         rf'^{EMBEDDED_STRING_PATTERN}',
         flags=re.IGNORECASE | re.MULTILINE | re.DOTALL
@@ -26,6 +29,10 @@ class EmbeddedString(LineWithBytes):
             instruction: str,
             comment: str,
             current_memzone: MemoryZone,
+            word_size: int,
+            word_segment_size: int,
+            intra_word_endianness: Literal['little', 'big'],
+            multi_word_endianness: Literal['little', 'big'],
             cstr_terminator: int = 0,
     ) -> EmbeddedString:
         # detyermine if string starts with a quoted string
@@ -33,7 +40,18 @@ class EmbeddedString(LineWithBytes):
         if match is None or len(match.groups()) != 2:
             return None
 
-        return EmbeddedString(line_id, match.group(0), match.group(2), comment, current_memzone, cstr_terminator)
+        return EmbeddedString(
+            line_id,
+            match.group(0),
+            match.group(2),
+            comment,
+            current_memzone,
+            word_size,
+            word_segment_size,
+            intra_word_endianness,
+            multi_word_endianness,
+            cstr_terminator,
+        )
 
     def __init__(
             self,
@@ -42,9 +60,22 @@ class EmbeddedString(LineWithBytes):
             quoted_string: str,
             comment: str,
             current_memzone: MemoryZone,
+            word_size: int,
+            word_segment_size: int,
+            intra_word_endianness: Literal['little', 'big'],
+            multi_word_endianness: Literal['little', 'big'],
             cstr_terminator: int = 0,
     ) -> None:
-        super().__init__(line_id, instruction, comment, current_memzone)
+        super().__init__(
+            line_id,
+            instruction,
+            comment,
+            current_memzone,
+            word_size,
+            word_segment_size,
+            intra_word_endianness,
+            multi_word_endianness,
+        )
         self._string_bytes = \
             [ord(x) for x in list(bytes(quoted_string, 'utf-8').decode('unicode_escape'))] \
             + [cstr_terminator]
@@ -57,6 +88,12 @@ class EmbeddedString(LineWithBytes):
         """Returns the number of bytes this data line will generate"""
         return len(self._string_bytes)
 
-    def generate_bytes(self) -> None:
+    @property
+    def word_count(self) -> int:
+        # TODO: reconcile this to final rules for data compilation
+        return math.ceil(self.byte_size*8 / self._word_size)
+
+    def generate_words(self) -> None:
         # set the bytes
-        self._bytes.extend(self._string_bytes)
+        for c in self._string_bytes:
+            self._words.append(Word(c, self._word_size, self._word_segment_size, self._intra_word_endianness))

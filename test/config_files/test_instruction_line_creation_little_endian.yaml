@@ -2,10 +2,11 @@
 description: Little Endian Line Creation
 general :
   address_size: 16
-  endian: little
+  multi_word_endianness: little
   identifier:
     name: bespokeasm-test
     version: "0.3.0"
+  min_version: "0.5.0"
 registers:
 operand_sets:
   2byte_value:
@@ -13,22 +14,22 @@ operand_sets:
       int16:
         type: numeric
         argument:
-          byte_align: true
+          word_align: true
           size: 16
-          endian: big
+          multi_word_endian: big
   address:
     operand_values:
       addr:
         type: numeric
         argument:
-          byte_align: true
+          word_align: true
           size: 16
   4bit:
     operand_values:
       little_int:
         type: numeric
         argument:
-          byte_align: false
+          word_align: false
           size: 4
 instructions:
   lda:

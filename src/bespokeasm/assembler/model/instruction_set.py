@@ -1,4 +1,5 @@
 import sys
+from typing import Literal
 
 from bespokeasm.assembler.model.instruction import Instruction
 from bespokeasm.assembler.model.instruction_macro import InstructionMacro
@@ -13,8 +14,11 @@ class InstructionSet(dict[str, InstructionBase]):
                 instructions_config: dict,
                 macros_config: dict,
                 operand_set_collection: OperandSetCollection,
-                default_endian: str,
-                registers: set[str]
+                default_multi_word_endian: Literal['big', 'little'],
+                default_intra_word_endian: Literal['big', 'little'],
+                registers: set[str],
+                word_size: int,
+                word_segment_size: int,
             ):
         self._instructions_config = instructions_config
         self._macros_config = macros_config
@@ -27,7 +31,16 @@ class InstructionSet(dict[str, InstructionBase]):
             mnemonic = mnemonic.lower()
             if mnemonic in lower_keywords:
                 sys.exit(f'ERROR - ISA configuration defined instruction "{mnemonic}" which is also a BespokeASM keyword')
-            self[mnemonic] = Instruction(mnemonic, instr_config, operand_set_collection, default_endian, registers)
+            self[mnemonic] = Instruction(
+                mnemonic,
+                instr_config,
+                operand_set_collection,
+                default_multi_word_endian,
+                default_intra_word_endian,
+                registers,
+                word_size,
+                word_segment_size,
+            )
             self._instruction_mnemonics.add(mnemonic)
 
         if self._macros_config is not None:
@@ -41,7 +54,16 @@ class InstructionSet(dict[str, InstructionBase]):
                 if mnemonic in self:
                     sys.exit(f'ERROR - Macro "{mnemonic}" has same mnemonic as a configured instruction.')
                 macro_list.append(
-                    InstructionMacro(mnemonic, macro_config_list, operand_set_collection, default_endian, registers)
+                    InstructionMacro(
+                        mnemonic,
+                        macro_config_list,
+                        operand_set_collection,
+                        default_multi_word_endian,
+                        default_intra_word_endian,
+                        registers,
+                        word_size,
+                        word_segment_size,
+                    )
                 )
             for macro in macro_list:
                 self[macro.mnemonic] = macro

@@ -2,7 +2,7 @@
 description: Test Instructions with Variants
 general:
   address_size: 16
-  endian: little
+  multi_word_endianness: little
   registers:
     - a
     - i
@@ -40,7 +40,7 @@ operand_sets:
           max: 127
           min: -128
           size: 8
-          byte_align: true
+          word_align: true
       defered_indexed_hl:
         type: indirect_indexed_register
         register: hl
@@ -52,7 +52,7 @@ operand_sets:
             type: indirect_numeric
             argument:
               size: 8
-              byte_align: true
+              word_align: true
       indirect_addr:
         type: indirect_numeric
         bytecode:
@@ -60,7 +60,7 @@ operand_sets:
           size: 3
         argument:
           size: 16
-          byte_align: true
+          word_align: true
       direct_value:
         type: numeric
         bytecode:
@@ -68,7 +68,7 @@ operand_sets:
           size: 3
         argument:
           size: 8
-          byte_align: true
+          word_align: true
   8_bit_destination:
     operand_values:
       register_a:
@@ -93,7 +93,7 @@ operand_sets:
           max: 127
           min: -128
           size: 8
-          byte_align: true
+          word_align: true
       indirect_addr:
         type: indirect_numeric
         bytecode:
@@ -101,7 +101,7 @@ operand_sets:
           size: 3
         argument:
           size: 16
-          byte_align: true
+          word_align: true
   hl_subregisters:
     operand_values:
       subregister_h:
@@ -153,7 +153,7 @@ operand_sets:
               max: 127
               min: -128
               size: 8
-              byte_align: true
+              word_align: true
       register_mar:
         type: indirect_indexed_register
         register: mar
@@ -186,7 +186,7 @@ operand_sets:
               size: 2
             argument:
               size: 8
-              byte_align: true
+              word_align: true
   address_source:
     operand_values:
       register_hl:
@@ -238,7 +238,7 @@ operand_sets:
               max: 255
               min: 0
               size: 8
-              byte_align: true
+              word_align: true
   hl_indexed:
     operand_values:
       register_hl:
@@ -276,7 +276,7 @@ operand_sets:
               max: 255
               min: 0
               size: 8
-              byte_align: true
+              word_align: true
   8_bit_indirect_registers_with_decorators:
     operand_values:
       inc_hl:
@@ -287,7 +287,7 @@ operand_sets:
           size: 3
         offset:
           size: 8
-          byte_align: true
+          word_align: true
         decorator:
           type: plus
           is_prefix: false
@@ -299,7 +299,7 @@ operand_sets:
           size: 3
         offset:
           size: 8
-          byte_align: true
+          word_align: true
         decorator:
           type: minus
           is_prefix: false
@@ -347,7 +347,7 @@ operand_sets:
               size: 2
             argument:
               size: 8
-              byte_align: true
+              word_align: true
 instructions:
   nop:
     bytecode:
@@ -382,7 +382,7 @@ instructions:
                 max: 127
                 min: -128
                 size: 8
-                byte_align: true
+                word_align: true
     variants:
       # sourced from h and l registers
       - bytecode:

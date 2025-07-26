@@ -1,7 +1,7 @@
 description: Example ISA
 general:
   address_size: 16
-  endian: little
+  multi_word_endianness: little
   registers:
     - a
     - i
@@ -34,7 +34,7 @@ operand_sets:
           max: 127
           min: -128
           size: 8
-          byte_align: true
+          word_align: true
       indirect_addr:
         type: indirect_numeric
         bytecode:
@@ -42,7 +42,7 @@ operand_sets:
           size: 3
         argument:
           size: 16
-          byte_align: true
+          word_align: true
       direct_value:
         type: numeric
         bytecode:
@@ -50,7 +50,7 @@ operand_sets:
           size: 3
         argument:
           size: 8
-          byte_align: true
+          word_align: true
   8_bit_destination:
     operand_values:
       a:
@@ -81,7 +81,7 @@ operand_sets:
           max: 127
           min: -128
           size: 8
-          byte_align: true
+          word_align: true
       indirect_addr:
         type: indirect_numeric
         bytecode:
@@ -89,21 +89,21 @@ operand_sets:
           size: 3
         argument:
           size: 16
-          byte_align: true
+          word_align: true
   int8:
     operand_values:
       int8:
         type: numeric
         argument:
           size: 8
-          byte_align: true
+          word_align: true
   int16:
     operand_values:
       int16:
         type: numeric
         argument:
           size: 16
-          byte_align: true
+          word_align: true
 instructions:
   nop:
     bytecode:
@@ -162,7 +162,7 @@ instructions:
                 max: 127
                 min: -128
                 size: 8
-                byte_align: true
+                word_align: true
               bytecode:
                 value: 0b101
                 size: 3
@@ -182,7 +182,7 @@ instructions:
                 max: 127
                 min: -128
                 size: 8
-                byte_align: true
+                word_align: true
               bytecode:
                 value: 0b101
                 size: 3
@@ -193,7 +193,7 @@ instructions:
                 max: 127
                 min: -128
                 size: 8
-                byte_align: true
+                word_align: true
               bytecode:
                 value: 0b101
                 size: 3
@@ -203,7 +203,7 @@ instructions:
               type: indirect_numeric
               argument:
                 size: 16
-                byte_align: true
+                word_align: true
               bytecode:
                 value: 0b110
                 size: 3

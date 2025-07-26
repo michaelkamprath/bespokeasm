@@ -1,6 +1,7 @@
 import unittest
 import importlib.resources as pkg_resources
 
+from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType, GlobalLabelScope
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
@@ -43,149 +44,278 @@ class TestLineObject(unittest.TestCase):
         label_values.set_label_value('test1', 0x1234, 1)
         memzone = MemoryZone(16, 0, 2**16 - 1, 'GLOBAL')
 
-        d1 = DataLine.factory(27, ' .byte $de, $ad, 0xbe, $ef', 'steak', 'big', memzone, '\0')
+        d1 = DataLine.factory(27, ' .byte $de, $ad, 0xbe, $ef', 'steak', memzone, 8, 8, 'big', 'big', '\0',)
         d1.label_scope = label_values
-        d1.generate_bytes()
+        d1.generate_words()
         self.assertIsInstance(d1, DataLine)
         self.assertEqual(d1.byte_size, 4, 'data line has 4 bytes')
-        self.assertEqual(d1.get_bytes(), bytearray([0xde, 0xad, 0xbe, 0xef]), '$deadbeef')
+        self.assertEqual(d1.word_count, 4, 'data line has 4 words for 8-bit words')
+        self.assertEqual(
+            d1.get_words(),
+            [
+                Word(0xde, 8, 8, 'big'),
+                Word(0xad, 8, 8, 'big'),
+                Word(0xbe, 8, 8, 'big'),
+                Word(0xef, 8, 8, 'big'),
+            ],
+            '$deadbeef',
+        )
 
-        d2 = DataLine.factory(38, ' .byte test1, 12', 'label mania', 'big', memzone)
+        d2 = DataLine.factory(38, ' .byte test1, 12', 'label mania', memzone, 8, 8, 'big', 'big', '\0',)
         d2.label_scope = label_values
-        d2.generate_bytes()
+        d2.generate_words()
         self.assertIsInstance(d2, DataLine)
         self.assertEqual(d2.byte_size, 2, 'data line has 2 bytes')
-        self.assertEqual(d2.get_bytes(), bytearray([0x34, 12]), 'should slice first byte')
+        self.assertEqual(d2.word_count, 2, 'data line has 2 words for 8-bit words')
+        self.assertEqual(
+            d2.get_words(),
+            [Word(0x34, 8, 8, 'big'), Word(0x0c, 8, 8, 'big')],
+            'should slice first byte',
+        )
 
-        d3 = DataLine.factory(38, ' .byte test1, , 12', 'label mania', 'big', memzone)
+        d3 = DataLine.factory(38, ' .byte test1, , 12', 'label mania', memzone, 8, 8, 'big', 'big', '\0',)
         d3.label_scope = label_values
-        d3.generate_bytes()
+        d3.generate_words()
         self.assertIsInstance(d3, DataLine)
         self.assertEqual(d3.byte_size, 2, 'data line has 2 bytes, ignore bad argument')
-        self.assertEqual(d3.get_bytes(), bytearray([0x34, 12]), 'should slice first byte, ignore bad argument')
+        self.assertEqual(d3.word_count, 2, 'data line has 2 words for 8-bit words')
+        self.assertEqual(
+            d3.get_words(),
+            [Word(0x34, 8, 8, 'big'), Word(0x0c, 8, 8, 'big')],
+            'should slice first byte, ignore bad argument',
+        )
 
-        d4 = DataLine.factory(38, ' .byte b1110', 'label mania', 'big', memzone)
+        d4 = DataLine.factory(38, ' .byte b1110', 'label mania', memzone, 8, 8, 'big', 'big', '\0',)
         d4.label_scope = label_values
-        d4.generate_bytes()
+        d4.generate_words()
         self.assertIsInstance(d4, DataLine)
         self.assertEqual(d4.byte_size, 1, 'data line has 1 bytes')
-        self.assertEqual(d4.get_bytes(), bytearray([0x0E]), 'onsie')
+        self.assertEqual(d4.word_count, 1, 'data line has 1 word for 8-bit words')
+        self.assertEqual(
+            d4.get_words(),
+            [Word(0x0e, 8, 8, 'big')],
+            'onsie',
+        )
 
         test_str = 'that\'s a test'
         d5_values = [ord(c) for c in test_str]
-        d5 = DataLine.factory(42, f' .byte "{test_str}"', 'string of bytes', 'big', memzone)
+        d5 = DataLine.factory(42, f' .byte "{test_str}"', 'string of bytes', memzone, 8, 8, 'big', 'big', 0,)
         d5.label_scope = label_values
-        d5.generate_bytes()
+        d5.generate_words()
         self.assertIsInstance(d5, DataLine)
         self.assertEqual(d5.byte_size, 13, 'byte string has 13 bytes')
-        self.assertEqual(d5.get_bytes(), bytearray(d5_values), 'character string matches')
+        self.assertEqual(d5.word_count, 13, 'byte string has 13 words for 8-bit words')
+        self.assertEqual(
+            d5.get_words(),
+            [Word(c, 8, 8, 'big') for c in d5_values],
+            'character string matches',
+        )
 
         d5a_values = [ord(c) for c in test_str]
         d5a_values.extend([0])
-        d5a = DataLine.factory(42, f' .cstr "{test_str}"', 'string of bytes', 'big', memzone)
+        d5a = DataLine.factory(42, f' .cstr "{test_str}"', 'string of bytes', memzone, 8, 8, 'big', 'big', 0,)
         d5a.label_scope = label_values
-        d5a.generate_bytes()
+        d5a.generate_words()
         self.assertIsInstance(d5a, DataLine)
         self.assertEqual(d5a.byte_size, 14, 'character string has 14 bytes')
-        self.assertEqual(d5a.get_bytes(), bytearray(d5a_values), 'character string matches')
+        self.assertEqual(d5a.word_count, 14, 'character string has 14 words for 8-bit words')
+        self.assertEqual(
+            d5a.get_words(),
+            [Word(c, 8, 8, 'big') for c in d5a_values],
+            'character string matches',
+        )
 
         d6a_values = [ord(c) for c in test_str]
         d6a_values.extend([0])
-        d6a = DataLine.factory(42, f' .asciiz "{test_str}"', 'string of bytes', 'big', memzone)
+        d6a = DataLine.factory(42, f' .asciiz "{test_str}"', 'string of bytes', memzone, 8, 8, 'big', 'big', 0,)
         d6a.label_scope = label_values
-        d6a.generate_bytes()
+        d6a.generate_words()
         self.assertIsInstance(d6a, DataLine)
         self.assertEqual(d6a.byte_size, 14, 'character string has 14 bytes')
-        self.assertEqual(d6a.get_bytes(), bytearray(d6a_values), 'character string matches')
+        self.assertEqual(d6a.word_count, 14, 'character string has 14 words for 8-bit words')
+        self.assertEqual(
+            d6a.get_words(),
+            [Word(c, 8, 8, 'big') for c in d6a_values],
+            'character string matches',
+        )
 
-        d6 = DataLine.factory(38, ' .2byte test1, 12', '2 byte label mania', 'little', memzone)
+        d6 = DataLine.factory(38, ' .2byte test1, 12', '2 byte label mania', memzone, 8, 8, 'big', 'little', 0,)
         d6.label_scope = label_values
-        d6.generate_bytes()
+        d6.generate_words()
         self.assertIsInstance(d6, DataLine)
         self.assertEqual(d6.byte_size, 4, 'data line has 4 bytes')
-        self.assertEqual(d6.get_bytes(), bytearray([0x34, 0x12, 12, 0]), 'should slice first two bytes')
+        self.assertEqual(d6.word_count, 4, 'data line has 4 words for 8-bit words')
+        self.assertEqual(
+            d6.get_words(),
+            [Word(0x34, 8, 8, 'big'), Word(0x12, 8, 8, 'big'), Word(0x0c, 8, 8, 'big'), Word(0, 8, 8, 'big')],
+            'should slice first two bytes',
+        )
 
         d7 = DataLine.factory(
             38, '.4byte %11110111011001010100001100100001, $1945', '4 byte label mania',
-            'little', memzone
+            memzone, 8, 8, 'big', 'little', 0,
         )
         d7.label_scope = label_values
-        d7.generate_bytes()
+        d7.generate_words()
         self.assertIsInstance(d7, DataLine)
         self.assertEqual(d7.byte_size, 8, 'data line has 8 bytes')
+        self.assertEqual(d7.word_count, 8, 'data line has 8 words for 8-bit words')
         self.assertEqual(
-            d7.get_bytes(),
-            bytearray([0x21, 0x43, 0x65, 0xf7, 0x45, 0x19, 0, 0]),
+            d7.get_words(),
+            [
+                Word(0x21, 8, 8, 'big'),
+                Word(0x43, 8, 8, 'big'),
+                Word(0x65, 8, 8, 'big'),
+                Word(0xf7, 8, 8, 'big'),
+                Word(0x45, 8, 8, 'big'),
+                Word(0x19, 8, 8, 'big'),
+                Word(0, 8, 8, 'big'),
+                Word(0, 8, 8, 'big'),
+            ],
             'should have each 4 byte numbe in litle endian'
         )
 
         d8 = DataLine.factory(
             38, '.4byte %11110111011001010100001100100001, $1945', '4 byte label mania',
-            'big', memzone
+            memzone, 8, 8, 'big', 'big', '\0',
         )
         d8.label_scope = label_values
-        d8.generate_bytes()
+        d8.generate_words()
         self.assertIsInstance(d8, DataLine)
         self.assertEqual(d8.byte_size, 8, 'data line has 8 bytes')
+        self.assertEqual(d8.word_count, 8, 'data line has 8 words for 8-bit words')
         self.assertEqual(
-            d8.get_bytes(),
-            bytearray([0xf7, 0x65, 0x43, 0x21, 0, 0, 0x19, 0x45]),
+            d8.get_words(),
+            [
+                Word(0xf7, 8, 8, 'big'),
+                Word(0x65, 8, 8, 'big'),
+                Word(0x43, 8, 8, 'big'),
+                Word(0x21, 8, 8, 'big'),
+                Word(0, 8, 8, 'big'),
+                Word(0, 8, 8, 'big'),
+                Word(0x19, 8, 8, 'big'),
+                Word(0x45, 8, 8, 'big'),
+            ],
             'should have each 4 byte numbe in big endian'
         )
 
-        d9 = DataLine.factory(38, '.4byte 0x0123456789abcdef', 'data masked!', 'little', memzone)
+        d9 = DataLine.factory(38, '.4byte 0x0123456789abcdef', 'data masked!', memzone, 8, 8, 'big', 'little', '\0',)
         d9.label_scope = label_values
-        d9.generate_bytes()
+        d9.generate_words()
         self.assertIsInstance(d9, DataLine)
         self.assertEqual(d9.byte_size, 4, 'data line has 4 bytes')
-        self.assertEqual(d9.get_bytes(), bytearray([0xef, 0xcd, 0xab, 0x89]), 'should slice first four bytes')
+        self.assertEqual(d9.word_count, 4, 'data line has 4 words for 8-bit words')
+        self.assertEqual(
+            d9.get_words(),
+            [
+                Word(0xef, 8, 8, 'big'),
+                Word(0xcd, 8, 8, 'big'),
+                Word(0xab, 8, 8, 'big'),
+                Word(0x89, 8, 8, 'big'),
+            ],
+            'should slice first four bytes',
+        )
 
-        d9a = DataLine.factory(38, '.8byte 0x0123456789abcdef', 'data masked!', 'little', memzone)
+        d9a = DataLine.factory(
+            38,
+            '.8byte 0x0123456789abcdef',
+            'data masked!',
+            memzone,
+            8,
+            8,
+            'big',
+            'little',
+            0,
+        )
         d9a.label_scope = label_values
-        d9a.generate_bytes()
+        d9a.generate_words()
         self.assertIsInstance(d9a, DataLine)
         self.assertEqual(d9a.byte_size, 8, 'data line has 8 bytes')
-        self.assertEqual(d9a.get_bytes(), bytearray([0xef, 0xcd, 0xab, 0x89, 0x67, 0x45, 0x23, 1]), 'should slice all 8 bytes')
+        self.assertEqual(d9a.word_count, 8, 'data line has 8 words for 8-bit words')
+        self.assertEqual(
+            d9a.get_words(),
+            [
+                Word(0xef, 8, 8, 'big'),
+                Word(0xcd, 8, 8, 'big'),
+                Word(0xab, 8, 8, 'big'),
+                Word(0x89, 8, 8, 'big'),
+                Word(0x67, 8, 8, 'big'),
+                Word(0x45, 8, 8, 'big'),
+                Word(0x23, 8, 8, 'big'),
+                Word(0x01, 8, 8, 'big'),
+            ],
+            'should slice all 8 bytes',
+        )
 
         # ensure spaces in strings aren't truncated
         test_str2 = ' space '
         d10_values = [ord(c) for c in test_str2]
-        d10 = DataLine.factory(42, f' .byte "{test_str2}"', 'string of bytes', 'big', memzone)
+        d10 = DataLine.factory(42, f' .byte "{test_str2}"', 'string of bytes', memzone, 8, 8, 'big', 'big', 0,)
         d10.label_scope = label_values
-        d10.generate_bytes()
+        d10.generate_words()
         self.assertIsInstance(d10, DataLine)
         self.assertEqual(d10.byte_size, 7, 'byte string has 7 bytes')
-        self.assertEqual(d10.get_bytes(), bytearray(d10_values), 'character string matches')
+        self.assertEqual(d10.word_count, 7, 'byte string has 7 words for 8-bit words')
+        self.assertEqual(
+            d10.get_words(),
+            [Word(c, 8, 8, 'big') for c in d10_values],
+            'character string matches',
+        )
 
         # test escapes in strings
         d11_values = [0x20, 0x01, 0x20, 0x09, 0x20, 0x0A, 0x00]
         # must double escape escape sequences here because this is in python
-        d11 = DataLine.factory(38, '.cstr " \\x01 \\t \\n"', 'escape reality', 'big', memzone)
+        d11 = DataLine.factory(38, '.cstr " \\x01 \\t \\n"', 'escape reality', memzone, 8, 8, 'big', 'big', 0,)
         d11.label_scope = label_values
-        d11.generate_bytes()
+        d11.generate_words()
         self.assertIsInstance(d11, DataLine)
         self.assertEqual(d11.byte_size, 7, 'byte string has 7 bytes')
-        self.assertEqual(d11.get_bytes(), bytearray(d11_values), 'character string matches')
+        self.assertEqual(d11.word_count, 7, 'byte string has 7 words for 8-bit words')
+        self.assertEqual(
+            d11.get_words(),
+            [Word(c, 8, 8, 'big') for c in d11_values],
+            'character string matches',
+        )
 
         # test expressions in .byte lists
-        d12 = DataLine.factory(38, '.byte ((PSAV+1) & 0FFH), $22+$44, 1<<4', 'escape reality', 'big', memzone)
+        d12 = DataLine.factory(
+            38,
+            '.byte ((PSAV+1) & 0FFH), $22+$44, 1<<4',
+            'escape reality',
+            memzone,
+            8,
+            8,
+            'big',
+            'big',
+            0,
+        )
         label_values.set_label_value('PSAV', 0x1234, LineIdentifier(1, 'test_d12'))
         d12.label_scope = label_values
-        d12.generate_bytes()
+        d12.generate_words()
         self.assertIsInstance(d12, DataLine)
         self.assertEqual(d12.byte_size, 3, 'byte string has 3 bytes')
-        self.assertEqual(d12.get_bytes(), bytearray([0x35, 0x66, 0x10]), 'byte array matches')
+        self.assertEqual(d12.word_count, 3, 'byte string has 3 words for 8-bit words')
+        self.assertEqual(
+            d12.get_words(),
+            [Word(0x35, 8, 8, 'big'), Word(0x66, 8, 8, 'big'), Word(0x10, 8, 8, 'big')],
+            'byte array matches',
+        )
 
         with self.assertRaises(SystemExit, msg='this instruction should fail'):
-            DataLine.factory(42, ' .cstr 0x42', 'bad cstr usage', 'big', memzone)
+            DataLine.factory(42, ' .cstr 0x42', 'bad cstr usage', memzone, 8, 8, 'big', 'big', 0,)
 
         # test initialiation with negative numbers
-        d13 = DataLine.factory(38, '.4byte -5', 'neg five', 'big', memzone)
+        d13 = DataLine.factory(38, '.4byte -5', 'neg five', memzone, 8, 8, 'big', 'big', 0,)
         d13.label_scope = label_values
-        d13.generate_bytes()
+        d13.generate_words()
         self.assertIsInstance(d13, DataLine)
         self.assertEqual(d13.byte_size, 4, 'byte string has 3 bytes')
-        self.assertEqual(d13.get_bytes(), bytearray([0xFF, 0xFF, 0xFF, 0xFB]), 'byte array matches')
+        self.assertEqual(d13.word_count, 4, 'byte string has 3 words for 8-bit words')
+        self.assertEqual(
+            d13.get_words(),
+            [Word(0xFF, 8, 8, 'big'), Word(0xFF, 8, 8, 'big'), Word(0xFF, 8, 8, 'big'), Word(0xFB, 8, 8, 'big')],
+            'byte array matches',
+        )
 
     def test_label_line_creation(self):
         label_values = GlobalLabelScope(set())
@@ -197,7 +327,7 @@ class TestLineObject(unittest.TestCase):
         l1 = LabelLine.factory(13, 'my_label:', 'cool comment', register_set, label_values, memzone)
         l1.set_start_address(1212)
         self.assertIsInstance(l1, LabelLine)
-        self.assertEqual(l1.byte_size, 0, 'has no bytes')
+        self.assertEqual(l1.word_count, 0, 'has no words')
         self.assertEqual(l1.get_value(), 1212, 'label value is address')
         self.assertEqual(l1.address, 1212, 'address value is address')
         self.assertEqual(l1.get_label(), 'my_label', 'label string')
@@ -205,7 +335,7 @@ class TestLineObject(unittest.TestCase):
         l2 = LabelLine.factory(13, 'my_constant = 1945', 'cool comment', register_set, label_values, memzone)
         l2.set_start_address(1212)
         self.assertIsInstance(l2, LabelLine)
-        self.assertEqual(l2.byte_size, 0, 'has no bytes')
+        self.assertEqual(l2.word_count, 0, 'has no words')
         self.assertEqual(l2.get_value(), 1945, 'constant value is assigned')
         self.assertEqual(l2.address, 1212, 'address value is address')
         self.assertEqual(l2.get_label(), 'my_constant', 'label string')
@@ -213,7 +343,7 @@ class TestLineObject(unittest.TestCase):
         l3 = LabelLine.factory(13, 'myLabelIsCool:', 'cool comment', register_set, label_values, memzone)
         l3.set_start_address(2001)
         self.assertIsInstance(l3, LabelLine)
-        self.assertEqual(l3.byte_size, 0, 'has no bytes')
+        self.assertEqual(l3.word_count, 0, 'has no words')
         self.assertEqual(l3.get_value(), 2001, 'label value is address')
         self.assertEqual(l3.address, 2001, 'address value is address')
         self.assertEqual(l3.get_label(), 'myLabelIsCool', 'label string')
@@ -224,7 +354,7 @@ class TestLineObject(unittest.TestCase):
         )
         l4.set_start_address(678)
         self.assertIsInstance(l4, LabelLine)
-        self.assertEqual(l4.byte_size, 0, 'has no bytes')
+        self.assertEqual(l4.word_count, 0, 'has no words')
         self.assertEqual(l4.get_value(), 8, 'label value is constant')
         self.assertEqual(l4.address, 678, 'address value is address')
         self.assertEqual(l4.get_label(), 'test_bit', 'label string')
@@ -235,7 +365,7 @@ class TestLineObject(unittest.TestCase):
         )
         l5.set_start_address(678)
         self.assertIsInstance(l5, LabelLine)
-        self.assertEqual(l5.byte_size, 0, 'has no bytes')
+        self.assertEqual(l5.word_count, 0, 'has no words')
         self.assertEqual(l5.get_value(), 8, 'label value is constant')
         self.assertEqual(l5.address, 678, 'address value is address')
         self.assertEqual(l5.get_label(), 'test_bit', 'label string')
@@ -261,7 +391,7 @@ class TestLineObject(unittest.TestCase):
         l6: LabelLine = LabelLine.factory(13, 'my_constant = -1945', 'cool comment', register_set, label_values, memzone)
         l6.set_start_address(1212)
         self.assertIsInstance(l6, LabelLine)
-        self.assertEqual(l6.byte_size, 0, 'has no bytes')
+        self.assertEqual(l6.word_count, 0, 'has no words')
         self.assertEqual(l6.get_value(), -1945, 'constant value is assigned')
         self.assertEqual(l6.address, 1212, 'address value is address')
         self.assertEqual(l6.get_label(), 'my_constant', 'label string')
@@ -269,7 +399,7 @@ class TestLineObject(unittest.TestCase):
         l7: LabelLine = LabelLine.factory(13, 'my_constant = -2*MY_VALUE', 'cool comment', register_set, label_values, memzone)
         l7.set_start_address(1313)
         self.assertIsInstance(l7, LabelLine)
-        self.assertEqual(l7.byte_size, 0, 'has no bytes')
+        self.assertEqual(l7.word_count, 0, 'has no words')
         self.assertEqual(l7.get_value(), -40, 'constant value is assigned')
         self.assertEqual(l7.address, 1313, 'address value is address')
         self.assertEqual(l7.get_label(), 'my_constant', 'label string')
@@ -307,9 +437,13 @@ class TestLineObject(unittest.TestCase):
         self.assertIsInstance(objs1[1], DataLine, 'the first line object should be a data line')
         self.assertEqual(objs1[0].get_label(), 'the_byte', 'the label string should match')
         objs1[1].label_scope = label_values
-        objs1[1].generate_bytes()
+        objs1[1].generate_words()
         self.assertEqual(objs1[1].byte_size, 1, 'the data value should have 1 byte')
-        self.assertEqual(list(objs1[1].get_bytes()), [0x88], 'the data value should be [0x88]')
+        self.assertEqual(
+            objs1[1].get_words(),
+            [Word(0x88, 8, 8, isa_model.intra_word_endianness)],
+            'the data value should be [0x88]',
+        )
 
         # test instruction on label line
         objs2: list[LineObject] = LineOjectFactory.parse_line(
@@ -328,9 +462,16 @@ class TestLineObject(unittest.TestCase):
         self.assertIsInstance(objs2[1], InstructionLine, 'the first line object should be an Instruction line')
         self.assertEqual(objs2[0].get_label(), 'the_instr', 'the label string should match')
         objs2[1].label_scope = label_values
-        objs2[1].generate_bytes()
-        self.assertEqual(objs2[1].byte_size, 2, 'the instruction value should have 2 bytes')
-        self.assertEqual(list(objs2[1].get_bytes()), [0b01000111, 40], 'the instruction bytes should match')
+        objs2[1].generate_words()
+        self.assertEqual(objs2[1].word_count, 2, 'the instruction value should have 2 words')
+        self.assertEqual(
+            objs2[1].get_words(),
+            [
+                Word(0b01000111, 8, 8, isa_model.intra_word_endianness),
+                Word(40, 8, 8, isa_model.intra_word_endianness),
+            ],
+            'the instruction bytes should match',
+        )
 
         # labels with no inline instruction should also work
         objs3: list[LineObject] = LineOjectFactory.parse_line(
@@ -348,22 +489,60 @@ class TestLineObject(unittest.TestCase):
         self.assertIsInstance(objs3[0], LabelLine, 'the first line object should be a label')
         self.assertEqual(objs3[0].get_label(), 'the_label', 'the label string should match')
 
-        # # labels with constants should not work
-        # with self.assertRaises(SystemExit, msg='this instruction should fail'):
-        #     LineOjectFactory.parse_line(
-        #         lineid,
-        #         'the_label: const = 3 ; label with constant',
-        #         isa_model,
-        #         label_values,
-        #     )
-        # # labels with other labels should not work
-        # with self.assertRaises(SystemExit, msg='this instruction should fail'):
-        #     LineOjectFactory.parse_line(
-        #         lineid,
-        #         'the_label: the_second_label: ; label with another label',
-        #         isa_model,
-        #         label_values,
-        #     )
+    def test_peculiar_label_line_situations(self):
+        fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
+
+        label_values = GlobalLabelScope(isa_model.registers)
+        label_values.set_label_value('a_const', 40, 1)
+
+        lineid = LineIdentifier(123, 'test_unallowed_label_line_situations')
+
+        preprocessor = Preprocessor()
+
+        # labels with constants should now be allowed
+        objs = LineOjectFactory.parse_line(
+            lineid,
+            'the_label: const = 3 ; label with constant',
+            isa_model,
+            label_values,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+            preprocessor,
+            ConditionStack(),
+            0,
+        )
+        self.assertEqual(len(objs), 2, 'should return two line objects')
+        self.assertIsInstance(objs[0], LabelLine, 'first object should be a label')
+        self.assertIsInstance(objs[1], LabelLine, 'second object should be a constant assignment')
+        self.assertEqual(objs[0].get_label(), 'the_label')
+        self.assertEqual(objs[1].get_label(), 'const')
+        self.assertEqual(objs[1].get_value(), 3)
+        self.assertEqual(objs[1].comment, 'label with constant')
+
+        # labels with other labels should now be allowed
+        objs = LineOjectFactory.parse_line(
+            lineid,
+            'the_label: the_second_label: ; label with another label',
+            isa_model,
+            label_values,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+            preprocessor,
+            ConditionStack(),
+            0,
+        )
+        self.assertEqual(len(objs), 2, 'should return two line objects')
+        self.assertIsInstance(objs[0], LabelLine, 'first object should be a label')
+        self.assertIsInstance(objs[1], LabelLine, 'second object should be a label')
+        self.assertEqual(objs[0].get_label(), 'the_label')
+        self.assertEqual(objs[1].get_label(), 'the_second_label')
+        self.assertEqual(objs[1].comment, 'label with another label')
 
     def test_valid_labels(self):
         self.assertTrue(is_valid_label('a_str'), 'valid label')
@@ -397,10 +576,14 @@ class TestLineObject(unittest.TestCase):
         )
         ins1.set_start_address(1212)
         self.assertIsInstance(ins1, InstructionLine)
-        self.assertEqual(ins1.byte_size, 1, 'has 1 byte')
+        self.assertEqual(ins1.word_count, 1, 'has 1 word')
         ins1.label_scope = label_values
-        ins1.generate_bytes()
-        self.assertEqual(ins1.get_bytes(), bytearray([0x1a]), 'instruction should match')
+        ins1.generate_words()
+        self.assertEqual(
+            ins1.get_words(),
+            [Word(0x1a, 8, 8, isa_model.intra_word_endianness)],
+            'instruction should match',
+        )
 
         ins2 = InstructionLine.factory(
             22, '  hlt', 'stop it!',
@@ -410,10 +593,14 @@ class TestLineObject(unittest.TestCase):
         )
         ins2.set_start_address(1212)
         self.assertIsInstance(ins2, InstructionLine)
-        self.assertEqual(ins2.byte_size, 1, 'has 1 byte')
+        self.assertEqual(ins2.word_count, 1, 'has 1 word')
         ins2.label_scope = label_values
-        ins2.generate_bytes()
-        self.assertEqual(ins2.get_bytes(), bytearray([0xF0]), 'instruction should match')
+        ins2.generate_words()
+        self.assertEqual(
+            ins2.get_words(),
+            [Word(0xF0, 8, 8, isa_model.intra_word_endianness)],
+            'instruction should match',
+        )
 
         ins3 = InstructionLine.factory(
             22, '  seta (high_de + $00AD)', 'is it alive?',
@@ -423,10 +610,18 @@ class TestLineObject(unittest.TestCase):
         )
         ins3.set_start_address(1313)
         self.assertIsInstance(ins3, InstructionLine)
-        self.assertEqual(ins3.byte_size, 3, 'has 3 bytes')
+        self.assertEqual(ins3.word_count, 3, 'has 3 words')
         ins3.label_scope = label_values
-        ins3.generate_bytes()
-        self.assertEqual(ins3.get_bytes(), bytearray([0x30, 0xAD, 0xDE]), 'instruction should match')
+        ins3.generate_words()
+        self.assertEqual(
+            ins3.get_words(),
+            [
+                Word(0x30, 8, 8, isa_model.intra_word_endianness),
+                Word(0xDE, 8, 8, isa_model.intra_word_endianness),
+                Word(0xAD, 8, 8, isa_model.intra_word_endianness),
+            ],
+            'instruction should match',
+        )
 
         ins4 = InstructionLine.factory(
             22, '  lda test1+2', 'load it',
@@ -436,10 +631,14 @@ class TestLineObject(unittest.TestCase):
         )
         ins4.set_start_address(1313)
         self.assertIsInstance(ins4, InstructionLine)
-        self.assertEqual(ins4.byte_size, 1, 'has 1 byte')
+        self.assertEqual(ins4.word_count, 1, 'has 1 word')
         ins4.label_scope = label_values
-        ins4.generate_bytes()
-        self.assertEqual(ins4.get_bytes(), bytearray([0x1c]), 'instruction should match')
+        ins4.generate_words()
+        self.assertEqual(
+            ins4.get_words(),
+            [Word(0x1c, 8, 8, isa_model.intra_word_endianness)],
+            'instruction should match',
+        )
 
         ins5 = InstructionLine.factory(
             22, '  plus 8', 'plus it',
@@ -449,10 +648,17 @@ class TestLineObject(unittest.TestCase):
         )
         ins5.set_start_address(888)
         self.assertIsInstance(ins5, InstructionLine)
-        self.assertEqual(ins5.byte_size, 2, 'has 2 bytes')
+        self.assertEqual(ins5.word_count, 2, 'has 2 words')
         ins5.label_scope = label_values
-        ins5.generate_bytes()
-        self.assertEqual(ins5.get_bytes(), bytearray([0x40, 0x08]), 'instruction should match')
+        ins5.generate_words()
+        self.assertEqual(
+            ins5.get_words(),
+            [
+                Word(0x40, 8, 8, isa_model.intra_word_endianness),
+                Word(0x08, 8, 8, isa_model.intra_word_endianness),
+            ],
+            'instruction should match',
+        )
 
         ins6 = InstructionLine.factory(
             22, '  lda test1-2', 'load it',
@@ -462,10 +668,14 @@ class TestLineObject(unittest.TestCase):
         )
         ins6.set_start_address(888)
         self.assertIsInstance(ins6, InstructionLine)
-        self.assertEqual(ins6.byte_size, 1, 'has 1 byte1')
+        self.assertEqual(ins6.word_count, 1, 'has 1 word')
         ins6.label_scope = label_values
-        ins6.generate_bytes()
-        self.assertEqual(ins6.get_bytes(), bytearray([0x18]), 'instruction should match')
+        ins6.generate_words()
+        self.assertEqual(
+            ins6.get_words(),
+            [Word(0x18, 8, 8, isa_model.intra_word_endianness)],
+            'instruction should match',
+        )
 
     def test_bad_instruction_lines(self):
         fp = pkg_resources.files(config_files).joinpath('register_argument_exmaple_config.yaml')
@@ -509,10 +719,18 @@ class TestLineObject(unittest.TestCase):
         )
         ins1.set_start_address(1212)
         self.assertIsInstance(ins1, InstructionLine)
-        self.assertEqual(ins1.byte_size, 3, 'has 3 byte')
+        self.assertEqual(ins1.word_count, 3, 'has 3 words')
         ins1.label_scope = label_values
-        ins1.generate_bytes()
-        self.assertEqual(ins1.get_bytes(), bytearray([0x10, 0xCD, 0xAB]), 'instruction should match')
+        ins1.generate_words()
+        self.assertEqual(
+            ins1.get_words(),
+            [
+                Word(0x10, 8, 8, isa_model.intra_word_endianness),
+                Word(0xCD, 8, 8, isa_model.intra_word_endianness),
+                Word(0xAB, 8, 8, isa_model.intra_word_endianness),
+            ],
+            'instruction should match',
+        )
 
         ins2 = InstructionLine.factory(
             22, 'set test1', 'set it!',
@@ -522,10 +740,18 @@ class TestLineObject(unittest.TestCase):
         )
         ins2.set_start_address(1212)
         self.assertIsInstance(ins2, InstructionLine)
-        self.assertEqual(ins2.byte_size, 3, 'has 3 byte')
+        self.assertEqual(ins2.word_count, 3, 'has 3 words')
         ins2.label_scope = label_values
-        ins2.generate_bytes()
-        self.assertEqual(ins2.get_bytes(), bytearray([0x30, 0xAB, 0xCD]), 'instruction should match')
+        ins2.generate_words()
+        self.assertEqual(
+            ins2.get_words(),
+            [
+                Word(0x30, 8, 8, isa_model.intra_word_endianness),
+                Word(0xAB, 8, 8, isa_model.intra_word_endianness),  # "set" has multi-word big endian arguments
+                Word(0xCD, 8, 8, isa_model.intra_word_endianness),
+            ],
+            'instruction should match',
+        )
 
         ins3 = InstructionLine.factory(
             22, 'big $f', 'big money',
@@ -535,10 +761,17 @@ class TestLineObject(unittest.TestCase):
         )
         ins3.set_start_address(1212)
         self.assertIsInstance(ins3, InstructionLine)
-        self.assertEqual(ins3.byte_size, 2, 'has 2 byte')
+        self.assertEqual(ins3.word_count, 2, 'has 2 words')
         ins3.label_scope = label_values
-        ins3.generate_bytes()
-        self.assertEqual(ins3.get_bytes(), bytearray([0xFF, 0x3C]), 'instruction should match')
+        ins3.generate_words()
+        self.assertEqual(
+            ins3.get_words(),
+            [
+                Word(0xFF, 8, 8, isa_model.intra_word_endianness),
+                Word(0x3C, 8, 8, isa_model.intra_word_endianness),
+            ],
+            'instruction should match',
+        )
 
     def test_specifc_configured_operands(self):
         fp = pkg_resources.files(config_files).joinpath('register_argument_exmaple_config.yaml')
@@ -560,10 +793,14 @@ class TestLineObject(unittest.TestCase):
         )
         ins1.set_start_address(1234)
         self.assertIsInstance(ins1, InstructionLine)
-        self.assertEqual(ins1.byte_size, 1, 'has 1 byte')
+        self.assertEqual(ins1.word_count, 1, 'has 1 word')
         ins1.label_scope = label_values
-        ins1.generate_bytes()
-        self.assertEqual(ins1.get_bytes(), bytearray([0x52]), 'instruction should match')
+        ins1.generate_words()
+        self.assertEqual(
+            ins1.get_words(),
+            [Word(0x52, 8, 8, isa_model.intra_word_endianness)],
+            'instruction should match',
+        )
 
         ins2 = InstructionLine.factory(
             22, 'mov [sp+8],[mar]', 'specific operands',
@@ -573,10 +810,17 @@ class TestLineObject(unittest.TestCase):
         )
         ins2.set_start_address(1234)
         self.assertIsInstance(ins2, InstructionLine)
-        self.assertEqual(ins2.byte_size, 2, 'has 2 byte')
+        self.assertEqual(ins2.word_count, 2, 'has 2 words')
         ins2.label_scope = label_values
-        ins2.generate_bytes()
-        self.assertEqual(ins2.get_bytes(), bytearray([0x6D, 0x08]), 'instruction should match')
+        ins2.generate_words()
+        self.assertEqual(
+            ins2.get_words(),
+            [
+                Word(0x6D, 8, 8, isa_model.intra_word_endianness),
+                Word(0x08, 8, 8, isa_model.intra_word_endianness),
+            ],
+            'instruction should match',
+        )
 
         # ensure operand sets operands still work when instruction has specific operands configured
         ins3 = InstructionLine.factory(
@@ -587,10 +831,17 @@ class TestLineObject(unittest.TestCase):
         )
         ins3.set_start_address(1234)
         self.assertIsInstance(ins3, InstructionLine)
-        self.assertEqual(ins3.byte_size, 2, 'has 2 byte')
+        self.assertEqual(ins3.word_count, 2, 'has 2 words')
         ins3.label_scope = label_values
-        ins3.generate_bytes()
-        self.assertEqual(ins3.get_bytes(), bytearray([0x45, 0x08]), 'instruction should match')
+        ins3.generate_words()
+        self.assertEqual(
+            ins3.get_words(),
+            [
+                Word(0x45, 8, 8, isa_model.intra_word_endianness),
+                Word(0x08, 8, 8, isa_model.intra_word_endianness),
+            ],
+            'instruction should match',
+        )
 
     def test_test_line_object_factory(self):
         label_values = GlobalLabelScope(set())
@@ -615,8 +866,14 @@ class TestLineObject(unittest.TestCase):
         print(lo1[0])
         self.assertIsInstance(lo1[0], DataLine, 'instruction is a DataLine')
         dl1: DataLine = lo1[0]
-        dl1.generate_bytes()
-        self.assertEqual(list(dl1.get_bytes()), [0x34, 0x12])
+        dl1.generate_words()
+        self.assertEqual(
+            dl1.get_words(),
+            [
+                Word(0x34, 8, 8, isa_model.intra_word_endianness),
+                Word(0x12, 8, 8, isa_model.intra_word_endianness),
+            ],
+        )
 
     def test_compound_instruction_line(self):
         fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
@@ -645,7 +902,7 @@ class TestLineObject(unittest.TestCase):
         self.assertIsInstance(lol1[0], LabelLine)
         self.assertIsInstance(lol1[1], InstructionLine)
         lol1[0].set_start_address(1)
-        lol1[1].set_start_address(lol1[0].address + lol1[0].byte_size)
+        lol1[1].set_start_address(lol1[0].address + lol1[0].word_count)
         self.assertEqual(lol1[1].address, 1, 'first instruction part is a label and has no byte size')
 
         lol2 = LineOjectFactory.parse_line(
@@ -664,8 +921,8 @@ class TestLineObject(unittest.TestCase):
         self.assertIsInstance(lol2[1], LabelLine)
         self.assertIsInstance(lol2[2], InstructionLine)
         self.assertEqual(lol2[0].address, 0x20, 'first instruction is .org')
-        lol2[1].set_start_address(lol2[0].address + lol2[0].byte_size)
-        lol2[2].set_start_address(lol2[1].address + lol2[1].byte_size)
+        lol2[1].set_start_address(lol2[0].address + lol2[0].word_count)
+        lol2[2].set_start_address(lol2[1].address + lol2[1].word_count)
         self.assertEqual(lol2[2].address, 0x20, 'third instruiction still same adress')
 
         # test instruction following an instruction
@@ -701,7 +958,7 @@ class TestLineObject(unittest.TestCase):
         self.assertIsInstance(lol4[0], InstructionLine)
         self.assertIsInstance(lol4[1], InstructionLine)
         lol4[0].set_start_address(1)
-        lol4[1].set_start_address(lol4[0].address + lol4[0].byte_size)
+        lol4[1].set_start_address(lol4[0].address + lol4[0].word_count)
         self.assertEqual(lol4[1].address, 3, 'instruction address should be 3')
 
         # use a label in the operand that ends with an instruction mnemonic
@@ -779,9 +1036,9 @@ class TestLineObject(unittest.TestCase):
         # this sequence replicates what happens in engine.assemble_bytecode()
         self.assertEqual(lol1[0].memory_zone.current_address, 0, 'startingh value of current address should be 0')
         lol1[0].set_start_address(lol1[0].memory_zone.current_address)
-        lol1[0].memory_zone.current_address = lol1[0].address + lol1[0].byte_size
+        lol1[0].memory_zone.current_address = lol1[0].address + lol1[0].word_count
         lol1[1].set_start_address(lol1[0].memory_zone.current_address)
-        lol1[1].memory_zone.current_address = lol1[1].address + lol1[1].byte_size
+        lol1[1].memory_zone.current_address = lol1[1].address + lol1[1].word_count
         lol1[2].set_start_address(lol1[1].memory_zone.current_address)
 
         self.assertEqual(lol1[0].address, 0x20, 'first instruction is .org')
@@ -813,7 +1070,7 @@ class TestLineObject(unittest.TestCase):
         # this sequence replicates what happens in engine.assemble_bytecode()
         self.assertEqual(lol2[0].memory_zone.current_address, 0, 'startingh value of current address should be 0')
         lol2[0].set_start_address(lol2[0].memory_zone.current_address)
-        lol2[0].memory_zone.current_address = lol2[0].address + lol2[0].byte_size
+        lol2[0].memory_zone.current_address = lol2[0].address + lol2[0].word_count
         lol2[1].set_start_address(lol2[0].memory_zone.current_address)
 
         self.assertEqual(lol2[0].address, 0, 'first instruction is a label')
@@ -862,12 +1119,23 @@ class TestLineObject(unittest.TestCase):
             '"this is a test" nop',
             'embedded string',
             memzone_mngr.global_zone,
+            isa_model.word_size,
+            isa_model.word_segment_size,
+            isa_model.intra_word_endianness,
+            isa_model.multi_word_endianness,
             0,
         )
         self.assertIsInstance(t1, EmbeddedString)
         self.assertEqual(t1.byte_size, 15, 'string has 15 bytes')
-        t1.generate_bytes()
-        self.assertEqual(t1.get_bytes(), bytearray([ord(c) for c in 'this is a test\x00']), 'string matches')
+        t1.generate_words()
+        self.assertEqual(
+            t1.get_words(),
+            [
+                Word(ord(c), isa_model.word_size, isa_model.word_segment_size, isa_model.intra_word_endianness)
+                for c in 'this is a test\x00'
+            ],
+            'string matches',
+        )
         self.assertEqual(t1.instruction, '"this is a test"', 'instruction string matches')
 
         # test the non-creation of an embedded string object
@@ -876,6 +1144,10 @@ class TestLineObject(unittest.TestCase):
             'this is a test',
             'embedded string',
             memzone_mngr.global_zone,
+            isa_model.word_size,
+            isa_model.word_segment_size,
+            isa_model.intra_word_endianness,
+            isa_model.multi_word_endianness,
             0,
         )
         self.assertIsNone(t2, 'no embedded string object created')
@@ -899,8 +1171,15 @@ class TestLineObject(unittest.TestCase):
         self.assertIsInstance(lo1[2], InstructionLine)
         self.assertEqual(lo1[1].byte_size, 15, 'string has 15 bytes')
         for lo in lo1:
-            lo.generate_bytes()
-        self.assertEqual(lo1[1].get_bytes(), bytearray([ord(c) for c in 'this is a test\x00']), 'string matches')
+            lo.generate_words()
+        self.assertEqual(
+            lo1[1].get_words(),
+            [
+                Word(ord(c), isa_model.word_size, isa_model.word_segment_size, isa_model.intra_word_endianness)
+                for c in 'this is a test\x00'
+            ],
+            'string matches',
+        )
 
         # test that when embedded strings are not allowed, the embedded string is not created
         isa_model._config['general']['allow_embedded_strings'] = False
@@ -940,6 +1219,10 @@ class TestLineObject(unittest.TestCase):
             '"\\n"',
             'embedded string',
             memzone_mngr.global_zone,
+            isa_model.word_size,
+            isa_model.word_segment_size,
+            isa_model.intra_word_endianness,
+            isa_model.multi_word_endianness,
             0,
         )
         self.assertIsNotNone(t1, 'embedded string object created')

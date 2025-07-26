@@ -1,0 +1,25 @@
+{
+  "pythonVersion": "3.11",
+  "lint": {
+    "flake8": {
+      "maxLineLength": 127
+    }
+  },
+  "format": {
+    "black": {
+      "lineLength": 127
+    }
+  },
+  "test": {
+    "pytest": {
+      "args": [
+        "-v"
+      ]
+    }
+  },
+  "precommit": {
+    "enabled": true,
+    "runOnSave": true
+  },
+  "instructions": "All code must pass pre-commit hooks, use single quotes, max line length 127, and have no trailing whitespace."
+}

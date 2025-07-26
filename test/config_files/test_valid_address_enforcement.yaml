@@ -2,7 +2,7 @@ description: Test Valid Address Enforcement
 general :
   address_size: 16
   origin: 0x5000
-  endian: little
+  multi_word_endianness: little
   identifier:
     name: bespokeasm-test
     version: "0.2.4"
@@ -10,7 +10,7 @@ general :
     - a
     - b
     - c
-  min_version: "0.3.0"
+  min_version: "0.5.0"
 predefined:
   memory_zones:
     - name: GLOBAL
@@ -46,7 +46,7 @@ operand_sets:
         type: enumeration
         argument:
           size: 4
-          byte_align: false
+          word_align: false
           value_dict:
             aa: 1
             bb: 2
@@ -60,7 +60,7 @@ operand_sets:
           size: 4
         argument:
           size: 16
-          byte_align: true
+          word_align: true
           valid_address: true
       relative_addr:
         type: relative_address
@@ -70,7 +70,7 @@ operand_sets:
           size: 4
         argument:
           size: 8
-          byte_align: true
+          word_align: true
           max: 128
           min: -127
 instructions:
@@ -131,7 +131,7 @@ instructions:
               type: relative_address
               argument:
                 size: 8
-                byte_align: true
+                word_align: true
                 max: 128
                 min: -127
   jmpre:
@@ -148,7 +148,7 @@ instructions:
               offset_from_instruction_end: true
               argument:
                 size: 8
-                byte_align: true
+                word_align: true
                 max: 128
                 min: -127
   jmp_local:
@@ -164,7 +164,7 @@ instructions:
               type: address
               argument:
                 size: 8
-                byte_align: true
+                word_align: true
                 slice_lsb: true
                 match_address_msb: true
   jmpa:
@@ -180,7 +180,7 @@ instructions:
               type: address
               argument:
                 size: 16
-                byte_align: true
+                word_align: true
                 valid_address: true
   jmp_test1:
     bytecode:
@@ -195,6 +195,6 @@ instructions:
               type: address
               argument:
                 size: 16
-                byte_align: true
+                word_align: true
                 valid_address: true
                 memory_zone: TEST1

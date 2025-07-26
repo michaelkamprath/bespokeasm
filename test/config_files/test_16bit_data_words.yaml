@@ -1,0 +1,134 @@
+description: Test 16 Bit Bytecode Words
+general:
+  address_size: 16
+  word_size: 16
+  endian: big
+  registers:
+    - a
+    - h
+    - l
+    - hl
+    - sp
+  identifier:
+    name: test_16bit_data_words
+    version: "0.1.0"
+  min_version: "0.5.0"
+operand_sets:
+  16_bit_source:
+    operand_values:
+      register_a:
+        type: register
+        register: a
+        bytecode:
+          value: 0
+          size: 4
+      indirect_sp:
+        type: indirect_register
+        register: sp
+        bytecode:
+          value: 1
+          size: 4
+        offset:
+          max: 32767
+          min: -32768
+          size: 16
+          word_align: true
+      indirect_addr:
+        type: indirect_numeric
+        bytecode:
+          value: 2
+          size: 4
+        argument:
+          size: 16
+          word_align: true
+      immediate_value:
+        type: numeric
+        bytecode:
+          value: 3
+          size: 4
+        argument:
+          size: 16
+          word_align: true
+  16_bit_destination:
+    operand_values:
+      register_a:
+        type: register
+        register: a
+        bytecode:
+          value: 0
+          size: 4
+      indirect_sp:
+        type: indirect_register
+        register: sp
+        bytecode:
+          value: 1
+          size: 4
+      indirect_addr:
+        type: indirect_numeric
+        bytecode:
+          value: 2
+          size: 4
+        argument:
+          size: 16
+          word_align: true
+  addresses:
+    operand_values:
+      absolute_addr:
+        type: address
+        bytecode:
+          value: 0x01
+          size: 8
+        argument:
+          size: 16
+          word_align: true
+          valid_address: true
+instructions:
+  nop:
+    variants:
+      - bytecode:
+          value: 0
+          size: 16
+        operands:
+          count: 0
+  mov:
+    variants:
+      - bytecode:
+          value: 8
+          size: 8
+        operands:
+          count: 2
+          operand_sets:
+            list:
+              - 16_bit_destination
+              - 16_bit_source
+            reverse_argument_order: true
+  push:
+    variants:
+      - bytecode:
+          value: 0x040
+          size: 12
+        operands:
+          count: 1
+          operand_sets:
+            list:
+              - 16_bit_source
+  pull:
+    variants:
+      - bytecode:
+          value: 0x050
+          size: 12
+        operands:
+          count: 1
+          operand_sets:
+            list:
+              - 16_bit_destination
+  jmp:
+    variants:
+      - bytecode:
+          value: 0x80
+          size: 8
+        operands:
+          count: 1
+          operand_sets:
+            list:
+              - addresses

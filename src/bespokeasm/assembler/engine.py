@@ -1,11 +1,11 @@
-import binascii
 import click
 import os
 import sys
 
 from bespokeasm.assembler.assembly_file import AssemblyFile
+from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.line_object import LineWithBytes, LineObject
+from bespokeasm.assembler.line_object import LineWithWords, LineObject
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.line_object.predefined_data import PredefinedDataLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
@@ -39,7 +39,7 @@ class Assembler:
         self._enable_pretty_print = enable_pretty_print
         self._pretty_print_format = pretty_print_format
         self._pretty_print_output = pretty_print_output
-        self._binary_fill_value = binary_fill_value & 0xff
+        self._binary_fill_value = binary_fill_value
         self._verbose = is_verbose
         self._binary_start = binary_start
         self._binary_end = binary_end
@@ -67,14 +67,18 @@ class Assembler:
             label: str = predefined_memory['name']
             address: int = predefined_memory['address']
             value: int = predefined_memory['value']
-            byte_length: int = predefined_memory['size']
+            word_length: int = predefined_memory['size']
             # create data object
             data_obj = PredefinedDataLine(
                 predefines_lineid,
-                byte_length,
+                word_length,
                 value,
                 label,
                 memzone_manager.global_zone,
+                self._model.word_size,
+                self._model.word_segment_size,
+                self._model.intra_word_endianness,
+                self._model.multi_word_endianness,
             )
             data_obj.set_start_address(address)
             predefined_line_obs.append(data_obj)
@@ -119,7 +123,7 @@ class Assembler:
         if self._verbose > 2:
             click.echo(f'Found {len(line_obs)} lines across all source files')
 
-        compilable_line_obs = [lobj for lobj in line_obs if lobj.compilable]
+        compilable_line_obs: list[LineObject] = [lobj for lobj in line_obs if lobj.compilable]
         # First pass: assign addresses to labels
         for lobj in compilable_line_obs:
             lobj.set_start_address(lobj.memory_zone.current_address)
@@ -127,7 +131,7 @@ class Assembler:
                 sys.exit(f'ERROR: {lobj.line_id} - INTERNAL line object address is None. Memory zone = {lobj.memory_zone}')
 
             try:
-                lobj.memory_zone.current_address = lobj.address + lobj.byte_size
+                lobj.memory_zone.current_address = lobj.address + lobj.word_count
             except ValueError as e:
                 sys.exit(f'ERROR: {lobj.line_id} - {str(e)}')
 
@@ -143,7 +147,7 @@ class Assembler:
         line_dict = {
             lobj.address: lobj
             for lobj in compilable_line_obs
-            if isinstance(lobj, LineWithBytes) and not lobj.is_muted
+            if isinstance(lobj, LineWithWords) and not lobj.is_muted
         }
 
         # second pass: build the machine code and check for overlaps
@@ -153,12 +157,12 @@ class Assembler:
         last_line = None
 
         for lobj in compilable_line_obs:
-            if isinstance(lobj, LineWithBytes):
-                lobj.generate_bytes()
+            if isinstance(lobj, LineWithWords):
+                lobj.generate_words()
             if self._verbose > 2:
                 click.echo(f'Processing {lobj.line_id} = {lobj} at address ${lobj.address:x}')
-            if isinstance(lobj, LineWithBytes):
-                if last_line is not None and (last_line.address + last_line.byte_size) > lobj.address:
+            if isinstance(lobj, LineWithWords):
+                if last_line is not None and (last_line.address + last_line.word_count) > lobj.address:
                     sys.exit(
                         f'ERROR: {lobj.line_id} - Address of byte code at this line overlaps with bytecode from '
                         f'line <{last_line.line_id}> at address {hex(lobj.address)}\n'
@@ -168,25 +172,22 @@ class Assembler:
                 last_line = lobj
 
         # Finally generate the binary image
-        fill_bytes = bytearray([self._binary_fill_value])
-        addr = self._binary_start
+        fill_word = Word(
+            self._binary_fill_value & ((1 << self._model.word_size) - 1),
+            self._model.word_size,
+            self._model.word_segment_size,
+            self._model.intra_word_endianness,
+        )
 
         if self._generate_binary:
-            if self._verbose > 2:
-                print('\nGenerating byte code:')
-            while addr <= (max_generated_address if self._binary_end is None else self._binary_end):
-                lobj = line_dict.get(addr, None)
-                insertion_bytes = fill_bytes
-                if lobj is not None:
-                    line_bytes = lobj.get_bytes()
-                    if line_bytes is not None:
-                        insertion_bytes = line_bytes
-                        if self._verbose > 2:
-                            line_bytes_str = binascii.hexlify(line_bytes, sep=' ').decode('utf-8')
-                            click.echo(f'Address ${addr:x} : {lobj} bytes = {line_bytes_str}')
-                bytecode.extend(insertion_bytes)
-                addr += len(insertion_bytes)
-
+            bytecode = Assembler._generate_bytes(
+                line_dict,
+                max_generated_address,
+                fill_word,
+                self._binary_start,
+                self._binary_end,
+                self._verbose,
+            )
             click.echo(f'Writing {len(bytecode)} bytes of byte code to {self._output_file}')
             with open(self._output_file, 'wb') as f:
                 f.write(bytecode)
@@ -206,3 +207,34 @@ class Assembler:
             else:
                 with open(self._pretty_print_output, 'w') as f:
                     f.write(pretty_str)
+
+    @classmethod
+    def _generate_bytes(
+        cls,
+        line_dict: dict[int, LineObject],
+        max_generated_address: int,
+        fill_word: Word,
+        start_address: int,
+        end_address: int,
+        log_level: int,
+    ) -> bytearray:
+        words = []
+        addr = start_address
+        if log_level > 2:
+            print('\nGenerating byte code:')
+        while addr <= (max_generated_address if end_address is None else end_address):
+            lobj = line_dict.get(addr, None)
+            word_advance = 1
+            if lobj is not None and isinstance(lobj, LineWithWords):
+                lobj_words = lobj.get_words()
+                words.extend(lobj_words)
+                word_advance = lobj.word_count
+                if log_level > 2:
+                    word_str = ', '.join(f'0x{w.value:x}' for w in lobj_words)
+                    click.echo(f'Address ${addr:x} : {lobj} words = [{word_str}]')
+            else:
+                words.append(fill_word)
+            addr += word_advance
+
+        # Use compact_bytes=True to pack bits for arbitrary word sizes
+        return Word.words_to_bytes(words, compact_bytes=True)

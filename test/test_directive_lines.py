@@ -2,6 +2,7 @@ import unittest
 import importlib.resources as pkg_resources
 import copy
 
+from bespokeasm.assembler.bytecode.word import Word
 from test import config_files
 
 from bespokeasm.assembler.label_scope import GlobalLabelScope
@@ -11,7 +12,7 @@ from bespokeasm.assembler.line_object.directive_line.fill_data import FillDataLi
 from bespokeasm.assembler.line_object.directive_line.factory import DirectiveLine
 from bespokeasm.assembler.line_object.directive_line.address import AddressOrgLine
 from bespokeasm.assembler.line_object.directive_line.page_align import PageAlignLine
-from bespokeasm.assembler.line_object import LineWithBytes
+from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
@@ -42,7 +43,6 @@ class TestDirectiveLines(unittest.TestCase):
             1234,
             '.org $1',
             'set address to 0=x100',
-            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
             TestDirectiveLines.isa_model,
@@ -51,13 +51,12 @@ class TestDirectiveLines(unittest.TestCase):
         self.assertEqual(o1.address, 1)
         o1.set_start_address(10)
         self.assertEqual(o1.address, 1, '.org address values cannot be directly set')
-        self.assertEqual(o1.byte_size, 0, '.org directives have 0 bytes')
+        self.assertEqual(o1.word_count, 0, '.org directives have 0 words')
 
         o2 = DirectiveLine.factory(
             5678,
             '.org 8',
             'set address to 1024',
-            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
             TestDirectiveLines.isa_model,
@@ -69,7 +68,6 @@ class TestDirectiveLines(unittest.TestCase):
             1357,
             '.org b000000000100',
             'set address to 2048',
-            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
             TestDirectiveLines.isa_model,
@@ -81,7 +79,6 @@ class TestDirectiveLines(unittest.TestCase):
             1357,
             '.org 0x000F',
             'set address to 54K',
-            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
             TestDirectiveLines.isa_model,
@@ -93,7 +90,6 @@ class TestDirectiveLines(unittest.TestCase):
             1357,
             '.org a_const',
             'set address to a label',
-            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
             TestDirectiveLines.isa_model,
@@ -107,7 +103,6 @@ class TestDirectiveLines(unittest.TestCase):
                 1357,
                 '.org sp',
                 'set address to a register',
-                TestDirectiveLines.isa_model.endian,
                 TestDirectiveLines.memzone,
                 TestDirectiveLines.memory_zone_manager,
                 TestDirectiveLines.isa_model,
@@ -120,7 +115,6 @@ class TestDirectiveLines(unittest.TestCase):
             1357,
             '.org a_const "zone1"',
             'set address to a label',
-            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
             TestDirectiveLines.isa_model,
@@ -133,7 +127,6 @@ class TestDirectiveLines(unittest.TestCase):
             1357,
             '.org a_const/2 + 5 "zone2"',
             'set address to a label',
-            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
             TestDirectiveLines.isa_model,
@@ -154,137 +147,193 @@ class TestDirectiveLines(unittest.TestCase):
             1234,
             ' .fill 32, $77',
             'fill with luck sevens',
-            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
             TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o1, FillDataLine)
         o1.label_scope = label_values
-        self.assertEqual(o1.byte_size, 32, 'has 32 bytes')
-        o1.generate_bytes()
-        self.assertEqual(o1.get_bytes(), bytearray([0x77]*32), '32 double 7s')
+        self.assertEqual(o1.word_count, 32, 'has 32 words')
+        o1.generate_words()
+        self.assertEqual(o1.get_words(), [
+                Word(
+                    0x77,
+                    TestDirectiveLines.isa_model.word_size,
+                    TestDirectiveLines.isa_model.word_segment_size,
+                    TestDirectiveLines.isa_model.intra_word_endianness,
+                ) for _ in range(32)
+            ],
+            '32 double 7s',
+        )
 
         o2 = DirectiveLine.factory(
             1234,
             ' .fill 0xFF, 0x2211',
             'snake eyes',
-            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
             TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o2, FillDataLine)
         o2.label_scope = label_values
-        self.assertEqual(o2.byte_size, 255, 'has 255 bytes')
-        o2.generate_bytes()
-        self.assertEqual(o2.get_bytes(), bytearray([0x11]*255), 'truncated values')
+        self.assertEqual(o2.word_count, 255, 'has 255 words')
+        o2.generate_words()
+        self.assertEqual(o2.get_words(), [
+            Word(
+                0x11,
+                TestDirectiveLines.isa_model.word_size,
+                TestDirectiveLines.isa_model.word_segment_size,
+                TestDirectiveLines.isa_model.intra_word_endianness,
+            ) for _ in range(255)
+        ], 'truncated values')
 
         o2b = DirectiveLine.factory(
             1234,
             ' .fill 8*MAX_N + 1, eff|$A0',
             'snake eyes',
-            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
             TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o2b, FillDataLine)
         o2b.label_scope = label_values
-        self.assertEqual(o2b.byte_size, 161, 'has 161 bytes')
-        o2b.generate_bytes()
-        self.assertEqual(o2b.get_bytes(), bytearray([0xAF]*161), 'complex expression in directive arguments')
+        self.assertEqual(o2b.word_count, 161, 'has 161 words')
+        o2b.generate_words()
+        self.assertEqual(o2b.get_words(), [
+            Word(
+                0xAF,
+                TestDirectiveLines.isa_model.word_size,
+                TestDirectiveLines.isa_model.word_segment_size,
+                TestDirectiveLines.isa_model.intra_word_endianness,
+            ) for _ in range(161)
+        ], 'complex expression in directive arguments')
 
         o3 = DirectiveLine.factory(
             1234,
             '.zero b000000100',
             'zipity doo dah',
-            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
             TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o3, FillDataLine)
         o3.label_scope = label_values
-        self.assertEqual(o3.byte_size, 4, 'has 4 bytes')
-        o3.generate_bytes()
-        self.assertEqual(o3.get_bytes(), bytearray([0]*4), 'truncated values')
+        self.assertEqual(o3.word_count, 4, 'has 4 words')
+        o3.generate_words()
+        self.assertEqual(o3.get_words(), [
+            Word(
+                0,
+                TestDirectiveLines.isa_model.word_size,
+                TestDirectiveLines.isa_model.word_segment_size,
+                TestDirectiveLines.isa_model.intra_word_endianness,
+            ) for _ in range(4)
+        ], 'truncated values')
 
         # test with constants
         o4 = DirectiveLine.factory(
             1234,
             '.zero forty',
             'constants in directives',
-            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
             TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o4, FillDataLine)
         o4.label_scope = label_values
-        self.assertEqual(o4.byte_size, 40, 'has 40 bytes')
-        o4.generate_bytes()
-        self.assertEqual(list(o4.get_bytes()), [0]*40, 'truncated values')
+        self.assertEqual(o4.word_count, 40, 'has 40 words')
+        o4.generate_words()
+        self.assertEqual(o4.get_words(), [
+            Word(
+                0,
+                TestDirectiveLines.isa_model.word_size,
+                TestDirectiveLines.isa_model.word_segment_size,
+                TestDirectiveLines.isa_model.intra_word_endianness,
+            ) for _ in range(40)
+        ], 'truncated values')
 
         o5 = DirectiveLine.factory(
             1234,
             '.fill eff, forty',
             'constants in directives',
-            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
             TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o5, FillDataLine)
         o5.label_scope = label_values
-        self.assertEqual(o5.byte_size, 15, 'has 15 bytes')
-        o5.generate_bytes()
-        self.assertEqual(list(o5.get_bytes()), [40]*15, 'truncated values')
+        self.assertEqual(o5.word_count, 15, 'has 15 words')
+        o5.generate_words()
+        self.assertEqual(o5.get_words(), [
+            Word(
+                40,
+                TestDirectiveLines.isa_model.word_size,
+                TestDirectiveLines.isa_model.word_segment_size,
+                TestDirectiveLines.isa_model.intra_word_endianness,
+            ) for _ in range(15)
+        ], 'truncated values')
 
         o6 = DirectiveLine.factory(
             1234,
             '.fill eff+eff, forty+2',
             'constants in directives',
-            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
             TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o6, FillDataLine)
         o6.label_scope = label_values
-        self.assertEqual(o6.byte_size, 30, 'has 30 bytes')
-        o6.generate_bytes()
-        self.assertEqual(list(o6.get_bytes()), [42]*30, 'truncated values')
+        self.assertEqual(o6.word_count, 30, 'has 30 words')
+        o6.generate_words()
+        self.assertEqual(o6.get_words(), [
+            Word(
+                42,
+                TestDirectiveLines.isa_model.word_size,
+                TestDirectiveLines.isa_model.word_segment_size,
+                TestDirectiveLines.isa_model.intra_word_endianness,
+            ) for _ in range(30)
+        ], 'truncated values')
 
         o6 = DirectiveLine.factory(
             1234,
             '.zero forty+2',
             'constants in directives',
-            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
             TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o6, FillDataLine)
         o6.label_scope = label_values
-        self.assertEqual(o6.byte_size, 42, 'has 42 bytes')
-        o6.generate_bytes()
-        self.assertEqual(list(o6.get_bytes()), [0]*42, 'truncated values')
+        self.assertEqual(o6.word_count, 42, 'has 42 words')
+        o6.generate_words()
+        self.assertEqual(o6.get_words(), [
+            Word(
+                0,
+                TestDirectiveLines.isa_model.word_size,
+                TestDirectiveLines.isa_model.word_segment_size,
+                TestDirectiveLines.isa_model.intra_word_endianness,
+            ) for _ in range(42)
+        ], 'truncated values')
 
         o7 = DirectiveLine.factory(
             1234,
             '.zero 8*(MAX_N+1)',
             'constants in directives',
-            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
             TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o7, FillDataLine)
         o7.label_scope = label_values
-        self.assertEqual(o7.byte_size, 168, 'has 168 bytes')
-        o7.generate_bytes()
-        self.assertEqual(list(o7.get_bytes()), [0]*168, 'truncated values')
+        self.assertEqual(o7.word_count, 168, 'has 168 words')
+        o7.generate_words()
+        self.assertEqual(o7.get_words(), [
+            Word(
+                0,
+                TestDirectiveLines.isa_model.word_size,
+                TestDirectiveLines.isa_model.word_segment_size,
+                TestDirectiveLines.isa_model.intra_word_endianness,
+            ) for _ in range(168)
+        ], 'truncated values')
 
     def test_filluntil_directive(self):
         label_values = LabelScope(LabelScopeType.GLOBAL, None, 'global')
@@ -294,7 +343,6 @@ class TestDirectiveLines(unittest.TestCase):
             1234,
             ' .zerountil $100',
             'fill with nothing',
-            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
             TestDirectiveLines.isa_model,
@@ -302,16 +350,22 @@ class TestDirectiveLines(unittest.TestCase):
         self.assertIsInstance(o1, FillUntilDataLine)
         o1.set_start_address(0x42)
         o1.label_scope = label_values
-        self.assertEqual(o1.byte_size, (0x100-0x42+1), 'must have the right number of bytes')
-        o1.generate_bytes()
-        self.assertEqual(o1.get_bytes(), bytearray([0]*(0x100-0x42+1)), 'must have all the bytes')
+        self.assertEqual(o1.word_count, (0x100-0x42+1), 'must have the right number of words')
+        o1.generate_words()
+        self.assertEqual(o1.get_words(), [
+            Word(
+                0,
+                TestDirectiveLines.isa_model.word_size,
+                TestDirectiveLines.isa_model.word_segment_size,
+                TestDirectiveLines.isa_model.intra_word_endianness,
+            ) for _ in range(0x100-0x42+1)
+        ], 'must have all the bytes')
 
         # test fill until current address
         o2 = DirectiveLine.factory(
             1234,
             '.zerountil 0xF',
             'them zeros',
-            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
             TestDirectiveLines.isa_model,
@@ -319,15 +373,21 @@ class TestDirectiveLines(unittest.TestCase):
         self.assertIsInstance(o2, FillUntilDataLine)
         o2.set_start_address(0xF)
         o2.label_scope = label_values
-        self.assertEqual(o2.byte_size, 1, 'must have the right number of bytes')
-        o2.generate_bytes()
-        self.assertEqual(o2.get_bytes(), bytearray([0]*1), 'must have all the bytes')
+        self.assertEqual(o2.word_count, 1, 'must have the right number of words')
+        o2.generate_words()
+        self.assertEqual(o2.get_words(), [
+            Word(
+                0,
+                TestDirectiveLines.isa_model.word_size,
+                TestDirectiveLines.isa_model.word_segment_size,
+                TestDirectiveLines.isa_model.intra_word_endianness,
+            ) for _ in range(1)
+        ], 'must have all the bytes')
 
         o3 = DirectiveLine.factory(
             1234,
             '.zerountil my_label+$f',
             'them zeros',
-            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
             TestDirectiveLines.isa_model,
@@ -335,9 +395,16 @@ class TestDirectiveLines(unittest.TestCase):
         self.assertIsInstance(o3, FillUntilDataLine)
         o3.set_start_address(0xF)
         o3.label_scope = label_values
-        self.assertEqual(o3.byte_size, 0x81, 'must have the right number of bytes')
-        o3.generate_bytes()
-        self.assertEqual(list(o3.get_bytes()), [0]*0x81, 'must have all the bytes')
+        self.assertEqual(o3.word_count, 0x81, 'must have the right number of words')
+        o3.generate_words()
+        self.assertEqual(o3.get_words(), [
+            Word(
+                0,
+                TestDirectiveLines.isa_model.word_size,
+                TestDirectiveLines.isa_model.word_segment_size,
+                TestDirectiveLines.isa_model.intra_word_endianness,
+            ) for _ in range(0x81)
+        ], 'must have all the bytes')
 
     def test_cstr_directive(self):
         label_values = LabelScope(LabelScopeType.GLOBAL, None, 'global')
@@ -349,41 +416,40 @@ class TestDirectiveLines(unittest.TestCase):
             1234,
             '.cstr "this is a test"',
             'that str',
-            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
             local_isa_model
         )
-        self.assertIsInstance(t1, LineWithBytes)
+        self.assertIsInstance(t1, LineWithWords)
         t1.set_start_address(0xF)
         t1.label_scope = label_values
         self.assertEqual(t1.byte_size, 15, 'must have the right number of bytes')
-        t1.generate_bytes()
-        self.assertEqual(list(t1.get_bytes())[-1], 0, 'terminating character must match')
+        self.assertEqual(t1.word_count, 15, 'must have the right number of words for 8-bit words')
+        t1.generate_words()
+        self.assertEqual(t1.get_words()[-1].value, 0, 'terminating character must match')
 
         local_isa_model._config['general']['cstr_terminator'] = 3
         t2 = DirectiveLine.factory(
             1234,
             '.cstr "this is a test"',
             'that str',
-            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
             local_isa_model
         )
-        self.assertIsInstance(t1, LineWithBytes)
+        self.assertIsInstance(t1, LineWithWords)
         t2.set_start_address(0xF)
         t2.label_scope = label_values
         self.assertEqual(t2.byte_size, 15, 'must have the right number of bytes')
-        t2.generate_bytes()
-        self.assertEqual(list(t2.get_bytes())[-1], 3, 'terminating character must match')
+        self.assertEqual(t2.word_count, 15, 'must have the right number of words for 8-bit words')
+        t2.generate_words()
+        self.assertEqual(t2.get_words()[-1].value, 3, 'terminating character must match')
 
     def test_page_align_line(self):
         t1: LineObject = DirectiveLine.factory(
             1234,
             '.align',
             'page align',
-            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
             TestDirectiveLines.isa_model
@@ -396,7 +462,6 @@ class TestDirectiveLines(unittest.TestCase):
             1234,
             '.align 4',
             'page align',
-            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
             TestDirectiveLines.isa_model
@@ -411,7 +476,6 @@ class TestDirectiveLines(unittest.TestCase):
             1234,
             '.align',
             'page align',
-            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
             local_isa_model
@@ -427,7 +491,6 @@ class TestDirectiveLines(unittest.TestCase):
             1234,
             '.align (eight >> 1)',
             'page align',
-            TestDirectiveLines.isa_model.endian,
             TestDirectiveLines.memzone,
             TestDirectiveLines.memory_zone_manager,
             local_isa_model

@@ -1,4 +1,4 @@
-from bespokeasm.assembler.line_object import LineObject, LineWithBytes
+from bespokeasm.assembler.line_object import LineObject, LineWithWords
 from bespokeasm.assembler.model import AssemblerModel
 
 
@@ -23,9 +23,9 @@ class PrettyPrinterBase:
                 instruction_max_width = len(lo.instruction) + instruction_indent
             if len(lo.comment) > self._max_comment_width:
                 self._max_comment_width = len(lo.comment)
-            if isinstance(lo, LineWithBytes):
-                if len(lo.get_bytes()) > self._max_byte_count:
-                    self._max_byte_count = len(lo.get_bytes())
+            if isinstance(lo, LineWithWords):
+                if len(lo.get_words()) > self._max_byte_count:
+                    self._max_byte_count = len(lo.get_words())
         self._max_line_num_width = len(str(line_num_max))
         self._max_instruction_width = instruction_max_width
 

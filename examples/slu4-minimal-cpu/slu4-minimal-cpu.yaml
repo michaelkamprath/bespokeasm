@@ -1,7 +1,7 @@
 description: slu4 Minimal UART CPU
 general:
   address_size: 16
-  endian: little
+  multi_word_endianness: little
   registers:
     - a
   origin: 0x8000
@@ -9,7 +9,7 @@ general:
     name: slu4-mincpu-asm
     version: "1.5.1"
     extension: min-asm
-  min_version: 0.3.0
+  min_version: 0.5.0
 operand_sets:
   immediate:
     operand_values:

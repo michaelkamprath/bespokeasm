@@ -22,11 +22,14 @@ class InstructionMacroVariant(InstructionBase):
                 mnemonic: str,
                 macro_variant_config: dict,
                 operand_set_collection: OperandSetCollection,
-                default_endian: str,
+                default_multi_word_endian: str,
+                default_intra_word_endian: str,
                 registers: set[str],
                 variant_num: int,
+                word_size: int,
+                word_segment_size: int,
             ) -> None:
-        super().__init__(mnemonic, default_endian, registers)
+        super().__init__(mnemonic, default_multi_word_endian, default_intra_word_endian, registers)
         self._variant_config = macro_variant_config
         self._variant_num = variant_num
 
@@ -35,8 +38,11 @@ class InstructionMacroVariant(InstructionBase):
                 mnemonic,
                 self._variant_config.get('operands', None),
                 operand_set_collection,
-                default_endian,
+                default_multi_word_endian,
+                default_intra_word_endian,
                 registers,
+                word_size,
+                word_segment_size,
             )
             self._operand_parser.validate(mnemonic)
         else:
@@ -68,10 +74,13 @@ class InstructionMacro(InstructionBase):
                 mnemonic: str,
                 macro_config: list[dict],
                 operand_set_collection: OperandSetCollection,
-                default_endian: str,
-                registers: set[str]
+                default_multi_word_endian: str,
+                default_intra_word_endian: str,
+                registers: set[str],
+                word_size: int,
+                word_segment_size: int,
             ) -> None:
-        super().__init__(mnemonic, default_endian, registers)
+        super().__init__(mnemonic, default_multi_word_endian, default_intra_word_endian, registers)
         self._config = macro_config
 
         variant_num = 0
@@ -83,9 +92,12 @@ class InstructionMacro(InstructionBase):
                     mnemonic,
                     variant_config,
                     operand_set_collection,
-                    default_endian,
+                    default_multi_word_endian,
+                    default_intra_word_endian,
                     registers,
-                    variant_num
+                    variant_num,
+                    word_size,
+                    word_segment_size,
                 )
             )
 

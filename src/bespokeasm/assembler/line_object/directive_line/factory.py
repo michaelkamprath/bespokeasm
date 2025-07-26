@@ -61,7 +61,6 @@ class DirectiveLine:
         line_id: LineIdentifier,
         line_str: str,
         comment: str,
-        endian: str,
         current_memzone: MemoryZone,
         memzone_manager: MemoryZoneManager,
         isa_model: AssemblerModel,
@@ -95,6 +94,10 @@ class DirectiveLine:
                 count_str,
                 value_str,
                 current_memzone,
+                isa_model.word_size,
+                isa_model.word_segment_size,
+                isa_model.intra_word_endianness,
+                isa_model.multi_word_endianness,
             )
 
         # .zero
@@ -110,6 +113,10 @@ class DirectiveLine:
                 count_str,
                 '0',
                 current_memzone,
+                isa_model.word_size,
+                isa_model.word_segment_size,
+                isa_model.intra_word_endianness,
+                isa_model.multi_word_endianness,
             )
 
         # .zerountil
@@ -123,6 +130,10 @@ class DirectiveLine:
                 address_str,
                 '0',
                 current_memzone,
+                isa_model.word_size,
+                isa_model.word_segment_size,
+                isa_model.intra_word_endianness,
+                isa_model.multi_word_endianness,
             )
 
         # .page
@@ -131,4 +142,14 @@ class DirectiveLine:
             return PageAlignLine(line_id, cleaned_line_str, comment, current_memzone, isa_model.page_size)
 
         # nothing was matched here. pass to data directive
-        return DataLine.factory(line_id, line_str, comment, endian, current_memzone, isa_model.cstr_terminator)
+        return DataLine.factory(
+            line_id,
+            line_str,
+            comment,
+            current_memzone,
+            isa_model.word_size,
+            isa_model.word_segment_size,
+            isa_model.intra_word_endianness,
+            isa_model.multi_word_endianness,
+            isa_model.cstr_terminator,
+        )

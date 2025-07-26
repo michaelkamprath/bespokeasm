@@ -2,7 +2,7 @@
 description: slu4 Minimal 64 Home Computer
 general:
   address_size: 16
-  endian: little
+  multi_word_endianness: little
   registers:
     - a
     - b
@@ -12,7 +12,7 @@ general:
     name: slu4-min64-asm
     version: "1.2.2"
     extension: min64
-  min_version: 0.4.1
+  min_version: 0.5.0
 operand_sets:
   immediate_8bit:
     # one byte is interpreted as an immediate value

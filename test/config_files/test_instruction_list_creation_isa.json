@@ -73,7 +73,7 @@
       "operand_values": {
         "int8": {
           "argument": {
-            "byte_align": true,
+            "word_align": true,
             "size": 8
           },
           "type": "numeric"
@@ -84,7 +84,7 @@
       "operand_values": {
         "int16": {
           "argument": {
-            "byte_align": true,
+            "word_align": true,
             "endian": "little",
             "size": 16
           },
@@ -96,7 +96,7 @@
       "operand_values": {
         "addr": {
           "argument": {
-            "byte_align": false,
+            "word_align": false,
             "size": 4
           },
           "type": "numeric"

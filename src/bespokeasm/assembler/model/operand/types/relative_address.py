@@ -17,14 +17,27 @@ class RelativeAddressByteCodePart(ExpressionByteCodePartInMemoryZone):
                 value_expression: str,
                 value_size: int,
                 byte_align: bool,
-                endian: str,
+                multi_word_endian: str,
+                intra_word_endian: str,
                 line_id: LineIdentifier,
                 min_relative_value: int,
                 max_relative_value: int,
                 memzone: MemoryZone,
                 offset_from_instruction_end: bool,
+                word_size: int,
+                word_segment_size: int,
             ) -> None:
-        super().__init__(memzone, value_expression, value_size, byte_align, endian, line_id)
+        super().__init__(
+            memzone,
+            value_expression,
+            value_size,
+            byte_align,
+            multi_word_endian,
+            intra_word_endian,
+            line_id,
+            word_size,
+            word_segment_size,
+        )
         self._min_relative_value = min_relative_value
         self._max_relative_value = max_relative_value
         self._offset_from_instruction_end = offset_from_instruction_end
@@ -51,8 +64,25 @@ class RelativeAddressByteCodePart(ExpressionByteCodePartInMemoryZone):
 
 
 class RelativeAddressOperand(OperandWithArgument):
-    def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str, require_arg: bool = True) -> None:
-        super().__init__(operand_id, arg_config_dict, default_endian, require_arg)
+    def __init__(
+        self,
+        operand_id: str,
+        arg_config_dict: dict,
+        default_multi_word_endian: str,
+        default_intra_word_endian: str,
+        word_size: int,
+        word_segment_size: int,
+        require_arg: bool = True,
+    ) -> None:
+        super().__init__(
+            operand_id,
+            arg_config_dict,
+            default_multi_word_endian,
+            default_intra_word_endian,
+            word_size,
+            word_segment_size,
+            require_arg,
+        )
 
     def __str__(self):
         return f'RelativeAddressOperand<{self.id}>'
@@ -103,20 +133,26 @@ class RelativeAddressOperand(OperandWithArgument):
             self.bytecode_value,
             self.bytecode_size,
             False,
-            'big',
-            line_id
+            self._default_multi_word_endian,
+            self._default_intra_word_endian,
+            line_id,
+            self._word_size,
+            self._word_segment_size,
         ) if self.bytecode_value is not None else None
         arg_part = RelativeAddressByteCodePart(
             match.group(1).strip(),
             self.argument_size,
-            self.argument_byte_align,
-            self.argument_endian,
+            self.argument_word_align,
+            self.argument_multi_word_endian,
+            self.argument_intra_word_endian,
             line_id,
             self.min_offset,
             self.max_offset,
             memzone_manager.global_zone,
             self.offset_from_instruction_end,
+            self._word_size,
+            self._word_segment_size,
         )
         if arg_part.contains_register_labels(register_labels):
             return None
-        return ParsedOperand(self, bytecode_part, arg_part, operand)
+        return ParsedOperand(self, bytecode_part, arg_part, operand, self._word_size, self._word_segment_size)

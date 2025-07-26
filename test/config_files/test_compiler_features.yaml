@@ -7,7 +7,7 @@
 description: Test Instructions Bytecode Ordering
 general:
   address_size: 8
-  endian: big
+  multi_word_endianness: big
   registers:
     - a
     - b
@@ -57,7 +57,7 @@ operand_sets:
           size: 3
         argument:
           size: 8
-          byte_align: true
+          word_align: true
       indirect_addr:
         type: indirect_numeric
         bytecode:
@@ -65,7 +65,7 @@ operand_sets:
           size: 3
         argument:
           size: 8
-          byte_align: true
+          word_align: true
       deferred_addr:
         type: deferred_numeric
         bytecode:
@@ -73,7 +73,7 @@ operand_sets:
           size: 3
         argument:
           size: 8
-          byte_align: true
+          word_align: true
 instructions:
   ld:
     bytecode:

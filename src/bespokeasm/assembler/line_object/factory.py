@@ -91,7 +91,6 @@ class LineOjectFactory:
                     line_id,
                     instruction_str,
                     comment_str,
-                    model.endian,
                     current_memzone,
                     memzone_manager,
                     model,
@@ -108,6 +107,10 @@ class LineOjectFactory:
                         instruction_str,
                         comment_str,
                         current_memzone,
+                        model.word_size,
+                        model.word_segment_size,
+                        model.intra_word_endianness,
+                        model.multi_word_endianness,
                         model.cstr_terminator,
                     )
                     if line_obj is not None:

@@ -16,12 +16,37 @@ class IndexedRegisterOperand(RegisterOperand):
 
     OPERAND_PATTERN_TEMPLATE = r'({0})\s*(\+|\-)\s*({1})'
 
-    def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str, regsiters: set[str]) -> None:
-        super().__init__(operand_id, arg_config_dict, default_endian, regsiters)
+    def __init__(
+        self,
+        operand_id: str,
+        arg_config_dict: dict,
+        default_multi_word_endian: str,
+        default_intra_word_endian: str,
+        regsiters: set[str],
+        word_size: int,
+        word_segment_size: int,
+    ) -> None:
+        super().__init__(
+            operand_id,
+            arg_config_dict,
+            default_multi_word_endian,
+            default_intra_word_endian,
+            regsiters,
+            word_size,
+            word_segment_size,
+        )
         self._index_operand_list = []
         op_match_patterns = []
         for op_id, op_config in self._config['index_operands'].items():
-            op = OF.OperandFactory.factory(op_id, op_config, default_endian, regsiters)
+            op = OF.OperandFactory.factory(
+                op_id,
+                op_config,
+                default_multi_word_endian,
+                default_intra_word_endian,
+                regsiters,
+                word_size,
+                word_segment_size,
+            )
             if op.null_operand:
                 sys.exit(f'ERROR: indirect indexed register operand "{operand_id}" configured with a empty index "{op_id}".')
             self._index_operand_list.append(op)
@@ -75,19 +100,58 @@ class IndexedRegisterOperand(RegisterOperand):
                 # for now, we only support addition when indexing
                 return None
             index_operand_str = match.group(3)
-            bytecode_part = NumericByteCodePart(self.bytecode_value, self.bytecode_size, False, 'big', line_id) \
-                if self.bytecode_value is not None else NumericByteCodePart(0, 0, False, 'big', line_id)
+            bytecode_part = NumericByteCodePart(
+                self.bytecode_value,
+                self.bytecode_size,
+                False,
+                self._default_multi_word_endian,
+                self._default_intra_word_endian,
+                line_id,
+                self._word_size,
+                self._word_segment_size,
+            ) if self.bytecode_value is not None else NumericByteCodePart(
+                0,
+                0,
+                False,
+                self._default_multi_word_endian,
+                self._default_intra_word_endian,
+                line_id,
+                self._word_size,
+                self._word_segment_size,
+            )
             # find an index operand match
             for index_op in self._index_operand_list:
-                parsed_index = index_op.parse_operand(line_id, index_operand_str, register_labels, memzone_manager)
+                parsed_index: ParsedOperand = index_op.parse_operand(
+                    line_id,
+                    index_operand_str,
+                    register_labels,
+                    memzone_manager,
+                )
                 if parsed_index is not None:
                     if parsed_index.bytecode is not None:
                         composit_bytecode = CompositeByteCodePart(
                             [bytecode_part, parsed_index.bytecode],
-                            bytecode_part.byte_align,
-                            bytecode_part.endian,
-                            line_id
+                            bytecode_part.word_align,
+                            bytecode_part.multi_word_endian,
+                            bytecode_part.intra_word_endian,
+                            line_id,
+                            self._word_size,
+                            self._word_segment_size,
                         )
-                        return ParsedOperand(self, composit_bytecode, parsed_index.argument, operand)
-                    return ParsedOperand(self, bytecode_part, parsed_index.argument, operand)
+                        return ParsedOperand(
+                            self,
+                            composit_bytecode,
+                            parsed_index.argument,
+                            operand,
+                            self._word_size,
+                            self._word_segment_size,
+                        )
+                    return ParsedOperand(
+                        self,
+                        bytecode_part,
+                        parsed_index.argument,
+                        operand,
+                        self._word_size,
+                        self._word_segment_size,
+                    )
         return None

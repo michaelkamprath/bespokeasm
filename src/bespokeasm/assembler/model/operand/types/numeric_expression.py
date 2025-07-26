@@ -8,8 +8,25 @@ from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 
 
 class NumericExpressionOperand(OperandWithArgument):
-    def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str, require_arg: bool = True) -> None:
-        super().__init__(operand_id, arg_config_dict, default_endian, require_arg)
+    def __init__(
+        self,
+        operand_id: str,
+        arg_config_dict: dict,
+        default_multi_word_endian: str,
+        default_intra_word_endian: str,
+        word_size: int,
+        word_segment_size: int,
+        require_arg: bool = True,
+    ) -> None:
+        super().__init__(
+            operand_id,
+            arg_config_dict,
+            default_multi_word_endian,
+            default_intra_word_endian,
+            word_size,
+            word_segment_size,
+            require_arg,
+        )
 
     def __str__(self):
         return f'NumericExpressionOperand<{self.id}>'
@@ -37,29 +54,38 @@ class NumericExpressionOperand(OperandWithArgument):
             self.bytecode_value,
             self.bytecode_size,
             False,
-            'big',
-            line_id
+            self._default_multi_word_endian,
+            self._default_intra_word_endian,
+            line_id,
+            self._word_size,
+            self._word_segment_size,
         ) if self.bytecode_value is not None else None
         if self.enforce_argument_valid_address:
             arg_part = ExpressionByteCodePartInMemoryZone(
                 memzone_manager.global_zone,
                 operand,
                 self.argument_size,
-                self.argument_byte_align,
-                self.argument_endian,
+                self.argument_word_align,
+                self.argument_multi_word_endian,
+                self.argument_intra_word_endian,
                 line_id,
+                self._word_size,
+                self._word_segment_size,
             )
         else:
             arg_part = ExpressionByteCodePart(
                 operand,
                 self.argument_size,
-                self.argument_byte_align,
-                self.argument_endian,
+                self.argument_word_align,
+                self.argument_multi_word_endian,
+                self.argument_intra_word_endian,
                 line_id,
+                self._word_size,
+                self._word_segment_size,
             )
         if arg_part.contains_register_labels(register_labels):
             return None
-        return ParsedOperand(self, bytecode_part, arg_part, operand)
+        return ParsedOperand(self, bytecode_part, arg_part, operand, self._word_size, self._word_segment_size)
 
     def parse_operand(
         self,

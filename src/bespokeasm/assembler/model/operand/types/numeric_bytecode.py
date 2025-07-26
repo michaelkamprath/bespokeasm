@@ -8,8 +8,23 @@ from bespokeasm.expression import EXPRESSION_PARTS_PATTERN
 
 
 class NumericBytecode(Operand):
-    def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str):
-        super().__init__(operand_id, arg_config_dict, default_endian)
+    def __init__(
+        self,
+        operand_id: str,
+        arg_config_dict: dict,
+        default_multi_word_endian: str,
+        default_intra_word_endian: str,
+        word_size: int,
+        word_segment_size: int,
+    ):
+        super().__init__(
+            operand_id,
+            arg_config_dict,
+            default_multi_word_endian,
+            default_intra_word_endian,
+            word_size,
+            word_segment_size,
+        )
         # validate config
         if self.bytecode_max < self.bytecode_min:
             sys.exit(
@@ -57,9 +72,12 @@ class NumericBytecode(Operand):
             operand,
             self.bytecode_size,
             False,
-            'big',
-            line_id
+            self._default_multi_word_endian,
+            self._default_intra_word_endian,
+            line_id,
+            self._word_size,
+            self._word_segment_size,
         )
         if bytecode_part.contains_register_labels(register_labels):
             return None
-        return ParsedOperand(self, bytecode_part, None, operand)
+        return ParsedOperand(self, bytecode_part, None, operand, self._word_size, self._word_segment_size)

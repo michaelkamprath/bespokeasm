@@ -1,3 +1,5 @@
+from typing import Literal
+import warnings
 import click
 import json
 import os
@@ -67,11 +69,23 @@ class AssemblerModel:
         for reg in self._registers:
             if reg in ASSEMBLER_KEYWORD_SET:
                 sys.exit(f'ERROR: the instruction set configuration file specified an unallowed register name: {reg}')
-        self._operand_sets = OperandSetCollection(self._config['operand_sets'], self.endian, self.registers)
+        self._operand_sets = OperandSetCollection(
+            self._config['operand_sets'],
+            self.multi_word_endianness,
+            self.intra_word_endianness,
+            self.registers,
+            self.word_size,
+            self.word_segment_size,
+        )
         self._instructions = InstructionSet(
                 self._config['instructions'],
                 self._config.get('macros', None),
-                self._operand_sets, self.endian, self.registers
+                self._operand_sets,
+                self.multi_word_endianness,
+                self.intra_word_endianness,
+                self.registers,
+                self.word_size,
+                self.word_segment_size,
             )
 
     def _validate_config(self, is_verbose: int) -> None:
@@ -151,9 +165,29 @@ class AssemblerModel:
         return self._file_extension
 
     @property
-    def endian(self) -> str:
+    def endian(self) -> Literal['little', 'big']:
+        warnings.warn(
+            "The 'endian' general configuration option is deprecated and will be removed in a "
+            "future version. Replace with 'multi_word_endianness'.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         if 'endian' in self._config['general']:
             return self._config['general']['endian']
+        else:
+            return 'big'
+
+    @property
+    def intra_word_endianness(self) -> Literal['little', 'big']:
+        if 'intra_word_endianness' in self._config['general']:
+            return self._config['general']['intra_word_endianness']
+        else:
+            return 'big'
+
+    @property
+    def multi_word_endianness(self) -> Literal['little', 'big']:
+        if 'multi_word_endianness' in self._config['general']:
+            return self._config['general']['multi_word_endianness']
         else:
             return 'big'
 
@@ -173,6 +207,16 @@ class AssemblerModel:
     def page_size(self) -> int:
         '''The number of bytes in a memory page'''
         return self._config['general'].get('page_size', 1)
+
+    @property
+    def word_size(self) -> int:
+        '''The number of bits in a word. defaults to 8 bits.'''
+        return self._config['general'].get('word_size', 8)
+
+    @property
+    def word_segment_size(self) -> int:
+        '''The number of bits in a word segment. Defaults to the word size.'''
+        return self._config['general'].get('word_segment_size', self.word_size)
 
     @property
     def registers(self) -> set[str]:
@@ -268,3 +312,47 @@ class AssemblerModel:
     @property
     def allow_embedded_strings(self) -> bool:
         return self._config['general'].get('allow_embedded_strings', False)
+
+    @staticmethod
+    def update_config_dict_to_latest(config_dict: dict) -> dict:
+        """
+        Given a config dict (as loaded from YAML/JSON), return a new dict updated to the latest config format.
+        Applies upgrades based on the min_version field in the general section (if present).
+        """
+        import copy
+        from packaging import version
+        updated = copy.deepcopy(config_dict)
+        general = updated.setdefault('general', {})
+        min_version = general.get('min_version', None)
+        # If no min_version, or min_version < 0.5.0, apply 0.5.0+ upgrades
+        if min_version is None or version.parse(str(min_version)) < version.parse('0.5.0'):
+            # endian -> multi_word_endianness
+            if 'endian' in general:
+                general['multi_word_endianness'] = general['endian']
+                del general['endian']
+            # byte_size -> word_size
+            if 'byte_size' in general:
+                general['word_size'] = general['byte_size']
+                del general['byte_size']
+            # byte_align -> word_align
+            if 'byte_align' in general:
+                general['word_align'] = general['byte_align']
+                del general['byte_align']
+            # Set defaults for new fields if missing
+            if 'multi_word_endianness' not in general:
+                general['multi_word_endianness'] = 'big'
+            if 'intra_word_endianness' not in general:
+                general['intra_word_endianness'] = 'big'
+            if 'word_size' not in general:
+                general['word_size'] = 8
+            if 'word_segment_size' not in general:
+                general['word_segment_size'] = general['word_size']
+            # Remove any other deprecated fields if present
+            for deprecated in ['endian', 'byte_size', 'byte_align']:
+                if deprecated in general:
+                    del general[deprecated]
+        # Future upgrades can be added here, keyed off min_version
+        # Always update min_version to the current minimum required
+        from bespokeasm import BESPOKEASM_VERSION_STR
+        general['min_version'] = BESPOKEASM_VERSION_STR
+        return updated

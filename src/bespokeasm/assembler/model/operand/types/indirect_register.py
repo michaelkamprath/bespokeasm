@@ -1,6 +1,7 @@
 from functools import cached_property
 import re
 import sys
+import warnings
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.bytecode.parts import NumericByteCodePart, ExpressionByteCodePart
@@ -13,8 +14,25 @@ from .register import RegisterOperand
 class IndirectRegisterOperand(RegisterOperand):
     _BASE_PATTERN_TEMPLATE = r'\[\s*({0})\s*(?:(\+|\-)\s*([\s\w\+\-\*\/\&\|\^\(\)\$\%]+)\s*)?\]'
 
-    def __init__(self, operand_id: str, arg_config_dict: dict, default_endian: str, regsiters: set[str]) -> None:
-        super().__init__(operand_id, arg_config_dict, default_endian, regsiters)
+    def __init__(
+        self,
+        operand_id: str,
+        arg_config_dict: dict,
+        default_multi_word_endian: str,
+        default_intra_word_endian: str,
+        regsiters: set[str],
+        word_size: int,
+        word_segment_size: int,
+    ) -> None:
+        super().__init__(
+            operand_id,
+            arg_config_dict,
+            default_multi_word_endian,
+            default_intra_word_endian,
+            regsiters,
+            word_size,
+            word_segment_size,
+        )
         self._parse_pattern = re.compile(
             fr'^{self.match_pattern}$',
             flags=re.IGNORECASE | re.MULTILINE
@@ -25,10 +43,10 @@ class IndirectRegisterOperand(RegisterOperand):
                     f'ERROR - configuration for indirect register operand "{self.register}" is '
                     f'missing "size" setting.'
                 )
-            if 'byte_align' not in self._config['offset']:
+            if 'word_align' not in self._config['offset'] and 'byte_align' not in self._config['offset']:
                 sys.exit(
                     f'ERROR - configuration for indirect register operand "{self.register}" is '
-                    f'missing "byte_align" setting.'
+                    f'missing "word_align" setting.'
                 )
 
     def __str__(self):
@@ -47,12 +65,25 @@ class IndirectRegisterOperand(RegisterOperand):
         return self._config['offset']['size']
 
     @property
-    def offset_byte_align(self) -> bool:
-        return self._config['offset']['byte_align']
+    def offset_word_align(self) -> bool:
+        if 'word_align' not in self._config['offset']:
+            warnings.warn(
+                f"The 'byte_align' option for offset configuration in operand configuration {self} is "
+                f'deprecated and will be removed in a future version. '
+                f"Replace with 'word_align'.",
+                DeprecationWarning,
+                stacklevel=2
+            )
+            return self._config['offset']['byte_align']
+        return self._config['offset']['word_align']
 
     @property
-    def offset_endian(self) -> str:
-        return self._config['offset'].get('endian', self._default_endian)
+    def offset_multi_word_endian(self) -> str:
+        return self._config['offset'].get('multi_word_endian', self._default_multi_word_endian)
+
+    @property
+    def offset_intra_word_endian(self) -> str:
+        return self._config['offset'].get('intra_word_endian', self._default_intra_word_endian)
 
     @cached_property
     def match_pattern(self) -> str:
@@ -83,8 +114,16 @@ class IndirectRegisterOperand(RegisterOperand):
             operand.strip(),
         )
         if match is not None and len(match.groups()) > 0:
-            bytecode_part = NumericByteCodePart(self.bytecode_value, self.bytecode_size, False, 'big', line_id) \
-                if self.bytecode_value is not None else None
+            bytecode_part = NumericByteCodePart(
+                self.bytecode_value,
+                self.bytecode_size,
+                False,
+                'big',
+                'big',
+                line_id,
+                self._word_size,
+                self._word_segment_size,
+            ) if self.bytecode_value is not None else None
             if self.has_offset:
                 if len(match.groups()) == 3 and match.group(2) is not None and match.group(3) is not None:
                     # we have an offset argument. construct the offset expression. Group 2 is the + or -
@@ -96,16 +135,28 @@ class IndirectRegisterOperand(RegisterOperand):
                     arg_part = ExpressionByteCodePart(
                         argument_str,
                         self.offset_size,
-                        self.offset_byte_align,
-                        self.offset_endian,
-                        line_id
+                        self.offset_word_align,
+                        self.offset_multi_word_endian,
+                        self.offset_intra_word_endian,
+                        line_id,
+                        self._word_size,
+                        self._word_segment_size,
                     )
                     # now test that is is a numeric expression. If not, return nothing
                     if arg_part.contains_register_labels(register_labels):
                         return None
                 else:
                     # must have and offset value of 0
-                    arg_part = NumericByteCodePart(0, self.offset_size, self.offset_byte_align, self.offset_endian, line_id)
+                    arg_part = NumericByteCodePart(
+                        0,
+                        self.offset_size,
+                        self.offset_word_align,
+                        self.offset_multi_word_endian,
+                        self.offset_intra_word_endian,
+                        line_id,
+                        self._word_size,
+                        self._word_segment_size,
+                    )
             else:
                 if len(match.groups()) == 3 and match.group(2) is not None and match.group(3) is not None:
                     # and offset was added for an operand that wasn't configured to have one. Error.
@@ -114,6 +165,6 @@ class IndirectRegisterOperand(RegisterOperand):
                         f'when none was expected.'
                     )
                 arg_part = None
-            return ParsedOperand(self, bytecode_part, arg_part, operand)
+            return ParsedOperand(self, bytecode_part, arg_part, operand, self._word_size, self._word_segment_size)
         else:
             return None

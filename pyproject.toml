@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bespokeasm"
-version = "0.4.3"
+version = "0.5.0"
 authors = [
   { name="Michael Kamprath", email="michael@kamprath.net" },
 ]
@@ -24,6 +24,7 @@ dependencies = [
     "packaging",
     "pyyaml",
     "pre-commit",
+    "click-default-group",
 ]
 
 [project.urls]
