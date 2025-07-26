@@ -3,3 +3,4 @@ intelhex
 packaging
 pyyaml
 pre-commit
+click-default-group

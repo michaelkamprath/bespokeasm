@@ -19,7 +19,7 @@ Changes that are planned but not implemented yet:
 * Update the `#ifdef` and related preprocessor directives to include detection of labels and constants.
 * Allow multiple `cstr` defininitions on the same line
 
-## [Unreleased]
+* ## [Unreleased]
 
 ## [0.5.0]
 * Major refactoring of the code base the enables support for data words of any size. See [Data Words and Endianness](https://github.com/michaelkamprath/bespokeasm/wiki/Instruction-Set-Configuration-File#data-words-and-endianness) for more information.This is a **BREAKING CHANGE** for the configuration file.
@@ -39,6 +39,7 @@ Changes that are planned but not implemented yet:
 * Fixed a bug in generating the syntax highlighting configuration that caused mnemonics with special characters to not be highlighted properly.
 * Added support for symbol definitions in Sublime Text. Symbols defined are labels and constants.
 * Added a new `update_config` CLI command to automatically upgrade older configuration files to the latest format required by this version. This tool will convert deprecated fields, set new defaults, and update the `min_version` field for you.
+* Running 'bespokeasm <args>' now defaults to the 'compile' command, so you no longer need to specify 'compile' explicitly. Other commands (such as 'update-config' and 'generate-extension') still require their explicit subcommand.
 
 ## [0.4.2]
 *  Added support for The Minimal 64x4 Home Computer with an example and updated assembler functionality to support it.

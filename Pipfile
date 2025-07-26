@@ -8,6 +8,7 @@ click = "*"
 intelhex = "*"
 packaging = "*"
 pyyaml = "*"
+click-default-group = "*"
 
 [dev-packages]
 pre-commit = "*"

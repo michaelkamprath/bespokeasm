@@ -8,9 +8,10 @@ from bespokeasm.assembler.engine import Assembler
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.configgen.vscode import VSCodeConfigGenerator
 from bespokeasm.configgen.sublime import SublimeConfigGenerator
+from click_default_group import DefaultGroup
 
 
-@click.group()
+@click.group(cls=DefaultGroup, default='compile', default_if_no_args=True)
 @click.version_option(BESPOKEASM_VERSION_STR)
 def main():
     """A Bespoke ISA Assembler"""
