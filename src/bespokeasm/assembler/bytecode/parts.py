@@ -86,7 +86,8 @@ class ByteCodePart:
         return \
             self._value_size == other._value_size \
             and self._word_align == other._word_align \
-            and self._endian == other._endian \
+            and self._multi_word_endian == other._multi_word_endian \
+            and self._intra_word_endian == other._intra_word_endian \
             and self._word_size == other._word_size \
             and self._segment_size == other._segment_size
 
@@ -250,6 +251,14 @@ class NumericByteCodePart(ByteCodePart):
 
     def __str__(self) -> str:
         return f'NumericByteCodePart<value={self._value},size={self.value_size}>'
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, NumericByteCodePart):
+            return False
+        return (
+            super().__eq__(other)
+            and self._value == other._value
+        )
 
     def get_value(self, label_scope: LabelScope, instruction_address: int, instruction_size: int) -> int:
         return self._value
@@ -495,7 +504,7 @@ class CompositeByteCodePart(ByteCodePart):
             self._parts_list,
             self.word_size,
             self.segment_size,
-            self.endian,
+            self.multi_word_endian,
             label_scope,
             instruction_address,
             instruction_size,

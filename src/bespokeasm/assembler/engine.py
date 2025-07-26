@@ -1,4 +1,3 @@
-import binascii
 import click
 import os
 import sys
@@ -219,22 +218,23 @@ class Assembler:
         end_address: int,
         log_level: int,
     ) -> bytearray:
-        bytecode = bytearray()
+        words = []
         addr = start_address
-        fill_bytes = bytearray(fill_word.to_bytes())
         if log_level > 2:
             print('\nGenerating byte code:')
         while addr <= (max_generated_address if end_address is None else end_address):
             lobj = line_dict.get(addr, None)
-            insertion_bytes = fill_bytes
-            if lobj is not None:
-                line_bytes = Word.words_to_bytes(lobj.get_words(), False, 'big')
-                if line_bytes is not None:
-                    insertion_bytes = line_bytes
-                    if log_level > 2:
-                        line_bytes_str = binascii.hexlify(line_bytes, sep=' ').decode('utf-8')
-                        click.echo(f'Address ${addr:x} : {lobj} bytes = {line_bytes_str}')
-            bytecode.extend(insertion_bytes)
-            addr += lobj.word_count
+            word_advance = 1
+            if lobj is not None and isinstance(lobj, LineWithWords):
+                lobj_words = lobj.get_words()
+                words.extend(lobj_words)
+                word_advance = lobj.word_count
+                if log_level > 2:
+                    word_str = ', '.join(f'0x{w.value:x}' for w in lobj_words)
+                    click.echo(f'Address ${addr:x} : {lobj} words = [{word_str}]')
+            else:
+                words.append(fill_word)
+            addr += word_advance
 
-        return bytecode
+        # Use compact_bytes=True to pack bits for arbitrary word sizes
+        return Word.words_to_bytes(words, compact_bytes=True)

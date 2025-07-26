@@ -218,3 +218,77 @@ class TestAssemblerEngine(unittest.TestCase):
             ]),
             'the bytecode should match',
         )
+
+    def test_generate_bytes_from_line_objects_4bit_words(self):
+        # Simulate a 4-bit word ISA: two 4-bit words should be packed into one byte
+        class DummyLineWithWords(LineWithWords):
+            def __init__(self, address, words):
+                self._address = address
+                self._words = words
+                self._memory_zone = type('mz', (), {'current_address': address})
+                self._line_id = f'line_{address}'
+                self.is_muted = False
+
+            def get_words(self):
+                return self._words
+
+            @property
+            def word_count(self):
+                return len(self._words)
+
+            @property
+            def compilable(self):
+                return True
+        # Create two lines, each with two 4-bit words
+        line1 = DummyLineWithWords(0, [Word(0xA, 4, 4), Word(0xB, 4, 4)])  # 0xA, 0xB
+        line2 = DummyLineWithWords(2, [Word(0xC, 4, 4), Word(0xD, 4, 4)])  # 0xC, 0xD
+        line_dict = {0: line1, 2: line2}
+        max_generated_address = 2
+        fill_word = Word(0x0, 4, 4)
+        # Should produce: 0xAB, 0xCD
+        bytecode = Assembler._generate_bytes(
+            line_dict,
+            max_generated_address,
+            fill_word,
+            0,
+            None,
+            2,
+        )
+        self.assertEqual(bytecode, bytearray([0xAB, 0xCD]), '4-bit words should be packed into bytes correctly')
+
+    def test_generate_bytes_from_line_objects_4bit_words_with_fill(self):
+        # Simulate a 4-bit word ISA with a gap, so fill_word is used and must be packed
+        class DummyLineWithWords(LineWithWords):
+            def __init__(self, address, words):
+                self._address = address
+                self._words = words
+                self._memory_zone = type('mz', (), {'current_address': address})
+                self._line_id = f'line_{address}'
+                self.is_muted = False
+
+            def get_words(self):
+                return self._words
+
+            @property
+            def word_count(self):
+                return len(self._words)
+
+            @property
+            def compilable(self):
+                return True
+        # Address 0: 0xA, Address 2: 0xB (address 1 missing, should be filled)
+        line1 = DummyLineWithWords(0, [Word(0xA, 4, 4)])
+        line2 = DummyLineWithWords(2, [Word(0xB, 4, 4)])
+        line_dict = {0: line1, 2: line2}
+        max_generated_address = 2
+        fill_word = Word(0xF, 4, 4)  # Use 0xF as fill
+        # Should produce: 0xAF (0xA from addr 0, 0xF fill for addr 1), 0xB0 (0xB from addr 2, 0x0 fill for addr 3)
+        bytecode = Assembler._generate_bytes(
+            line_dict,
+            max_generated_address,
+            fill_word,
+            0,
+            None,
+            2,
+        )
+        self.assertEqual(bytecode, bytearray([0xAF, 0xB0]), 'fill_word should be packed with real words correctly')

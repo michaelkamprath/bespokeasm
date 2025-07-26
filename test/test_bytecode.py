@@ -187,3 +187,34 @@ class TestBytecodeObjects(unittest.TestCase):
             b'\x80\x00\x11\x22\x44\x33\x22\x11\x00\x80',
             'ensure segment endian is honored when converting to bytes'
         )
+
+    def test_bytecode_part_equality(self):
+        test_line_id = LineIdentifier(1, 'test_bytecode_part_equality')
+        # Identical parts
+        p1 = NumericByteCodePart(5, 4, True, 'big', 'little', test_line_id, 8, 8)
+        p2 = NumericByteCodePart(5, 4, True, 'big', 'little', test_line_id, 8, 8)
+        self.assertEqual(p1, p2, 'Identical NumericByteCodeParts should be equal')
+
+        # Differ by multi_word_endian
+        p3 = NumericByteCodePart(5, 4, True, 'little', 'little', test_line_id, 8, 8)
+        self.assertNotEqual(p1, p3, 'Parts with different multi_word_endian should not be equal')
+
+        # Differ by intra_word_endian
+        p4 = NumericByteCodePart(5, 4, True, 'big', 'big', test_line_id, 8, 8)
+        self.assertNotEqual(p1, p4, 'Parts with different intra_word_endian should not be equal')
+
+        # Differ by value_size
+        p5 = NumericByteCodePart(6, 4, True, 'big', 'little', test_line_id, 8, 8)
+        self.assertNotEqual(p1, p5, 'Parts with different value_size should not be equal')
+
+        # Differ by word_align
+        p6 = NumericByteCodePart(5, 4, False, 'big', 'little', test_line_id, 8, 8)
+        self.assertNotEqual(p1, p6, 'Parts with different word_align should not be equal')
+
+        # Differ by word_size
+        p7 = NumericByteCodePart(5, 4, True, 'big', 'little', test_line_id, 16, 8)
+        self.assertNotEqual(p1, p7, 'Parts with different word_size should not be equal')
+
+        # Differ by segment_size
+        p8 = NumericByteCodePart(5, 4, True, 'big', 'little', test_line_id, 8, 16)
+        self.assertNotEqual(p1, p8, 'Parts with different segment_size should not be equal')
