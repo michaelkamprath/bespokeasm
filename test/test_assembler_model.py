@@ -335,5 +335,54 @@ class TestConfigObject(unittest.TestCase):
         pass
 
 
+class TestUpdateConfigDictToLatest(unittest.TestCase):
+    def test_deprecated_fields_are_converted(self):
+        old_config = {
+            'general': {
+                'endian': 'little',
+                'byte_size': 16,
+                'byte_align': 2,
+                'min_version': '0.4.0',
+            }
+        }
+        updated = AssemblerModel.update_config_dict_to_latest(old_config)
+        g = updated['general']
+        self.assertNotIn('endian', g)
+        self.assertNotIn('byte_size', g)
+        self.assertNotIn('byte_align', g)
+        self.assertEqual(g['multi_word_endianness'], 'little')
+        self.assertEqual(g['word_size'], 16)
+        self.assertEqual(g['word_align'], 2)
+        self.assertEqual(g['word_segment_size'], 16)
+        self.assertEqual(g['intra_word_endianness'], 'big')  # default
+        self.assertIn('min_version', g)
+
+    def test_min_version_is_updated(self):
+        old_config = {'general': {'min_version': '0.1.0'}}
+        updated = AssemblerModel.update_config_dict_to_latest(old_config)
+        g = updated['general']
+        from bespokeasm import BESPOKEASM_VERSION_STR
+        self.assertEqual(g['min_version'], BESPOKEASM_VERSION_STR)
+
+    def test_noop_for_up_to_date_config(self):
+        up_to_date = {
+            'general': {
+                'multi_word_endianness': 'big',
+                'intra_word_endianness': 'little',
+                'word_size': 8,
+                'word_segment_size': 8,
+                'min_version': '0.5.0',
+            }
+        }
+        updated = AssemblerModel.update_config_dict_to_latest(up_to_date)
+        g = updated['general']
+        self.assertEqual(g['multi_word_endianness'], 'big')
+        self.assertEqual(g['intra_word_endianness'], 'little')
+        self.assertEqual(g['word_size'], 8)
+        self.assertEqual(g['word_segment_size'], 8)
+        from bespokeasm import BESPOKEASM_VERSION_STR
+        self.assertEqual(g['min_version'], BESPOKEASM_VERSION_STR)
+
+
 if __name__ == '__main__':
     unittest.main()

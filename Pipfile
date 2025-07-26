@@ -6,11 +6,11 @@ name = "pypi"
 [packages]
 click = "*"
 intelhex = "*"
-PyYAML = "*"
-build = "*"
+packaging = "*"
+pyyaml = "*"
 
 [dev-packages]
-pre-commit = '*'
+pre-commit = "*"
 
 [requires]
 python_version = "3.11"

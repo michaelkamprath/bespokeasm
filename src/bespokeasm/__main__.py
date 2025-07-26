@@ -2,8 +2,10 @@ import click
 import os
 import sys
 
+import yaml
 from bespokeasm import BESPOKEASM_VERSION_STR
 from bespokeasm.assembler.engine import Assembler
+from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.configgen.vscode import VSCodeConfigGenerator
 from bespokeasm.configgen.sublime import SublimeConfigGenerator
 
@@ -104,6 +106,54 @@ def compile(
         macro_symbol,
     )
     asm.assemble_bytecode()
+
+
+@main.command(short_help='update an ISA configuration file to the latest format')
+@click.option(
+    '--config-file', '-c', required=True,
+    help='The filepath to the instruction set configuration file (YAML or JSON).'
+)
+@click.option(
+    '--output-file', '-o',
+    help='The filepath to write the updated configuration file. Defaults to stdout.'
+)
+def update_config(config_file, output_file):
+    """Update an older ISA configuration file to the latest format and output the result."""
+    import sys
+    import os
+    import json
+    # Load config
+    config_file = os.path.abspath(os.path.expanduser(config_file))
+    if config_file.endswith('.json'):
+        with open(config_file) as f:
+            config_dict = json.load(f)
+    elif config_file.endswith('.yaml') or config_file.endswith('.yml'):
+        with open(config_file) as f:
+            config_dict = yaml.safe_load(f)
+    else:
+        click.echo('ERROR: Unknown config file type. Must be .yaml, .yml, or .json.', err=True)
+        sys.exit(1)
+    # Update config
+    updated_dict = AssemblerModel.update_config_dict_to_latest(config_dict)
+    # Check for changes
+    if updated_dict == config_dict:
+        click.echo(
+            'No changes were made to the configuration file.',
+            err=True,
+        )
+        return
+    # Output only if changes occurred
+    if output_file:
+        output_file = os.path.abspath(os.path.expanduser(output_file))
+        with open(output_file, 'w') as f:
+            if output_file.endswith('.json'):
+                json.dump(updated_dict, f, indent=2)
+            else:
+                yaml.safe_dump(updated_dict, f, sort_keys=False)
+        click.echo(f'Updated configuration written to {output_file}')
+    else:
+        # Default: YAML to stdout
+        yaml.safe_dump(updated_dict, sys.stdout, sort_keys=False)
 
 
 @main.group(short_help='generate a language syntax highlighting extension')

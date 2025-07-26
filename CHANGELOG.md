@@ -25,12 +25,20 @@ Changes that are planned but not implemented yet:
 * Major refactoring of the code base the enables support for data words of any size. See [Data Words and Endianness](https://github.com/michaelkamprath/bespokeasm/wiki/Instruction-Set-Configuration-File#data-words-and-endianness) for more information.This is a **BREAKING CHANGE** for the configuration file.
   * The `endian` general configuration option is deprecated and replaced with `multi_word_endianness` and `intra_word_endianness`.
   * The `byte_size` configuration options used in many places is deprecated and replaced with `word_size`. Similarly, the `byte_align` configuration option is deprecated and replaced with `word_align`.
+  * **Additional upgrade instructions for configuration file changes:**
+    * The new fields `multi_word_endianness` and `intra_word_endianness` must be set to either `'big'` or `'little'`. If omitted, they default to `'big'`.
+    * The new field `word_size` (in bits) replaces all uses of `byte_size`. If omitted, it defaults to `8`.
+    * The new field `word_segment_size` (in bits) is optional and defaults to the value of `word_size`. Only set this if your word is composed of smaller segments (e.g., 16-bit word with 8-bit segments).
+    * The new field `word_align` replaces `byte_align` for alignment settings.
+    * All these fields must be placed in the `general` section of the configuration file.
+    * The deprecated fields (`endian`, `byte_size`, `byte_align`) are still recognized for now, but will emit warnings and should be removed from your configuration files.
 * Upgrade python version requirements to 3.11
 * Improved several error messages
 * Fixed a bug where embedded strings weren't properly parsed if they contained a newline character or there were multiple embedded strings per line
 * Fixed a bug where parsing properly discriminate between labels starting with `BYTE` string and the `BYTEx()` operator.
 * Fixed a bug in generating the syntax highlighting configuration that caused mnemonics with special characters to not be highlighted properly.
 * Added support for symbol definitions in Sublime Text. Symbols defined are labels and constants.
+* Added a new `update_config` CLI command to automatically upgrade older configuration files to the latest format required by this version. This tool will convert deprecated fields, set new defaults, and update the `min_version` field for you.
 
 ## [0.4.2]
 *  Added support for The Minimal 64x4 Home Computer with an example and updated assembler functionality to support it.

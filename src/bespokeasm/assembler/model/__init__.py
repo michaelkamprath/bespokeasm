@@ -312,3 +312,47 @@ class AssemblerModel:
     @property
     def allow_embedded_strings(self) -> bool:
         return self._config['general'].get('allow_embedded_strings', False)
+
+    @staticmethod
+    def update_config_dict_to_latest(config_dict: dict) -> dict:
+        """
+        Given a config dict (as loaded from YAML/JSON), return a new dict updated to the latest config format.
+        Applies upgrades based on the min_version field in the general section (if present).
+        """
+        import copy
+        from packaging import version
+        updated = copy.deepcopy(config_dict)
+        general = updated.setdefault('general', {})
+        min_version = general.get('min_version', None)
+        # If no min_version, or min_version < 0.5.0, apply 0.5.0+ upgrades
+        if min_version is None or version.parse(str(min_version)) < version.parse('0.5.0'):
+            # endian -> multi_word_endianness
+            if 'endian' in general:
+                general['multi_word_endianness'] = general['endian']
+                del general['endian']
+            # byte_size -> word_size
+            if 'byte_size' in general:
+                general['word_size'] = general['byte_size']
+                del general['byte_size']
+            # byte_align -> word_align
+            if 'byte_align' in general:
+                general['word_align'] = general['byte_align']
+                del general['byte_align']
+            # Set defaults for new fields if missing
+            if 'multi_word_endianness' not in general:
+                general['multi_word_endianness'] = 'big'
+            if 'intra_word_endianness' not in general:
+                general['intra_word_endianness'] = 'big'
+            if 'word_size' not in general:
+                general['word_size'] = 8
+            if 'word_segment_size' not in general:
+                general['word_segment_size'] = general['word_size']
+            # Remove any other deprecated fields if present
+            for deprecated in ['endian', 'byte_size', 'byte_align']:
+                if deprecated in general:
+                    del general[deprecated]
+        # Future upgrades can be added here, keyed off min_version
+        # Always update min_version to the current minimum required
+        from bespokeasm import BESPOKEASM_VERSION_STR
+        general['min_version'] = BESPOKEASM_VERSION_STR
+        return updated
