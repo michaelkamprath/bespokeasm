@@ -18,8 +18,9 @@ Changes that are planned but not implemented yet:
 * Create a "align if needed" preprocessor directive paid that generates an `.align` directive if the bytecode in between the pair isn't naturally on the same page and can fit on the same page if aligned. An error would be benerated if the block of code can't fit on the same page regardless of alignment.
 * Update the `#ifdef` and related preprocessor directives to include detection of labels and constants.
 * Allow multiple `cstr` defininitions on the same line
+* Add ISA-level configuration options for how byte data (`.byte` and `.cstr`) is emitted in data words that are not 8-bit in size.
 
-* ## [Unreleased]
+## [Unreleased]
 
 ## [0.5.0]
 * Major refactoring of the code base the enables support for data words of any size. See [Data Words and Endianness](https://github.com/michaelkamprath/bespokeasm/wiki/Instruction-Set-Configuration-File#data-words-and-endianness) for more information.This is a **BREAKING CHANGE** for the configuration file.
