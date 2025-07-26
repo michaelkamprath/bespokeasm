@@ -68,12 +68,21 @@ class RelativeAddressOperand(OperandWithArgument):
         self,
         operand_id: str,
         arg_config_dict: dict,
-        default_endian: str,
+        default_multi_word_endian: str,
+        default_intra_word_endian: str,
         word_size: int,
         word_segment_size: int,
         require_arg: bool = True,
     ) -> None:
-        super().__init__(operand_id, arg_config_dict, default_endian, word_size, word_segment_size, require_arg)
+        super().__init__(
+            operand_id,
+            arg_config_dict,
+            default_multi_word_endian,
+            default_intra_word_endian,
+            word_size,
+            word_segment_size,
+            require_arg,
+        )
 
     def __str__(self):
         return f'RelativeAddressOperand<{self.id}>'
