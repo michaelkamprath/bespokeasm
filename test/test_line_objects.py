@@ -489,22 +489,60 @@ class TestLineObject(unittest.TestCase):
         self.assertIsInstance(objs3[0], LabelLine, 'the first line object should be a label')
         self.assertEqual(objs3[0].get_label(), 'the_label', 'the label string should match')
 
-        # # labels with constants should not work
-        # with self.assertRaises(SystemExit, msg='this instruction should fail'):
-        #     LineOjectFactory.parse_line(
-        #         lineid,
-        #         'the_label: const = 3 ; label with constant',
-        #         isa_model,
-        #         label_values,
-        #     )
-        # # labels with other labels should not work
-        # with self.assertRaises(SystemExit, msg='this instruction should fail'):
-        #     LineOjectFactory.parse_line(
-        #         lineid,
-        #         'the_label: the_second_label: ; label with another label',
-        #         isa_model,
-        #         label_values,
-        #     )
+    def test_peculiar_label_line_situations(self):
+        fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
+
+        label_values = GlobalLabelScope(isa_model.registers)
+        label_values.set_label_value('a_const', 40, 1)
+
+        lineid = LineIdentifier(123, 'test_unallowed_label_line_situations')
+
+        preprocessor = Preprocessor()
+
+        # labels with constants should now be allowed
+        objs = LineOjectFactory.parse_line(
+            lineid,
+            'the_label: const = 3 ; label with constant',
+            isa_model,
+            label_values,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+            preprocessor,
+            ConditionStack(),
+            0,
+        )
+        self.assertEqual(len(objs), 2, 'should return two line objects')
+        self.assertIsInstance(objs[0], LabelLine, 'first object should be a label')
+        self.assertIsInstance(objs[1], LabelLine, 'second object should be a constant assignment')
+        self.assertEqual(objs[0].get_label(), 'the_label')
+        self.assertEqual(objs[1].get_label(), 'const')
+        self.assertEqual(objs[1].get_value(), 3)
+        self.assertEqual(objs[1].comment, 'label with constant')
+
+        # labels with other labels should now be allowed
+        objs = LineOjectFactory.parse_line(
+            lineid,
+            'the_label: the_second_label: ; label with another label',
+            isa_model,
+            label_values,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+            preprocessor,
+            ConditionStack(),
+            0,
+        )
+        self.assertEqual(len(objs), 2, 'should return two line objects')
+        self.assertIsInstance(objs[0], LabelLine, 'first object should be a label')
+        self.assertIsInstance(objs[1], LabelLine, 'second object should be a label')
+        self.assertEqual(objs[0].get_label(), 'the_label')
+        self.assertEqual(objs[1].get_label(), 'the_second_label')
+        self.assertEqual(objs[1].comment, 'label with another label')
 
     def test_valid_labels(self):
         self.assertTrue(is_valid_label('a_str'), 'valid label')
