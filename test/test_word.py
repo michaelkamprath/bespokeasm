@@ -1,4 +1,5 @@
 import unittest
+
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.bytecode.word_slice import WordSlice
 

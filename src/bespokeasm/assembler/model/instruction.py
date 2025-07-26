@@ -1,9 +1,9 @@
 import sys
 from typing import Literal
 
+from bespokeasm.assembler.model.instruction_base import InstructionBase
 from bespokeasm.assembler.model.operand_parser import OperandParser
 from bespokeasm.assembler.model.operand_set import OperandSetCollection
-from bespokeasm.assembler.model.instruction_base import InstructionBase
 
 # Instruction
 #

@@ -3,11 +3,11 @@ import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithWords
-from bespokeasm.assembler.model import AssemblerModel
-from bespokeasm.assembler.model.instruction_parser import InstructioParser
+from bespokeasm.assembler.line_object.emdedded_string import EMBEDDED_STRING_PATTERN
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
-from bespokeasm.assembler.line_object.emdedded_string import EMBEDDED_STRING_PATTERN
+from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.assembler.model.instruction_parser import InstructioParser
 
 
 class InstructionLine(LineWithWords):

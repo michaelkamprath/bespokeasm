@@ -1,14 +1,17 @@
-from functools import cached_property
 import re
 import sys
+from functools import cached_property
 
-from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.bytecode.parts import NumericByteCodePart, ExpressionByteCodePartInMemoryZone
-from bespokeasm.assembler.model.operand import OperandWithArgument, OperandType, ParsedOperand
+from bespokeasm.assembler.bytecode.parts import ExpressionByteCodePartInMemoryZone
+from bespokeasm.assembler.bytecode.parts import NumericByteCodePart
 from bespokeasm.assembler.label_scope import LabelScope
-from bespokeasm.expression import EXPRESSION_PARTS_PATTERN
-from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone import MemoryZone
+from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.model.operand import OperandType
+from bespokeasm.assembler.model.operand import OperandWithArgument
+from bespokeasm.assembler.model.operand import ParsedOperand
+from bespokeasm.expression import EXPRESSION_PARTS_PATTERN
 
 
 class RelativeAddressByteCodePart(ExpressionByteCodePartInMemoryZone):

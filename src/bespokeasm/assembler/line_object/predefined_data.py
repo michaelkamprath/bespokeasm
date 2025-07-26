@@ -4,6 +4,7 @@ for bytecode output. Each word is of a specified size and value, and the line is
 of repeated data in the assembled output.
 """
 from typing import Literal
+
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithWords

@@ -6,16 +6,17 @@
 #
 #    from bespokeasm.expression import parse_expression, ExpressionNode
 #
-
 import enum
 import operator
 import re
 import sys
 
-from bespokeasm.utilities import is_string_numeric, parse_numeric_string, PATTERN_HEX
-from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.label_scope import LabelScope
+from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.utilities import is_string_numeric
 from bespokeasm.utilities import is_valid_label
+from bespokeasm.utilities import parse_numeric_string
+from bespokeasm.utilities import PATTERN_HEX
 
 EXPRESSION_PARTS_PATTERN = \
     r'(?:(?:\%|b)[01]+|{}|\d+|[\+\-\*\/\&\|\^\(\)]|>>|<<|%|LSB\(|BYTE\d\(|(?:\.|_)?\w+|\'.\'|[><])'.format(

@@ -1,7 +1,9 @@
 from bespokeasm.assembler.bytecode.parts import NumericByteCodePart
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.model.operand import Operand, OperandType, ParsedOperand
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.model.operand import Operand
+from bespokeasm.assembler.model.operand import OperandType
+from bespokeasm.assembler.model.operand import ParsedOperand
 
 
 class EmptyOperand(Operand):

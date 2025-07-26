@@ -1,4 +1,5 @@
 import unittest
+
 from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.line_object.data_line import DataLine
 from bespokeasm.assembler.memory_zone import MemoryZone

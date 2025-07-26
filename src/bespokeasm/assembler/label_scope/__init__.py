@@ -43,8 +43,8 @@ from __future__ import annotations
 import enum
 import sys
 
-from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.keywords import ASSEMBLER_KEYWORD_SET
+from bespokeasm.assembler.line_identifier import LineIdentifier
 
 
 class LabelScopeType(enum.Enum):

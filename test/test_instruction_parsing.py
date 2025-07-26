@@ -1,19 +1,22 @@
-import unittest
 import importlib.resources as pkg_resources
+import unittest
 
 from bespokeasm.assembler.bytecode.word import Word
-from test import config_files
-
-from bespokeasm.assembler.label_scope import GlobalLabelScope, LabelScope, LabelScopeType
+from bespokeasm.assembler.label_scope import GlobalLabelScope
+from bespokeasm.assembler.label_scope import LabelScope
+from bespokeasm.assembler.label_scope import LabelScopeType
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.line_object import LineObject, LineWithWords
+from bespokeasm.assembler.line_object import LineObject
+from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.assembler.line_object.factory import LineOjectFactory
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.line_object.label_line import LabelLine
-from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
+
+from test import config_files
 
 
 class TestInstructionParsing(unittest.TestCase):

@@ -2,8 +2,8 @@
 """
 Test cases for the enhanced Word class with proper endianness support.
 """
-
 import unittest
+
 from src.bespokeasm.assembler.bytecode.word import Word
 
 

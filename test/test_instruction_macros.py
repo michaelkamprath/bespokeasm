@@ -1,15 +1,16 @@
-import unittest
 import importlib.resources as pkg_resources
+import unittest
 
 from bespokeasm.assembler.bytecode.word import Word
-from bespokeasm.assembler.line_object import LineWithWords
-from test import config_files
-
-from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType
-from bespokeasm.assembler.model import AssemblerModel
-from bespokeasm.assembler.line_object.instruction_line import InstructionLine
+from bespokeasm.assembler.label_scope import LabelScope
+from bespokeasm.assembler.label_scope import LabelScopeType
 from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.line_object import LineWithWords
+from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.model import AssemblerModel
+
+from test import config_files
 
 
 class TestInstructionMacros(unittest.TestCase):

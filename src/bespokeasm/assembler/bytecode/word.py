@@ -1,6 +1,7 @@
-from typing import Literal
-from .word_slice import WordSlice
 import math
+from typing import Literal
+
+from .word_slice import WordSlice
 
 
 class Word:

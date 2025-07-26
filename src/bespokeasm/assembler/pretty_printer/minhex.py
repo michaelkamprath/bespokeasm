@@ -2,10 +2,11 @@ import io
 import sys
 
 from bespokeasm.assembler.bytecode.word import Word
-from bespokeasm.assembler.line_object import LineWithWords, LineObject
+from bespokeasm.assembler.line_object import LineObject
+from bespokeasm.assembler.line_object import LineWithWords
+from bespokeasm.assembler.line_object.directive_line.address import AddressOrgLine
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.pretty_printer import PrettyPrinterBase
-from bespokeasm.assembler.line_object.directive_line.address import AddressOrgLine
 
 
 class MinHexPrettyPrinter(PrettyPrinterBase):

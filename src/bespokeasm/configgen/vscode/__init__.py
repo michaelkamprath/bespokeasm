@@ -1,13 +1,15 @@
 import importlib.resources as pkg_resources
 import json
 import os
-from pathlib import Path
 import shutil
+from pathlib import Path
 
-from bespokeasm.configgen import LanguageConfigGenerator
 import bespokeasm.configgen.vscode.resources as resources
-from bespokeasm.assembler.keywords import \
-    COMPILER_DIRECTIVES_SET, BYTECODE_DIRECTIVES_SET, PREPROCESSOR_DIRECTIVES_SET, EXPRESSION_FUNCTIONS_SET
+from bespokeasm.assembler.keywords import BYTECODE_DIRECTIVES_SET
+from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET
+from bespokeasm.assembler.keywords import EXPRESSION_FUNCTIONS_SET
+from bespokeasm.assembler.keywords import PREPROCESSOR_DIRECTIVES_SET
+from bespokeasm.configgen import LanguageConfigGenerator
 
 
 class VSCodeConfigGenerator(LanguageConfigGenerator):

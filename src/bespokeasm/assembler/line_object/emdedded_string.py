@@ -3,14 +3,15 @@
 # embedded string feature must be enabled in the ISA configuration file, whether there is a
 # termination character or not to be included in the bytecode.
 from __future__ import annotations
+
 import math
 import re
 from typing import Literal
 
 from bespokeasm.assembler.bytecode.word import Word
+from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.assembler.memory_zone import MemoryZone
-from bespokeasm.assembler.line_identifier import LineIdentifier
 
 
 EMBEDDED_STRING_PATTERN = r'(?P<quote>[\"])((?:\\(?P=quote)|.|\n)*?)(?P=quote)'

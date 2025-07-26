@@ -1,10 +1,19 @@
 import sys
 
 from bespokeasm.assembler.model.operand import Operand
-from bespokeasm.assembler.model.operand.types import empty, numeric_expression, indirect_register, \
-                                                     indirect_numeric, register, indirect_indexed_register, \
-                                                     deferred_numeric, numeric_bytecode, enumeration_operand, \
-                                                     numeric_enumeration, relative_address, indexed_register, address
+from bespokeasm.assembler.model.operand.types import address
+from bespokeasm.assembler.model.operand.types import deferred_numeric
+from bespokeasm.assembler.model.operand.types import empty
+from bespokeasm.assembler.model.operand.types import enumeration_operand
+from bespokeasm.assembler.model.operand.types import indexed_register
+from bespokeasm.assembler.model.operand.types import indirect_indexed_register
+from bespokeasm.assembler.model.operand.types import indirect_numeric
+from bespokeasm.assembler.model.operand.types import indirect_register
+from bespokeasm.assembler.model.operand.types import numeric_bytecode
+from bespokeasm.assembler.model.operand.types import numeric_enumeration
+from bespokeasm.assembler.model.operand.types import numeric_expression
+from bespokeasm.assembler.model.operand.types import register
+from bespokeasm.assembler.model.operand.types import relative_address
 
 
 class OperandFactory:

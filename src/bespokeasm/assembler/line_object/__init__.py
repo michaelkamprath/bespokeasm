@@ -1,7 +1,8 @@
 from typing import Literal
+
 from bespokeasm.assembler.bytecode.word import Word
-from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.label_scope import LabelScope
+from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.expression import EXPRESSION_PARTS_PATTERN
 

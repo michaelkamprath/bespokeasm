@@ -1,18 +1,19 @@
-import unittest
 import importlib.resources as pkg_resources
+import unittest
 
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.engine import Assembler
+from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.line_object import LineObject, LineWithWords
+from bespokeasm.assembler.line_object import LineObject
+from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.assembler.line_object.factory import LineOjectFactory
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
-from bespokeasm.assembler.label_scope import GlobalLabelScope
-
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
+
 from test import config_files
 
 

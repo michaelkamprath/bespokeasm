@@ -1,14 +1,15 @@
 import importlib.resources as pkg_resources
 import unittest
-import yaml
 
-from bespokeasm.assembler.bytecode.word import Word
-from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType
 import bespokeasm.assembler.model.operand_set as AS
+import yaml
+from bespokeasm.assembler.bytecode.word import Word
+from bespokeasm.assembler.label_scope import LabelScope
+from bespokeasm.assembler.label_scope import LabelScopeType
+from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.model.instruction_parser import InstructioParser
-from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 
 from test import config_files
 

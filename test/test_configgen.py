@@ -1,17 +1,17 @@
-import json
 import importlib.resources as pkg_resources
+import json
 import os
 import pathlib as pl
 import re
 import shutil
 import tempfile
 import unittest
+
 import yaml
+from bespokeasm.configgen.sublime import SublimeConfigGenerator
+from bespokeasm.configgen.vscode import VSCodeConfigGenerator
 
 from test import config_files
-
-from bespokeasm.configgen.vscode import VSCodeConfigGenerator
-from bespokeasm.configgen.sublime import SublimeConfigGenerator
 
 
 class TestConfigurationGeneration(unittest.TestCase):

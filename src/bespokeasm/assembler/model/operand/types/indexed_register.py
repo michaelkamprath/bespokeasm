@@ -1,14 +1,17 @@
-from functools import cached_property
 import re
 import sys
-
-from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.bytecode.parts import NumericByteCodePart, CompositeByteCodePart
-from bespokeasm.assembler.model.operand import Operand, OperandType, ParsedOperand
-from .register import RegisterOperand
-from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from functools import cached_property
 
 import bespokeasm.assembler.model.operand.factory as OF
+from bespokeasm.assembler.bytecode.parts import CompositeByteCodePart
+from bespokeasm.assembler.bytecode.parts import NumericByteCodePart
+from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.model.operand import Operand
+from bespokeasm.assembler.model.operand import OperandType
+from bespokeasm.assembler.model.operand import ParsedOperand
+
+from .register import RegisterOperand
 
 
 class IndexedRegisterOperand(RegisterOperand):

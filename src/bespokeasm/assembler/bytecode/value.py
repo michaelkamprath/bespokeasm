@@ -1,4 +1,5 @@
 from typing import Literal
+
 from .word import Word
 from .word_slice import WordSlice
 

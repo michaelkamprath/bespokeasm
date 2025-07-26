@@ -1,8 +1,8 @@
 import re
 import sys
 
-from bespokeasm.assembler.preprocessor.symbol import PreprocessorSymbol
 from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.preprocessor.symbol import PreprocessorSymbol
 from bespokeasm.assembler.preprocessor.symbol import SYMBOL_PATTERN
 
 

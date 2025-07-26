@@ -1,15 +1,15 @@
-import unittest
 import importlib.resources as pkg_resources
+import unittest
 
-from test import config_files
-from test import test_code
-
+from bespokeasm.assembler.assembly_file import AssemblyFile
+from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
-from bespokeasm.assembler.label_scope import GlobalLabelScope
-from bespokeasm.assembler.assembly_file import AssemblyFile
 from bespokeasm.assembler.preprocessor import Preprocessor
+
+from test import config_files
+from test import test_code
 
 
 class TestMemoryZones(unittest.TestCase):

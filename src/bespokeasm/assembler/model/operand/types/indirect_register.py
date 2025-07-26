@@ -1,12 +1,14 @@
-from functools import cached_property
 import re
 import sys
 import warnings
+from functools import cached_property
 
+from bespokeasm.assembler.bytecode.parts import ExpressionByteCodePart
+from bespokeasm.assembler.bytecode.parts import NumericByteCodePart
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.bytecode.parts import NumericByteCodePart, ExpressionByteCodePart
-from bespokeasm.assembler.model.operand import OperandType, ParsedOperand
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.model.operand import OperandType
+from bespokeasm.assembler.model.operand import ParsedOperand
 
 from .register import RegisterOperand
 

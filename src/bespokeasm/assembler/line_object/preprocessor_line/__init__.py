@@ -1,5 +1,5 @@
-from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.memory_zone import MemoryZone
 
 

@@ -1,12 +1,15 @@
 import sys
 
+from bespokeasm.assembler.bytecode.assembled import AssembledInstruction
+from bespokeasm.assembler.bytecode.assembled import CompositeAssembledInstruction
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.bytecode.assembled import AssembledInstruction, CompositeAssembledInstruction
-from bespokeasm.assembler.model.operand_parser import MatchedOperandSet
-from bespokeasm.assembler.model.instruction_macro import InstructionMacro, InstructionMacroVariant, MacroLineIdentifier
-from bespokeasm.assembler.model import AssemblerModel
-from bespokeasm.assembler.model.instruction_parser_base import InstructioParserBase
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.assembler.model.instruction_macro import InstructionMacro
+from bespokeasm.assembler.model.instruction_macro import InstructionMacroVariant
+from bespokeasm.assembler.model.instruction_macro import MacroLineIdentifier
+from bespokeasm.assembler.model.instruction_parser_base import InstructioParserBase
+from bespokeasm.assembler.model.operand_parser import MatchedOperandSet
 
 
 class MacroBytecodeGenerator:

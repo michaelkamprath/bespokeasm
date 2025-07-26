@@ -1,4 +1,5 @@
 import re
+
 from bespokeasm.assembler.model import AssemblerModel
 
 

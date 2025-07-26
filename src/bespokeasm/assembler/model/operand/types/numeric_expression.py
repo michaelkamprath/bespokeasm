@@ -1,10 +1,13 @@
 import re
 
+from bespokeasm.assembler.bytecode.parts import ExpressionByteCodePart
+from bespokeasm.assembler.bytecode.parts import ExpressionByteCodePartInMemoryZone
+from bespokeasm.assembler.bytecode.parts import NumericByteCodePart
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.bytecode.parts import \
-    NumericByteCodePart, ExpressionByteCodePart, ExpressionByteCodePartInMemoryZone
-from bespokeasm.assembler.model.operand import OperandWithArgument, OperandType, ParsedOperand
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.model.operand import OperandType
+from bespokeasm.assembler.model.operand import OperandWithArgument
+from bespokeasm.assembler.model.operand import ParsedOperand
 
 
 class NumericExpressionOperand(OperandWithArgument):

@@ -1,10 +1,12 @@
 import unittest
 
-from bespokeasm.assembler.bytecode.word import Word
-from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.bytecode.assembled import AssembledInstruction
-from bespokeasm.assembler.bytecode.parts import NumericByteCodePart, ExpressionByteCodePart, CompositeByteCodePart
+from bespokeasm.assembler.bytecode.parts import CompositeByteCodePart
+from bespokeasm.assembler.bytecode.parts import ExpressionByteCodePart
+from bespokeasm.assembler.bytecode.parts import NumericByteCodePart
+from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.label_scope import GlobalLabelScope
+from bespokeasm.assembler.line_identifier import LineIdentifier
 
 
 class TestBytecodeObjects(unittest.TestCase):

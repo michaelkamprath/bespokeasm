@@ -1,12 +1,13 @@
 import sys
 
-from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.bytecode.assembled import AssembledInstruction
-from bespokeasm.assembler.model.operand_parser import MatchedOperandSet
 from bespokeasm.assembler.bytecode.parts import NumericByteCodePart
-from bespokeasm.assembler.model.instruction import Instruction, InstructionVariant
-from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.assembler.model.instruction import Instruction
+from bespokeasm.assembler.model.instruction import InstructionVariant
+from bespokeasm.assembler.model.operand_parser import MatchedOperandSet
 
 
 class InstructionBytecodeGenerator:

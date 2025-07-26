@@ -1,13 +1,14 @@
+import os
 import unittest
-from bespokeasm.assembler.pretty_printer.intelhex import IntelHexPrettyPrinter
-from bespokeasm.assembler.model import AssemblerModel
-from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.memory_zone import MemoryZone
+
 from bespokeasm.assembler.bytecode.word import Word
+from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.assembler.line_object.directive_line.address import AddressOrgLine
+from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
-import os
+from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.assembler.pretty_printer.intelhex import IntelHexPrettyPrinter
 
 
 class DummyLineWithWords(LineWithWords):

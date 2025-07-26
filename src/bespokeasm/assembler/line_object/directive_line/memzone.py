@@ -2,7 +2,8 @@ import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
-from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager, GLOBAL_ZONE_NAME
+from bespokeasm.assembler.memory_zone.manager import GLOBAL_ZONE_NAME
+from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 
 
 class SetMemoryZoneLine(LineObject):

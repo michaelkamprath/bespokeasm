@@ -1,10 +1,10 @@
 import math
 from typing import Literal
 
-from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.bytecode.parts import ByteCodePart
-from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.bytecode.word import Word
+from bespokeasm.assembler.label_scope import LabelScope
+from bespokeasm.assembler.line_identifier import LineIdentifier
 
 
 class AssembledInstruction:

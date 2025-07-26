@@ -3,13 +3,15 @@ import os
 import shutil
 import sys
 import tempfile
-import yaml
 from zipfile import ZipFile
 
-from bespokeasm.configgen import LanguageConfigGenerator
 import bespokeasm.configgen.sublime.resources as resources
-from bespokeasm.assembler.keywords import \
-    COMPILER_DIRECTIVES_SET, BYTECODE_DIRECTIVES_SET, PREPROCESSOR_DIRECTIVES_SET, EXPRESSION_FUNCTIONS_SET
+import yaml
+from bespokeasm.assembler.keywords import BYTECODE_DIRECTIVES_SET
+from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET
+from bespokeasm.assembler.keywords import EXPRESSION_FUNCTIONS_SET
+from bespokeasm.assembler.keywords import PREPROCESSOR_DIRECTIVES_SET
+from bespokeasm.configgen import LanguageConfigGenerator
 
 
 class SublimeConfigGenerator(LanguageConfigGenerator):

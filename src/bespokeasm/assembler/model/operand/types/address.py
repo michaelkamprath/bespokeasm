@@ -6,13 +6,16 @@
 #   * The expected significant bytes can either be configured to a specific value (e.g., "zero page")
 #     or to the same as the current instruction's address. If the operand's value has a signficant byte(s)
 #     that is not what is expected, the assembler will raise an error.
-from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.model.operand.types.numeric_expression import NumericExpressionOperand
-from bespokeasm.assembler.memory_zone import MemoryZone
-from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager, GLOBAL_ZONE_NAME
-from bespokeasm.assembler.model.operand import OperandType, ParsedOperand
-from bespokeasm.assembler.bytecode.parts import NumericByteCodePart, ExpressionByteCodePartInMemoryZone
+from bespokeasm.assembler.bytecode.parts import ExpressionByteCodePartInMemoryZone
+from bespokeasm.assembler.bytecode.parts import NumericByteCodePart
 from bespokeasm.assembler.label_scope import LabelScope
+from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.memory_zone import MemoryZone
+from bespokeasm.assembler.memory_zone.manager import GLOBAL_ZONE_NAME
+from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.model.operand import OperandType
+from bespokeasm.assembler.model.operand import ParsedOperand
+from bespokeasm.assembler.model.operand.types.numeric_expression import NumericExpressionOperand
 
 
 class AddressByteCodePart(ExpressionByteCodePartInMemoryZone):

@@ -1,16 +1,19 @@
 import re
 import sys
 
-from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.line_object import LineObject, INSTRUCTION_EXPRESSION_PATTERN
+from bespokeasm.assembler.line_object import INSTRUCTION_EXPRESSION_PATTERN
+from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object.data_line import DataLine
+from bespokeasm.assembler.memory_zone import MEMORY_ZONE_NAME_PATTERN
+from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
-from bespokeasm.assembler.memory_zone import MEMORY_ZONE_NAME_PATTERN, MemoryZone
+from bespokeasm.assembler.model import AssemblerModel
 
 from .address import AddressOrgLine
+from .fill_data import FillDataLine
+from .fill_data import FillUntilDataLine
 from .memzone import SetMemoryZoneLine
-from .fill_data import FillDataLine, FillUntilDataLine
 from .page_align import PageAlignLine
 
 # Directives are lines that tell the assembler to do something with respect to current address or

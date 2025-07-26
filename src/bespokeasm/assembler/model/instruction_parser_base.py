@@ -1,9 +1,9 @@
 import sys
 
-from bespokeasm.assembler.model import AssemblerModel
-from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.bytecode.assembled import AssembledInstruction
+from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.model import AssemblerModel
 
 
 class InstructioParserBase:

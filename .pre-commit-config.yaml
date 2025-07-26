@@ -28,7 +28,12 @@ repos:
     -   id: flake8
         args: [--max-line-length=127]
 -   repo: https://github.com/asottile/pyupgrade
-    rev: v3.19.1
+    rev: v3.20.0
     hooks:
     -   id: pyupgrade
-        args: [--py39-plus]
+        args: [--py311-plus]
+-   repo: https://github.com/asottile/reorder-python-imports
+    rev: v3.15.0
+    hooks:
+    -   id: reorder-python-imports
+        args: [--py311-plus]

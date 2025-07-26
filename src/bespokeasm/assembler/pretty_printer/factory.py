@@ -1,9 +1,9 @@
-from bespokeasm.assembler.pretty_printer import PrettyPrinterBase
-from bespokeasm.assembler.pretty_printer.minhex import MinHexPrettyPrinter
-from bespokeasm.assembler.pretty_printer.intelhex import IntelHexPrettyPrinter
-from bespokeasm.assembler.pretty_printer.listing import ListingPrettyPrinter
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.assembler.pretty_printer import PrettyPrinterBase
+from bespokeasm.assembler.pretty_printer.intelhex import IntelHexPrettyPrinter
+from bespokeasm.assembler.pretty_printer.listing import ListingPrettyPrinter
+from bespokeasm.assembler.pretty_printer.minhex import MinHexPrettyPrinter
 
 
 class PrettyPrinterFactory:

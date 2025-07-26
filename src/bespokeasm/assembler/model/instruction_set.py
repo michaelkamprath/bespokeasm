@@ -1,11 +1,11 @@
 import sys
 from typing import Literal
 
-from bespokeasm.assembler.model.instruction import Instruction
-from bespokeasm.assembler.model.instruction_macro import InstructionMacro
-from bespokeasm.assembler.model.instruction_base import InstructionBase
-from bespokeasm.assembler.model.operand_set import OperandSetCollection
 from bespokeasm.assembler.keywords import ASSEMBLER_KEYWORD_SET
+from bespokeasm.assembler.model.instruction import Instruction
+from bespokeasm.assembler.model.instruction_base import InstructionBase
+from bespokeasm.assembler.model.instruction_macro import InstructionMacro
+from bespokeasm.assembler.model.operand_set import OperandSetCollection
 
 
 class InstructionSet(dict[str, InstructionBase]):

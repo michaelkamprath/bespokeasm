@@ -1,4 +1,5 @@
 from bespokeasm.assembler.model.operand import OperandType
+
 from .indexed_register import IndexedRegisterOperand
 
 

@@ -3,13 +3,14 @@ import math
 import sys
 
 from bespokeasm.assembler.bytecode.word import Word
-from bespokeasm.assembler.line_object import LineObject, LineWithWords
-from bespokeasm.assembler.line_object.label_line import LabelLine
+from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.line_object import LineObject
+from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.assembler.line_object.directive_line.memzone import SetMemoryZoneLine
+from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.pretty_printer import PrettyPrinterBase
-from bespokeasm.assembler.line_identifier import LineIdentifier
 
 
 class ListingPrettyPrinter(PrettyPrinterBase):

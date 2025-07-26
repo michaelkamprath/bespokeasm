@@ -1,13 +1,17 @@
 from __future__ import annotations
+
 import sys
 from typing import Literal
 
-from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.bytecode.parts import ByteCodePart
-from bespokeasm.assembler.model.operand_set import OperandSetCollection, OperandSet
-from bespokeasm.assembler.model.operand import Operand, ParsedOperand, OperandBytecodePositionType
-from bespokeasm.assembler.model.operand.factory import OperandFactory
+from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.model.operand import Operand
+from bespokeasm.assembler.model.operand import OperandBytecodePositionType
+from bespokeasm.assembler.model.operand import ParsedOperand
+from bespokeasm.assembler.model.operand.factory import OperandFactory
+from bespokeasm.assembler.model.operand_set import OperandSet
+from bespokeasm.assembler.model.operand_set import OperandSetCollection
 
 # Operand Parser
 #

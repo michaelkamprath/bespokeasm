@@ -17,9 +17,11 @@
 import re
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.line_object import INSTRUCTION_EXPRESSION_PATTERN
+from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.memory_zone import MemoryZone
-from bespokeasm.assembler.line_object import LineObject, INSTRUCTION_EXPRESSION_PATTERN
-from bespokeasm.expression import parse_expression, ExpressionNode
+from bespokeasm.expression import ExpressionNode
+from bespokeasm.expression import parse_expression
 
 
 class PageAlignLine(LineObject):

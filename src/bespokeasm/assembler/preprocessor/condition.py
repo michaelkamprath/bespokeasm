@@ -1,12 +1,14 @@
 from __future__ import annotations
+
 import re
 import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.preprocessor import Preprocessor
-from bespokeasm.expression import parse_expression, ExpressionNode
 from bespokeasm.assembler.line_object import INSTRUCTION_EXPRESSION_PATTERN
+from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.symbol import SYMBOL_PATTERN
+from bespokeasm.expression import ExpressionNode
+from bespokeasm.expression import parse_expression
 
 # NOTE: the order of the RHS expressions is important, as it determines the order of evaluation. Need to parse the
 #       quoted strings first, then the expressions.

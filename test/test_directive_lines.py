@@ -1,21 +1,23 @@
-import unittest
-import importlib.resources as pkg_resources
 import copy
+import importlib.resources as pkg_resources
+import unittest
 
 from bespokeasm.assembler.bytecode.word import Word
-from test import config_files
-
 from bespokeasm.assembler.label_scope import GlobalLabelScope
-from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType
-from bespokeasm.assembler.line_object import LineObject
-from bespokeasm.assembler.line_object.directive_line.fill_data import FillDataLine, FillUntilDataLine
-from bespokeasm.assembler.line_object.directive_line.factory import DirectiveLine
-from bespokeasm.assembler.line_object.directive_line.address import AddressOrgLine
-from bespokeasm.assembler.line_object.directive_line.page_align import PageAlignLine
-from bespokeasm.assembler.line_object import LineWithWords
-from bespokeasm.assembler.model import AssemblerModel
-from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.label_scope import LabelScope
+from bespokeasm.assembler.label_scope import LabelScopeType
 from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.line_object import LineObject
+from bespokeasm.assembler.line_object import LineWithWords
+from bespokeasm.assembler.line_object.directive_line.address import AddressOrgLine
+from bespokeasm.assembler.line_object.directive_line.factory import DirectiveLine
+from bespokeasm.assembler.line_object.directive_line.fill_data import FillDataLine
+from bespokeasm.assembler.line_object.directive_line.fill_data import FillUntilDataLine
+from bespokeasm.assembler.line_object.directive_line.page_align import PageAlignLine
+from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.model import AssemblerModel
+
+from test import config_files
 
 
 class TestDirectiveLines(unittest.TestCase):

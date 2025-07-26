@@ -2,7 +2,9 @@ import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
-from bespokeasm.expression import parse_expression, ExpressionNode
+from bespokeasm.expression import ExpressionNode
+from bespokeasm.expression import parse_expression
+
 from .memzone import SetMemoryZoneLine
 
 

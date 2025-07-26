@@ -1,13 +1,14 @@
 import re
 import sys
 
-from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
 from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
+from bespokeasm.assembler.memory_zone import MEMORY_ZONE_NAME_PATTERN
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
-from bespokeasm.assembler.memory_zone import MEMORY_ZONE_NAME_PATTERN
-from bespokeasm.utilities import PATTERN_NUMERIC, parse_numeric_string
+from bespokeasm.utilities import parse_numeric_string
+from bespokeasm.utilities import PATTERN_NUMERIC
 
 
 class CreateMemzoneLine(PreprocessorLine):

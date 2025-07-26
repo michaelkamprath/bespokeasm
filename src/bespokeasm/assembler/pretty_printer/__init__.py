@@ -1,4 +1,5 @@
-from bespokeasm.assembler.line_object import LineObject, LineWithWords
+from bespokeasm.assembler.line_object import LineObject
+from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.assembler.model import AssemblerModel
 
 

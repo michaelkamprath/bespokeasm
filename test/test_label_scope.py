@@ -1,18 +1,20 @@
-from collections import defaultdict
-import unittest
 import importlib.resources as pkg_resources
+import unittest
+from collections import defaultdict
+
 from bespokeasm.assembler.assembly_file import AssemblyFile
+from bespokeasm.assembler.label_scope import GlobalLabelScope
+from bespokeasm.assembler.label_scope import LabelScope
+from bespokeasm.assembler.label_scope import LabelScopeType
+from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
-
-from test import config_files
-from test import test_code
-
-from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType, GlobalLabelScope
-from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.preprocessor import Preprocessor
+
+from test import config_files
+from test import test_code
 
 
 class TestLabelScope(unittest.TestCase):

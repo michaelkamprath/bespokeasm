@@ -1,15 +1,16 @@
 from __future__ import annotations
-from functools import reduce
+
 import sys
+from functools import reduce
 from typing import Literal
 
-from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.label_scope import LabelScope
-from bespokeasm.assembler.memory_zone import MemoryZone
-from bespokeasm.expression import parse_expression
+from bespokeasm.assembler.bytecode.value import Value
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.bytecode.word_slice import WordSlice
-from bespokeasm.assembler.bytecode.value import Value
+from bespokeasm.assembler.label_scope import LabelScope
+from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.memory_zone import MemoryZone
+from bespokeasm.expression import parse_expression
 
 from .packed_bits import PackedBits
 

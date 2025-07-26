@@ -1,21 +1,24 @@
-import unittest
 import importlib.resources as pkg_resources
+import unittest
 
 from bespokeasm.assembler.bytecode.word import Word
-from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType, GlobalLabelScope
+from bespokeasm.assembler.label_scope import GlobalLabelScope
+from bespokeasm.assembler.label_scope import LabelScope
+from bespokeasm.assembler.label_scope import LabelScopeType
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
-from bespokeasm.assembler.line_object.factory import LineOjectFactory
 from bespokeasm.assembler.line_object.data_line import DataLine
-from bespokeasm.assembler.line_object.label_line import LabelLine, is_valid_label
-from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.line_object.directive_line.address import AddressOrgLine
-from bespokeasm.assembler.model import AssemblerModel
-from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.line_object.emdedded_string import EmbeddedString
+from bespokeasm.assembler.line_object.factory import LineOjectFactory
+from bespokeasm.assembler.line_object.instruction_line import InstructionLine
+from bespokeasm.assembler.line_object.label_line import is_valid_label
+from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.memory_zone import MemoryZone
+from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
-from bespokeasm.assembler.line_object.emdedded_string import EmbeddedString
 
 from test import config_files
 

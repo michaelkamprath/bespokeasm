@@ -1,6 +1,8 @@
-import unittest
-from bespokeasm.assembler.line_object.utility import is_valid_label, PATTERN_ALLOWED_LABELS
 import re
+import unittest
+
+from bespokeasm.assembler.line_object.utility import is_valid_label
+from bespokeasm.assembler.line_object.utility import PATTERN_ALLOWED_LABELS
 
 
 class TestLineObjectUtility(unittest.TestCase):

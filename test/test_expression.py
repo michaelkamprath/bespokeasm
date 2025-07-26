@@ -1,7 +1,7 @@
 import unittest
 
-from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.label_scope import GlobalLabelScope
+from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.expression import parse_expression
 
 

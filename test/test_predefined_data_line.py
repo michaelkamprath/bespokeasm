@@ -1,7 +1,8 @@
 import unittest
+
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.line_object.predefined_data import PredefinedDataLine
+from bespokeasm.assembler.memory_zone import MemoryZone
 
 
 class TestPredefinedDataLine(unittest.TestCase):

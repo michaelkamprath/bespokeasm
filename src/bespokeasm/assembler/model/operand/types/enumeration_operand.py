@@ -1,11 +1,13 @@
-from functools import cached_property
 import re
 import sys
+from functools import cached_property
 
-from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.bytecode.parts import NumericByteCodePart
-from bespokeasm.assembler.model.operand import OperandWithArgument, OperandType, ParsedOperand
+from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.model.operand import OperandType
+from bespokeasm.assembler.model.operand import OperandWithArgument
+from bespokeasm.assembler.model.operand import ParsedOperand
 
 
 # TODO: Validate that the passed key is not a label of any sort

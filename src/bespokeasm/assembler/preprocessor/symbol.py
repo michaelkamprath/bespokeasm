@@ -1,7 +1,8 @@
 from functools import cached_property
 
-from bespokeasm.utilities import is_string_numeric, parse_numeric_string
 from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.utilities import is_string_numeric
+from bespokeasm.utilities import parse_numeric_string
 
 
 SYMBOL_PATTERN = r'[\w_][\w\d_]+'

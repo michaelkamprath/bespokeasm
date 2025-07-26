@@ -1,13 +1,13 @@
-import click
 import os
 import sys
 
+import click
 import yaml
 from bespokeasm import BESPOKEASM_VERSION_STR
 from bespokeasm.assembler.engine import Assembler
 from bespokeasm.assembler.model import AssemblerModel
-from bespokeasm.configgen.vscode import VSCodeConfigGenerator
 from bespokeasm.configgen.sublime import SublimeConfigGenerator
+from bespokeasm.configgen.vscode import VSCodeConfigGenerator
 from click_default_group import DefaultGroup
 
 

@@ -1,7 +1,7 @@
 from functools import cached_property
 
-from bespokeasm.assembler.model.operand.types.indirect_numeric import IndirectNumericOperand
 from bespokeasm.assembler.model.operand import OperandType
+from bespokeasm.assembler.model.operand.types.indirect_numeric import IndirectNumericOperand
 
 
 class DeferredNumericOperand(IndirectNumericOperand):

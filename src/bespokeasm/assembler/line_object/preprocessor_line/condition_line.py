@@ -1,9 +1,9 @@
 import sys
 
-from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
-from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.memory_zone import MemoryZone
 import bespokeasm.assembler.preprocessor.condition as condition
+from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
+from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
 

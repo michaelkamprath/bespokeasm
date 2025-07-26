@@ -1,12 +1,12 @@
-from packaging import version
 import operator
 import re
 import sys
 
-from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
 from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.model import AssemblerModel
+from packaging import version
 
 
 class RequiredLanguageLine(PreprocessorLine):

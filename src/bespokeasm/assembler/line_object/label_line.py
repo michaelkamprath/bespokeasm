@@ -3,10 +3,11 @@ import sys
 
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.line_object import LineObject, INSTRUCTION_EXPRESSION_PATTERN
-from bespokeasm.utilities import is_valid_label
-from bespokeasm.expression import parse_expression
+from bespokeasm.assembler.line_object import INSTRUCTION_EXPRESSION_PATTERN
+from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.memory_zone import MemoryZone
+from bespokeasm.expression import parse_expression
+from bespokeasm.utilities import is_valid_label
 
 
 class LabelLine(LineObject):

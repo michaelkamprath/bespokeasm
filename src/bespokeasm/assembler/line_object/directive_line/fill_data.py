@@ -1,9 +1,11 @@
 from typing import Literal
+
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithWords
-from bespokeasm.expression import parse_expression, ExpressionNode
 from bespokeasm.assembler.memory_zone import MemoryZone
+from bespokeasm.expression import ExpressionNode
+from bespokeasm.expression import parse_expression
 
 
 class FillDataLine(LineWithWords):

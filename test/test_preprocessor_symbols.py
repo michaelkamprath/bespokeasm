@@ -1,23 +1,26 @@
 import importlib.resources as pkg_resources
 import unittest
 
-from test import config_files
-from test import test_code
-
-from bespokeasm.assembler.preprocessor import Preprocessor
-from bespokeasm.assembler.preprocessor.condition import \
-    IfPreprocessorCondition, IfdefPreprocessorCondition, ElifPreprocessorCondition, \
-    ElsePreprocessorCondition, EndifPreprocessorCondition, MutePreprocessorCondition, \
-    UnmutePreprocessorCondition
+from bespokeasm.assembler.assembly_file import AssemblyFile
+from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.model import AssemblerModel
-from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object.factory import LineOjectFactory
-from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.line_object.preprocessor_line.define_symbol import DefineSymbolLine
-from bespokeasm.assembler.assembly_file import AssemblyFile
+from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.assembler.preprocessor import Preprocessor
+from bespokeasm.assembler.preprocessor.condition import ElifPreprocessorCondition
+from bespokeasm.assembler.preprocessor.condition import ElsePreprocessorCondition
+from bespokeasm.assembler.preprocessor.condition import EndifPreprocessorCondition
+from bespokeasm.assembler.preprocessor.condition import IfdefPreprocessorCondition
+from bespokeasm.assembler.preprocessor.condition import IfPreprocessorCondition
+from bespokeasm.assembler.preprocessor.condition import MutePreprocessorCondition
+from bespokeasm.assembler.preprocessor.condition import UnmutePreprocessorCondition
 from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
+
+from test import config_files
+from test import test_code
 
 
 class TestPreprocessorSymbols(unittest.TestCase):

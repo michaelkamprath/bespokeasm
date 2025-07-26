@@ -1,20 +1,23 @@
-from typing import Literal
-import warnings
-import click
 import json
 import os
-from functools import cached_property
-from packaging import version
 import re
 import sys
-import yaml
+import warnings
+from functools import cached_property
+from typing import Literal
 
-from bespokeasm import BESPOKEASM_VERSION_STR, BESPOKEASM_MIN_REQUIRED_STR
+import click
+import yaml
+from bespokeasm import BESPOKEASM_MIN_REQUIRED_STR
+from bespokeasm import BESPOKEASM_VERSION_STR
 from bespokeasm.assembler.keywords import ASSEMBLER_KEYWORD_SET
-from bespokeasm.assembler.model.instruction_set import InstructionSet
-from bespokeasm.assembler.model.operand_set import OperandSet, OperandSetCollection
-from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType
+from bespokeasm.assembler.label_scope import LabelScope
+from bespokeasm.assembler.label_scope import LabelScopeType
 from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.model.instruction_set import InstructionSet
+from bespokeasm.assembler.model.operand_set import OperandSet
+from bespokeasm.assembler.model.operand_set import OperandSetCollection
+from packaging import version
 
 
 class AssemblerModel:

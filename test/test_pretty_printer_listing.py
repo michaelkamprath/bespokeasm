@@ -1,13 +1,15 @@
-import unittest
-from bespokeasm.assembler.pretty_printer.listing import ListingPrettyPrinter
-from bespokeasm.assembler.model import AssemblerModel
-from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.memory_zone import MemoryZone
-from bespokeasm.assembler.line_object import LineObject, LineWithWords
-from bespokeasm.assembler.bytecode.word import Word
+import json
 import os
 import tempfile
-import json
+import unittest
+
+from bespokeasm.assembler.bytecode.word import Word
+from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.line_object import LineObject
+from bespokeasm.assembler.line_object import LineWithWords
+from bespokeasm.assembler.memory_zone import MemoryZone
+from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.assembler.pretty_printer.listing import ListingPrettyPrinter
 
 
 class DummyLineWithWords(LineWithWords):

@@ -1,7 +1,8 @@
 import unittest
 
-from bespokeasm.utilities import parse_numeric_string, is_string_numeric
 from bespokeasm.assembler.bytecode.packed_bits import PackedBits
+from bespokeasm.utilities import is_string_numeric
+from bespokeasm.utilities import parse_numeric_string
 
 
 class TestUtilities(unittest.TestCase):

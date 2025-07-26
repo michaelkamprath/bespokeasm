@@ -1,7 +1,8 @@
-from bespokeasm.assembler.preprocessor.condition import \
-            PreprocessorCondition, EndifPreprocessorCondition, \
-            MutePreprocessorCondition, UnmutePreprocessorCondition
 from bespokeasm.assembler.preprocessor import Preprocessor
+from bespokeasm.assembler.preprocessor.condition import EndifPreprocessorCondition
+from bespokeasm.assembler.preprocessor.condition import MutePreprocessorCondition
+from bespokeasm.assembler.preprocessor.condition import PreprocessorCondition
+from bespokeasm.assembler.preprocessor.condition import UnmutePreprocessorCondition
 
 
 class ConditionStack:
