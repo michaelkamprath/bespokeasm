@@ -21,6 +21,8 @@ Changes that are planned but not implemented yet:
 * Add ISA-level configuration options for how byte data (`.byte` and `.cstr`) is emitted in data words that are not 8-bit in size.
 
 ## [Unreleased]
+- Support for preserving comments, integer formats, list formats, and file type in configuration files during `update-config` command
+
 
 ## [0.5.0]
 * Major refactoring of the code base the enables support for data words of any size. See [Data Words and Endianness](https://github.com/michaelkamprath/bespokeasm/wiki/Instruction-Set-Configuration-File#data-words-and-endianness) for more information.This is a **BREAKING CHANGE** for the configuration file.

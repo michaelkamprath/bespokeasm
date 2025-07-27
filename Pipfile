@@ -7,8 +7,8 @@ name = "pypi"
 click = "*"
 intelhex = "*"
 packaging = "*"
-pyyaml = "*"
 click-default-group = "*"
+ruamel.yaml = "*"
 
 [dev-packages]
 pre-commit = "*"

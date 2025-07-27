@@ -5,8 +5,9 @@ import sys
 import tempfile
 from zipfile import ZipFile
 
+from ruamel.yaml import YAML
+
 import bespokeasm.configgen.sublime.resources as resources
-import yaml
 from bespokeasm.assembler.keywords import BYTECODE_DIRECTIVES_SET
 from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET
 from bespokeasm.assembler.keywords import EXPRESSION_FUNCTIONS_SET
@@ -47,11 +48,11 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
 
         # generate syntax file
         fp = pkg_resources.files(resources).joinpath('sublime-syntax.yaml')
-        with open(fp) as syntax_file:
-            try:
-                syntax_dict = yaml.safe_load(syntax_file)
-            except yaml.YAMLError as exc:
-                sys.exit(f'ERROR: {exc}')
+        yaml_loader = YAML()
+        try:
+            syntax_dict = yaml_loader.load(fp)
+        except Exception as exc:
+            sys.exit(f'ERROR: {exc}')
 
         # handle instructions
         update_instructions = False
@@ -165,8 +166,9 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
 
         # save syntax file
         syntax_fp = os.path.join(destination_dir, self.language_name + '.sublime-syntax')
+        yaml_dumper = YAML()
         with open(syntax_fp, 'w', encoding='utf-8') as f:
-            yaml.dump(syntax_dict, f)
+            yaml_dumper.dump(syntax_dict, f)
         # now reinsert the YAML prefix. This is required due to an odditity in Sublime's package loading.
         # I don't know a better way to do this.
         with open(syntax_fp) as f:

@@ -2,13 +2,15 @@ import os
 import sys
 
 import click
-import yaml
+from click_default_group import DefaultGroup
+
 from bespokeasm import BESPOKEASM_VERSION_STR
 from bespokeasm.assembler.engine import Assembler
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.configgen.sublime import SublimeConfigGenerator
 from bespokeasm.configgen.vscode import VSCodeConfigGenerator
-from click_default_group import DefaultGroup
+from bespokeasm.utilities import dump_yaml_with_formatting
+from bespokeasm.utilities import load_yaml_with_format_preservation
 
 
 @click.group(cls=DefaultGroup, default='compile', default_if_no_args=True)
@@ -128,9 +130,11 @@ def update_config(config_file, output_file):
     if config_file.endswith('.json'):
         with open(config_file) as f:
             config_dict = json.load(f)
+        input_format = 'json'
     elif config_file.endswith('.yaml') or config_file.endswith('.yml'):
         with open(config_file) as f:
-            config_dict = yaml.safe_load(f)
+            config_dict = load_yaml_with_format_preservation(f.read())
+        input_format = 'yaml'
     else:
         click.echo('ERROR: Unknown config file type. Must be .yaml, .yml, or .json.', err=True)
         sys.exit(1)
@@ -143,18 +147,29 @@ def update_config(config_file, output_file):
             err=True,
         )
         return
-    # Output only if changes occurred
+    # Determine output format
     if output_file:
         output_file = os.path.abspath(os.path.expanduser(output_file))
+        if output_file.endswith('.json'):
+            output_format = 'json'
+        elif output_file.endswith('.yaml') or output_file.endswith('.yml'):
+            output_format = 'yaml'
+        else:
+            # Default to input format if extension is unknown
+            output_format = input_format
         with open(output_file, 'w') as f:
-            if output_file.endswith('.json'):
+            if output_format == 'json':
                 json.dump(updated_dict, f, indent=2)
             else:
-                yaml.safe_dump(updated_dict, f, sort_keys=False)
+                dump_yaml_with_formatting(updated_dict, f)
         click.echo(f'Updated configuration written to {output_file}')
     else:
-        # Default: YAML to stdout
-        yaml.safe_dump(updated_dict, sys.stdout, sort_keys=False)
+        # No output file specified: use input format for stdout
+        if input_format == 'json':
+            json.dump(updated_dict, sys.stdout, indent=2)
+            print()  # Ensure newline at end
+        else:
+            dump_yaml_with_formatting(updated_dict, sys.stdout)
 
 
 @main.group(short_help='generate a language syntax highlighting extension')

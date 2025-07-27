@@ -1,6 +1,6 @@
 click
 intelhex
 packaging
-pyyaml
+ruamel.yaml
 pre-commit
 click-default-group

@@ -7,10 +7,10 @@ import shutil
 import tempfile
 import unittest
 
-import yaml
+from ruamel.yaml import YAML
+
 from bespokeasm.configgen.sublime import SublimeConfigGenerator
 from bespokeasm.configgen.vscode import VSCodeConfigGenerator
-
 from test import config_files
 
 
@@ -204,7 +204,8 @@ class TestConfigurationGeneration(unittest.TestCase):
         syntax_fp = os.path.join(test_tmp_dir, 'bespokeasm-test.sublime-syntax')
         self.assertIsFile(syntax_fp)
         with open(syntax_fp) as yaml_file:
-            syntax_dict = yaml.safe_load(yaml_file)
+            yaml_loader = YAML()
+            syntax_dict = yaml_loader.load(yaml_file)
 
         self.assertListEqual(syntax_dict['file_extensions'], ['asmtest'], 'file extension should be as assigned')
         for instr_dict in syntax_dict['contexts']['instructions']:
@@ -284,7 +285,8 @@ class TestConfigurationGeneration(unittest.TestCase):
         syntax_fp = os.path.join(test_tmp_dir, 'tester-assembly.sublime-syntax')
         self.assertIsFile(syntax_fp)
         with open(syntax_fp) as yaml_file:
-            syntax_dict = yaml.safe_load(yaml_file)
+            yaml_loader = YAML()
+            syntax_dict = yaml_loader.load(yaml_file)
 
         self.assertListEqual(syntax_dict['file_extensions'], ['asmtest'], 'file extension should be as assigned')
         for instr_dict in syntax_dict['contexts']['instructions']:
@@ -372,7 +374,8 @@ class TestConfigurationGeneration(unittest.TestCase):
         syntax_fp = os.path.join(test_tmp_dir, 'test_instructions_with_periods.sublime-syntax')
         self.assertIsFile(syntax_fp)
         with open(syntax_fp) as yaml_file:
-            syntax_dict = yaml.safe_load(yaml_file)
+            yaml_loader = YAML()
+            syntax_dict = yaml_loader.load(yaml_file)
 
         for instr_dict in syntax_dict['contexts']['instructions']:
             if instr_dict['scope'] == 'variable.function.instruction':
