@@ -13,16 +13,18 @@ Changes that are planned but not implemented yet:
   * Disallowed operands
   * missing `:` after labels
   * unknown labels
-  * Disallow instructions on the same line as an `.org` directivexy
+  * Disallow instructions on the same line as an `.org` directive
 * Add named label scopes. This would allow a label to be defined in a specific scope that can be shared across files.
 * Create a "align if needed" preprocessor directive paid that generates an `.align` directive if the bytecode in between the pair isn't naturally on the same page and can fit on the same page if aligned. An error would be benerated if the block of code can't fit on the same page regardless of alignment.
 * Update the `#ifdef` and related preprocessor directives to include detection of labels and constants.
 * Allow multiple `cstr` defininitions on the same line
-* Add ISA-level configuration options for how byte data (`.byte` and `.cstr`) is emitted in data words that are not 8-bit in size.
+
 
 ## [Unreleased]
-- Support for preserving comments, integer formats, list formats, and file type in configuration files during `update-config` command
 
+## [0.5.1] - 2024-06-09
+- Support for preserving comments, integer formats, list formats, and file type in configuration files during `update-config` command
+- Added `string_byte_packing` and `string_byte_packing_fill` options to the `general` section of the configuration file. When `string_byte_packing` is enabled, quoted strings in `.byte` and `.cstr` data directives are packed tightly into words (if `word_size` is a multiple of 8 and at least 16). The `string_byte_packing_fill` option controls the byte value used to pad the last word if the string does not fill it completely. The `.cstr` directive always appends the configured `cstr_terminator` before padding. Extensive tests and documentation updates included.
 
 ## [0.5.0]
 * Major refactoring of the code base the enables support for data words of any size. See [Data Words and Endianness](https://github.com/michaelkamprath/bespokeasm/wiki/Instruction-Set-Configuration-File#data-words-and-endianness) for more information.This is a **BREAKING CHANGE** for the configuration file.
@@ -181,7 +183,8 @@ First tracked released
 * Enabled the `reverse_argument_order` instruction option be applied to a specific operand configuration. This slightly changed the configuration file format.
 * Added ability for instructions with operands to have a single "empty operand" variant, e.g., `pop`
 
-[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/michaelkamprath/bespokeasm/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/michaelkamprath/bespokeasm/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/michaelkamprath/bespokeasm/compare/v0.4.0...v0.4.1

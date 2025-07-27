@@ -7,3 +7,13 @@ rules:
       - Ensure all tests pass before considering a change complete.
       - Prefer small, incremental changes with corresponding tests.
       - If a feature is hard to test, discuss how to make it more testable.
+      - The AI assistant should automatically run relevant test commands (e.g., `python3 -m unittest`)
+        after code or test changes, unless explicitly instructed not to.
+      - The AI assistant should also run shell commands for codebase searches, dependency checks,
+        or other validation steps as needed, unless explicitly instructed not to.
+  - name: "General Project Overview"
+    applies_to: "global"
+    description: |
+      This project is named BespokeASM and is an assembler that allows the user to define
+      the instruction set architecture (ISA) in a YAML or JSON file, sometimes referred to
+      as the language configuration file.

@@ -7,9 +7,6 @@ from functools import cached_property
 from typing import Literal
 
 import click
-from packaging import version
-from ruamel.yaml import YAML
-
 from bespokeasm import BESPOKEASM_MIN_REQUIRED_STR
 from bespokeasm import BESPOKEASM_VERSION_STR
 from bespokeasm.assembler.keywords import ASSEMBLER_KEYWORD_SET
@@ -19,6 +16,8 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.model.instruction_set import InstructionSet
 from bespokeasm.assembler.model.operand_set import OperandSet
 from bespokeasm.assembler.model.operand_set import OperandSetCollection
+from packaging import version
+from ruamel.yaml import YAML
 
 
 class AssemblerModel:
@@ -110,9 +109,24 @@ class AssemblerModel:
         if 'general' not in self._config:
             sys.exit('ERROR - ISA configuration file does not contain a "general" section.')
 
+        # require min_version
+        if 'min_version' not in self._config['general']:
+            sys.exit('ERROR - ISA configuration file does not contain a required "min_version" field in the general section.')
+
         # what's the point if there is no instruction set?
         if 'instructions' not in self._config:
             sys.exit('ERROR - ISA configuration file does not contain an "instructions" section.')
+
+        # Validate string_byte_packing option
+        general = self._config['general']
+        if general.get('string_byte_packing', False):
+            word_size = general.get('word_size', 8)
+            if word_size < 16 or word_size % 8 != 0:
+                sys.exit('ERROR - "string_byte_packing" is only allowed if word_size is a multiple of 8 and at least 16.')
+        # Validate string_byte_packing_fill
+        fill = general.get('string_byte_packing_fill', 0)
+        if not isinstance(fill, int) or not (0 <= fill <= 255):
+            sys.exit('ERROR - "string_byte_packing_fill" must be an integer between 0 and 255.')
 
         # check for min required BespokeASM version
         if 'min_version' in self._config['general']:
@@ -197,6 +211,19 @@ class AssemblerModel:
             return self._config['general']['multi_word_endianness']
         else:
             return 'big'
+
+    @property
+    def string_byte_packing(self) -> bool:
+        '''Whether to pack string bytes tightly into words (for .byte/.cstr with quoted strings).'''
+        return bool(self._config['general'].get('string_byte_packing', False))
+
+    @property
+    def string_byte_packing_fill(self) -> int:
+        '''
+        The byte value used to pad words when string_byte_packing is enabled and the string doesn't
+        fill the word. Defaults to 0.
+        '''
+        return int(self._config['general'].get('string_byte_packing_fill', 0)) & 0xFF
 
     @property
     def cstr_terminator(self) -> int:

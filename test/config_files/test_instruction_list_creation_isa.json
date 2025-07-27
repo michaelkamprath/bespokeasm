@@ -1,6 +1,7 @@
 {
   "description": "test_instruction_list_creation_isa",
   "general": {
+    "min_version": "0.5.0",
     "address_size": 4,
     "endian": "big"
   },

@@ -1,5 +1,6 @@
 description: Eater SAP-1 ISA
 general:
+  min_version: '0.5.0'
   address_size: 4
   multi_word_endianness: big
   registers:

@@ -47,6 +47,8 @@ class DataLine(LineWithWords):
             intra_word_endianness: Literal['little', 'big'],
             multi_word_endianness: Literal['little', 'big'],
             cstr_terminator: int = 0,
+            string_byte_packing: bool = False,
+            string_byte_packing_fill: int = 0,
     ) -> LineWithWords:
         """Tries to match the passed line string to the data directive pattern.
         If succcessful, returns a constructed DataLine object. If not, None is
@@ -85,6 +87,8 @@ class DataLine(LineWithWords):
                 word_segment_size,
                 intra_word_endianness,
                 multi_word_endianness,
+                string_byte_packing,
+                string_byte_packing_fill,
             )
         else:
             return None
@@ -101,6 +105,8 @@ class DataLine(LineWithWords):
             word_segment_size: int,
             intra_word_endianness: Literal['little', 'big'],
             multi_word_endianness: Literal['little', 'big'],
+            string_byte_packing: bool = False,
+            string_byte_packing_fill: int = 0,
     ) -> None:
         super().__init__(
             line_id,
@@ -114,6 +120,8 @@ class DataLine(LineWithWords):
         )
         self._arg_value_list = value_list
         self._directive = directive_str
+        self._string_byte_packing = string_byte_packing
+        self._string_byte_packing_fill = string_byte_packing_fill
 
     def __str__(self):
         return f'DataLine<{self._directive}: {self._arg_value_list}>'
@@ -139,6 +147,33 @@ class DataLine(LineWithWords):
 
     def generate_words(self):
         """Finalize the data bytes for this line with the label assignments, matching documentation rules."""
+        # If string_byte_packing is enabled and this is a string-based .byte/.cstr/.asciiz, pack bytes into words
+        if (
+            self._string_byte_packing
+            and self._directive in ('.byte', '.cstr', '.asciiz')
+            and all(isinstance(x, int) for x in self._arg_value_list)
+        ):
+            word_bytes = self._word_size // 8
+            values = self._arg_value_list[:]
+            # Pad to full word if needed, using string_byte_packing_fill
+            if len(values) % word_bytes != 0:
+                pad_len = word_bytes - (len(values) % word_bytes)
+                values += [self._string_byte_packing_fill] * pad_len
+            for i in range(0, len(values), word_bytes):
+                chunk = values[i:i+word_bytes]
+                if self._multi_word_endianness == 'big':
+                    word_val = 0
+                    for b in chunk:
+                        word_val = (word_val << 8) | (b & 0xFF)
+                else:
+                    word_val = 0
+                    for j, b in enumerate(chunk):
+                        word_val |= (b & 0xFF) << (8 * j)
+                self._words.append(
+                    Word(word_val, self._word_size, self._word_segment_size, self._intra_word_endianness)
+                )
+            return
+        # Default behavior
         for arg_item in self._arg_value_list:
             if isinstance(arg_item, int):
                 arg_val = arg_item

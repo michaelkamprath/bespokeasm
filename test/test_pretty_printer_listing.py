@@ -96,7 +96,14 @@ class TestListingPrettyPrinter(unittest.TestCase):
         def make_config(address_size, word_size):
             config = {
                 'description': 'header test',
-                'general': {'address_size': address_size, 'endian': 'big', 'registers': []},
+                'general': {
+                    'address_size': address_size,
+                    'endian': 'big',
+                    'registers': [],
+                    'min_version': '0.5.0',
+                    'string_byte_packing': False,
+                    'string_byte_packing_fill': 0,
+                },
                 'instructions': {'nop': {'bytecode': {'size': 4, 'value': 0}}},
                 'operand_sets': {},
                 'registers': []

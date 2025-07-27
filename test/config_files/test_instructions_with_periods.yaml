@@ -1,6 +1,7 @@
 ---
 description: Test Instructions with Periods
 general:
+  min_version: '0.5.0'
   address_size: 16
   multi_word_endianness: little
   registers:

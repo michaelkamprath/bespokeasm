@@ -155,4 +155,6 @@ class DirectiveLine:
             isa_model.intra_word_endianness,
             isa_model.multi_word_endianness,
             isa_model.cstr_terminator,
+            isa_model.string_byte_packing,
+            isa_model.string_byte_packing_fill,
         )
