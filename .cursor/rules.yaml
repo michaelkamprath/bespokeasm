@@ -1,0 +1,9 @@
+rules:
+  - name: "Test Driven Development"
+    applies_to: "global"
+    description: |
+      All new features and bug fixes should follow Test Driven Development (TDD) practices.
+      - Write or update tests before implementing new code or fixing bugs.
+      - Ensure all tests pass before considering a change complete.
+      - Prefer small, incremental changes with corresponding tests.
+      - If a feature is hard to test, discuss how to make it more testable.
