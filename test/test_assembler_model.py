@@ -1,8 +1,6 @@
 import importlib.resources as pkg_resources
 import unittest
 
-from ruamel.yaml import YAML
-
 import bespokeasm.assembler.model.operand_set as AS
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.label_scope import LabelScope
@@ -11,6 +9,8 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.model.instruction_parser import InstructioParser
+from ruamel.yaml import YAML
+
 from test import config_files
 
 #
@@ -335,6 +335,43 @@ class TestConfigObject(unittest.TestCase):
     def test_predefined_data_creation(self):
         # TODO: add test for predefined data creation
         pass
+
+    def test_duplicate_mnemonic_or_alias(self):
+        # This config has 'jsr' and an alias 'jsr' for another instruction, which should fail
+        from ruamel.yaml import YAML
+        bad_config = {
+            'description': 'Duplicate mnemonic/alias',
+            'general': {
+                'min_version': '0.5.0',
+                'address_size': 8,
+                'multi_word_endianness': 'little',
+                'registers': [],
+                'identifier': {'name': 'bad', 'version': '0.1.0'}
+            },
+            'operand_sets': {},
+            'instructions': {
+                'jsr': {
+                    'aliases': ['call'],
+                    'bytecode': {'value': 1, 'size': 8}
+                },
+                'foo': {
+                    'aliases': ['jsr'],  # This should cause a duplicate error
+                    'bytecode': {'value': 2, 'size': 8}
+                }
+            }
+        }
+        import tempfile
+        import os
+        yaml = YAML()
+        with tempfile.NamedTemporaryFile('w', suffix='.yaml', delete=False) as tmp:
+            yaml.dump(bad_config, tmp)
+            tmp_path = tmp.name
+        try:
+            with self.assertRaises(SystemExit) as cm:
+                AssemblerModel(tmp_path, 0)
+            self.assertIn('Duplicate mnemonic or alias found: "jsr"', str(cm.exception))
+        finally:
+            os.remove(tmp_path)
 
 
 class TestUpdateConfigDictToLatest(unittest.TestCase):

@@ -1,4 +1,4 @@
-BESPOKEASM_VERSION_STR = '0.5.1'
+BESPOKEASM_VERSION_STR = '0.5.2b1'
 
 # if a cconfig file requires a certain bespoke ASM version, it should be at least this version.
 BESPOKEASM_MIN_REQUIRED_STR = '0.5.0'

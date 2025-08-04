@@ -8,7 +8,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 Changes that are planned but not implemented yet:
 
 * Add ability for an instruction to have order agnostic operands. That is, `instr a, b` is the same as `instr b, a`. This allows `swap` to occupy less instruction space.
-* Enable instruction aliases that allow alternative mnemonics for an instruction. For example, allowing `call` and `jsr` to mean the same thing.
 * Improve error checking:
   * Disallowed operands
   * missing `:` after labels
@@ -21,6 +20,8 @@ Changes that are planned but not implemented yet:
 
 
 ## [Unreleased]
+
+- Added support for instruction aliases: you can now specify an `aliases` field (a list of alternative mnemonics) in an instruction's configuration. All aliases are globally unique, are accepted as valid mnemonics in assembly source, and generate the same code as the root mnemonic. This does not apply to macros.
 
 ## [0.5.1] - 2024-06-09
 - Support for preserving comments, integer formats, list formats, and file type in configuration files during `update-config` command
