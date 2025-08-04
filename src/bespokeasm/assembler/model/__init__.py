@@ -263,7 +263,7 @@ class AssemblerModel:
 
     @property
     def instruction_mnemonics(self) -> set[str]:
-        '''returns a set of only native instruction mnemonics (not including aliases)'''
+        '''returns a set of all instruction mnemonics, including aliases (not including macros)'''
         return self._instructions.instruction_mnemonics
 
     @property
