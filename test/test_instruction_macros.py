@@ -2,13 +2,16 @@ import importlib.resources as pkg_resources
 import unittest
 
 from bespokeasm.assembler.bytecode.word import Word
+from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.label_scope import LabelScopeType
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithWords
+from bespokeasm.assembler.line_object.factory import LineOjectFactory
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.assembler.preprocessor import Preprocessor
 
 from test import config_files
 
@@ -354,4 +357,51 @@ class TestInstructionMacros(unittest.TestCase):
                 Word(0b00100011, isa_model.word_size, isa_model.word_segment_size, isa_model.intra_word_endianness),
             ],
             'instruction words should match'
+        )
+
+    def test_macro_expansion_with_alias_mnemonic(self):
+        fp = pkg_resources.files(config_files).joinpath('test_macro_with_alias.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones if hasattr(isa_model, 'predefined_memory_zones') else [],
+        )
+        preprocessor = Preprocessor()
+        label_scope = GlobalLabelScope(set())
+        # Assemble a line that uses the macro
+        macro_line_obj = LineOjectFactory.parse_line(
+            line_id=LineIdentifier(1, 'test_macro_expansion_with_alias_mnemonic'),
+            line_str='my_macro',
+            model=isa_model,
+            label_scope=None,
+            current_memzone=memzone_mngr.global_zone,
+            memzone_manager=memzone_mngr,
+            preprocessor=preprocessor,
+            condition_stack=None,
+            log_verbosity=0,
+        )[0]
+        macro_line_obj.set_start_address(0x3000)
+        macro_line_obj.label_scope = label_scope
+        macro_line_obj.generate_words()
+        # Assemble a line that uses the alias directly
+        alias_line_obj = LineOjectFactory.parse_line(
+            line_id=2,
+            line_str='call',
+            model=isa_model,
+            label_scope=None,
+            current_memzone=memzone_mngr.global_zone,
+            memzone_manager=memzone_mngr,
+            preprocessor=preprocessor,
+            condition_stack=None,
+            log_verbosity=0,
+        )[0]
+        alias_line_obj.set_start_address(0x3001)
+        alias_line_obj.label_scope = label_scope
+        alias_line_obj.generate_words()
+        # Both should generate the same machine code
+        self.assertEqual(
+            macro_line_obj.get_words(),
+            alias_line_obj.get_words(),
+            'Macro expanding to alias mnemonic should generate same code as alias directly',
         )

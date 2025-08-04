@@ -1,10 +1,27 @@
+import importlib.resources as pkg_resources
 import unittest
 
 from bespokeasm.assembler.bytecode.word import Word
+from bespokeasm.assembler.label_scope import GlobalLabelScope
+from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.line_object.factory import LineOjectFactory
+from bespokeasm.assembler.line_object.instruction_line import InstructionLine
+from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.assembler.preprocessor import Preprocessor
+from bespokeasm.assembler.pretty_printer.factory import PrettyPrinterFactory
 from bespokeasm.assembler.pretty_printer.listing import ListingPrettyPrinter
+
+from test import config_files
 
 
 class TestPrettyPrinting(unittest.TestCase):
+
+    def setUp(self):
+        InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN = None
+
+    def tearDown(self):
+        InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN = None
 
     def test_listing_bytes_per_line(self):
         word_list = [
@@ -102,3 +119,44 @@ class TestPrettyPrinting(unittest.TestCase):
             ),
             ['0000 0001 00a2 ', '0b03 1234 abcd ', 'ffff 8000      '],
         )
+
+    def test_listing_prints_original_mnemonic(self):
+        fp = pkg_resources.files(config_files).joinpath('test_instruction_aliases.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones if hasattr(isa_model, 'predefined_memory_zones') else [],
+        )
+        # Source lines using both root and alias mnemonics
+        lines = [
+            'jsr',      # root mnemonic
+            'call',     # alias for jsr
+            'jsr2',     # root mnemonic
+            'call2',    # alias for jsr2
+            'nop',      # control
+        ]
+        line_objs = []
+        preprocessor = Preprocessor()
+        label_scope = GlobalLabelScope(set())
+        for i, line in enumerate(lines, 1):
+            line_obj = LineOjectFactory.parse_line(
+                line_id=LineIdentifier(i, f'test_listing_prints_original_mnemonic - {line}'),
+                line_str=line,
+                model=isa_model,
+                label_scope=None,
+                current_memzone=memzone_mngr.global_zone,
+                memzone_manager=memzone_mngr,
+                preprocessor=preprocessor,
+                condition_stack=None,
+                log_verbosity=0,
+            )[0]
+            line_obj.set_start_address(0x1000 + i)
+            line_obj.label_scope = label_scope
+            line_obj.generate_words()
+            line_objs.append(line_obj)
+        printer = PrettyPrinterFactory.getPrettyPrinter('listing', line_objs, isa_model, 'test.asm')
+        output = printer.pretty_print()
+        # Check that each original mnemonic appears in the output
+        for mnemonic in lines:
+            self.assertIn(mnemonic, output, f'Listing should show original mnemonic: {mnemonic}')

@@ -7,10 +7,10 @@ import shutil
 import tempfile
 import unittest
 
-from ruamel.yaml import YAML
-
 from bespokeasm.configgen.sublime import SublimeConfigGenerator
 from bespokeasm.configgen.vscode import VSCodeConfigGenerator
+from ruamel.yaml import YAML
+
 from test import config_files
 
 
@@ -392,3 +392,61 @@ class TestConfigurationGeneration(unittest.TestCase):
 
         # clean up
         shutil.rmtree(test_tmp_dir)
+
+    def test_vscode_and_sublime_include_aliases(self):
+        # Use the instruction alias config
+        test_dir = tempfile.mkdtemp()
+        config_file = pkg_resources.files(config_files).joinpath('test_instruction_aliases.yaml')
+        # VSCode
+        configgen_vscode = VSCodeConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            None,
+            None,
+            'asmtest',
+        )
+        configgen_vscode.generate()
+        extension_dirpath = os.path.join(str(test_dir), 'extensions')
+        # Dynamically find the generated extension directory
+        ext_subdirs = [d for d in os.listdir(extension_dirpath) if os.path.isdir(os.path.join(extension_dirpath, d))]
+        self.assertTrue(ext_subdirs, 'No extension subdirectory found')
+        ext_dir = os.path.join(extension_dirpath, ext_subdirs[0])
+        grammar_fp = os.path.join(ext_dir, 'syntaxes', 'tmGrammar.json')
+        self.assertIsFile(grammar_fp)
+        with open(grammar_fp) as json_file:
+            grammar_json = json.load(json_file)
+        # All mnemonics and aliases should be present
+        regex_str = grammar_json['repository']['instructions']['begin']
+        # Remove leading (?i)( and trailing ) if present
+        if regex_str.startswith('(?i)(') and regex_str.endswith(')'):
+            regex_str = regex_str[5:-1]
+        actual = set(regex_str.split('|'))
+        expected = {'\\bjsr\\b', '\\bcall\\b', '\\bjsr2\\b', '\\bcall2\\b', '\\bjump_to_subroutine\\b', '\\bnop\\b'}
+        self.assertSetEqual(actual, expected, 'VSCode: all mnemonics and aliases should be present')
+        # Sublime
+        configgen_sublime = SublimeConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            'bespokeasm-test-instruction-aliases',
+            '0.1.0',
+            'asmtest',
+        )
+        configgen_sublime.generate()
+        # Find the .sublime-package file in test_dir
+        sublime_pkg_fp = None
+        for file in os.listdir(test_dir):
+            if file.endswith('.sublime-package'):
+                sublime_pkg_fp = os.path.join(test_dir, file)
+                break
+        self.assertIsNotNone(sublime_pkg_fp, 'No .sublime-package file found')
+        import zipfile
+        with zipfile.ZipFile(sublime_pkg_fp, 'r') as zf:
+            syntax_files = [f for f in zf.namelist() if f.endswith('.sublime-syntax')]
+            self.assertTrue(syntax_files, 'No .sublime-syntax file in package')
+            with zf.open(syntax_files[0]) as f:
+                syntax = f.read().decode('utf-8')
+        # All mnemonics and aliases should be present in the regex
+        for mnemonic in ['jsr', 'call', 'jsr2', 'call2', 'jump_to_subroutine', 'nop']:
+            self.assertRegex(syntax, rf'\\b{re.escape(mnemonic)}\\b', f'Sublime: {mnemonic} should be present')

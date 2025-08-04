@@ -1,4 +1,5 @@
 import sys
+from functools import cached_property
 from typing import Literal
 
 from bespokeasm.assembler.keywords import ASSEMBLER_KEYWORD_SET
@@ -27,11 +28,25 @@ class InstructionSet(dict[str, InstructionBase]):
 
         lower_keywords = {kw.lower(): kw for kw in ASSEMBLER_KEYWORD_SET}
 
+        # Collect all mnemonics and aliases to check for global uniqueness
+        all_mnemonics = set()
+        for mnemonic, instr_config in self._instructions_config.items():
+            mnemonic_lower = mnemonic.lower()
+            if mnemonic_lower in all_mnemonics:
+                sys.exit(f'ERROR - Duplicate mnemonic or alias found: "{mnemonic_lower}"')
+            all_mnemonics.add(mnemonic_lower)
+            aliases = instr_config.get('aliases', [])
+            for alias in aliases:
+                alias_lower = alias.lower()
+                if alias_lower in all_mnemonics:
+                    sys.exit(f'ERROR - Duplicate mnemonic or alias found: "{alias_lower}"')
+                all_mnemonics.add(alias_lower)
+
         for mnemonic, instr_config in self._instructions_config.items():
             mnemonic = mnemonic.lower()
             if mnemonic in lower_keywords:
                 sys.exit(f'ERROR - ISA configuration defined instruction "{mnemonic}" which is also a BespokeASM keyword')
-            self[mnemonic] = Instruction(
+            instr_obj = Instruction(
                 mnemonic,
                 instr_config,
                 operand_set_collection,
@@ -41,7 +56,20 @@ class InstructionSet(dict[str, InstructionBase]):
                 word_size,
                 word_segment_size,
             )
+            self[mnemonic] = instr_obj
             self._instruction_mnemonics.add(mnemonic)
+            # Handle aliases
+            aliases = instr_config.get('aliases', [])
+            for alias in aliases:
+                alias_lower = alias.lower()
+                if alias_lower in lower_keywords:
+                    sys.exit(f'ERROR - ISA configuration defined alias "{alias_lower}" which is also a BespokeASM keyword')
+                if alias_lower in self:
+                    sys.exit(
+                        f'ERROR - Alias "{alias_lower}" for instruction "{mnemonic}" '
+                        f'collides with another instruction or alias.',
+                    )
+                self[alias_lower] = instr_obj
 
         if self._macros_config is not None:
             # build a list of macros first so a macro can't be defined based on other macros
@@ -72,9 +100,19 @@ class InstructionSet(dict[str, InstructionBase]):
     def get(self, mnemonic: str) -> InstructionBase:
         return super().get(mnemonic, None)
 
-    @property
+    @cached_property
     def instruction_mnemonics(self) -> set[str]:
-        return self._instruction_mnemonics
+        '''returns a set of all instruction mnemonics and their aliases (not including macros)'''
+        result = set()
+        for mnemonic, instr in self.items():
+            if isinstance(instr, Instruction):
+                result.add(mnemonic)
+        return result
+
+    @property
+    def operation_mnemonics(self) -> list[str]:
+        '''returns list of all mnemonics, instructions and macros (including aliases)'''
+        return list(self.keys())
 
     @property
     def macro_mnemonics(self) -> set[str]:

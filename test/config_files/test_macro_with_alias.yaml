@@ -1,0 +1,29 @@
+---
+description: Test Macro with Alias Mnemonic
+
+general:
+  min_version: '0.5.0'
+  address_size: 8
+  multi_word_endianness: little
+  intra_word_endianness: little
+  registers: []
+  identifier:
+    name: test_macro_with_alias
+    version: "0.1.0"
+operand_sets: {}
+instructions:
+  jsr:
+    aliases: [call]
+    bytecode:
+      value: 42
+      size: 8
+  nop:
+    bytecode:
+      value: 0
+      size: 8
+macros:
+  my_macro:
+    - operands:
+        count: 0
+      instructions:
+        - call

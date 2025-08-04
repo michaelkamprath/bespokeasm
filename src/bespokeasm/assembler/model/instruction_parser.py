@@ -29,10 +29,13 @@ class InstructioParser(InstructioParserBase):
         if instr_obj is None:
             sys.exit(f'ERROR: {line_id} - Unrecognized mnemonic "{mnemonic}"')
 
+        # Always use the canonical mnemonic for bytecode generation
+        canonical_mnemonic = instr_obj.mnemonic
+
         return BytecodeGenerator.generate_bytecode_parts(
             instr_obj,
             line_id,
-            mnemonic,
+            canonical_mnemonic,
             operands,
             isa_model,
             memzone_manager,

@@ -258,12 +258,12 @@ class AssemblerModel:
 
     @property
     def operation_mnemonics(self) -> list[str]:
-        '''returns list of all mnemonics, instructions and macros'''
-        return list(self._instructions.keys())
+        '''returns list of all mnemonics, including instruction aliases and macros'''
+        return self._instructions.operation_mnemonics
 
     @property
     def instruction_mnemonics(self) -> set[str]:
-        '''returns a set of only native instruction mnemonics'''
+        '''returns a set of all instruction mnemonics, including aliases (not including macros)'''
         return self._instructions.instruction_mnemonics
 
     @property

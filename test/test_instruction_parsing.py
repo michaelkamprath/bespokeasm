@@ -1229,3 +1229,130 @@ class TestInstructionParsing(unittest.TestCase):
             ],
             'instruction byte should match',
         )
+
+    def test_instruction_aliases(self):
+        fp = pkg_resources.files(config_files).joinpath('test_instruction_aliases.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones if hasattr(isa_model, 'predefined_memory_zones') else [],
+        )
+        # Test root mnemonic
+        ins_jsr = InstructionLine.factory(
+            1,
+            'jsr',
+            '',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+        ins_jsr.set_start_address(0)
+        self.assertIsInstance(ins_jsr, InstructionLine)
+        ins_jsr.label_scope = TestInstructionParsing.label_values
+        ins_jsr.generate_words()
+        jsr_words = ins_jsr.get_words()
+        self.assertEqual(jsr_words, [Word(42, 8, 8, 'little')], 'jsr should assemble to correct word')
+        # Test alias mnemonic
+        ins_call = InstructionLine.factory(
+            2,
+            'call',
+            '',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+        ins_call.set_start_address(0)
+        self.assertIsInstance(ins_call, InstructionLine)
+        ins_call.label_scope = TestInstructionParsing.label_values
+        ins_call.generate_words()
+        call_words = ins_call.get_words()
+        self.assertEqual(call_words, [Word(42, 8, 8, 'little')], 'call (alias) should assemble to same word as jsr')
+        # Test non-aliased instruction
+        ins_nop = InstructionLine.factory(
+            3,
+            'nop',
+            '',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+        ins_nop.set_start_address(0)
+        self.assertIsInstance(ins_nop, InstructionLine)
+        ins_nop.label_scope = TestInstructionParsing.label_values
+        ins_nop.generate_words()
+        nop_words = ins_nop.get_words()
+        self.assertEqual(nop_words, [Word(0, 8, 8, 'little')], 'nop should assemble to correct word')
+
+    def test_instruction_multiple_aliases(self):
+        fp = pkg_resources.files(config_files).joinpath('test_instruction_aliases.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones if hasattr(isa_model, 'predefined_memory_zones') else [],
+        )
+        # Test root mnemonic
+        ins_jsr2 = InstructionLine.factory(
+            1,
+            'jsr2',
+            '',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+        ins_jsr2.set_start_address(0)
+        self.assertIsInstance(ins_jsr2, InstructionLine)
+        ins_jsr2.label_scope = TestInstructionParsing.label_values
+        ins_jsr2.generate_words()
+        jsr2_words = ins_jsr2.get_words()
+        self.assertEqual(jsr2_words, [Word(99, 8, 8, 'little')], 'jsr2 should assemble to correct word')
+        # Test first alias
+        ins_call2 = InstructionLine.factory(
+            2,
+            'call2',
+            '',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+        ins_call2.set_start_address(0)
+        self.assertIsInstance(ins_call2, InstructionLine)
+        ins_call2.label_scope = TestInstructionParsing.label_values
+        ins_call2.generate_words()
+        call2_words = ins_call2.get_words()
+        self.assertEqual(call2_words, [Word(99, 8, 8, 'little')], 'call2 (alias) should assemble to same word as jsr2')
+        # Test second alias
+        ins_jts = InstructionLine.factory(
+            3,
+            'jump_to_subroutine',
+            '',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+        ins_jts.set_start_address(0)
+        self.assertIsInstance(ins_jts, InstructionLine)
+        ins_jts.label_scope = TestInstructionParsing.label_values
+        ins_jts.generate_words()
+        jts_words = ins_jts.get_words()
+        self.assertEqual(
+            jts_words,
+            [Word(99, 8, 8, 'little')],
+            'jump_to_subroutine (alias) should assemble to same word as jsr2',
+        )
+        # Test non-aliased instruction
+        ins_nop = InstructionLine.factory(
+            4,
+            'nop',
+            '',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+        ins_nop.set_start_address(0)
+        self.assertIsInstance(ins_nop, InstructionLine)
+        ins_nop.label_scope = TestInstructionParsing.label_values
+        ins_nop.generate_words()
+        nop_words = ins_nop.get_words()
+        self.assertEqual(nop_words, [Word(0, 8, 8, 'little')], 'nop should assemble to correct word')
