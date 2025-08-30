@@ -5,14 +5,13 @@ import sys
 import tempfile
 from zipfile import ZipFile
 
-from ruamel.yaml import YAML
-
 import bespokeasm.configgen.sublime.resources as resources
 from bespokeasm.assembler.keywords import BYTECODE_DIRECTIVES_SET
 from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET
 from bespokeasm.assembler.keywords import EXPRESSION_FUNCTIONS_SET
 from bespokeasm.assembler.keywords import PREPROCESSOR_DIRECTIVES_SET
 from bespokeasm.configgen import LanguageConfigGenerator
+from ruamel.yaml import YAML
 
 
 class SublimeConfigGenerator(LanguageConfigGenerator):
@@ -141,7 +140,8 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         syntax_dict['contexts']['data_types_directives'][0]['match'] = datatypes_str.replace('##DATATYPES##', datatypes_regex)
 
         # preprocessor directives
-        preprocessor_regex = '|'.join(PREPROCESSOR_DIRECTIVES_SET)
+        # Sort by length (desc) to avoid prefix matches like 'if' matching 'ifdef'
+        preprocessor_regex = '|'.join(sorted(PREPROCESSOR_DIRECTIVES_SET, key=len, reverse=True))
         updated = False
         for rule in syntax_dict['contexts']['preprocessor_directives'][0]['push']:
             if 'match' in rule and '##PREPROCESSOR##' in rule['match']:
