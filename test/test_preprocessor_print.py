@@ -143,6 +143,29 @@ class TestPreprocessorPrint(unittest.TestCase):
             calls_high = [c.args[0] for c in mock_echo_high.call_args_list if isinstance(c.args[0], str)]
             self.assertIn('gated', calls_high)
 
+    def test_print_color_basic(self):
+        with patch('click.secho') as mock_secho:
+            self._load_file('test_preprocessor_print_color_basic.asm', log_verbosity=0)
+            # ensure colored output used with correct fg
+            self.assertTrue(any((args, kwargs)[1].get('fg') == 'red' and (args, kwargs)[0][0] == 'red message'
+                                for args, kwargs in [(c.args, c.kwargs) for c in mock_secho.call_args_list]))
+
+    def test_print_color_with_min_verbosity(self):
+        # below threshold
+        with patch('click.secho') as mock_secho_low:
+            self._load_file('test_preprocessor_print_color_min_verbosity.asm', log_verbosity=1)
+            self.assertEqual(len(mock_secho_low.call_args_list), 0, 'should not print below threshold')
+        # at threshold
+        with patch('click.secho') as mock_secho_high:
+            self._load_file('test_preprocessor_print_color_min_verbosity.asm', log_verbosity=2)
+            self.assertTrue(any(kwargs.get('fg') == 'yellow' and args[0] == 'level two yellow'
+                                for args, kwargs in [(c.args, c.kwargs) for c in mock_secho_high.call_args_list]))
+
+    def test_print_color_invalid_raises(self):
+        with self.assertRaises(SystemExit):
+            with patch('click.secho') as _:
+                self._load_file('test_preprocessor_print_color_invalid.asm', log_verbosity=3)
+
 
 if __name__ == '__main__':
     unittest.main()

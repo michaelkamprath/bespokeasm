@@ -10,7 +10,10 @@ from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
 
 
 class PrintLine(PreprocessorLine):
-    PATTERN_PRINT = re.compile(r'^#print(?:\s+(\d+))?\s+"([\s\S]*?)"\s*$', re.MULTILINE)
+    PATTERN_PRINT = re.compile(
+        r'^#print(?:\s+(\d+))?(?:\s+(black|red|green|yellow|blue|magenta|cyan|white))?\s+"([\s\S]*?)"\s*$',
+        re.IGNORECASE,
+    )
 
     def __init__(
                 self,
@@ -29,12 +32,25 @@ class PrintLine(PreprocessorLine):
             sys.exit(f'ERROR - {line_id}: Invalid #print directive syntax: {instruction}')
 
         min_level_str = match.group(1)
-        message = match.group(2)
+        color_str = match.group(2)
+        message = match.group(3)
 
         try:
             min_level = int(min_level_str) if min_level_str is not None else None
         except ValueError:
             sys.exit(f'ERROR - {line_id}: Invalid verbosity level in #print directive: {instruction}')
+
+        try:
+            min_level = int(min_level_str) if min_level_str is not None else None
+        except ValueError:
+            sys.exit(f'ERROR - {line_id}: Invalid verbosity level in #print directive: {instruction}')
+
+        color = None
+        if color_str is not None:
+            color = color_str.lower()
+            allowed_colors = {'black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white'}
+            if color not in allowed_colors:
+                sys.exit(f'ERROR - {line_id}: Invalid color in #print directive: {color_str}')
 
         should_emit = (
             condition_stack.currently_active(preprocessor)
@@ -43,9 +59,13 @@ class PrintLine(PreprocessorLine):
         )
 
         if should_emit:
-            click.echo(message)
+            if color is not None:
+                click.secho(message, fg=color)
+            else:
+                click.echo(message)
 
         self._min_level = min_level
+        self._color = color
         self._message = message
 
     def __repr__(self) -> str:

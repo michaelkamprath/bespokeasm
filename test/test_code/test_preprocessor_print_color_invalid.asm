@@ -1,0 +1,1 @@
+#print chartreuse "bad color"
