@@ -247,7 +247,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         self._assert_grouped_item_list(
             item_match_str,
             [
-                'include', 'require', 'create_memzone', 'define', 'if',
+                'include', 'require', 'create_memzone', 'print', 'define', 'if',
                 'elif', 'else', 'endif', 'ifdef', 'ifndef',
                 'mute', 'unmute', 'emit',
             ],
@@ -333,7 +333,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         self._assert_grouped_item_list(
             item_match_str,
             [
-                'include', 'require', 'create_memzone', 'define',
+                'include', 'require', 'create_memzone', 'print', 'define',
                 'if', 'elif', 'else', 'endif', 'ifdef', 'ifndef',
                 'mute', 'unmute', 'emit',
             ],
