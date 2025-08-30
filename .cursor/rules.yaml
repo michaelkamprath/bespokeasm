@@ -17,3 +17,17 @@ rules:
       This project is named BespokeASM and is an assembler that allows the user to define
       the instruction set architecture (ISA) in a YAML or JSON file, sometimes referred to
       as the language configuration file.
+  - name: "Virtual Environment Setup for Testing"
+    applies_to: "global"
+    description: |
+      When running tests locally, use a fresh Python virtual environment:
+      1. Create a new venv with the host system's latest Python 3:
+         python3 -m venv .venv
+      2. Activate the venv:
+         source .venv/bin/activate
+      3. Install dependencies:
+         pip install -r requirements.txt
+         pip install pytest
+      4. Run the test suite:
+         pytest -q
+      The AI assistant should automatically perform these steps before running tests, unless explicitly instructed otherwise.

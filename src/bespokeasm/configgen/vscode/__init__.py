@@ -136,7 +136,8 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             elif 'meta.preprocessor' == item['name']:
                 for pattern in item['patterns']:
                     if 'name' in pattern and 'keyword.control.preprocessor' == pattern['name']:
-                        preprocessor_regex = '|'.join(PREPROCESSOR_DIRECTIVES_SET)
+                        # Sort by length (desc) to avoid prefix matches like 'if' matching 'ifdef'
+                        preprocessor_regex = '|'.join(sorted(PREPROCESSOR_DIRECTIVES_SET, key=len, reverse=True))
                         preprocesspr_str = pattern['match']
                         pattern['match'] = preprocesspr_str.replace('##PREPROCESSOR##', preprocessor_regex)
 
