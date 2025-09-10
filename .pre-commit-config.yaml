@@ -23,7 +23,7 @@ repos:
     -   id: trailing-whitespace
         args: ['--markdown-linebreak-ext=md']
 -   repo: https://github.com/pycqa/flake8
-    rev: '7.1.1'
+    rev: '7.3.0'
     hooks:
     -   id: flake8
         args: [--max-line-length=127]
