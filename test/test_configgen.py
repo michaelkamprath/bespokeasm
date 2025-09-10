@@ -8,6 +8,7 @@ import tempfile
 import unittest
 
 from bespokeasm.configgen.sublime import SublimeConfigGenerator
+from bespokeasm.configgen.vim import VimConfigGenerator
 from bespokeasm.configgen.vscode import VSCodeConfigGenerator
 from ruamel.yaml import YAML
 
@@ -393,6 +394,35 @@ class TestConfigurationGeneration(unittest.TestCase):
         # clean up
         shutil.rmtree(test_tmp_dir)
 
+    def test_vim_instruction_with_periods(self):
+        # Ensure Vim generator escapes instruction mnemonics with periods (e.g., AN.z)
+        import tempfile
+        test_dir = tempfile.mkdtemp()
+        config_file = pkg_resources.files(config_files).joinpath('test_instructions_with_periods.yaml')
+        from bespokeasm.configgen.vim import VimConfigGenerator
+        configgen = VimConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            None,
+            None,
+            'asmtest',
+        )
+        configgen.generate()
+        vim_ft = (configgen.language_id.replace('-', '').lower())
+        syntax_fp = os.path.join(str(test_dir), 'syntax', f'{vim_ft}.vim')
+        self.assertIsFile(syntax_fp)
+        with open(syntax_fp) as f:
+            syn = f.read()
+        # The instruction match should contain an escaped version of 'ma.hl' from the test config
+        # and also support word boundary around it.
+        self.assertRegex(
+            syn,
+            r'syn\s+match\s+\w+Instruction\s+/.+ma\\\.hl.+/',
+            'Vim: instruction with period should be escaped and matched',
+        )
+        shutil.rmtree(test_dir)
+
     def test_vscode_and_sublime_include_aliases(self):
         # Use the instruction alias config
         test_dir = tempfile.mkdtemp()
@@ -450,3 +480,134 @@ class TestConfigurationGeneration(unittest.TestCase):
         # All mnemonics and aliases should be present in the regex
         for mnemonic in ['jsr', 'call', 'jsr2', 'call2', 'jump_to_subroutine', 'nop']:
             self.assertRegex(syntax, rf'\\b{re.escape(mnemonic)}\\b', f'Sublime: {mnemonic} should be present')
+
+    def test_vim_configgen_no_registers(self):
+        test_dir = tempfile.mkdtemp()
+        config_file = pkg_resources.files(config_files).joinpath('test_instruction_line_creation_little_endian.yaml')
+        configgen = VimConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            None,
+            None,
+            'asmtest',
+        )
+        self.assertEqual(configgen.model.isa_name, 'bespokeasm-test', 'name should be in ISA config')
+        configgen.generate()
+        # Compute Vim filetype (sanitized)
+        vim_ft = (configgen.language_id.replace('-', '').lower())
+        syntax_fp = os.path.join(str(test_dir), 'syntax', f'{vim_ft}.vim')
+        ftdetect_fp = os.path.join(str(test_dir), 'ftdetect', f'{vim_ft}.vim')
+        self.assertIsFile(syntax_fp)
+        self.assertIsFile(ftdetect_fp)
+        with open(syntax_fp) as f:
+            syn = f.read()
+        # Instructions present (syn match alternation with word boundaries)
+        m = re.search(rf'^syn\s+match\s+{re.escape(vim_ft)}Instruction\s+/(.+)/$', syn, re.MULTILINE)
+        self.assertIsNotNone(m, 'Instruction match line should exist')
+        pat = m.group(1)
+        # Extract the alternation group between \%( ... ) without using nested-regex
+        start = pat.find(r'\%(')
+        end = pat.rfind(r'\)')
+        self.assertTrue(start >= 0 and end > start, 'Instruction pattern should contain alternation group')
+        group = pat[start+3:end]
+        for mnemonic in ['lda', 'add', 'set', 'big', 'hlt']:
+            self.assertRegex(group, rf'(?:^|\\\|){re.escape(mnemonic)}(?:\\\||$)')
+        # No macros
+        self.assertIsNone(re.search(rf'^syn\s+keyword\s+{re.escape(vim_ft)}Macro\b', syn, re.MULTILINE), 'No macros expected')
+        # No registers
+        self.assertIsNone(
+            re.search(rf'^syn\s+keyword\s+{re.escape(vim_ft)}Register\b', syn, re.MULTILINE),
+            'No registers expected',
+        )
+        # Directives
+        self.assertRegex(syn, rf'syn\s+match\s+{re.escape(vim_ft)}Directive\s+/.+\\.org\\>/', 'directive .org present')
+        self.assertRegex(syn, rf'syn\s+match\s+{re.escape(vim_ft)}Directive\s+/.+\\.memzone\\>/', 'directive .memzone present')
+        self.assertRegex(syn, rf'syn\s+match\s+{re.escape(vim_ft)}Directive\s+/.+\\.align\\>/', 'directive .align present')
+        # Data types
+        for dt in ['fill', 'zero', 'zerountil', 'byte', '2byte', '4byte', '8byte', 'cstr', 'asciiz']:
+            self.assertRegex(
+                syn,
+                rf'syn\s+match\s+{re.escape(vim_ft)}DataType\s+/.+\\.{re.escape(dt)}\\>/',
+                f'datatype .{dt} present',
+            )
+        # Preprocessor
+        for pp in [
+            'include', 'require',
+            'create_memzone', 'print',
+            'define', 'if', 'elif', 'else', 'endif',
+            'ifdef', 'ifndef', 'mute', 'unmute', 'emit',
+        ]:
+            self.assertRegex(
+                syn,
+                rf'syn\s+match\s+{re.escape(vim_ft)}PreProc\s+/\^#{re.escape(pp)}\\>/',
+                f'preprocessor {pp} present',
+            )
+        # ftdetect
+        with open(ftdetect_fp) as f:
+            ft = f.read()
+        self.assertIn(f'autocmd BufRead,BufNewFile *.asmtest setfiletype {vim_ft}', ft)
+        shutil.rmtree(test_dir)
+
+    def test_vim_configgen_with_registers(self):
+        test_dir = tempfile.mkdtemp()
+        config_file = pkg_resources.files(config_files).joinpath('test_indirect_indexed_register_operands.yaml')
+        configgen = VimConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            None,
+            None,
+            'asmtest',
+        )
+        self.assertEqual(configgen.model.isa_name, 'tester-assembly', 'name should be in ISA config')
+        configgen.generate()
+        vim_ft = (configgen.language_id.replace('-', '').lower())
+        syntax_fp = os.path.join(str(test_dir), 'syntax', f'{vim_ft}.vim')
+        self.assertIsFile(syntax_fp)
+        with open(syntax_fp) as f:
+            syn = f.read()
+        # Registers present
+        m = re.search(rf'^syn\s+keyword\s+{re.escape(vim_ft)}Register\s+(.+)$', syn, re.MULTILINE)
+        self.assertIsNotNone(m, 'Register keyword line should exist')
+        regs = set(m.group(1).split())
+        self.assertTrue({'a', 'j', 'i', 'h', 'l', 'hl', 'sp', 'mar'}.issubset(regs))
+        # Instructions present
+        m = re.search(rf'^syn\s+match\s+{re.escape(vim_ft)}Instruction\s+/(.+)/$', syn, re.MULTILINE)
+        self.assertIsNotNone(m, 'Instruction match line should exist')
+        pat = m.group(1)
+        start = pat.find(r'\%(')
+        end = pat.rfind(r'\)')
+        self.assertTrue(start >= 0 and end > start, 'Instruction pattern should contain alternation group')
+        group = pat[start+3:end]
+        for mnemonic in ['nop', 'mov', 'cmp', 'jmp']:
+            self.assertRegex(group, rf'(?:^|\\\|){re.escape(mnemonic)}(?:\\\||$)')
+        shutil.rmtree(test_dir)
+
+    def test_vim_include_aliases(self):
+        test_dir = tempfile.mkdtemp()
+        config_file = pkg_resources.files(config_files).joinpath('test_instruction_aliases.yaml')
+        configgen = VimConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            None,
+            None,
+            'asmtest',
+        )
+        configgen.generate()
+        vim_ft = (configgen.language_id.replace('-', '').lower())
+        syntax_fp = os.path.join(str(test_dir), 'syntax', f'{vim_ft}.vim')
+        self.assertIsFile(syntax_fp)
+        with open(syntax_fp) as f:
+            syn = f.read()
+        m = re.search(rf'^syn\s+match\s+{re.escape(vim_ft)}Instruction\s+/(.+)/$', syn, re.MULTILINE)
+        self.assertIsNotNone(m, 'Instruction match line should exist')
+        pat = m.group(1)
+        start = pat.find(r'\%(')
+        end = pat.rfind(r'\)')
+        self.assertTrue(start >= 0 and end > start, 'Instruction pattern should contain alternation group')
+        group = pat[start+3:end]
+        for mnemonic in ['jsr', 'call', 'jsr2', 'call2', 'jump_to_subroutine', 'nop']:
+            self.assertRegex(group, rf'(?:^|\\\|){re.escape(mnemonic)}(?:\\\||$)')
+        shutil.rmtree(test_dir)
