@@ -32,7 +32,7 @@ Once installed, assembly code can be compiled in this manner:
 
 Note that supplying an instruction set configuration file is required via the `-c` option. The binary byte code image will be written to `<asm-file-basename>.bin`, though this can be changed with the `-o` option. Add `--pretty-print` to the command to get a human readable output.
 
-### Installing Systax Highlighting
+### Installing Syntax Highlighting
 #### Visual Studio Code
 BespokeASM can generate a syntax highlighting extension for [Visual Studio Code](https://code.visualstudio.com) that will properly highlight the instruction mnemonics and other aspects of the assembly language configured in the instruction set architecture configuration file. To install:
 ```sh
@@ -41,9 +41,16 @@ bespokeasm generate-extension vscode -c isa-config.yaml
 #### Sublime Text
 BespokeASM can generate a syntax highlighting extension for [Sublime Text](https://www.sublimetext.com) that will properly highlight the instruction mnemonics and other aspects of the assembly language configured in the instruction set architecture configuration file. To generate the `.sublime-package` file:
 ```sh
-bespokeasm generate-extension vscode -c isa-config.yaml -d /path/to/some/directory
+bespokeasm generate-extension sublime -c isa-config.yaml -d /path/to/some/directory
 ```
 Once generated, move the `.sublime-package` file to the `Installed Packages` directory of the Sublime Text application settings directory. On MacOS, this can be found at `~/Library/Application Support/Sublime Text/Installed Packages`, and on Linux this is typically found at `~/.config/sublime-text/Installed\ Packages/`. Of course, this directory can also be used for the `-d` option in the above command.
+
+#### Vim
+BespokeASM can generate Vim syntax highlighting and filetype detection files based on your ISA configuration. To generate:
+```sh
+bespokeasm generate-extension vim -c isa-config.yaml [-d ~/.vim/]
+```
+This creates `syntax/<language-id>.vim` and `ftdetect/<language-id>.vim` under the specified directory (default `~/.vim/`). For Neovim, you can use `~/.config/nvim/` instead.
 
 # Documentation
 Documentation is available on the [Bespoke ASM Wiki](https://github.com/michaelkamprath/bespokeasm/wiki).
