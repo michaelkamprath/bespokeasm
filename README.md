@@ -52,6 +52,8 @@ bespokeasm generate-extension vim -c isa-config.yaml [-d ~/.vim/]
 ```
 This creates `syntax/<language-id>.vim` and `ftdetect/<language-id>.vim` under the specified directory (default `~/.vim/`). For Neovim, you can use `~/.config/nvim/` instead.
 
+See [documentation for more information](https://github.com/michaelkamprath/bespokeasm/wiki/Installation-and-Usage#vim) on how to configure Vim to use the generated files.
+
 # Documentation
 Documentation is available on the [Bespoke ASM Wiki](https://github.com/michaelkamprath/bespokeasm/wiki).
 
