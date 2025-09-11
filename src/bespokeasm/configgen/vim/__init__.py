@@ -107,10 +107,10 @@ class VimConfigGenerator(LanguageConfigGenerator):
         lines.append('')
         # Comments
         lines.append(f'syn match {lang_group}Comment /;.*/ contains=@Spell')
-        # Strings (double and single quoted) - restrict to one line to avoid swallowing following lines
-        # lines.append(f'syn region {lang_group}String start=+"+ skip=+\\"+ end=+"+ oneline contains={lang_group}Escape')
-        # lines.append(f"syn region {lang_group}String start=+'+ skip=+\\'+ end=+'+ oneline contains={lang_group}Escape")
-        lines.append(fr'syn match {lang_group}String /"[^"\\]*\(\\"[^"\\]*\)*"/')
+        # Strings (double and single quoted) - only allow escape sequences inside
+        # This prevents all keywords and other syntax elements from being highlighted within strings
+        lines.append(f'syn region {lang_group}String start=+"+ skip=+\\\\.+ end=+"+ oneline contains={lang_group}Escape')
+        lines.append(f"syn region {lang_group}String start=+'+ skip=+\\\\.+ end=+'+ oneline contains={lang_group}Escape")
         # Escapes inside strings
         lines.append(
             fr"syn match {lang_group}Escape /\\\|\\\"\|\\'\|\\[abfnrtv]\|\\o[0-7]\{{2}}\|\\x[0-9A-Fa-f]\{{2}}/ contained"
@@ -164,9 +164,9 @@ class VimConfigGenerator(LanguageConfigGenerator):
             lines.append(fr'syn match {lang_group}CompilerLabel /\<' + labels_alt + r'/')
 
         # Punctuation
-        lines.append(fr'syn match {lang_group}Bracket /\[\|\]/')
-        lines.append(fr'syn match {lang_group}DoubleBracket /\[\[\|\]\]/')
-        lines.append(fr'syn match {lang_group}Paren /(\|)/')
+        lines.append(fr'syn match {lang_group}Bracket /\[\|\]/ contained')
+        lines.append(fr'syn match {lang_group}DoubleBracket /\[\[\|\]\]/ contained')
+        lines.append(fr'syn match {lang_group}Paren /(\|)/ contained')
 
         lines.append('')
         # Base links (fallbacks if explicit colors below are not supported)
