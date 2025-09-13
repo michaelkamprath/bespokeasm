@@ -257,10 +257,10 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         color_scheme_fp = os.path.join(destination_dir, self.language_name + '.sublime-color-scheme')
         color_scheme_data = {
             'globals': {
-                'background': 'rgb(34, 34, 34)',  # Keep as rgb for Sublime compatibility
+                'background': DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.BACKGROUND),
                 'caret': DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.CARET),
                 'foreground': DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.FOREGROUND),
-                'line_highlight': 'rgb(68, 68, 68)',  # Convert hex to rgb for Sublime
+                'line_highlight': DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.LINE_HIGHLIGHT),
                 'selection': DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.SELECTION)
             },
             'name': 'BespokeASM Color Scheme',
