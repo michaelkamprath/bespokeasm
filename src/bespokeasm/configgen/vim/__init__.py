@@ -6,6 +6,8 @@ from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET
 from bespokeasm.assembler.keywords import EXPRESSION_FUNCTIONS_SET
 from bespokeasm.assembler.keywords import PREPROCESSOR_DIRECTIVES_SET
 from bespokeasm.configgen import LanguageConfigGenerator
+from bespokeasm.configgen.color_scheme import DEFAULT_COLOR_SCHEME
+from bespokeasm.configgen.color_scheme import SyntaxElement
 
 
 class VimConfigGenerator(LanguageConfigGenerator):
@@ -19,6 +21,157 @@ class VimConfigGenerator(LanguageConfigGenerator):
                 code_extension: str,
             ) -> None:
         super().__init__(config_file_path, is_verbose, vim_config_dir, language_name, language_version, code_extension)
+
+    def _get_vim_cterm_approximation(self, hex_color: str) -> int:
+        """
+        Convert hex color to approximate 256-color terminal color code for VIM.
+
+        This uses a generic RGB-to-256-color mapping algorithm that works for any
+        hex color, not just pre-defined ones. The 256-color palette consists of:
+        - Colors 0-15: Standard ANSI colors
+        - Colors 16-231: 6x6x6 RGB cube (216 colors)
+        - Colors 232-255: Grayscale ramp (24 colors)
+
+        Args:
+            hex_color: Hex color string (with # prefix, case insensitive)
+
+        Returns:
+            Terminal color code (0-255)
+        """
+        # Parse hex color to RGB components
+        hex_color = hex_color.lstrip('#').upper()
+        if len(hex_color) != 6:
+            return 15  # Default to white for invalid colors
+
+        try:
+            r = int(hex_color[0:2], 16)
+            g = int(hex_color[2:4], 16)
+            b = int(hex_color[4:6], 16)
+        except ValueError:
+            return 15  # Default to white for invalid hex
+
+        # Check if it's close to grayscale first (colors 232-255)
+        # If R, G, B are very close to each other, use grayscale ramp
+        if abs(r - g) < 10 and abs(g - b) < 10 and abs(r - b) < 10:
+            # Convert to grayscale (average of RGB)
+            gray = (r + g + b) // 3
+            # Map to 24-step grayscale ramp (232-255)
+            # Each step represents about 10.4 gray levels (255/24.6)
+            if gray < 8:
+                return 16  # Very dark, use black from RGB cube
+            elif gray > 247:
+                return 231  # Very light, use white from RGB cube
+            else:
+                # Map to grayscale ramp: 232 + (0-23)
+                gray_index = min(23, max(0, (gray - 8) // 10))
+                return 232 + gray_index
+
+        # Use 6x6x6 RGB cube (colors 16-231)
+        # Each component (R,G,B) is mapped to 6 levels: 0,1,2,3,4,5
+        # Formula: 16 + 36*r + 6*g + b (where r,g,b are 0-5)
+
+        # Convert 0-255 RGB values to 0-5 cube coordinates
+        # The 6 levels correspond to: 0, 95, 135, 175, 215, 255
+        def rgb_to_cube_level(value):
+            if value < 48:    # 0-47 -> 0
+                return 0
+            elif value < 115:  # 48-114 -> 1 (closest to 95)
+                return 1
+            elif value < 155:  # 115-154 -> 2 (closest to 135)
+                return 2
+            elif value < 195:  # 155-194 -> 3 (closest to 175)
+                return 3
+            elif value < 235:  # 195-234 -> 4 (closest to 215)
+                return 4
+            else:             # 235-255 -> 5 (closest to 255)
+                return 5
+
+        r_cube = rgb_to_cube_level(r)
+        g_cube = rgb_to_cube_level(g)
+        b_cube = rgb_to_cube_level(b)
+
+        # Calculate color index in 6x6x6 cube
+        color_index = 16 + (36 * r_cube) + (6 * g_cube) + b_cube
+
+        return min(231, max(16, color_index))
+
+    def _generate_vim_color_lines(self, lang_group: str) -> list:
+        """
+        Generate VIM color highlight lines by mapping generic syntax elements
+        to VIM-specific highlighting groups.
+
+        Args:
+            lang_group: Language group prefix for VIM syntax highlighting
+
+        Returns:
+            List of VIM highlight command strings
+        """
+        lines = []
+
+        # Set overall editor colors using Normal highlight group
+        bg_color = DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.BACKGROUND)
+        fg_color = DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.FOREGROUND)
+        bg_cterm = self._get_vim_cterm_approximation(bg_color)
+        fg_cterm = self._get_vim_cterm_approximation(fg_color)
+        lines.append(f'hi Normal guifg={fg_color} guibg={bg_color} ctermfg={fg_cterm} ctermbg={bg_cterm}')
+
+        # Set selection colors
+        selection_color = DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.SELECTION)
+        selection_cterm = self._get_vim_cterm_approximation(selection_color)
+        lines.append(f'hi Visual guibg={selection_color} ctermbg={selection_cterm}')
+
+        # Set current line highlighting
+        line_highlight_color = DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.LINE_HIGHLIGHT)
+        line_highlight_cterm = self._get_vim_cterm_approximation(line_highlight_color)
+        lines.append(f'hi CursorLine guibg={line_highlight_color} ctermbg={line_highlight_cterm} cterm=NONE gui=NONE')
+
+        # Mapping from generic syntax elements to VIM highlight groups
+        vim_mappings = [
+            (f'{lang_group}HexNumber', SyntaxElement.HEX_NUMBER),
+            (f'{lang_group}BinNumber', SyntaxElement.BINARY_NUMBER),
+            (f'{lang_group}DecNumber', SyntaxElement.DECIMAL_NUMBER),
+            (f'{lang_group}CharNumber', SyntaxElement.CHARACTER_NUMBER),
+            (f'{lang_group}LabelName', SyntaxElement.LABEL_NAME),
+            (f'{lang_group}LabelColon', SyntaxElement.PUNCTUATION_LABEL_COLON),
+            (f'{lang_group}String', SyntaxElement.STRING),
+            (f'{lang_group}StringPunc', SyntaxElement.PUNCTUATION_STRING),
+            (f'{lang_group}Escape', SyntaxElement.STRING_ESCAPE),
+            (f'{lang_group}Comment', SyntaxElement.COMMENT),
+            (f'{lang_group}Instruction', SyntaxElement.INSTRUCTION),
+            (f'{lang_group}Macro', SyntaxElement.MACRO),
+            (f'{lang_group}Register', SyntaxElement.REGISTER),
+            (f'{lang_group}ConstName', SyntaxElement.CONSTANT_NAME),
+            (f'{lang_group}CompilerLabel', SyntaxElement.COMPILER_LABEL),
+            (f'{lang_group}PreProc', SyntaxElement.PREPROCESSOR),
+            (f'{lang_group}PreProcPunc', SyntaxElement.PUNCTUATION_PREPROCESSOR),
+            (f'{lang_group}DataType', SyntaxElement.DATA_TYPE),
+            (f'{lang_group}Operator', SyntaxElement.OPERATOR),
+            (f'{lang_group}Directive', SyntaxElement.DIRECTIVE),
+        ]
+
+        # Generate standard color lines with background color inheritance
+        for vim_name, syntax_element in vim_mappings:
+            hex_color = DEFAULT_COLOR_SCHEME.get_color(syntax_element)
+            cterm_color = self._get_vim_cterm_approximation(hex_color)
+            # Use NONE for background to inherit from Normal highlight group
+            lines.append(f'hi {vim_name} guifg={hex_color} guibg=NONE ctermfg={cterm_color} ctermbg=NONE')
+
+        # Special colors with styling (brackets get bold formatting)
+        bracket_color = DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.BRACKET)
+        bracket_cterm = self._get_vim_cterm_approximation(bracket_color)
+        lines.append(f'hi {lang_group}Bracket guifg={bracket_color} guibg=NONE ctermfg={bracket_cterm} \
+ctermbg=NONE gui=bold cterm=bold')
+
+        double_bracket_color = DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.DOUBLE_BRACKET)
+        double_bracket_cterm = self._get_vim_cterm_approximation(double_bracket_color)
+        lines.append(f'hi {lang_group}DoubleBracket guifg={double_bracket_color} guibg=NONE ctermfg={double_bracket_cterm} \
+ctermbg=NONE gui=bold cterm=bold')
+
+        paren_color = DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.PARENTHESIS)
+        paren_cterm = self._get_vim_cterm_approximation(paren_color)
+        lines.append(f'hi {lang_group}Paren guifg={paren_color} guibg=NONE ctermfg={paren_cterm} ctermbg=NONE')
+
+        return lines
 
     def generate(self) -> None:
         syntax_dir_path = os.path.join(self.export_dir, 'syntax')
@@ -109,11 +262,13 @@ class VimConfigGenerator(LanguageConfigGenerator):
         lines.append(f'syn match {lang_group}Comment /;.*/ contains=@Spell')
         # Strings (double and single quoted) - only allow escape sequences inside
         # This prevents all keywords and other syntax elements from being highlighted within strings
-        lines.append(f'syn region {lang_group}String start=+"+ skip=+\\\\.+ end=+"+ oneline contains={lang_group}Escape')
-        lines.append(f"syn region {lang_group}String start=+'+ skip=+\\\\.+ end=+'+ oneline contains={lang_group}Escape")
+        lines.append(f'syn region {lang_group}String matchgroup={lang_group}StringPunc start=+"+ \
+skip=+\\.+ end=+"+ oneline contains={lang_group}Escape')
+        lines.append(f"syn region {lang_group}String matchgroup={lang_group}StringPunc start=+'+ \
+skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         # Escapes inside strings
         lines.append(
-            fr"syn match {lang_group}Escape /\\\|\\\"\|\\'\|\\[abfnrtv]\|\\o[0-7]\{{2}}\|\\x[0-9A-Fa-f]\{{2}}/ contained"
+            fr"syn match {lang_group}Escape /\\x[0-9A-Fa-f]\{{2}}\|\\o[0-7]\{{2}}\|\\[abfnrtv\"']\|\\\\/ contained"
         )
         # Numbers (split for per-type coloring)
         # - Ensure prefixes like '$' and '%' are included in the match
@@ -143,9 +298,11 @@ class VimConfigGenerator(LanguageConfigGenerator):
             lines.append(fr'syn match {lang_group}DataType /\s*\.' + self._vim_escape(w) + r'\>/')
         # Preprocessor
         if preproc_alt:
-            # Emit one rule per directive so tests can match `<pp>\>/` at end of pattern
+            # Highlight the leading '#' separately as punctuation and chain to macro name
+            lines.append(fr'syn match {lang_group}PreProcPunc /^#/ nextgroup={lang_group}PreProc skipwhite')
+            # Highlight the macro name as a contained match following '#'
             for w in preproc_directives:
-                lines.append(fr'syn match {lang_group}PreProc /^#' + self._vim_escape(w) + r'\>/')
+                lines.append(fr'syn match {lang_group}PreProc /\<' + self._vim_escape(w) + r'\>/ contained')
         # Expression functions
         if expr_funcs_alt:
             lines.append(fr'syn match {lang_group}Operator /\<' + expr_funcs_alt + r'\>/')
@@ -164,9 +321,9 @@ class VimConfigGenerator(LanguageConfigGenerator):
             lines.append(fr'syn match {lang_group}CompilerLabel /\<' + labels_alt + r'/')
 
         # Punctuation
-        lines.append(fr'syn match {lang_group}Bracket /\[\|\]/ contained')
-        lines.append(fr'syn match {lang_group}DoubleBracket /\[\[\|\]\]/ contained')
-        lines.append(fr'syn match {lang_group}Paren /(\|)/ contained')
+        lines.append(fr'syn match {lang_group}Bracket /\[\|\]/')
+        lines.append(fr'syn match {lang_group}DoubleBracket /\[\[\|\]\]/')
+        lines.append(fr'syn match {lang_group}Paren /(\|)/')
 
         lines.append('')
         # Base links (fallbacks if explicit colors below are not supported)
@@ -188,29 +345,9 @@ class VimConfigGenerator(LanguageConfigGenerator):
         lines.append(f'hi def link {lang_group}ConstName Constant')
         lines.append(f'hi def link {lang_group}AssignOp Operator')
         lines.append(f'hi def link {lang_group}Escape SpecialChar')
-        # Explicit BespokeASM-inspired colors (GUI + cterm approximations)
-        lines.append(f'hi {lang_group}HexNumber guifg=#ffe80b ctermfg=220')
-        lines.append(f'hi {lang_group}BinNumber guifg=#d6d300 ctermfg=184')
-        lines.append(f'hi {lang_group}DecNumber guifg=#fffd80 ctermfg=229')
-        lines.append(f'hi {lang_group}CharNumber guifg=#FFE880 ctermfg=222')
-        lines.append(f'hi {lang_group}LabelName guifg=#278ed8 ctermfg=67')
-        lines.append(f'hi {lang_group}LabelColon guifg=#ed80a2 ctermfg=176')
-        lines.append(f'hi {lang_group}String guifg=#aaff4d ctermfg=148')
-        lines.append(f'hi {lang_group}Escape guifg=#7ab736 ctermfg=106')
-        lines.append(f'hi {lang_group}Comment guifg=#568c3b ctermfg=65')
-        lines.append(f'hi {lang_group}Instruction guifg=#ffa83f ctermfg=215')
-        lines.append(f'hi {lang_group}Macro guifg=#ff883f ctermfg=208')
-        lines.append(f'hi {lang_group}Register guifg=#2ea9d2 ctermfg=38')
-        lines.append(f'hi {lang_group}ConstName guifg=#abd7ed ctermfg=153')
-        lines.append(f'hi {lang_group}CompilerLabel guifg=#abedc1 ctermfg=151')
-        lines.append(f'hi {lang_group}PreProc guifg=#c080ff ctermfg=141')
-        lines.append(f'hi {lang_group}DataType guifg=#d6adff ctermfg=183')
-        lines.append(f'hi {lang_group}Operator guifg=#cc99ff ctermfg=177')
-        lines.append(f'hi {lang_group}Directive guifg=#c080ff ctermfg=141')
-        # Punctuation coloring similar to Sublime
-        lines.append(f'hi {lang_group}Bracket guifg=#b72dd2 ctermfg=171 gui=bold cterm=bold')
-        lines.append(f'hi {lang_group}DoubleBracket guifg=#d22d9b ctermfg=169 gui=bold cterm=bold')
-        lines.append(f'hi {lang_group}Paren guifg=#dc81e4 ctermfg=176')
+        # BespokeASM color scheme from central configuration
+        color_lines = self._generate_vim_color_lines(lang_group)
+        lines.extend(color_lines)
         # Do not relink CompilerLabel after assigning explicit colors above, to avoid
         # overriding the custom palette with a generic Constant link.
         lines.append('')

@@ -1,4 +1,5 @@
 import importlib.resources as pkg_resources
+import json
 import os
 import shutil
 import sys
@@ -11,6 +12,8 @@ from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET
 from bespokeasm.assembler.keywords import EXPRESSION_FUNCTIONS_SET
 from bespokeasm.assembler.keywords import PREPROCESSOR_DIRECTIVES_SET
 from bespokeasm.configgen import LanguageConfigGenerator
+from bespokeasm.configgen.color_scheme import DEFAULT_COLOR_SCHEME
+from bespokeasm.configgen.color_scheme import SyntaxElement
 from ruamel.yaml import YAML
 
 
@@ -25,6 +28,77 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
                 code_extension: str,
             ) -> None:
         super().__init__(config_file_path, is_verbose, save_config_dir, language_name, language_version, code_extension)
+
+    def _generate_sublime_color_rules(self) -> list:
+        """
+        Generate Sublime Text color rules by mapping generic syntax elements
+        to Sublime-specific TextMate scopes.
+
+        Returns:
+            List of color rule dictionaries for Sublime Text
+        """
+        # Mapping from generic syntax elements to Sublime TextMate scopes
+        scope_mappings = [
+            (SyntaxElement.HEX_NUMBER, 'constant.numeric.integer.hexadecimal', 'Numbers - Hex'),
+            (SyntaxElement.BINARY_NUMBER, 'constant.numeric.integer.binary', 'Numbers - Binary'),
+            (SyntaxElement.DECIMAL_NUMBER, 'constant.numeric.integer.decimal', 'Numbers - Decimal'),
+            (SyntaxElement.CHARACTER_NUMBER, 'constant.numeric.character', 'Numbers - Character'),
+            (SyntaxElement.LABEL_NAME, 'variable.other.label', 'Labels'),
+            (SyntaxElement.PUNCTUATION_STRING, 'punctuation.definition.string', 'String Punctuation'),
+            (SyntaxElement.STRING, 'string.quoted', 'Strings'),
+            (SyntaxElement.STRING_ESCAPE, 'constant.character.escape', 'Strings - Escaped Characters'),
+            (SyntaxElement.COMMENT, 'comment.line', 'Comments'),
+            (SyntaxElement.PARAMETER, 'variable.parameter', 'Parameters'),
+            (SyntaxElement.INSTRUCTION, 'variable.function.instruction', 'Instruction Functions'),
+            (SyntaxElement.MACRO, 'variable.function.macro', 'Macro Functions'),
+            (SyntaxElement.REGISTER, 'variable.language', 'Variables - Language'),
+            (SyntaxElement.CONSTANT_NAME, 'variable.other.constant', 'Variables - Constant'),
+            (SyntaxElement.COMPILER_LABEL, 'constant.language', 'Variables - Language Defined'),
+            (SyntaxElement.PREPROCESSOR, 'keyword.control.preprocessor', 'Keyword - Preprocessor'),
+            (SyntaxElement.DATA_TYPE, 'storage.type', 'Data Types'),
+            (SyntaxElement.OPERATOR, 'keyword.operator', 'Keyword - Operators'),
+            (SyntaxElement.DIRECTIVE, 'keyword.other', 'Keyword - Other'),
+            (SyntaxElement.PUNCTUATION_PREPROCESSOR, 'punctuation.definition.preprocessor', 'Punctuation - Preprocessor'),
+            (SyntaxElement.PUNCTUATION_SEPARATOR, 'punctuation.separator', 'Punctuation - Separator'),
+            (SyntaxElement.PUNCTUATION_VARIABLE, 'punctuation.definition.variable', 'Punctuation - Variable'),
+        ]
+
+        rules = []
+
+        # Generate standard rules
+        for syntax_element, scope, name in scope_mappings:
+            hex_color = DEFAULT_COLOR_SCHEME.get_color(syntax_element)
+            rules.append({
+                'foreground': hex_color,
+                'name': name,
+                'scope': scope
+            })
+
+        # Special rules with additional styling
+        bracket_color = DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.BRACKET)
+        rules.append({
+            'font_style': 'bold',
+            'foreground': bracket_color,
+            'name': 'Punctuation - Addressing Brackets',
+            'scope': 'punctuation.section.brackets'
+        })
+
+        double_bracket_color = DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.DOUBLE_BRACKET)
+        rules.append({
+            'font_style': 'bold',
+            'foreground': double_bracket_color,
+            'name': 'Punctuation - Addressing Double Brackets',
+            'scope': 'punctuation.section.double_brackets'
+        })
+
+        paren_color = DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.PARENTHESIS)
+        rules.append({
+            'foreground': paren_color,
+            'name': 'Punctuation - Parenthesis',
+            'scope': 'punctuation.section.parens'
+        })
+
+        return rules
 
     def generate(self) -> None:
         if self.verbose >= 1:
@@ -179,10 +253,22 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             if self.verbose > 1:
                 print(f'  generated {os.path.basename(syntax_fp)}')
 
-        # copy color files over
+        # generate color scheme file from central configuration
         color_scheme_fp = os.path.join(destination_dir, self.language_name + '.sublime-color-scheme')
-        fp = pkg_resources.files(resources).joinpath('sublime-color-scheme.json')
-        shutil.copy(str(fp), color_scheme_fp)
+        color_scheme_data = {
+            'globals': {
+                'background': 'rgb(34, 34, 34)',  # Keep as rgb for Sublime compatibility
+                'caret': DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.CARET),
+                'foreground': DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.FOREGROUND),
+                'line_highlight': 'rgb(68, 68, 68)',  # Convert hex to rgb for Sublime
+                'selection': DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.SELECTION)
+            },
+            'name': 'BespokeASM Color Scheme',
+            'rules': self._generate_sublime_color_rules()
+        }
+
+        with open(color_scheme_fp, 'w', encoding='utf-8') as f:
+            json.dump(color_scheme_data, f, indent=2)
         if self.verbose > 1:
             print(f'  generated {os.path.basename(color_scheme_fp)}')
 
