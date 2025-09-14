@@ -13,3 +13,6 @@ indent_size = 4
 [*.md]
 # Preserve intentional two-space line breaks in Markdown
 trim_trailing_whitespace = true
+
+[*.yaml]
+indent_size = 2

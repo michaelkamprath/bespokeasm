@@ -8,6 +8,7 @@ from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.configgen.sublime import SublimeConfigGenerator
 from bespokeasm.configgen.vim import VimConfigGenerator
 from bespokeasm.configgen.vscode import VSCodeConfigGenerator
+from bespokeasm.docsgen import DocumentationGenerator
 from bespokeasm.utilities import dump_yaml_with_formatting
 from bespokeasm.utilities import load_yaml_with_format_preservation
 from click_default_group import DefaultGroup
@@ -170,6 +171,36 @@ def update_config(config_file, output_file):
             print()  # Ensure newline at end
         else:
             dump_yaml_with_formatting(updated_dict, sys.stdout)
+
+
+@main.command(short_help='generate markdown documentation for an ISA')
+@click.option(
+    '--config-file', '-c', required=True,
+    help='The filepath to the instruction set configuration file (YAML or JSON).'
+)
+@click.option(
+    '--output-file', '-o',
+    help='The filepath to write the markdown documentation. Defaults to same directory as config file with .md extension.'
+)
+@click.option('--verbose', '-v', count=True, help='Verbosity of logging')
+def docs(config_file, output_file, verbose):
+    """Generate markdown documentation for an instruction set architecture."""
+    config_file = os.path.abspath(os.path.expanduser(config_file))
+
+    if not os.path.exists(config_file):
+        click.echo(f'ERROR: Configuration file not found: {config_file}', err=True)
+        sys.exit(1)
+
+    generator = DocumentationGenerator(config_file, verbose)
+    try:
+        output_path = generator.generate_markdown_documentation(output_file)
+        click.echo(f'Documentation generated: {output_path}')
+    except SystemExit:
+        # Re-raise SystemExit from the generator (contains proper error messages)
+        raise
+    except Exception as e:
+        click.echo(f'ERROR: Failed to generate documentation: {e}', err=True)
+        sys.exit(1)
 
 
 @main.group(short_help='generate a language syntax highlighting extension')
