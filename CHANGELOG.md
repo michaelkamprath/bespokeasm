@@ -25,7 +25,7 @@ Changes that are planned but not implemented yet:
 - Added `#print` preprocessor directive for compile-time messages with optional verbosity gating and honoring conditional/mute controls.
 - Added Vim syntax highlighting generator via `bespokeasm generate-extension vim`. This creates Vim `syntax/` and `ftdetect/` files for your ISA.
 
-## [0.5.1] - 2024-06-09
+## [0.5.1]
 - Support for preserving comments, integer formats, list formats, and file type in configuration files during `update-config` command
 - Added `string_byte_packing` and `string_byte_packing_fill` options to the `general` section of the configuration file. When `string_byte_packing` is enabled, quoted strings in `.byte` and `.cstr` data directives are packed tightly into words (if `word_size` is a multiple of 8 and at least 16). The `string_byte_packing_fill` option controls the byte value used to pad the last word if the string does not fill it completely. The `.cstr` directive always appends the configured `cstr_terminator` before padding. Extensive tests and documentation updates included.
 
