@@ -2,15 +2,15 @@ import os
 import sys
 
 import click
-from click_default_group import DefaultGroup
-
 from bespokeasm import BESPOKEASM_VERSION_STR
 from bespokeasm.assembler.engine import Assembler
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.configgen.sublime import SublimeConfigGenerator
+from bespokeasm.configgen.vim import VimConfigGenerator
 from bespokeasm.configgen.vscode import VSCodeConfigGenerator
 from bespokeasm.utilities import dump_yaml_with_formatting
 from bespokeasm.utilities import load_yaml_with_format_preservation
+from click_default_group import DefaultGroup
 
 
 @click.group(cls=DefaultGroup, default='compile', default_if_no_args=True)
@@ -236,6 +236,35 @@ def sublime(config_file, verbose, editor_config_dir, language_name, language_ver
     config_file = os.path.abspath(os.path.expanduser(config_file))
     save_config_dir = os.path.abspath(os.path.expanduser(editor_config_dir))
     generator = SublimeConfigGenerator(config_file, verbose, save_config_dir, language_name, language_version, code_extension)
+    generator.generate()
+
+
+@generate_extension.command(short_help='generate for Vim editor (syntax only)')
+@click.option(
+        '--config-file', '-c', required=True,
+        help='The filepath to the instruction set configuration file,'
+    )
+@click.option('--verbose', '-v', count=True, help='Verbosity of logging')
+@click.option(
+        '--editor-config-dir', '-d', default='~/.vim/',
+        help='The Vim configuration root directory containing syntax/ and ftdetect/.'
+    )
+@click.option(
+        '--language-name', '-l',
+        help='The name of the language (used in filetype). Defaults to ISA name.'
+    )
+@click.option(
+        '--language-version', '-k',
+        help='The version of the language. Unused by Vim but kept for parity.'
+    )
+@click.option(
+        '--code-extension', '-x',
+        help='The file extension for asssembly code files for this language configuraton.'
+    )
+def vim(config_file, verbose, editor_config_dir, language_name, language_version, code_extension):
+    config_file = os.path.abspath(os.path.expanduser(config_file))
+    vim_config_dir = os.path.abspath(os.path.expanduser(editor_config_dir))
+    generator = VimConfigGenerator(config_file, verbose, vim_config_dir, language_name, language_version, code_extension)
     generator.generate()
 
 

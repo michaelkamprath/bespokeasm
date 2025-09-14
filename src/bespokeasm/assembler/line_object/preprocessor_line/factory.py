@@ -5,6 +5,7 @@ from bespokeasm.assembler.line_object.preprocessor_line.condition_line import CO
 from bespokeasm.assembler.line_object.preprocessor_line.condition_line import ConditionLine
 from bespokeasm.assembler.line_object.preprocessor_line.create_memzone import CreateMemzoneLine
 from bespokeasm.assembler.line_object.preprocessor_line.define_symbol import DefineSymbolLine
+from bespokeasm.assembler.line_object.preprocessor_line.print_line import PrintLine
 from bespokeasm.assembler.line_object.preprocessor_line.required_language import RequiredLanguageLine
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
@@ -59,6 +60,16 @@ class PreprocessorLineFactory:
                         memzone_manager,
                         isa_model,
                         preprocessor,
+                        log_verbosity,
+                    )]
+        if instruction.startswith('#print '):
+            return [PrintLine(
+                        line_id,
+                        instruction,
+                        comment,
+                        current_memzone,
+                        preprocessor,
+                        condition_stack,
                         log_verbosity,
                     )]
         if instruction.startswith(tuple(CONDITIONAL_LINE_PREFIX_LIST)):

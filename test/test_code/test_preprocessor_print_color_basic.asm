@@ -1,0 +1,1 @@
+#print red "red message"

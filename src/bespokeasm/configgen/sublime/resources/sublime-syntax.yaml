@@ -185,7 +185,7 @@ contexts:
       scope: punctuation.definition.preprocessor
       push:
         - meta_scope: meta.preprocessor
-        - match: (?<=\#)(?:##PREPROCESSOR##)
+        - match: (?<=\#)(?:##PREPROCESSOR##)\b
           scope: keyword.control.preprocessor
         - include: strings
         - include: numerical_expressions

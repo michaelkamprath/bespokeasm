@@ -10,6 +10,8 @@ from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET
 from bespokeasm.assembler.keywords import EXPRESSION_FUNCTIONS_SET
 from bespokeasm.assembler.keywords import PREPROCESSOR_DIRECTIVES_SET
 from bespokeasm.configgen import LanguageConfigGenerator
+from bespokeasm.configgen.color_scheme import DEFAULT_COLOR_SCHEME
+from bespokeasm.configgen.color_scheme import SyntaxElement
 
 
 class VSCodeConfigGenerator(LanguageConfigGenerator):
@@ -23,6 +25,144 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
                 code_extension: str,
             ) -> None:
         super().__init__(config_file_path, is_verbose, vscode_config_dir, language_name,  language_version, code_extension)
+
+    def _generate_vscode_color_rules(self) -> list:
+        """
+        Generate VS Code color rules by mapping generic syntax elements
+        to VS Code-specific TextMate scopes.
+
+        Returns:
+            List of color rule dictionaries for VS Code tmTheme format
+        """
+        # Mapping from generic syntax elements to VS Code TextMate scopes
+        scope_mappings = [
+            (SyntaxElement.HEX_NUMBER, 'constant.numeric.integer.hexadecimal', 'Numbers - Hex'),
+            (SyntaxElement.BINARY_NUMBER, 'constant.numeric.integer.binary', 'Numbers - Binary'),
+            (SyntaxElement.DECIMAL_NUMBER, 'constant.numeric.integer.decimal', 'Numbers - Decimal'),
+            (SyntaxElement.CHARACTER_NUMBER, 'constant.numeric.character', 'Numbers - Character'),
+            (SyntaxElement.LABEL_NAME, 'variable.other.label', 'Labels'),
+            (SyntaxElement.PUNCTUATION_STRING, 'punctuation.definition.string', 'String Punctuation'),
+            (SyntaxElement.STRING, 'string.quoted', 'Strings'),
+            (SyntaxElement.STRING_ESCAPE, 'constant.character.escape', 'Strings - Escaped Characters'),
+            (SyntaxElement.COMMENT, 'comment.line', 'Comments'),
+            (SyntaxElement.PARAMETER, 'variable.parameter', 'Parameters'),
+            (SyntaxElement.INSTRUCTION, 'variable.function.instruction', 'Functions - Instruction'),
+            (SyntaxElement.MACRO, 'variable.function.macro', 'Functions - Macro'),
+            (SyntaxElement.REGISTER, 'variable.language', 'Variables - Language'),
+            (SyntaxElement.CONSTANT_NAME, 'variable.other.constant', 'Variables - Constant'),
+            (SyntaxElement.COMPILER_LABEL, 'constant.language', 'Variables - Language Defined'),
+            (SyntaxElement.PREPROCESSOR, 'keyword.control.preprocessor', 'Keyword - Preprocessor'),
+            (SyntaxElement.DATA_TYPE, 'storage.type', 'Data Types'),
+            (SyntaxElement.OPERATOR, 'keyword.operator', 'Keyword - Operators'),
+            (SyntaxElement.DIRECTIVE, 'keyword.other', 'Keyword - Other'),
+            (SyntaxElement.PUNCTUATION_PREPROCESSOR, 'punctuation.definition.preprocessor', 'Punctuation - Preprocessor'),
+            (SyntaxElement.PUNCTUATION_SEPARATOR, 'punctuation.separator', 'Punctuation - Separator'),
+            (SyntaxElement.PUNCTUATION_VARIABLE, 'punctuation.definition.variable', 'Punctuation - Variable'),
+        ]
+
+        rules = []
+
+        # Generate standard rules
+        for syntax_element, scope, name in scope_mappings:
+            hex_color = DEFAULT_COLOR_SCHEME.get_color(syntax_element)
+            rules.append({
+                'name': name,
+                'scope': scope,
+                'settings': {'foreground': hex_color}
+            })
+
+        # Special rules with additional styling
+        bracket_color = DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.BRACKET)
+        rules.append({
+            'name': 'Punctuation - Addressing Brackets',
+            'scope': 'punctuation.section.brackets',
+            'settings': {
+                'foreground': bracket_color,
+                'font_style': 'bold'
+            }
+        })
+
+        double_bracket_color = DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.DOUBLE_BRACKET)
+        rules.append({
+            'name': 'Punctuation - Addressing Double Brackets',
+            'scope': 'punctuation.section.double_brackets',
+            'settings': {
+                'foreground': double_bracket_color,
+                'font_style': 'bold'
+            }
+        })
+
+        paren_color = DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.PARENTHESIS)
+        rules.append({
+            'name': 'Punctuation - Parenthesis',
+            'scope': 'punctuation.section.parens',
+            'settings': {'foreground': paren_color}
+        })
+
+        return rules
+
+    def _generate_tmtheme_xml(self, language_id: str) -> str:
+        """Generate tmTheme XML content by mapping generic syntax elements to VS Code scopes."""
+        color_rules = self._generate_vscode_color_rules()
+
+        # Build the XML structure
+        xml_parts = [
+            '<?xml version="1.0" encoding="UTF-8"?>',
+            '<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
+            '<plist version="1.0">',
+            '<dict>',
+            '    <key>name</key>',
+            f'    <string>{language_id} Color Scheme</string>',
+            '    <key>settings</key>',
+            '    <array>',
+            '        <!-- Global settings -->',
+            '        <dict>',
+            '            <key>settings</key>',
+            '            <dict>',
+            '                <key>background</key>',
+            f'                <string>{DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.BACKGROUND)}</string>',
+            '                <key>foreground</key>',
+            f'                <string>{DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.FOREGROUND)}</string>',
+            '                <key>caret</key>',
+            f'                <string>{DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.CARET)}</string>',
+            '            </dict>',
+            '        </dict>',
+            '        <!-- Scope styles -->'
+        ]
+
+        # Add each color rule
+        for rule in color_rules:
+            xml_parts.extend([
+                '        <dict>',
+                '            <key>name</key>',
+                f'            <string>{rule["name"]}</string>',
+                '            <key>scope</key>',
+                f'            <string>{rule["scope"]}</string>',
+                '            <key>settings</key>',
+                '            <dict>',
+                '                <key>foreground</key>',
+                f'                <string>{rule["settings"]["foreground"]}</string>'
+            ])
+
+            # Add font style if present
+            if 'font_style' in rule['settings']:
+                xml_parts.extend([
+                    '                <key>font_style</key>',
+                    f'                <string>{rule["settings"]["font_style"]}</string>'
+                ])
+
+            xml_parts.extend([
+                '            </dict>',
+                '        </dict>'
+            ])
+
+        xml_parts.extend([
+            '    </array>',
+            '</dict>',
+            '</plist>'
+        ])
+
+        return '\n'.join(xml_parts)
 
     def generate(self) -> None:
         extension_name = self.language_name
@@ -136,7 +276,8 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             elif 'meta.preprocessor' == item['name']:
                 for pattern in item['patterns']:
                     if 'name' in pattern and 'keyword.control.preprocessor' == pattern['name']:
-                        preprocessor_regex = '|'.join(PREPROCESSOR_DIRECTIVES_SET)
+                        # Sort by length (desc) to avoid prefix matches like 'if' matching 'ifdef'
+                        preprocessor_regex = '|'.join(sorted(PREPROCESSOR_DIRECTIVES_SET, key=len, reverse=True))
                         preprocesspr_str = pattern['match']
                         pattern['match'] = preprocesspr_str.replace('##PREPROCESSOR##', preprocessor_regex)
 
@@ -164,10 +305,8 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
         if self.verbose > 1:
             print(f'  generated {os.path.basename(str(fp))}')
 
-        fp = pkg_resources.files(resources).joinpath('tmTheme.xml')
-        with open(fp) as theme_template_file:
-            color_theme_xml = theme_template_file.read()
-        color_theme_xml.replace('##LANGUAGE_ID##', self.language_id)
+        # Generate theme file from central color configuration
+        color_theme_xml = self._generate_tmtheme_xml(self.language_id)
         with open(os.path.join(extension_dir_path, theme_filename), 'w') as theme_file:
             theme_file.write(color_theme_xml)
             if self.verbose > 1:
