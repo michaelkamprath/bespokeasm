@@ -9,7 +9,8 @@
 ; Code modified by Michael Kamprath (michaelkampath) 2024
 ; Adapted to be compiled with BespokeASM
 ;
-#require "slu4-min64x4-asm >= 1.1.0"
+#require __LANGUAGE_NAME__ == slu4-min64x4-asm
+#require __LANGUAGE_VERSION__ >= 1.1.0
 
 .org 0 "USER_APPS"
                 JPS MakeStars                       ; generate star data

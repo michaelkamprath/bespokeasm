@@ -2,7 +2,8 @@
 ;  This program calculates prime numbers using the algorithm documented here:
 ;       https://en.wikipedia.org/wiki/Primality_test
 ;
-#require "slu4-min64x4-asm >= 1.1.0"
+#require __LANGUAGE_NAME__ == slu4-min64x4-asm
+#require __LANGUAGE_VERSION__ >= 1.1.0
 
 .memzone ZERO_PAGE_APPS
 #mute
