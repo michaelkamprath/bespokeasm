@@ -57,7 +57,7 @@ class Assembler:
         )
 
         # create preprocessor
-        preprocessor: Preprocessor = Preprocessor(self._model.predefined_symbols)
+        preprocessor: Preprocessor = Preprocessor(self._model.predefined_symbols, self._model)
         # add any predefined macros from the command line
         preprocessor.add_cli_symbols(self._predefined_symbols)
 

@@ -220,10 +220,11 @@ ctermbg=NONE gui=bold cterm=bold')
 
     def _build_syntax_vim(self, vim_filetype: str) -> str:
         # Collect token groups
+        from bespokeasm.assembler.keywords import BUILTIN_CONSTANTS_SET
         instructions = list(self.model.instruction_mnemonics)
         macros = list(self.model.macro_mnemonics)
         registers = list(self.model.registers)
-        predefined_labels = list(self.model.predefined_labels)
+        predefined_labels = list(self.model.predefined_labels) + list(BUILTIN_CONSTANTS_SET)
 
         # Directives and datatypes prefixed with '.'
         compiler_directives = ['.' + d for d in COMPILER_DIRECTIVES_SET]
