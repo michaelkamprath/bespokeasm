@@ -70,17 +70,19 @@ class AssemblyFile:
                         # this is the one preprocessor directive that is handled
                         # by the assembly file object.
                         if line_str.startswith('#include'):
-                            additional_line_objects = self._handle_include_file(
-                                line_str,
-                                line_id,
-                                isa_model,
-                                memzone_manager,
-                                preprocessor,
-                                include_paths,
-                                log_verbosity,
-                                assembly_files_used
-                            )
-                            line_objects.extend(additional_line_objects)
+                            # Only process the #include if the current conditional block is active
+                            if condition_stack.currently_active(preprocessor):
+                                additional_line_objects = self._handle_include_file(
+                                    line_str,
+                                    line_id,
+                                    isa_model,
+                                    memzone_manager,
+                                    preprocessor,
+                                    include_paths,
+                                    log_verbosity,
+                                    assembly_files_used
+                                )
+                                line_objects.extend(additional_line_objects)
                             continue
 
                         lobj_list: list[LineObject] = []
