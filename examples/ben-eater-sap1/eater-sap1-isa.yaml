@@ -76,7 +76,9 @@ instructions:
       - register: a
         description: will contain the results of the addition
       - flag: carry
+        description: Set to the value of the 8-bit addition carry bit.
       - flag: zero
+        description: Set to 1 if register A is equal to zero, 0 otherwise.
   sub:
     bytecode:
       value: 3
@@ -177,7 +179,7 @@ instructions:
     documentation:
       category: input/output
       description: Display Value
-      details: Writes value in register A to the output register, causing it to be displayed.
+      details: Output register A to 7 segment LED display as decimal
       modifies:
       - register: out
   hlt:
@@ -187,4 +189,4 @@ instructions:
     documentation:
       category: control
       description: Halt Clock
-      details: Halt the computer clock, stopping all operations.
+      details: Halt the computer clock, stopping all execution.
