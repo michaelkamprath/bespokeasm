@@ -1,6 +1,9 @@
 {
+  "python.pythonPath": ".venv/bin/python",
   "python.testing.nosetestsEnabled": false,
   "python.testing.pytestEnabled": true,
   "python.testing.unittestEnabled": false,
-  "python.unitTest.pyTestArgs": []
+  "python.unitTest.pyTestArgs": [],
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true
 }

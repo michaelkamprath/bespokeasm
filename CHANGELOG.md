@@ -25,6 +25,7 @@ Changes that are planned but not implemented yet:
 - Added `#print` preprocessor directive for compile-time messages with optional verbosity gating and honoring conditional/mute controls.
 - Added Vim syntax highlighting generator via `bespokeasm generate-extension vim`. This creates Vim `syntax/` and `ftdetect/` files for your ISA.
 - Added support for built-in language version symbols in `#require`, `#if`, and `#elif` preprocessor directives.
+- Fixed a bug where `#include` directives were not properly processed when they were inside a conditional block.
 
 ## [0.5.1]
 - Support for preserving comments, integer formats, list formats, and file type in configuration files during `update-config` command
