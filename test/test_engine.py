@@ -8,6 +8,7 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.assembler.line_object.factory import LineOjectFactory
+from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
@@ -18,6 +19,9 @@ from test import config_files
 
 
 class TestAssemblerEngine(unittest.TestCase):
+    def setUp(self):
+        InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN = None
+
     def test_generate_bytes_from_line_objects_8bit_words(self):
         fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')
         isa_model = AssemblerModel(str(fp), 0)
