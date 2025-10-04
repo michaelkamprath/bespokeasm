@@ -179,7 +179,7 @@ class DataLine(LineWithWords):
                 arg_val = arg_item
             elif isinstance(arg_item, str):
                 e: ExpressionNode = parse_expression(self.line_id, arg_item)
-                arg_val = e.get_value(self.label_scope, self.line_id)
+                arg_val = e.get_value(self.label_scope, self.active_named_scopes, self.line_id)
             else:
                 sys.exit(f'ERROR: line {self.line_id} - unknown data item "{arg_item}"')
             value_size = DataLine.DIRECTIVE_VALUE_BYTE_SIZE[self._directive]

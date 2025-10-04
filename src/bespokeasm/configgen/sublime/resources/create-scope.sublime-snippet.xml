@@ -1,0 +1,6 @@
+<snippet>
+    <content><![CDATA[#create-scope "$1" prefix="$2"]]></content>
+    <tabTrigger>&#35;create-scope</tabTrigger>
+    <scope>source.bespokeasm.##FILEEXTENSION##</scope>
+    <description>Create a named label scope with custom prefix</description>
+</snippet>

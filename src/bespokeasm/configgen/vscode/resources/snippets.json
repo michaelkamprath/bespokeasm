@@ -36,5 +36,32 @@
     "prefix": [
       "#require"
     ]
+  },
+  "create-scope": {
+    "body": [
+      "#create-scope \"$1\" prefix=\"$2\""
+    ],
+    "description": "Create a named label scope with custom prefix",
+    "prefix": [
+      "#create-scope"
+    ]
+  },
+  "use-scope": {
+    "body": [
+      "#use-scope \"$1\""
+    ],
+    "description": "Activate a named label scope",
+    "prefix": [
+      "#use-scope"
+    ]
+  },
+  "deactivate-scope": {
+    "body": [
+      "#deactivate-scope \"$1\""
+    ],
+    "description": "Deactivate a named label scope",
+    "prefix": [
+      "#deactivate-scope"
+    ]
   }
 }

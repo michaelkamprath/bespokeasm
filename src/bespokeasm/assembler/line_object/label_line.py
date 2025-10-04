@@ -2,6 +2,7 @@ import re
 import sys
 
 from bespokeasm.assembler.label_scope import LabelScope
+from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import INSTRUCTION_EXPRESSION_PATTERN
 from bespokeasm.assembler.line_object import LineObject
@@ -28,8 +29,9 @@ class LabelLine(LineObject):
                 comment: str,
                 registers: set[str],
                 label_scope: LabelScope,
+                active_named_scopes: ActiveNamedScopeList,
                 current_memzone: MemoryZone,
-            ) -> LineObject:
+            ) -> LineObject | None:
         """Tries to match the passed line string to the Label or Constant directive patterns.
         If succcessful, returns a constructed LabelLine object. If not, None is
         returned.
@@ -59,7 +61,7 @@ class LabelLine(LineObject):
                 line_obj = LabelLine(
                     line_id,
                     constant_label,
-                    value_expr.get_value(label_scope, line_id),
+                    value_expr.get_value(label_scope, active_named_scopes, line_id),
                     line_str,
                     comment,
                     current_memzone,

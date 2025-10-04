@@ -35,7 +35,7 @@ class EmbeddedString(LineWithWords):
             intra_word_endianness: Literal['little', 'big'],
             multi_word_endianness: Literal['little', 'big'],
             cstr_terminator: int = 0,
-    ) -> EmbeddedString:
+    ) -> EmbeddedString | None:
         # detyermine if string starts with a quoted string
         match = re.search(EmbeddedString.QUOTED_STRING_PATTERN, instruction)
         if match is None or len(match.groups()) != 2:

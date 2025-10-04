@@ -2,6 +2,7 @@ from typing import Literal
 
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.label_scope import LabelScope
+from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.expression import EXPRESSION_PARTS_PATTERN
@@ -23,6 +24,7 @@ class LineObject:
         self._memzone = memzone
         self._compilable = True
         self._is_muted = False
+        self._active_named_scopes = None
 
     def __repr__(self):
         return str(self)
@@ -74,6 +76,14 @@ class LineObject:
     @label_scope.setter
     def label_scope(self, value):
         self._label_scope = value
+
+    @property
+    def active_named_scopes(self) -> ActiveNamedScopeList:
+        return self._active_named_scopes
+
+    @active_named_scopes.setter
+    def active_named_scopes(self, value: ActiveNamedScopeList):
+        self._active_named_scopes = value.copy()
 
     @property
     def memory_zone(self) -> MemoryZone:

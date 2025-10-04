@@ -1,12 +1,16 @@
 from bespokeasm.assembler.label_scope import LabelScope
+from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object.preprocessor_line.condition_line import CONDITIONAL_LINE_PREFIX_LIST
 from bespokeasm.assembler.line_object.preprocessor_line.condition_line import ConditionLine
 from bespokeasm.assembler.line_object.preprocessor_line.create_memzone import CreateMemzoneLine
+from bespokeasm.assembler.line_object.preprocessor_line.create_scope import CreateScopeLine
+from bespokeasm.assembler.line_object.preprocessor_line.deactivate_scope import DeactivateScopeLine
 from bespokeasm.assembler.line_object.preprocessor_line.define_symbol import DefineSymbolLine
 from bespokeasm.assembler.line_object.preprocessor_line.print_line import PrintLine
 from bespokeasm.assembler.line_object.preprocessor_line.required_language import RequiredLanguageLine
+from bespokeasm.assembler.line_object.preprocessor_line.use_scope import UseScopeLine
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
@@ -23,13 +27,50 @@ class PreprocessorLineFactory:
         comment: str,
         isa_model: AssemblerModel,
         label_scope: LabelScope,
+        active_named_scopes: ActiveNamedScopeList,
         current_memzone: MemoryZone,
         memzone_manager: MemoryZoneManager,
         preprocessor: Preprocessor,
         condition_stack: ConditionStack,
         log_verbosity: int,
+        filename: str,
     ) -> list[LineObject]:
         '''Parse a preprocessor line.'''
+        if instruction.startswith('#create-scope '):
+            return [CreateScopeLine(
+                        line_id,
+                        instruction,
+                        comment,
+                        current_memzone,
+                        isa_model,
+                        active_named_scopes.named_scope_manager,
+                        log_verbosity
+                    )]
+
+        if instruction.startswith('#use-scope '):
+            return [UseScopeLine(
+                        line_id,
+                        instruction,
+                        comment,
+                        current_memzone,
+                        isa_model,
+                        active_named_scopes.named_scope_manager,
+                        filename,
+                        log_verbosity
+                    )]
+
+        if instruction.startswith('#deactivate-scope '):
+            return [DeactivateScopeLine(
+                        line_id,
+                        instruction,
+                        comment,
+                        current_memzone,
+                        isa_model,
+                        active_named_scopes.named_scope_manager,
+                        filename,
+                        log_verbosity
+                    )]
+
         if instruction.startswith('#require '):
             return [RequiredLanguageLine(
                         line_id,

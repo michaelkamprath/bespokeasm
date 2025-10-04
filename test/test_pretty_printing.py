@@ -3,6 +3,8 @@ import unittest
 
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.label_scope import GlobalLabelScope
+from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
+from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object.factory import LineOjectFactory
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
@@ -138,6 +140,7 @@ class TestPrettyPrinting(unittest.TestCase):
         ]
         line_objs = []
         preprocessor = Preprocessor()
+        active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
         label_scope = GlobalLabelScope(set())
         for i, line in enumerate(lines, 1):
             line_obj = LineOjectFactory.parse_line(
@@ -145,6 +148,7 @@ class TestPrettyPrinting(unittest.TestCase):
                 line_str=line,
                 model=isa_model,
                 label_scope=None,
+                active_named_scopes=active_named_scopes,
                 current_memzone=memzone_mngr.global_zone,
                 memzone_manager=memzone_mngr,
                 preprocessor=preprocessor,

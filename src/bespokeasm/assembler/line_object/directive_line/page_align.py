@@ -54,7 +54,7 @@ class PageAlignLine(LineObject):
         """Sets the finalized address to the next page boundary.
         """
         if isinstance(self._page_size, ExpressionNode):
-            self._page_size = self._page_size.get_value(self.label_scope, self.line_id)
+            self._page_size = self._page_size.get_value(self.label_scope, self.active_named_scopes, self.line_id)
 
         if self._page_size == 1:
             self._address = address

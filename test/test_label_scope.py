@@ -6,6 +6,7 @@ from bespokeasm.assembler.assembly_file import AssemblyFile
 from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.label_scope import LabelScopeType
+from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
@@ -118,9 +119,9 @@ class TestLabelScope(unittest.TestCase):
             isa_model.predefined_memory_zones
         )
         preprocessor = Preprocessor()
-
+        named_scope_manager = NamedScopeManager()
         asm_fp = pkg_resources.files(test_code).joinpath('test_line_object_scope_assignment.asm')
-        asm_obj = AssemblyFile(asm_fp, label_scope)
+        asm_obj = AssemblyFile(asm_fp, label_scope, named_scope_manager)
 
         try:
             line_objs: list[LineObject] = asm_obj.load_line_objects(
