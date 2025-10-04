@@ -20,6 +20,7 @@ Changes that are planned but not implemented yet:
 
 ## [Unreleased]
 
+## [0.5.2]
 - Added support for instruction aliases: you can now specify an `aliases` field (a list of alternative mnemonics) in an instruction's configuration. All aliases are globally unique, are accepted as valid mnemonics in assembly source, and generate the same code as the root mnemonic. This does not apply to macros.
 - Added `#print` preprocessor directive for compile-time messages with optional verbosity gating and honoring conditional/mute controls.
 - Added Vim syntax highlighting generator via `bespokeasm generate-extension vim`. This creates Vim `syntax/` and `ftdetect/` files for your ISA.
@@ -188,7 +189,8 @@ First tracked released
 * Enabled the `reverse_argument_order` instruction option be applied to a specific operand configuration. This slightly changed the configuration file format.
 * Added ability for instructions with operands to have a single "empty operand" variant, e.g., `pop`
 
-[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/michaelkamprath/bespokeasm/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/michaelkamprath/bespokeasm/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/michaelkamprath/bespokeasm/compare/v0.4.1...v0.4.2
