@@ -51,9 +51,11 @@ class LabelScopeType(enum.Enum):
     GLOBAL = 0
     FILE = 1
     LOCAL = 2
+    NAMED = 3
 
     @classmethod
     def get_label_scope(cls, label: str) -> LabelScopeType:
+        """Get the label scope type for a given label. Does not check for named scopes."""
         if label.startswith('.'):
             return LabelScopeType.LOCAL
         elif label.startswith('_'):

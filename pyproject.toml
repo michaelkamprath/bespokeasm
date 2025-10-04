@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bespokeasm"
-version = "0.5.2b3"
+version = "0.5.2b4"
 authors = [
   { name="Michael Kamprath", email="michael@kamprath.net" },
 ]

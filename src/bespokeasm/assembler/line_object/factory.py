@@ -2,6 +2,7 @@ import re
 import sys
 
 from bespokeasm.assembler.label_scope import LabelScope
+from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object.directive_line.factory import DirectiveLine
@@ -33,11 +34,13 @@ class LineOjectFactory:
                 line_str: str,
                 model: AssemblerModel,
                 label_scope: LabelScope,
+                active_named_scopes: ActiveNamedScopeList,
                 current_memzone: MemoryZone,
                 memzone_manager: MemoryZoneManager,
                 preprocessor: Preprocessor,
                 condition_stack: ConditionStack,
                 log_verbosity: int,
+                filename: str = None,
             ) -> list[LineObject]:
         # find comments
         comment_str = ''
@@ -61,11 +64,13 @@ class LineOjectFactory:
                     comment_str,
                     model,
                     label_scope,
+                    active_named_scopes,
                     current_memzone,
                     memzone_manager,
                     preprocessor,
                     condition_stack,
                     log_verbosity,
+                    filename,
                 ))
         else:
             # resolve preprocessor symbols
@@ -79,6 +84,7 @@ class LineOjectFactory:
                     comment_str,
                     model.registers,
                     label_scope,
+                    active_named_scopes,
                     current_memzone,
                 )
                 if line_obj is not None:

@@ -5,6 +5,7 @@ import click
 from bespokeasm.assembler.assembly_file import AssemblyFile
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.label_scope import LabelScopeType
+from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object import LineWithWords
@@ -49,6 +50,9 @@ class Assembler:
         self._predefined_symbols = predefined
 
     def assemble_bytecode(self):
+        # Create the named scope manager for this assembly session
+        named_scope_manager = NamedScopeManager()
+
         global_label_scope = self._model.global_label_scope
         memzone_manager = MemoryZoneManager(
             self._model.address_size,
@@ -112,7 +116,7 @@ class Assembler:
         if self._verbose > 1:
             print(f'Source will be searched in the following include directories: {include_dirs}')
 
-        asm_file = AssemblyFile(self._source_file, global_label_scope)
+        asm_file = AssemblyFile(self._source_file, global_label_scope, named_scope_manager)
         line_obs: list[LineObject] = asm_file.load_line_objects(
             self._model,
             include_dirs,
@@ -137,7 +141,20 @@ class Assembler:
                 sys.exit(f'ERROR: {lobj.line_id} - {str(e)}')
 
             if isinstance(lobj, LabelLine) and not lobj.is_constant:
-                lobj.label_scope.set_label_value(lobj.get_label(), lobj.get_value(), lobj.line_id)
+                # Address labels: try to add to named scope first (only if in same file as scope creation)
+                # is_constant=False by default for address labels
+                if not named_scope_manager.set_label_value(
+                    lobj.get_label(),
+                    lobj.get_value(),
+                    lobj.line_id,
+                    lobj.active_named_scopes
+                ):
+                    # if not in an active named scope, set to the current scope
+                    lobj.label_scope.set_label_value(
+                        lobj.get_label(),
+                        lobj.get_value(),
+                        lobj.line_id,
+                    )
 
         # now merge prefined line objects and parsed line objects
         compilable_line_obs.extend(predefined_line_obs)

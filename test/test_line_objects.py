@@ -5,6 +5,8 @@ from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.label_scope import LabelScopeType
+from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
+from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object.data_line import DataLine
@@ -38,6 +40,7 @@ class TestLineObject(unittest.TestCase):
         local_scope = LabelScope(LabelScopeType.LOCAL, global_scope, 'TestInstructionParsing')
         local_scope.set_label_value('.local_var', 10, lineid)
         cls.label_values = local_scope
+        cls.active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
 
     def setUp(self):
         InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN = None
@@ -326,8 +329,11 @@ class TestLineObject(unittest.TestCase):
         label_values.set_label_value('MY_VALUE', 20, 1)
         register_set = {'a', 'b', 'sp', 'mar'}
         memzone = MemoryZone(16, 0, 2**16 - 1, 'GLOBAL')
+        active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
 
-        l1 = LabelLine.factory(13, 'my_label:', 'cool comment', register_set, label_values, memzone)
+        l1: LabelLine = LabelLine.factory(
+            13, 'my_label:', 'cool comment', register_set, label_values, active_named_scopes, memzone
+        )
         l1.set_start_address(1212)
         self.assertIsInstance(l1, LabelLine)
         self.assertEqual(l1.word_count, 0, 'has no words')
@@ -335,7 +341,9 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(l1.address, 1212, 'address value is address')
         self.assertEqual(l1.get_label(), 'my_label', 'label string')
 
-        l2 = LabelLine.factory(13, 'my_constant = 1945', 'cool comment', register_set, label_values, memzone)
+        l2: LabelLine = LabelLine.factory(
+            13, 'my_constant = 1945', 'cool comment', register_set, label_values, active_named_scopes, memzone
+        )
         l2.set_start_address(1212)
         self.assertIsInstance(l2, LabelLine)
         self.assertEqual(l2.word_count, 0, 'has no words')
@@ -343,7 +351,9 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(l2.address, 1212, 'address value is address')
         self.assertEqual(l2.get_label(), 'my_constant', 'label string')
 
-        l3 = LabelLine.factory(13, 'myLabelIsCool:', 'cool comment', register_set, label_values, memzone)
+        l3: LabelLine = LabelLine.factory(
+            13, 'myLabelIsCool:', 'cool comment', register_set, label_values, active_named_scopes, memzone
+        )
         l3.set_start_address(2001)
         self.assertIsInstance(l3, LabelLine)
         self.assertEqual(l3.word_count, 0, 'has no words')
@@ -353,7 +363,7 @@ class TestLineObject(unittest.TestCase):
 
         l4: LabelLine = LabelLine.factory(
             13, 'test_bit = (5 + 3)', 'numeric expression constants',
-            register_set, label_values, memzone
+            register_set, label_values, active_named_scopes, memzone,
         )
         l4.set_start_address(678)
         self.assertIsInstance(l4, LabelLine)
@@ -364,7 +374,7 @@ class TestLineObject(unittest.TestCase):
 
         l5: LabelLine = LabelLine.factory(
             27, 'test_bit = (1 << 3)', 'numeric expression constants',
-            register_set, label_values, memzone
+            register_set, label_values, active_named_scopes, memzone,
         )
         l5.set_start_address(678)
         self.assertIsInstance(l5, LabelLine)
@@ -377,21 +387,22 @@ class TestLineObject(unittest.TestCase):
         with self.assertRaises(SystemExit, msg='unresolvable expression constant assignments should fail'):
             LabelLine.factory(
                 13, 'my_constant = some_var1 + 7', 'bad constant',
-                register_set, label_values, memzone
+                register_set, label_values, active_named_scopes, memzone,
             )
         with self.assertRaises(SystemExit, msg='labels should not be registers'):
             LabelLine.factory(
                 13, 'mar = $1234', 'bad label', register_set,
-                label_values, memzone
+                label_values, active_named_scopes, memzone,
             )
         with self.assertRaises(SystemExit, msg='labels should not be registers'):
             LabelLine.factory(
-                13, 'sp:', 'bad label', register_set, label_values,
-                memzone
+                13, 'sp:', 'bad label', register_set, label_values, active_named_scopes, memzone
             )
 
         # negative contants
-        l6: LabelLine = LabelLine.factory(13, 'my_constant = -1945', 'cool comment', register_set, label_values, memzone)
+        l6: LabelLine = LabelLine.factory(
+            13, 'my_constant = -1945', 'cool comment', register_set, label_values, active_named_scopes, memzone
+        )
         l6.set_start_address(1212)
         self.assertIsInstance(l6, LabelLine)
         self.assertEqual(l6.word_count, 0, 'has no words')
@@ -399,7 +410,9 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(l6.address, 1212, 'address value is address')
         self.assertEqual(l6.get_label(), 'my_constant', 'label string')
 
-        l7: LabelLine = LabelLine.factory(13, 'my_constant = -2*MY_VALUE', 'cool comment', register_set, label_values, memzone)
+        l7: LabelLine = LabelLine.factory(
+            13, 'my_constant = -2*MY_VALUE', 'cool comment', register_set, label_values, active_named_scopes, memzone
+        )
         l7.set_start_address(1313)
         self.assertIsInstance(l7, LabelLine)
         self.assertEqual(l7.word_count, 0, 'has no words')
@@ -418,7 +431,7 @@ class TestLineObject(unittest.TestCase):
 
         label_values = GlobalLabelScope(isa_model.registers)
         label_values.set_label_value('a_const', 40, 1)
-
+        active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
         lineid = LineIdentifier(123, 'test_label_line_with_instruction')
 
         preprocessor = Preprocessor()
@@ -429,6 +442,7 @@ class TestLineObject(unittest.TestCase):
             'the_byte: .byte 0x88 ; label and instruction',
             isa_model,
             label_values,
+            active_named_scopes,
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
@@ -454,6 +468,7 @@ class TestLineObject(unittest.TestCase):
             'the_instr: mov a, a_const ; label and instruction',
             isa_model,
             label_values,
+            active_named_scopes,
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
@@ -482,6 +497,7 @@ class TestLineObject(unittest.TestCase):
             'the_label: ;just a label',
             isa_model,
             label_values,
+            active_named_scopes,
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
@@ -503,7 +519,7 @@ class TestLineObject(unittest.TestCase):
 
         label_values = GlobalLabelScope(isa_model.registers)
         label_values.set_label_value('a_const', 40, 1)
-
+        active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
         lineid = LineIdentifier(123, 'test_unallowed_label_line_situations')
 
         preprocessor = Preprocessor()
@@ -514,6 +530,7 @@ class TestLineObject(unittest.TestCase):
             'the_label: const = 3 ; label with constant',
             isa_model,
             label_values,
+            active_named_scopes,
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
@@ -534,6 +551,7 @@ class TestLineObject(unittest.TestCase):
             'the_label: the_second_label: ; label with another label',
             isa_model,
             label_values,
+            active_named_scopes,
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
@@ -849,6 +867,7 @@ class TestLineObject(unittest.TestCase):
     def test_test_line_object_factory(self):
         label_values = GlobalLabelScope(set())
         label_values.set_label_value('test1', 0x1234, 1)
+        active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
         line_id = LineIdentifier(33, 'test_test_line_object_factory')
         fp = pkg_resources.files(config_files).joinpath('test_instruction_line_creation_little_endian.yaml')
         isa_model = AssemblerModel(str(fp), 0)
@@ -859,6 +878,7 @@ class TestLineObject(unittest.TestCase):
             '    .2byte $1234',
             isa_model,
             label_values,
+            active_named_scopes,
             memzone_mngr.global_zone,
             memzone_mngr,
             Preprocessor(),
@@ -895,6 +915,7 @@ class TestLineObject(unittest.TestCase):
             'start: ADD .local_var+7',
             isa_model,
             TestLineObject.label_values,
+            TestLineObject.active_named_scopes,
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
@@ -913,6 +934,7 @@ class TestLineObject(unittest.TestCase):
             '.org $20 prog_start: ld x, [var1]',
             isa_model,
             TestLineObject.label_values,
+            TestLineObject.active_named_scopes,
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
@@ -934,6 +956,7 @@ class TestLineObject(unittest.TestCase):
             'ld x, [var1] add 47',
             isa_model,
             TestLineObject.label_values,
+            TestLineObject.active_named_scopes,
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
@@ -951,6 +974,7 @@ class TestLineObject(unittest.TestCase):
             'ADD nope_str&$00FF            NOP',
             isa_model,
             TestLineObject.label_values,
+            TestLineObject.active_named_scopes,
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
@@ -970,6 +994,7 @@ class TestLineObject(unittest.TestCase):
             'ADD 5+something_to_add',
             isa_model,
             TestLineObject.label_values,
+            TestLineObject.active_named_scopes,
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
@@ -984,6 +1009,7 @@ class TestLineObject(unittest.TestCase):
             'the_label: const = 3 ; label with constant',
             isa_model,
             TestLineObject.label_values,
+            TestLineObject.active_named_scopes,
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
@@ -1001,6 +1027,7 @@ class TestLineObject(unittest.TestCase):
                     'ADD nope_str&$00FF       newLabel:',
                     isa_model,
                     TestLineObject.label_values,
+                    TestLineObject.active_named_scopes,
                     memzone_mngr.global_zone,
                     memzone_mngr,
                     preprocessor,
@@ -1026,6 +1053,7 @@ class TestLineObject(unittest.TestCase):
             '.org $20 prog_start: foo $1234',   # having an instruction follow a lable is OK
             isa_model,
             TestLineObject.label_values,
+            TestLineObject.active_named_scopes,
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
@@ -1060,6 +1088,7 @@ class TestLineObject(unittest.TestCase):
             'prog_start: .org $20',     # having an instruction follow an org is not supported
             isa_model,
             TestLineObject.label_values,
+            TestLineObject.active_named_scopes,
             memzone_mngr2.global_zone,
             memzone_mngr2,
             preprocessor,
@@ -1096,6 +1125,7 @@ class TestLineObject(unittest.TestCase):
                     '  madeup my_val ; my_comment',
                     isa_model,
                     TestLineObject.label_values,
+                    TestLineObject.active_named_scopes,
                     memzone_mngr.global_zone,
                     memzone_mngr,
                     Preprocessor(),
@@ -1162,6 +1192,7 @@ class TestLineObject(unittest.TestCase):
             'add 5 "this is a test" nop',
             isa_model,
             TestLineObject.label_values,
+            TestLineObject.active_named_scopes,
             memzone_mngr.global_zone,
             memzone_mngr,
             Preprocessor(),
@@ -1192,6 +1223,7 @@ class TestLineObject(unittest.TestCase):
                 'add 5 "this is a test" nop',
                 isa_model,
                 TestLineObject.label_values,
+                TestLineObject.active_named_scopes,
                 memzone_mngr.global_zone,
                 memzone_mngr,
                 Preprocessor(),
@@ -1242,6 +1274,7 @@ class TestLineObject(unittest.TestCase):
             'add 5 "this is a test\nof new lines" nop ; comments',
             isa_model,
             TestLineObject.label_values,
+            TestLineObject.active_named_scopes,
             memzone_mngr.global_zone,
             memzone_mngr,
             Preprocessor(),
@@ -1274,6 +1307,7 @@ class TestLineObject(unittest.TestCase):
             'add VALUE2 "string 1" nop "string 2" nop',
             isa_model,
             TestLineObject.label_values,
+            TestLineObject.active_named_scopes,
             memzone_mngr.global_zone,
             memzone_mngr,
             Preprocessor(),

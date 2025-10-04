@@ -1,0 +1,6 @@
+<snippet>
+    <content><![CDATA[#use-scope "$1"]]></content>
+    <tabTrigger>&#35;use-scope</tabTrigger>
+    <scope>source.bespokeasm.##FILEEXTENSION##</scope>
+    <description>Activate a named label scope</description>
+</snippet>

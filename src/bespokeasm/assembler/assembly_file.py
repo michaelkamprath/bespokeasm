@@ -14,12 +14,17 @@ import sys
 import click
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.label_scope import LabelScopeType
+from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
+from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object.directive_line.factory import SetMemoryZoneLine
 from bespokeasm.assembler.line_object.factory import LineOjectFactory
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.line_object.preprocessor_line.condition_line import ConditionLine
+from bespokeasm.assembler.line_object.preprocessor_line.create_scope import CreateScopeLine
+from bespokeasm.assembler.line_object.preprocessor_line.deactivate_scope import DeactivateScopeLine
+from bespokeasm.assembler.line_object.preprocessor_line.use_scope import UseScopeLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.preprocessor import Preprocessor
@@ -27,12 +32,13 @@ from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
 
 
 class AssemblyFile:
-    def __init__(self, filename: str, parent_label_scope: LabelScope) -> None:
+    def __init__(self, filename: str, parent_label_scope: LabelScope, named_scope_manager: NamedScopeManager) -> None:
         self._filename = filename
+        self._named_scope_manager = named_scope_manager
         self._label_scope = LabelScope(
                 LabelScopeType.FILE,
                 parent_label_scope,
-                self._filename
+                self._filename,
             )
 
     @property
@@ -61,6 +67,7 @@ class AssemblyFile:
                 current_scope = self.label_scope
                 current_memzone = memzone_manager.global_zone
                 condition_stack = ConditionStack()
+                active_named_scopes = ActiveNamedScopeList(self._named_scope_manager)
                 for line in f:
                     line_num += 1
                     line_id = LineIdentifier(line_num, filename=self.filename)
@@ -92,11 +99,13 @@ class AssemblyFile:
                             line_str,
                             isa_model,
                             current_scope,
+                            active_named_scopes,
                             current_memzone,
                             memzone_manager,
                             preprocessor,
                             condition_stack,
                             log_verbosity,
+                            self._filename,
                         ))
                         for lobj in lobj_list:
                             if not isinstance(lobj, ConditionLine):
@@ -112,10 +121,24 @@ class AssemblyFile:
                                 elif isinstance(lobj, SetMemoryZoneLine):
                                     current_scope = self.label_scope
                                     current_memzone = lobj.memory_zone
+                                elif isinstance(lobj, UseScopeLine) or isinstance(lobj, CreateScopeLine):
+                                    active_named_scopes.activate_named_scope(lobj.scope_name)
+                                elif isinstance(lobj, DeactivateScopeLine):
+                                    active_named_scopes.deactivate_named_scope(lobj.scope_name)
                                 lobj.label_scope = current_scope
+                                lobj.active_named_scopes = active_named_scopes
                                 # setting constants now so they can be used when evaluating lines later.
                                 if isinstance(lobj, LabelLine) and lobj.is_constant:
-                                    lobj.label_scope.set_label_value(lobj.get_label(), lobj.get_value(), lobj.line_id)
+                                    # first check if label belongs to an active named scope
+                                    if not self._named_scope_manager.set_label_value(
+                                        lobj.get_label(),
+                                        lobj.get_value(),
+                                        lobj.line_id,
+                                        lobj.active_named_scopes,
+                                        is_constant=True
+                                    ):
+                                        # if not in an active named scope, set to the current scope
+                                        lobj.label_scope.set_label_value(lobj.get_label(), lobj.get_value(), lobj.line_id)
                             line_objects.append(lobj)
         except FileNotFoundError:
             sys.exit(f'ERROR: Compilation file "{self.filename}" not found.')
@@ -150,7 +173,7 @@ class AssemblyFile:
                 )
             if new_filepath in assembly_files_used:
                 sys.exit(f'ERROR: {line_id} - assembly file included multiple times')
-            file_obj = AssemblyFile(new_filepath, self.label_scope.parent)
+            file_obj = AssemblyFile(new_filepath, self.label_scope.parent, self._named_scope_manager)
             return file_obj.load_line_objects(
                 isa_model,
                 include_paths,

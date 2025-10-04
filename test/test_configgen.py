@@ -251,8 +251,9 @@ class TestConfigurationGeneration(unittest.TestCase):
                 'include', 'require', 'create_memzone', 'print', 'define', 'if',
                 'elif', 'else', 'endif', 'ifdef', 'ifndef',
                 'mute', 'unmute', 'emit',
+                'create-scope', 'use-scope', 'deactivate-scope',
             ],
-            'data type directives'
+            'preprocessor directives'
         )
         self.assertIsFile(os.path.join(test_tmp_dir, 'bespokeasm-test.sublime-color-scheme'))
         self.assertIsFile(os.path.join(test_tmp_dir, 'bespokeasm-test__cstr.sublime-snippet'))
@@ -337,8 +338,9 @@ class TestConfigurationGeneration(unittest.TestCase):
                 'include', 'require', 'create_memzone', 'print', 'define',
                 'if', 'elif', 'else', 'endif', 'ifdef', 'ifndef',
                 'mute', 'unmute', 'emit',
+                'create-scope', 'use-scope', 'deactivate-scope',
             ],
-            'data type directives'
+            'preprocessor directives'
         )
         self.assertIsFile(os.path.join(test_tmp_dir, 'tester-assembly.sublime-color-scheme'))
         self.assertIsFile(os.path.join(test_tmp_dir, 'tester-assembly__cstr.sublime-snippet'))

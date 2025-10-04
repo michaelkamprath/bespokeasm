@@ -67,7 +67,7 @@ class DirectiveLine:
         current_memzone: MemoryZone,
         memzone_manager: MemoryZoneManager,
         isa_model: AssemblerModel,
-    ) -> LineObject:
+    ) -> LineObject | None:
         # for efficiency, if it doesn't start with a period, it is not a directive
         cleaned_line_str = line_str.strip()
         if not cleaned_line_str.startswith('.'):

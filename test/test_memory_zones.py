@@ -3,6 +3,8 @@ import unittest
 
 from bespokeasm.assembler.assembly_file import AssemblyFile
 from bespokeasm.assembler.label_scope import GlobalLabelScope
+from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
+from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
@@ -14,7 +16,7 @@ from test import test_code
 
 class TestMemoryZones(unittest.TestCase):
     def setUp(self):
-        pass
+        InstructionLine.reset_instruction_pattern_cache()
 
     def test_memory_zone_obj(self):
         z1 = MemoryZone(16, 0, 0x7FFF, 'test_zone_1')
@@ -31,11 +33,12 @@ class TestMemoryZones(unittest.TestCase):
             isa_model.predefined_memory_zones
         )
         preprocessor = Preprocessor()
+        named_scope_manager = NamedScopeManager()
         self.assertEqual(memzone_manager.global_zone.start, 0x0100, 'global zone starts at $0100')
         self.assertEqual(memzone_manager.global_zone.end, 0xDFFF, 'global zone ends at $DFFF')
 
         asm_fp = pkg_resources.files(test_code).joinpath('test_memory_zones.asm')
-        asm_obj = AssemblyFile(asm_fp, label_scope)
+        asm_obj = AssemblyFile(asm_fp, label_scope, named_scope_manager)
 
         line_objs = asm_obj.load_line_objects(
             isa_model,

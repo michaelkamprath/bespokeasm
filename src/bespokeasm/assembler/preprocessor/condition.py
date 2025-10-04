@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 import sys
 
+from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
+from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import INSTRUCTION_EXPRESSION_PATTERN
 from bespokeasm.assembler.preprocessor import Preprocessor
@@ -119,9 +121,10 @@ class IfPreprocessorCondition(PreprocessorCondition):
             lhs_value = lhs_resolved
             rhs_value = rhs_resolved
         else:
-            # can do a numeric comparison
-            lhs_value = lhs_expression.get_value(None, self._line)
-            rhs_value = rhs_expression.get_value(None, self._line)
+            # can do a numeric comparison. Note that label scopes and active named scopes are not used here as
+            # preprocessor conditions are not evaluated in a specific context.
+            lhs_value = lhs_expression.get_value(None, ActiveNamedScopeList(NamedScopeManager()), self._line)
+            rhs_value = rhs_expression.get_value(None, ActiveNamedScopeList(NamedScopeManager()), self._line)
 
         if self._operator == '==':
             return lhs_value == rhs_value

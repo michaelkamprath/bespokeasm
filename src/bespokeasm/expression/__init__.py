@@ -12,6 +12,7 @@ import re
 import sys
 
 from bespokeasm.assembler.label_scope import LabelScope
+from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.utilities import is_string_numeric
 from bespokeasm.utilities import is_valid_label
@@ -81,14 +82,24 @@ class ExpressionNode:
             TokenType.T_NEGATION,
         ]
 
-    def _numeric_value(self, label_scope: LabelScope, line_id: LineIdentifier) -> int:
+    def _numeric_value(
+        self,
+        label_scope: LabelScope | None,
+        active_named_scopes: ActiveNamedScopeList,
+        line_id: LineIdentifier,
+    ) -> int:
         if self.token_type == TokenType.T_NUM:
             return self.value
         elif self.token_type == TokenType.T_LABEL:
             if label_scope is None:
                 sys.exit(f'ERROR - INTERNAL: {line_id} - Label {self.value} has no label scope = {self}')
             # in ths case value is a label
-            val = label_scope.get_label_value(self.value, line_id)
+            if active_named_scopes is not None:
+                val = active_named_scopes.named_scope_manager.get_label_value(
+                    self.value, label_scope, active_named_scopes, line_id
+                )
+            else:
+                val = label_scope.get_label_value(self.value, line_id)
             if val is None:
                 sys.exit(f'ERROR: {line_id} - Label {self.value} resolves to NONE = {self}')
             return val
@@ -96,14 +107,19 @@ class ExpressionNode:
             # this wasn't a numeric value
             sys.exit(f'ERROR: {line_id} - Label {self.value} is not numeric = {self}')
 
-    def _compute(self, label_scope: LabelScope, line_id: LineIdentifier) -> int:
+    def _compute(
+        self,
+        label_scope: LabelScope,
+        active_named_scopes: ActiveNamedScopeList,
+        line_id: LineIdentifier
+    ) -> int:
         if self.token_type in [TokenType.T_NUM, TokenType.T_LABEL]:
-            return self._numeric_value(label_scope, line_id)
+            return self._numeric_value(label_scope, active_named_scopes, line_id)
         if self.token_type in [TokenType.T_LSB, TokenType.T_BYTE]:
             byte_idx = 0
             if self.token_type == TokenType.T_BYTE:
                 byte_idx = int(self.value[4])
-            arg_value = int(self.left_child._compute(label_scope, line_id))
+            arg_value = int(self.left_child._compute(label_scope, active_named_scopes, line_id))
             byte_count = max(((abs(arg_value).bit_length() + 7) // 8), byte_idx+1)
             masked_arg = arg_value & (2**(8 * byte_count) - 1)
             try:
@@ -114,12 +130,12 @@ class ExpressionNode:
                 )
             return arg_value_bytes[byte_idx]
         elif self.token_type == TokenType.T_NEGATION:
-            arg_value = self.left_child._compute(label_scope, line_id)
+            arg_value = self.left_child._compute(label_scope, active_named_scopes, line_id)
             operation = ExpressionNode._operations[self.token_type]
             return operation(arg_value)
         else:
-            left_result = self.left_child._compute(label_scope, line_id)
-            right_result = self.right_child._compute(label_scope, line_id)
+            left_result = self.left_child._compute(label_scope, active_named_scopes, line_id)
+            right_result = self.right_child._compute(label_scope, active_named_scopes, line_id)
             operation = ExpressionNode._operations[self.token_type]
             if self.token_type in [
                         TokenType.T_AND,
@@ -135,8 +151,13 @@ class ExpressionNode:
                 right_result = float(right_result)
             return operation(left_result, right_result)
 
-    def get_value(self, label_scope: LabelScope, line_id: LineIdentifier) -> int:
-        calculated_value = self._compute(label_scope, line_id)
+    def get_value(
+        self,
+        label_scope: LabelScope,
+        active_named_scopes: ActiveNamedScopeList,
+        line_id: LineIdentifier
+    ) -> int:
+        calculated_value = self._compute(label_scope, active_named_scopes, line_id)
         return int(calculated_value)
 
     def contains_register_labels(self, register_labels: set[str]) -> bool:

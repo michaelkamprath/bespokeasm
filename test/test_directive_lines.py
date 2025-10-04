@@ -6,6 +6,8 @@ from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.label_scope import LabelScopeType
+from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
+from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object import LineWithWords
@@ -41,7 +43,7 @@ class TestDirectiveLines(unittest.TestCase):
         label_values = GlobalLabelScope(['a', 'b', 'sp', 'mar'])
         label_values.set_label_value('a_const', 12, 1)
 
-        o1 = DirectiveLine.factory(
+        o1: LineObject = DirectiveLine.factory(
             1234,
             '.org $1',
             'set address to 0=x100',
@@ -97,6 +99,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model,
         )
         o5.label_scope = label_values
+        o5.active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
         self.assertIsInstance(o5, AddressOrgLine)
         self.assertEqual(o5.address, 12)
 
@@ -110,6 +113,7 @@ class TestDirectiveLines(unittest.TestCase):
                 TestDirectiveLines.isa_model,
             )
             e1.label_scope = label_values
+            e1.active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
             e1.address
 
         # test with memory zones
@@ -122,6 +126,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model,
         )
         o6.label_scope = label_values
+        o6.active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
         self.assertIsInstance(o6, AddressOrgLine)
         self.assertEqual(o6.address, 14)
 
@@ -134,6 +139,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model,
         )
         o7.label_scope = label_values
+        o7.active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
         self.assertIsInstance(o7, AddressOrgLine)
         self.assertEqual(o7.address, 15)
 
@@ -155,6 +161,7 @@ class TestDirectiveLines(unittest.TestCase):
         )
         self.assertIsInstance(o1, FillDataLine)
         o1.label_scope = label_values
+        o1.active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
         self.assertEqual(o1.word_count, 32, 'has 32 words')
         o1.generate_words()
         self.assertEqual(o1.get_words(), [
@@ -178,6 +185,7 @@ class TestDirectiveLines(unittest.TestCase):
         )
         self.assertIsInstance(o2, FillDataLine)
         o2.label_scope = label_values
+        o2.active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
         self.assertEqual(o2.word_count, 255, 'has 255 words')
         o2.generate_words()
         self.assertEqual(o2.get_words(), [
@@ -199,6 +207,7 @@ class TestDirectiveLines(unittest.TestCase):
         )
         self.assertIsInstance(o2b, FillDataLine)
         o2b.label_scope = label_values
+        o2b.active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
         self.assertEqual(o2b.word_count, 161, 'has 161 words')
         o2b.generate_words()
         self.assertEqual(o2b.get_words(), [
@@ -220,6 +229,7 @@ class TestDirectiveLines(unittest.TestCase):
         )
         self.assertIsInstance(o3, FillDataLine)
         o3.label_scope = label_values
+        o3.active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
         self.assertEqual(o3.word_count, 4, 'has 4 words')
         o3.generate_words()
         self.assertEqual(o3.get_words(), [
@@ -242,6 +252,7 @@ class TestDirectiveLines(unittest.TestCase):
         )
         self.assertIsInstance(o4, FillDataLine)
         o4.label_scope = label_values
+        o4.active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
         self.assertEqual(o4.word_count, 40, 'has 40 words')
         o4.generate_words()
         self.assertEqual(o4.get_words(), [
@@ -263,6 +274,7 @@ class TestDirectiveLines(unittest.TestCase):
         )
         self.assertIsInstance(o5, FillDataLine)
         o5.label_scope = label_values
+        o5.active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
         self.assertEqual(o5.word_count, 15, 'has 15 words')
         o5.generate_words()
         self.assertEqual(o5.get_words(), [
@@ -284,6 +296,7 @@ class TestDirectiveLines(unittest.TestCase):
         )
         self.assertIsInstance(o6, FillDataLine)
         o6.label_scope = label_values
+        o6.active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
         self.assertEqual(o6.word_count, 30, 'has 30 words')
         o6.generate_words()
         self.assertEqual(o6.get_words(), [
@@ -305,6 +318,7 @@ class TestDirectiveLines(unittest.TestCase):
         )
         self.assertIsInstance(o6, FillDataLine)
         o6.label_scope = label_values
+        o6.active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
         self.assertEqual(o6.word_count, 42, 'has 42 words')
         o6.generate_words()
         self.assertEqual(o6.get_words(), [
@@ -326,6 +340,7 @@ class TestDirectiveLines(unittest.TestCase):
         )
         self.assertIsInstance(o7, FillDataLine)
         o7.label_scope = label_values
+        o7.active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
         self.assertEqual(o7.word_count, 168, 'has 168 words')
         o7.generate_words()
         self.assertEqual(o7.get_words(), [
@@ -352,6 +367,7 @@ class TestDirectiveLines(unittest.TestCase):
         self.assertIsInstance(o1, FillUntilDataLine)
         o1.set_start_address(0x42)
         o1.label_scope = label_values
+        o1.active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
         self.assertEqual(o1.word_count, (0x100-0x42+1), 'must have the right number of words')
         o1.generate_words()
         self.assertEqual(o1.get_words(), [
@@ -375,6 +391,7 @@ class TestDirectiveLines(unittest.TestCase):
         self.assertIsInstance(o2, FillUntilDataLine)
         o2.set_start_address(0xF)
         o2.label_scope = label_values
+        o2.active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
         self.assertEqual(o2.word_count, 1, 'must have the right number of words')
         o2.generate_words()
         self.assertEqual(o2.get_words(), [
@@ -397,6 +414,7 @@ class TestDirectiveLines(unittest.TestCase):
         self.assertIsInstance(o3, FillUntilDataLine)
         o3.set_start_address(0xF)
         o3.label_scope = label_values
+        o3.active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
         self.assertEqual(o3.word_count, 0x81, 'must have the right number of words')
         o3.generate_words()
         self.assertEqual(o3.get_words(), [
@@ -425,6 +443,7 @@ class TestDirectiveLines(unittest.TestCase):
         self.assertIsInstance(t1, LineWithWords)
         t1.set_start_address(0xF)
         t1.label_scope = label_values
+        t1.active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
         self.assertEqual(t1.byte_size, 15, 'must have the right number of bytes')
         self.assertEqual(t1.word_count, 15, 'must have the right number of words for 8-bit words')
         t1.generate_words()
@@ -442,6 +461,7 @@ class TestDirectiveLines(unittest.TestCase):
         self.assertIsInstance(t1, LineWithWords)
         t2.set_start_address(0xF)
         t2.label_scope = label_values
+        t2.active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
         self.assertEqual(t2.byte_size, 15, 'must have the right number of bytes')
         self.assertEqual(t2.word_count, 15, 'must have the right number of words for 8-bit words')
         t2.generate_words()
@@ -498,6 +518,7 @@ class TestDirectiveLines(unittest.TestCase):
             local_isa_model
         )
         t4.label_scope = label_values
+        t4.active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
         self.assertIsInstance(t4, PageAlignLine)
         t4.set_start_address(3)
         self.assertEqual(t4.address, 4)

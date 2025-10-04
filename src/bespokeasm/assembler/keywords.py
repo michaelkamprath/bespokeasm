@@ -11,6 +11,7 @@ PREPROCESSOR_DIRECTIVES_SET = {
     'include', 'require', 'create_memzone', 'print',
     'define', 'if', 'elif', 'else', 'endif', 'ifdef', 'ifndef',
     'mute', 'unmute', 'emit',
+    'create-scope', 'use-scope', 'deactivate-scope',
 }
 
 EXPRESSION_FUNCTIONS_SET = set([
