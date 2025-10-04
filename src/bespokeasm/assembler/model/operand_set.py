@@ -63,7 +63,7 @@ class OperandSet:
         operand_str: str,
         register_labels: set[str],
         memzone_manager: MemoryZoneManager,
-    ) -> ParsedOperand:
+    ) -> ParsedOperand | None:
         for operand in self._ordered_operand_list:
             op: ParsedOperand = operand.parse_operand(line_id, operand_str, register_labels, memzone_manager)
             if op is not None:
@@ -77,7 +77,7 @@ class OperandSet:
         line_id: LineIdentifier,
         operand_str: str,
         register_labels: set[str]
-    ) -> Operand:
+    ) -> Operand | None:
         for operand in self._ordered_operand_list:
             if operand.match_operand(line_id, operand_str, register_labels):
                 return operand
@@ -93,7 +93,7 @@ class OperandSetCollection(dict):
         registers: set[str],
         word_size: int,
         word_segment_size: int,
-    ):
+    ) -> None:
         super().__init__(self)
         for set_name, set_config in config_dict.items():
             self[set_name] = OperandSet(
@@ -113,5 +113,5 @@ class OperandSetCollection(dict):
         set_names = ','.join([str(v) for v in self.values()])
         return f'OperandSetCollection[{set_names}]'
 
-    def get_operand_set(self, key) -> OperandSet:
+    def get_operand_set(self, key) -> OperandSet | None:
         return self.get(key, None)

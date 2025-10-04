@@ -4,6 +4,8 @@ import unittest
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.engine import Assembler
 from bespokeasm.assembler.label_scope import GlobalLabelScope
+from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
+from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object import LineWithWords
@@ -44,6 +46,7 @@ class TestAssemblerEngine(unittest.TestCase):
                 'nop ; do nothing',
                 isa_model,
                 label_values,
+                ActiveNamedScopeList(NamedScopeManager()),
                 memzone_mngr.global_zone,
                 memzone_mngr,
                 preprocessor,
@@ -59,6 +62,7 @@ class TestAssemblerEngine(unittest.TestCase):
                 'the_byte: .byte 0x88 ; label and instruction',
                 isa_model,
                 label_values,
+                ActiveNamedScopeList(NamedScopeManager()),
                 memzone_mngr.global_zone,
                 memzone_mngr,
                 preprocessor,
@@ -75,6 +79,7 @@ class TestAssemblerEngine(unittest.TestCase):
                 'the_instr: mov a, [the_byte] ; label and instruction',
                 isa_model,
                 label_values,
+                ActiveNamedScopeList(NamedScopeManager()),
                 memzone_mngr.global_zone,
                 memzone_mngr,
                 preprocessor,
@@ -85,10 +90,12 @@ class TestAssemblerEngine(unittest.TestCase):
 
         # "assemble" the line objects to a dictionary
         line_dict: dict[int, LineObject] = {}
+        active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
         for lobj in line_objects:
             lobj.set_start_address(lobj.memory_zone.current_address)
             lobj.memory_zone.current_address = lobj.address + lobj.word_count
             lobj.label_scope = label_values
+            lobj.active_named_scopes = active_named_scopes
             if isinstance(lobj, LabelLine) and not lobj.is_constant:
                 lobj.label_scope.set_label_value(lobj.get_label(), lobj.get_value(), lobj.line_id)
             line_dict[lobj.address] = lobj
@@ -137,6 +144,7 @@ class TestAssemblerEngine(unittest.TestCase):
                 'nop ; do nothing',
                 isa_model,
                 label_values,
+                ActiveNamedScopeList(NamedScopeManager()),
                 memzone_mngr.global_zone,
                 memzone_mngr,
                 preprocessor,
@@ -151,6 +159,7 @@ class TestAssemblerEngine(unittest.TestCase):
                 'mov [$1234], [$8899] ; move it',
                 isa_model,
                 label_values,
+                ActiveNamedScopeList(NamedScopeManager()),
                 memzone_mngr.global_zone,
                 memzone_mngr,
                 preprocessor,
@@ -165,6 +174,7 @@ class TestAssemblerEngine(unittest.TestCase):
                 'my_label: push [$1234] ; push it real good',
                 isa_model,
                 label_values,
+                ActiveNamedScopeList(NamedScopeManager()),
                 memzone_mngr.global_zone,
                 memzone_mngr,
                 preprocessor,
@@ -179,6 +189,7 @@ class TestAssemblerEngine(unittest.TestCase):
                 'jmp my_label ; get out of here',
                 isa_model,
                 label_values,
+                ActiveNamedScopeList(NamedScopeManager()),
                 memzone_mngr.global_zone,
                 memzone_mngr,
                 preprocessor,
@@ -189,10 +200,12 @@ class TestAssemblerEngine(unittest.TestCase):
 
         # "assemble" the line objects to a dictionary
         line_dict: dict[int, LineObject] = {}
+        active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
         for lobj in line_objects:
             lobj.set_start_address(lobj.memory_zone.current_address)
             lobj.memory_zone.current_address = lobj.address + lobj.word_count
             lobj.label_scope = label_values
+            lobj.active_named_scopes = active_named_scopes
             if isinstance(lobj, LabelLine) and not lobj.is_constant:
                 lobj.label_scope.set_label_value(lobj.get_label(), lobj.get_value(), lobj.line_id)
             line_dict[lobj.address] = lobj

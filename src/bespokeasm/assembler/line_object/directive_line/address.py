@@ -27,7 +27,7 @@ class AddressOrgLine(SetMemoryZoneLine):
     def address(self) -> int:
         """Returns the adjusted address value set by the .org directive.
         """
-        offset_value = self._address_expr.get_value(self.label_scope, self.line_id)
+        offset_value = self._address_expr.get_value(self.label_scope, self.active_named_scopes, self.line_id)
         if self._parsed_memzone_name is None:
             value = offset_value
         else:

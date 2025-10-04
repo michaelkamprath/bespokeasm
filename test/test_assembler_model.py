@@ -5,6 +5,8 @@ import bespokeasm.assembler.model.operand_set as AS
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.label_scope import LabelScopeType
+from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
+from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
@@ -52,6 +54,7 @@ class TestConfigObject(unittest.TestCase):
         fp = pkg_resources.files(config_files).joinpath('eater-sap1-isa.yaml')
         model1 = AssemblerModel(str(fp), 0)
         memzone_mngr = MemoryZoneManager(model1.address_size, model1.default_origin)
+        named_scope_manager = NamedScopeManager()
 
         test_line_id = LineIdentifier(1212, 'test_instruction_parsing')
 
@@ -60,7 +63,12 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(pi1.word_count, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(
-            pi1.get_words(TestConfigObject.label_values, 0x8000, pi1.word_count),
+            pi1.get_words(
+                TestConfigObject.label_values,
+                ActiveNamedScopeList(named_scope_manager),
+                0x8000,
+                pi1.word_count
+            ),
             [Word(0x1F, model1.word_size, model1.word_segment_size, model1.intra_word_endianness)],
             'assembled instruction',
         )
@@ -70,7 +78,12 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(pi2.word_count, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(
-            pi2.get_words(TestConfigObject.label_values, 0x8000, pi2.word_count),
+            pi2.get_words(
+                TestConfigObject.label_values,
+                ActiveNamedScopeList(named_scope_manager),
+                0x8000,
+                pi2.word_count,
+            ),
             [Word(0x27, model1.word_size, model1.word_segment_size, model1.intra_word_endianness)],
             'assembled instruction',
         )
@@ -80,7 +93,12 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(pi3.word_count, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(
-            pi3.get_words(TestConfigObject.label_values, 0x8000, pi3.word_count),
+            pi3.get_words(
+                TestConfigObject.label_values,
+                ActiveNamedScopeList(named_scope_manager),
+                0x8000,
+                pi3.word_count,
+            ),
             [Word(0xE0, model1.word_size, model1.word_segment_size, model1.intra_word_endianness)],
             'assembled instruction'
         )
@@ -94,7 +112,12 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(piA.word_count, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(
-            piA.get_words(TestConfigObject.label_values, 0x8000, 1),
+            piA.get_words(
+                TestConfigObject.label_values,
+                ActiveNamedScopeList(named_scope_manager),
+                0x8000,
+                1,
+            ),
             [Word(0b01000010, model2.word_size, model2.word_segment_size, model2.intra_word_endianness)],
             'assembled instruction'
         )
@@ -104,7 +127,12 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(piB.word_count, 3, 'assembled instruciton is 3 byte')
         self.assertEqual(
-            piB.get_words(TestConfigObject.label_values, 0x8000, 3),
+            piB.get_words(
+                TestConfigObject.label_values,
+                ActiveNamedScopeList(named_scope_manager),
+                0x8000,
+                3,
+            ),
             [
                 Word(0b01000110, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
                 Word(0x22, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
@@ -118,7 +146,12 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(piC.word_count, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(
-            piC.get_words(TestConfigObject.label_values, 0x8000, 1),
+            piC.get_words(
+                TestConfigObject.label_values,
+                ActiveNamedScopeList(named_scope_manager),
+                0x8000,
+                1,
+            ),
             [Word(0b10111010, model2.word_size, model2.word_segment_size, model2.intra_word_endianness)],
             'assembled instruction'
         )
@@ -128,7 +161,12 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(piD.word_count, 4, 'assembled instruciton is 4 byte')
         self.assertEqual(
-            piD.get_words(TestConfigObject.label_values, 0x8000, 4),
+            piD.get_words(
+                TestConfigObject.label_values,
+                ActiveNamedScopeList(named_scope_manager),
+                0x8000,
+                4,
+            ),
             [
                 Word(0b01110111, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
                 Word(0x88, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
@@ -143,7 +181,12 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(piE.word_count, 3, 'assembled instruciton is 3 byte')
         self.assertEqual(
-            piE.get_words(TestConfigObject.label_values, 0x8000, 3),
+            piE.get_words(
+                TestConfigObject.label_values,
+                ActiveNamedScopeList(named_scope_manager),
+                0x8000,
+                3,
+            ),
             [
                 Word(0b01101111, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
                 Word(0x88, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
@@ -157,7 +200,12 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(piF.word_count, 3, 'assembled instruciton is 3 byte')
         self.assertEqual(
-            piF.get_words(TestConfigObject.label_values, 0x8000, 3),
+            piF.get_words(
+                TestConfigObject.label_values,
+                ActiveNamedScopeList(named_scope_manager),
+                0x8000,
+                3,
+            ),
             [
                 Word(0b01101111, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
                 Word(0x88, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
@@ -171,7 +219,12 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(piG.word_count, 3, 'assembled instruciton is 3 byte')
         self.assertEqual(
-            piG.get_words(TestConfigObject.label_values, 0x8000, 3),
+            piG.get_words(
+                TestConfigObject.label_values,
+                ActiveNamedScopeList(named_scope_manager),
+                0x8000,
+                3,
+            ),
             [
                 Word(0b01101111, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
                 Word(0x88, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
@@ -185,7 +238,12 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(piH.word_count, 5, 'assembled instruciton is 5 byte')
         self.assertEqual(
-            piH.get_words(TestConfigObject.label_values, 0x8000, 5),
+            piH.get_words(
+                TestConfigObject.label_values,
+                ActiveNamedScopeList(named_scope_manager),
+                0x8000,
+                5,
+            ),
             [
                 Word(0b01110110, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
                 Word(0x02, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
@@ -201,7 +259,12 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(piI.word_count, 3, 'assembled instruciton is 3 byte')
         self.assertEqual(
-            piI.get_words(TestConfigObject.label_values, 0x8000, 3),
+            piI.get_words(
+                TestConfigObject.label_values,
+                ActiveNamedScopeList(named_scope_manager),
+                0x8000,
+                3,
+            ),
             [
                 Word(0b01100110, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
                 Word(0x02, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
@@ -215,7 +278,12 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(piJ.word_count, 5, 'assembled instruciton is 3 byte')
         self.assertEqual(
-            piJ.get_words(TestConfigObject.label_values, 0x8000, 5),
+            piJ.get_words(
+                TestConfigObject.label_values,
+                ActiveNamedScopeList(named_scope_manager),
+                0x8000,
+                5,
+            ),
             [
                 Word(0b11110110, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
                 Word(0x00, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
@@ -231,7 +299,12 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(piK.word_count, 3, 'assembled instruciton is 3 byte')
         self.assertEqual(
-            piK.get_words(TestConfigObject.label_values, 0x8000, 3),
+            piK.get_words(
+                TestConfigObject.label_values,
+                ActiveNamedScopeList(named_scope_manager),
+                0x8000,
+                3,
+            ),
             [
                 Word(0b01101101, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
                 Word(0x04, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
@@ -245,7 +318,12 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(piL.word_count, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(
-            piL.get_words(TestConfigObject.label_values, 0x8000, 1),
+            piL.get_words(
+                TestConfigObject.label_values,
+                ActiveNamedScopeList(named_scope_manager),
+                0x8000,
+                1,
+            ),
             [Word(0b00001010, model2.word_size, model2.word_segment_size, model2.intra_word_endianness)],
             'pop to i'
         )
@@ -255,7 +333,12 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(piM.word_count, 1, 'assembled instruciton is 1 byte')
         self.assertEqual(
-            piM.get_words(TestConfigObject.label_values, 0x8000, 1),
+            piM.get_words(
+                TestConfigObject.label_values,
+                ActiveNamedScopeList(named_scope_manager),
+                0x8000,
+                1,
+            ),
             [Word(0b00001111, model2.word_size, model2.word_segment_size, model2.intra_word_endianness)],
             'just pop'
         )
@@ -265,7 +348,12 @@ class TestConfigObject(unittest.TestCase):
         )
         self.assertEqual(piN.word_count, 2, 'assembled instruciton is 2 byte')
         self.assertEqual(
-            piN.get_words(TestConfigObject.label_values, 0x8000, 2),
+            piN.get_words(
+                TestConfigObject.label_values,
+                ActiveNamedScopeList(named_scope_manager),
+                0x8000,
+                2,
+            ),
             [
                 Word(0b01000101, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),
                 Word(0x02, model2.word_size, model2.word_segment_size, model2.intra_word_endianness),

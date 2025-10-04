@@ -5,6 +5,8 @@ import unittest
 
 from bespokeasm.assembler.assembly_file import AssemblyFile
 from bespokeasm.assembler.label_scope import GlobalLabelScope
+from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
+from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.preprocessor import Preprocessor
@@ -14,9 +16,13 @@ from test import config_files
 
 class TestConditionalInclude(unittest.TestCase):
     def setUp(self):
+        # Reset instruction pattern cache for test isolation
+        InstructionLine.reset_instruction_pattern_cache()
+
         # Use a simple test configuration
         fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')
         self.isa_model = AssemblerModel(str(fp), 0)
+        self.named_scope_manager = NamedScopeManager()
         self.memzone_mngr = MemoryZoneManager(
             self.isa_model.address_size,
             self.isa_model.default_origin,
@@ -56,7 +62,7 @@ nop ; This should work
             # Test that the assembly file loads without error
             # If #include is processed incorrectly, it would try to include the file
             # and fail on the invalid instruction
-            asm_file = AssemblyFile(main_file_path, self.global_scope)
+            asm_file = AssemblyFile(main_file_path, self.global_scope, self.named_scope_manager)
             include_paths = {temp_dir}
 
             # This should not raise an exception since the #include is in an inactive block
@@ -111,7 +117,7 @@ nop ; This should also work
                 f.write(main_file_content)
 
             # Test that the assembly file loads and includes the content
-            asm_file = AssemblyFile(main_file_path, self.global_scope)
+            asm_file = AssemblyFile(main_file_path, self.global_scope, self.named_scope_manager)
             include_paths = {temp_dir}
 
             line_objects = asm_file.load_line_objects(
@@ -166,7 +172,7 @@ nop
             with open(main_file_path, 'w') as f:
                 f.write(main_file_content)
 
-            asm_file = AssemblyFile(main_file_path, self.global_scope)
+            asm_file = AssemblyFile(main_file_path, self.global_scope, self.named_scope_manager)
             include_paths = {temp_dir}
 
             line_objects = asm_file.load_line_objects(
@@ -213,7 +219,7 @@ mov a, 1
                 f.write(file_b_content)
 
             # Test that attempting to load file A causes a sys.exit due to circular include
-            asm_file = AssemblyFile(file_a_path, self.global_scope)
+            asm_file = AssemblyFile(file_a_path, self.global_scope, self.named_scope_manager)
             include_paths = {temp_dir}
 
             with self.assertRaises(SystemExit) as cm:
@@ -242,7 +248,7 @@ nop
                 f.write(self_include_content)
 
             # Test that attempting to load the file causes a sys.exit due to self-include
-            asm_file = AssemblyFile(self_include_path, self.global_scope)
+            asm_file = AssemblyFile(self_include_path, self.global_scope, self.named_scope_manager)
             include_paths = {temp_dir}
 
             with self.assertRaises(SystemExit) as cm:

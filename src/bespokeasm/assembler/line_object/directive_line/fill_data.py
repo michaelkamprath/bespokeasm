@@ -43,14 +43,14 @@ class FillDataLine(LineWithWords):
     @property
     def word_count(self) -> int:
         if self._count is None:
-            self._count = self._count_expr.get_value(self.label_scope, self.line_id)
+            self._count = self._count_expr.get_value(self.label_scope, self.active_named_scopes, self.line_id)
         return self._count
 
     def generate_words(self):
         if self._count is None:
-            self._count = self._count_expr.get_value(self.label_scope, self.line_id)
+            self._count = self._count_expr.get_value(self.label_scope, self.active_named_scopes, self.line_id)
         if self._value is None:
-            self._value = self._value_expr.get_value(self.label_scope, self.line_id)
+            self._value = self._value_expr.get_value(self.label_scope, self.active_named_scopes, self.line_id)
         value_mask = (1 << self._word_size) - 1
         self._words.extend([
             Word(self._value & value_mask, self._word_size, self._word_segment_size, self._intra_word_endianness)
@@ -95,7 +95,9 @@ class FillUntilDataLine(LineWithWords):
     @property
     def word_count(self) -> int:
         if self._fill_until_addr is None:
-            self._fill_until_addr = self._fill_until_addr_expr.get_value(self.label_scope, self.line_id)
+            self._fill_until_addr = self._fill_until_addr_expr.get_value(
+                self.label_scope, self.active_named_scopes, self.line_id
+            )
         if self._fill_until_addr >= self.address:
             return self._fill_until_addr - self.address + 1
         else:
@@ -105,9 +107,11 @@ class FillUntilDataLine(LineWithWords):
         """Finalize the bytes for this fill until line.
         """
         if self._fill_until_addr is None:
-            self._fill_until_addr = self._fill_until_addr_expr.get_value(self.label_scope, self.line_id)
+            self._fill_until_addr = self._fill_until_addr_expr.get_value(
+                self.label_scope, self.active_named_scopes, self.line_id
+            )
         if self._fill_value is None:
-            self._fill_value = self._fill_value_expr.get_value(self.label_scope, self.line_id)
+            self._fill_value = self._fill_value_expr.get_value(self.label_scope, self.active_named_scopes, self.line_id)
         if self.word_count > 0 and len(self._words) == 0:
             value_mask = (1 << self._word_size) - 1
             self._words.extend([

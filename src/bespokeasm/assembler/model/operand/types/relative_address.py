@@ -5,6 +5,7 @@ from functools import cached_property
 from bespokeasm.assembler.bytecode.parts import ExpressionByteCodePartInMemoryZone
 from bespokeasm.assembler.bytecode.parts import NumericByteCodePart
 from bespokeasm.assembler.label_scope import LabelScope
+from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
@@ -45,10 +46,16 @@ class RelativeAddressByteCodePart(ExpressionByteCodePartInMemoryZone):
         self._max_relative_value = max_relative_value
         self._offset_from_instruction_end = offset_from_instruction_end
 
-    def get_value(self, label_scope: LabelScope, instruction_address: int, instruction_size: int) -> int:
+    def get_value(
+        self,
+        label_scope: LabelScope,
+        active_named_scopes: ActiveNamedScopeList,
+        instruction_address: int,
+        instruction_size: int,
+    ) -> int:
         if instruction_address is None:
             raise ValueError('RelativeAddressByteCodePart.get_value had no instruction_address passed')
-        expression_value = super().get_value(label_scope, instruction_address, instruction_size)
+        expression_value = super().get_value(label_scope, active_named_scopes, instruction_address, instruction_size)
         relative_value = expression_value - instruction_address
         if self._offset_from_instruction_end:
             # minus one to account for the current address being 1 byte of instruction size

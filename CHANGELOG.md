@@ -13,7 +13,6 @@ Changes that are planned but not implemented yet:
   * missing `:` after labels
   * unknown labels
   * Disallow instructions on the same line as an `.org` directive
-* Add named label scopes. This would allow a label to be defined in a specific scope that can be shared across files.
 * Create a "align if needed" preprocessor directive paid that generates an `.align` directive if the bytecode in between the pair isn't naturally on the same page and can fit on the same page if aligned. An error would be benerated if the block of code can't fit on the same page regardless of alignment.
 * Update the `#ifdef` and related preprocessor directives to include detection of labels and constants.
 * Allow multiple `cstr` defininitions on the same line
@@ -24,7 +23,9 @@ Changes that are planned but not implemented yet:
 - Added support for instruction aliases: you can now specify an `aliases` field (a list of alternative mnemonics) in an instruction's configuration. All aliases are globally unique, are accepted as valid mnemonics in assembly source, and generate the same code as the root mnemonic. This does not apply to macros.
 - Added `#print` preprocessor directive for compile-time messages with optional verbosity gating and honoring conditional/mute controls.
 - Added Vim syntax highlighting generator via `bespokeasm generate-extension vim`. This creates Vim `syntax/` and `ftdetect/` files for your ISA.
+- Added **named label scopes** feature: Create custom symbol namespaces with user-defined prefixes that can be shared across files. Use `#create-scope "name" prefix="prefix_"`, `#use-scope "name"`, and `#deactivate-scope "name"` directives. Supports library workflows where scopes can be used before being defined.
 - Fixed a bug where `#include` directives were not properly processed when they were inside a conditional block.
+- Fixed a test isolation issue where instruction pattern caching caused pytest failures when different ISA configurations were used across test files.
 
 ## [0.5.1]
 - Support for preserving comments, integer formats, list formats, and file type in configuration files during `update-config` command

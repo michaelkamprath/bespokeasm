@@ -16,6 +16,11 @@ class InstructionLine(LineWithWords):
     _INSTRUCTUION_EXTRACTION_PATTERN = None
 
     @classmethod
+    def reset_instruction_pattern_cache(cls):
+        """Reset the instruction extraction pattern cache for test isolation."""
+        cls._INSTRUCTUION_EXTRACTION_PATTERN = None
+
+    @classmethod
     def factory(
             cls,
             line_id: LineIdentifier,
@@ -24,7 +29,7 @@ class InstructionLine(LineWithWords):
             isa_model: AssemblerModel,
             current_memzone: MemoryZone,
             memzone_manager: MemoryZoneManager,
-    ) -> LineWithWords:
+    ) -> LineWithWords | None:
         """Tries to contruct a instruction line object from the passed instruction line"""
         # first, extract evertything up to the next extruction
         if cls._INSTRUCTUION_EXTRACTION_PATTERN is None:
@@ -51,8 +56,14 @@ class InstructionLine(LineWithWords):
             argument_str = instruction_str.strip()[len(command_str):]
 
             return InstructionLine(
-                line_id, command_str, argument_str, isa_model,
-                memzone_manager, instruction_str, comment, current_memzone,
+                line_id,
+                command_str,
+                argument_str,
+                isa_model,
+                memzone_manager,
+                instruction_str,
+                comment,
+                current_memzone,
             )
         else:
             return None
@@ -92,4 +103,11 @@ class InstructionLine(LineWithWords):
 
     def generate_words(self) -> bytearray:
         """Finalize the bytes for this line with the label assignemnts"""
-        self._words.extend(self._assembled_instruction.get_words(self.label_scope, self.address, self.word_count))
+        self._words.extend(
+            self._assembled_instruction.get_words(
+                self.label_scope,
+                self.active_named_scopes,
+                self.address,
+                self.word_count,
+            )
+        )

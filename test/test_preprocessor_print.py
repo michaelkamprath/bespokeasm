@@ -4,6 +4,8 @@ from unittest.mock import patch
 
 from bespokeasm.assembler.assembly_file import AssemblyFile
 from bespokeasm.assembler.label_scope import GlobalLabelScope
+from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
+from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object.factory import LineOjectFactory
 from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
@@ -26,9 +28,10 @@ class TestPreprocessorPrint(unittest.TestCase):
         )
         label_scope = GlobalLabelScope(isa_model.registers)
         preprocessor = Preprocessor()
+        named_scope_manager = NamedScopeManager()
 
         asm_fp = pkg_resources.files(test_code).joinpath(asm_filename)
-        asm_obj = AssemblyFile(asm_fp, label_scope)
+        asm_obj = AssemblyFile(asm_fp, label_scope, named_scope_manager)
 
         return asm_obj.load_line_objects(
             isa_model,
@@ -48,7 +51,8 @@ class TestPreprocessorPrint(unittest.TestCase):
         )
         label_scope = GlobalLabelScope(isa_model.registers)
         preprocessor = Preprocessor()
-        return isa_model, memzone_mngr, label_scope, preprocessor
+        active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
+        return isa_model, memzone_mngr, label_scope, preprocessor, active_named_scopes
 
     def test_print_basic_always(self):
         with patch('click.echo') as mock_echo:
@@ -89,7 +93,7 @@ class TestPreprocessorPrint(unittest.TestCase):
                 self.assertEqual(calls.count('unterminated'), 0, 'no printing should occur when malformed')
 
     def test_print_line_object_parsing_basic(self):
-        isa_model, memzone_mngr, label_scope, preprocessor = self._model_and_state()
+        isa_model, memzone_mngr, label_scope, preprocessor, active_named_scopes = self._model_and_state()
         lineid = LineIdentifier(10, 'test_print_line_object_parsing_basic')
         with patch('click.echo') as mock_echo:
             objs = LineOjectFactory.parse_line(
@@ -97,6 +101,7 @@ class TestPreprocessorPrint(unittest.TestCase):
                 '#print "inline"',
                 isa_model,
                 label_scope,
+                active_named_scopes,
                 memzone_mngr.global_zone,
                 memzone_mngr,
                 preprocessor,
@@ -110,7 +115,7 @@ class TestPreprocessorPrint(unittest.TestCase):
             self.assertIn('inline', calls)
 
     def test_print_line_object_parsing_min_verbosity(self):
-        isa_model, memzone_mngr, label_scope, preprocessor = self._model_and_state()
+        isa_model, memzone_mngr, label_scope, preprocessor, active_named_scopes = self._model_and_state()
         lineid = LineIdentifier(11, 'test_print_line_object_parsing_min_verbosity')
         # below threshold
         with patch('click.echo') as mock_echo_low:
@@ -119,6 +124,7 @@ class TestPreprocessorPrint(unittest.TestCase):
                 '#print 3 "gated"',
                 isa_model,
                 label_scope,
+                active_named_scopes,
                 memzone_mngr.global_zone,
                 memzone_mngr,
                 preprocessor,
@@ -134,6 +140,7 @@ class TestPreprocessorPrint(unittest.TestCase):
                 '#print 3 "gated"',
                 isa_model,
                 label_scope,
+                active_named_scopes,
                 memzone_mngr.global_zone,
                 memzone_mngr,
                 preprocessor,

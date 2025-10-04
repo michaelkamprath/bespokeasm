@@ -5,6 +5,8 @@ from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.label_scope import LabelScopeType
+from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
+from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.assembler.line_object.factory import LineOjectFactory
@@ -69,7 +71,7 @@ class TestInstructionMacros(unittest.TestCase):
             'instruction bytes should match'
         )
 
-        ins1 = InstructionLine.factory(line_id, 'mov2 [$2000],[$1234]', 'some comment!', isa_model, memzone, memzone_mngr)
+        ins1 = InstructionLine.factory(line_id, 'mov2 [$2000],[$1234]', 'some comment!', isa_model, memzone, memzone_mngr, )
         ins1.set_start_address(1212)
         self.assertIsInstance(ins1, InstructionLine)
         self.assertEqual(ins1.word_count, 10, 'has 10 words')
@@ -92,7 +94,7 @@ class TestInstructionMacros(unittest.TestCase):
             'instruction words should match'
         )
 
-        ins2 = InstructionLine.factory(line_id, 'add16 [$1234], $5678', 'some comment!', isa_model, memzone, memzone_mngr)
+        ins2 = InstructionLine.factory(line_id, 'add16 [$1234], $5678', 'some comment!', isa_model, memzone, memzone_mngr, )
         ins2.set_start_address(1212)
         self.assertIsInstance(ins2, InstructionLine)
         self.assertEqual(ins2.word_count, 16, 'has 16 words')
@@ -121,7 +123,7 @@ class TestInstructionMacros(unittest.TestCase):
             'instruction words should match'
         )
 
-        ins3 = InstructionLine.factory(line_id, 'add16 [$1234], [var1+7]', 'some comment!', isa_model, memzone, memzone_mngr)
+        ins3 = InstructionLine.factory(line_id, 'add16 [$1234], [var1+7]', 'some comment!', isa_model, memzone, memzone_mngr, )
         ins3.set_start_address(1212)
         self.assertIsInstance(ins3, InstructionLine)
         self.assertEqual(ins3.word_count, 18, 'has 18 words')
@@ -204,7 +206,7 @@ class TestInstructionMacros(unittest.TestCase):
 
         line_id = LineIdentifier(1, 'test_macro_parsing_operands')
 
-        ins1: LineWithWords = InstructionLine.factory(line_id, 'swap a,j', 'some comment!', isa_model, memzone, memzone_mngr)
+        ins1: LineWithWords = InstructionLine.factory(line_id, 'swap a,j', 'some comment!', isa_model, memzone, memzone_mngr, )
         ins1.set_start_address(1212)
         self.assertIsInstance(ins1, InstructionLine)
         self.assertEqual(ins1.word_count, 3, 'has 3 words')
@@ -220,7 +222,7 @@ class TestInstructionMacros(unittest.TestCase):
             'instruction words should match'
         )
 
-        ins2: LineWithWords = InstructionLine.factory(line_id, 'swap i,j', 'some comment!', isa_model, memzone, memzone_mngr)
+        ins2: LineWithWords = InstructionLine.factory(line_id, 'swap i,j', 'some comment!', isa_model, memzone, memzone_mngr, )
         ins2.set_start_address(1212)
         self.assertIsInstance(ins2, InstructionLine)
         self.assertEqual(ins2.word_count, 3, 'has 3 words')
@@ -279,7 +281,9 @@ class TestInstructionMacros(unittest.TestCase):
         )
 
         ins5: LineWithWords = InstructionLine.factory(
-            line_id, 'swap [sp+10],[sp+predefined_value1]', 'some comment!',
+            line_id,
+            'swap [sp+10],[sp+predefined_value1]',
+            'some comment!',
             isa_model, memzone, memzone_mngr,
         )
         ins5.set_start_address(1212)
@@ -331,7 +335,7 @@ class TestInstructionMacros(unittest.TestCase):
 
         line_id = LineIdentifier(1, 'test_macro_with_variants')
 
-        ins1: LineWithWords = InstructionLine.factory(line_id, 'incs sp', 'some comment!', isa_model, memzone, memzone_mngr)
+        ins1: LineWithWords = InstructionLine.factory(line_id, 'incs sp', 'some comment!', isa_model, memzone, memzone_mngr, )
         ins1.set_start_address(1212)
         self.assertIsInstance(ins1, InstructionLine)
         self.assertEqual(ins1.word_count, 1, 'has 1 words')
@@ -345,7 +349,7 @@ class TestInstructionMacros(unittest.TestCase):
             'instruction words should match'
         )
 
-        ins2: LineWithWords = InstructionLine.factory(line_id, 'incs 3', 'some comment!', isa_model, memzone, memzone_mngr)
+        ins2: LineWithWords = InstructionLine.factory(line_id, 'incs 3', 'some comment!', isa_model, memzone, memzone_mngr, )
         ins2.set_start_address(1212)
         self.assertIsInstance(ins2, InstructionLine)
         self.assertEqual(ins2.word_count, 1, 'has 1 words')
@@ -362,6 +366,7 @@ class TestInstructionMacros(unittest.TestCase):
     def test_macro_expansion_with_alias_mnemonic(self):
         fp = pkg_resources.files(config_files).joinpath('test_macro_with_alias.yaml')
         isa_model = AssemblerModel(str(fp), 0)
+        named_scope_manager = NamedScopeManager()
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -375,6 +380,7 @@ class TestInstructionMacros(unittest.TestCase):
             line_str='my_macro',
             model=isa_model,
             label_scope=None,
+            active_named_scopes=ActiveNamedScopeList(named_scope_manager),
             current_memzone=memzone_mngr.global_zone,
             memzone_manager=memzone_mngr,
             preprocessor=preprocessor,
@@ -390,6 +396,7 @@ class TestInstructionMacros(unittest.TestCase):
             line_str='call',
             model=isa_model,
             label_scope=None,
+            active_named_scopes=ActiveNamedScopeList(named_scope_manager),
             current_memzone=memzone_mngr.global_zone,
             memzone_manager=memzone_mngr,
             preprocessor=preprocessor,
