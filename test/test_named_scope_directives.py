@@ -216,6 +216,78 @@ class TestNamedScopeDirectives(unittest.TestCase):
         self.assertIsNotNone(definition)
         self.assertEqual(definition.prefix, 'gfx_')
 
+    def test_multiple_active_scopes_precedence(self):
+        """Test that when multiple scopes are active, most recently activated takes precedence.
+
+        This test validates the precedence behavior when multiple scopes are active.
+        If a label could match multiple scope prefixes, the most recently activated
+        scope's prefix is checked first due to the order in the active scope list.
+        """
+        from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType
+        from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
+
+        # Create two scopes with different prefixes
+        self.named_scope_manager.create_scope('scope_a', 'a_', LineIdentifier(1, 'test.asm'))
+        self.named_scope_manager.create_scope('scope_b', 'b_', LineIdentifier(2, 'test.asm'))
+
+        # Create active scope list
+        active_scopes = ActiveNamedScopeList(self.named_scope_manager)
+
+        # Activate both scopes (scope_b activated second, so it should be first in list)
+        active_scopes.activate_named_scope('scope_a')
+        active_scopes.activate_named_scope('scope_b')
+
+        # Verify scope_b is first in the list (most recent activation)
+        self.assertEqual(active_scopes[0], 'scope_b')
+        self.assertEqual(active_scopes[1], 'scope_a')
+
+        # Set label values in each scope
+        scope_a_def = self.named_scope_manager.get_scope_definition('scope_a')
+        scope_b_def = self.named_scope_manager.get_scope_definition('scope_b')
+
+        scope_a_def.set_label_value('a_label', 100, LineIdentifier(3, 'test.asm'), LabelScopeType.NAMED)
+        scope_b_def.set_label_value('b_label', 200, LineIdentifier(4, 'test.asm'), LabelScopeType.NAMED)
+
+        # Create a dummy current scope for fallback
+        current_scope = LabelScope(LabelScopeType.GLOBAL, None, 'global')
+
+        # Get label value for b_label - should return value from scope_b
+        value = self.named_scope_manager.get_label_value(
+            'b_label',
+            current_scope,
+            active_scopes,
+            LineIdentifier(5, 'test.asm')
+        )
+
+        self.assertEqual(value, 200, 'Label with b_ prefix should be found in scope_b')
+
+        # Get label value for a_label - should return value from scope_a
+        value = self.named_scope_manager.get_label_value(
+            'a_label',
+            current_scope,
+            active_scopes,
+            LineIdentifier(6, 'test.asm')
+        )
+
+        self.assertEqual(value, 100, 'Label with a_ prefix should be found in scope_a')
+
+        # Re-activate scope_a to move it to the front
+        active_scopes.activate_named_scope('scope_a')
+
+        # Now scope_a should be first
+        self.assertEqual(active_scopes[0], 'scope_a')
+        self.assertEqual(active_scopes[1], 'scope_b')
+
+        # Labels should still be found correctly based on their prefix
+        value = self.named_scope_manager.get_label_value(
+            'a_label',
+            current_scope,
+            active_scopes,
+            LineIdentifier(7, 'test.asm')
+        )
+
+        self.assertEqual(value, 100, 'Label lookup should still work after re-activation')
+
 
 if __name__ == '__main__':
     unittest.main()

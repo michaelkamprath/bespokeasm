@@ -95,9 +95,13 @@ class NamedScopeManager:
         active_named_scopes: ActiveNamedScopeList,
         line_id: LineIdentifier,
     ) -> int:
-        """Get the value of a label found in the active named scopes.
+        """Get the value of a label from active named scopes or current scope.
 
-        If not found, return None.
+        Searches active named scopes in order (most recently activated first) for a scope
+        whose prefix matches the label. If found, returns the label value from that scope.
+        If not found in any active named scope, delegates to current_scope.get_label_value().
+
+        Note: This method may raise SystemExit if the label is not found.
         """
         for name in active_named_scopes:
             if name in self._scope_definitions:
@@ -133,14 +137,14 @@ class NamedScopeManager:
                     # Labels and constants can only be created in the same file
                     # where the named scope was created. This prevents external
                     # code from polluting a library's namespace.
-                    # Normalize paths for comparison (relative vs absolute)
+                    # Normalize paths for comparison (resolve symlinks and relative paths)
                     scope_file = (
-                        os.path.abspath(scope.defined_at.filename)
+                        os.path.realpath(scope.defined_at.filename)
                         if scope.defined_at.filename
                         else None
                     )
                     label_file = (
-                        os.path.abspath(line_id.filename)
+                        os.path.realpath(line_id.filename)
                         if line_id.filename
                         else None
                     )
@@ -152,8 +156,13 @@ class NamedScopeManager:
                     return True
         return False
 
-    def get_scope_definition(self, name: str) -> NamedLabelScope:
-        return self._scope_definitions[name]
+    def get_scope_definition(self, name: str) -> NamedLabelScope | None:
+        """Get a named scope definition by name.
+
+        Returns the NamedLabelScope if it exists, None otherwise.
+        This method is used internally and by tests.
+        """
+        return self._scope_definitions.get(name)
 
 
 class ActiveNamedScopeList(list[str]):

@@ -42,17 +42,12 @@ class CreateScopeLine(PreprocessorLine):
                 sys.exit(f'ERROR: {line_id} - Scope prefix cannot be empty')
 
             # Create the scope
-            try:
-                named_scope_manager.create_scope(scope_name, prefix, line_id)
-                self._scope_name = scope_name
-                self._prefix = prefix
+            named_scope_manager.create_scope(scope_name, prefix, line_id)
+            self._scope_name = scope_name
+            self._prefix = prefix
 
-                if log_verbosity >= 2:
-                    print(f'INFO: {line_id} - Created named scope "{scope_name}" with prefix "{prefix}"')
-
-            except SystemExit:
-                # Re-raise system exits (these are expected error conditions)
-                raise
+            if log_verbosity >= 2:
+                print(f'INFO: {line_id} - Created named scope "{scope_name}" with prefix "{prefix}"')
 
         else:
             sys.exit(f'ERROR: {line_id} - Invalid #create-scope directive syntax: {instruction}')
