@@ -6,6 +6,9 @@ by #if, #elif, and #require preprocessor directives when they encounter
 language version symbols.
 """
 import importlib.resources as pkg_resources
+import os
+import tempfile
+import textwrap
 import unittest
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
@@ -152,6 +155,56 @@ class TestLanguageVersionEvaluator(unittest.TestCase):
         with self.assertRaises(SystemExit):
             LanguageVersionEvaluator.evaluate_expression(
                 '__LANGUAGE_VERSION_MAJOR__ ~= 1', self.preprocessor, self.line_id)
+
+    def test_numeric_comparison_uses_numeric_semantics(self):
+        """Demonstrate that explicit comparisons are currently evaluated as strings."""
+        config_yaml = textwrap.dedent(
+            '''
+            description: Numeric Comparison Test ISA
+            general:
+              min_version: 0.5.0
+              address_size: 4
+              identifier:
+                name: numeric_comparison_test
+                version: "1.0.10"
+            operand_sets:
+              integer:
+                operand_values:
+                  int4:
+                    type: numeric
+                    argument:
+                      size: 4
+                      word_align: false
+            instructions:
+              ldi:
+                bytecode:
+                  value: 0
+                  size: 4
+                operands:
+                  count: 1
+                  operand_sets:
+                    list:
+                      - integer
+            '''
+        )
+        with tempfile.NamedTemporaryFile('w', suffix='.yaml', delete=False) as tmp_file:
+            tmp_file.write(config_yaml)
+            tmp_path = tmp_file.name
+
+        try:
+            isa_model = AssemblerModel(tmp_path, 0)
+            preprocessor = Preprocessor(isa_model.predefined_symbols, isa_model)
+            line_id = LineIdentifier(1, 'numeric_comparison_test')
+
+            # With numeric semantics, 10 < 2 should be False; current bug returns True.
+            self.assertFalse(
+                LanguageVersionEvaluator.evaluate_expression(
+                    '__LANGUAGE_VERSION_PATCH__ < 2', preprocessor, line_id
+                ),
+                msg='Version comparisons are being performed using string ordering instead of numeric ordering.'
+            )
+        finally:
+            os.unlink(tmp_path)
 
     def test_integration_with_different_isa_models(self):
         """Test evaluator works with different ISA model configurations."""

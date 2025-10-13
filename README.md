@@ -38,6 +38,8 @@ BespokeASM can generate a syntax highlighting extension for [Visual Studio Code]
 ```sh
 bespokeasm generate-extension vscode -c isa-config.yaml
 ```
+
+For [Cursor](https://cursor.com/), add the `-d ~/.cursor/` options.
 #### Sublime Text
 BespokeASM can generate a syntax highlighting extension for [Sublime Text](https://www.sublimetext.com) that will properly highlight the instruction mnemonics and other aspects of the assembly language configured in the instruction set architecture configuration file. To generate the `.sublime-package` file:
 ```sh
