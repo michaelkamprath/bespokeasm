@@ -45,7 +45,11 @@ class MarkdownGenerator:
 
         return '\n\n'.join(filter(None, sections))
 
-    def _optimize_table_columns(self, headers: list[str], rows: list[list[str]]) -> tuple[list[str], list[list[str]]]:
+    def _optimize_table_columns(
+        self,
+        headers: list[str],
+        rows: list[list[str]]
+    ) -> tuple[list[str], list[list[str]], list[int]]:
         """
         Optimize table columns by removing columns that are empty for all rows.
 
@@ -57,7 +61,7 @@ class MarkdownGenerator:
             Tuple of (optimized_headers, optimized_rows)
         """
         if not rows or not headers:
-            return headers, rows
+            return headers, rows, list(range(len(headers)))
 
         # Determine which columns have any non-empty content
         columns_to_keep = []
@@ -73,15 +77,21 @@ class MarkdownGenerator:
             columns_to_keep.append(has_content)
 
         # Filter headers and rows to keep only non-empty columns
-        optimized_headers = [headers[i] for i in range(len(headers)) if columns_to_keep[i]]
+        keep_indices = [i for i in range(len(headers)) if columns_to_keep[i]]
+        optimized_headers = [headers[i] for i in keep_indices]
         optimized_rows = []
         for row in rows:
-            optimized_row = [row[i] if i < len(row) else '' for i in range(len(headers)) if columns_to_keep[i]]
+            optimized_row = [row[i] if i < len(row) else '' for i in keep_indices]
             optimized_rows.append(optimized_row)
 
-        return optimized_headers, optimized_rows
+        return optimized_headers, optimized_rows, keep_indices
 
-    def _generate_markdown_table(self, headers: list[str], rows: list[list[str]]) -> str:
+    def _generate_markdown_table(
+        self,
+        headers: list[str],
+        rows: list[list[str]],
+        column_alignments: list[str | None] | None = None
+    ) -> str:
         """
         Generate a markdown table with column optimization.
 
@@ -93,7 +103,7 @@ class MarkdownGenerator:
             Formatted markdown table string
         """
         # Optimize columns
-        opt_headers, opt_rows = self._optimize_table_columns(headers, rows)
+        opt_headers, opt_rows, keep_indices = self._optimize_table_columns(headers, rows)
 
         if not opt_headers or not opt_rows:
             return ''
@@ -106,7 +116,21 @@ class MarkdownGenerator:
         table_lines.append(header_line)
 
         # Separator row
-        separator_line = '| ' + ' | '.join(['---'] * len(opt_headers)) + ' |'
+        alignments = []
+        if column_alignments:
+            for idx in keep_indices:
+                if idx < len(column_alignments):
+                    alignments.append(column_alignments[idx])
+                else:
+                    alignments.append(None)
+        separator_line = \
+            '| ' + ' | '.join(
+                self._get_alignment_marker(alignment)
+                for alignment in self._pad_alignments(
+                    alignments,
+                    len(opt_headers)
+                )
+            ) + ' |'
         table_lines.append(separator_line)
 
         # Data rows
@@ -117,6 +141,50 @@ class MarkdownGenerator:
             table_lines.append(row_line)
 
         return '\n'.join(table_lines)
+
+    @staticmethod
+    def _pad_alignments(alignments: list[str | None], size: int) -> list[str | None]:
+        """Ensure the alignments list matches the number of columns."""
+        if not alignments:
+            return [None] * size
+
+        padded = list(alignments)
+        if len(padded) < size:
+            padded.extend([None] * (size - len(padded)))
+        elif len(padded) > size:
+            padded = padded[:size]
+        return padded
+
+    @staticmethod
+    def _get_alignment_marker(alignment: str | None) -> str:
+        """Convert alignment keywords into markdown separator markers."""
+        if alignment == 'left':
+            return ':--'
+        if alignment == 'right':
+            return '--:'
+        if alignment == 'center':
+            return ':-:'
+        return '---'
+
+    def _generate_attribute_table(self, category: str, rows: list[tuple[str, str]]) -> str:
+        """Generate a two-column attribute/value table with left alignment."""
+        if not rows:
+            return ''
+
+        lines: list[str] = []
+        for label, value in rows:
+            if value is None:
+                continue
+            value_str = str(value).strip()
+            if not value_str:
+                continue
+            if not lines:
+                # Initialize header and alignment rows once we know we have data
+                lines.append(f'| {category} Attribute | Value |')
+                lines.append('|:--|:--|')
+            lines.append(f'| **{label}** | {value_str} |')
+
+        return '\n'.join(lines)
 
     def _generate_header(self) -> str:
         """Generate the document header."""
@@ -158,24 +226,29 @@ class MarkdownGenerator:
         general = self.doc_model.general_docs
 
         # ISA Overview
+        table_sections = []
+
         isa_overview = self._generate_isa_overview(general)
         if isa_overview:
-            sections.append(isa_overview)
+            table_sections.append(isa_overview)
 
         # Hardware Architecture Details
         hardware_section = self._generate_hardware_section(general.get('hardware', {}))
         if hardware_section:
-            sections.append(hardware_section)
+            table_sections.append(hardware_section)
 
         # Endianness Configuration
         endianness_section = self._generate_endianness_section(general.get('endianness', {}))
         if endianness_section:
-            sections.append(endianness_section)
+            table_sections.append(endianness_section)
 
         # String and Data Handling
         string_section = self._generate_string_section(general.get('string_config', {}))
         if string_section:
-            sections.append(string_section)
+            table_sections.append(string_section)
+
+        if table_sections:
+            sections.append('\n\n---\n\n'.join(table_sections))
 
         # Register Set
         registers_section = self._generate_registers_section(general.get('registers', []))
@@ -203,29 +276,28 @@ class MarkdownGenerator:
 
     def _generate_isa_overview(self, general: dict[str, Any]) -> str:
         """Generate the ISA Overview subsection."""
-        items = []
-
-        if general.get('isa_name'):
-            items.append(f"**ISA Name:** {general['isa_name']}")
-
-        if general.get('isa_version'):
-            items.append(f"**Version:** {general['isa_version']}")
-
-        extension = general.get('file_extension', 'asm')
-        if extension != 'asm':
-            items.append(f'**File Extension:** {extension}')
-        else:
-            items.append(f'**File Extension:** {extension} (default)')
+        rows = []
 
         if general.get('description'):
-            items.append(f"**Description:** {general['description']}")
+            rows.append(('Description', general['description']))
 
-        if not items:
+        if general.get('isa_name'):
+            rows.append(('ISA Name', f"`{general['isa_name']}`"))
+
+        if general.get('isa_version'):
+            rows.append(('Version', str(general['isa_version'])))
+
+        extension = general.get('file_extension', 'asm')
+        if extension:
+            rows.append(('File Extension', f'*.{extension}'))
+
+        if not rows:
             return ''
 
-        sections = ['### ISA Overview'] + items
+        table = self._generate_attribute_table('ISA', rows)
 
-        # Add details if present
+        sections = ['### ISA Overview', table]
+
         if general.get('details'):
             sections.append(general['details'])
 
@@ -233,111 +305,103 @@ class MarkdownGenerator:
 
     def _generate_hardware_section(self, hardware: dict[str, Any]) -> str:
         """Generate the Hardware Architecture Details subsection."""
-        items = []
+        rows: list[tuple[str, str]] = []
 
         if hardware.get('address_size') is not None:
-            items.append(f"**Address Size:** {hardware['address_size']} bits")
+            rows.append(('Address Size', f"{hardware['address_size']} bits"))
 
         word_size = hardware.get('word_size', 8)
-        if word_size != 8:
-            items.append(f'**Word Size:** {word_size} bits (default: 8)')
-        else:
-            items.append(f'**Word Size:** {word_size} bits')
+        rows.append(('Word Size', f'{word_size} bits'))
 
         word_segment_size = hardware.get('word_segment_size')
-        if word_segment_size != word_size:
-            items.append(f'**Word Segment Size:** {word_segment_size} bits (default: {word_size})')
-        elif word_segment_size != 8:  # only show if different from default word size
-            items.append(f'**Word Segment Size:** {word_segment_size} bits')
+        if word_segment_size is not None and word_segment_size != word_size:
+            rows.append(('Word Segment Size', f'{word_segment_size} bits'))
 
         page_size = hardware.get('page_size', 1)
-        if page_size != 1:
-            items.append(f'**Page Size:** {page_size} bytes (default: 1)')
-        else:
-            items.append(f'**Page Size:** {page_size} byte')
+        if page_size not in (None, 1):
+            unit = 'addresses' if page_size != 1 else 'address'
+            rows.append(('Page Size', f'{page_size} {unit}'))
 
         origin = hardware.get('origin', 0)
-        if origin != 0:
-            items.append(f'**Origin Address:** {origin} (default: 0)')
-        else:
-            items.append(f'**Origin Address:** {origin}')
+        origin_label = 'Default Origin Address' if origin == 0 else 'Origin Address'
+        rows.append((origin_label, str(origin)))
 
-        if not items:
+        if not rows:
             return ''
 
-        return '\n\n'.join(['### Hardware Architecture Details'] + items)
+        return self._generate_attribute_table('Hardware', rows)
 
     def _generate_endianness_section(self, endianness: dict[str, Any]) -> str:
         """Generate the Endianness Configuration subsection."""
-        items = []
+        rows: list[tuple[str, str]] = []
 
         multi_word = endianness.get('multi_word_endianness', 'big')
-        if multi_word != 'big':
-            items.append(f'**Multi-Word Endianness:** {multi_word} (default: big)')
-        else:
-            items.append(f'**Multi-Word Endianness:** {multi_word}')
+        rows.append(('Multi-Word Endianness', f'`{multi_word}`'))
 
         intra_word = endianness.get('intra_word_endianness', 'big')
-        if intra_word != 'big':
-            items.append(f'**Intra-Word Endianness:** {intra_word} (default: big)')
-        else:
-            items.append(f'**Intra-Word Endianness:** {intra_word}')
+        rows.append(('Intra-Word Endianness', f'`{intra_word}`'))
 
-        # Check for deprecated endian field
-        if endianness.get('deprecated_endian'):
-            items.append(
-                f"**⚠️ Deprecated 'endian' field:** {endianness['deprecated_endian']} "
-                f'(use multi_word_endianness instead)'
-            )
-
-        if not items:
+        if not rows:
             return ''
 
-        return '\n\n'.join(['### Endianness Configuration'] + items)
+        return self._generate_attribute_table('Endianness', rows)
 
     def _generate_string_section(self, string_config: dict[str, Any]) -> str:
         """Generate the String and Data Handling subsection."""
-        items = []
+        rows: list[tuple[str, str]] = []
 
         cstr_term = string_config.get('cstr_terminator', 0)
-        if cstr_term != 0:
-            items.append(f'**C-String Terminator:** {cstr_term} (default: 0)')
-        else:
-            items.append(f'**C-String Terminator:** {cstr_term}')
+        rows.append(('C-String Terminator', str(cstr_term)))
 
         embedded_strings = string_config.get('allow_embedded_strings', False)
-        status = 'Enabled' if embedded_strings else 'Disabled'
-        if embedded_strings:
-            items.append(f'**Embedded Strings Allowed:** {status} (default: Disabled)')
-        else:
-            items.append(f'**Embedded Strings Allowed:** {status}')
+        rows.append(('Embedded Strings Allowed', 'Enabled' if embedded_strings else 'Disabled'))
 
         byte_packing = string_config.get('string_byte_packing', False)
-        status = 'Enabled' if byte_packing else 'Disabled'
+        rows.append(('String Byte Packing', 'Enabled' if byte_packing else 'Disabled'))
+
         if byte_packing:
-            items.append(f'**String Byte Packing:** {status} (default: Disabled)')
-
-            # Only show packing fill if packing is enabled
             fill = string_config.get('string_byte_packing_fill', 0)
-            if fill != 0:
-                items.append(f'**String Byte Packing Fill:** {fill} (default: 0)')
-            else:
-                items.append(f'**String Byte Packing Fill:** {fill}')
-        else:
-            items.append(f'**String Byte Packing:** {status}')
+            rows.append(('String Byte Packing Fill', str(fill)))
 
-        if not items:
+        if not rows:
             return ''
 
-        return '\n\n'.join(['### String and Data Handling'] + items)
+        return self._generate_attribute_table('String Handling', rows)
 
-    def _generate_registers_section(self, registers: list[str]) -> str:
+    def _generate_registers_section(self, registers: list[dict[str, Any]]) -> str:
         """Generate the Register Set subsection."""
         if not registers:
             return ''
 
-        register_list = ', '.join(f'`{reg}`' for reg in registers)
-        return f'### Register Set\n\n**Registers:** {register_list}'
+        headers = ['Register Name', 'Description', 'Bit Size']
+        rows: list[list[str]] = []
+
+        for register in registers:
+            name_value = register.get('name')
+            name = '' if name_value is None else str(name_value)
+
+            description_value = register.get('description')
+            description = str(description_value).replace('\n', '<br>') if description_value else ''
+            details = register.get('details')
+
+            # Normalize whitespace and support markdown line breaks
+            if details:
+                details_text = str(details).replace('\n', '<br>')
+                if description:
+                    description = f'{description}<br><br>{details_text}'
+                else:
+                    description = details_text
+
+            size = register.get('size')
+            bit_size = str(size) if size is not None else ''
+
+            rows.append([f'`{name}`', description, bit_size])
+
+        table = self._generate_markdown_table(headers, rows, column_alignments=['left', 'left', 'right'])
+        if not table:
+            return ''
+
+        return '### Register Set\n\n' + table
 
     def _generate_compatibility_section(self, general: dict[str, Any]) -> str:
         """Generate the Compatibility subsection."""
@@ -383,6 +447,8 @@ class MarkdownGenerator:
 
         for flag in flags:
             symbol = flag.get('symbol', '') if flag.get('symbol') else ''
+            if symbol:
+                symbol = f'`{symbol}`'
             details = flag.get('details', '').replace('\n', '<br>') if flag.get('details') else ''
             description = flag.get('description', '').replace('\n', '<br>')
             rows.append([flag['name'], symbol, description, details])
@@ -464,7 +530,8 @@ class MarkdownGenerator:
         sections = []
 
         # Instruction header
-        header = f'### {instruction_name.upper()}'
+        mnemonic = instruction_name.upper()
+        header = f'### `{mnemonic}`'
         if instruction_doc.get('description'):
             header += f" : {instruction_doc['description']}"
         sections.append(header)

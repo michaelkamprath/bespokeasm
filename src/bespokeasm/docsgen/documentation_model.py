@@ -103,14 +103,14 @@ class DocumentationModel:
             'string_config': string_config,
 
             # Register set
-            'registers': general_config.get('registers', []),
+            'registers': self._parse_registers_documentation(general_config),
 
             # Compatibility
             'min_version': general_config.get('min_version'),
 
             # Custom documentation elements
             'addressing_modes': self._parse_addressing_modes(doc_config.get('addressing_modes', {})),
-            'flags': self._parse_flags(doc_config.get('flags', [])),
+            'flags': self._parse_flags(general_config.get('flags'), doc_config.get('flags')),
             'examples': self._parse_examples(doc_config.get('examples', []))
         }
 
@@ -137,27 +137,102 @@ class DocumentationModel:
 
         return modes
 
-    def _parse_flags(self, flags: list[dict[str, Any]]) -> list[dict[str, str]]:
+    def _parse_registers_documentation(self, general_config: dict[str, Any]) -> list[dict[str, Any]]:
+        """
+        Parse register documentation from general configuration.
+
+        Args:
+            general_config: General section of ISA configuration
+
+        Returns:
+            List of register documentation entries including name, description, details, and size.
+        """
+        registers_config = general_config.get('registers')
+        if registers_config is None:
+            return []
+
+        register_docs: list[dict[str, Any]] = []
+
+        if isinstance(registers_config, dict):
+            for name, info in registers_config.items():
+                if not isinstance(info, dict):
+                    info = {}
+                register_docs.append({
+                    'name': name,
+                    'description': info.get('description'),
+                    'details': info.get('details'),
+                    'size': info.get('size')
+                })
+        else:
+            try:
+                iterator = iter(registers_config)
+            except TypeError:
+                if self.verbose:
+                    click.echo('Warning: Invalid registers configuration; expected list or dict.')
+                return []
+
+            for name in iterator:
+                register_docs.append({
+                    'name': name,
+                    'description': None,
+                    'details': None,
+                    'size': None
+                })
+
+        return register_docs
+
+    def _parse_flags(
+        self,
+        primary_flags: Any,
+        legacy_flags: Any
+    ) -> list[dict[str, str]]:
         """
         Parse flags documentation.
 
         Args:
-            flags: Raw flags list from config
+            primary_flags: Raw flags structure from the new configuration layout
+            legacy_flags: Flags provided via the deprecated documentation subsection
 
         Returns:
             List of structured flag data
         """
+        if primary_flags is None:
+            flags_config = legacy_flags
+        else:
+            flags_config = primary_flags
+
+        if flags_config is None:
+            return []
+
         parsed_flags = []
-        for flag_data in flags:
-            if isinstance(flag_data, dict) and 'name' in flag_data:
+
+        if isinstance(flags_config, dict):
+            for symbol, data in flags_config.items():
+                if not isinstance(data, dict):
+                    if self.verbose:
+                        click.echo(f'Warning: Invalid flag configuration for symbol "{symbol}". Expected a dictionary.')
+                    data = {}
+                name = data.get('name') or symbol
                 parsed_flags.append({
-                    'name': flag_data['name'],
-                    'symbol': flag_data.get('symbol'),
-                    'description': flag_data.get('description', ''),
-                    'details': flag_data.get('details')
+                    'name': name,
+                    'symbol': symbol,
+                    'description': data.get('description', ''),
+                    'details': data.get('details')
                 })
-            elif self.verbose:
-                click.echo(f'Warning: Invalid flag format: {flag_data}')
+        elif isinstance(flags_config, list):
+            for flag_data in flags_config:
+                if isinstance(flag_data, dict) and 'name' in flag_data:
+                    parsed_flags.append({
+                        'name': flag_data['name'],
+                        'symbol': flag_data.get('symbol'),
+                        'description': flag_data.get('description', ''),
+                        'details': flag_data.get('details')
+                    })
+                elif self.verbose:
+                    click.echo(f'Warning: Invalid flag format: {flag_data}')
+        else:
+            if self.verbose:
+                click.echo('Warning: Flags configuration must be a dictionary or list.')
 
         return parsed_flags
 

@@ -387,6 +387,7 @@ class TestConfigObject(unittest.TestCase):
         model = AssemblerModel(str(fp), 0)
 
         self.assertSetEqual(set(model.predefined_labels), {'CONST1', 'CONST2', 'buffer'}, 'label set should equal')
+        self.assertSetEqual(model.registers, {'a', 'b', 'x'}, 'registers should include documented names')
 
     def test_mnemonic_lists(self):
         fp = pkg_resources.files(config_files).joinpath('test_instruction_macros.yaml')

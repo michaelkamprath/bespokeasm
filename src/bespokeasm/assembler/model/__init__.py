@@ -69,8 +69,14 @@ class AssemblerModel:
         self._isa_name = self._isa_name.strip().replace(' ', '_')
         self._isa_version = self._isa_version.strip()
         # set up registers
-        registers = self._config['general'].get('registers', [])
-        self._registers = set(registers if registers is not None else [])
+        registers_config = self._config['general'].get('registers')
+        if isinstance(registers_config, dict):
+            register_names = list(registers_config.keys())
+        elif registers_config is None:
+            register_names = []
+        else:
+            register_names = list(registers_config)
+        self._registers = set(register_names)
         # check to see if any registers named with a keyword
         for reg in self._registers:
             if reg in ASSEMBLER_KEYWORD_SET:

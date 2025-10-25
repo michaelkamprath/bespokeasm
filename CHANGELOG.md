@@ -19,6 +19,7 @@ Changes that are planned but not implemented yet:
 
 
 ## [Unreleased]
+- Fixed a bug in handling comparisons to preprocessor language version symbols.
 
 ## [0.6.0]
 - Added support for instruction aliases: you can now specify an `aliases` field (a list of alternative mnemonics) in an instruction's configuration. All aliases are globally unique, are accepted as valid mnemonics in assembly source, and generate the same code as the root mnemonic. This does not apply to macros.

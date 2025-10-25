@@ -88,6 +88,20 @@ class TestMarkdownGenerator(unittest.TestCase):
                     'details': 'This shows basic usage',
                     'code': 'lda #5\nsta $10'
                 }
+            ],
+            'registers': [
+                {
+                    'name': 'A',
+                    'description': 'Accumulator register',
+                    'details': 'Primary register.',
+                    'size': 8
+                },
+                {
+                    'name': 'X',
+                    'description': None,
+                    'details': None,
+                    'size': None
+                }
             ]
         }
 
@@ -109,7 +123,7 @@ class TestMarkdownGenerator(unittest.TestCase):
         # Verify flags table
         self.assertIn('### Flags', result)
         self.assertIn('| Name | Symbol | Description | Details |', result)
-        self.assertIn('| carry | C | Carry flag | Set on overflow |', result)
+        self.assertIn('| carry | `C` | Carry flag | Set on overflow |', result)
         self.assertIn('| zero |  | Zero flag |  |', result)
 
         # Verify examples
@@ -117,6 +131,69 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.assertIn('#### Basic example', result)
         self.assertIn('This shows basic usage', result)
         self.assertIn('```assembly\nlda #5\nsta $10\n```', result)
+
+        # Verify registers table
+        self.assertIn('### Register Set', result)
+        self.assertIn('| Register Name | Description | Bit Size |', result)
+        self.assertIn('| `A` | Accumulator register<br><br>Primary register. | 8 |', result)
+        self.assertIn('| `X` |  |  |', result)
+
+    def test_generate_register_table_with_documentation(self):
+        """Registers with documentation produce a table with optional columns."""
+        self.mock_doc_model.general_docs['registers'] = [
+            {
+                'name': 'A',
+                'description': 'Accumulator register',
+                'details': 'Primary working register.',
+                'size': 8
+            },
+            {
+                'name': 'SP',
+                'description': 'Stack pointer',
+                'details': None,
+                'size': 16
+            },
+            {
+                'name': 'X',
+                'description': None,
+                'details': None,
+                'size': None
+            }
+        ]
+
+        generator = MarkdownGenerator(self.mock_doc_model, verbose=0)
+        result = generator.generate()
+
+        self.assertIn('### Register Set', result)
+        self.assertIn('| Register Name | Description | Bit Size |', result)
+        self.assertIn('| `A` | Accumulator register<br><br>Primary working register. | 8 |', result)
+        self.assertIn('| `SP` | Stack pointer | 16 |', result)
+        self.assertIn('| `X` |  |  |', result)
+
+    def test_generate_register_table_with_names_only(self):
+        """Registers without documentation fall back to a name-only table."""
+        self.mock_doc_model.general_docs['registers'] = [
+            {
+                'name': 'A',
+                'description': None,
+                'details': None,
+                'size': None
+            },
+            {
+                'name': 'B',
+                'description': None,
+                'details': None,
+                'size': None
+            }
+        ]
+
+        generator = MarkdownGenerator(self.mock_doc_model, verbose=0)
+        result = generator.generate()
+
+        self.assertIn('### Register Set', result)
+        self.assertIn('| Register Name |', result)
+        self.assertIn('| `A` |', result)
+        self.assertIn('| `B` |', result)
 
     def test_generate_with_instruction_documentation(self):
         """Test generating document with instruction documentation."""
@@ -182,9 +259,9 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.assertLess(arithmetic_pos, data_movement_pos)
 
         # Verify instruction headers
-        self.assertIn('### ADD : Add to accumulator', result)
-        self.assertIn('### LDA : Load accumulator', result)
-        self.assertIn('### STA : Store accumulator', result)
+        self.assertIn('### `ADD` : Add to accumulator', result)
+        self.assertIn('### `LDA` : Load accumulator', result)
+        self.assertIn('### `STA` : Store accumulator', result)
 
         # Verify detailed instruction content
         self.assertIn('Load a value into the accumulator register', result)
@@ -243,7 +320,7 @@ class TestMarkdownGenerator(unittest.TestCase):
 
         # Verify newlines are converted to <br> in table cells
         self.assertIn('| test | Line 1<br>Line 2 | Detail 1<br>Detail 2 |', result)
-        self.assertIn('| test_flag | T | Flag line 1<br>Flag line 2 | Flag detail 1<br>Flag detail 2 |', result)
+        self.assertIn('| test_flag | `T` | Flag line 1<br>Flag line 2 | Flag detail 1<br>Flag detail 2 |', result)
 
     def test_modifies_table_without_details_column(self):
         """Test that modifies table omits Details column when no entries have details."""

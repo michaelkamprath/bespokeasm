@@ -31,6 +31,30 @@ class TestDocumentationModel(unittest.TestCase):
         """Test parsing general documentation section."""
         self.mock_isa_model._config = {
             'general': {
+                'word_size': 12,
+                'registers': {
+                    'A': {
+                        'description': 'Accumulator register',
+                        'details': 'Primary working register.',
+                        'size': 8
+                    },
+                    'SP': {
+                        'description': 'Stack pointer',
+                        'size': 16
+                    },
+                    'X': {}
+                },
+                'flags': {
+                    'C': {
+                        'name': 'carry',
+                        'description': 'Carry flag',
+                        'details': 'Set on arithmetic overflow'
+                    },
+                    'Z': {
+                        'name': 'zero',
+                        'description': 'Zero flag'
+                    }
+                },
                 'documentation': {
                     'description': 'Test ISA Description',
                     'details': 'Detailed information about the ISA',
@@ -43,18 +67,6 @@ class TestDocumentationModel(unittest.TestCase):
                             'description': 'Register addressing'
                         }
                     },
-                    'flags': [
-                        {
-                            'name': 'carry',
-                            'symbol': 'C',
-                            'description': 'Carry flag',
-                            'details': 'Set on arithmetic overflow'
-                        },
-                        {
-                            'name': 'zero',
-                            'description': 'Zero flag'
-                        }
-                    ],
                     'examples': [
                         {
                             'description': 'Basic example',
@@ -83,6 +95,22 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertEqual(addressing_modes[1]['description'], 'Register addressing')
         self.assertIsNone(addressing_modes[1]['details'])
 
+        # Test registers
+        registers = model.general_docs['registers']
+        self.assertEqual(len(registers), 3)
+        self.assertEqual(registers[0]['name'], 'A')
+        self.assertEqual(registers[0]['description'], 'Accumulator register')
+        self.assertEqual(registers[0]['details'], 'Primary working register.')
+        self.assertEqual(registers[0]['size'], 8)
+        self.assertEqual(registers[1]['name'], 'SP')
+        self.assertEqual(registers[1]['description'], 'Stack pointer')
+        self.assertIsNone(registers[1]['details'])
+        self.assertEqual(registers[1]['size'], 16)
+        self.assertEqual(registers[2]['name'], 'X')
+        self.assertIsNone(registers[2]['description'])
+        self.assertIsNone(registers[2]['details'])
+        self.assertIsNone(registers[2]['size'])
+
         # Test flags
         flags = model.general_docs['flags']
         self.assertEqual(len(flags), 2)
@@ -91,7 +119,7 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertEqual(flags[0]['description'], 'Carry flag')
         self.assertEqual(flags[0]['details'], 'Set on arithmetic overflow')
         self.assertEqual(flags[1]['name'], 'zero')
-        self.assertIsNone(flags[1]['symbol'])
+        self.assertEqual(flags[1]['symbol'], 'Z')
         self.assertEqual(flags[1]['description'], 'Zero flag')
 
         # Test examples
@@ -100,6 +128,46 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertEqual(examples[0]['description'], 'Basic example')
         self.assertEqual(examples[0]['code'], 'lda #5')
         self.assertEqual(examples[0]['details'], 'Load immediate value')
+
+    def test_register_documentation_from_list(self):
+        """Registers provided as a list are converted into name-only documentation entries."""
+        self.mock_isa_model._config = {
+            'general': {
+                'registers': ['A', 'B', 'C']
+            }
+        }
+
+        model = DocumentationModel(self.mock_isa_model, verbose=0)
+        registers = model.general_docs['registers']
+        self.assertEqual(len(registers), 3)
+        self.assertEqual(registers[0]['name'], 'A')
+        self.assertIsNone(registers[0]['description'])
+        self.assertIsNone(registers[0]['details'])
+        self.assertIsNone(registers[0]['size'])
+
+    def test_parse_general_documentation_legacy_flags(self):
+        """Legacy documentation.flags structure is still supported."""
+        self.mock_isa_model._config = {
+            'general': {
+                'documentation': {
+                    'flags': [
+                        {
+                            'name': 'carry',
+                            'symbol': 'C',
+                            'description': 'Carry flag'
+                        }
+                    ]
+                }
+            }
+        }
+
+        model = DocumentationModel(self.mock_isa_model, verbose=1)
+        flags = model.general_docs['flags']
+        self.assertEqual(len(flags), 1)
+        self.assertEqual(flags[0]['name'], 'carry')
+        self.assertEqual(flags[0]['symbol'], 'C')
+        self.assertEqual(flags[0]['description'], 'Carry flag')
+        self.assertIsNone(flags[0]['details'])
 
     def test_parse_instruction_documentation(self):
         """Test parsing instruction documentation."""

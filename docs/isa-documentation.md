@@ -14,8 +14,9 @@ The general documentastion is mostly implied by the configuration of the `genera
 | `description` | string | A short description of the instruction set architecture. |
 | `details` | string | _Optional_ A detailed description of the instruction set architecture. Markdown text is allowed. |
 | `addressing_modes` | dictionary | _Optional_ A dictionary of addressing modes. The keys are the addressing mode names and the values are dictionaries with the following keys:<ul><li>`description` - A short description of the addressing mode.</li><li>`details` - _Optional_ A detailed description of the addressing mode. Markdown text is allowed.</li></ul>The keys in this dictionary are used by the `mode` field in the [Operand Documentation](#operand-documentation) section. Note that while there is corelation between an instruction set's addressing modes and **BespokeASM**'s operand types, an operand type describes how *BespokeASM* will parse the operand value when assembling an instruction, while an addressing mode describes how the operand value is used in the instruction set and ultimately in the hardware the assembled bytecode is executed on and is not a **BespokeASM** concept. |
-| `flags` | array | _Optional_ An array of flags. The flags are used to describe the flags that are supported by the instruction set. The flags are a dictionary with the following keys:<ul><li>`name` - The name of the flag.</li><li>`symbol` - _Optional_ A very short symbol representing the flag (e.g., "C" for carry, "Z" for zero). This is commonly used in assembly language documentation.</li><li>`description` - A short description of the flag.</li><li>`details` - _Optional_ A detailed description of the flag. Markdown text is allowed.</li></ul>The flags are used to describe the flags that are supported by the instruction set. |
 | `examples` | array | _Optional_ An array of example instructions. Each example is a dictionary with the following keys:<ul><li>`description` - A short description of the example.</li><li>`details` - _Optional_ A detailed description of the example. Markdown text is allowed.</li><li>`code` - The code of the example instruction.</li></ul><p>Examples are used to show how the instruction set can be used in practice. They should be used to demonstrate the use of the instruction set in a way that is easy to understand and use. |
+
+Flag documentation is defined directly in the `general.flags` dictionary rather than inside the `documentation` subsection. Each entry in that dictionary is keyed by the flag symbol and contains the remaining metadata (for example, `description` and optional `details`).
 
 
 ### Instruction Documentation
@@ -57,21 +58,21 @@ The markdown documentation page will have the following overall structure:
 
 ### General Information Section
 
-The General Information section will include comprehensive details from the entire `general` section of the configuration file, structured as follows:
+The General Information section will include comprehensive details from the entire `general` section of the configuration file. Each subsection is emitted as a two-column markdown table (`<Attribute> | Value`) with the attribute names bolded. When multiple tables are generated, they are separated by horizontal rules (`---`) to match the curated example layout. Fields that are absent from the configuration are omitted from the tables entirely.
 
 #### ISA Overview
 - **ISA Name** - From `general.identifier.name` (if present)
 - **Version** - From `general.identifier.version` (if present)
-- **File Extension** - From `general.identifier.extension` (if present, otherwise defaults to "asm")
+- **File Extension** - From `general.identifier.extension` (if present). Values are rendered using the `*.ext` convention (e.g., `*.sap1`).
 - **Description** - From `general.documentation.description` (if present)
-- **Details** - From `general.documentation.details` (if present, rendered as markdown)
+- **Details** - From `general.documentation.details` (if present, rendered as markdown immediately after the table)
 
 #### Hardware Architecture Details
 - **Address Size** - From `general.address_size` (required field)
-- **Word Size** - From `general.word_size` (defaults to 8 if not specified)
-- **Word Segment Size** - From `general.word_segment_size` (defaults to word_size if not specified)
-- **Page Size** - From `general.page_size` (defaults to 1 if not specified)
-- **Origin Address** - From `general.origin` (defaults to 0 if not specified)
+- **Word Size** - From `general.word_size`
+- **Word Segment Size** - From `general.word_segment_size` (only shown when different from `general.word_size`)
+- **Page Size** - From `general.page_size` (only shown when the value is greater than 1, rendered as `<value> addresses`)
+- **Origin Address** - From `general.origin` (shown as **Default Origin Address** when the value is `0`)
 
 #### Endianness Configuration
 - **Multi-Word Endianness** - From `general.multi_word_endianness` (defaults to "big" if not specified)
@@ -82,16 +83,21 @@ The General Information section will include comprehensive details from the enti
 - **C-String Terminator** - From `general.cstr_terminator` (defaults to 0 if not specified)
 - **Embedded Strings Allowed** - From `general.allow_embedded_strings` (defaults to false if not specified)
 - **String Byte Packing** - From `general.string_byte_packing` (defaults to false if not specified)
-- **String Byte Packing Fill** - From `general.string_byte_packing_fill` (defaults to 0 if not specified, only relevant if string_byte_packing is true)
+- **String Byte Packing Fill** - From `general.string_byte_packing_fill` (only shown when string byte packing is enabled)
 
 #### Register Set
-- **Registers** - From `general.registers` (if present, displayed as a list)
+**Registers** - If the `registers` seciton fo the `general` configuration is present, then the set of registers will be documentated in a table with the following columns:
+* Register Name
+* Description
+* Bit Size
+
+The columns in this table should only be present if the relevant configuration is available for at least one register in the set.
 
 #### Addressing Modes
 - **Addressing Modes** - Table of addressing modes from `general.documentation.addressing_modes` (if present)
 
 #### Flags
-- **Flags** - Table of flags from `general.documentation.flags` (if present, including symbol if provided)
+- **Flags** - Table of flags from `general.flags` (if present). Each flag entry is keyed by its symbol, and the symbol is rendered as inline code in the table.
 
 #### Examples
 - **Examples** - Code examples from `general.documentation.examples` (if present)
@@ -103,11 +109,11 @@ The General Information section will include comprehensive details from the enti
 
 The following formatting guidelines apply to all sections of the generated documentation:
 
-- Fields with default values should show both the configured value and the default (e.g., "Word Size: 16 bits (default: 8)")
-- Boolean fields should be clearly indicated as "Enabled" or "Disabled"
-- Optional fields that are not present should be omitted from the documentation
-- Required fields should always be displayed
-- Deprecated fields should be marked with a deprecation notice
+- Tables are used whenever possible for attribute/value pairs to improve scanability.
+- Boolean fields are rendered as "Enabled" or "Disabled".
+- Optional fields that are not present are omitted from the documentation.
+- Required fields should always be displayed when data exists.
+- Deprecated fields should be marked with a deprecation notice.
 
 #### Table Column Optimization
 
@@ -123,7 +129,7 @@ The distinct set of `category` values will be used as level 2 sections in the do
 
 Instructions within each category will be listed in alphabetical order.
 
-Each instruction's documentation will be prefaced with a markdown section header `### <instruction mnemonic> : <instruction description>` where `<instruction mnemonic>` is the instruction mnemonic capitalized and ` : <instruction description>` is the instruction description from the [Instruction Documentation](#instruction-documentation) section and is only present if the `description` field is present in the [Instruction Documentation](#instruction-documentation) section.
+Each instruction's documentation will be prefaced with a markdown section header ``### `<instruction mnemonic>` : <instruction description>`` where `<instruction mnemonic>` is the instruction mnemonic capitalized and rendered as inline code. The ` : <instruction description>` suffix comes from the [Instruction Documentation](#instruction-documentation) section and is only present if the `description` field is provided.
 
 If the instruction has a `modifies` field, then it will be listed in a markdown table under the instruction's documentation with the text header of "Modifies:". Each entry in the `modifies` field will be listed in the table with the following columns:
 - `Type` - The type of modification (Register, Memory, or Flag).
