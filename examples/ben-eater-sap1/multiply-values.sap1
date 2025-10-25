@@ -1,0 +1,37 @@
+; Multiply the bytes stored at addresses $0E and $0F, emit the product on the OUT register
+#require __LANGUAGE_NAME__ == eater-sap1
+#require __LANGUAGE_VERSION__ >= 1.0.0
+
+.org $0
+
+check_multiplier:
+    LDA factor_b        ; load current counter (multiplier)
+    JZ output_result    ; nothing to do if multiplier is zero
+    LDA partial         ; load the running product (starts at 0)
+
+multiply_loop:
+    ADD factor_a        ; accumulate multiplicand into the running product
+    STA partial         ; persist the updated product
+    LDA factor_b        ; fetch the remaining count
+    SUB decrement       ; decrement multiplier by one
+    STA factor_b        ; write back updated multiplier
+    JMP check_multiplier
+
+output_result:
+    LDA partial         ; ensure result is in A for OUT
+    OUT
+    HLT
+
+.org $0C
+
+partial:
+    .byte $00           ; storage for the running product
+
+decrement:
+    .byte $01           ; constant used to decrement the multiplier
+
+factor_a:
+    .byte $04           ; multiplicand source stored at $0E
+
+factor_b:
+    .byte $03           ; multiplier source stored at $0F
