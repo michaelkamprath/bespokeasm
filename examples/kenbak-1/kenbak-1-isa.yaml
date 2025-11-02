@@ -3,15 +3,55 @@ general:
   address_size: 8
   multi_word_endianness: big
   registers:
-    - a
-    - b
-    - x
+    a:
+      title: "`A` Register"
+      details: Primary ALU register
+    b:
+      title: "`B` Register"
+      details: Secondary ALU register
+    x:
+      title: Indexing Register
+      details: The contents of the `x` register are used in the `indexed` address mode.
+    output:
+      title: Output Register
+      details: This register controls the Console Data Lamps when the computer is in the Run state.
+
   origin: 4
   identifier:
     name: kenbak-1
     version: "1.0.2"
     extension: kb1
-  min_version: 0.5.0
+  min_version: 0.7.0
+  documentation:
+    addressing_modes:
+      register:
+        description: register
+        details: the operand is a register.
+      immediate:
+        description: immediate value
+        details: the operand is the contents of the second word of the instruction.
+      memory:
+        description: address of a value in memory
+        details: the second word of the instruction is the address of the operand.
+      indirect:
+        description: address to an address of a value in memory
+        details: the second word of the instruction is the address of the address of the operand.
+      indexed:
+        description: index value added to `X` register
+        details: >
+          the contents of the second word of the instruction are added to the contents of the `X`
+          Register to form the address of the operand.
+      indirect_indexed:
+        description: address to index value added to `X` register
+        details: >
+          the contents of the second word of the instruction are used as an address pointer to the
+          contents of another, second, location. The contents of this second location are added to the
+          contents of the `X` Register to form the address of the operand.
+      numeric_enumeration:
+        description: mapped integer values
+        details: >
+          There is a set of allowed integer values for the operand, and each integer value is mapped
+          to a specific meaning and thus byte code value.
 predefined:
   data:
     - name: A_REG
@@ -60,6 +100,9 @@ operand_sets:
           value: 0
           size: 2
           position: prefix
+        documentation:
+          title: "`a` register"
+          mode: register
       register_b:
         type: register
         register: b
@@ -67,6 +110,9 @@ operand_sets:
           value: 1
           size: 2
           position: prefix
+        documentation:
+          title: "`b` register"
+          mode: register
       register_x:
         type: register
         register: x
@@ -74,6 +120,11 @@ operand_sets:
           value: 2
           size: 2
           position: prefix
+        documentation:
+          title: "`x` register"
+          mode: register
+    documentation:
+      title: Register Operands
   memory_operands:
     operand_values:
       immediate:
@@ -84,6 +135,9 @@ operand_sets:
         argument:
           size: 8
           word_align: true
+        documentation:
+          title: "Immediate Value"
+          mode: immediate
       indirect_addr:
         type: indirect_numeric
         bytecode:
@@ -92,6 +146,9 @@ operand_sets:
         argument:
           size: 8
           word_align: true
+        documentation:
+          title: "Memory Value"
+          mode: memory
       deferred_addr:
         type: deferred_numeric
         bytecode:
@@ -100,6 +157,9 @@ operand_sets:
         argument:
           size: 8
           word_align: true
+        documentation:
+          title: "Indirect Memory Value"
+          mode: indirect
       indexed_x:
         type: indirect_register
         register: x
@@ -111,6 +171,9 @@ operand_sets:
           min: 0
           size: 8
           word_align: true
+        documentation:
+          title: "Indexed `x` Memory Value"
+          mode: indexed
       defered_indexed_x:
         type: indirect_indexed_register
         register: x
@@ -123,16 +186,22 @@ operand_sets:
             argument:
               size: 8
               word_align: true
+        documentation:
+          title: "Indirect Indexed `x` Memory Value"
+          mode: indirect_indexed
+    documentation:
+      title: Memory Value Operands
+      description: Operands that represent a value in RAM, each using a different addressing mode.
   direct_memory_no_bc:
     operand_values:
-      immediate:
+      numeric:
         type: numeric
         argument:
           size: 8
           word_align: true
   indirect_memory_no_bc:
     operand_values:
-      immediate:
+      indirect_numeric:
         type: indirect_numeric
         argument:
           size: 8
@@ -152,6 +221,11 @@ operand_sets:
           size: 3
           max: 7
           min: 0
+        documentation:
+          mode: numeric_enumeration
+    documentation:
+      title: Bit Indexes
+      description: The operand is the bit index to be operated on by the instruction.
   shift_enums:
     operand_values:
       shift_enums:
@@ -163,6 +237,8 @@ operand_sets:
             2: 0b10
             3: 0b11
             4: 0b00
+        documentation:
+          mode: numeric_enumeration
   shift_registers:
     operand_values:
       register_a:
@@ -171,21 +247,36 @@ operand_sets:
         bytecode:
           value: 0
           size: 1
+        documentation:
+          title: "`a` register"
+          mode: register
       register_b:
         type: register
         register: b
         bytecode:
           value: 1
           size: 1
+        documentation:
+          title: "`b` register"
+          mode: register
+    documentation:
+      title: Shift Register Operands
+      description: Registers that are able to be used with shift instructions.
 instructions:
   noop:
     bytecode:
       value: 128
       size: 8
+    documentation:
+      category: control
+      title: No Operation
   halt:
     bytecode:
       value: 0
       size: 8
+    documentation:
+      category: control
+      title: Halt Execution
   ld:
     bytecode:
       value: 2
@@ -207,6 +298,9 @@ instructions:
             list:
               - memory_operands
               - register_operands
+    documentation:
+      category: data movement
+      title: Load Data
   add:
     bytecode:
       value: 0
@@ -217,6 +311,14 @@ instructions:
         list:
           - register_operands
           - memory_operands
+    documentation:
+      category: arithmetic
+      title: Addition
+      details: >
+        The contents of the designated register and the second operand
+        are added together and the sum is placed in the designated register. The value indicated by
+        second operand is unchanged in the memory (unless the operand was the
+        designated register's address itself).
   sub:
     bytecode:
       value: 1
@@ -227,6 +329,14 @@ instructions:
         list:
           - register_operands
           - memory_operands
+    documentation:
+      category: arithmetic
+      title: Subtraction
+      details: >
+        The value indicated by the second operand is subtracted from the designated
+        register and the difference is placed in the designated register. The value indicated by
+        second operand is unchanged in the memory (unless the operand was the
+        designated register's address itself).
   and:
     bytecode:
       value: 26
@@ -236,6 +346,9 @@ instructions:
       operand_sets:
         list:
           - memory_operands
+    documentation:
+      category: arithmetic
+      title: Logical Product
   or:
     bytecode:
       value: 24
@@ -245,6 +358,9 @@ instructions:
       operand_sets:
         list:
           - memory_operands
+    documentation:
+      category: arithmetic
+      title: Logical Sum
   lneg:
     bytecode:
       value: 27
@@ -254,6 +370,9 @@ instructions:
       operand_sets:
         list:
           - memory_operands
+    documentation:
+      category: arithmetic
+      title: Load Complement
   jp:
     bytecode:
       value: 231
@@ -272,6 +391,9 @@ instructions:
           operand_sets:
             list:
               - deferred_memory_no_bc
+    documentation:
+      category: control
+      title: Jump Direct
   jm:
     bytecode:
       value: 247
@@ -290,6 +412,9 @@ instructions:
           operand_sets:
             list:
               - deferred_memory_no_bc
+    documentation:
+      category: control
+      title: Jump and Mark Direct
   jpnz:
     bytecode:
       value: 35
@@ -310,6 +435,9 @@ instructions:
             list:
               - register_operands
               - deferred_memory_no_bc
+    documentation:
+      category: control
+      title: Jump if Register Non-Zero
   jpz:
     bytecode:
       value: 36
@@ -330,6 +458,9 @@ instructions:
             list:
               - register_operands
               - deferred_memory_no_bc
+    documentation:
+      category: control
+      title: Jump if Register Zero
   jpn:
     bytecode:
       value: 37
@@ -350,6 +481,9 @@ instructions:
             list:
               - register_operands
               - deferred_memory_no_bc
+    documentation:
+      category: control
+      title: Jump if Register Negative
   jpp:
     bytecode:
       value: 38
@@ -370,6 +504,9 @@ instructions:
             list:
               - register_operands
               - deferred_memory_no_bc
+    documentation:
+      category: control
+      title: Jump if Register Positive
   jppnz:
     bytecode:
       value: 39
@@ -390,6 +527,9 @@ instructions:
             list:
               - register_operands
               - deferred_memory_no_bc
+    documentation:
+      category: control
+      title: Jump if Register Positive and Non-Zero
   jmnz:
     bytecode:
       value: 51
@@ -410,6 +550,9 @@ instructions:
             list:
               - register_operands
               - deferred_memory_no_bc
+    documentation:
+      category: control
+      title: Jump and Mark if Register Non-Zero
   jmz:
     bytecode:
       value: 52
@@ -430,6 +573,9 @@ instructions:
             list:
               - register_operands
               - deferred_memory_no_bc
+    documentation:
+      category: control
+      title: Jump and Mark if Register Zero
   jmn:
     bytecode:
       value: 53
@@ -450,6 +596,9 @@ instructions:
             list:
               - register_operands
               - deferred_memory_no_bc
+    documentation:
+      category: control
+      title: Jump and Mark if Register Negative
   jmp:
     bytecode:
       value: 54
@@ -470,6 +619,9 @@ instructions:
             list:
               - register_operands
               - deferred_memory_no_bc
+    documentation:
+      category: control
+      title: Jump and Mark if Register Positive
   jmpnz:
     bytecode:
       value: 55
@@ -490,6 +642,9 @@ instructions:
             list:
               - register_operands
               - deferred_memory_no_bc
+    documentation:
+      category: control
+      title: Jump and Mark if Register Positive and Non-Zero
   skip0:
     bytecode:
       value: 2
@@ -503,6 +658,9 @@ instructions:
         list:
           - bit_indexes
           - indirect_memory_no_bc
+    documentation:
+      category: control
+      title: Skip if Bit is Zero
   skip1:
     bytecode:
       value: 3
@@ -516,6 +674,9 @@ instructions:
         list:
           - bit_indexes
           - indirect_memory_no_bc
+    documentation:
+      category: control
+      title: Skip if Bit is One
   set0:
     bytecode:
       value: 0
@@ -529,6 +690,9 @@ instructions:
         list:
           - bit_indexes
           - indirect_memory_no_bc
+    documentation:
+      category: arithmetic
+      title: Set Bit Zero
   set1:
     bytecode:
       value: 1
@@ -542,6 +706,9 @@ instructions:
         list:
           - bit_indexes
           - indirect_memory_no_bc
+    documentation:
+      category: arithmetic
+      title: Set Bit One
   sftl:
     bytecode:
       value: 0b10
@@ -555,6 +722,9 @@ instructions:
         list:
           - shift_registers
           - shift_enums
+    documentation:
+      category: arithmetic
+      title: Shift Left
   sftr:
     bytecode:
       value: 0b00
@@ -568,6 +738,9 @@ instructions:
         list:
           - shift_registers
           - shift_enums
+    documentation:
+      category: arithmetic
+      title: Shift Right
   rotl:
     bytecode:
       value: 0b11
@@ -581,6 +754,9 @@ instructions:
         list:
           - shift_registers
           - shift_enums
+    documentation:
+      category: arithmetic
+      title: Rotate Left
   rotr:
     bytecode:
       value: 0b01
@@ -594,3 +770,6 @@ instructions:
         list:
           - shift_registers
           - shift_enums
+    documentation:
+      category: arithmetic
+      title: Rotate Right

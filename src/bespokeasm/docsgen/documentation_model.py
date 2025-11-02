@@ -157,11 +157,25 @@ class DocumentationModel:
         if isinstance(registers_config, dict):
             for name, info in registers_config.items():
                 if not isinstance(info, dict):
+                    if self.verbose:
+                        click.echo(f'Warning: Register "{name}" configuration should be a dictionary.')
                     info = {}
+
+                title = info.get('title')
+                description = info.get('description')
+                details = info.get('details')
+
+                # Backward compatibility: treat legacy description as title when title absent.
+                if title is None and description is not None and 'title' not in info:
+                    title = description
+                    description = details
+                    details = None
+
                 register_docs.append({
                     'name': name,
-                    'description': info.get('description'),
-                    'details': info.get('details'),
+                    'title': title,
+                    'description': description,
+                    'details': details,
                     'size': info.get('size')
                 })
         else:
@@ -175,6 +189,7 @@ class DocumentationModel:
             for name in iterator:
                 register_docs.append({
                     'name': name,
+                    'title': None,
                     'description': None,
                     'details': None,
                     'size': None
@@ -289,11 +304,16 @@ class DocumentationModel:
                 operand_doc = operand_config.get('documentation') or {}
                 operand_type = operand_config.get('type', '')
 
+                mode_from_doc = bool(operand_doc.get('mode'))
                 mode = operand_doc.get('mode') or self._default_mode_from_type(operand_type)
                 description = operand_doc.get('description')
 
                 details = operand_doc.get('details')
-                auto_details = self._derive_operand_auto_details(operand_type, operand_config)
+                auto_details = self._derive_operand_auto_details(
+                    operand_type,
+                    operand_config,
+                    bool(details)
+                )
                 if auto_details:
                     combined_details = []
                     if details:
@@ -307,6 +327,7 @@ class DocumentationModel:
                     'name': operand_name,
                     'title': operand_doc.get('title'),
                     'mode': mode,
+                    'mode_from_doc': mode_from_doc,
                     'description': description,
                     'details': details,
                     'syntax': syntax,
@@ -419,26 +440,31 @@ class DocumentationModel:
             syntax = register_label if register_label else 'register_label'
         elif operand_type == 'indexed_register':
             register_label = operand_config.get('register', 'register_label')
-            syntax = f'{register_label} + offset_operand'
+            index_syntax = self._build_index_operand_syntax(operand_config)
+            if index_syntax:
+                syntax = f'{register_label} + {index_syntax}'
+            else:
+                syntax = f'{register_label} + offset_operand'
         elif operand_type == 'indirect_register':
             register_label = operand_config.get('register', 'register_label')
             offset_suffix = ' + offset' if operand_config.get('offset') else ''
             syntax = f'[{register_label}{offset_suffix}]'
         elif operand_type == 'indirect_indexed_register':
             register_label = operand_config.get('register', 'register_label')
-            syntax = f'[{register_label} + offset_operand]'
+            index_syntax = self._build_index_operand_syntax(operand_config)
+            if not index_syntax:
+                index_syntax = 'offset_operand'
+            syntax = f'[{register_label} + {index_syntax}]'
         elif operand_type == 'enumeration':
             literal_tokens = self._collect_enumeration_literals(operand_config)
             if literal_tokens:
                 syntax = ' | '.join(literal_tokens)
             else:
                 syntax = operand_name
-        elif operand_type in {'numeric_enumeration', 'numeric_bytecode'}:
-            literal_tokens = self._collect_enumeration_literals(operand_config)
-            if literal_tokens:
-                syntax = ' | '.join(literal_tokens)
-            else:
-                syntax = f'<{operand_name}>'
+        elif operand_type == 'numeric_enumeration':
+            syntax = 'integer'
+        elif operand_type == 'numeric_bytecode':
+            syntax = 'integer'
         elif operand_type == 'address':
             syntax = 'numeric_expression'
         elif operand_type == 'relative_address':
@@ -475,8 +501,38 @@ class DocumentationModel:
 
         return sorted(literals)
 
+    def _build_index_operand_syntax(self, operand_config: dict[str, Any]) -> str | None:
+        """Derive combined syntax for index operands."""
+        index_operands = operand_config.get('index_operands')
+        if not isinstance(index_operands, dict) or not index_operands:
+            return None
+
+        syntaxes: list[str] = []
+        for idx_name, idx_config in index_operands.items():
+            if not isinstance(idx_config, dict):
+                continue
+            idx_type = idx_config.get('type')
+            if not idx_type:
+                continue
+            idx_syntax = self._derive_operand_syntax(idx_name, idx_type, idx_config)
+            if idx_syntax:
+                syntaxes.append(idx_syntax)
+
+        if not syntaxes:
+            return None
+
+        # Preserve order while removing duplicates
+        unique_syntaxes = list(dict.fromkeys(syntaxes))
+        if len(unique_syntaxes) == 1:
+            return unique_syntaxes[0]
+        return f"({' | '.join(unique_syntaxes)})"
+
     @staticmethod
-    def _derive_operand_auto_details(operand_type: str | None, operand_config: dict[str, Any]) -> list[str]:
+    def _derive_operand_auto_details(
+        operand_type: str | None,
+        operand_config: dict[str, Any],
+        has_manual_details: bool
+    ) -> list[str]:
         """Generate automatic detail notes for specific operand configurations."""
         notes: list[str] = []
         operand_type = operand_type or ''
@@ -511,6 +567,12 @@ class DocumentationModel:
                     elif max_value is not None:
                         notes.append(f'Maximum value: {max_value}.')
 
+        if operand_type == 'numeric_enumeration' and not has_manual_details:
+            literals = DocumentationModel._collect_enumeration_literals(operand_config)
+            if literals:
+                formatted = ', '.join(f'`{literal}`' for literal in literals)
+                notes.append(f'Possible values: {formatted}.')
+
         return notes
 
     def _parse_instruction_documentation(self) -> dict[str, Any]:
@@ -537,9 +599,14 @@ class DocumentationModel:
 
             categories.add(category)
 
+            title = doc_config.get('title')
+            if title is None and 'description' in doc_config:
+                # Backward compatibility for legacy field name
+                title = doc_config.get('description')
+
             instruction_docs[instr_name] = {
                 'category': category,
-                'description': doc_config.get('description') if documented else None,
+                'title': title if documented else None,
                 'details': doc_config.get('details') if documented else None,
                 'modifies': self._parse_modifies(doc_config.get('modifies', [])) if documented else [],
                 'examples': self._parse_examples(doc_config.get('examples', [])) if documented else [],

@@ -298,8 +298,11 @@ class MarkdownGenerator:
 
         sections: list[str] = ['## Operand Sets']
         for operand_set in sorted_sets:
-            display_name = operand_set.get('title') or operand_set.get('key', 'Operand Set')
-            subsection_parts: list[str] = [f'### {display_name}']
+            key = operand_set.get('key', 'Operand Set')
+            title = operand_set.get('title')
+            code_key = f'`{key}`'
+            header_text = f'{code_key} - {title}' if title else code_key
+            subsection_parts: list[str] = [f'### {header_text}']
 
             category = operand_set.get('category')
             if category:
@@ -328,7 +331,7 @@ class MarkdownGenerator:
         if not operands:
             return ''
 
-        headers = ['Operand', 'Syntax', 'Mode', 'Description', 'Details']
+        headers = ['Operand', 'Syntax', '[Addressing Mode](#addressing-modes)', 'Description', 'Details']
         alignments = ['left', 'left', 'left', 'left', 'left']
         rows: list[list[str]] = []
 
@@ -343,9 +346,17 @@ class MarkdownGenerator:
                 operand_cell = f'`{operand_name}`' if operand_name else ''
 
             syntax = operand.get('syntax', '')
-            syntax_cell = f'`{syntax}`' if syntax else ''
+            if syntax:
+                escaped_syntax = syntax.replace('|', r'\|')
+                syntax_cell = f'`{escaped_syntax}`'
+            else:
+                syntax_cell = ''
 
-            mode = operand.get('mode') or ''
+            mode_value = operand.get('mode') or ''
+            if operand.get('mode_from_doc') and mode_value:
+                mode_cell = f'`{mode_value}`'
+            else:
+                mode_cell = mode_value
             description = operand.get('description') or ''
             if description:
                 description = description.replace('\n', '<br>')
@@ -354,7 +365,7 @@ class MarkdownGenerator:
             if details:
                 details = details.replace('\n', '<br>')
 
-            rows.append([operand_cell, syntax_cell, mode, description, details])
+            rows.append([operand_cell, syntax_cell, mode_cell, description, details])
 
         table = self._generate_markdown_table(headers, rows, column_alignments=alignments)
         if not table:
@@ -461,31 +472,49 @@ class MarkdownGenerator:
         if not registers:
             return ''
 
-        headers = ['Register Name', 'Description', 'Bit Size']
+        has_title = any(reg.get('title') for reg in registers)
+        has_description = any((reg.get('description') or reg.get('details')) for reg in registers)
+        has_size = any(reg.get('size') is not None for reg in registers)
+
+        headers = ['Symbol']
+        alignments = ['left']
+        if has_title:
+            headers.append('Title')
+            alignments.append('left')
+        if has_description:
+            headers.append('Description')
+            alignments.append('left')
+        if has_size:
+            headers.append('Bit Size')
+            alignments.append('right')
+
         rows: list[list[str]] = []
 
         for register in registers:
-            name_value = register.get('name')
-            name = '' if name_value is None else str(name_value)
+            symbol_value = register.get('name')
+            symbol = f'`{symbol_value}`' if symbol_value is not None else ''
+            row = [symbol]
 
-            description_value = register.get('description')
-            description = str(description_value).replace('\n', '<br>') if description_value else ''
-            details = register.get('details')
+            if has_title:
+                row.append(register.get('title') or '')
 
-            # Normalize whitespace and support markdown line breaks
-            if details:
-                details_text = str(details).replace('\n', '<br>')
-                if description:
-                    description = f'{description}<br><br>{details_text}'
-                else:
-                    description = details_text
+            if has_description:
+                description_value = register.get('description') or ''
+                description = str(description_value).replace('\n', '<br>') if description_value else ''
+                details = register.get('details')
+                if details:
+                    details_text = str(details).replace('\n', '<br>')
+                    description = f'{description}<br><br>{details_text}' if description else details_text
+                row.append(description)
 
-            size = register.get('size')
-            bit_size = str(size) if size is not None else ''
+            if has_size:
+                size = register.get('size')
+                bit_size = '' if size is None else str(size)
+                row.append(bit_size)
 
-            rows.append([f'`{name}`', description, bit_size])
+            rows.append(row)
 
-        table = self._generate_markdown_table(headers, rows, column_alignments=['left', 'left', 'right'])
+        table = self._generate_markdown_table(headers, rows, column_alignments=alignments)
         if not table:
             return ''
 
@@ -513,7 +542,9 @@ class MarkdownGenerator:
         for mode in addressing_modes:
             details = mode.get('details', '').replace('\n', '<br>') if mode.get('details') else ''
             description = mode.get('description', '').replace('\n', '<br>')
-            rows.append([mode['name'], description, details])
+            mode_name = mode.get('name', '')
+            mode_cell = f'`{mode_name}`' if mode_name else ''
+            rows.append([mode_cell, description, details])
 
         # Generate optimized table
         table = self._generate_markdown_table(headers, rows)
@@ -620,8 +651,8 @@ class MarkdownGenerator:
         # Instruction header
         mnemonic = instruction_name.upper()
         header = f'### `{mnemonic}`'
-        if instruction_doc.get('description'):
-            header += f" : {instruction_doc['description']}"
+        if instruction_doc.get('title'):
+            header += f" : {instruction_doc['title']}"
         sections.append(header)
 
         documented = instruction_doc.get('documented', True)

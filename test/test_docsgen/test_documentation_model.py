@@ -35,12 +35,13 @@ class TestDocumentationModel(unittest.TestCase):
                 'word_size': 12,
                 'registers': {
                     'A': {
-                        'description': 'Accumulator register',
-                        'details': 'Primary working register.',
+                        'title': 'Accumulator',
+                        'description': 'Primary working register.',
                         'size': 8
                     },
                     'SP': {
-                        'description': 'Stack pointer',
+                        'title': 'Stack Pointer',
+                        'description': 'Holds the top of stack address.',
                         'size': 16
                     },
                     'X': {}
@@ -100,14 +101,17 @@ class TestDocumentationModel(unittest.TestCase):
         registers = model.general_docs['registers']
         self.assertEqual(len(registers), 3)
         self.assertEqual(registers[0]['name'], 'A')
-        self.assertEqual(registers[0]['description'], 'Accumulator register')
-        self.assertEqual(registers[0]['details'], 'Primary working register.')
+        self.assertEqual(registers[0]['title'], 'Accumulator')
+        self.assertEqual(registers[0]['description'], 'Primary working register.')
+        self.assertIsNone(registers[0]['details'])
         self.assertEqual(registers[0]['size'], 8)
         self.assertEqual(registers[1]['name'], 'SP')
-        self.assertEqual(registers[1]['description'], 'Stack pointer')
+        self.assertEqual(registers[1]['title'], 'Stack Pointer')
+        self.assertEqual(registers[1]['description'], 'Holds the top of stack address.')
         self.assertIsNone(registers[1]['details'])
         self.assertEqual(registers[1]['size'], 16)
         self.assertEqual(registers[2]['name'], 'X')
+        self.assertIsNone(registers[2]['title'])
         self.assertIsNone(registers[2]['description'])
         self.assertIsNone(registers[2]['details'])
         self.assertIsNone(registers[2]['size'])
@@ -173,15 +177,50 @@ class TestDocumentationModel(unittest.TestCase):
                             }
                         }
                     }
+                },
+                'memory_operands': {
+                    'operand_values': {
+                        'defered_indexed_x': {
+                            'type': 'indirect_indexed_register',
+                            'register': 'x',
+                            'index_operands': {
+                                'indirect_addr': {
+                                    'type': 'indirect_numeric'
+                                }
+                            },
+                            'documentation': {
+                                'title': 'Indirect Indexed Memory Value',
+                                'mode': 'indirect_indexed'
+                            }
+                        }
+                    }
+                },
+                'enum_values': {
+                    'operand_values': {
+                        'enum': {
+                            'type': 'numeric_enumeration',
+                            'bytecode': {
+                                'value_dict': {
+                                    0: 0,
+                                    1: 1,
+                                    2: 2
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
 
         model = DocumentationModel(self.mock_isa_model, verbose=0)
         operand_sets = model.operand_sets
-        self.assertEqual(len(operand_sets), 2)
+        operand_sets_map = {entry['key']: entry for entry in operand_sets}
+        self.assertSetEqual(
+            set(operand_sets_map.keys()),
+            {'register_operands', 'zero_page', 'enum_values', 'memory_operands'}
+        )
 
-        register_set = operand_sets[0]
+        register_set = operand_sets_map['register_operands']
         self.assertEqual(register_set['title'], 'General Registers')
         self.assertEqual(register_set['category'], 'Registers')
         self.assertEqual(register_set['description'], 'General purpose registers.')
@@ -189,22 +228,43 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertEqual([op['name'] for op in register_set['operands']], ['reg_b', 'reg_a'])
         self.assertEqual(register_set['operands'][0]['syntax'], 'b')
         self.assertEqual(register_set['operands'][0]['mode'], 'Register')
+        self.assertTrue(register_set['operands'][0]['mode_from_doc'])
         self.assertEqual(register_set['operands'][0]['description'], 'Index register')
-        self.assertEqual(register_set['operands'][0]['details'], None)
+        self.assertIsNone(register_set['operands'][0]['details'])
         self.assertEqual(register_set['operands'][0]['title'], 'Register B')
         self.assertEqual(register_set['operands'][1]['syntax'], 'a')
         self.assertEqual(register_set['operands'][1]['details'], 'Used frequently.')
         self.assertEqual(register_set['operands'][1]['title'], 'Register A')
+        self.assertTrue(register_set['operands'][1]['mode_from_doc'])
 
-        zero_page_set = operand_sets[1]
+        zero_page_set = operand_sets_map['zero_page']
         self.assertEqual(zero_page_set['description'], 'Undocumented operand set zero_page.')
         self.assertIsNone(zero_page_set['details'])
         self.assertEqual(len(zero_page_set['operands']), 1)
         zp_operand = zero_page_set['operands'][0]
         self.assertEqual(zp_operand['mode'], 'Address')
+        self.assertFalse(zp_operand['mode_from_doc'])
         self.assertEqual(zp_operand['syntax'], 'numeric_expression')
         self.assertIn('Valid within `ZERO_PAGE` memory zone.', zp_operand['details'])
         self.assertIsNone(zp_operand['title'])
+
+        enum_set = operand_sets_map['enum_values']
+        self.assertEqual(enum_set['description'], 'Undocumented operand set enum_values.')
+        enum_operand = enum_set['operands'][0]
+        self.assertEqual(enum_operand['mode'], 'Numeric Enumeration')
+        self.assertFalse(enum_operand['mode_from_doc'])
+        self.assertIsNone(enum_operand['title'])
+        self.assertIsNone(enum_operand['description'])
+        self.assertEqual(enum_operand['syntax'], 'integer')
+        self.assertIn('Possible values: `0`, `1`, `2`.', enum_operand['details'])
+
+        memory_set = operand_sets_map['memory_operands']
+        self.assertEqual(memory_set['description'], 'Undocumented operand set memory_operands.')
+        memory_operand = memory_set['operands'][0]
+        self.assertEqual(memory_operand['name'], 'defered_indexed_x')
+        self.assertEqual(memory_operand['syntax'], '[x + [numeric_expression]]')
+        self.assertEqual(memory_operand['mode'], 'indirect_indexed')
+        self.assertTrue(memory_operand['mode_from_doc'])
 
     def test_register_documentation_from_list(self):
         """Registers provided as a list are converted into name-only documentation entries."""
@@ -218,6 +278,7 @@ class TestDocumentationModel(unittest.TestCase):
         registers = model.general_docs['registers']
         self.assertEqual(len(registers), 3)
         self.assertEqual(registers[0]['name'], 'A')
+        self.assertIsNone(registers[0]['title'])
         self.assertIsNone(registers[0]['description'])
         self.assertIsNone(registers[0]['details'])
         self.assertIsNone(registers[0]['size'])
@@ -253,7 +314,7 @@ class TestDocumentationModel(unittest.TestCase):
                 'lda': {
                     'documentation': {
                         'category': 'Data Movement',
-                        'description': 'Load accumulator',
+                        'title': 'Load accumulator',
                         'details': 'Load a value into the accumulator register',
                         'modifies': [
                             {
@@ -277,7 +338,7 @@ class TestDocumentationModel(unittest.TestCase):
                 'add': {
                     'documentation': {
                         'category': 'Arithmetic',
-                        'description': 'Add to accumulator'
+                        'title': 'Add to accumulator'
                     }
                 },
                 'nop': {
@@ -294,7 +355,7 @@ class TestDocumentationModel(unittest.TestCase):
         # Test LDA instruction
         lda_doc = model.instruction_docs['lda']
         self.assertEqual(lda_doc['category'], 'Data Movement')
-        self.assertEqual(lda_doc['description'], 'Load accumulator')
+        self.assertEqual(lda_doc['title'], 'Load accumulator')
         self.assertEqual(lda_doc['details'], 'Load a value into the accumulator register')
         self.assertTrue(lda_doc['documented'])
 
@@ -318,7 +379,7 @@ class TestDocumentationModel(unittest.TestCase):
         # Test ADD instruction (minimal documentation)
         add_doc = model.instruction_docs['add']
         self.assertEqual(add_doc['category'], 'Arithmetic')
-        self.assertEqual(add_doc['description'], 'Add to accumulator')
+        self.assertEqual(add_doc['title'], 'Add to accumulator')
         self.assertIsNone(add_doc['details'])
         self.assertEqual(add_doc['modifies'], [])
         self.assertEqual(add_doc['examples'], [])
@@ -327,7 +388,7 @@ class TestDocumentationModel(unittest.TestCase):
         # Test NOP instruction (no documentation)
         nop_doc = model.instruction_docs['nop']
         self.assertEqual(nop_doc['category'], 'Uncategorized')
-        self.assertIsNone(nop_doc['description'])
+        self.assertIsNone(nop_doc['title'])
         self.assertIsNone(nop_doc['details'])
         self.assertEqual(nop_doc['modifies'], [])
         self.assertEqual(nop_doc['examples'], [])
@@ -340,25 +401,25 @@ class TestDocumentationModel(unittest.TestCase):
                 'lda': {
                     'documentation': {
                         'category': 'Data Movement',
-                        'description': 'Load accumulator'
+                        'title': 'Load accumulator'
                     }
                 },
                 'sta': {
                     'documentation': {
                         'category': 'Data Movement',
-                        'description': 'Store accumulator'
+                        'title': 'Store accumulator'
                     }
                 },
                 'add': {
                     'documentation': {
                         'category': 'Arithmetic',
-                        'description': 'Add to accumulator'
+                        'title': 'Add to accumulator'
                     }
                 },
                 'jmp': {
                     'documentation': {
                         'category': 'Control Flow',
-                        'description': 'Jump'
+                        'title': 'Jump'
                     }
                 }
             }
