@@ -23,6 +23,7 @@ class DocumentationModel:
 
         # Parse documentation sections
         self.general_docs = self._parse_general_documentation()
+        self.operand_sets = self._parse_operand_sets_documentation()
         self.instruction_docs = self._parse_instruction_documentation()
 
     @property
@@ -259,6 +260,259 @@ class DocumentationModel:
 
         return parsed_examples
 
+    def _parse_operand_sets_documentation(self) -> list[dict[str, Any]]:
+        """
+        Parse operand set documentation from the configuration.
+
+        Returns:
+            List of operand set documentation entries.
+        """
+        operand_sets_config = self._config.get('operand_sets', {})
+        operand_set_docs: list[dict[str, Any]] = []
+
+        for set_index, (set_name, set_config) in enumerate(operand_sets_config.items()):
+            if not isinstance(set_config, dict):
+                if self.verbose:
+                    click.echo(f'Warning: Operand set "{set_name}" is not a dictionary.')
+                continue
+
+            doc_config = set_config.get('documentation') or {}
+            operand_values = set_config.get('operand_values') or {}
+
+            operands: list[dict[str, Any]] = []
+            for operand_index, (operand_name, operand_config) in enumerate(operand_values.items()):
+                if not isinstance(operand_config, dict):
+                    if self.verbose:
+                        click.echo(f'Warning: Operand "{operand_name}" in set "{set_name}" is not a dictionary.')
+                    continue
+
+                operand_doc = operand_config.get('documentation') or {}
+                operand_type = operand_config.get('type', '')
+
+                mode = operand_doc.get('mode') or self._default_mode_from_type(operand_type)
+                description = operand_doc.get('description')
+
+                details = operand_doc.get('details')
+                auto_details = self._derive_operand_auto_details(operand_type, operand_config)
+                if auto_details:
+                    combined_details = []
+                    if details:
+                        combined_details.append(details)
+                    combined_details.extend(auto_details)
+                    details = '\n\n'.join(filter(None, combined_details))
+
+                syntax = self._derive_operand_syntax(operand_name, operand_type, operand_config)
+
+                operands.append({
+                    'name': operand_name,
+                    'title': operand_doc.get('title'),
+                    'mode': mode,
+                    'description': description,
+                    'details': details,
+                    'syntax': syntax,
+                    'config_order': operand_index
+                })
+
+            # Apply operand_order if provided
+            operand_order = doc_config.get('operand_order') or []
+            if operand_order:
+                # Map operand name to its order index
+                order_lookup = {name: idx for idx, name in enumerate(operand_order)}
+                max_index = len(order_lookup)
+
+                def sort_key(entry: dict[str, Any]) -> tuple[int, int]:
+                    return (
+                        order_lookup.get(entry['name'], max_index + entry['config_order']),
+                        entry['config_order']
+                    )
+
+                operands.sort(key=sort_key)
+
+            documented = bool(doc_config)
+            description = doc_config.get('description')
+            details = doc_config.get('details')
+
+            if not documented:
+                description = f'Undocumented operand set {set_name}.'
+
+            operand_set_docs.append({
+                'key': set_name,
+                'title': doc_config.get('title'),
+                'category': doc_config.get('category'),
+                'description': description,
+                'details': details,
+                'operands': operands,
+                'documented': documented,
+                'config_index': set_index
+            })
+
+        return operand_set_docs
+
+    @staticmethod
+    def _default_mode_from_type(operand_type: str | None) -> str | None:
+        """Provide a fallback addressing mode label based on the operand type."""
+        if operand_type is None:
+            return None
+
+        defaults = {
+            'numeric': 'Immediate',
+            'indirect_numeric': 'Indirect',
+            'deferred_numeric': 'Deferred',
+            'register': 'Register',
+            'indexed_register': 'Indexed Register',
+            'indirect_register': 'Indirect Register',
+            'indirect_indexed_register': 'Indirect Indexed Register',
+            'enumeration': 'Enumeration',
+            'numeric_enumeration': 'Numeric Enumeration',
+            'numeric_bytecode': 'Numeric Bytecode',
+            'address': 'Address',
+            'relative_address': 'Relative Address',
+            'empty': 'No Operand'
+        }
+
+        return defaults.get(operand_type, operand_type.replace('_', ' ').title())
+
+    @staticmethod
+    def _get_decorator_symbol(decorator_config: dict[str, Any]) -> tuple[str, bool] | None:
+        """Convert a decorator configuration into a symbol and prefix flag."""
+        if not decorator_config or not isinstance(decorator_config, dict):
+            return None
+
+        decorator_type = decorator_config.get('type')
+        if decorator_type is None:
+            return None
+
+        symbol_map = {
+            'plus': '+',
+            'plus_plus': '++',
+            'minus': '-',
+            'minus_minus': '--',
+            'exclamation': '!',
+            'at': '@'
+        }
+
+        symbol = symbol_map.get(decorator_type)
+        if symbol is None:
+            return None
+
+        is_prefix = bool(decorator_config.get('is_prefix', False))
+        return symbol, is_prefix
+
+    def _derive_operand_syntax(
+        self,
+        operand_name: str,
+        operand_type: str | None,
+        operand_config: dict[str, Any]
+    ) -> str:
+        """Produce a syntax representation for an operand."""
+        operand_type = operand_type or ''
+
+        syntax: str
+        if operand_type == 'numeric':
+            syntax = 'numeric_expression'
+        elif operand_type == 'indirect_numeric':
+            syntax = '[numeric_expression]'
+        elif operand_type == 'deferred_numeric':
+            syntax = '[[numeric_expression]]'
+        elif operand_type == 'register':
+            register_label = operand_config.get('register')
+            syntax = register_label if register_label else 'register_label'
+        elif operand_type == 'indexed_register':
+            register_label = operand_config.get('register', 'register_label')
+            syntax = f'{register_label} + offset_operand'
+        elif operand_type == 'indirect_register':
+            register_label = operand_config.get('register', 'register_label')
+            offset_suffix = ' + offset' if operand_config.get('offset') else ''
+            syntax = f'[{register_label}{offset_suffix}]'
+        elif operand_type == 'indirect_indexed_register':
+            register_label = operand_config.get('register', 'register_label')
+            syntax = f'[{register_label} + offset_operand]'
+        elif operand_type == 'enumeration':
+            literal_tokens = self._collect_enumeration_literals(operand_config)
+            if literal_tokens:
+                syntax = ' | '.join(literal_tokens)
+            else:
+                syntax = operand_name
+        elif operand_type in {'numeric_enumeration', 'numeric_bytecode'}:
+            literal_tokens = self._collect_enumeration_literals(operand_config)
+            if literal_tokens:
+                syntax = ' | '.join(literal_tokens)
+            else:
+                syntax = f'<{operand_name}>'
+        elif operand_type == 'address':
+            syntax = 'numeric_expression'
+        elif operand_type == 'relative_address':
+            use_curly = bool(operand_config.get('use_curly_braces', False))
+            syntax = '{numeric_expression}' if use_curly else 'numeric_expression'
+        elif operand_type == 'empty':
+            syntax = ''
+        else:
+            syntax = operand_name
+
+        decorator_info = self._get_decorator_symbol(operand_config.get('decorator'))
+        if decorator_info:
+            decorator_symbol, is_prefix = decorator_info
+            if syntax:
+                syntax = f'{decorator_symbol}{syntax}' if is_prefix else f'{syntax}{decorator_symbol}'
+            else:
+                syntax = decorator_symbol
+
+        return syntax
+
+    @staticmethod
+    def _collect_enumeration_literals(operand_config: dict[str, Any]) -> list[str]:
+        """Collect literal tokens from enumeration-style operand configurations."""
+        literals: set[str] = set()
+
+        for section in ('bytecode', 'argument'):
+            section_config = operand_config.get(section)
+            if not isinstance(section_config, dict):
+                continue
+            value_dict = section_config.get('value_dict')
+            if isinstance(value_dict, dict):
+                for key in value_dict.keys():
+                    literals.add(str(key))
+
+        return sorted(literals)
+
+    @staticmethod
+    def _derive_operand_auto_details(operand_type: str | None, operand_config: dict[str, Any]) -> list[str]:
+        """Generate automatic detail notes for specific operand configurations."""
+        notes: list[str] = []
+        operand_type = operand_type or ''
+
+        if operand_type == 'address':
+            argument_config = operand_config.get('argument', {})
+            if isinstance(argument_config, dict):
+                memory_zone = argument_config.get('memory_zone')
+                if memory_zone:
+                    notes.append(f'Valid within `{memory_zone}` memory zone.')
+
+                if argument_config.get('slice_lsb'):
+                    notes.append('Uses only the least significant bits of the address value.')
+
+                if argument_config.get('match_address_msb'):
+                    notes.append('High address bits are taken from the current instruction address.')
+
+        if operand_type == 'relative_address':
+            if operand_config.get('use_curly_braces'):
+                notes.append('Relative address operand uses curly brace notation.')
+
+        if operand_type == 'numeric_bytecode':
+            bytecode_config = operand_config.get('bytecode', {})
+            if isinstance(bytecode_config, dict):
+                min_value = bytecode_config.get('min')
+                max_value = bytecode_config.get('max')
+                if min_value is not None or max_value is not None:
+                    if min_value is not None and max_value is not None:
+                        notes.append(f'Allowed values: {min_value} to {max_value}.')
+                    elif min_value is not None:
+                        notes.append(f'Minimum value: {min_value}.')
+                    elif max_value is not None:
+                        notes.append(f'Maximum value: {max_value}.')
+
+        return notes
+
     def _parse_instruction_documentation(self) -> dict[str, Any]:
         """
         Parse instruction documentation from the configuration.
@@ -271,24 +525,39 @@ class DocumentationModel:
         categories = set()
 
         for instr_name, instr_config in instructions_config.items():
-            doc_config = instr_config.get('documentation', {})
+            doc_config = instr_config.get('documentation')
+            if not isinstance(doc_config, dict):
+                doc_config = {}
 
-            if doc_config:
+            documented = bool(doc_config)
+            if documented:
                 category = doc_config.get('category', 'Uncategorized')
-                categories.add(category)
+            else:
+                category = 'Uncategorized'
 
-                instruction_docs[instr_name] = {
-                    'category': category,
-                    'description': doc_config.get('description'),
-                    'details': doc_config.get('details'),
-                    'modifies': self._parse_modifies(doc_config.get('modifies', [])),
-                    'examples': self._parse_examples(doc_config.get('examples', []))
-                }
-            elif self.verbose >= 2:
+            categories.add(category)
+
+            instruction_docs[instr_name] = {
+                'category': category,
+                'description': doc_config.get('description') if documented else None,
+                'details': doc_config.get('details') if documented else None,
+                'modifies': self._parse_modifies(doc_config.get('modifies', [])) if documented else [],
+                'examples': self._parse_examples(doc_config.get('examples', [])) if documented else [],
+                'documented': documented
+            }
+
+            if not documented and self.verbose >= 2:
                 click.echo(f'No documentation found for instruction: {instr_name}')
 
         if self.verbose:
-            click.echo(f'Found documentation for {len(instruction_docs)} instructions')
+            documented_count = sum(
+                1 for doc in instruction_docs.values()
+                if doc.get('documented', False)
+            )
+            click.echo(
+                f'Processed {len(instruction_docs)} instructions; '
+                f'{documented_count} with documentation'
+            )
             click.echo(f"Categories found: {', '.join(sorted(categories))}")
 
         return instruction_docs

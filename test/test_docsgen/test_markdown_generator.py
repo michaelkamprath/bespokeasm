@@ -28,6 +28,7 @@ class TestMarkdownGenerator(unittest.TestCase):
             'min_version': None
         }
         self.mock_doc_model.instruction_docs = {}
+        self.mock_doc_model.operand_sets = []
 
     def test_generate_header_only(self):
         """Test generating document with only header."""
@@ -195,6 +196,68 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.assertIn('| `A` |', result)
         self.assertIn('| `B` |', result)
 
+    def test_generate_with_operand_sets(self):
+        """Operand sets render as their own section with per-operand tables."""
+        self.mock_doc_model.operand_sets = [
+            {
+                'key': 'register_operands',
+                'title': 'General Registers',
+                'category': 'Registers',
+                'description': 'General purpose registers.',
+                'details': 'Used for arithmetic operations.',
+                'config_index': 0,
+                'operands': [
+                    {
+                        'name': 'reg_a',
+                        'title': 'Register A',
+                        'syntax': 'a',
+                        'mode': 'Register',
+                        'description': 'Accumulator',
+                        'details': 'Primary register.'
+                    },
+                    {
+                        'name': 'reg_b',
+                        'title': 'Register B',
+                        'syntax': 'b',
+                        'mode': 'Register',
+                        'description': 'Index register',
+                        'details': None
+                    }
+                ]
+            },
+            {
+                'key': 'zero_page',
+                'title': None,
+                'category': None,
+                'description': 'Undocumented operand set zero_page.',
+                'details': None,
+                'config_index': 1,
+                'operands': [
+                    {
+                        'name': 'zp_addr',
+                        'syntax': 'numeric_expression',
+                        'mode': 'Address',
+                        'description': None,
+                        'details': 'Valid within `ZERO_PAGE` memory zone.'
+                    }
+                ]
+            }
+        ]
+
+        generator = MarkdownGenerator(self.mock_doc_model, verbose=0)
+        result = generator.generate()
+
+        self.assertIn('## Operand Sets', result)
+        self.assertIn('### General Registers', result)
+        self.assertIn('*Category: Registers*', result)
+        self.assertIn('General purpose registers.', result)
+        self.assertIn('Used for arithmetic operations.', result)
+        self.assertIn('| Register A (`reg_a`) | `a` | Register | Accumulator | Primary register. |', result)
+        self.assertIn('| Register B (`reg_b`) | `b` | Register | Index register |  |', result)
+        self.assertIn('### zero_page', result)
+        self.assertIn('Undocumented operand set zero_page.', result)
+        self.assertIn('| `zp_addr` | `numeric_expression` | Address | Valid within `ZERO_PAGE` memory zone. |', result)
+
     def test_generate_with_instruction_documentation(self):
         """Test generating document with instruction documentation."""
         self.mock_doc_model.instruction_docs = {
@@ -277,6 +340,29 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.assertIn('##### Load immediate', result)
         self.assertIn('Load the value 42', result)
         self.assertIn('```assembly\nlda #42\n```', result)
+
+    def test_generate_with_undocumented_instructions(self):
+        """Instructions without documentation still produce placeholders."""
+        self.mock_doc_model.instruction_docs = {
+            'nop': {
+                'category': 'Uncategorized',
+                'description': None,
+                'details': None,
+                'modifies': [],
+                'examples': [],
+                'documented': False
+            }
+        }
+        self.mock_doc_model.get_instructions_by_category.return_value = {
+            'Uncategorized': ['nop']
+        }
+
+        generator = MarkdownGenerator(self.mock_doc_model, verbose=0)
+        result = generator.generate()
+
+        self.assertIn('# Instructions', result)
+        self.assertIn('### `NOP`', result)
+        self.assertIn('*Documentation not provided.*', result)
 
     def test_generate_empty_instruction_documentation(self):
         """Test generating document with no instruction documentation."""

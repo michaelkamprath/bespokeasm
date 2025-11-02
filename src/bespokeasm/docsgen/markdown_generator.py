@@ -37,6 +37,12 @@ class MarkdownGenerator:
         if self._has_general_documentation():
             sections.append(self._generate_general_section())
 
+        # Operand sets section
+        if getattr(self.doc_model, 'operand_sets', None):
+            operand_sets_section = self._generate_operand_sets_section()
+            if operand_sets_section:
+                sections.append(operand_sets_section)
+
         # Instructions section
         if self.doc_model.instruction_docs:
             sections.append(self._generate_instructions_section())
@@ -273,6 +279,88 @@ class MarkdownGenerator:
             sections.append(compatibility_section)
 
         return '\n\n'.join(sections)
+
+    def _generate_operand_sets_section(self) -> str:
+        """Generate the operand sets section of the documentation."""
+        operand_sets = getattr(self.doc_model, 'operand_sets', None) or []
+        if not operand_sets:
+            return ''
+
+        def sort_key(set_doc: dict[str, Any]) -> tuple[Any, ...]:
+            category = set_doc.get('category')
+            display_name = (set_doc.get('title') or set_doc.get('key') or '').lower()
+            category_rank = 0 if category else 1
+            category_label = category.lower() if isinstance(category, str) else ''
+            config_index = set_doc.get('config_index', 0)
+            return category_rank, category_label, display_name, config_index
+
+        sorted_sets = sorted(operand_sets, key=sort_key)
+
+        sections: list[str] = ['## Operand Sets']
+        for operand_set in sorted_sets:
+            display_name = operand_set.get('title') or operand_set.get('key', 'Operand Set')
+            subsection_parts: list[str] = [f'### {display_name}']
+
+            category = operand_set.get('category')
+            if category:
+                subsection_parts.append(f'*Category: {category}*')
+
+            description = operand_set.get('description')
+            if description:
+                subsection_parts.append(description)
+
+            details = operand_set.get('details')
+            if details:
+                subsection_parts.append(details)
+
+            table = self._generate_operand_set_table(operand_set.get('operands', []))
+            if table:
+                subsection_parts.append(table)
+            elif self.verbose:
+                click.echo(f'Warning: Operand set "{operand_set.get("key")}" has no operand entries.')
+
+            sections.append('\n\n'.join(filter(None, subsection_parts)))
+
+        return '\n\n'.join(sections)
+
+    def _generate_operand_set_table(self, operands: list[dict[str, Any]]) -> str:
+        """Generate the per-operand table for an operand set."""
+        if not operands:
+            return ''
+
+        headers = ['Operand', 'Syntax', 'Mode', 'Description', 'Details']
+        alignments = ['left', 'left', 'left', 'left', 'left']
+        rows: list[list[str]] = []
+
+        for operand in operands:
+            operand_name = operand.get('name', '')
+            operand_title = operand.get('title')
+            if operand_title and operand_name:
+                operand_cell = f'{operand_title} (`{operand_name}`)'
+            elif operand_title:
+                operand_cell = operand_title
+            else:
+                operand_cell = f'`{operand_name}`' if operand_name else ''
+
+            syntax = operand.get('syntax', '')
+            syntax_cell = f'`{syntax}`' if syntax else ''
+
+            mode = operand.get('mode') or ''
+            description = operand.get('description') or ''
+            if description:
+                description = description.replace('\n', '<br>')
+
+            details = operand.get('details') or ''
+            if details:
+                details = details.replace('\n', '<br>')
+
+            rows.append([operand_cell, syntax_cell, mode, description, details])
+
+        table = self._generate_markdown_table(headers, rows, column_alignments=alignments)
+        if not table:
+            return ''
+
+        return table
 
     def _generate_isa_overview(self, general: dict[str, Any]) -> str:
         """Generate the ISA Overview subsection."""
@@ -535,6 +623,11 @@ class MarkdownGenerator:
         if instruction_doc.get('description'):
             header += f" : {instruction_doc['description']}"
         sections.append(header)
+
+        documented = instruction_doc.get('documented', True)
+
+        if not documented:
+            sections.append('*Documentation not provided.*')
 
         # Details
         if instruction_doc.get('details'):

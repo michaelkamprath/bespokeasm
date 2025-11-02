@@ -25,6 +25,7 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertEqual(model.general_docs['addressing_modes'], [])
         self.assertEqual(model.general_docs['flags'], [])
         self.assertEqual(model.general_docs['examples'], [])
+        self.assertEqual(model.operand_sets, [])
         self.assertEqual(model.instruction_docs, {})
 
     def test_parse_general_documentation(self):
@@ -129,6 +130,82 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertEqual(examples[0]['code'], 'lda #5')
         self.assertEqual(examples[0]['details'], 'Load immediate value')
 
+    def test_parse_operand_sets_documentation(self):
+        """Operand set documentation is parsed with ordering, syntax, and auto details."""
+        self.mock_isa_model._config = {
+            'operand_sets': {
+                'register_operands': {
+                    'documentation': {
+                        'title': 'General Registers',
+                        'category': 'Registers',
+                        'description': 'General purpose registers.',
+                        'details': 'Used for arithmetic operations.',
+                        'operand_order': ['reg_b', 'reg_a']
+                    },
+                    'operand_values': {
+                        'reg_a': {
+                            'type': 'register',
+                            'register': 'a',
+                            'documentation': {
+                                'title': 'Register A',
+                                'mode': 'Register',
+                                'description': 'Accumulator register',
+                                'details': 'Used frequently.'
+                            }
+                        },
+                        'reg_b': {
+                            'type': 'register',
+                            'register': 'b',
+                            'documentation': {
+                                'title': 'Register B',
+                                'mode': 'Register',
+                                'description': 'Index register'
+                            }
+                        }
+                    }
+                },
+                'zero_page': {
+                    'operand_values': {
+                        'zp_addr': {
+                            'type': 'address',
+                            'argument': {
+                                'memory_zone': 'ZERO_PAGE'
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        model = DocumentationModel(self.mock_isa_model, verbose=0)
+        operand_sets = model.operand_sets
+        self.assertEqual(len(operand_sets), 2)
+
+        register_set = operand_sets[0]
+        self.assertEqual(register_set['title'], 'General Registers')
+        self.assertEqual(register_set['category'], 'Registers')
+        self.assertEqual(register_set['description'], 'General purpose registers.')
+        self.assertEqual(register_set['details'], 'Used for arithmetic operations.')
+        self.assertEqual([op['name'] for op in register_set['operands']], ['reg_b', 'reg_a'])
+        self.assertEqual(register_set['operands'][0]['syntax'], 'b')
+        self.assertEqual(register_set['operands'][0]['mode'], 'Register')
+        self.assertEqual(register_set['operands'][0]['description'], 'Index register')
+        self.assertEqual(register_set['operands'][0]['details'], None)
+        self.assertEqual(register_set['operands'][0]['title'], 'Register B')
+        self.assertEqual(register_set['operands'][1]['syntax'], 'a')
+        self.assertEqual(register_set['operands'][1]['details'], 'Used frequently.')
+        self.assertEqual(register_set['operands'][1]['title'], 'Register A')
+
+        zero_page_set = operand_sets[1]
+        self.assertEqual(zero_page_set['description'], 'Undocumented operand set zero_page.')
+        self.assertIsNone(zero_page_set['details'])
+        self.assertEqual(len(zero_page_set['operands']), 1)
+        zp_operand = zero_page_set['operands'][0]
+        self.assertEqual(zp_operand['mode'], 'Address')
+        self.assertEqual(zp_operand['syntax'], 'numeric_expression')
+        self.assertIn('Valid within `ZERO_PAGE` memory zone.', zp_operand['details'])
+        self.assertIsNone(zp_operand['title'])
+
     def test_register_documentation_from_list(self):
         """Registers provided as a list are converted into name-only documentation entries."""
         self.mock_isa_model._config = {
@@ -212,13 +289,14 @@ class TestDocumentationModel(unittest.TestCase):
         model = DocumentationModel(self.mock_isa_model, verbose=0)
 
         # Test instruction documentation
-        self.assertEqual(len(model.instruction_docs), 2)  # Only documented instructions
+        self.assertEqual(len(model.instruction_docs), 3)
 
         # Test LDA instruction
         lda_doc = model.instruction_docs['lda']
         self.assertEqual(lda_doc['category'], 'Data Movement')
         self.assertEqual(lda_doc['description'], 'Load accumulator')
         self.assertEqual(lda_doc['details'], 'Load a value into the accumulator register')
+        self.assertTrue(lda_doc['documented'])
 
         # Test modifies
         modifies = lda_doc['modifies']
@@ -244,6 +322,16 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertIsNone(add_doc['details'])
         self.assertEqual(add_doc['modifies'], [])
         self.assertEqual(add_doc['examples'], [])
+        self.assertTrue(add_doc['documented'])
+
+        # Test NOP instruction (no documentation)
+        nop_doc = model.instruction_docs['nop']
+        self.assertEqual(nop_doc['category'], 'Uncategorized')
+        self.assertIsNone(nop_doc['description'])
+        self.assertIsNone(nop_doc['details'])
+        self.assertEqual(nop_doc['modifies'], [])
+        self.assertEqual(nop_doc['examples'], [])
+        self.assertFalse(nop_doc['documented'])
 
     def test_get_instructions_by_category(self):
         """Test getting instructions organized by category."""
