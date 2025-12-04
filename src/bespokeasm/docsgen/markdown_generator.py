@@ -629,9 +629,12 @@ class MarkdownGenerator:
         """
         sections = [f'## {category.title()}']
 
-        for instruction in instructions:
+        num_instructions = len(instructions)
+        for index, instruction in enumerate(instructions):
             instruction_doc = self.doc_model.instruction_docs[instruction]
             sections.append(self._generate_instruction_documentation(instruction, instruction_doc))
+            if index < num_instructions - 1:
+                sections.append('---')
 
         return '\n\n'.join(sections)
 
@@ -660,9 +663,24 @@ class MarkdownGenerator:
         if not documented:
             sections.append('*Documentation not provided.*')
 
-        # Details
+        # Shared description and details
+        if instruction_doc.get('description'):
+            sections.append(instruction_doc['description'])
+
         if instruction_doc.get('details'):
             sections.append(instruction_doc['details'])
+
+        # Operand syntax by version
+        versions = instruction_doc.get('versions') or []
+        multi_version = len(versions) > 1
+        for version in versions:
+            version_section = self._generate_instruction_version_section(
+                mnemonic,
+                version,
+                include_heading=multi_version
+            )
+            if version_section:
+                sections.append(version_section)
 
         # Modifies table
         if instruction_doc.get('modifies'):
@@ -673,6 +691,83 @@ class MarkdownGenerator:
             sections.append(self._generate_instruction_examples(instruction_doc['examples']))
 
         return '\n\n'.join(sections)
+
+    def _generate_instruction_version_section(
+        self,
+        mnemonic: str,
+        version_data: dict[str, Any],
+        include_heading: bool
+    ) -> str:
+        """Generate the syntax documentation for a single instruction version."""
+        lines: list[str] = []
+
+        if include_heading:
+            version_index = version_data.get('index')
+            heading_label = f'#### Version {version_index}'
+            lines.append(heading_label)
+
+        signatures = version_data.get('signatures') or []
+        if not signatures:
+            signatures = [{'operands': []}]
+
+        for signature in signatures:
+            lines.append('*Calling syntax:*')
+
+            operands = signature.get('operands') or []
+            operand_tokens: list[str] = []
+            for operand in operands:
+                if not operand.get('include_in_code', True):
+                    continue
+                name_value = operand.get('name', '')
+                name = str(name_value) if name_value is not None else ''
+                if name:
+                    operand_tokens.append(name)
+
+            syntax_line = mnemonic
+            if operand_tokens:
+                syntax_line = f"{syntax_line} {', '.join(operand_tokens)}"
+
+            lines.append(f'```asm\n{syntax_line}\n```')
+
+            operand_table = self._generate_instruction_operand_table(operands)
+            if operand_table:
+                lines.append('where')
+                lines.append(operand_table)
+
+        return '\n\n'.join(lines)
+
+    def _generate_instruction_operand_table(self, operands: list[dict[str, Any]]) -> str:
+        """Build the operand table for an instruction signature."""
+        if not operands:
+            return ''
+
+        headers = ['Operand', 'Type', 'Description', 'Details']
+        alignments = ['left', 'left', 'left', 'left']
+        rows: list[list[str]] = []
+
+        for operand in operands:
+            operand_name_value = operand.get('name')
+            operand_name = str(operand_name_value) if operand_name_value is not None else ''
+            operand_cell = f'`{operand_name}`' if operand_name else ''
+
+            operand_type_value = operand.get('type')
+            operand_type = str(operand_type_value) if operand_type_value is not None else ''
+
+            description_value = operand.get('description')
+            if description_value is None:
+                description_cell = ''
+            else:
+                description_cell = str(description_value).replace('\n', '<br>')
+
+            details = operand.get('details')
+            if details is None:
+                details_cell = ''
+            else:
+                details_cell = str(details).replace('\n', '<br>')
+
+            rows.append([operand_cell, operand_type, description_cell, details_cell])
+
+        return self._generate_markdown_table(headers, rows, column_alignments=alignments)
 
     def _generate_modifies_table(self, modifies: list[dict[str, str]]) -> str:
         """Generate a table of what the instruction modifies."""

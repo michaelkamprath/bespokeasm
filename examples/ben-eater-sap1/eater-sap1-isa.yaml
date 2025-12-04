@@ -73,6 +73,9 @@ operand_sets:
         argument:
           size: 4
           byte_align: false
+    documentation:
+      title: Integer Value Operands
+      description: Immediate integer value that fits in the lower 4-bits after the instruction.
   address:
     operand_values:
       addr:
@@ -80,6 +83,9 @@ operand_sets:
         argument:
           size: 4
           byte_align: false
+    documentation:
+      title: Memory Address Operands
+      description: Memory address location value that fits in the lower 4-bits after the instruction.
 instructions:
   nop:
     bytecode:

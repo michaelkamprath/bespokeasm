@@ -586,6 +586,8 @@ class DocumentationModel:
         instruction_docs = {}
         categories = set()
 
+        operand_sets_config = self._config.get('operand_sets', {})
+
         for instr_name, instr_config in instructions_config.items():
             doc_config = instr_config.get('documentation')
             if not isinstance(doc_config, dict):
@@ -604,13 +606,21 @@ class DocumentationModel:
                 # Backward compatibility for legacy field name
                 title = doc_config.get('description')
 
+            versions = self._build_instruction_versions(
+                instr_name,
+                instr_config,
+                operand_sets_config
+            )
+
             instruction_docs[instr_name] = {
                 'category': category,
                 'title': title if documented else None,
+                'description': doc_config.get('description') if documented else None,
                 'details': doc_config.get('details') if documented else None,
                 'modifies': self._parse_modifies(doc_config.get('modifies', [])) if documented else [],
                 'examples': self._parse_examples(doc_config.get('examples', [])) if documented else [],
-                'documented': documented
+                'documented': documented,
+                'versions': versions
             }
 
             if not documented and self.verbose >= 2:
@@ -628,6 +638,138 @@ class DocumentationModel:
             click.echo(f"Categories found: {', '.join(sorted(categories))}")
 
         return instruction_docs
+
+    def _build_instruction_versions(
+        self,
+        mnemonic: str,
+        instruction_config: dict[str, Any],
+        operand_sets_config: dict[str, Any]
+    ) -> list[dict[str, Any]]:
+        """
+        Build the ordered list of operand signatures for an instruction across all variants.
+        """
+        version_sources: list[dict[str, Any] | None] = []
+
+        if 'operands' in instruction_config or 'bytecode' in instruction_config:
+            version_sources.append(instruction_config.get('operands'))
+
+        variants = instruction_config.get('variants')
+        if isinstance(variants, list):
+            for variant in variants:
+                if isinstance(variant, dict):
+                    version_sources.append(variant.get('operands'))
+                elif self.verbose:
+                    click.echo(
+                        f'Warning: Variant for instruction "{mnemonic}" is not a dictionary. Skipping operand extraction.'
+                    )
+
+        if not version_sources:
+            # Ensure at least one version so the syntax block can be emitted even without operands.
+            version_sources.append(None)
+
+        versions: list[dict[str, Any]] = []
+        for index, operands_config in enumerate(version_sources, start=1):
+            signatures = self._build_instruction_signatures(
+                operands_config,
+                operand_sets_config
+            )
+            versions.append({
+                'index': index,
+                'signatures': signatures
+            })
+
+        return versions
+
+    def _build_instruction_signatures(
+        self,
+        operands_config: dict[str, Any] | None,
+        operand_sets_config: dict[str, Any]
+    ) -> list[dict[str, Any]]:
+        """
+        Derive the documented operand signatures for a given operands configuration.
+        """
+        config = operands_config if isinstance(operands_config, dict) else {}
+        signatures: list[dict[str, Any]] = []
+
+        specific_operands = config.get('specific_operands')
+        if isinstance(specific_operands, dict):
+            for specific_key, specific_config in specific_operands.items():
+                operand_list = specific_config.get('list')
+                if not isinstance(operand_list, dict):
+                    if self.verbose:
+                        click.echo(
+                            f'Warning: specific_operands entry "{specific_key}" is missing a valid "list" dictionary.'
+                        )
+                    continue
+
+                operands: list[dict[str, Any]] = []
+                for operand_name, operand_definition in operand_list.items():
+                    operand_info = operand_definition if isinstance(operand_definition, dict) else {}
+                    operand_doc_raw = operand_info.get('documentation')
+                    operand_doc = operand_doc_raw if isinstance(operand_doc_raw, dict) else {}
+                    operand_type_value = operand_info.get('type')
+                    operand_type = str(operand_type_value) if operand_type_value is not None else ''
+
+                    operands.append({
+                        'name': operand_name,
+                        'type': operand_type,
+                        'description': operand_doc.get('description'),
+                        'details': operand_doc.get('details'),
+                        'include_in_code': operand_type != 'empty'
+                    })
+
+                signatures.append({
+                    'kind': 'specific',
+                    'label': specific_key,
+                    'operands': operands
+                })
+
+        operand_sets = config.get('operand_sets')
+        if isinstance(operand_sets, dict):
+            operand_set_names = operand_sets.get('list')
+            if isinstance(operand_set_names, list) and operand_set_names:
+                operands: list[dict[str, Any]] = []
+                for set_name in operand_set_names:
+                    if not isinstance(set_name, str):
+                        if self.verbose:
+                            click.echo(
+                                'Warning: Operand set name encountered that is not a string. '
+                                'Skipping in syntax documentation.'
+                            )
+                        continue
+
+                    set_doc_config = operand_sets_config.get(set_name, {}) if operand_sets_config else {}
+                    doc_config = set_doc_config.get('documentation') if isinstance(set_doc_config, dict) else None
+                    if isinstance(doc_config, dict):
+                        description = doc_config.get('description')
+                        details = doc_config.get('details')
+                    else:
+                        description = None
+                        details = None
+
+                    operands.append({
+                        'name': set_name,
+                        'type': 'operand set',
+                        'description': description,
+                        'details': details,
+                        'include_in_code': True
+                    })
+
+                if operands:
+                    signatures.append({
+                        'kind': 'operand_sets',
+                        'label': None,
+                        'operands': operands
+                    })
+
+        if not signatures:
+            signatures.append({
+                'kind': 'none',
+                'label': None,
+                'operands': []
+            })
+
+        return signatures
 
     def _parse_modifies(self, modifies: list[dict[str, Any]]) -> list[dict[str, str]]:
         """

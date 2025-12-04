@@ -175,13 +175,39 @@ Instructions within each category will be listed in alphabetical order.
 
 Each instruction's documentation will be prefaced with a markdown section header ``### `<instruction mnemonic>` : <instruction title>`` where `<instruction mnemonic>` is the instruction mnemonic capitalized and rendered as inline code. The ` : <instruction title>` suffix comes from the [Instruction Documentation](#instruction-documentation) section and is only present if the `title` field is provided.
 
-If the instruction has a `modifies` field, then it will be listed in a markdown table under the instruction's documentation with the text header of "Modifies:". Each entry in the `modifies` field will be listed in the table with the following columns:
+Immediately after the instruction heading, render the shared narrative elements that apply to all operand signatures:
+- Emit `documentation.description` as a short lead-in paragraph.
+- Follow with `documentation.details`, when provided, as multiline markdown.
+
+Once the shared description is in place, evaluate the operand signatures defined for the instruction. Signatures can come from the top-level `operands` configuration, from entries in the `variants` list, or both. The generator treats these configurations as an ordered list of versions:
+
+1. If the top-level instruction configuration includes an `operands` block, it becomes Version&nbsp;1.
+2. Each item in the `variants` list is considered in file order and assigned the next version number (Version&nbsp;2, Version&nbsp;3, …).
+3. If the instruction omits a top-level `operands` block and only declares variants, numbering still starts at Version&nbsp;1 using the first variant.
+
+When more than one signature exists, insert a subheading `#### Version <N>` for each version. These subheadings appear immediately after the shared description (and before any `Modifies` or `Examples` subsections). For instructions with only one signature, omit the subheading and apply the Version&nbsp;1 layout directly under the shared description.
+
+Inside each version section, emit a syntax summary that makes the callable form of that signature explicit. The syntax block follows this structure:
+
+1. Render an italicized lead-in line `*Calling syntax:*`.
+2. Emit an `````asm```` code block that shows the mnemonic followed by its operands in source order, separated by `, ` to match the [assembly language syntax](https://github.com/michaelkamprath/bespokeasm/wiki/Assembly-Language-Syntax#general-assembler-syntax). When the instruction accepts multiple operand signatures, each version already isolates a single signature, so only one code block is emitted per version.
+3. When at least one operand placeholder is present, add a `where` paragraph followed by a markdown table describing each operand. The default columns are `Operand`, `Type`, and `Description`, with an optional `Details` column included only when any operand surfaces `documentation.details`. Column inclusion continues to follow the [Table Column Optimization](#table-column-optimization) rules.
+
+Operand placeholders and table rows are derived from the instruction version's operand configuration:
+
+- **Specific operands**: For each entry in `specific_operands`, emit a dedicated syntax block. Operands appear in the order of the `list` dictionary. The `Operand` column uses the `list` key (rendered as inline code), the `Type` column is populated from that operand's configured `type`, and the `Description`/`Details` columns come from the operand's `documentation` stanza. If an operand uses the `empty` type, omit it from the mnemonic output while still documenting it in the table so that readers understand the implicit behavior.
+- **Operand sets**: When `operand_sets` are used (and no overlapping `specific_operands` override the combination), emit a syntax block whose operand placeholders match the operand set names from the `list` array, rendered as inline code in both the code block and table. The `Type` column for these rows is the literal string `operand_set`, and the description data is sourced from the operand set's documentation (`operand_sets.<set name>.documentation.description` with optional `details`). If an operand set lacks documentation, leave the description blank in this table—the Operand Sets section already clarifies the set's members and behavior.
+- **Mixed configurations**: When both `specific_operands` and `operand_sets` are present, list all `specific_operands` variants first (preserving configuration order) and then emit the operand set signature that applies when no specific variant matches.
+
+For instruction versions with zero operands, still render the `*Calling syntax:*` lead-in and a single-line code block containing only the mnemonic. In this case the `where` paragraph and operand table are omitted.
+
+After all version sections are rendered, if the instruction has a `modifies` field, list it in a markdown table under the instruction's documentation with the text header of "Modifies:". Each entry in the `modifies` field will be listed in the table with the following columns:
 - `Type` - The type of modification (Register, Memory, or Flag).
 - `Target` - The target that is modified (register name, memory location, or flag name).
 - `Description` - The description of the modification.
 - `Details` - The detailed description of the modification.
 
-Note: Column inclusion follows the [Table Column Optimization](#table-column-optimization) rules - empty columns will be omitted from the generated table.
+Note: Column inclusion follows the [Table Column Optimization](#table-column-optimization) rules - empty columns will be omitted from the generated table. Once the `Modifies` and `Examples` subsections (if present) are emitted for an instruction, insert a horizontal rule (`---`) before documenting the next instruction in the category. This provides clear separation between instruction entries without interrupting the syntax section itself.
 
 If the instruction has an `examples` field under the instruction's documentation, then a `#### Examples` section will be added under the instruction's documentation and the examples will be added with this format:
 ```markdown

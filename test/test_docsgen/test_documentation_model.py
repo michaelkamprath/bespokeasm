@@ -310,11 +310,26 @@ class TestDocumentationModel(unittest.TestCase):
     def test_parse_instruction_documentation(self):
         """Test parsing instruction documentation."""
         self.mock_isa_model._config = {
+            'operand_sets': {
+                'imm8': {
+                    'documentation': {
+                        'description': '8-bit immediate value',
+                        'details': 'Unsigned literal constrained to 0-255.'
+                    }
+                }
+            },
             'instructions': {
                 'lda': {
+                    'operands': {
+                        'count': 1,
+                        'operand_sets': {
+                            'list': ['imm8']
+                        }
+                    },
                     'documentation': {
                         'category': 'Data Movement',
                         'title': 'Load accumulator',
+                        'description': 'Transfers a literal into the accumulator.',
                         'details': 'Load a value into the accumulator register',
                         'modifies': [
                             {
@@ -336,6 +351,27 @@ class TestDocumentationModel(unittest.TestCase):
                     }
                 },
                 'add': {
+                    'operands': {
+                        'count': 2,
+                        'specific_operands': {
+                            'register_immediate': {
+                                'list': {
+                                    'dest': {
+                                        'type': 'register',
+                                        'documentation': {
+                                            'description': 'Destination register.'
+                                        }
+                                    },
+                                    'value': {
+                                        'type': 'numeric',
+                                        'documentation': {
+                                            'description': 'Immediate value to add.'
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
                     'documentation': {
                         'category': 'Arithmetic',
                         'title': 'Add to accumulator'
@@ -343,6 +379,9 @@ class TestDocumentationModel(unittest.TestCase):
                 },
                 'nop': {
                     # No documentation
+                    'operands': {
+                        'count': 0
+                    }
                 }
             }
         }
@@ -356,8 +395,20 @@ class TestDocumentationModel(unittest.TestCase):
         lda_doc = model.instruction_docs['lda']
         self.assertEqual(lda_doc['category'], 'Data Movement')
         self.assertEqual(lda_doc['title'], 'Load accumulator')
+        self.assertEqual(lda_doc['description'], 'Transfers a literal into the accumulator.')
         self.assertEqual(lda_doc['details'], 'Load a value into the accumulator register')
         self.assertTrue(lda_doc['documented'])
+        self.assertEqual(len(lda_doc['versions']), 1)
+        lda_signature = lda_doc['versions'][0]['signatures'][0]
+        self.assertEqual(lda_signature['kind'], 'operand_sets')
+        self.assertEqual(len(lda_signature['operands']), 1)
+        self.assertEqual(lda_signature['operands'][0]['name'], 'imm8')
+        self.assertEqual(lda_signature['operands'][0]['type'], 'operand set')
+        self.assertEqual(lda_signature['operands'][0]['description'], '8-bit immediate value')
+        self.assertEqual(
+            lda_signature['operands'][0]['details'],
+            'Unsigned literal constrained to 0-255.'
+        )
 
         # Test modifies
         modifies = lda_doc['modifies']
@@ -380,19 +431,29 @@ class TestDocumentationModel(unittest.TestCase):
         add_doc = model.instruction_docs['add']
         self.assertEqual(add_doc['category'], 'Arithmetic')
         self.assertEqual(add_doc['title'], 'Add to accumulator')
+        self.assertIsNone(add_doc['description'])
         self.assertIsNone(add_doc['details'])
         self.assertEqual(add_doc['modifies'], [])
         self.assertEqual(add_doc['examples'], [])
         self.assertTrue(add_doc['documented'])
+        self.assertEqual(len(add_doc['versions']), 1)
+        add_signature = add_doc['versions'][0]['signatures'][0]
+        operand_names = [operand['name'] for operand in add_signature['operands']]
+        self.assertEqual(operand_names, ['dest', 'value'])
+        operand_types = [operand['type'] for operand in add_signature['operands']]
+        self.assertEqual(operand_types, ['register', 'numeric'])
 
         # Test NOP instruction (no documentation)
         nop_doc = model.instruction_docs['nop']
         self.assertEqual(nop_doc['category'], 'Uncategorized')
         self.assertIsNone(nop_doc['title'])
+        self.assertIsNone(nop_doc['description'])
         self.assertIsNone(nop_doc['details'])
         self.assertEqual(nop_doc['modifies'], [])
         self.assertEqual(nop_doc['examples'], [])
         self.assertFalse(nop_doc['documented'])
+        self.assertEqual(len(nop_doc['versions']), 1)
+        self.assertEqual(len(nop_doc['versions'][0]['signatures'][0]['operands']), 0)
 
     def test_get_instructions_by_category(self):
         """Test getting instructions organized by category."""
@@ -438,6 +499,74 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertEqual(categories['Data Movement'], ['lda', 'sta'])
         self.assertEqual(categories['Arithmetic'], ['add'])
         self.assertEqual(categories['Control Flow'], ['jmp'])
+
+    def test_instruction_variant_versions(self):
+        """Instruction variants are exposed as sequential versions."""
+        self.mock_isa_model._config = {
+            'operand_sets': {
+                'imm': {},
+                'reg': {}
+            },
+            'instructions': {
+                'jmp': {
+                    'operands': {
+                        'count': 1,
+                        'operand_sets': {
+                            'list': ['imm']
+                        }
+                    },
+                    'variants': [
+                        {
+                            'operands': {
+                                'count': 2,
+                                'specific_operands': {
+                                    'double_address': {
+                                        'list': {
+                                            'target': {
+                                                'type': 'address'
+                                            },
+                                            'source': {
+                                                'type': 'address'
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                'mov': {
+                    'variants': [
+                        {
+                            'operands': {
+                                'count': 1,
+                                'operand_sets': {
+                                    'list': ['reg']
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+
+        model = DocumentationModel(self.mock_isa_model, verbose=0)
+
+        jmp_versions = model.instruction_docs['jmp']['versions']
+        self.assertEqual([version['index'] for version in jmp_versions], [1, 2])
+        self.assertEqual(jmp_versions[1]['signatures'][0]['kind'], 'specific')
+        self.assertEqual(
+            [operand['name'] for operand in jmp_versions[1]['signatures'][0]['operands']],
+            ['target', 'source']
+        )
+
+        mov_versions = model.instruction_docs['mov']['versions']
+        self.assertEqual([version['index'] for version in mov_versions], [1])
+        self.assertEqual(mov_versions[0]['signatures'][0]['kind'], 'operand_sets')
+        self.assertEqual(
+            mov_versions[0]['signatures'][0]['operands'][0]['name'],
+            'reg'
+        )
 
     def test_invalid_documentation_formats(self):
         """Test handling of invalid documentation formats."""

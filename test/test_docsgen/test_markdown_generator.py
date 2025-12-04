@@ -317,6 +317,7 @@ class TestMarkdownGenerator(unittest.TestCase):
             'lda': {
                 'category': 'Data Movement',
                 'title': 'Load accumulator',
+                'description': 'Transfers a literal into A.',
                 'details': 'Load a value into the accumulator register',
                 'modifies': [
                     {
@@ -338,6 +339,27 @@ class TestMarkdownGenerator(unittest.TestCase):
                         'details': 'Load the value 42',
                         'code': 'lda #42'
                     }
+                ],
+                'documented': True,
+                'versions': [
+                    {
+                        'index': 1,
+                        'signatures': [
+                            {
+                                'kind': 'operand_sets',
+                                'label': None,
+                                'operands': [
+                                    {
+                                        'name': 'imm8',
+                                        'type': 'operand_set',
+                                        'description': '8-bit immediate value.',
+                                        'details': None,
+                                        'include_in_code': True
+                                    }
+                                ]
+                            }
+                        ]
+                    }
                 ]
             },
             'add': {
@@ -345,14 +367,55 @@ class TestMarkdownGenerator(unittest.TestCase):
                 'title': 'Add to accumulator',
                 'details': None,
                 'modifies': [],
-                'examples': []
+                'examples': [],
+                'documented': True,
+                'versions': [
+                    {
+                        'index': 1,
+                        'signatures': [
+                            {
+                                'kind': 'specific',
+                                'label': 'reg_imm',
+                                'operands': [
+                                    {
+                                        'name': 'dest',
+                                        'type': 'register',
+                                        'description': 'Destination register.',
+                                        'details': None,
+                                        'include_in_code': True
+                                    },
+                                    {
+                                        'name': 'value',
+                                        'type': 'numeric',
+                                        'description': 'Immediate value.',
+                                        'details': None,
+                                        'include_in_code': True
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
             },
             'sta': {
                 'category': 'Data Movement',
                 'title': 'Store accumulator',
                 'details': None,
                 'modifies': [],
-                'examples': []
+                'examples': [],
+                'documented': True,
+                'versions': [
+                    {
+                        'index': 1,
+                        'signatures': [
+                            {
+                                'kind': 'none',
+                                'label': None,
+                                'operands': []
+                            }
+                        ]
+                    }
+                ]
             }
         }
 
@@ -380,7 +443,16 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.assertIn('### `STA` : Store accumulator', result)
 
         # Verify detailed instruction content
+        self.assertIn('Transfers a literal into A.', result)
         self.assertIn('Load a value into the accumulator register', result)
+        self.assertIn('*Calling syntax:*', result)
+        self.assertIn('```asm\nLDA imm8\n```', result)
+        self.assertIn('```asm\nADD dest, value\n```', result)
+        self.assertIn('| Operand | Type | Description |', result)
+        self.assertIn('| `imm8` | operand_set | 8-bit immediate value. |', result)
+        self.assertIn('| `dest` | register | Destination register. |', result)
+        self.assertIn('\n---\n\n### `STA`', result)
+        self.assertNotIn('---\n*Calling syntax:*', result)
 
         # Verify modifies table
         self.assertIn('#### Modifies', result)
@@ -400,10 +472,23 @@ class TestMarkdownGenerator(unittest.TestCase):
             'nop': {
                 'category': 'Uncategorized',
                 'title': None,
+                'description': None,
                 'details': None,
                 'modifies': [],
                 'examples': [],
-                'documented': False
+                'documented': False,
+                'versions': [
+                    {
+                        'index': 1,
+                        'signatures': [
+                            {
+                                'kind': 'none',
+                                'label': None,
+                                'operands': []
+                            }
+                        ]
+                    }
+                ]
             }
         }
         self.mock_doc_model.get_instructions_by_category.return_value = {
@@ -416,6 +501,70 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.assertIn('# Instructions', result)
         self.assertIn('### `NOP`', result)
         self.assertIn('*Documentation not provided.*', result)
+        self.assertIn('```asm\nNOP\n```', result)
+
+    def test_instruction_versions_emit_headings(self):
+        """Multiple operand variants render distinct version headings."""
+        self.mock_doc_model.instruction_docs = {
+            'mix': {
+                'category': 'Data Movement',
+                'title': 'Mixed operand instruction',
+                'description': None,
+                'details': None,
+                'modifies': [],
+                'examples': [],
+                'documented': True,
+                'versions': [
+                    {
+                        'index': 1,
+                        'signatures': [
+                            {
+                                'kind': 'specific',
+                                'label': 'reg_variant',
+                                'operands': [
+                                    {
+                                        'name': 'reg',
+                                        'type': 'register',
+                                        'description': None,
+                                        'details': None,
+                                        'include_in_code': True
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        'index': 2,
+                        'signatures': [
+                            {
+                                'kind': 'operand_sets',
+                                'label': None,
+                                'operands': [
+                                    {
+                                        'name': 'imm',
+                                        'type': 'operand_set',
+                                        'description': None,
+                                        'details': None,
+                                        'include_in_code': True
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+        self.mock_doc_model.get_instructions_by_category.return_value = {
+            'Data Movement': ['mix']
+        }
+
+        generator = MarkdownGenerator(self.mock_doc_model, verbose=0)
+        result = generator.generate()
+
+        self.assertIn('#### Version 1', result)
+        self.assertIn('#### Version 2', result)
+        self.assertIn('```asm\nMIX reg\n```', result)
+        self.assertIn('```asm\nMIX imm\n```', result)
 
     def test_generate_empty_instruction_documentation(self):
         """Test generating document with no instruction documentation."""
