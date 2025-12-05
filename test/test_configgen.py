@@ -7,6 +7,8 @@ import shutil
 import tempfile
 import unittest
 
+from bespokeasm.configgen.color_scheme import DEFAULT_COLOR_SCHEME
+from bespokeasm.configgen.color_scheme import SyntaxElement
 from bespokeasm.configgen.sublime import SublimeConfigGenerator
 from bespokeasm.configgen.vim import VimConfigGenerator
 from bespokeasm.configgen.vscode import VSCodeConfigGenerator
@@ -649,9 +651,11 @@ class TestConfigurationGeneration(unittest.TestCase):
             syn = f.read()
 
         # Test Normal highlight group with background and foreground
+        bg_color = DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.BACKGROUND)
+        fg_color = DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.FOREGROUND)
         self.assertRegex(
             syn,
-            r'hi\s+Normal\s+guifg=#EEEEEE\s+guibg=#222222\s+ctermfg=\d+\s+ctermbg=\d+',
+            rf'hi\s+Normal\s+guifg={re.escape(fg_color)}\s+guibg={re.escape(bg_color)}\s+ctermfg=\d+\s+ctermbg=\d+',
             'Normal highlight should set both foreground and background colors'
         )
 

@@ -331,7 +331,10 @@ class MarkdownGenerator:
         if not operands:
             return ''
 
-        headers = ['Operand', 'Syntax', '[Addressing Mode](#addressing-modes)', 'Description', 'Details']
+        addressing_modes = getattr(self.doc_model, 'general_docs', {}).get('addressing_modes') or []
+        addressing_mode_header = '[Addressing Mode](#addressing-modes)' if addressing_modes else 'Addressing Mode'
+
+        headers = ['Operand', 'Syntax', addressing_mode_header, 'Description', 'Details']
         alignments = ['left', 'left', 'left', 'left', 'left']
         rows: list[list[str]] = []
 
@@ -692,6 +695,35 @@ class MarkdownGenerator:
 
         return '\n\n'.join(sections)
 
+    def _build_operand_display_names(self, operands: list[dict[str, Any]]) -> list[str]:
+        """
+        Construct display names for operands, adding numeric suffixes when the same
+        operand name appears multiple times in the calling syntax.
+        """
+        counts: dict[str, int] = {}
+        base_names: list[str] = []
+
+        for operand in operands:
+            raw_name = operand.get('name', '')
+            base_name = str(raw_name) if raw_name is not None else ''
+            base_names.append(base_name)
+            if operand.get('include_in_code', True) and base_name:
+                counts[base_name] = counts.get(base_name, 0) + 1
+
+        duplicates = {name for name, count in counts.items() if count > 1}
+        duplicate_indices = {name: 1 for name in duplicates}
+
+        display_names: list[str] = []
+        for operand, base_name in zip(operands, base_names):
+            if operand.get('include_in_code', True) and base_name in duplicates:
+                display_name = f'{base_name}{duplicate_indices[base_name]}'
+                duplicate_indices[base_name] += 1
+            else:
+                display_name = base_name
+            display_names.append(display_name)
+
+        return display_names
+
     def _generate_instruction_version_section(
         self,
         mnemonic: str,
@@ -714,14 +746,13 @@ class MarkdownGenerator:
             lines.append('*Calling syntax:*')
 
             operands = signature.get('operands') or []
+            display_names = self._build_operand_display_names(operands)
             operand_tokens: list[str] = []
-            for operand in operands:
+            for operand, display_name in zip(operands, display_names):
                 if not operand.get('include_in_code', True):
                     continue
-                name_value = operand.get('name', '')
-                name = str(name_value) if name_value is not None else ''
-                if name:
-                    operand_tokens.append(name)
+                if display_name:
+                    operand_tokens.append(display_name)
 
             syntax_line = mnemonic
             if operand_tokens:
@@ -729,14 +760,18 @@ class MarkdownGenerator:
 
             lines.append(f'```asm\n{syntax_line}\n```')
 
-            operand_table = self._generate_instruction_operand_table(operands)
+            operand_table = self._generate_instruction_operand_table(operands, display_names)
             if operand_table:
                 lines.append('where')
                 lines.append(operand_table)
 
         return '\n\n'.join(lines)
 
-    def _generate_instruction_operand_table(self, operands: list[dict[str, Any]]) -> str:
+    def _generate_instruction_operand_table(
+        self,
+        operands: list[dict[str, Any]],
+        display_names: list[str] | None = None
+    ) -> str:
         """Build the operand table for an instruction signature."""
         if not operands:
             return ''
@@ -745,10 +780,13 @@ class MarkdownGenerator:
         alignments = ['left', 'left', 'left', 'left']
         rows: list[list[str]] = []
 
-        for operand in operands:
+        display_names = display_names or []
+
+        for index, operand in enumerate(operands):
             operand_name_value = operand.get('name')
-            operand_name = str(operand_name_value) if operand_name_value is not None else ''
-            operand_cell = f'`{operand_name}`' if operand_name else ''
+            base_name = str(operand_name_value) if operand_name_value is not None else ''
+            display_name = display_names[index] if index < len(display_names) else base_name
+            operand_cell = f'`{display_name}`' if display_name else ''
 
             operand_type_value = operand.get('type')
             operand_type = str(operand_type_value) if operand_type_value is not None else ''

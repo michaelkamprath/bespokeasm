@@ -124,13 +124,13 @@ For each operand set subsection:
 3. **Operand Table** — Emit a table where each row represents an operand from the operand set. Rows are ordered by `documentation.operand_order` when provided; otherwise the operands preserve the configuration file order. The default table columns are:
    - `Operand` — The operand key from `operand_values`, rendered as inline code.
    - `Syntax` — Shows how the operand would be written in source code. Determined from the operand’s configured `type` using the notation described in the [Operand Configuration Dictionary](https://github.com/michaelkamprath/bespokeasm/wiki/Instruction-Set-Configuration-File#operand-configuration-dictionary) (for the type-to-addressing-mode mapping) and the [Addressing Modes](https://github.com/michaelkamprath/bespokeasm/wiki/Assembly-Language-Syntax#addressing-modes) section of the language syntax guide.
-   - `Mode` — Populated from the operand’s `documentation.mode`.
+   - `Mode` — Populated from the operand’s `documentation.mode`. The column header links to the Addressing Modes section only when `general.documentation.addressing_modes` is present; otherwise the header is plain text.
    - `Description` — Populated from the operand’s `documentation.description`.
    - `Details` — Populated from the operand’s `documentation.details`, allowing inline markdown.
 
    Column inclusion follows the [Table Column Optimization](#table-column-optimization) guidance. If every operand lacks a value for a column, that column is omitted entirely.
 
-Operand sets that lack a `documentation` block are still rendered to keep coverage complete. In this case, the subsection heading is derived from the operand set key, the summary text is `Undocumented operand set <key>.`, and the operand table is still generated using the available per-operand documentation (fields left blank when absent).
+Operand sets that lack a `documentation` block are still rendered to keep coverage complete. In this case, the subsection heading is derived from the operand set key, and the operand table is generated using the available per-operand documentation (fields are left blank when absent).
 
 The syntax rendering should use canonical placeholders when a literal operand string is not available. Example mappings include:
 - `numeric` → `numeric_expression`
@@ -191,7 +191,7 @@ Inside each version section, emit a syntax summary that makes the callable form 
 
 1. Render an italicized lead-in line `*Calling syntax:*`.
 2. Emit an `````asm```` code block that shows the mnemonic followed by its operands in source order, separated by `, ` to match the [assembly language syntax](https://github.com/michaelkamprath/bespokeasm/wiki/Assembly-Language-Syntax#general-assembler-syntax). When the instruction accepts multiple operand signatures, each version already isolates a single signature, so only one code block is emitted per version.
-3. When at least one operand placeholder is present, add a `where` paragraph followed by a markdown table describing each operand. The default columns are `Operand`, `Type`, and `Description`, with an optional `Details` column included only when any operand surfaces `documentation.details`. Column inclusion continues to follow the [Table Column Optimization](#table-column-optimization) rules.
+3. When at least one operand placeholder is present, add a `where` paragraph followed by a markdown table describing each operand. The default columns are `Operand`, `Type`, and `Description`, with an optional `Details` column included only when any operand surfaces `documentation.details`. When an instruction signature includes the same operand name more than once (for example, two instances of the `absolute_address` operand set), the generated calling syntax appends an ordered suffix (`absolute_address1`, `absolute_address2`, …) to each occurrence, and the operand table uses the same numbered identifiers. Column inclusion continues to follow the [Table Column Optimization](#table-column-optimization) rules.
 
 Operand placeholders and table rows are derived from the instruction version's operand configuration:
 

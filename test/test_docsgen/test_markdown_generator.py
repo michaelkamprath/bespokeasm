@@ -236,7 +236,7 @@ class TestMarkdownGenerator(unittest.TestCase):
                 'key': 'zero_page',
                 'title': None,
                 'category': None,
-                'description': 'Undocumented operand set zero_page.',
+                'description': None,
                 'details': None,
                 'config_index': 1,
                 'operands': [
@@ -254,7 +254,7 @@ class TestMarkdownGenerator(unittest.TestCase):
                 'key': 'enum_values',
                 'title': 'Enumerated Values',
                 'category': None,
-                'description': 'Undocumented operand set enum_values.',
+                'description': None,
                 'details': None,
                 'config_index': 2,
                 'operands': [
@@ -272,7 +272,7 @@ class TestMarkdownGenerator(unittest.TestCase):
                 'key': 'memory_operands',
                 'title': 'Memory Operands',
                 'category': None,
-                'description': 'Undocumented operand set memory_operands.',
+                'description': None,
                 'details': None,
                 'config_index': 3,
                 'operands': [
@@ -298,7 +298,7 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.assertIn('General purpose registers.', result)
         self.assertIn('Used for arithmetic operations.', result)
         self.assertIn('| Register A (`reg_a`) | `a` | `Register` | Accumulator | Primary register. |', result)
-        self.assertIn('[Addressing Mode](#addressing-modes)', result)
+        self.assertIn('| Operand | Syntax | Addressing Mode | Description | Details |', result)
         self.assertIn('| Register B (`reg_b`) | `b` | `Register` | Index register |  |', result)
         self.assertIn('### `enum_values` - Enumerated Values', result)
         self.assertIn('| `enum` | `integer` | Numeric Enumeration | Possible values: `0`, `1`, `2`. |', result)
@@ -308,7 +308,7 @@ class TestMarkdownGenerator(unittest.TestCase):
             result
         )
         self.assertIn('### `zero_page`', result)
-        self.assertIn('Undocumented operand set zero_page.', result)
+        self.assertNotIn('Undocumented operand set zero_page.', result)
         self.assertIn('| `zp_addr` | `numeric_expression` | Address | Valid within `ZERO_PAGE` memory zone. |', result)
 
     def test_generate_with_instruction_documentation(self):
@@ -565,6 +565,58 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.assertIn('#### Version 2', result)
         self.assertIn('```asm\nMIX reg\n```', result)
         self.assertIn('```asm\nMIX imm\n```', result)
+
+    def test_duplicate_operand_names_are_numbered(self):
+        """Operands with identical names are numbered in syntax and operand tables."""
+        self.mock_doc_model.instruction_docs = {
+            'abb': {
+                'category': 'Arithmetic',
+                'title': None,
+                'description': None,
+                'details': None,
+                'modifies': [],
+                'examples': [],
+                'documented': True,
+                'versions': [
+                    {
+                        'index': 1,
+                        'signatures': [
+                            {
+                                'kind': 'operand_sets',
+                                'label': None,
+                                'operands': [
+                                    {
+                                        'name': 'absolute_address',
+                                        'type': 'operand set',
+                                        'description': None,
+                                        'details': None,
+                                        'include_in_code': True
+                                    },
+                                    {
+                                        'name': 'absolute_address',
+                                        'type': 'operand set',
+                                        'description': None,
+                                        'details': None,
+                                        'include_in_code': True
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+
+        self.mock_doc_model.get_instructions_by_category.return_value = {
+            'Arithmetic': ['abb']
+        }
+
+        generator = MarkdownGenerator(self.mock_doc_model, verbose=0)
+        result = generator.generate()
+
+        self.assertIn('```asm\nABB absolute_address1, absolute_address2\n```', result)
+        self.assertIn('| `absolute_address1` | operand set |', result)
+        self.assertIn('| `absolute_address2` | operand set |', result)
 
     def test_generate_empty_instruction_documentation(self):
         """Test generating document with no instruction documentation."""

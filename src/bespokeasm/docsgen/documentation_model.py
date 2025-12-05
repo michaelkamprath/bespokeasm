@@ -354,7 +354,7 @@ class DocumentationModel:
             details = doc_config.get('details')
 
             if not documented:
-                description = f'Undocumented operand set {set_name}.'
+                description = None
 
             operand_set_docs.append({
                 'key': set_name,

@@ -238,7 +238,7 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertTrue(register_set['operands'][1]['mode_from_doc'])
 
         zero_page_set = operand_sets_map['zero_page']
-        self.assertEqual(zero_page_set['description'], 'Undocumented operand set zero_page.')
+        self.assertIsNone(zero_page_set['description'])
         self.assertIsNone(zero_page_set['details'])
         self.assertEqual(len(zero_page_set['operands']), 1)
         zp_operand = zero_page_set['operands'][0]
@@ -249,7 +249,7 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertIsNone(zp_operand['title'])
 
         enum_set = operand_sets_map['enum_values']
-        self.assertEqual(enum_set['description'], 'Undocumented operand set enum_values.')
+        self.assertIsNone(enum_set['description'])
         enum_operand = enum_set['operands'][0]
         self.assertEqual(enum_operand['mode'], 'Numeric Enumeration')
         self.assertFalse(enum_operand['mode_from_doc'])
@@ -259,7 +259,7 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertIn('Possible values: `0`, `1`, `2`.', enum_operand['details'])
 
         memory_set = operand_sets_map['memory_operands']
-        self.assertEqual(memory_set['description'], 'Undocumented operand set memory_operands.')
+        self.assertIsNone(memory_set['description'])
         memory_operand = memory_set['operands'][0]
         self.assertEqual(memory_operand['name'], 'defered_indexed_x')
         self.assertEqual(memory_operand['syntax'], '[x + [numeric_expression]]')
