@@ -125,6 +125,12 @@ class DocumentationModel:
         Returns:
             List of structured addressing mode data
         """
+        if addressing_modes is None:
+            raise ValueError(
+                'general.documentation.addressing_modes must be a mapping; '
+                'set it to {} or remove the field if unused.'
+            )
+
         modes = []
         for name, data in addressing_modes.items():
             if isinstance(data, dict):
@@ -153,6 +159,7 @@ class DocumentationModel:
             return []
 
         register_docs: list[dict[str, Any]] = []
+        default_word_size = general_config.get('word_size', 8)
 
         if isinstance(registers_config, dict):
             for name, info in registers_config.items():
@@ -171,12 +178,14 @@ class DocumentationModel:
                     description = details
                     details = None
 
+                size = info.get('size', default_word_size)
+
                 register_docs.append({
                     'name': name,
                     'title': title,
                     'description': description,
                     'details': details,
-                    'size': info.get('size')
+                    'size': size
                 })
         else:
             try:
@@ -192,7 +201,7 @@ class DocumentationModel:
                     'title': None,
                     'description': None,
                     'details': None,
-                    'size': None
+                    'size': default_word_size
                 })
 
         return register_docs
@@ -212,18 +221,16 @@ class DocumentationModel:
         Returns:
             List of structured flag data
         """
-        if primary_flags is None:
-            flags_config = legacy_flags
-        else:
-            flags_config = primary_flags
+        if legacy_flags and self.verbose:
+            click.echo('Warning: documentation.flags is deprecated and ignored; use general.flags instead.')
 
-        if flags_config is None:
+        if primary_flags is None:
             return []
 
-        parsed_flags = []
+        parsed_flags: list[dict[str, str]] = []
 
-        if isinstance(flags_config, dict):
-            for symbol, data in flags_config.items():
+        if isinstance(primary_flags, dict):
+            for symbol, data in primary_flags.items():
                 if not isinstance(data, dict):
                     if self.verbose:
                         click.echo(f'Warning: Invalid flag configuration for symbol "{symbol}". Expected a dictionary.')
@@ -235,20 +242,9 @@ class DocumentationModel:
                     'description': data.get('description', ''),
                     'details': data.get('details')
                 })
-        elif isinstance(flags_config, list):
-            for flag_data in flags_config:
-                if isinstance(flag_data, dict) and 'name' in flag_data:
-                    parsed_flags.append({
-                        'name': flag_data['name'],
-                        'symbol': flag_data.get('symbol'),
-                        'description': flag_data.get('description', ''),
-                        'details': flag_data.get('details')
-                    })
-                elif self.verbose:
-                    click.echo(f'Warning: Invalid flag format: {flag_data}')
         else:
             if self.verbose:
-                click.echo('Warning: Flags configuration must be a dictionary or list.')
+                click.echo('Warning: Flags configuration must be a dictionary.')
 
         return parsed_flags
 
@@ -321,7 +317,18 @@ class DocumentationModel:
                     combined_details.extend(auto_details)
                     details = '\n\n'.join(filter(None, combined_details))
 
-                syntax = self._derive_operand_syntax(operand_name, operand_type, operand_config)
+                syntax = self._derive_operand_syntax(
+                    operand_name,
+                    operand_type,
+                    operand_config,
+                    operand_doc
+                )
+                value_summary = self._derive_operand_value(
+                    operand_name,
+                    operand_type,
+                    operand_config,
+                    syntax
+                )
 
                 operands.append({
                     'name': operand_name,
@@ -331,6 +338,7 @@ class DocumentationModel:
                     'description': description,
                     'details': details,
                     'syntax': syntax,
+                    'value': value_summary,
                     'config_order': operand_index
                 })
 
@@ -423,19 +431,19 @@ class DocumentationModel:
         self,
         operand_name: str,
         operand_type: str | None,
-        operand_config: dict[str, Any]
+        operand_config: dict[str, Any],
+        operand_doc: dict[str, Any] | None = None
     ) -> str:
         """Produce a syntax representation for an operand."""
         operand_type = operand_type or ''
+        operand_doc = operand_doc or {}
+
+        syntax_example = operand_doc.get('syntax_example')
+        if isinstance(syntax_example, str) and syntax_example.strip():
+            return syntax_example.strip()
 
         syntax: str
-        if operand_type == 'numeric':
-            syntax = 'numeric_expression'
-        elif operand_type == 'indirect_numeric':
-            syntax = '[numeric_expression]'
-        elif operand_type == 'deferred_numeric':
-            syntax = '[[numeric_expression]]'
-        elif operand_type == 'register':
+        if operand_type == 'register':
             register_label = operand_config.get('register')
             syntax = register_label if register_label else 'register_label'
         elif operand_type == 'indexed_register':
@@ -462,14 +470,25 @@ class DocumentationModel:
             else:
                 syntax = operand_name
         elif operand_type == 'numeric_enumeration':
-            syntax = 'integer'
+            syntax = operand_name or 'integer'
         elif operand_type == 'numeric_bytecode':
-            syntax = 'integer'
+            syntax = operand_name or 'integer'
+        elif operand_type == 'numeric':
+            placeholder = operand_name or 'numeric_expression'
+            syntax = placeholder
+        elif operand_type == 'indirect_numeric':
+            placeholder = operand_name or 'numeric_expression'
+            syntax = f'[{placeholder}]'
+        elif operand_type == 'deferred_numeric':
+            placeholder = operand_name or 'numeric_expression'
+            syntax = f'[[{placeholder}]]'
         elif operand_type == 'address':
-            syntax = 'numeric_expression'
+            placeholder = operand_name or 'numeric_expression'
+            syntax = placeholder
         elif operand_type == 'relative_address':
+            placeholder = operand_name or 'numeric_expression'
             use_curly = bool(operand_config.get('use_curly_braces', False))
-            syntax = '{numeric_expression}' if use_curly else 'numeric_expression'
+            syntax = f'{{{placeholder}}}' if use_curly else placeholder
         elif operand_type == 'empty':
             syntax = ''
         else:
@@ -500,6 +519,183 @@ class DocumentationModel:
                     literals.add(str(key))
 
         return sorted(literals)
+
+    def _derive_operand_value(
+        self,
+        operand_name: str,
+        operand_type: str | None,
+        operand_config: dict[str, Any],
+        syntax: str | None = None
+    ) -> str:
+        """Summarize the concrete value constraints for an operand."""
+        operand_type = operand_type or ''
+        decorator_info = self._get_decorator_symbol(operand_config.get('decorator'))
+
+        def apply_decorator(label: str) -> str:
+            if not decorator_info or not label:
+                return label
+            symbol, is_prefix = decorator_info
+            return f'{symbol}{label}' if is_prefix else f'{label}{symbol}'
+
+        def format_int(value: Any, force_decimal: bool = False) -> str:
+            if value is None:
+                return ''
+            try:
+                number = int(value)
+            except (TypeError, ValueError):
+                return str(value)
+            if force_decimal:
+                return str(number)
+            # Prefer hex for non-negative values >= 10
+            if number >= 0 and abs(number) >= 10:
+                return f'0x{number:X}'
+            return str(number)
+
+        if operand_type == 'register':
+            register_label = operand_config.get('register', 'register_label')
+            return f'register `{register_label}`'
+
+        if operand_type == 'indexed_register':
+            register_label = operand_config.get('register', 'register_label')
+            return f'register `{register_label}`'
+
+        if operand_type == 'indirect_register':
+            register_label = operand_config.get('register', 'register_label')
+            return f'register `{register_label}`'
+
+        if operand_type == 'indirect_indexed_register':
+            register_label = operand_config.get('register', 'register_label')
+            return f'register `{register_label}`'
+
+        if operand_type in ('numeric', 'indirect_numeric', 'deferred_numeric', 'address'):
+            # Value column uses a generic placeholder for numeric/address types
+            placeholder = 'numeric expression'
+            if operand_type == 'numeric':
+                bytecode_config = operand_config.get('bytecode', {}) if isinstance(operand_config, dict) else {}
+                argument_config = operand_config.get('argument', {}) if isinstance(operand_config, dict) else {}
+
+                # Treat an empty bytecode config as absent
+                use_bytecode = isinstance(bytecode_config, dict) and any(bytecode_config.values())
+                min_value = max_value = size = None
+
+                if use_bytecode:
+                    min_value = bytecode_config.get('min')
+                    max_value = bytecode_config.get('max')
+                    size = bytecode_config.get('size')
+                if size is None and isinstance(argument_config, dict):
+                    size = argument_config.get('size')
+
+                parts: list[str] = [placeholder]
+
+                range_text = ''
+                if min_value is not None or max_value is not None:
+                    force_decimal = any(
+                        v is not None and isinstance(v, (int, float)) and v < 0
+                        for v in (min_value, max_value)
+                    )
+                    min_text = format_int(min_value, force_decimal) if min_value is not None else ''
+                    max_text = format_int(max_value, force_decimal) if max_value is not None else ''
+                    if min_text and max_text:
+                        range_text = f'valued between {min_text} and {max_text}'
+                    elif min_text:
+                        range_text = f'valued >= {min_text}'
+                    elif max_text:
+                        range_text = f'valued <= {max_text}'
+                size_text = f'expressed as {size} bit value' if size is not None else ''
+
+                if range_text:
+                    parts.append(range_text)
+                if size_text:
+                    parts.append(size_text)
+
+                return ' '.join(parts).strip()
+            if operand_type == 'address':
+                argument_config = operand_config.get('argument', {}) if isinstance(operand_config, dict) else {}
+                if isinstance(argument_config, dict):
+                    size = argument_config.get('size')
+                    if size is not None:
+                        return f'{placeholder} expressed as {size} bit value'
+
+            return placeholder
+
+        if operand_type == 'relative_address':
+            use_curly = bool(operand_config.get('use_curly_braces', False))
+            placeholder = '{numeric_expression}' if use_curly else 'numeric expression'
+
+            argument_config = operand_config.get('argument', {}) if isinstance(operand_config, dict) else {}
+            min_value = max_value = size = None
+            if isinstance(argument_config, dict):
+                min_value = argument_config.get('min')
+                max_value = argument_config.get('max')
+                size = argument_config.get('size')
+
+            parts: list[str] = [placeholder]
+            range_text = ''
+            if min_value is not None or max_value is not None:
+                force_decimal = any(
+                    v is not None and isinstance(v, (int, float)) and v < 0
+                    for v in (min_value, max_value)
+                )
+                min_text = format_int(min_value, force_decimal) if min_value is not None else ''
+                max_text = format_int(max_value, force_decimal) if max_value is not None else ''
+                if min_text and max_text:
+                    range_text = f'valued between {min_text} and {max_text}'
+                elif min_text:
+                    range_text = f'valued >= {min_text}'
+                elif max_text:
+                    range_text = f'valued <= {max_text}'
+            size_text = f'expressed as {size} bit value' if size is not None else ''
+
+            if range_text:
+                parts.append(range_text)
+            if size_text:
+                parts.append(size_text)
+
+            return ' '.join(parts).strip()
+
+        if operand_type == 'enumeration':
+            literals = self._collect_enumeration_literals(operand_config)
+            if not literals:
+                return ''
+            if len(literals) == 1:
+                return f'token `{literals[0]}`'
+            formatted = ', '.join(f'`{literal}`' for literal in literals)
+            return f'tokens: {formatted}'
+
+        if operand_type == 'numeric_enumeration':
+            literals = self._collect_enumeration_literals(operand_config)
+            if literals:
+                formatted = ', '.join(f'`{literal}`' for literal in literals)
+                return f'numeric values: {formatted}'
+            return 'numeric value'
+
+        if operand_type == 'numeric_bytecode':
+            bytecode_config = operand_config.get('bytecode', {}) if isinstance(operand_config, dict) else {}
+            if isinstance(bytecode_config, dict):
+                min_value = bytecode_config.get('min')
+                max_value = bytecode_config.get('max')
+                size = bytecode_config.get('size')
+                force_decimal = any(
+                    v is not None and isinstance(v, (int, float)) and v < 0
+                    for v in (min_value, max_value)
+                )
+                if min_value is not None or max_value is not None:
+                    min_text = format_int(min_value, force_decimal) if min_value is not None else ''
+                    max_text = format_int(max_value, force_decimal) if max_value is not None else ''
+                    if min_text and max_text:
+                        return f'numeric expression valued between {min_text} and {max_text}'
+                    if min_text:
+                        return f'numeric expression valued >= {min_text}'
+                    if max_text:
+                        return f'numeric expression valued <= {max_text}'
+                if size is not None:
+                    return f'numeric expression valued ({size} bits)'
+            return 'numeric expression valued'
+
+        if operand_type == 'empty':
+            return ''
+
+        return syntax or operand_name
 
     def _build_index_operand_syntax(self, operand_config: dict[str, Any]) -> str | None:
         """Derive combined syntax for index operands."""
@@ -553,19 +749,6 @@ class DocumentationModel:
         if operand_type == 'relative_address':
             if operand_config.get('use_curly_braces'):
                 notes.append('Relative address operand uses curly brace notation.')
-
-        if operand_type == 'numeric_bytecode':
-            bytecode_config = operand_config.get('bytecode', {})
-            if isinstance(bytecode_config, dict):
-                min_value = bytecode_config.get('min')
-                max_value = bytecode_config.get('max')
-                if min_value is not None or max_value is not None:
-                    if min_value is not None and max_value is not None:
-                        notes.append(f'Allowed values: {min_value} to {max_value}.')
-                    elif min_value is not None:
-                        notes.append(f'Minimum value: {min_value}.')
-                    elif max_value is not None:
-                        notes.append(f'Maximum value: {max_value}.')
 
         if operand_type == 'numeric_enumeration' and not has_manual_details:
             literals = DocumentationModel._collect_enumeration_literals(operand_config)
@@ -648,16 +831,22 @@ class DocumentationModel:
         """
         Build the ordered list of operand signatures for an instruction across all variants.
         """
-        version_sources: list[dict[str, Any] | None] = []
+        version_sources: list[dict[str, Any]] = []
 
         if 'operands' in instruction_config or 'bytecode' in instruction_config:
-            version_sources.append(instruction_config.get('operands'))
+            version_sources.append({
+                'operands': instruction_config.get('operands'),
+                'documentation': None
+            })
 
         variants = instruction_config.get('variants')
         if isinstance(variants, list):
             for variant in variants:
                 if isinstance(variant, dict):
-                    version_sources.append(variant.get('operands'))
+                    version_sources.append({
+                        'operands': variant.get('operands'),
+                        'documentation': variant.get('documentation')
+                    })
                 elif self.verbose:
                     click.echo(
                         f'Warning: Variant for instruction "{mnemonic}" is not a dictionary. Skipping operand extraction.'
@@ -665,17 +854,31 @@ class DocumentationModel:
 
         if not version_sources:
             # Ensure at least one version so the syntax block can be emitted even without operands.
-            version_sources.append(None)
+            version_sources.append({
+                'operands': None,
+                'documentation': None
+            })
 
         versions: list[dict[str, Any]] = []
-        for index, operands_config in enumerate(version_sources, start=1):
+        for index, version_source in enumerate(version_sources, start=1):
+            operands_config = version_source.get('operands') if isinstance(version_source, dict) else None
+            doc_config_raw = version_source.get('documentation') if isinstance(version_source, dict) else None
+            doc_config = doc_config_raw if isinstance(doc_config_raw, dict) else {}
+            documented = bool(doc_config)
+
             signatures = self._build_instruction_signatures(
                 operands_config,
                 operand_sets_config
             )
             versions.append({
                 'index': index,
-                'signatures': signatures
+                'signatures': signatures,
+                'title': doc_config.get('title') if documented else None,
+                'description': doc_config.get('description') if documented else None,
+                'details': doc_config.get('details') if documented else None,
+                'modifies': self._parse_modifies(doc_config.get('modifies', [])) if documented else [],
+                'examples': self._parse_examples(doc_config.get('examples', [])) if documented else [],
+                'documented': documented
             })
 
         return versions
@@ -709,12 +912,42 @@ class DocumentationModel:
                     operand_doc = operand_doc_raw if isinstance(operand_doc_raw, dict) else {}
                     operand_type_value = operand_info.get('type')
                     operand_type = str(operand_type_value) if operand_type_value is not None else ''
+                    description = operand_doc.get('description')
+                    details = operand_doc.get('details')
+
+                    syntax = self._derive_operand_syntax(
+                        operand_name,
+                        operand_type,
+                        operand_info,
+                        operand_doc
+                    )
+                    value_summary = self._derive_operand_value(
+                        operand_name,
+                        operand_type,
+                        operand_info,
+                        syntax
+                    )
+
+                    auto_details = self._derive_operand_auto_details(
+                        operand_type,
+                        operand_info,
+                        bool(details)
+                    )
+                    if auto_details:
+                        combined_details = []
+                        if details:
+                            combined_details.append(details)
+                        combined_details.extend(auto_details)
+                        details = '\n\n'.join(filter(None, combined_details))
 
                     operands.append({
                         'name': operand_name,
+                        'display_name': operand_name,
                         'type': operand_type,
-                        'description': operand_doc.get('description'),
-                        'details': operand_doc.get('details'),
+                        'syntax': syntax,
+                        'value': value_summary,
+                        'description': description,
+                        'details': details,
                         'include_in_code': operand_type != 'empty'
                     })
 
@@ -747,9 +980,40 @@ class DocumentationModel:
                         description = None
                         details = None
 
+                    # Derive a representative syntax/value when the operand set has a single member
+                    syntax_value = set_name
+                    value_summary = ''
+                    display_name = set_name
+                    display_type = 'operand_set'
+                    operand_values = set_doc_config.get('operand_values') if isinstance(set_doc_config, dict) else None
+                    if isinstance(operand_values, dict) and len(operand_values) == 1:
+                        member_name, member_config = next(iter(operand_values.items()))
+                        member_doc = member_config.get('documentation') if isinstance(member_config, dict) else None
+                        if isinstance(member_config, dict):
+                            member_type = member_config.get('type')
+                            member_syntax = self._derive_operand_syntax(
+                                member_name,
+                                member_type,
+                                member_config,
+                                member_doc if isinstance(member_doc, dict) else None
+                            )
+                            member_value = self._derive_operand_value(
+                                member_name,
+                                member_type,
+                                member_config,
+                                member_syntax
+                            )
+                            syntax_value = member_syntax
+                            value_summary = member_value
+                            display_name = member_name
+                            display_type = member_type or 'operand_set'
+
                     operands.append({
-                        'name': set_name,
-                        'type': 'operand set',
+                        'name': display_name,
+                        'display_name': display_name,
+                        'type': display_type,
+                        'syntax': syntax_value,
+                        'value': value_summary,
                         'description': description,
                         'details': details,
                         'include_in_code': True

@@ -216,6 +216,7 @@ class TestMarkdownGenerator(unittest.TestCase):
                         'name': 'reg_a',
                         'title': 'Register A',
                         'syntax': 'a',
+                        'value': 'register `a`',
                         'mode': 'Register',
                         'mode_from_doc': True,
                         'description': 'Accumulator',
@@ -225,6 +226,7 @@ class TestMarkdownGenerator(unittest.TestCase):
                         'name': 'reg_b',
                         'title': 'Register B',
                         'syntax': 'b',
+                        'value': 'register `b`',
                         'mode': 'Register',
                         'mode_from_doc': True,
                         'description': 'Index register',
@@ -243,6 +245,7 @@ class TestMarkdownGenerator(unittest.TestCase):
                     {
                         'name': 'zp_addr',
                         'syntax': 'numeric_expression',
+                        'value': 'numeric expression',
                         'mode': 'Address',
                         'mode_from_doc': False,
                         'description': None,
@@ -260,7 +263,8 @@ class TestMarkdownGenerator(unittest.TestCase):
                 'operands': [
                     {
                         'name': 'enum',
-                        'syntax': 'integer',
+                        'syntax': 'enum',
+                        'value': 'numeric values: `0`, `1`, `2`',
                         'mode': 'Numeric Enumeration',
                         'mode_from_doc': False,
                         'description': None,
@@ -280,8 +284,28 @@ class TestMarkdownGenerator(unittest.TestCase):
                         'name': 'defered_indexed_x',
                         'title': 'Indirect Indexed Memory Value',
                         'syntax': '[x + [numeric_expression]]',
+                        'value': 'register `x`',
                         'mode': 'indirect_indexed',
                         'mode_from_doc': True,
+                        'description': None,
+                        'details': None
+                    }
+                ]
+            },
+            {
+                'key': 'limited_num',
+                'title': 'Limited Number',
+                'category': None,
+                'description': None,
+                'details': None,
+                'config_index': 4,
+                'operands': [
+                    {
+                        'name': 'n3',
+                        'syntax': 'numeric_expression',
+                        'value': 'numeric expression valued between 0 and 0x7 expressed as 3 bit value',
+                        'mode': 'numeric',
+                        'mode_from_doc': False,
                         'description': None,
                         'details': None
                     }
@@ -297,19 +321,38 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.assertIn('*Category: Registers*', result)
         self.assertIn('General purpose registers.', result)
         self.assertIn('Used for arithmetic operations.', result)
-        self.assertIn('| Register A (`reg_a`) | `a` | `Register` | Accumulator | Primary register. |', result)
-        self.assertIn('| Operand | Syntax | Addressing Mode | Description | Details |', result)
-        self.assertIn('| Register B (`reg_b`) | `b` | `Register` | Index register |  |', result)
+        self.assertIn(
+            '| Register A (`reg_a`) | `a` | register `a` | `Register` | Accumulator | Primary register. |',
+            result
+        )
+        self.assertIn('| Operand | Syntax | Value | Addressing Mode | Description | Details |', result)
+        self.assertIn(
+            '| Register B (`reg_b`) | `b` | register `b` | `Register` | Index register |  |',
+            result
+        )
         self.assertIn('### `enum_values` - Enumerated Values', result)
-        self.assertIn('| `enum` | `integer` | Numeric Enumeration | Possible values: `0`, `1`, `2`. |', result)
+        self.assertIn(
+            '| `enum` | `enum` | numeric values: `0`, `1`, `2` | Numeric Enumeration | Possible values: `0`, `1`, `2`. |',
+            result
+        )
         self.assertIn('### `memory_operands` - Memory Operands', result)
         self.assertIn(
-            '| Indirect Indexed Memory Value (`defered_indexed_x`) | `[x + [numeric_expression]]` | `indirect_indexed` |',
+            '| Indirect Indexed Memory Value (`defered_indexed_x`) | `[x + [numeric_expression]]` '
+            '| register `x` | `indirect_indexed` |',
             result
         )
         self.assertIn('### `zero_page`', result)
         self.assertNotIn('Undocumented operand set zero_page.', result)
-        self.assertIn('| `zp_addr` | `numeric_expression` | Address | Valid within `ZERO_PAGE` memory zone. |', result)
+        self.assertIn(
+            '| `zp_addr` | `numeric_expression` | numeric expression | Address | Valid within `ZERO_PAGE` memory zone. |',
+            result
+        )
+        self.assertIn('### `limited_num` - Limited Number', result)
+        self.assertIn('| Operand | Syntax | Value | Addressing Mode |', result)
+        self.assertIn(
+            '| `n3` | `numeric_expression` | numeric expression valued between 0 and 0x7 expressed as 3 bit value | numeric |',
+            result
+        )
 
     def test_generate_with_instruction_documentation(self):
         """Test generating document with instruction documentation."""
@@ -352,6 +395,8 @@ class TestMarkdownGenerator(unittest.TestCase):
                                     {
                                         'name': 'imm8',
                                         'type': 'operand_set',
+                                        'syntax': 'imm8',
+                                        'value': '8-bit immediate',
                                         'description': '8-bit immediate value.',
                                         'details': None,
                                         'include_in_code': True
@@ -380,6 +425,8 @@ class TestMarkdownGenerator(unittest.TestCase):
                                     {
                                         'name': 'dest',
                                         'type': 'register',
+                                        'syntax': 'r0',
+                                        'value': 'register `r0`',
                                         'description': 'Destination register.',
                                         'details': None,
                                         'include_in_code': True
@@ -387,6 +434,8 @@ class TestMarkdownGenerator(unittest.TestCase):
                                     {
                                         'name': 'value',
                                         'type': 'numeric',
+                                        'syntax': 'numeric_expression',
+                                        'value': 'numeric_expression',
                                         'description': 'Immediate value.',
                                         'details': None,
                                         'include_in_code': True
@@ -447,10 +496,10 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.assertIn('Load a value into the accumulator register', result)
         self.assertIn('*Calling syntax:*', result)
         self.assertIn('```asm\nLDA imm8\n```', result)
-        self.assertIn('```asm\nADD dest, value\n```', result)
-        self.assertIn('| Operand | Type | Description |', result)
-        self.assertIn('| `imm8` | operand_set | 8-bit immediate value. |', result)
-        self.assertIn('| `dest` | register | Destination register. |', result)
+        self.assertIn('```asm\nADD r0, numeric_expression\n```', result)
+        self.assertIn('| Operand | Type | Value | Description |', result)
+        self.assertIn('| `imm8` | operand_set | 8-bit immediate | 8-bit immediate value. |', result)
+        self.assertIn('| `r0` | register | register `r0` | Destination register. |', result)
         self.assertIn('\n---\n\n### `STA`', result)
         self.assertNotIn('---\n*Calling syntax:*', result)
 
@@ -587,14 +636,14 @@ class TestMarkdownGenerator(unittest.TestCase):
                                 'operands': [
                                     {
                                         'name': 'absolute_address',
-                                        'type': 'operand set',
+                                        'type': 'operand_set',
                                         'description': None,
                                         'details': None,
                                         'include_in_code': True
                                     },
                                     {
                                         'name': 'absolute_address',
-                                        'type': 'operand set',
+                                        'type': 'operand_set',
                                         'description': None,
                                         'details': None,
                                         'include_in_code': True
@@ -615,8 +664,8 @@ class TestMarkdownGenerator(unittest.TestCase):
         result = generator.generate()
 
         self.assertIn('```asm\nABB absolute_address1, absolute_address2\n```', result)
-        self.assertIn('| `absolute_address1` | operand set |', result)
-        self.assertIn('| `absolute_address2` | operand set |', result)
+        self.assertIn('| `absolute_address1` | operand_set |', result)
+        self.assertIn('| `absolute_address2` | operand_set |', result)
 
     def test_generate_empty_instruction_documentation(self):
         """Test generating document with no instruction documentation."""
@@ -738,6 +787,105 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.assertIn('| Type | Target | Description | Details |', result)
         self.assertIn('| Register | A | Loaded with value |  |', result)
         self.assertIn('| Flag | Z | Set if zero | Detailed flag behavior |', result)
+
+    def test_numeric_bytecode_value_column(self):
+        """Numeric bytecode operands show value range without duplicating details."""
+        self.mock_doc_model.instruction_docs = {
+            'lr': {
+                'category': 'Data Movement',
+                'title': 'Load register',
+                'details': None,
+                'modifies': [],
+                'examples': [],
+                'documented': True,
+                'versions': [
+                    {
+                        'index': 1,
+                        'signatures': [
+                            {
+                                'kind': 'specific',
+                                'label': 'reg_and_nbyte',
+                                'operands': [
+                                    {
+                                        'name': 'dest',
+                                        'type': 'register',
+                                        'syntax': 'a',
+                                        'value': 'register `a`',
+                                        'description': None,
+                                        'details': None,
+                                        'include_in_code': True
+                                    },
+                                    {
+                                        'name': 'scratchpad_regs',
+                                        'type': 'numeric_bytecode',
+                                        'syntax': 'scratchpad_regs',
+                                        'value': 'numeric expression valued between 0 and 0xB',
+                                        'description': None,
+                                        'details': None,
+                                        'include_in_code': True
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+        self.mock_doc_model.get_instructions_by_category.return_value = {
+            'Data Movement': ['lr']
+        }
+
+        generator = MarkdownGenerator(self.mock_doc_model, verbose=0)
+        result = generator.generate()
+
+        self.assertIn('```asm\nLR a, scratchpad_regs\n```', result)
+        self.assertIn('| Operand | Type | Value |', result)
+        self.assertIn('| `scratchpad_regs` | numeric_bytecode | numeric expression valued between 0 and 0xB |', result)
+
+    def test_single_member_operand_set_shows_member_value(self):
+        """Operand set with one member surfaces that member's syntax/value in where table."""
+        self.mock_doc_model.instruction_docs = {
+            'lr': {
+                'category': 'Data Movement',
+                'title': 'Load register',
+                'details': None,
+                'modifies': [],
+                'examples': [],
+                'documented': True,
+                'versions': [
+                    {
+                        'index': 1,
+                        'signatures': [
+                            {
+                                'kind': 'operand_sets',
+                                'label': None,
+                                'operands': [
+                                    {
+                                        'name': 'single_reg',
+                                        'type': 'register',
+                                        'syntax': 'a',
+                                        'value': 'register `a`',
+                                        'description': None,
+                                        'details': None,
+                                        'include_in_code': True
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+        self.mock_doc_model.get_instructions_by_category.return_value = {
+            'Data Movement': ['lr']
+        }
+
+        generator = MarkdownGenerator(self.mock_doc_model, verbose=0)
+        result = generator.generate()
+
+        self.assertIn('```asm\nLR a\n```', result)
+        self.assertIn('| Operand | Type | Value |', result)
+        self.assertIn('| `a` | register | register `a` |', result)
 
     def test_has_general_documentation(self):
         """Test the _has_general_documentation method."""

@@ -334,8 +334,8 @@ class MarkdownGenerator:
         addressing_modes = getattr(self.doc_model, 'general_docs', {}).get('addressing_modes') or []
         addressing_mode_header = '[Addressing Mode](#addressing-modes)' if addressing_modes else 'Addressing Mode'
 
-        headers = ['Operand', 'Syntax', addressing_mode_header, 'Description', 'Details']
-        alignments = ['left', 'left', 'left', 'left', 'left']
+        headers = ['Operand', 'Syntax', 'Value', addressing_mode_header, 'Description', 'Details']
+        alignments = ['left', 'left', 'left', 'left', 'left', 'left']
         rows: list[list[str]] = []
 
         for operand in operands:
@@ -355,6 +355,11 @@ class MarkdownGenerator:
             else:
                 syntax_cell = ''
 
+            value_text = operand.get('value') or ''
+            if value_text:
+                value_text = str(value_text).replace('\n', '<br>')
+            value_cell = value_text
+
             mode_value = operand.get('mode') or ''
             if operand.get('mode_from_doc') and mode_value:
                 mode_cell = f'`{mode_value}`'
@@ -368,7 +373,7 @@ class MarkdownGenerator:
             if details:
                 details = details.replace('\n', '<br>')
 
-            rows.append([operand_cell, syntax_cell, mode_cell, description, details])
+            rows.append([operand_cell, syntax_cell, value_cell, mode_cell, description, details])
 
         table = self._generate_markdown_table(headers, rows, column_alignments=alignments)
         if not table:
@@ -704,7 +709,7 @@ class MarkdownGenerator:
         base_names: list[str] = []
 
         for operand in operands:
-            raw_name = operand.get('name', '')
+            raw_name = operand.get('syntax') or operand.get('display_name') or operand.get('name') or ''
             base_name = str(raw_name) if raw_name is not None else ''
             base_names.append(base_name)
             if operand.get('include_in_code', True) and base_name:
@@ -715,11 +720,17 @@ class MarkdownGenerator:
 
         display_names: list[str] = []
         for operand, base_name in zip(operands, base_names):
+            display_text = (
+                operand.get('syntax')
+                or operand.get('display_name')
+                or operand.get('name')
+                or base_name
+            )
             if operand.get('include_in_code', True) and base_name in duplicates:
-                display_name = f'{base_name}{duplicate_indices[base_name]}'
+                display_name = f'{display_text}{duplicate_indices[base_name]}'
                 duplicate_indices[base_name] += 1
             else:
-                display_name = base_name
+                display_name = display_text
             display_names.append(display_name)
 
         return display_names
@@ -736,7 +747,18 @@ class MarkdownGenerator:
         if include_heading:
             version_index = version_data.get('index')
             heading_label = f'#### Version {version_index}'
+            version_title = version_data.get('title')
+            if version_title:
+                heading_label += f' : {version_title}'
             lines.append(heading_label)
+
+        version_description = version_data.get('description')
+        if version_description:
+            lines.append(version_description)
+
+        version_details = version_data.get('details')
+        if version_details:
+            lines.append(version_details)
 
         signatures = version_data.get('signatures') or []
         if not signatures:
@@ -765,6 +787,12 @@ class MarkdownGenerator:
                 lines.append('where')
                 lines.append(operand_table)
 
+        if version_data.get('modifies'):
+            lines.append(self._generate_modifies_table(version_data['modifies']))
+
+        if version_data.get('examples'):
+            lines.append(self._generate_instruction_examples(version_data['examples']))
+
         return '\n\n'.join(lines)
 
     def _generate_instruction_operand_table(
@@ -776,8 +804,8 @@ class MarkdownGenerator:
         if not operands:
             return ''
 
-        headers = ['Operand', 'Type', 'Description', 'Details']
-        alignments = ['left', 'left', 'left', 'left']
+        headers = ['Operand', 'Type', 'Value', 'Description', 'Details']
+        alignments = ['left', 'left', 'left', 'left', 'left']
         rows: list[list[str]] = []
 
         display_names = display_names or []
@@ -791,6 +819,11 @@ class MarkdownGenerator:
             operand_type_value = operand.get('type')
             operand_type = str(operand_type_value) if operand_type_value is not None else ''
 
+            value_text = operand.get('value')
+            value_cell = str(value_text) if value_text is not None else ''
+            if value_cell:
+                value_cell = value_cell.replace('\n', '<br>')
+
             description_value = operand.get('description')
             if description_value is None:
                 description_cell = ''
@@ -803,7 +836,7 @@ class MarkdownGenerator:
             else:
                 details_cell = str(details).replace('\n', '<br>')
 
-            rows.append([operand_cell, operand_type, description_cell, details_cell])
+            rows.append([operand_cell, operand_type, value_cell, description_cell, details_cell])
 
         return self._generate_markdown_table(headers, rows, column_alignments=alignments)
 

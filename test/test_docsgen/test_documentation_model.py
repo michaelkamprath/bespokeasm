@@ -114,7 +114,7 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertIsNone(registers[2]['title'])
         self.assertIsNone(registers[2]['description'])
         self.assertIsNone(registers[2]['details'])
-        self.assertIsNone(registers[2]['size'])
+        self.assertEqual(registers[2]['size'], 12)
 
         # Test flags
         flags = model.general_docs['flags']
@@ -178,6 +178,43 @@ class TestDocumentationModel(unittest.TestCase):
                         }
                     }
                 },
+                'limited_num': {
+                    'operand_values': {
+                        'n3': {
+                            'type': 'numeric',
+                            'bytecode': {
+                                'min': 0,
+                                'max': 7,
+                                'size': 3
+                            }
+                        }
+                    }
+                },
+                'rel_range': {
+                    'operand_values': {
+                        'rel_off': {
+                            'type': 'relative_address',
+                            'argument': {
+                                'min': -5,
+                                'max': 5,
+                                'size': 8
+                            },
+                            'use_curly_braces': False
+                        }
+                    }
+                },
+                'offset_addr': {
+                    'operand_values': {
+                        'offset': {
+                            'type': 'relative_address',
+                            'argument': {
+                                'min': -127,
+                                'max': 128,
+                                'size': 8
+                            }
+                        }
+                    }
+                },
                 'memory_operands': {
                     'operand_values': {
                         'defered_indexed_x': {
@@ -217,7 +254,7 @@ class TestDocumentationModel(unittest.TestCase):
         operand_sets_map = {entry['key']: entry for entry in operand_sets}
         self.assertSetEqual(
             set(operand_sets_map.keys()),
-            {'register_operands', 'zero_page', 'enum_values', 'memory_operands'}
+            {'register_operands', 'zero_page', 'enum_values', 'memory_operands', 'limited_num', 'rel_range', 'offset_addr'}
         )
 
         register_set = operand_sets_map['register_operands']
@@ -227,12 +264,14 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertEqual(register_set['details'], 'Used for arithmetic operations.')
         self.assertEqual([op['name'] for op in register_set['operands']], ['reg_b', 'reg_a'])
         self.assertEqual(register_set['operands'][0]['syntax'], 'b')
+        self.assertEqual(register_set['operands'][0]['value'], 'register `b`')
         self.assertEqual(register_set['operands'][0]['mode'], 'Register')
         self.assertTrue(register_set['operands'][0]['mode_from_doc'])
         self.assertEqual(register_set['operands'][0]['description'], 'Index register')
         self.assertIsNone(register_set['operands'][0]['details'])
         self.assertEqual(register_set['operands'][0]['title'], 'Register B')
         self.assertEqual(register_set['operands'][1]['syntax'], 'a')
+        self.assertEqual(register_set['operands'][1]['value'], 'register `a`')
         self.assertEqual(register_set['operands'][1]['details'], 'Used frequently.')
         self.assertEqual(register_set['operands'][1]['title'], 'Register A')
         self.assertTrue(register_set['operands'][1]['mode_from_doc'])
@@ -244,7 +283,8 @@ class TestDocumentationModel(unittest.TestCase):
         zp_operand = zero_page_set['operands'][0]
         self.assertEqual(zp_operand['mode'], 'Address')
         self.assertFalse(zp_operand['mode_from_doc'])
-        self.assertEqual(zp_operand['syntax'], 'numeric_expression')
+        self.assertEqual(zp_operand['syntax'], 'zp_addr')
+        self.assertEqual(zp_operand['value'], 'numeric expression')
         self.assertIn('Valid within `ZERO_PAGE` memory zone.', zp_operand['details'])
         self.assertIsNone(zp_operand['title'])
 
@@ -255,16 +295,30 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertFalse(enum_operand['mode_from_doc'])
         self.assertIsNone(enum_operand['title'])
         self.assertIsNone(enum_operand['description'])
-        self.assertEqual(enum_operand['syntax'], 'integer')
+        self.assertEqual(enum_operand['syntax'], 'enum')
+        self.assertEqual(enum_operand['value'], 'numeric values: `0`, `1`, `2`')
         self.assertIn('Possible values: `0`, `1`, `2`.', enum_operand['details'])
 
         memory_set = operand_sets_map['memory_operands']
         self.assertIsNone(memory_set['description'])
         memory_operand = memory_set['operands'][0]
         self.assertEqual(memory_operand['name'], 'defered_indexed_x')
-        self.assertEqual(memory_operand['syntax'], '[x + [numeric_expression]]')
+        self.assertEqual(memory_operand['syntax'], '[x + [indirect_addr]]')
+        self.assertEqual(memory_operand['value'], 'register `x`')
         self.assertEqual(memory_operand['mode'], 'indirect_indexed')
         self.assertTrue(memory_operand['mode_from_doc'])
+
+        limited_set = operand_sets_map['limited_num']
+        limited_operand = limited_set['operands'][0]
+        self.assertEqual(limited_operand['value'], 'numeric expression valued between 0 and 7 expressed as 3 bit value')
+
+        rel_set = operand_sets_map['rel_range']
+        rel_operand = rel_set['operands'][0]
+        self.assertEqual(rel_operand['value'], 'numeric expression valued between -5 and 5 expressed as 8 bit value')
+
+        offset_set = operand_sets_map['offset_addr']
+        offset_operand = offset_set['operands'][0]
+        self.assertEqual(offset_operand['value'], 'numeric expression valued between -127 and 128 expressed as 8 bit value')
 
     def test_register_documentation_from_list(self):
         """Registers provided as a list are converted into name-only documentation entries."""
@@ -281,10 +335,10 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertIsNone(registers[0]['title'])
         self.assertIsNone(registers[0]['description'])
         self.assertIsNone(registers[0]['details'])
-        self.assertIsNone(registers[0]['size'])
+        self.assertEqual(registers[0]['size'], 8)
 
     def test_parse_general_documentation_legacy_flags(self):
-        """Legacy documentation.flags structure is still supported."""
+        """Legacy documentation.flags structure should be ignored."""
         self.mock_isa_model._config = {
             'general': {
                 'documentation': {
@@ -299,13 +353,11 @@ class TestDocumentationModel(unittest.TestCase):
             }
         }
 
-        model = DocumentationModel(self.mock_isa_model, verbose=1)
-        flags = model.general_docs['flags']
-        self.assertEqual(len(flags), 1)
-        self.assertEqual(flags[0]['name'], 'carry')
-        self.assertEqual(flags[0]['symbol'], 'C')
-        self.assertEqual(flags[0]['description'], 'Carry flag')
-        self.assertIsNone(flags[0]['details'])
+        with patch('click.echo') as mock_echo:
+            model = DocumentationModel(self.mock_isa_model, verbose=1)
+            flags = model.general_docs['flags']
+            self.assertEqual(len(flags), 0)
+            mock_echo.assert_called()
 
     def test_parse_instruction_documentation(self):
         """Test parsing instruction documentation."""
@@ -403,7 +455,7 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertEqual(lda_signature['kind'], 'operand_sets')
         self.assertEqual(len(lda_signature['operands']), 1)
         self.assertEqual(lda_signature['operands'][0]['name'], 'imm8')
-        self.assertEqual(lda_signature['operands'][0]['type'], 'operand set')
+        self.assertEqual(lda_signature['operands'][0]['type'], 'operand_set')
         self.assertEqual(lda_signature['operands'][0]['description'], '8-bit immediate value')
         self.assertEqual(
             lda_signature['operands'][0]['details'],
@@ -442,6 +494,10 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertEqual(operand_names, ['dest', 'value'])
         operand_types = [operand['type'] for operand in add_signature['operands']]
         self.assertEqual(operand_types, ['register', 'numeric'])
+        self.assertEqual(add_signature['operands'][0]['syntax'], 'register_label')
+        self.assertEqual(add_signature['operands'][0]['value'], 'register `register_label`')
+        self.assertEqual(add_signature['operands'][1]['syntax'], 'value')
+        self.assertEqual(add_signature['operands'][1]['value'], 'numeric expression')
 
         # Test NOP instruction (no documentation)
         nop_doc = model.instruction_docs['nop']
@@ -454,6 +510,39 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertFalse(nop_doc['documented'])
         self.assertEqual(len(nop_doc['versions']), 1)
         self.assertEqual(len(nop_doc['versions'][0]['signatures'][0]['operands']), 0)
+
+    def test_operand_set_single_member_exposes_syntax_and_value(self):
+        """Operand sets with a single member surface that member's syntax/value in signatures."""
+        self.mock_isa_model._config = {
+            'operand_sets': {
+                'single_reg': {
+                    'operand_values': {
+                        'reg_a': {
+                            'type': 'register',
+                            'register': 'a'
+                        }
+                    }
+                }
+            },
+            'instructions': {
+                'lr': {
+                    'operands': {
+                        'count': 1,
+                        'operand_sets': {
+                            'list': ['single_reg']
+                        }
+                    }
+                }
+            }
+        }
+
+        model = DocumentationModel(self.mock_isa_model, verbose=0)
+        signature = model.instruction_docs['lr']['versions'][0]['signatures'][0]
+        operand = signature['operands'][0]
+        self.assertEqual(operand['type'], 'register')
+        self.assertEqual(operand['name'], 'reg_a')
+        self.assertEqual(operand['syntax'], 'a')
+        self.assertEqual(operand['value'], 'register `a`')
 
     def test_get_instructions_by_category(self):
         """Test getting instructions organized by category."""
@@ -568,6 +657,94 @@ class TestDocumentationModel(unittest.TestCase):
             'reg'
         )
 
+    def test_operand_syntax_example_and_value(self):
+        """Specific operands honor syntax_example and derive value summaries."""
+        self.mock_isa_model._config = {
+            'instructions': {
+                'lr': {
+                    'operands': {
+                        'count': 3,
+                        'specific_operands': {
+                            'reg_indirect_numeric': {
+                                'list': {
+                                    'acc': {
+                                        'type': 'register',
+                                        'register': 'a',
+                                        'documentation': {
+                                            'syntax_example': 'a',
+                                            'description': 'Accumulator'
+                                        }
+                                    },
+                                    'ptr': {
+                                        'type': 'indirect_register',
+                                        'register': 'is',
+                                        'documentation': {
+                                            'description': 'Pointer'
+                                        }
+                                    },
+                                    'scratchpad_regs': {
+                                        'type': 'numeric_bytecode',
+                                        'bytecode': {
+                                            'min': 0,
+                                            'max': 11
+                                        },
+                                        'documentation': {
+                                            'description': 'Scratchpad register selector'
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    'documentation': {
+                        'category': 'Data Movement',
+                        'title': 'Load register'
+                    }
+                }
+            }
+        }
+
+        model = DocumentationModel(self.mock_isa_model, verbose=0)
+        lr_signature = model.instruction_docs['lr']['versions'][0]['signatures'][0]
+        operands = lr_signature['operands']
+        self.assertEqual(operands[0]['syntax'], 'a')
+        self.assertEqual(operands[0]['value'], 'register `a`')
+        self.assertEqual(operands[1]['syntax'], '[is]')
+        self.assertEqual(operands[1]['value'], 'register `is`')
+        self.assertEqual(operands[2]['syntax'], 'scratchpad_regs')
+        self.assertEqual(operands[2]['value'], 'numeric expression valued between 0 and 0xB')
+
+    def test_numeric_value_with_size_and_range(self):
+        """Numeric operand value includes range and bit size when present."""
+        self.mock_isa_model._config = {
+            'instructions': {
+                'ld': {
+                    'operands': {
+                        'count': 1,
+                        'specific_operands': {
+                            'imm': {
+                                'list': {
+                                    'immediate': {
+                                        'type': 'numeric',
+                                        'bytecode': {
+                                            'min': 1,
+                                            'max': 10,
+                                            'size': 8
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        model = DocumentationModel(self.mock_isa_model, verbose=0)
+        signature = model.instruction_docs['ld']['versions'][0]['signatures'][0]
+        operand = signature['operands'][0]
+        self.assertEqual(operand['value'], 'numeric expression valued between 1 and 0xA expressed as 8 bit value')
+
     def test_invalid_documentation_formats(self):
         """Test handling of invalid documentation formats."""
         self.mock_isa_model._config = {
@@ -610,8 +787,7 @@ class TestDocumentationModel(unittest.TestCase):
 
             # Test that valid items are preserved and invalid ones ignored
             self.assertEqual(len(model.general_docs['addressing_modes']), 0)
-            self.assertEqual(len(model.general_docs['flags']), 1)
-            self.assertEqual(model.general_docs['flags'][0]['name'], 'valid_flag')
+            self.assertEqual(len(model.general_docs['flags']), 0)
             self.assertEqual(len(model.general_docs['examples']), 1)
             self.assertEqual(model.general_docs['examples'][0]['description'], 'valid')
 

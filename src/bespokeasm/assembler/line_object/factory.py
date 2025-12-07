@@ -55,6 +55,7 @@ class LineOjectFactory:
             instruction_str = instruction_match.group(1).strip()
 
         line_obj_list: list[LineObject] = []
+        label_seen = False
         # check to see if this is preprocessor directive
         if instruction_str.startswith('#'):
             # this is a preprocessor directive
@@ -88,7 +89,10 @@ class LineOjectFactory:
                     current_memzone,
                 )
                 if line_obj is not None:
+                    if label_seen:
+                        sys.exit(f'ERROR: {line_id} - only one label or constant assignment is allowed per line')
                     line_obj_list.append(line_obj)
+                    label_seen = True
                     instruction_str = instruction_str.replace(line_obj.instruction, '', 1).strip()
                     continue
 
