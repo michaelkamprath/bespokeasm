@@ -27,6 +27,13 @@ dependencies = [
     "ruamel.yaml",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "build",
+    "pipx",
+    "pyinstaller",
+]
+
 [project.urls]
 homepage = "https://github.com/michaelkamprath/bespokeasm"
 repository = "https://github.com/michaelkamprath/bespokeasm"
