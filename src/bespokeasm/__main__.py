@@ -6,6 +6,8 @@ import click
 from bespokeasm import BESPOKEASM_VERSION_STR
 from bespokeasm.assembler.engine import Assembler
 from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.cli_completion import AutoOptionGroup
+from bespokeasm.cli_completion import OptionForwardingCommand
 from bespokeasm.configgen.sublime import SublimeConfigGenerator
 from bespokeasm.configgen.vim import VimConfigGenerator
 from bespokeasm.configgen.vscode import VSCodeConfigGenerator
@@ -16,6 +18,7 @@ from click.shell_completion import get_completion_class
 
 
 SUPPORTED_COMPLETION_SHELLS = ('bash', 'zsh', 'fish')
+VERBOSE_HELP = 'Verbosity of logging (counting flag: -v, -vv, -vvv or --verbose <n>).'
 
 
 def _detect_shell():
@@ -46,7 +49,80 @@ def _is_completion_invocation():
     return any(name.endswith('_COMPLETE') for name in os.environ.keys())
 
 
-@click.group()
+def _inject_zsh_nosort(script: str) -> str:
+    """Ensure zsh completion function preserves provided order and uses stable compadd."""
+    lines = script.splitlines()
+    injected_compstate = False
+    for idx, line in enumerate(lines):
+        if line.strip().startswith('local -a completions') and not injected_compstate:
+            lines.insert(idx, '    compstate[nosort]=true')
+            injected_compstate = True
+        if (
+            line.strip()
+            == 'if [ -n "$completions_with_descriptions" ]; then'
+            and idx + 2 < len(lines)
+            and '_describe -V unsorted completions_with_descriptions -U' in lines[idx + 1]
+        ):
+            lines[idx:idx + 3] = [
+                '    if [ -n "$completions_with_descriptions" ]; then',
+                '        local -a _pretty _order',
+                '        typeset -A _grouped _primary',
+                '        local _cd _name _help _names',
+                '        local -i _maxlen=0',
+                '        for _cd in "${completions_with_descriptions[@]}"; do',
+                '            _name="${_cd%%:*}"',
+                '            _help="${_cd#*:}"',
+                '            if [[ -z ${_primary[$_help]} && "$_name" == --* ]]; then',
+                '                _primary[$_help]="$_name"',
+                '            elif [[ -z ${_primary[$_help]} ]]; then',
+                '                _primary[$_help]="$_name"',
+                '            fi',
+                '            if [[ -n ${_grouped[$_help]} ]]; then',
+                '                _grouped[$_help]+=" $_name"',
+                '            else',
+                '                _grouped[$_help]="$_name"',
+                '                _order+=("$_help")',
+                '            fi',
+                '        done',
+                '        for _help in "${_order[@]}"; do',
+                '            _names="${_primary[$_help]:-${_grouped[$_help]}}"',
+                '            if [ ${#_names} -gt $_maxlen ]; then',
+                '                _maxlen=${#_names}',
+                '            fi',
+                '        done',
+                '        for _help in "${_order[@]}"; do',
+                '            _names="${_primary[$_help]:-${_grouped[$_help]}}"',
+                '            _pretty+=("${_names}:$(printf \'%-*s -- %s\' $_maxlen \\"$_names\\" \\"$_help\\")")',
+                '        done',
+                '        _describe -V unsorted completions_with_descriptions _pretty -l',
+                '        completions=()',
+                '        return',
+                '    fi',
+            ]
+        if line.strip() == 'if [ -n "$completions" ]; then':
+            lines[idx] = '    if [ -n "$completions" ] && [ -z "$completions_with_descriptions" ]; then'
+        if 'compadd -U -V unsorted -a completions' in line:
+            existing_block = (
+                'if [ -n "$completions" ]; then\n'
+                '        compadd -U -V unsorted -a completions\n'
+                '    fi'
+            )
+            replacement_block = (
+                'if [ -n "$completions" ] && [ -z "$completions_with_descriptions" ]; then\n'
+                '        compadd -1 -U -V unsorted -a completions\n'
+                '    fi'
+            )
+            lines[idx] = line.replace(
+                existing_block,
+                replacement_block,
+            ).replace(
+                'compadd -U -V unsorted -a completions',
+                'compadd -1 -U -V unsorted -a completions',
+            )
+    return '\n'.join(lines)
+
+
+@click.group(cls=AutoOptionGroup)
 @click.version_option(BESPOKEASM_VERSION_STR)
 def main():
     """A Bespoke ISA Assembler"""
@@ -89,7 +165,7 @@ def main():
 @click.option(
         '--pretty-print', '-p',
         is_flag=True, default=False,
-        help='if true, a pretty print version of the compilation will be produced.'
+        help='if present, a pretty print version of the compilation will be produced.'
     )
 @click.option(
         '--pretty-print-format', '-t',
@@ -102,7 +178,7 @@ def main():
         type=click.Path(dir_okay=False),
         help='if pretty-print is enabled, this specifies the output file. Defaults to stdout.'
     )
-@click.option('--verbose', '-v', count=True, help='Verbosity of logging')
+@click.option('--verbose', '-v', count=True, help=VERBOSE_HELP)
 @click.option(
         '--include-path', '-I', multiple=True, default=[],
         type=click.Path(file_okay=False),
@@ -151,7 +227,7 @@ def compile(
     asm.assemble_bytecode()
 
 
-@main.command(short_help='update an ISA configuration file to the latest format')
+@main.command(cls=OptionForwardingCommand, short_help='update an ISA configuration file to the latest format')
 @click.option(
     '--config-file', '-c', required=True,
     type=click.Path(dir_okay=False, exists=True),
@@ -214,7 +290,7 @@ def update_config(config_file, output_file):
             dump_yaml_with_formatting(updated_dict, sys.stdout)
 
 
-@main.command(short_help='generate markdown documentation for an ISA')
+@main.command(cls=OptionForwardingCommand, short_help='generate markdown documentation for an ISA')
 @click.option(
     '--config-file', '-c', required=True,
     type=click.Path(dir_okay=False, exists=True),
@@ -225,7 +301,7 @@ def update_config(config_file, output_file):
     type=click.Path(dir_okay=False),
     help='The filepath to write the markdown documentation. Defaults to same directory as config file with .md extension.'
 )
-@click.option('--verbose', '-v', count=True, help='Verbosity of logging')
+@click.option('--verbose', '-v', count=True, help=VERBOSE_HELP)
 def docs(config_file, output_file, verbose):
     """Generate markdown documentation for an instruction set architecture."""
     config_file = os.path.abspath(os.path.expanduser(config_file))
@@ -246,18 +322,18 @@ def docs(config_file, output_file, verbose):
         sys.exit(1)
 
 
-@main.group(short_help='generate a language syntax highlighting extension')
+@main.group(cls=AutoOptionGroup, short_help='generate a language syntax highlighting extension')
 def generate_extension():
     pass
 
 
-@generate_extension.command(short_help='generate for VisualStudio Code')
+@generate_extension.command(cls=OptionForwardingCommand, short_help='generate for VisualStudio Code')
 @click.option(
         '--config-file', '-c', required=True,
         type=click.Path(dir_okay=False, exists=True),
         help='The filepath to the instruction set configuration file,'
     )
-@click.option('--verbose', '-v', count=True, help='Verbosity of logging')
+@click.option('--verbose', '-v', count=True, help=VERBOSE_HELP)
 @click.option(
         '--editor-config-dir', '-d', default='~/.vscode/',
         type=click.Path(file_okay=False),
@@ -284,13 +360,13 @@ def vscode(config_file, verbose, editor_config_dir, language_name, language_vers
     generator.generate()
 
 
-@generate_extension.command(short_help='generate for Sublime text editor')
+@generate_extension.command(cls=OptionForwardingCommand, short_help='generate for Sublime text editor')
 @click.option(
         '--config-file', '-c', required=True,
         type=click.Path(dir_okay=False, exists=True),
         help='The filepath to the instruction set configuration file,'
     )
-@click.option('--verbose', '-v', count=True, help='Verbosity of logging')
+@click.option('--verbose', '-v', count=True, help=VERBOSE_HELP)
 @click.option(
         '--editor-config-dir', '-d', default='~/',
         type=click.Path(file_okay=False),
@@ -317,13 +393,16 @@ def sublime(config_file, verbose, editor_config_dir, language_name, language_ver
     generator.generate()
 
 
-@generate_extension.command(short_help='generate for Vim editor (syntax only)')
+@generate_extension.command(cls=OptionForwardingCommand, short_help='generate for Vim editor (syntax only)')
 @click.option(
         '--config-file', '-c', required=True,
         type=click.Path(dir_okay=False, exists=True),
         help='The filepath to the instruction set configuration file,'
     )
-@click.option('--verbose', '-v', count=True, help='Verbosity of logging')
+@click.option(
+        '--verbose', '-v', count=True,
+        help='Verbosity of logging (counting flag: -v, -vv, -vvv or --verbose <n>).'
+    )
 @click.option(
         '--editor-config-dir', '-d', default='~/.vim/',
         type=click.Path(file_okay=False),
@@ -348,7 +427,7 @@ def vim(config_file, verbose, editor_config_dir, language_name, language_version
     generator.generate()
 
 
-@main.command(short_help='install shell tab completions for bespokeasm')
+@main.command(cls=OptionForwardingCommand, short_help='install shell tab completions for bespokeasm')
 @click.option(
     '--shell', 'target_shell',
     type=click.Choice(SUPPORTED_COMPLETION_SHELLS, case_sensitive=False),
@@ -390,7 +469,17 @@ def install_completion(target_shell, destination, prog_name):
 
     complete_var = f'_{resolved_prog_name.upper().replace("-", "_")}_COMPLETE'
     comp = comp_cls(main, {}, resolved_prog_name, complete_var)
-    completion_path.write_text(comp.source())
+    script = comp.source()
+    if resolved_shell == 'zsh':
+        script = _inject_zsh_nosort(script)
+        script += (
+            f'\n# bespokeasm completion preferences\n'
+            f"zstyle ':completion:*:*:{resolved_prog_name}:*' sort false\n"
+            f"zstyle ':completion:*:*:{resolved_prog_name}:*' list-packed true\n"
+            f"zstyle ':completion:*:*:{resolved_prog_name}:*:commands' list-packed true\n"
+            f"zstyle ':completion:*:*:{resolved_prog_name}:*' group-order ''\n"
+        )
+    completion_path.write_text(script)
 
     click.echo(f'Installed {resolved_shell} completions at {completion_path}')
     if resolved_shell == 'bash':
