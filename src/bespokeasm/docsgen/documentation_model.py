@@ -25,6 +25,7 @@ class DocumentationModel:
         self.general_docs = self._parse_general_documentation()
         self.predefined_memory_zones = self._parse_predefined_memory_zones()
         self.predefined_constants = self._parse_predefined_constants()
+        self.predefined_data = self._parse_predefined_data()
         self.operand_sets = self._parse_operand_sets_documentation()
         self.instruction_docs = self._parse_instruction_documentation()
         self.macro_docs = self._parse_macro_documentation()
@@ -203,6 +204,47 @@ class DocumentationModel:
 
         return constants
 
+    def _parse_predefined_data(self) -> list[dict[str, Any]]:
+        """
+        Parse predefined data documentation from the configuration.
+
+        Returns:
+            List of predefined data documentation entries.
+        """
+        predefined_config = self._config.get('predefined', {})
+        data_config = predefined_config.get('data', [])
+
+        if data_config is None:
+            return []
+
+        if not isinstance(data_config, list):
+            if self.verbose:
+                click.echo('Warning: predefined.data must be a list of data block entries.')
+            return []
+
+        data_blocks: list[dict[str, Any]] = []
+        for index, data_block in enumerate(data_config):
+            if not isinstance(data_block, dict):
+                if self.verbose:
+                    click.echo('Warning: data block entries must be dictionaries.')
+                continue
+
+            doc_config = data_block.get('documentation') if isinstance(data_block.get('documentation'), dict) else None
+            documented = doc_config is not None
+            description = doc_config.get('description') if doc_config else None
+
+            data_blocks.append({
+                'name': data_block.get('name'),
+                'address': data_block.get('address'),
+                'size': data_block.get('size'),
+                'value': data_block.get('value'),
+                'description': description,
+                'documented': documented,
+                'config_index': index
+            })
+
+        return data_blocks
+
     def _parse_addressing_modes(self, addressing_modes: dict[str, Any]) -> list[dict[str, str]]:
         """
         Parse addressing modes documentation.
@@ -349,9 +391,15 @@ class DocumentationModel:
         parsed_examples = []
         for example in examples:
             if isinstance(example, dict) and 'code' in example:
+                title = example.get('title')
+                description = example.get('description')
+                if title is None and 'title' not in example:
+                    title = example.get('description', '')
+                    description = example.get('details')
+
                 parsed_examples.append({
-                    'description': example.get('description', ''),
-                    'details': example.get('details'),
+                    'title': title or '',
+                    'description': description,
                     'code': example['code']
                 })
             elif self.verbose:

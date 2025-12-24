@@ -1,20 +1,27 @@
----
 description: slu4 Minimal 64x4 Home Computer
 general:
   address_size: 16
   page_size: 256
   multi_word_endianness: little
   registers:
-    - a
-    - b
-    - bank
+    a:
+      title: Accumulator
+    b:
+      title: Temporary
+    bank:
+      title: Memory Bank
+    sp:
+      title: Stack Pointer
   origin: 0x0000
   identifier:
     name: slu4-min64x4-asm
     version: "1.1.0"
     extension: min64x4
-  min_version: "0.5.0"
+  min_version: "0.7.0"
   allow_embedded_strings: true
+  documentation:
+    description: slu4 Minimal 64x4 Home Computer
+    addressing_modes: {}
 operand_sets:
   immediate_8bit:
     # one byte is interpreted as an immediate value
@@ -25,6 +32,12 @@ operand_sets:
           size: 8
           word_align: true
           endian: little
+        documentation:
+          mode: immediate
+          title: Immediate 8-bit
+    documentation:
+      title: Immediate 8-bit
+      category: immediate
   immediate_16bit:
     # 2 bytes is interpreted as an immediate value
     operand_values:
@@ -34,6 +47,12 @@ operand_sets:
           size: 16
           word_align: true
           endian: little
+        documentation:
+          mode: immediate
+          title: Immediate 16-bit
+    documentation:
+      title: Immediate 16-bit
+      category: immediate
   immediate_32bit:
     # 4 bytes is interpreted as an immediate value
     operand_values:
@@ -43,6 +62,12 @@ operand_sets:
           size: 32
           word_align: true
           endian: little
+        documentation:
+          mode: immediate
+          title: Immediate 32-bit
+    documentation:
+      title: Immediate 32-bit
+      category: immediate
   absolute_address:
     # two bytes are interpreted as an address
     operand_values:
@@ -52,6 +77,13 @@ operand_sets:
           size: 16
           word_align: true
           endian: little
+        documentation:
+          mode: absolute_address
+          title: Absolute Address
+          description: Two byte absolute address
+    documentation:
+      title: Absolute Address
+      category: addressing
   relative_address:
     # two byte is interpreted as a relative address
     operand_values:
@@ -61,11 +93,15 @@ operand_sets:
           size: 16
           word_align: true
           endian: little
+        documentation:
+          title: Relative Address
+          category: addressing
+          description: Two byte address pointing two two bytes in memory that contain another address to use.
   address_lsb:
     # one byte is interpreted as an address's LSB and the address MSB
     # is taken from the current instruction address
     operand_values:
-      address:
+      address_lsb:
         type: address
         argument:
           size: 8
@@ -73,19 +109,27 @@ operand_sets:
           endian: little
           slice_lsb: true
           match_address_msb: true
+        documentation:
+          title: Page Offset Address
+          category: addressing
+          description: One byte used as the LSB for the address. The MSB is the current instruct's address MSB.
   offset:
     # one byte is interpreted as an offset
     operand_values:
-      int8:
+      offset:
         type: numeric
         argument:
           size: 8
           word_align: true
           endian: little
+        documentation:
+          title: Offset
+          category: addressing
+          description: one byte is interpreted as an offset
   zero_page:
     # one byte is interpreted as a zero page address
     operand_values:
-      address:
+      zp_addr:
         type: address
         argument:
           size: 8
@@ -93,11 +137,15 @@ operand_sets:
           endian: little
           slice_lsb: true
           memory_zone: ZERO_PAGE
+        documentation:
+          title: Zero Page Address
+          category: addressing
+          description: one byte is interpreted as a zero page address
   relative_zero_page:
     # one byte is interpreted as a zero page address to a word that
     # in turn is used as a relative address
     operand_values:
-      address:
+      zp_addr:
         type: address
         argument:
           size: 8
@@ -105,293 +153,766 @@ operand_sets:
           endian: little
           slice_lsb: true
           memory_zone: ZERO_PAGE
+        documentation:
+          title: Zero Page Address
+          category: addressing
+          description: one byte is interpreted as a zero page address to a word that in turn is used as a relative address.
 predefined:
   memory_zones:
     - name: ZERO_PAGE
       start: 0x0000
       end: 0x00FF
+      documentation:
+        title: Zero Page Memory
+        description: Fast-access zero page for direct addressing and shared scratch space.
     - name: ZERO_PAGE_APPS
       start: 0x0000
       end: 0x003F
+      documentation:
+        title: Zero Page Application Memory
+        description: Application-reserved scratch bytes within the zero page.
     - name: ZERO_PAGE_LIBS
       start: 0x0040
       end: 0x007F
+      documentation:
+        title: Zero Page Library Memory
+        description: Library-reserved zero page range for shared routines.
     - name: ZERO_PAGE_OS
       start: 0x0080
       end: 0x00FF
+      documentation:
+        title: Zero Page Operating System Memory
+        description: Operating system zero page workspace and vectors.
     - name: USER_APPS
       start: 0x8000
       end: 0xEFFF
+      documentation:
+        title: User Application Memory
+        description: Main RAM window reserved for user application code and data.
   constants:
-    -  # Start vector of the OS in RAM
-      name: _Start
+    - name: _Start
       value: 0xf000
-    -  # Hands back control to the input prompt
-      name: _Prompt
+      documentation:
+        type: subroutine
+        description: Start vector of the OS in RAM.
+    - name: _Prompt
       value: 0xf003
-    -  # Moves memory area (may be overlapping)
-      name: _MemMove
+      documentation:
+        type: subroutine
+        description: Hands back control to the input prompt.
+    - name: _MemMove
       value: 0xf006
-    -  # Returns a pseudo-random byte (see _RandomState)
-      name: _Random
+      documentation:
+        type: subroutine
+        description: Moves memory area (may be overlapping).
+    - name: _Random
       value: 0xf009
-    -  # Scans the PS/2 register for new input
-      name: _ScanPS2
+      documentation:
+        type: subroutine
+        description: Returns a pseudo-random byte (see _RandomState).
+    - name: _ScanPS2
       value: 0xf00c
-    -  # Resets the state of PS/2 SHIFT, ALTGR, CTRL
-      name: _ResetPS2
+      documentation:
+        type: subroutine
+        description: Scans the PS/2 register for new input.
+    - name: _ResetPS2
       value: 0xf00f
-    -  # Reads any input (PS/2 or serial)
-      name: _ReadInput
+      documentation:
+        type: subroutine
+        description: Resets the state of PS/2 SHIFT, ALTGR, CTRL.
+    - name: _ReadInput
       value: 0xf012
-    -  # Waits for any input (PS/2 or serial)
-      name: _WaitInput
+      documentation:
+        type: subroutine
+        description: Reads any input (PS/2 or serial).
+    - name: _WaitInput
       value: 0xf015
-    -  # Reads a command line into _ReadBuffer
-      name: _ReadLine
+      documentation:
+        type: subroutine
+        description: Waits for any input (PS/2 or serial).
+    - name: _ReadLine
       value: 0xf018
-    -  # Skips whitespaces (<= 39) in command line
-      name: _SkipSpace
+      documentation:
+        type: subroutine
+        description: Reads a command line into `_ReadBuffer`.
+    - name: _SkipSpace
       value: 0xf01b
-    -  # Parses command line input for a HEX value
-      name: _ReadHex
+      documentation:
+        type: subroutine
+        description: Skips whitespaces (<= 39) in command line.
+    - name: _ReadHex
       value: 0xf01e
-    -  # Waits for a UART transmission to complete
-      name: _SerialWait
+      documentation:
+        type: subroutine
+        description: Parses command line input for a HEX value.
+    - name: _SerialWait
       value: 0xf021
-    -  # Transmits a zero-terminated string via UART
-      name: _SerialPrint
+      documentation:
+        type: subroutine
+        description: Waits for a UART transmission to complete.
+    - name: _SerialPrint
       value: 0xf024
-    -  # Searches for file <name> given by _ReadPtr
-      name: _FindFile
+      documentation:
+        type: subroutine
+        description: Transmits a zero-terminated string via UART.
+    - name: _FindFile
       value: 0xf027
-    -  # Loads a file <name> given by _ReadPtr
-      name: _LoadFile
+      documentation:
+        type: subroutine
+        description: Searches for file <name> given by `_ReadPtr`.
+    - name: _LoadFile
       value: 0xf02a
-    -  # Saves data to file <name> defined at _ReadPtr
-      name: _SaveFile
+      documentation:
+        type: subroutine
+        description: Loads a file <name> given by `_ReadPtr`.
+    - name: _SaveFile
       value: 0xf02d
-    -  # Clears the video RAM including blanking areas
-      name: _ClearVRAM
+      documentation:
+        type: subroutine
+        description: Saves data to file <name> defined at `_ReadPtr`.
+    - name: _ClearVRAM
       value: 0xf030
-    -  # Clears the visible video RAM (viewport)
-      name: _Clear
+      documentation:
+        type: subroutine
+        description: Clears the video RAM including blanking areas.
+    - name: _Clear
       value: 0xf033
-    -  # Clears the current row from cursor pos onwards
-      name: _ClearRow
+      documentation:
+        type: subroutine
+        description: Clears the visible video RAM (viewport)
+    - name: _ClearRow
       value: 0xf036
-    -  # Scrolls up the viewport by 8 pixels
-      name: _ScrollUp
+      documentation:
+        type: subroutine
+        description: Clears the current row from cursor pos onwards
+    - name: _ScrollUp
       value: 0xf039
-    -  # Scrolls down the viewport by 8 pixels
-      name: _ScrollDn
+      documentation:
+        type: subroutine
+        description: Scrolls up the viewport by 8 pixels
+    - name: _ScrollDn
       value: 0xf03c
-    -  # Outputs a char at the cursor pos (non-advancing)
-      name: _Char
+      documentation:
+        type: subroutine
+        description: Scrolls down the viewport by 8 pixels
+    - name: _Char
       value: 0xf03f
-    -  # Prints a char at the cursor pos (advancing)
-      name: _PrintChar
+      documentation:
+        type: subroutine
+        description: Outputs a char at the cursor position (non-advancing).
+    - name: _PrintChar
       value: 0xf042
-    -  # Prints a zero-terminated immediate string
-      name: _Print
+      documentation:
+        type: subroutine
+        description: Prints a char at the cursor position (advancing)
+    - name: _Print
       value: 0xf045
-    -  # Prints a zero-terminated string at an address
-      name: _PrintPtr
+      documentation:
+        type: subroutine
+        description: Prints a zero-terminated immediate (inline) string
+    - name: _PrintPtr
       value: 0xf048
-    -  # Prints a HEX number (advancing)
-      name: _PrintHex
+      documentation:
+        type: subroutine
+        description: Prints a zero-terminated string at an address
+    - name: _PrintHex
       value: 0xf04b
-    -  # Sets a pixel at position (x, y)
-      name: _SetPixel
+      documentation:
+        type: subroutine
+        description: Prints a HEX number (advancing)
+    - name: _SetPixel
       value: 0xf04e
-    -  # Draws a line using Bresenham’s algorithm
-      name: _Line
+      documentation:
+        type: subroutine
+        description: Sets a pixel at position (x, y)
+    - name: _Line
       value: 0xf051
-    -  # Draws a rectangle at (x, y) of size (w, h)
-      name: _Rect
+      documentation:
+        type: subroutine
+        description: Draws a line using Bresenham's algorithm
+    - name: _Rect
       value: 0xf054
-    -  # Clears a pixel at position (x, y)
-      name: _ClearPixel
+      documentation:
+        type: subroutine
+        description: Draws a rectangle at (x, y) of size (w, h)
+    - name: _ClearPixel
       value: 0xf057
-    -  # Horizontal cursor position (see _Print)
-      name: _XPos
+      documentation:
+        type: subroutine
+        description: Clears a pixel at position (x, y)
+    - name: _XPos
       value: 0x00c0
-    -  # Vertical cursor position (see _Print)
-      name: _YPos
+      documentation:
+        type: variable
+        size: 1
+        description: Horizontal cursor position (see `_Print`).
+    - name: _YPos
       value: 0x00c1
-    -  # _Random state seed
-      name: _RandomState
+      documentation:
+        type: variable
+        size: 1
+        description: Vertical cursor position (see _Print).
+    - name: _RandomState
       value: 0x00c2
-    -  # Number parsed by _ReadHex
-      name: _ReadNum
+      documentation:
+        type: variable
+        size: 4
+        description: _Random state seed.
+    - name: _ReadNum
       value: 0x00c6
-    -  # Command line parsing pointer
-      name: _ReadPtr
+      documentation:
+        type: variable
+        size: 3
+        description: Number parsed by _ReadHex.
+    - name: _ReadPtr
       value: 0x00c9
-    -  # Address of command line input buffer
-      name: _ReadBuffer
+      documentation:
+        type: variable
+        size: 2
+        description: Command line parsing pointer.
+    - name: _ReadBuffer
       value: 0x00cd
+      documentation:
+        type: variable
+        size: 2
+        description: Address of command line input buffer.
 instructions:
   nop:
     # No operation
     bytecode:
       value: 0x00
       size: 8
+    documentation:
+      category: Flow Control
+      title: No operation
+      cycles: 16
   out:
     # Output A to UART: UART = A
     bytecode:
       value: 0x01
       size: 8
+    documentation:
+      category: Input/Output
+      title: 'Output A to UART: UART = A'
+      cycles: 2
+      modifies:
+        - flag: N
+          description: Set to 1
+        - flag: C
+          description: Set to 0
+        - flag: Z
+          description: Set to 0
   int:
     # Read UART input to A: A = UART
     bytecode:
       value: 0x02
       size: 8
+    documentation:
+      category: Input/Output
+      title: 'Read UART input to A: A = UART'
+      cycles: 3
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Undefined
+        - flag: C
+          description: Undefined
+        - flag: Z
+          description: Undefined
   ink:
     # Read PS/2 input to A: A = PS2
     bytecode:
       value: 0x03
       size: 8
+    documentation:
+      category: Input/Output
+      title: 'Read PS/2 input to A: A = PS2'
+      cycles: 3/4
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Undefined
+        - flag: C
+          description: Undefined
+        - flag: Z
+          description: Undefined
   win:
     # Wait for input
     bytecode:
       value: 0x04
       size: 8
+    documentation:
+      category: Input/Output
+      title: Wait for input
+      cycles: 6
+      modifies:
+        - flag: N
+          description: Undefined
+        - flag: C
+          description: Undefined
+        - flag: Z
+          description: Undefined
   sec:
     # Set carry flag (C=1)
     bytecode:
       value: 0x05
       size: 8
+    documentation:
+      category: Arithmetic
+      title: Set carry flag (C=1)
+      modifies:
+        - register: a
+          description: Undefined
+        - flag: C
+          description: Set to 1
+        - flag: N
+          description: Set to 0
+        - flag: Z
+          description: Set to 0
+      cycles: 3
   clc:
     # Clear carry flag (C=0)
     bytecode:
       value: 0x06
       size: 8
+    documentation:
+      category: Arithmetic
+      title: Clear carry flag (C=0)
+      modifies:
+        - register: a
+          description: Undefined
+        - flag: C
+          description: Set to 0
+        - flag: N
+          description: Set to 1
+        - flag: Z
+          description: Set to 0
+      cycles: 3
   ll0:
     # Logical left-shift A 0 steps (C=0)
     bytecode:
       value: 0x07
       size: 8
+    documentation:
+      category: Arithmetic
+      title: Logical left-shift A 0 steps (C=0)
+      cycles: 2
   ll1:
     # Logical left-shift A 1 step (C=0)
     bytecode:
       value: 0x08
       size: 8
+    documentation:
+      category: Arithmetic
+      title: Logical left-shift A 1 step (C=0)
+      cycles: 3
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   ll2:
     # Logical left-shift A 2 steps (C=0)
     bytecode:
       value: 0x09
       size: 8
+    documentation:
+      category: Arithmetic
+      title: Logical left-shift A 2 steps (C=0)
+      cycles: 4
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   ll3:
     # Logical left-shift A 3 steps (C=0)
     bytecode:
       value: 0x0a
       size: 8
+    documentation:
+      category: Arithmetic
+      title: Logical left-shift A 3 steps (C=0)
+      cycles: 5
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   ll4:
     # Logical left-shift A 4 steps (C=0)
     bytecode:
       value: 0x0b
       size: 8
+    documentation:
+      category: Arithmetic
+      title: Logical left-shift A 4 steps (C=0)
+      cycles: 6
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   ll5:
     # Logical left-shift A 5 steps (C=0)
     bytecode:
       value: 0x0c
       size: 8
+    documentation:
+      category: Arithmetic
+      title: Logical left-shift A 5 steps (C=0)
+      cycles: 7
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   ll6:
     # Logical left-shift A 6 steps (C=0)
     bytecode:
       value: 0x0d
       size: 8
+    documentation:
+      category: Arithmetic
+      title: Logical left-shift A 6 steps (C=0)
+      cycles: 8
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   ll7:
     # Logical left-shift A 7 steps (C=0)
     bytecode:
       value: 0x0e
       size: 8
+    documentation:
+      category: Arithmetic
+      title: Logical left-shift A 7 steps (C=0)
+      cycles: 9
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   rl0:
     # Rotate left A 0 steps via C (= RR9)
     bytecode:
       value: 0x0f
       size: 8
+    documentation:
+      category: Arithmetic
+      title: Rotate left A 0 steps via C (= RR9)
+      cycles: 2
   rl1:
     # Rotate left A 1 step via C (= RR8)
     bytecode:
       value: 0x10
       size: 8
+    documentation:
+      category: Arithmetic
+      title: Rotate left A 1 step via C (= RR8)
+      cycles: 3
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   rl2:
     # Rotate left A 2 steps via C (= RR7)
     bytecode:
       value: 0x11
       size: 8
+    documentation:
+      category: Arithmetic
+      title: Rotate left A 2 steps via C (= RR7)
+      cycles: 4
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   rl3:
     # Rotate left A 3 steps via C (= RR6)
     bytecode:
       value: 0x12
       size: 8
+    documentation:
+      category: Arithmetic
+      title: Rotate left A 3 steps via C (= RR6)
+      cycles: 5
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   rl4:
     # Rotate left A 4 steps via C (= RR5)
     bytecode:
       value: 0x13
       size: 8
+    documentation:
+      category: Arithmetic
+      title: Rotate left A 4 steps via C (= RR5)
+      cycles: 6
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   rl5:
     # Rotate left A 5 steps via C (= RR4)
     bytecode:
       value: 0x14
       size: 8
+    documentation:
+      category: Arithmetic
+      title: Rotate left A 5 steps via C (= RR4)
+      cycles: 7
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   rl6:
     # Rotate left A 6 steps via C (= RR3)
     bytecode:
       value: 0x15
       size: 8
+    documentation:
+      category: Arithmetic
+      title: Rotate left A 6 steps via C (= RR3)
+      cycles: 8
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   rl7:
     # Rotate left A 7 steps via C (= RR2)
     bytecode:
       value: 0x16
       size: 8
+    documentation:
+      category: Arithmetic
+      title: Rotate left A 7 steps via C (= RR2)
+      cycles: 9
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   rr1:
     # Rotate right A 1 step via C (= RL8)
     bytecode:
       value: 0x17
       size: 8
+    documentation:
+      category: Arithmetic
+      title: Rotate right A 1 step via C (= RL8)
+      cycles: 10
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   lr0:
     # Logical right-shift A 0 steps (C=0) (= RR0, RL9)
     bytecode:
       value: 0x18
       size: 8
+    documentation:
+      category: Arithmetic
+      title: Logical right-shift A 0 steps (C=0) (= RR0, RL9)
+      cycles: 2
   lr1:
     # Logical right-shift A 1 step (C=0)
     bytecode:
       value: 0x19
       size: 8
+    documentation:
+      category: Arithmetic
+      title: Logical right-shift A 1 step (C=0)
+      cycles: 10
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   lr2:
     # Logical right-shift A 2 steps (C=0)
     bytecode:
       value: 0x1a
       size: 8
+    documentation:
+      category: Arithmetic
+      title: "Logical right-shift A 2 steps (C=0) §"
+      cycles: 15
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   lr3:
     # Logical right-shift A 3 steps (C=0)
     bytecode:
       value: 0x1b
       size: 8
+    documentation:
+      category: Arithmetic
+      title: "Logical right-shift A 3 steps (C=0) §"
+      cycles: 15
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   lr4:
     # Logical right-shift A 4 steps (C=0)
     bytecode:
       value: 0x1c
       size: 8
+    documentation:
+      category: Arithmetic
+      title: "Logical right-shift A 4 steps (C=0) §"
+      cycles: 15
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   lr5:
     # Logical right-shift A 5 steps (C=0)
     bytecode:
       value: 0x1d
       size: 8
+    documentation:
+      category: Arithmetic
+      title: "Logical right-shift A 5 steps (C=0) §"
+      cycles: 15
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   lr6:
     # Logical right-shift A 6 steps (C=0)
     bytecode:
       value: 0x1e
       size: 8
+    documentation:
+      category: Arithmetic
+      title: "Logical right-shift A 6 steps (C=0) §"
+      cycles: 13
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   lr7:
     # Logical right-shift A 7 steps (C=0)
     bytecode:
       value: 0x1f
       size: 8
+    documentation:
+      category: Arithmetic
+      title: Logical right-shift A 7 steps (C=0)
+      cycles: 5
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   llz:
     # Logical shift left *Z 1 step (C=0)
     bytecode:
@@ -402,6 +923,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: Logical shift left *Z 1 step (C=0)
+      cycles: 4
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   llb:
     # Logical shift byte left 1 step (C=0)
     bytecode:
@@ -412,6 +946,19 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: Logical shift byte left 1 step (C=0)
+      cycles: 6
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   llv:
     # Logical shift fast word left 1 step (C=0)
     bytecode:
@@ -422,6 +969,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: Logical shift fast word left 1 step (C=0)
+      cycles: 6
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Reflects MSB of result
+        - flag: Z
+          description: Reflects MSB of result
   llw:
     # Logical shift word left 1 step (C=0)
     bytecode:
@@ -432,6 +992,19 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: Logical shift word left 1 step (C=0)
+      cycles: 8
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Reflects MSB of result
+        - flag: Z
+          description: Reflects MSB of result
   llq:
     # Logical shift fast long left 1 step (C=0)
     bytecode:
@@ -442,6 +1015,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: Logical shift fast long left 1 step (C=0)
+      cycles: 10
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Reflects MSB of result
+        - flag: Z
+          description: Reflects MSB of result
   lll:
     # Logical shift long left 1 step (C=0)
     bytecode:
@@ -452,6 +1038,19 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: Logical shift long left 1 step (C=0)
+      cycles: 12
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Reflects MSB of result
+        - flag: Z
+          description: Reflects MSB of result
   lrz:
     # Logical shift right zero-page byte 1 step (C=0)
     bytecode:
@@ -462,6 +1061,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: Logical shift right zero-page byte 1 step (C=0)
+      cycles: 11
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   lrb:
     # Logical shift right abs byte 1 step (C=0)
     bytecode:
@@ -472,6 +1084,19 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: Logical shift right abs byte 1 step (C=0)
+      cycles: 13
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   rlz:
     # Rotate left zero-page byte 1 step via C
     bytecode:
@@ -482,6 +1107,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: Rotate left zero-page byte 1 step via C
+      cycles: 4
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   rlb:
     # Rotate left byte at abs addr 1 step via C
     bytecode:
@@ -492,6 +1130,19 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: Rotate left byte at abs addr 1 step via C
+      cycles: 6
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   rlv:
     # Rotate left zero-page word 1 step via C
     bytecode:
@@ -502,6 +1153,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: Rotate left zero-page word 1 step via C
+      cycles: 6
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Reflects MSB of result
+        - flag: Z
+          description: Reflects MSB of result
   rlw:
     # Rotate left word at abs addr 1 step via C
     bytecode:
@@ -512,6 +1176,19 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: Rotate left word at abs addr 1 step via C
+      cycles: 8
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Reflects MSB of result
+        - flag: Z
+          description: Reflects MSB of result
   rlq:
     # Rotate left zero-page long 1 step via C
     bytecode:
@@ -522,6 +1199,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: Rotate left zero-page long 1 step via C
+      cycles: 10
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Reflects MSB of result
+        - flag: Z
+          description: Reflects MSB of result
   rll:
     # Rotate left abs long 1 step via C
     bytecode:
@@ -532,6 +1222,19 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: Rotate left abs long 1 step via C
+      cycles: 12
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Reflects MSB of result
+        - flag: Z
+          description: Reflects MSB of result
   rrz:
     # Rotate right zero-page byte 1 step via C
     bytecode:
@@ -542,6 +1245,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: Rotate right zero-page byte 1 step via C
+      cycles: 11
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   rrb:
     # Rotate right byte at abs addr 1 step via C
     bytecode:
@@ -552,11 +1268,31 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: Rotate right byte at abs addr 1 step via C
+      cycles: 13
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   not:
     # Bitwise NOT A: A = ~A
     bytecode:
       value: 0x30
       size: 8
+    documentation:
+      category: Arithmetic
+      title: 'Bitwise NOT A: A = ~A'
+      cycles: 4
+      modifies:
+        - register: A
+          description: Updated
   noz:
     # Bitwise NOT Z: *Z = ~(*Z)
     bytecode:
@@ -567,6 +1303,13 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Bitwise NOT *Z: *Z = ~(*Z)'
+      cycles: 5
+      modifies:
+        - register: A
+          description: Updated
   nob:
     # Bitwise NOT byte: *addr = ~(*addr)
     bytecode:
@@ -577,6 +1320,13 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Bitwise NOT byte: *addr = ~(*addr)'
+      cycles: 7
+      modifies:
+        - register: A
+          description: Updated
   nov:
     # Bitwise NOT zero-page word: *V = ~(*V)
     bytecode:
@@ -587,6 +1337,13 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Bitwise NOT zero-page word: *V = ~(*V)'
+      cycles: 7
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
   now:
     # Bitwise NOT word at abs address
     bytecode:
@@ -597,6 +1354,13 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: Bitwise NOT word at abs address
+      cycles: 9
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
   noq:
     # Bitwise NOT zero-page long
     bytecode:
@@ -607,6 +1371,13 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: Bitwise NOT zero-page long
+      cycles: 11
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
   nol:
     # Bitwise NOT long at abs address
     bytecode:
@@ -617,11 +1388,31 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: Bitwise NOT long at abs address
+      cycles: 13
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
   neg:
     # Negate A: A = -A
     bytecode:
       value: 0x37
       size: 8
+    documentation:
+      category: Arithmetic
+      title: 'Negate A: A = -A'
+      cycles: 4
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Copied from zero flag
+        - flag: Z
+          description: Reflects result
   nez:
     # Negate zero-page byte: *Z = -(*Z)
     bytecode:
@@ -632,6 +1423,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Negate zero-page byte: *Z = -(*Z)'
+      cycles: 5
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Copied from zero flag
+        - flag: Z
+          description: Reflects result
   neb:
     # Negate byte at abs address: *addr = -(*addr)
     bytecode:
@@ -642,6 +1446,19 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Negate byte at abs address: *addr = -(*addr)'
+      cycles: 7
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Copied from zero flag
+        - flag: Z
+          description: Reflects result
   nev:
     # Negate zero-page word: *V = -(*V)
     bytecode:
@@ -652,6 +1469,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: Negate zero-page word (C = 1 only if word=0)
+      cycles: 7
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Copied from zero flag
+        - flag: Z
+          description: Reflects MSB of result
   new:
     # Negate word at abs address
     bytecode:
@@ -662,6 +1492,19 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: Negate word at abs address (C = 1 only if word=0)
+      cycles: 9
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Copied from zero flag
+        - flag: Z
+          description: Reflects MSB of result
   neq:
     # Negate zero-page long
     bytecode:
@@ -672,6 +1515,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: Negate zero-page long (C = 1 only if long = 0)
+      cycles: 11
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Copied from zero flag
+        - flag: Z
+          description: Reflects MSB of result
   nel:
     # Negate long at abs address
     bytecode:
@@ -682,6 +1538,19 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: Negate long (C = 1 only if long = 0)
+      cycles: 13
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Copied from zero flag
+        - flag: Z
+          description: Reflects MSB of result
   ani:
     # Bitwise AND immediate: A = A & imm
     bytecode:
@@ -692,6 +1561,13 @@ instructions:
       operand_sets:
         list:
           - immediate_8bit
+    documentation:
+      category: Arithmetic
+      title: 'Bitwise AND: A = A & imm'
+      cycles: 3
+      modifies:
+        - register: A
+          description: Updated
   anz:
     # Bitwise AND zero-page byte: A = A & *Z
     bytecode:
@@ -702,6 +1578,13 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Bitwise AND: A = A & *Z'
+      cycles: 4
+      modifies:
+        - register: A
+          description: Updated
   anb:
     # Bitwise AND byte at abs address: A = A & *addr
     bytecode:
@@ -712,6 +1595,13 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Bitwise AND: A = A & *addr'
+      cycles: 6
+      modifies:
+        - register: A
+          description: Updated
   ant:
     # Bitwise AND byte at rel zero-page address: A = A & *(*Z)
     bytecode:
@@ -722,6 +1612,13 @@ instructions:
       operand_sets:
         list:
           - relative_zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Bitwise AND: A = A & *(*Z)'
+      cycles: 7
+      modifies:
+        - register: A
+          description: Updated
   anr:
     # Bitwise AND byte at rel address: A = A & *(*addr)
     bytecode:
@@ -732,6 +1629,13 @@ instructions:
       operand_sets:
         list:
           - relative_address
+    documentation:
+      category: Arithmetic
+      title: 'Bitwise AND: A = A & *(*addr)'
+      cycles: 9
+      modifies:
+        - register: A
+          description: Updated
   an.z:
     # Bitwise AND A to zero-page byte: *Z = *Z & A
     bytecode:
@@ -742,6 +1646,13 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Bitwise AND: *Z = *Z & A'
+      cycles: 4
+      modifies:
+        - register: A
+          description: Updated
   an.b:
     # Bitwise AND A to byte at abs address: *addr = *addr & A
     bytecode:
@@ -752,6 +1663,13 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Bitwise AND: *addr = *addr & A'
+      cycles: 6
+      modifies:
+        - register: A
+          description: Updated
   ori:
     # Bitwise OR immediate: A = A | imm
     bytecode:
@@ -762,6 +1680,13 @@ instructions:
       operand_sets:
         list:
           - immediate_8bit
+    documentation:
+      category: Arithmetic
+      title: 'Bitwise OR: A = A | imm'
+      cycles: 3
+      modifies:
+        - register: A
+          description: Updated
   orz:
     # Bitwise OR zero-page byte: A = A | *Z
     bytecode:
@@ -772,6 +1697,13 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Bitwise OR: A = A | *Z'
+      cycles: 4
+      modifies:
+        - register: A
+          description: Updated
   orb:
     # Bitwise OR byte at abs address: A = A | *addr
     bytecode:
@@ -782,6 +1714,13 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Bitwise OR: A = A | *addr'
+      cycles: 6
+      modifies:
+        - register: A
+          description: Updated
   ort:
     # Bitwise OR byte at rel zero-page address: A = A | *(*Z)
     bytecode:
@@ -792,6 +1731,13 @@ instructions:
       operand_sets:
         list:
           - relative_zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Bitwise OR: A = A | *(*Z)'
+      cycles: 7
+      modifies:
+        - register: A
+          description: Updated
   orr:
     # Bitwise OR byte at rel address: A = A | *(*addr)
     bytecode:
@@ -802,6 +1748,13 @@ instructions:
       operand_sets:
         list:
           - relative_address
+    documentation:
+      category: Arithmetic
+      title: 'Bitwise OR: A = A | *(*addr)'
+      cycles: 9
+      modifies:
+        - register: A
+          description: Updated
   or.z:
     # Bitwise OR A to zero-page byte: *Z = *Z | A
     bytecode:
@@ -812,6 +1765,13 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Bitwise OR: *Z = *Z | A'
+      cycles: 4
+      modifies:
+        - register: A
+          description: Updated
   or.b:
     # Bitwise OR A to byte at abs address: *addr = *addr | A
     bytecode:
@@ -822,6 +1782,13 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Bitwise OR: *addr = *addr | A'
+      cycles: 6
+      modifies:
+        - register: A
+          description: Updated
   xri:
     # Bitwise XOR immediate: A = A ^ imm
     bytecode:
@@ -832,6 +1799,13 @@ instructions:
       operand_sets:
         list:
           - immediate_8bit
+    documentation:
+      category: Arithmetic
+      title: "Bitwise XOR: A = A ^ imm §"
+      cycles: 9
+      modifies:
+        - register: A
+          description: Updated
   xrz:
     # Bitwise XOR zero-page byte: A = A ^ *Z
     bytecode:
@@ -842,6 +1816,13 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Bitwise XOR: A = A ^ *Z'
+      cycles: 10
+      modifies:
+        - register: A
+          description: Updated
   xrb:
     # Bitwise XOR byte at abs address: A = A ^ *addr
     bytecode:
@@ -852,6 +1833,13 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: "Bitwise XOR: A = A ^ * addr §"
+      cycles: 12
+      modifies:
+        - register: A
+          description: Updated
   xrt:
     # Bitwise XOR byte at rel zero-page address: A = A ^ *(*Z)
     bytecode:
@@ -862,6 +1850,13 @@ instructions:
       operand_sets:
         list:
           - relative_zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Bitwise XOR: A = A ^ *(*Z)'
+      cycles: 13
+      modifies:
+        - register: A
+          description: Updated
   xrr:
     # Bitwise XOR byte at rel address: A = A ^ *(*addr)
     bytecode:
@@ -872,6 +1867,13 @@ instructions:
       operand_sets:
         list:
           - relative_address
+    documentation:
+      category: Arithmetic
+      title: "Bitwise XOR: A = A ^ *(*addr) §"
+      cycles: 15
+      modifies:
+        - register: A
+          description: Updated
   xr.z:
     # Bitwise XOR A to zero-page byte: *Z = *Z ^ A
     bytecode:
@@ -882,6 +1884,13 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Bitwise XOR: *Z = *Z ^ A'
+      cycles: 9
+      modifies:
+        - register: A
+          description: Updated
   xr.b:
     # Bitwise XOR A to byte at abs address: *addr = *addr ^ A
     bytecode:
@@ -892,6 +1901,13 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Bitwise XOR: *addr = *addr ^ A'
+      cycles: 11
+      modifies:
+        - register: A
+          description: Updated
   fne:
     # Fast branch on non-zero
     bytecode:
@@ -902,6 +1918,10 @@ instructions:
       operand_sets:
         list:
           - address_lsb
+    documentation:
+      category: Flow Control
+      title: Fast branch on non-zero
+      cycles: 2
   feq:
     # Fast branch on equal
     bytecode:
@@ -912,6 +1932,10 @@ instructions:
       operand_sets:
         list:
           - address_lsb
+    documentation:
+      category: Flow Control
+      title: Fast branch on zero
+      cycles: 2
   fcc:
     # Fast branch on carry clear
     bytecode:
@@ -922,6 +1946,10 @@ instructions:
       operand_sets:
         list:
           - address_lsb
+    documentation:
+      category: Flow Control
+      title: Fast branch on carry clear
+      cycles: 2
   fcs:
     # Fast branch on carry set
     bytecode:
@@ -932,6 +1960,10 @@ instructions:
       operand_sets:
         list:
           - address_lsb
+    documentation:
+      category: Flow Control
+      title: Fast branch on carry set
+      cycles: 2
   fpl:
     # Fast branch on plus
     bytecode:
@@ -942,6 +1974,10 @@ instructions:
       operand_sets:
         list:
           - address_lsb
+    documentation:
+      category: Flow Control
+      title: Fast branch on plus
+      cycles: 2
   fmi:
     # Fast branch on minus
     bytecode:
@@ -952,6 +1988,10 @@ instructions:
       operand_sets:
         list:
           - address_lsb
+    documentation:
+      category: Flow Control
+      title: Fast branch on minus
+      cycles: 2
   fgt:
     # Fast branch on greater
     bytecode:
@@ -962,6 +2002,10 @@ instructions:
       operand_sets:
         list:
           - address_lsb
+    documentation:
+      category: Flow Control
+      title: Fast branch on greater
+      cycles: 2
   fle:
     # Fast branch on less or equal
     bytecode:
@@ -972,6 +2016,10 @@ instructions:
       operand_sets:
         list:
           - address_lsb
+    documentation:
+      category: Flow Control
+      title: Fast branch on less or equal
+      cycles: 2
   fpa:
     # Fast jump to lsb address
     bytecode:
@@ -982,6 +2030,10 @@ instructions:
       operand_sets:
         list:
           - address_lsb
+    documentation:
+      category: Flow Control
+      title: Fast jump to lsb addr
+      cycles: 2
   bne:
     # Branch on non-zero
     bytecode:
@@ -992,6 +2044,10 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Flow Control
+      title: Branch on non-zero
+      cycles: 3/4
   beq:
     # Branch on zero
     bytecode:
@@ -1002,6 +2058,10 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Flow Control
+      title: Branch on zero
+      cycles: 3/4
   bcc:
     # Branch on carry clear
     bytecode:
@@ -1012,6 +2072,10 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Flow Control
+      title: Branch on carry clear
+      cycles: 3/4
   bcs:
     # Branch on carry set
     bytecode:
@@ -1022,6 +2086,10 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Flow Control
+      title: Branch on carry set
+      cycles: 3/4
   bpl:
     # Branch on plus
     bytecode:
@@ -1032,6 +2100,10 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Flow Control
+      title: Branch on plus
+      cycles: 3/4
   bmi:
     # Branch on minus
     bytecode:
@@ -1042,6 +2114,10 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Flow Control
+      title: Branch on minus
+      cycles: 3/4
   bgt:
     # Branch on greater
     bytecode:
@@ -1052,6 +2128,10 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Flow Control
+      title: Branch on greater
+      cycles: 3/4
   ble:
     # Branch on less or equal
     bytecode:
@@ -1062,6 +2142,10 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Flow Control
+      title: Branch on less or equal
+      cycles: 3/4
   jpa:
     # Jump to address
     bytecode:
@@ -1072,6 +2156,10 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Flow Control
+      title: 'Jump to abs address: PC = addr'
+      cycles: 4
   jpr:
     # Jump to relative address
     bytecode:
@@ -1082,6 +2170,10 @@ instructions:
       operand_sets:
         list:
           - relative_address
+    documentation:
+      category: Flow Control
+      title: 'Jump to rel address: PC = *addr'
+      cycles: 7
   jar:
     # Jump A-indexed to rel address: PC = *(addr + A)
     bytecode:
@@ -1092,6 +2184,17 @@ instructions:
       operand_sets:
         list:
           - relative_address
+    documentation:
+      category: Flow Control
+      title: 'Jump A-indexed to rel address: PC = *(addr + A)'
+      cycles: 7/9
+      modifies:
+        - flag: N
+          description: Reflects LSB of result
+        - flag: C
+          description: Reflects LSB of result
+        - flag: Z
+          description: Reflects LSB of result
   jps:
     # Jump to subroutine
     bytecode:
@@ -1102,6 +2205,13 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Flow Control
+      title: Jump to subroutine
+      cycles: 11
+      modifies:
+        - register: A
+          description: Undefined
   jas:
     # Jump to subroutine conserving A
     bytecode:
@@ -1112,21 +2222,40 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Flow Control
+      title: "Jump to subroutine conserving A §"
+      cycles: 14
   rts:
     # Return from subroutine
     bytecode:
       value: 0x69
       size: 8
+    documentation:
+      category: Flow Control
+      title: Return from subroutine
+      cycles: 10
   phs:
     # Push A to stack
     bytecode:
       value: 0x6a
       size: 8
+    documentation:
+      category: Stack Management
+      title: Push A onto stack
+      cycles: 8
   pls:
     # Pull A from stack
     bytecode:
       value: 0x6b
       size: 8
+    documentation:
+      category: Stack Management
+      title: Pull A from stack
+      cycles: 6
+      modifies:
+        - register: A
+          description: Updated
   lds:
     # Load from stack: A = *(0xff00 + SP + off)
     bytecode:
@@ -1137,6 +2266,13 @@ instructions:
       operand_sets:
         list:
           - immediate_8bit
+    documentation:
+      category: Stack Management
+      title: 'Load from stack: A = *(0xff00 + SP + off)'
+      cycles: 6
+      modifies:
+        - register: A
+          description: Updated
   sts:
     # Store to stack: *(0xff00 + SP + off) = A
     bytecode:
@@ -1147,6 +2283,10 @@ instructions:
       operand_sets:
         list:
           - immediate_8bit
+    documentation:
+      category: Stack Management
+      title: 'Store on stack: *(0xff00 + SP + off) = A'
+      cycles: 11
   rdb:
     # Read FLASH data from abs 3-byte address
     bytecode:
@@ -1158,6 +2298,13 @@ instructions:
         list:
           - immediate_16bit   # flash address
           - immediate_8bit    # bank
+    documentation:
+      category: Input/Output
+      title: Read FLASH data from abs 3-byte address
+      cycles: 8
+      modifies:
+        - register: A
+          description: Updated
   rdr:
     # Read FLASH data from rel 3-byte address
     bytecode:
@@ -1168,6 +2315,13 @@ instructions:
       operand_sets:
         list:
           - relative_address
+    documentation:
+      category: Input/Output
+      title: Read FLASH data from rel 3-byte address
+      cycles: 11
+      modifies:
+        - register: A
+          description: Updated
   rap:
     # Read FLASH data from A-indexed 3-byte address  A = *(pg<<8 + A)
     bytecode:
@@ -1179,6 +2333,13 @@ instructions:
         list:
           - immediate_8bit  # page
           - immediate_8bit  # bank
+    documentation:
+      category: Input/Output
+      title: 'Read A-indexed FLASH data: A = *(pg<<8 + A)'
+      cycles: 7
+      modifies:
+        - register: A
+          description: Updated
   rzp:
     # Read Z-indexed FLASH data: A = *(pg<<8 + *Z)
     bytecode:
@@ -1191,6 +2352,13 @@ instructions:
           - zero_page
           - immediate_8bit  # page
           - immediate_8bit  # bank
+    documentation:
+      category: Input/Output
+      title: 'Read Z-indexed FLASH data: A = *(pg<<8 + *Z)'
+      cycles: 9
+      modifies:
+        - register: A
+          description: Updated
   wdb:
     # Write FLASH data to abs 3-byte address
     bytecode:
@@ -1202,6 +2370,10 @@ instructions:
         list:
           - immediate_16bit   # flash address
           - immediate_8bit    # bank
+    documentation:
+      category: Input/Output
+      title: "Write FLASH data to abs 3-byte address §"
+      cycles: 14
   wdr:
     # Write FLASH data to rel 3-byte address
     bytecode:
@@ -1212,6 +2384,10 @@ instructions:
       operand_sets:
         list:
           - relative_address
+    documentation:
+      category: Input/Output
+      title: "Write FLASH data to rel 3-byte address §"
+      cycles: 16
   ldi:
     # Load immediate value to A: A = imm
     bytecode:
@@ -1222,6 +2398,13 @@ instructions:
       operand_sets:
         list:
           - immediate_8bit
+    documentation:
+      category: Memory Movement
+      title: 'Load A immediate: A = imm'
+      cycles: 2
+      modifies:
+        - register: A
+          description: Updated
   ldz:
     # Load zero-page byte to A: A = *Z
     bytecode:
@@ -1232,6 +2415,13 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Memory Movement
+      title: 'Load A from Z: A = *Z'
+      cycles: 3
+      modifies:
+        - register: A
+          description: Updated
   ldb:
     # Load byte at abs address to A: A = *addr
     bytecode:
@@ -1242,6 +2432,13 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Memory Movement
+      title: 'Load A from abs address: A = *addr'
+      cycles: 5
+      modifies:
+        - register: A
+          description: Updated
   ldt:
     # Load byte at rel zero-page address to A: A = *(*Z)
     bytecode:
@@ -1252,6 +2449,13 @@ instructions:
       operand_sets:
         list:
           - relative_zero_page
+    documentation:
+      category: Memory Movement
+      title: 'Load A from rel address in zero page: A = *(*Z)'
+      cycles: 6
+      modifies:
+        - register: A
+          description: Updated
   ldr:
     # Load byte at rel address to A: A = *(*addr)
     bytecode:
@@ -1262,6 +2466,13 @@ instructions:
       operand_sets:
         list:
           - relative_address
+    documentation:
+      category: Memory Movement
+      title: 'Load A from relative address: A = *(*addr)'
+      cycles: 8
+      modifies:
+        - register: A
+          description: Updated
   lap:
     # Load A-indexed byte to A: A = *(pg<<8 + A)
     bytecode:
@@ -1272,6 +2483,13 @@ instructions:
       operand_sets:
         list:
           - immediate_8bit  # page
+    documentation:
+      category: Arithmetic
+      title: 'Load A A-indexed from page: A = *(pg<<8 + A)'
+      cycles: 4
+      modifies:
+        - register: A
+          description: Updated
   lab:
     # Load A A-indexed from addr: A = *(addr + A)
     bytecode:
@@ -1282,6 +2500,19 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Load A A-indexed from addr: A = *(addr + A)'
+      cycles: 5/7
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects LSB of result
+        - flag: C
+          description: Reflects LSB of result
+        - flag: Z
+          description: Reflects LSB of result
   lzp:
     # Load Z-indexed byte to A: A = *(pg<<8 + *Z)
     bytecode:
@@ -1293,6 +2524,13 @@ instructions:
         list:
           - zero_page
           - immediate_8bit  # page
+    documentation:
+      category: Arithmetic
+      title: 'Load A Z-indexed from page: A = *(pg<<8 + *Z)'
+      cycles: 6
+      modifies:
+        - register: A
+          description: Updated
   lzb:
     # Load Z-indexed byte from addr: A = *(addr + *Z)
     bytecode:
@@ -1304,6 +2542,19 @@ instructions:
         list:
           - zero_page
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Load A Z-indexed from addr: A = *(addr + *Z)'
+      cycles: 7/9
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects LSB of result
+        - flag: C
+          description: Reflects LSB of result
+        - flag: Z
+          description: Reflects LSB of result
   stz:
     # Store A to zero-page byte: *Z = A
     bytecode:
@@ -1314,6 +2565,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Store A to Z: *Z = A'
+      cycles: 3
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   stb:
     # Store A to byte at abs address: *addr = A
     bytecode:
@@ -1324,6 +2588,10 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Memory Movement
+      title: 'Store A to address: *addr = A'
+      cycles: 5
   stt:
     # Store A to byte at rel zero-page address: *(*Z) = A
     bytecode:
@@ -1334,6 +2602,19 @@ instructions:
       operand_sets:
         list:
           - relative_zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Store A at rel address in zero page: *(*Z) = A'
+      cycles: 6
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   str:
     # Store A to byte at rel address: *(*addr) = A
     bytecode:
@@ -1344,6 +2625,10 @@ instructions:
       operand_sets:
         list:
           - relative_address
+    documentation:
+      category: Memory Movement
+      title: 'Store A at relative address: *(*addr) = A'
+      cycles: 8
   szp:
     # Store Z-indexed A: *(pg<<8 + *Z) = A
     bytecode:
@@ -1355,6 +2640,10 @@ instructions:
         list:
           - zero_page
           - immediate_8bit  # page
+    documentation:
+      category: Arithmetic
+      title: 'Store A Z-indexed to page: *(pg<<8 + *Z) = A'
+      cycles: 6
   miz:
     # Move immediate to zero-page byte: *Z = imm
     bytecode:
@@ -1366,6 +2655,13 @@ instructions:
         list:
           - immediate_8bit
           - zero_page
+    documentation:
+      category: Memory Movement
+      title: 'Move imm byte to zero-page: *Z = imm'
+      cycles: 4
+      modifies:
+        - register: A
+          description: Updated
   mib:
     # Move immediate to byte at abs address: *addr = imm
     bytecode:
@@ -1377,6 +2673,13 @@ instructions:
         list:
           - immediate_8bit
           - absolute_address
+    documentation:
+      category: Memory Movement
+      title: 'Move imm byte to abs addr: *addr = imm'
+      cycles: 6
+      modifies:
+        - register: A
+          description: Updated
   mit:
     # Move immediate to byte at rel zero-page address: *(*Z) = imm
     bytecode:
@@ -1388,6 +2691,13 @@ instructions:
         list:
           - immediate_8bit
           - relative_zero_page
+    documentation:
+      category: Memory Movement
+      title: 'Move imm byte to rel zero-page addr: *(*T) = imm'
+      cycles: 7
+      modifies:
+        - register: A
+          description: Updated
   mir:
     # Move immediate to byte at rel address: *(*addr) = imm
     bytecode:
@@ -1399,6 +2709,13 @@ instructions:
         list:
           - immediate_8bit
           - relative_address
+    documentation:
+      category: Memory Movement
+      title: 'Move imm byte to rel addr: *(*addr) = imm'
+      cycles: 9
+      modifies:
+        - register: A
+          description: Updated
   miv:
     # Move immediate word to zero-page word: *V = imm
     bytecode:
@@ -1410,6 +2727,13 @@ instructions:
         list:
           - immediate_16bit
           - zero_page
+    documentation:
+      category: Memory Movement
+      title: 'Move imm word to zero-page word: *V = imm'
+      cycles: 6
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
   miw:
     # Move immediate word to word at abs address: *addr = imm
     bytecode:
@@ -1421,6 +2745,13 @@ instructions:
         list:
           - immediate_16bit
           - absolute_address
+    documentation:
+      category: Memory Movement
+      title: 'Move imm word to abs addr: *addr = imm'
+      cycles: 13
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
   mzz:
     # Move zero-page byte to zero-page byte: *Z2 = *Z1
     bytecode:
@@ -1432,6 +2763,13 @@ instructions:
         list:
           - zero_page
           - zero_page
+    documentation:
+      category: Memory Movement
+      title: 'Move zero-page byte to zero-page byte: *Z2 = *Z1'
+      cycles: 5
+      modifies:
+        - register: A
+          description: Updated
   mzb:
     # Move zero-page byte to byte at abs address: *addr = *Z
     bytecode:
@@ -1443,6 +2781,13 @@ instructions:
         list:
           - zero_page
           - absolute_address
+    documentation:
+      category: Memory Movement
+      title: 'Move zero-page byte to abs addr: *addr = *Z'
+      cycles: 7
+      modifies:
+        - register: A
+          description: Updated
   mbz:
     # Move byte at abs address to zero-page byte: *Z = *addr
     bytecode:
@@ -1454,6 +2799,13 @@ instructions:
         list:
           - absolute_address
           - zero_page
+    documentation:
+      category: Memory Movement
+      title: 'Move byte at abs addr to zero-page: *Z = *addr'
+      cycles: 7
+      modifies:
+        - register: A
+          description: Updated
   mbb:
     # Move byte at abs address to byte at abs address: *addr2 = *addr1
     bytecode:
@@ -1465,6 +2817,13 @@ instructions:
         list:
           - absolute_address
           - absolute_address
+    documentation:
+      category: Memory Movement
+      title: 'Move byte from abs adr1 to abs adr2: *adr2 = *adr1'
+      cycles: 9
+      modifies:
+        - register: A
+          description: Updated
   mvv:
     # Move zero-page word to zero-page word: *V2 = *V1
     bytecode:
@@ -1476,6 +2835,13 @@ instructions:
         list:
           - zero_page
           - zero_page
+    documentation:
+      category: Memory Movement
+      title: 'Move zero-page word to zero-page word: *V2 = *V1'
+      cycles: 7
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
   mwv:
     # Move word at abs address to zero-page word: *V = *addr
     bytecode:
@@ -1487,6 +2853,13 @@ instructions:
         list:
           - absolute_address
           - zero_page
+    documentation:
+      category: Memory Movement
+      title: 'Move word at abs addr to fast word: *V = *addr'
+      cycles: 9
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
   clz:
     # Clear zero-page byte: *Z = 0
     bytecode:
@@ -1497,6 +2870,10 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Memory Movement
+      title: 'Clear Z: *Z = 0x00'
+      cycles: 4
   clb:
     # Clear byte at abs address: *addr = 0
     bytecode:
@@ -1507,6 +2884,10 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Memory Movement
+      title: 'Clear byte at addr: *addr = 0x00'
+      cycles: 6
   clv:
     # Clear zero-page word: *V = 0
     bytecode:
@@ -1517,6 +2898,13 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Memory Movement
+      title: 'Clear fast word: *V = 0x0000'
+      cycles: 5
+      modifies:
+        - register: A
+          description: Set to 0
   clw:
     # Clear word at abs address: *addr = 0
     bytecode:
@@ -1527,6 +2915,13 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Memory Movement
+      title: 'Clear word at addr: *addr = 0x0000'
+      cycles: 7
+      modifies:
+        - register: A
+          description: Set to 0
   clq:
     # Clear zero-page long: *Q = 0
     bytecode:
@@ -1537,6 +2932,13 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Memory Movement
+      title: 'Clear zero-page long: *Q = 0x00000000'
+      cycles: 7
+      modifies:
+        - register: A
+          description: Set to 0
   cll:
     # Clear long at abs address: *addr = 0
     bytecode:
@@ -1547,11 +2949,31 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Memory Movement
+      title: 'Clear long: *addr = 0x00000000'
+      cycles: 11
+      modifies:
+        - register: A
+          description: Set to 0
   inc:
     # Increment A: A++
     bytecode:
       value: 0x94
       size: 8
+    documentation:
+      category: Arithmetic
+      title: 'Increment A: A = A + 1'
+      cycles: 3
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   inz:
     # Increment zero-page byte: (*Z)++
     bytecode:
@@ -1562,6 +2984,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Increment zero-page byte: *Z = *Z + 1'
+      cycles: 5
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   inb:
     # Increment byte at abs address: (*addr)++
     bytecode:
@@ -1572,6 +3007,19 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Increment byte at abs addr: *addr = *addr + 1'
+      cycles: 7
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   inv:
     # Increment zero-page word: (*V) += 0x0001
     bytecode:
@@ -1582,6 +3030,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Increment zero-page word: *V = *V + 0x0001'
+      cycles: 7
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Reflects MSB of result
+        - flag: Z
+          description: Reflects MSB of result
   inw:
     # Increment word at abs address: (*addr) += 0x0001
     bytecode:
@@ -1592,6 +3053,19 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Increment word at abs addr: *addr = *addr + 0x0001'
+      cycles: 9
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Reflects MSB of result
+        - flag: Z
+          description: Reflects MSB of result
   inq:
     # Increment zero-page long: (*Q) += 0x00000001
     bytecode:
@@ -1602,6 +3076,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Increment zero-page long: *Q = *Q + 0x00000001'
+      cycles: 11
+      modifies:
+        - register: A
+          description: Undefined
+        - flag: N
+          description: Undefined
+        - flag: C
+          description: Undefined
+        - flag: Z
+          description: Undefined
   inl:
     # Increment long at abs address: (*addr) += 0x00000001
     bytecode:
@@ -1612,11 +3099,37 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Increment long: *addr = *addr + 0x00000001'
+      cycles: 13
+      modifies:
+        - register: A
+          description: Undefined
+        - flag: N
+          description: Undefined
+        - flag: C
+          description: Undefined
+        - flag: Z
+          description: Undefined
   dec:
     # Decrement A: A--
     bytecode:
       value: 0x9b
       size: 8
+    documentation:
+      category: Arithmetic
+      title: 'Decrement A: A = A - 1'
+      cycles: 3
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   dez:
     # Decrement zero-page byte: (*Z)--
     bytecode:
@@ -1627,6 +3140,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: Decrement *Z = *Z - 1
+      cycles: 5
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   deb:
     # Decrement byte at abs address: (*addr)--
     bytecode:
@@ -1637,6 +3163,19 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Decrement byte: *addr = *addr - 1'
+      cycles: 7
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   dev:
     # Decrement zero-page word: (*V) -= 0x0001
     bytecode:
@@ -1647,6 +3186,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Decrement zero-page word: *V = *V - 0x0001'
+      cycles: 7
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Reflects MSB of result
+        - flag: Z
+          description: Reflects MSB of result
   dew:
     # Decrement word at abs address: (*addr) -= 0x0001
     bytecode:
@@ -1657,6 +3209,19 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Decrement word at abs addr: *addr = *addr - 0x0001'
+      cycles: 9
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Reflects MSB of result
+        - flag: Z
+          description: Reflects MSB of result
   deq:
     # Decrement zero-page long: (*Q) -= 0x00000001
     bytecode:
@@ -1667,6 +3232,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Decrement zero-page long: *Q = *Q - 0x00000001'
+      cycles: 11
+      modifies:
+        - register: A
+          description: Undefined
+        - flag: N
+          description: Undefined
+        - flag: C
+          description: Undefined
+        - flag: Z
+          description: Undefined
   del:
     # Decrement long at abs address: (*addr) -= 0x00000001
     bytecode:
@@ -1677,6 +3255,19 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Decrement long: *addr = *addr - 0x00000001'
+      cycles: 13
+      modifies:
+        - register: A
+          description: Undefined
+        - flag: N
+          description: Undefined
+        - flag: C
+          description: Undefined
+        - flag: Z
+          description: Undefined
   adi:
     # Add immediate to A: A += imm
     bytecode:
@@ -1687,6 +3278,19 @@ instructions:
       operand_sets:
         list:
           - immediate_8bit
+    documentation:
+      category: Arithmetic
+      title: 'Add immediate to A: A = A + imm'
+      cycles: 3
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   adz:
     # Add zero-page byte to A: A += *Z
     bytecode:
@@ -1697,6 +3301,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Add zero-page byte to A: A = A + *Z'
+      cycles: 4
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   adb:
     # Add byte at abs address to A: A += *addr
     bytecode:
@@ -1707,6 +3324,19 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Add byte at addr to A: A = A + *addr'
+      cycles: 6
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   adt:
     # Add byte at rel zero-page address to A: A += *(*Z)
     bytecode:
@@ -1717,6 +3347,19 @@ instructions:
       operand_sets:
         list:
           - relative_zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Add byte at rel zero-page addr to A: A = A + *(*Z)'
+      cycles: 7
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   adr:
     # Add byte at rel address to A: A += *(*addr)
     bytecode:
@@ -1727,6 +3370,19 @@ instructions:
       operand_sets:
         list:
           - relative_address
+    documentation:
+      category: Arithmetic
+      title: 'Add byte at rel addr to A: A = A + *(*addr)'
+      cycles: 9
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   ad.z:
     # Add A to zero-page byte: *Z += A
     bytecode:
@@ -1737,6 +3393,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Add A to zero-page byte: *Z = *Z + A'
+      cycles: 4
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   ad.b:
     # Add A to byte at abs address: *addr += A
     bytecode:
@@ -1747,6 +3416,19 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Add A to byte at abs addr: *addr = *addr + A'
+      cycles: 6
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   ad.t:
     # Add A to byte at rel zero-page address: *(*Z) += A
     bytecode:
@@ -1757,6 +3439,19 @@ instructions:
       operand_sets:
         list:
           - relative_zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Add A to rel zero-page address: *(*Z) = *(*Z) + A'
+      cycles: 7
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   ad.r:
     # Add A to byte at rel address: *(*addr) += A
     bytecode:
@@ -1767,6 +3462,19 @@ instructions:
       operand_sets:
         list:
           - relative_address
+    documentation:
+      category: Arithmetic
+      title: 'Add A to rel address: *(*addr) = *(*addr) + A'
+      cycles: 9
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   adv:
     # Add A to zero-page word: *V = *V + A
     bytecode:
@@ -1777,6 +3485,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Add A to zero-page word: *V = *V + A'
+      cycles: 7
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Reflects MSB of result
+        - flag: Z
+          description: Reflects MSB of result
   adw:
     # Add A to word at abs address: *addr = *addr + A
     bytecode:
@@ -1787,6 +3508,19 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Add A to word at abs addr: *addr = *addr + A'
+      cycles: 9
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Reflects MSB of result
+        - flag: Z
+          description: Reflects MSB of result
   adq:
     # Add A to zero-page long: *Q = *Q + A
     bytecode:
@@ -1797,6 +3531,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Add A to zero-page long: *Q = *Q + A'
+      cycles: 11
+      modifies:
+        - register: A
+          description: Undefined
+        - flag: N
+          description: Undefined
+        - flag: C
+          description: Undefined
+        - flag: Z
+          description: Undefined
   adl:
     # Add A to long at abs address: *addr = *addr + A
     bytecode:
@@ -1807,6 +3554,19 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Add A to long: *addr = *addr + A'
+      cycles: 13
+      modifies:
+        - register: A
+          description: Undefined
+        - flag: N
+          description: Undefined
+        - flag: C
+          description: Undefined
+        - flag: Z
+          description: Undefined
   aiz:
     # Add immediate to zero-page byte: *Z += imm
     bytecode:
@@ -1818,6 +3578,19 @@ instructions:
         list:
           - immediate_8bit
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Add immediate to zero-page byte: *Z = *Z + imm'
+      cycles: 5
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   aib:
     # Add immediate to byte at abs address: *addr += imm
     bytecode:
@@ -1829,6 +3602,19 @@ instructions:
         list:
           - immediate_8bit
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Add imm to byte at abs addr: *addr = *addr + imm'
+      cycles: 7
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   ait:
     # Add immediate to byte at rel zero-page address: *(*Z) += imm
     bytecode:
@@ -1840,6 +3626,19 @@ instructions:
         list:
           - immediate_8bit
           - relative_zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Add imm to byte at rel Z addr: *(*Z) = *(*Z) + imm'
+      cycles: 8
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   air:
     # Add immediate to byte at rel address: *(*addr) += imm
     bytecode:
@@ -1851,6 +3650,19 @@ instructions:
         list:
           - immediate_8bit
           - relative_address
+    documentation:
+      category: Arithmetic
+      title: 'Add imm to byte at rel addr: *(*adr) = *(*adr) + imm'
+      cycles: 10
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   aiv:
     # Add immediate byte to zero-page word: *V += imm
     bytecode:
@@ -1862,6 +3674,19 @@ instructions:
         list:
           - immediate_8bit
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Add immediate byte to zero-page word: *V = *V + imm'
+      cycles: 8
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   aiw:
     # Add immediate byte to word at abs address: *addr += imm
     bytecode:
@@ -1873,6 +3698,19 @@ instructions:
         list:
           - immediate_8bit
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Add imm byte to abs word: *addr = *addr + imm'
+      cycles: 10
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Reflects MSB of result
+        - flag: Z
+          description: Reflects MSB of result
   aiq:
     # Add immediate byte to zero-page long: *Q += imm
     bytecode:
@@ -1884,6 +3722,19 @@ instructions:
         list:
           - immediate_8bit
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Add immediate byte to zero-page long: *Q = *Q + imm'
+      cycles: 12
+      modifies:
+        - register: A
+          description: Undefined
+        - flag: N
+          description: Undefined
+        - flag: C
+          description: Undefined
+        - flag: Z
+          description: Undefined
   ail:
     # Add immediate byte to long at abs address: *addr += imm
     bytecode:
@@ -1895,6 +3746,19 @@ instructions:
         list:
           - immediate_8bit
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Add immediate byte to long: *L = *L + imm'
+      cycles: 14
+      modifies:
+        - register: A
+          description: Undefined
+        - flag: N
+          description: Undefined
+        - flag: C
+          description: Undefined
+        - flag: Z
+          description: Undefined
   azz:
     # Add zero-page byte to zero-page byte: *Z2 += *Z1
     bytecode:
@@ -1906,6 +3770,19 @@ instructions:
         list:
           - zero_page
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Add zero-page byte to zero-page byte: *Z2 = *Z2 + *Z1'
+      cycles: 6
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   azb:
     # Add zero-page byte to byte at abs address: *addr += *Z
     bytecode:
@@ -1917,6 +3794,19 @@ instructions:
         list:
           - zero_page
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Add zero-page to byte at abs addr: *addr = *addr + *Z'
+      cycles: 8
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   azv:
     # Add zero-page byte to zero-page word: *V = *V + *Z
     bytecode:
@@ -1928,6 +3818,19 @@ instructions:
         list:
           - zero_page   # Z
           - zero_page   # V
+    documentation:
+      category: Arithmetic
+      title: 'Add zero-page byte to zero-page word: *V = *V + *Z'
+      cycles: 9
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   azw:
     # Add zero-page byte to word at abs address: *addr = *addr + *Z
     bytecode:
@@ -1939,6 +3842,19 @@ instructions:
         list:
           - zero_page
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Add zero-page byte to word at addr: *addr = *addr + *Z'
+      cycles: 11
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Reflects MSB of result
+        - flag: Z
+          description: Reflects MSB of result
   azq:
     # Add zero-page byte to zero-page long: *Q = *Q + *Z
     bytecode:
@@ -1950,6 +3866,19 @@ instructions:
         list:
           - zero_page   # Z
           - zero_page   # Q
+    documentation:
+      category: Arithmetic
+      title: 'Add zero-page byte to zero-page long: *Q = *Q + *Z'
+      cycles: 13
+      modifies:
+        - register: A
+          description: Undefined
+        - flag: N
+          description: Undefined
+        - flag: C
+          description: Undefined
+        - flag: Z
+          description: Undefined
   azl:
     # Add zero-page byte to long at abs address: *addr = *addr + *Z
     bytecode:
@@ -1961,6 +3890,19 @@ instructions:
         list:
           - zero_page
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Add zero-page byte to long: *L = *L + *Z'
+      cycles: 15
+      modifies:
+        - register: A
+          description: Undefined
+        - flag: N
+          description: Undefined
+        - flag: C
+          description: Undefined
+        - flag: Z
+          description: Undefined
   abz:
     # Add byte at abs address to zero-page byte: *Z += *addr
     bytecode:
@@ -1972,6 +3914,19 @@ instructions:
         list:
           - absolute_address
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Add abs byte to zero-page byte: *Z = *Z + *addr'
+      cycles: 8
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   abb:
     # Add byte at abs address to byte at abs address: *addr2 = *addr2 + *addr1
     bytecode:
@@ -1983,6 +3938,19 @@ instructions:
         list:
           - absolute_address  # addr1
           - absolute_address  # addr2
+    documentation:
+      category: Arithmetic
+      title: 'Add abs byte to byte: *adr2 = *adr2 + *adr1'
+      cycles: 10
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   abv:
     # Add byte at abs address to zero-page word: *V = *V + *addr
     bytecode:
@@ -1994,6 +3962,19 @@ instructions:
         list:
           - absolute_address
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Add abs byte to zero-page word: *V = *V + *addr'
+      cycles: 11
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   abw:
     # Add byte at abs address to word at abs address: *addr2 = *addr2 + *addr1
     bytecode:
@@ -2005,6 +3986,19 @@ instructions:
         list:
           - absolute_address  # addr1
           - absolute_address  # addr2
+    documentation:
+      category: Arithmetic
+      title: 'Add byte at ad1 to word at ad2: *ad2 = *ad2 + *ad1'
+      cycles: 13
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Reflects MSB of result
+        - flag: Z
+          description: Reflects MSB of result
   abq:
     # Add byte at abs address to zero-page long: *Q = *Q + *addr
     bytecode:
@@ -2016,6 +4010,19 @@ instructions:
         list:
           - absolute_address
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Add abs byte to zero-page long: *Q = *Q + *addr'
+      cycles: 15
+      modifies:
+        - register: A
+          description: Undefined
+        - flag: N
+          description: Undefined
+        - flag: C
+          description: Undefined
+        - flag: Z
+          description: Undefined
   avv:
     # Add zero-page word to zero-page word: *V2 = *V2 + *V1
     bytecode:
@@ -2027,6 +4034,19 @@ instructions:
         list:
           - zero_page   # V1
           - zero_page   # V2
+    documentation:
+      category: Arithmetic
+      title: 'Add zero-page word to zero-page word: *V2 = *V2 + *V1'
+      cycles: 14
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   sui:
     # Subtract immediate from A: A -= imm
     bytecode:
@@ -2037,6 +4057,19 @@ instructions:
       operand_sets:
         list:
           - immediate_8bit
+    documentation:
+      category: Arithmetic
+      title: 'Sub immediate from A: A = A - imm'
+      cycles: 3
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   suz:
     # Subtract zero-page byte from A: A -= *Z
     bytecode:
@@ -2047,6 +4080,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Sub zero-page byte from A: A = A - *Z'
+      cycles: 4
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   sub:
     # Subtract byte at abs address from A: A -= *addr
     bytecode:
@@ -2057,6 +4103,19 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Sub byte at addr from A: A = A - *addr'
+      cycles: 6
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   sut:
     # Subtract byte at rel zero-page address from A: A -= *(*Z)
     bytecode:
@@ -2067,6 +4126,19 @@ instructions:
       operand_sets:
         list:
           - relative_zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Sub byte at rel zero-page addr from A: A = A - *(*Z)'
+      cycles: 7
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   sur:
     # Subtract byte at rel address from A: A -= *(*addr)
     bytecode:
@@ -2077,6 +4149,19 @@ instructions:
       operand_sets:
         list:
           - relative_address
+    documentation:
+      category: Arithmetic
+      title: 'Sub byte at rel addr from A: A = A - *(*addr)'
+      cycles: 9
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   su.z:
     # Subtract A from zero-page byte: *Z -= A
     bytecode:
@@ -2087,6 +4172,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Sub A from zero-page byte: *Z = *Z - A'
+      cycles: 5
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   su.b:
     # Subtract A from byte at abs address: *addr -= A
     bytecode:
@@ -2097,6 +4195,19 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Sub A from byte at abs addr: *addr = *addr - A'
+      cycles: 7
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   su.t:
     # Subtract A from byte at rel zero-page address: *(*Z) -= A
     bytecode:
@@ -2107,6 +4218,19 @@ instructions:
       operand_sets:
         list:
           - relative_zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Sub A from rel zero-page address: *(*Z) = *(*Z) - A'
+      cycles: 8
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   su.r:
     # Subtract A from byte at rel address: *(*addr) -= A
     bytecode:
@@ -2117,6 +4241,19 @@ instructions:
       operand_sets:
         list:
           - relative_address
+    documentation:
+      category: Arithmetic
+      title: 'Sub A from byte at rel addr: *(*addr) = *(*addr) - A'
+      cycles: 10
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   suv:
     # Subtract A from zero-page word: *V = *V - A
     bytecode:
@@ -2127,6 +4264,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Sub A from zero-page word: *v = *V - A'
+      cycles: 8
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Reflects MSB of result
+        - flag: Z
+          description: Reflects MSB of result
   suw:
     # Subtract A from word at abs address: *addr = *addr - A
     bytecode:
@@ -2137,6 +4287,19 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Sub A from word at abs addr: *addr = *addr - A'
+      cycles: 10
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Reflects MSB of result
+        - flag: Z
+          description: Reflects MSB of result
   suq:
     # Subtract A from zero-page long: *Q = *Q - A
     bytecode:
@@ -2147,7 +4310,20 @@ instructions:
       operand_sets:
         list:
           - zero_page
-  su.l:
+    documentation:
+      category: Arithmetic
+      title: 'Sub A from zero-page long: *Q = *Q - A'
+      cycles: 12
+      modifies:
+        - register: A
+          description: Undefined
+        - flag: N
+          description: Undefined
+        - flag: C
+          description: Undefined
+        - flag: Z
+          description: Undefined
+  sul:
     # Subtract A from long at abs address: *addr = *addr - A
     bytecode:
       value: 0xcf
@@ -2157,6 +4333,19 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Sub A from long: *addr = *addr - A'
+      cycles: 14
+      modifies:
+        - register: A
+          description: Undefined
+        - flag: N
+          description: Undefined
+        - flag: C
+          description: Undefined
+        - flag: Z
+          description: Undefined
   siz:
     # Subtract immediate from zero-page byte: *Z -= imm
     bytecode:
@@ -2168,6 +4357,19 @@ instructions:
         list:
           - immediate_8bit
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Sub immediate from zero-page byte: *Z = *Z - imm'
+      cycles: 5
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   sib:
     # Subtract immediate from byte at abs address: *addr -= imm
     bytecode:
@@ -2179,6 +4381,19 @@ instructions:
         list:
           - immediate_8bit
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Sub imm from byte: *addr = *addr - imm'
+      cycles: 7
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   sit:
     # Subtract immediate from byte at rel zero-page address: *(*Z) -= imm
     bytecode:
@@ -2190,6 +4405,19 @@ instructions:
         list:
           - immediate_8bit
           - relative_zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Sub imm from byte at rel Z addr: *(*Z) = *(*Z) + imm'
+      cycles: 8
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   sir:
     # Subtract immediate from byte at rel address: *(*addr) -= imm
     bytecode:
@@ -2201,6 +4429,19 @@ instructions:
         list:
           - immediate_8bit
           - relative_address
+    documentation:
+      category: Arithmetic
+      title: 'Sub imm from byte at rel addr: *(*ad) = *(*ad) + imm'
+      cycles: 10
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   siv:
     # Subtract immediate byte from zero-page word: *V -= imm
     bytecode:
@@ -2212,6 +4453,19 @@ instructions:
         list:
           - immediate_8bit
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Sub imm byte from zero-page word: *V = *V - imm'
+      cycles: 8
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   siw:
     # Subtract immediate byte from word at abs address: *addr -= imm
     bytecode:
@@ -2223,6 +4477,19 @@ instructions:
         list:
           - immediate_8bit
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Sub imm byte from abs word: *addr = *addr - imm'
+      cycles: 10
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Reflects MSB of result
+        - flag: Z
+          description: Reflects MSB of result
   siq:
     # Subtract immediate byte from zero-page long: *Q -= imm
     bytecode:
@@ -2234,6 +4501,19 @@ instructions:
         list:
           - immediate_8bit
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Sub imm byte from zero-page long Z: *Z = *Z - imm'
+      cycles: 12
+      modifies:
+        - register: A
+          description: Undefined
+        - flag: N
+          description: Undefined
+        - flag: C
+          description: Undefined
+        - flag: Z
+          description: Undefined
   sil:
     # Subtract immediate byte from long at abs address: *addr -= imm
     bytecode:
@@ -2245,6 +4525,19 @@ instructions:
         list:
           - immediate_8bit
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Sub imm byte from long at abs address: *L = *L - imm'
+      cycles: 14
+      modifies:
+        - register: A
+          description: Undefined
+        - flag: N
+          description: Undefined
+        - flag: C
+          description: Undefined
+        - flag: Z
+          description: Undefined
   szz:
     # Subtract zero-page byte from zero-page byte: *Z2 -= *Z1
     bytecode:
@@ -2256,6 +4549,19 @@ instructions:
         list:
           - zero_page   # Z1
           - zero_page   # Z2
+    documentation:
+      category: Arithmetic
+      title: 'Sub zero-page byte from Z byte: *Z2 = *Z2 - *Z1'
+      cycles: 6
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   szb:
     # Subtract zero-page byte from byte at abs address: *addr -= *Z
     bytecode:
@@ -2267,6 +4573,19 @@ instructions:
         list:
           - zero_page
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Sub zero-page byte from abs byte: *addr = *addr - *Z'
+      cycles: 8
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   szv:
     # Subtract zero-page byte from zero-page word: *V = *V - *Z
     bytecode:
@@ -2278,6 +4597,19 @@ instructions:
         list:
           - zero_page   # Z
           - zero_page   # V
+    documentation:
+      category: Arithmetic
+      title: 'Sub zero-page byte from zero-page word: *V = *V - *Z'
+      cycles: 9
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   szw:
     # Subtract zero-page byte from word at abs address: *addr = *addr - *Z
     bytecode:
@@ -2289,6 +4621,19 @@ instructions:
         list:
           - zero_page
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Sub zero-page byte from abs word: *addr = *addr - *Z'
+      cycles: 11
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Reflects MSB of result
+        - flag: Z
+          description: Reflects MSB of result
   szq:
     # Subtract zero-page byte from zero-page long: *Q = *Q - *Z
     bytecode:
@@ -2300,6 +4645,19 @@ instructions:
         list:
           - zero_page   # Z
           - zero_page   # Q
+    documentation:
+      category: Arithmetic
+      title: 'Sub zero-page byte from zero-page long: *Q = *Q - *Z'
+      cycles: 13
+      modifies:
+        - register: A
+          description: Undefined
+        - flag: N
+          description: Undefined
+        - flag: C
+          description: Undefined
+        - flag: Z
+          description: Undefined
   szl:
     # Subtract zero-page byte from long at abs address: *addr = *addr - *Z
     bytecode:
@@ -2311,6 +4669,19 @@ instructions:
         list:
           - zero_page
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Sub zero-page byte from long: *L = *L - *Z'
+      cycles: 15
+      modifies:
+        - register: A
+          description: Undefined
+        - flag: N
+          description: Undefined
+        - flag: C
+          description: Undefined
+        - flag: Z
+          description: Undefined
   sbz:
     # Subtract byte at abs address from zero-page byte: *Z -= *addr
     bytecode:
@@ -2322,6 +4693,19 @@ instructions:
         list:
           - absolute_address
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Sub abs byte from zero-page byte: *Z = *Z - *addr'
+      cycles: 8
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   sbb:
     # Subtract byte at abs address from byte at abs
     # address: *addr2 = *addr2 - *addr1
@@ -2334,6 +4718,19 @@ instructions:
         list:
           - absolute_address  # addr1
           - absolute_address  # addr2
+    documentation:
+      category: Arithmetic
+      title: 'Sub abs byte from byte: *adr2 = *adr2 - *adr1'
+      cycles: 10
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   sbv:
     # Subtract byte at abs address from zero-page word: *V = *V - *addr
     bytecode:
@@ -2345,6 +4742,19 @@ instructions:
         list:
           - absolute_address
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Sub abs byte from zero-page word: *V = *V - *addr'
+      cycles: 11
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   sbw:
     # Subtract byte at abs address from word at abs
     # address: *addr2 = *addr2 - *addr1
@@ -2357,6 +4767,19 @@ instructions:
         list:
           - absolute_address  # addr1
           - absolute_address  # addr2
+    documentation:
+      category: Arithmetic
+      title: 'Sub abs byte from word at adr2: *adr2 = *adr2 - *adr1'
+      cycles: 13
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Reflects MSB of result
+        - flag: Z
+          description: Reflects MSB of result
   sbq:
     # Subtract byte at abs address from zero-page long: *Q = *Q - *addr
     bytecode:
@@ -2368,6 +4791,19 @@ instructions:
         list:
           - absolute_address
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Sub abs byte from zero-page long: *Q = *Q - *addr'
+      cycles: 15
+      modifies:
+        - register: A
+          description: Undefined
+        - flag: N
+          description: Undefined
+        - flag: C
+          description: Undefined
+        - flag: Z
+          description: Undefined
   svv:
     # Subtract zero-page word from zero-page word: *V2 = *V2 - *V1
     bytecode:
@@ -2379,6 +4815,19 @@ instructions:
         list:
           - zero_page   # V1
           - zero_page   # V2
+    documentation:
+      category: Arithmetic
+      title: 'Sub zero-page word from word: *V2 = *V2 - *V1'
+      cycles: 14
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   cpi:
     # Compare immediate with A: A - imm
     bytecode:
@@ -2389,6 +4838,17 @@ instructions:
       operand_sets:
         list:
           - immediate_8bit
+    documentation:
+      category: comparison
+      title: 'Compare immediate value to A: eval A - imm'
+      cycles: 3
+      modifies:
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   cpz:
     # Compare zero-page byte with A: A - *Z
     bytecode:
@@ -2399,6 +4859,17 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: comparison
+      title: 'Compare zero-page byte to A: eval A - *Z'
+      cycles: 4
+      modifies:
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   cpb:
     # Compare byte at abs address with A: A - *addr
     bytecode:
@@ -2409,6 +4880,17 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: comparison
+      title: 'Compare byte at addr to A: eval A - *addr'
+      cycles: 6
+      modifies:
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   cpt:
     # Compare byte at rel zero-page address with A: A - *(*Z)
     bytecode:
@@ -2419,6 +4901,17 @@ instructions:
       operand_sets:
         list:
           - relative_zero_page
+    documentation:
+      category: comparison
+      title: 'Compare byte at rel Z to A: eval A - *(*Z)'
+      cycles: 7
+      modifies:
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   cpr:
     # Compare byte at rel address with A: A - *(*addr)
     bytecode:
@@ -2429,6 +4922,17 @@ instructions:
       operand_sets:
         list:
           - relative_address
+    documentation:
+      category: comparison
+      title: 'Compare rel byte to A: eval A - *(*addr)'
+      cycles: 9
+      modifies:
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   ciz:
     # Compare immediate with zero-page byte: *Z - imm
     bytecode:
@@ -2440,6 +4944,19 @@ instructions:
         list:
           - immediate_8bit
           - zero_page
+    documentation:
+      category: comparison
+      title: 'Compare imm to zero-page byte: A = *Z - imm'
+      cycles: 5
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   cib:
     # Compare immediate with byte at abs address: *addr - imm
     bytecode:
@@ -2451,6 +4968,19 @@ instructions:
         list:
           - immediate_8bit
           - absolute_address
+    documentation:
+      category: comparison
+      title: 'Compare imm to byte at abs addr: A = *addr - imm'
+      cycles: 7
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   cit:
     # Compare immediate with byte at rel zero-page address: *(*Z) - imm
     bytecode:
@@ -2462,6 +4992,19 @@ instructions:
         list:
           - immediate_8bit
           - relative_zero_page
+    documentation:
+      category: comparison
+      title: 'Compare imm to byte at rel Z: A = *(*Z) - imm'
+      cycles: 8
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   cir:
     # Compare immediate with byte at rel address: *(*addr) - imm
     bytecode:
@@ -2473,6 +5016,19 @@ instructions:
         list:
           - immediate_8bit
           - relative_address
+    documentation:
+      category: comparison
+      title: 'Compare imm to byte at rel addr: A = *(*addr) - imm'
+      cycles: 10
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   czz:
     # Compare zero-page byte with zero-page byte: *Z2 - *Z1
     bytecode:
@@ -2484,6 +5040,19 @@ instructions:
         list:
           - zero_page   # Z1
           - zero_page   # Z2
+    documentation:
+      category: comparison
+      title: 'Compare zero-page byte to byte: A = *Z2 - *Z1'
+      cycles: 6
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   czb:
     # Compare zero-page byte with byte at abs address: *addr - *Z
     bytecode:
@@ -2495,6 +5064,19 @@ instructions:
         list:
           - zero_page
           - absolute_address
+    documentation:
+      category: comparison
+      title: 'Compare zero-page byte to byte: A = *addr - *Z'
+      cycles: 8
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   cbz:
     # Compare abs byte to zero-page byte: A = *addr - *Z
     bytecode:
@@ -2506,6 +5088,19 @@ instructions:
         list:
           - absolute_address
           - zero_page
+    documentation:
+      category: comparison
+      title: 'Compare abs byte to zero-page byte: A = *addr - *Z'
+      cycles: 8
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   cbb:
     # Compare byte at abs address with byte at abs address: *addr2 - *addr1
     bytecode:
@@ -2517,6 +5112,19 @@ instructions:
         list:
           - absolute_address  # addr1
           - absolute_address  # addr2
+    documentation:
+      category: comparison
+      title: 'Compare abs byte to byte: A = *adr2 - *adr1'
+      cycles: 10
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   aci:
     # Add immediate value to A with C: A = A + imm + C
     bytecode:
@@ -2527,6 +5135,19 @@ instructions:
       operand_sets:
         list:
           - immediate_8bit
+    documentation:
+      category: Arithmetic
+      title: 'Add immediate value to A with C: A = A + imm + C'
+      cycles: 3
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   acz:
     # Add zero-page byte to A with C: A = A + *Z + C
     bytecode:
@@ -2537,6 +5158,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Add zero-page byte with C to A: A = A + *Z + C'
+      cycles: 4
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   acb:
     # Add byte at abs address to A with C: A = A + *addr + C
     bytecode:
@@ -2547,6 +5181,19 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Add byte at addr with C to A: A = A + *addr + C'
+      cycles: 6
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   ac.z:
     # Add A to zero-page byte with C: *Z = *Z + A + C
     bytecode:
@@ -2557,6 +5204,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Add A with C to zero-page byte: *Z = *Z + A + C'
+      cycles: 4
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   ac.b:
     # Add A to byte at abs address with C: *addr = *addr + A + C
     bytecode:
@@ -2567,6 +5227,19 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Add A with C to byte at addr: *addr = *addr + A + C'
+      cycles: 6
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   acv:
     # Add A to zero-page word with C: *V = *V + A + C
     bytecode:
@@ -2577,6 +5250,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Add A with C to zero-page word'
+      cycles: 7
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Reflects MSB of result
+        - flag: Z
+          description: Reflects MSB of result
   acw:
     # Add A to word at abs address with C: *addr = *addr + A + C
     bytecode:
@@ -2587,6 +5273,19 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Add A with C to word at ads addr: *adr = *adr + A + C'
+      cycles: 9
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Reflects MSB of result
+        - flag: Z
+          description: Reflects MSB of result
   sci:
     # Sub imm value from A with C: A = A - imm - 1 + C
     bytecode:
@@ -2597,6 +5296,19 @@ instructions:
       operand_sets:
         list:
           - immediate_8bit
+    documentation:
+      category: Arithmetic
+      title: 'Sub imm value from A with C: A = A - imm - 1 + C'
+      cycles: 3
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   scz:
     # Sub zero-page byte from A with C: A = A - *Z - 1 + C
     bytecode:
@@ -2607,6 +5319,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Sub zero-page byte with C from A: A = A - *Z - 1 + C'
+      cycles: 4
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   scb:
     # Sub byte at abs address from A with C: A = A - *addr - 1 + C
     bytecode:
@@ -2617,6 +5342,19 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Sub byte at addr from A with C: A = A - *addr - 1 + C'
+      cycles: 6
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   sc.z:
     # Sub A from zero-page byte with C: *Z = *Z - A - 1 + C
     bytecode:
@@ -2627,6 +5365,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Sub A with C from zero-page byte: *Z = *Z - A - 1 + C'
+      cycles: 5
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   sc.b:
     # Sub A from byte at abs address with C: *addr = *addr - A - 1 + C
     bytecode:
@@ -2637,6 +5388,19 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Sub A with C from byte: *addr = *addr - A - 1 + C'
+      cycles: 7
+      modifies:
+        - register: A
+          description: Updated
+        - flag: N
+          description: Reflects result
+        - flag: C
+          description: Reflects result
+        - flag: Z
+          description: Reflects result
   scv:
     # Sub A from zero-page word with C: *V = *V - A - 1 + C
     bytecode:
@@ -2647,6 +5411,19 @@ instructions:
       operand_sets:
         list:
           - zero_page
+    documentation:
+      category: Arithmetic
+      title: 'Sub A with C from zero-page word'
+      cycles: 8
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Reflects MSB of result
+        - flag: Z
+          description: Reflects MSB of result
   scw:
     # Sub A from word at abs address with C: *addr = *addr - A - 1 + C
     bytecode:
@@ -2657,375 +5434,507 @@ instructions:
       operand_sets:
         list:
           - absolute_address
+    documentation:
+      category: Arithmetic
+      title: 'Sub A with C from word at abs addr'
+      cycles: 10
+      modifies:
+        - register: A
+          description: Updated (MSB of result)
+        - flag: N
+          description: Reflects MSB of result
+        - flag: C
+          description: Reflects MSB of result
+        - flag: Z
+          description: Reflects MSB of result
 macros:
   spinit:
-    - operands:
-        count: 0
-      instructions:
-        - "mib 0xfe,0xffff"
+    variants:
+      - operands:
+          count: 0
+        instructions:
+          - "mib 0xfe,0xffff"
+    documentation:
+      category: Stack Management
+      title: Initialize Stack Pointer
+      modifies:
+        - register: sp
+          description: Initialized
   phsi:
-    - operands:
-        count: 1
-        operand_sets:
-          list:
-            - immediate_8bit
-      instructions:
-        - "ldi @ARG(0)"
-        - "phs"
-  phs2i:
-    - operands:
-        count: 1
-        operand_sets:
-          list:
-            - immediate_16bit
-      instructions:
-        - "ldi LSB(@ARG(0))"
-        - "phs"
-        - "ldi BYTE1(@ARG(0))"
-        - "phs"
-  phs4i:
-    - operands:
-        count: 1
-        specific_operands:
-          immediate:
+    variants:
+      - operands:
+          count: 1
+          operand_sets:
             list:
-              uint32:
-                type: numeric
-                argument:
-                  size: 32
-                  word_align: true
-      instructions:
-        - "ldi BYTE0(@ARG(0))"
-        - "phs"
-        - "ldi BYTE1(@ARG(0))"
-        - "phs"
-        - "ldi BYTE2(@ARG(0))"
-        - "phs"
-        - "ldi BYTE3(@ARG(0))"
-        - "phs"
+              - immediate_8bit
+        instructions:
+          - "ldi @ARG(0)"
+          - "phs"
+    documentation:
+      category: Stack Management
+      title: Push Immediate Byte onto Stack
+  phs2i:
+    variants:
+      - operands:
+          count: 1
+          operand_sets:
+            list:
+              - immediate_16bit
+        instructions:
+          - "ldi LSB(@ARG(0))"
+          - "phs"
+          - "ldi BYTE1(@ARG(0))"
+          - "phs"
+    documentation:
+      category: Stack Management
+      title: Push Immediate Word onto Stack
+  phs4i:
+    variants:
+      - operands:
+          count: 1
+          specific_operands:
+            immediate:
+              list:
+                uint32:
+                  type: numeric
+                  argument:
+                    size: 32
+                    word_align: true
+        instructions:
+          - "ldi BYTE0(@ARG(0))"
+          - "phs"
+          - "ldi BYTE1(@ARG(0))"
+          - "phs"
+          - "ldi BYTE2(@ARG(0))"
+          - "phs"
+          - "ldi BYTE3(@ARG(0))"
+          - "phs"
+    documentation:
+      category: Stack Management
+      title: Push Immediate Long onto Stack
   phs4a:
     # push 4 bytes of an absolute address to the stack
     # stack is arranged as big-endian, address is little-endian
-    - operands:
-        count: 1
-        operand_sets:
-          list:
-            - absolute_address
-      instructions:
-        - "ldb @ARG(0)+0"
-        - "phs"
-        - "ldb @ARG(0)+1"
-        - "phs"
-        - "ldb @ARG(0)+2"
-        - "phs"
-        - "ldb @ARG(0)+3"
-        - "phs"
+    variants:
+      - operands:
+          count: 1
+          operand_sets:
+            list:
+              - absolute_address
+        instructions:
+          - "ldb @ARG(0)+0"
+          - "phs"
+          - "ldb @ARG(0)+1"
+          - "phs"
+          - "ldb @ARG(0)+2"
+          - "phs"
+          - "ldb @ARG(0)+3"
+          - "phs"
+    documentation:
+      category: Stack Management
+      title: Push Word in Memory onto Stack
+      details: push 4 bytes at an absolute address onto the stack
   phsptr:
     # push an immediate absolute address to the stack per MinOS calling convention
-    - operands:
-        count: 1
-        operand_sets:
-          list:
-            - absolute_address
-      instructions:
-        - "ldi BYTE0(@ARG(0))"
-        - "phs"
-        - "ldi BYTE1(@ARG(0))"
-        - "phs"
+    variants:
+      - operands:
+          count: 1
+          operand_sets:
+            list:
+              - absolute_address
+        instructions:
+          - "ldi BYTE0(@ARG(0))"
+          - "phs"
+          - "ldi BYTE1(@ARG(0))"
+          - "phs"
+    documentation:
+      category: Stack Management
+      title: Push Immediate Memory Address onto Stack
+      description: push an immediate absolute address to the stack per MinOS calling convention
   phs2s:
     # push 2 bytes at (current) stack offset to the stack
-    - operands:
-        count: 1
-        operand_sets:
-          list:
-            - offset
-      instructions:
-        - "lds @ARG(0)+1+0"
-        - "phs"
-        - "lds @ARG(0)+0+1"
-        - "phs"
+    variants:
+      - operands:
+          count: 1
+          operand_sets:
+            list:
+              - offset
+        instructions:
+          - "lds @ARG(0)+1+0"
+          - "phs"
+          - "lds @ARG(0)+0+1"
+          - "phs"
+    documentation:
+      category: Stack Management
+      title: Push Word at Stack Offset onto Stack
+      description: Pushes a 2 byte value currently at given stack offset onto the stack (again).
   phs4s:
     # push 4 bytes at (current) stack offset to the stack
-    - operands:
-        count: 1
-        operand_sets:
-          list:
-            - offset
-      instructions:
-        - "lds @ARG(0)+3+0"
-        - "phs"
-        - "lds @ARG(0)+2+1"
-        - "phs"
-        - "lds @ARG(0)+1+2"
-        - "phs"
-        - "lds @ARG(0)+0+3"
-        - "phs"
+    variants:
+      - operands:
+          count: 1
+          operand_sets:
+            list:
+              - offset
+        instructions:
+          - "lds @ARG(0)+3+0"
+          - "phs"
+          - "lds @ARG(0)+2+1"
+          - "phs"
+          - "lds @ARG(0)+1+2"
+          - "phs"
+          - "lds @ARG(0)+0+3"
+          - "phs"
+    documentation:
+      category: Stack Management
+      title: Push Long at Stack Offset onto Stack
+      description: Pushes a 4 byte value currently at given stack offset onto the stack (again).
   phsz:
     # push a zero-page byte to the stack
-    - operands:
-        count: 1
-        operand_sets:
-          list:
-            - zero_page
-      instructions:
-        - "ldz @ARG(0)"
-        - "phs"
+    variants:
+      - operands:
+          count: 1
+          operand_sets:
+            list:
+              - zero_page
+        instructions:
+          - "ldz @ARG(0)"
+          - "phs"
+    documentation:
+      category: Stack Management
+      title: Push Zero-page Byte onto the Stack
   phsv:
     # push a zero-page word to the stack
     # stack is arranged as big-endian, word in zero-page is little-endian
-    - operands:
-        count: 1
-        operand_sets:
-          list:
-            - zero_page
-      instructions:
-        - "ldz @ARG(0)+0"
-        - "phs"
-        - "ldz @ARG(0)+1"
-        - "phs"
+    variants:
+      - operands:
+          count: 1
+          operand_sets:
+            list:
+              - zero_page
+        instructions:
+          - "ldz @ARG(0)+0"
+          - "phs"
+          - "ldz @ARG(0)+1"
+          - "phs"
+    documentation:
+      category: Stack Management
+      title: push a zero-page word to the stack
   phsq:
     # push a zero page long to the stack
     # stack is arranged as big-endian, long in zero-page is little-endian
-    - operands:
-        count: 1
-        operand_sets:
-          list:
-            - zero_page
-      instructions:
-        - "ldz @ARG(0)+0"
-        - "phs"
-        - "ldz @ARG(0)+1"
-        - "phs"
-        - "ldz @ARG(0)+2"
-        - "phs"
-        - "ldz @ARG(0)+3"
-        - "phs"
+    variants:
+      - operands:
+          count: 1
+          operand_sets:
+            list:
+              - zero_page
+        instructions:
+          - "ldz @ARG(0)+0"
+          - "phs"
+          - "ldz @ARG(0)+1"
+          - "phs"
+          - "ldz @ARG(0)+2"
+          - "phs"
+          - "ldz @ARG(0)+3"
+          - "phs"
+    documentation:
+      category: Stack Management
+      title: push a zero page long to the stack
   pls2:
     # pull 2 bytes from the stack
-    - operands:
-        count: 0
-      instructions:
-        - "pls"
-        - "pls"
+    variants:
+      - operands:
+          count: 0
+        instructions:
+          - "pls"
+          - "pls"
+    documentation:
+      category: Stack Management
+      title: pull 2 bytes from the stack
   pls4:
-    - operands:
-        count: 0
-      instructions:
-        - "pls"
-        - "pls"
-        - "pls"
-        - "pls"
+    variants:
+      - operands:
+          count: 0
+        instructions:
+          - "pls"
+          - "pls"
+          - "pls"
+          - "pls"
+    documentation:
+      category: Arithmetic
+      title: pls4
   mws2:
     # move 2-byte word at absolute address to stack at offset
     # stack is arranged as big-endian, word at abs address is little-endian
-    - operands:
-        count: 2
-        operand_sets:
-          list:
-            - absolute_address
-            - offset
-      instructions:
-        - "ldb @ARG(0)+0"
-        - "sts @ARG(1)+1"
-        - "ldb @ARG(0)+1"
-        - "sts @ARG(1)+0"
+    variants:
+      - operands:
+          count: 2
+          operand_sets:
+            list:
+              - absolute_address
+              - offset
+        instructions:
+          - "ldb @ARG(0)+0"
+          - "sts @ARG(1)+1"
+          - "ldb @ARG(0)+1"
+          - "sts @ARG(1)+0"
+    documentation:
+      category: Stack Management
+      title: move 2-byte word at absolute address to stack at offset
   ms2w:
     # move 2-byte word from stack at offset to absolute address
     # stack is arranged as big-endian, word at abs address is little-endian
-    - operands:
-        count: 2
-        operand_sets:
-          list:
-            - offset
-            - absolute_address
-      instructions:
-        - "lds @ARG(0)+1"
-        - "stb @ARG(1)+0"
-        - "lds @ARG(0)+0"
-        - "stb @ARG(1)+1"
+    variants:
+      - operands:
+          count: 2
+          operand_sets:
+            list:
+              - offset
+              - absolute_address
+        instructions:
+          - "lds @ARG(0)+1"
+          - "stb @ARG(1)+0"
+          - "lds @ARG(0)+0"
+          - "stb @ARG(1)+1"
+    documentation:
+      category: Stack Management
+      title: move 2-byte word from stack at offset to absolute address
   ms2v:
     # move 2 bytes from stack to zero-page word
     # stack is arranged as big-endian, word in zero-page is little-endian
-    - operands:
-        count: 2
-        operand_sets:
-          list:
-            - offset
-            - zero_page
-      instructions:
-        - "lds @ARG(0)+0"
-        - "stz @ARG(1)+1"
-        - "lds @ARG(0)+1"
-        - "stz @ARG(1)+0"
+    variants:
+      - operands:
+          count: 2
+          operand_sets:
+            list:
+              - offset
+              - zero_page
+        instructions:
+          - "lds @ARG(0)+0"
+          - "stz @ARG(1)+1"
+          - "lds @ARG(0)+1"
+          - "stz @ARG(1)+0"
+    documentation:
+      category: Stack Management
+      title: move 2 bytes from stack to zero-page word
   mvs2:
     # move 4 bytes from zero-page word to stack starting at passed offset
     # stack is arranged as big-endian, word in zero-page is little-endian
-    - operands:
-        count: 2
-        operand_sets:
-          list:
-            - zero_page
-            - offset
-      instructions:
-        - "ldz @ARG(0)+1"
-        - "sts @ARG(1)+0"
-        - "ldz @ARG(0)+0"
-        - "sts @ARG(1)+1"
+    variants:
+      - operands:
+          count: 2
+          operand_sets:
+            list:
+              - zero_page
+              - offset
+        instructions:
+          - "ldz @ARG(0)+1"
+          - "sts @ARG(1)+0"
+          - "ldz @ARG(0)+0"
+          - "sts @ARG(1)+1"
+    documentation:
+      category: Stack Management
+      title: move 4 bytes from zero-page word to stack starting at passed offset
   ms4q:
     # move 4 bytes from stack starting at passed offset to zero-page long
     # stack is arranged as big-endian, long in zero-page is little-endian
-    - operands:
-        count: 2
-        operand_sets:
-          list:
-            - offset
-            - zero_page
-      instructions:
-        - "lds @ARG(0)+3"
-        - "stz @ARG(1)+0"
-        - "lds @ARG(0)+2"
-        - "stz @ARG(1)+1"
-        - "lds @ARG(0)+1"
-        - "stz @ARG(1)+2"
-        - "lds @ARG(0)+0"
-        - "stz @ARG(1)+3"
+    variants:
+      - operands:
+          count: 2
+          operand_sets:
+            list:
+              - offset
+              - zero_page
+        instructions:
+          - "lds @ARG(0)+3"
+          - "stz @ARG(1)+0"
+          - "lds @ARG(0)+2"
+          - "stz @ARG(1)+1"
+          - "lds @ARG(0)+1"
+          - "stz @ARG(1)+2"
+          - "lds @ARG(0)+0"
+          - "stz @ARG(1)+3"
+    documentation:
+      category: Stack Management
+      title: move 4 bytes from stack starting at passed offset to zero-page long
   mqs4:
     # move 4 bytes from zero-page long to stack starting at passed offset
     # stack is arranged as big-endian, long in zero-page is little-endian
-    - operands:
-        count: 2
-        operand_sets:
-          list:
-            - zero_page
-            - offset
-      instructions:
-        - "ldz @ARG(0)+3"
-        - "sts @ARG(1)+0"
-        - "ldz @ARG(0)+2"
-        - "sts @ARG(1)+1"
-        - "ldz @ARG(0)+1"
-        - "sts @ARG(1)+2"
-        - "ldz @ARG(0)+0"
-        - "sts @ARG(1)+3"
+    variants:
+      - operands:
+          count: 2
+          operand_sets:
+            list:
+              - zero_page
+              - offset
+        instructions:
+          - "ldz @ARG(0)+3"
+          - "sts @ARG(1)+0"
+          - "ldz @ARG(0)+2"
+          - "sts @ARG(1)+1"
+          - "ldz @ARG(0)+1"
+          - "sts @ARG(1)+2"
+          - "ldz @ARG(0)+0"
+          - "sts @ARG(1)+3"
+    documentation:
+      category: Stack Management
+      title: move 4 bytes from zero-page long to stack starting at passed offset
   mls4:
     # move a long (4 bytes) from abs address to stack starting at passed offset
     # stack is arranged as big-endian, long at abs address is little-endian
-    - operands:
-        count: 2
-        operand_sets:
-          list:
-            - absolute_address
-            - offset
-      instructions:
-        - "ldb @ARG(0)+3"
-        - "sts @ARG(1)+0"
-        - "ldb @ARG(0)+2"
-        - "sts @ARG(1)+1"
-        - "ldb @ARG(0)+1"
-        - "sts @ARG(1)+2"
-        - "ldb @ARG(0)+0"
-        - "sts @ARG(1)+3"
+    variants:
+      - operands:
+          count: 2
+          operand_sets:
+            list:
+              - absolute_address
+              - offset
+        instructions:
+          - "ldb @ARG(0)+3"
+          - "sts @ARG(1)+0"
+          - "ldb @ARG(0)+2"
+          - "sts @ARG(1)+1"
+          - "ldb @ARG(0)+1"
+          - "sts @ARG(1)+2"
+          - "ldb @ARG(0)+0"
+          - "sts @ARG(1)+3"
+    documentation:
+      category: Stack Management
+      title: move a long (4 bytes) from abs address to stack starting at passed offset
   ms4l:
     # move a long (4 bytes) from stack starting at passed offset to abs address
     # stack is arranged as big-endian, long at abs address is little-endian
-    - operands:
-        count: 2
-        operand_sets:
-          list:
-            - offset
-            - absolute_address
-      instructions:
-        - "lds @ARG(0)+3"
-        - "stb @ARG(1)+0"
-        - "lds @ARG(0)+2"
-        - "stb @ARG(1)+1"
-        - "lds @ARG(0)+1"
-        - "stb @ARG(1)+2"
-        - "lds @ARG(0)+0"
-        - "stb @ARG(1)+3"
+    variants:
+      - operands:
+          count: 2
+          operand_sets:
+            list:
+              - offset
+              - absolute_address
+        instructions:
+          - "lds @ARG(0)+3"
+          - "stb @ARG(1)+0"
+          - "lds @ARG(0)+2"
+          - "stb @ARG(1)+1"
+          - "lds @ARG(0)+1"
+          - "stb @ARG(1)+2"
+          - "lds @ARG(0)+0"
+          - "stb @ARG(1)+3"
+    documentation:
+      category: Stack Management
+      title: move a long (4 bytes) from stack starting at passed offset to abs address
   aqq:
     # add two zero-page longs. result in second zero page operand
-    - operands:
-        count: 2
-        operand_sets:
-          list:
-            - zero_page
-            - zero_page
-      instructions:
-        - "azz @ARG(0)+0,@ARG(1)+0"
-        - "ldz @ARG(0)+1"
-        - "ac.z @ARG(1)+1"
-        - "ldz @ARG(0)+2"
-        - "ac.z @ARG(1)+2"
-        - "ldz @ARG(0)+3"
-        - "ac.z @ARG(1)+3"
+    variants:
+      - operands:
+          count: 2
+          operand_sets:
+            list:
+              - zero_page
+              - zero_page
+        instructions:
+          - "azz @ARG(0)+0,@ARG(1)+0"
+          - "ldz @ARG(0)+1"
+          - "ac.z @ARG(1)+1"
+          - "ldz @ARG(0)+2"
+          - "ac.z @ARG(1)+2"
+          - "ldz @ARG(0)+3"
+          - "ac.z @ARG(1)+3"
+    documentation:
+      category: Arithmetic
+      title: add two zero-page longs. result in second zero page operand
   sqq:
     # subtract two zero-page longs. *Q2 = *Q2 - Q1
-    - operands:
-        count: 2
-        operand_sets:
-          list:
-            - zero_page
-            - zero_page
-      instructions:
-        - "svv @ARG(0)+0,@ARG(1)+0"
-        - "ldz @ARG(0)+2"
-        - "sc.z @ARG(1)+2"
-        - "ldz @ARG(0)+3"
-        - "sc.z @ARG(1)+3"
+    variants:
+      - operands:
+          count: 2
+          operand_sets:
+            list:
+              - zero_page
+              - zero_page
+        instructions:
+          - "svv @ARG(0)+0,@ARG(1)+0"
+          - "ldz @ARG(0)+2"
+          - "sc.z @ARG(1)+2"
+          - "ldz @ARG(0)+3"
+          - "sc.z @ARG(1)+3"
+    documentation:
+      category: Arithmetic
+      title: subtract two zero-page longs. *Q2 = *Q2 - Q1
   mqq:
     # move zero-page long to zero-page long
-    - operands:
-        count: 2
-        operand_sets:
-          list:
-            - zero_page
-            - zero_page
-      instructions:
-        - "mvv @ARG(0)+0,@ARG(1)+0"
-        - "mvv @ARG(0)+2,@ARG(1)+2"
+    variants:
+      - operands:
+          count: 2
+          operand_sets:
+            list:
+              - zero_page
+              - zero_page
+        instructions:
+          - "mvv @ARG(0)+0,@ARG(1)+0"
+          - "mvv @ARG(0)+2,@ARG(1)+2"
+    documentation:
+      category: Memory Movement
+      title: move zero-page long to zero-page long
   mll:
     # move long from abs address to abs address
-    - operands:
-        count: 2
-        operand_sets:
-          list:
-            - absolute_address
-            - absolute_address
-      instructions:
-        - "mbb @ARG(0)+0,@ARG(1)+0"
-        - "mbb @ARG(0)+1,@ARG(1)+1"
-        - "mbb @ARG(0)+2,@ARG(1)+2"
-        - "mbb @ARG(0)+3,@ARG(1)+3"
+    variants:
+      - operands:
+          count: 2
+          operand_sets:
+            list:
+              - absolute_address
+              - absolute_address
+        instructions:
+          - "mbb @ARG(0)+0,@ARG(1)+0"
+          - "mbb @ARG(0)+1,@ARG(1)+1"
+          - "mbb @ARG(0)+2,@ARG(1)+2"
+          - "mbb @ARG(0)+3,@ARG(1)+3"
+    documentation:
+      category: Memory Movement
+      title: move long from abs address to abs address
   mlq:
     # move long from abs address to zero-page long
-    - operands:
-        count: 2
-        operand_sets:
-          list:
-            - absolute_address
-            - zero_page
-      instructions:
-        - "mwv @ARG(0)+0,@ARG(1)+0"
-        - "mwv @ARG(0)+2,@ARG(1)+2"
+    variants:
+      - operands:
+          count: 2
+          operand_sets:
+            list:
+              - absolute_address
+              - zero_page
+        instructions:
+          - "mwv @ARG(0)+0,@ARG(1)+0"
+          - "mwv @ARG(0)+2,@ARG(1)+2"
+    documentation:
+      category: Memory Movement
+      title: move long from abs address to zero-page long
   m2iv:
     # move 2 byte word from immediate to zero-page word
-    - operands:
-        count: 2
-        operand_sets:
-          list:
-            - immediate_16bit
-            - zero_page
-      instructions:
-        - "miv @ARG(0) & $FFFF ,@ARG(1)+0"
+    variants:
+      - operands:
+          count: 2
+          operand_sets:
+            list:
+              - immediate_16bit
+              - zero_page
+        instructions:
+          - "miv @ARG(0) & $FFFF ,@ARG(1)+0"
+    documentation:
+      category: Memory Movement
+      title: move 2 byte word from immediate to zero-page word
   m4iq:
     # move 4 bytes long from immediate to zero-page long
-    - operands:
-        count: 2
-        operand_sets:
-          list:
-            - immediate_32bit
-            - zero_page
-      instructions:
-        - "miv @ARG(0) & $0000FFFF ,@ARG(1)+0"
-        - "miv (@ARG(0) & $FFFF0000) >> 16,@ARG(1)+2"
+    variants:
+      - operands:
+          count: 2
+          operand_sets:
+            list:
+              - immediate_32bit
+              - zero_page
+        instructions:
+          - "miv @ARG(0) & $0000FFFF ,@ARG(1)+0"
+          - "miv (@ARG(0) & $FFFF0000) >> 16,@ARG(1)+2"
+    documentation:
+      category: Memory Movement
+      title: move 4 bytes long from immediate to zero-page long

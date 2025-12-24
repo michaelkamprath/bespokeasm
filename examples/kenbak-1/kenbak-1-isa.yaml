@@ -66,38 +66,56 @@ predefined:
       address: 0
       value: 0
       size: 1
+      documentation:
+        description: Accumulator register memory-mapped storage.
     - name: B_REG
       address: 1
       value: 0
       size: 1
+      documentation:
+        description: Secondary accumulator register storage.
     - name: X_REG
       address: 2
       value: 0
       size: 1
+      documentation:
+        description: Index register storage.
     - name: P_REG
       address: 3
       value: 4
       size: 1
+      documentation:
+        description: Program counter register storage.
     - name: OUTPUT
       address: 128
       value: 0
       size: 1
+      documentation:
+        description: Output register mapped to the front-panel LEDs.
     - name: A_REG_F
       address: 129
       value: 0
       size: 1
+      documentation:
+        description: A register flag storage.
     - name: B_REG_F
       address: 130
       value: 0
       size: 1
+      documentation:
+        description: B register flag storage.
     - name: X_REG_F
       address: 131
       value: 0
       size: 1
+      documentation:
+        description: X register flag storage.
     - name: INPUT
       address: 255
       value: 0
       size: 1
+      documentation:
+        description: Input register mapped to the front-panel switches.
 operand_sets:
   register_operands:
     operand_values:

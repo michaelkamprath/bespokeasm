@@ -14,7 +14,7 @@ The general documentastion is mostly implied by the configuration of the `genera
 | `description` | string | A short description of the instruction set architecture. |
 | `details` | string | _Optional_ A detailed description of the instruction set architecture. Markdown text is allowed. |
 | `addressing_modes` | dictionary | _Optional_ A dictionary of addressing modes. The keys are the addressing mode names and the values are dictionaries with the following keys:<ul><li>`description` - A short description of the addressing mode.</li><li>`details` - _Optional_ A detailed description of the addressing mode. Markdown text is allowed.</li></ul>The keys in this dictionary are used by the `mode` field in the [Operand Documentation](#operand-documentation) section. Note that while there is corelation between an instruction set's addressing modes and **BespokeASM**'s operand types, an operand type describes how *BespokeASM* will parse the operand value when assembling an instruction, while an addressing mode describes how the operand value is used in the instruction set and ultimately in the hardware the assembled bytecode is executed on and is not a **BespokeASM** concept. |
-| `examples` | array | _Optional_ An array of example instructions. Each example is a dictionary with the following keys:<ul><li>`description` - A short description of the example.</li><li>`details` - _Optional_ A detailed description of the example. Markdown text is allowed.</li><li>`code` - The code of the example instruction.</li></ul><p>Examples are used to show how the instruction set can be used in practice. They should be used to demonstrate the use of the instruction set in a way that is easy to understand and use. |
+| `examples` | array | _Optional_ An array of example instructions. Each example is a dictionary with the following keys:<ul><li>`title` - A short title for the example.</li><li>`description` - _Optional_ A detailed description of the example. Markdown text is allowed.</li><li>`code` - The code of the example instruction.</li></ul><p>Examples are used to show how the instruction set can be used in practice. They should be used to demonstrate the use of the instruction set in a way that is easy to understand and use. |
 
 Flag documentation is defined directly in the `general.flags` dictionary rather than inside the `documentation` subsection. Each entry in that dictionary is keyed by the flag symbol and contains the remaining metadata (for example, `description` and optional `details`).
 
@@ -28,7 +28,7 @@ Each instruction entry in the configuration file (as documented in the [Instruct
 | `title` | string | A short title or summary of the instruction. |
 | `details` | string | _Optional_ A detailed description of the instruction. Markdown text is allowed. |
 | `modifies` | array | _Optional_ An array of dictionaries each representing a register or memory location that is modified by the instruction. Each dictionary has the following keys:<ul><li>`register` - The register that is modified. The value of this key is the name of the register.</li><li>`memory` - The memory location that is modified. The value of this key is the name of the memory location.</li><li>`flag` - The flag that is modified. The value of this key is the name of the flag.</li><li>`description` - A short description of the modification.</li><li>`details` - _Optional_ A detailed description of the modification. Markdown text is allowed.</li></ul><p>Each `modifies`dictionary must contain exact one of the keys `register`, `memory`, or `flag`, and the `description` field, and `details` field is optional. |
-| `examples` | array | _Optional_ An array of example usages of the instruction. Each example is a dictionary with the following keys:<ul><li>`description` - A short description of the example.</li><li>`details` - _Optional_ A detailed description of the example. Markdown text is allowed.</li><li>`code` - The code of the example instruction.</li></ul><p>Examples are used to show how the instruction can be used in practice. They should be concise and to the point. |
+| `examples` | array | _Optional_ An array of example usages of the instruction. Each example is a dictionary with the following keys:<ul><li>`title` - A short title for the example.</li><li>`description` - _Optional_ A detailed description of the example. Markdown text is allowed.</li><li>`code` - The code of the example instruction.</li></ul><p>Examples are used to show how the instruction can be used in practice. They should be concise and to the point. |
 
 ### Macro Documentation
 Instruction macros may also include documentation, using the same schema as instructions. When a macro is defined with the dictionary-style configuration (macro name maps to an object), an optional `documentation` field can be provided alongside the `variants` list. The fields are identical to those in [Instruction Documentation](#instruction-documentation):
@@ -84,6 +84,13 @@ Each entry in `predefined.constants` (see the [Instruction Set Configuration Fil
 | `size` | integer | _Optional_ Size in bytes for `variable` constants. Required when `type` is `variable`. |
 | `description` | string | A short summary of the constant's meaning or usage. |
 
+### Predefined Data Documentation
+Each entry in `predefined.data` (see the [Instruction Set Configuration File](https://github.com/michaelkamprath/bespokeasm/wiki/Instruction-Set-Configuration-File#data-blocks) wiki page) may include an optional `documentation` field that describes the predefined data block in generated ISA docs. The data block definition fields (`name`, `address`, `size`, and optional `value`) are documented as described in the configuration file specification.
+
+| Option Key | Value Type | Description |
+| --- | --- | --- |
+| `description` | string | A short summary of the data block's meaning or usage. |
+
 # Generated Documentation
 
 ## Markdown Documentation Page
@@ -98,9 +105,11 @@ The markdown documentation page will have the following overall structure:
 2. **General Information Section** - Comprehensive information from the entire `general` section including hardware architecture, configuration details, and custom documentation if present
 3. **Predefined Memory Zones Section** - Documents the `predefined.memory_zones` entries declared in the configuration file
 4. **Predefined Constants Section** - Documents the `predefined.constants` entries declared in the configuration file
-5. **Operand Sets Section** - Documents each configured operand set with narrative context and a per-operand table
-6. **Instructions Section** - Organized by category with detailed instruction documentation
-7. **Macros Section** - Organized by category with detailed macro documentation using the same layout as instructions
+5. **Predefined Data Section** - Documents the `predefined.data` entries declared in the configuration file
+6. **Operand Sets Section** - Documents each configured operand set with narrative context and a per-operand table
+7. **Instructions Section** - Organized by category with detailed instruction documentation
+8. **Macros Section** - Organized by category with detailed macro documentation using the same layout as instructions
+9. **Examples Section** - General ISA examples defined in `general.documentation.examples`
 
 ### General Information Section
 
@@ -143,9 +152,6 @@ The General Information section will include comprehensive details from the enti
 #### Flags
 - **Flags** - Table of flags from `general.flags` (if present). Each flag entry is keyed by its symbol, and the symbol is rendered as inline code in the table.
 
-#### Examples
-- **Examples** - Code examples from `general.documentation.examples` (if present)
-
 #### Compatibility
 - **Minimum BespokeASM Version** - From `general.min_version` (required field)
 
@@ -173,10 +179,22 @@ Each constant is rendered as a table row with the following default columns:
 - `Size (Words)` - Populated from `documentation.size` when the type is `variable`.
 - `Description` - Populated from `documentation.description` when present.
 
-Column inclusion follows the [Table Column Optimization](#table-column-optimization) guidance. When no constant supplies a `documentation` field, the `Type`, `Size`, and `Description` columns are omitted and only `Name` and `Value` are shown.
+Column inclusion follows the [Table Column Optimization](#table-column-optimization) guidance. When no constant supplies a `documentation` field, the `Type`, `Size (Words)`, and `Description` columns are omitted and only `Name` and `Value` are shown.
+
+### Predefined Data Section
+The predefined data section is emitted immediately after the Predefined Constants section and before the `# Operand Sets` section. It begins with the markdown header `## Predefined Data`. This section is generated only when `predefined.data` is present and contains at least one entry (documentation fields remain optional).
+
+Each data block is rendered as a table row with the following default columns:
+- `Name` - The data block `name`, rendered as inline code.
+- `Address` - The data block `address` rendered as hexadecimal. Hex values should be zero-padded to match the ISA address size when `general.address_size` is available (for example, 16-bit address space renders `0x0000`). When the address size is missing or not divisible by 4, render the shortest hexadecimal representation.
+- `Size (Bytes)` - The data block `size` in bytes, as defined in the configuration file.
+- `Value` - The optional fill `value` rendered as hexadecimal when present.
+- `Description` - Populated from `documentation.description` when present.
+
+Column inclusion follows the [Table Column Optimization](#table-column-optimization) guidance. When no data block supplies a `documentation` field, the `Description` column is omitted and only `Name`, `Address`, `Size (Bytes)`, and `Value` are shown.
 
 ### Operand Sets Section
-The operand sets section is emitted immediately after the Predefined Constants section and before the `# Instructions` section. It begins with the markdown header `## Operand Sets`. Each operand set documented in the ISA configuration is rendered as a separate `### `<operand set key>` - <operand set title>` subsection (if `documentation.title` is provided). If no title is provided, the header is simply `### `<operand set key>`` with the key rendered as inline code. Operand sets are ordered first by `documentation.category` (alphabetical, with uncategorized sets listed last) and then by display name.
+The operand sets section is emitted immediately after the Predefined Data section and before the `# Instructions` section. It begins with the markdown header `## Operand Sets`. Each operand set documented in the ISA configuration is rendered as a separate `### `<operand set key>` - <operand set title>` subsection (if `documentation.title` is provided). If no title is provided, the header is simply `### `<operand set key>`` with the key rendered as inline code. Operand sets are ordered first by `documentation.category` (alphabetical, with uncategorized sets listed last) and then by display name.
 
 For each operand set subsection:
 1. **Category Label** — When `documentation.category` is present, emit an italicized line `*Category: <category>*` directly beneath the heading.
@@ -274,14 +292,23 @@ Note: Column inclusion follows the [Table Column Optimization](#table-column-opt
 If the instruction has an `examples` field under the instruction's documentation, then a `#### Examples` section will be added under the instruction's documentation and the examples will be added with this format:
 ```markdown
 #### Examples
-##### <example description>
-<example details formatted as markdown text>
+##### <example title>
+<example description formatted as markdown text>
 <example code formatted as markdown code block>
 ```
 
 ### Macro Documentation Section
 
 Macro documentation is emitted under a dedicated `# Macros` heading. Macros are grouped by their `documentation.category` (or `Uncategorized` when absent) using `## <category>` subsections. Each macro uses the same presentation as instructions: a `### \`<mnemonic>\` : <title>` heading when a title is present, followed by shared description/details, per-variant calling syntax and `where` tables derived from the macro’s operand configuration, and optional `Modifies` and `Examples` subsections. Variant-level documentation from individual entries in the macro `variants` list is rendered within the corresponding version block just like instruction variants. Macros without documentation are still listed with a placeholder message when documentation is generated.
+
+### Examples Section
+General examples from `general.documentation.examples` are emitted at the end of the markdown file, after the Macros section. The section begins with the header `# Examples` and follows the same formatting rules used elsewhere in the documentation:
+```markdown
+# Examples
+## <example title>
+<example description formatted as markdown text>
+<example code formatted as markdown code block>
+```
 
 ## CLI Command Implementation
 

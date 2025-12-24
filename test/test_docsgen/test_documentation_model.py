@@ -27,6 +27,7 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertEqual(model.general_docs['examples'], [])
         self.assertEqual(model.predefined_memory_zones, [])
         self.assertEqual(model.predefined_constants, [])
+        self.assertEqual(model.predefined_data, [])
         self.assertEqual(model.operand_sets, [])
         self.assertEqual(model.instruction_docs, {})
         self.assertEqual(model.macro_docs, {})
@@ -74,9 +75,9 @@ class TestDocumentationModel(unittest.TestCase):
                     },
                     'examples': [
                         {
-                            'description': 'Basic example',
+                            'title': 'Basic example',
                             'code': 'lda #5',
-                            'details': 'Load immediate value'
+                            'description': 'Load immediate value'
                         }
                     ]
                 }
@@ -133,9 +134,9 @@ class TestDocumentationModel(unittest.TestCase):
         # Test examples
         examples = model.general_docs['examples']
         self.assertEqual(len(examples), 1)
-        self.assertEqual(examples[0]['description'], 'Basic example')
+        self.assertEqual(examples[0]['title'], 'Basic example')
         self.assertEqual(examples[0]['code'], 'lda #5')
-        self.assertEqual(examples[0]['details'], 'Load immediate value')
+        self.assertEqual(examples[0]['description'], 'Load immediate value')
 
     def test_parse_macro_documentation(self):
         """Macro documentation matches instruction-style fields and variant parsing."""
@@ -148,7 +149,7 @@ class TestDocumentationModel(unittest.TestCase):
                         'title': 'Push Word',
                         'description': 'Pushes a 16-bit value.',
                         'details': 'Expands to two pushes.',
-                        'examples': [{'description': 'push', 'code': 'push2 $1234'}]
+                        'examples': [{'title': 'push', 'code': 'push2 $1234'}]
                     },
                     'variants': [
                         {
@@ -505,6 +506,49 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertIsNone(prompt_const['description'])
         self.assertFalse(prompt_const['documented'])
 
+    def test_parse_predefined_data_documentation(self):
+        """Predefined data documentation is parsed with optional metadata."""
+        self.mock_isa_model._config = {
+            'predefined': {
+                'data': [
+                    {
+                        'name': 'BUFFER',
+                        'address': 0x10,
+                        'size': 8,
+                        'value': 0,
+                        'documentation': {
+                            'description': 'Scratch buffer for input.'
+                        }
+                    },
+                    {
+                        'name': 'FLAG',
+                        'address': '0x20',
+                        'size': 1
+                    }
+                ]
+            }
+        }
+
+        model = DocumentationModel(self.mock_isa_model, verbose=0)
+        data_blocks = model.predefined_data
+        self.assertEqual(len(data_blocks), 2)
+
+        buffer_block = data_blocks[0]
+        self.assertEqual(buffer_block['name'], 'BUFFER')
+        self.assertEqual(buffer_block['address'], 0x10)
+        self.assertEqual(buffer_block['size'], 8)
+        self.assertEqual(buffer_block['value'], 0)
+        self.assertEqual(buffer_block['description'], 'Scratch buffer for input.')
+        self.assertTrue(buffer_block['documented'])
+
+        flag_block = data_blocks[1]
+        self.assertEqual(flag_block['name'], 'FLAG')
+        self.assertEqual(flag_block['address'], '0x20')
+        self.assertEqual(flag_block['size'], 1)
+        self.assertIsNone(flag_block['value'])
+        self.assertIsNone(flag_block['description'])
+        self.assertFalse(flag_block['documented'])
+
     def test_register_documentation_from_list(self):
         """Registers provided as a list are converted into name-only documentation entries."""
         self.mock_isa_model._config = {
@@ -580,9 +624,9 @@ class TestDocumentationModel(unittest.TestCase):
                         ],
                         'examples': [
                             {
-                                'description': 'Load immediate',
+                                'title': 'Load immediate',
                                 'code': 'lda #42',
-                                'details': 'Load the value 42 into accumulator'
+                                'description': 'Load the value 42 into accumulator'
                             }
                         ]
                     }
@@ -660,9 +704,9 @@ class TestDocumentationModel(unittest.TestCase):
         # Test examples
         examples = lda_doc['examples']
         self.assertEqual(len(examples), 1)
-        self.assertEqual(examples[0]['description'], 'Load immediate')
+        self.assertEqual(examples[0]['title'], 'Load immediate')
         self.assertEqual(examples[0]['code'], 'lda #42')
-        self.assertEqual(examples[0]['details'], 'Load the value 42 into accumulator')
+        self.assertEqual(examples[0]['description'], 'Load the value 42 into accumulator')
 
         # Test ADD instruction (minimal documentation)
         add_doc = model.instruction_docs['add']
@@ -944,8 +988,8 @@ class TestDocumentationModel(unittest.TestCase):
                         {'description': 'no_name'}  # Should be ignored - no name
                     ],
                     'examples': [
-                        {'description': 'valid', 'code': 'nop'},
-                        {'description': 'no_code'},  # Should be ignored - no code
+                        {'title': 'valid', 'code': 'nop'},
+                        {'title': 'no_code'},  # Should be ignored - no code
                         'invalid'  # Should be ignored
                     ]
                 }
@@ -974,7 +1018,7 @@ class TestDocumentationModel(unittest.TestCase):
             self.assertEqual(len(model.general_docs['addressing_modes']), 0)
             self.assertEqual(len(model.general_docs['flags']), 0)
             self.assertEqual(len(model.general_docs['examples']), 1)
-            self.assertEqual(model.general_docs['examples'][0]['description'], 'valid')
+            self.assertEqual(model.general_docs['examples'][0]['title'], 'valid')
 
             # Test instruction modifies
             test_doc = model.instruction_docs['test']

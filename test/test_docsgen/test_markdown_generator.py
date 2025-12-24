@@ -32,6 +32,7 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.mock_doc_model.operand_sets = []
         self.mock_doc_model.predefined_memory_zones = []
         self.mock_doc_model.predefined_constants = []
+        self.mock_doc_model.predefined_data = []
         self.mock_doc_model.macro_docs = {}
         self.mock_doc_model.get_macros_by_category = Mock(return_value={})
 
@@ -90,8 +91,8 @@ class TestMarkdownGenerator(unittest.TestCase):
             ],
             'examples': [
                 {
-                    'description': 'Basic example',
-                    'details': 'This shows basic usage',
+                    'title': 'Basic example',
+                    'description': 'This shows basic usage',
                     'code': 'lda #5\nsta $10'
                 }
             ],
@@ -134,8 +135,8 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.assertIn('| zero |  | Zero flag |  |', result)
 
         # Verify examples
-        self.assertIn('### Examples', result)
-        self.assertIn('#### Basic example', result)
+        self.assertIn('# Examples', result)
+        self.assertIn('## Basic example', result)
         self.assertIn('This shows basic usage', result)
         self.assertIn('```assembly\nlda #5\nsta $10\n```', result)
 
@@ -325,6 +326,66 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.assertIn('## Predefined Constants', result)
         self.assertIn('| Name | Value |', result)
         self.assertNotIn('| Name | Value | Type | Size (Words) | Description |', result)
+
+    def test_generate_predefined_data_with_documentation(self):
+        """Predefined data blocks render with documentation and hex values."""
+        self.mock_doc_model.general_docs = {
+            'hardware': {
+                'address_size': 16,
+                'word_size': 8
+            }
+        }
+        self.mock_doc_model.predefined_data = [
+            {
+                'name': 'BUFFER',
+                'address': 0x10,
+                'size': 8,
+                'value': 0,
+                'description': 'Scratch buffer for input.',
+                'documented': True
+            },
+            {
+                'name': 'FLAG',
+                'address': '0x20',
+                'size': 1,
+                'value': None,
+                'description': 'Status flag byte.',
+                'documented': True
+            }
+        ]
+
+        generator = MarkdownGenerator(self.mock_doc_model, verbose=0)
+        result = generator.generate()
+
+        self.assertIn('## Predefined Data', result)
+        self.assertIn('| Name | Address | Size (Bytes) | Value | Description |', result)
+        self.assertIn('| `BUFFER` | 0x0010 | 8 | 0x00 | Scratch buffer for input. |', result)
+        self.assertIn('| `FLAG` | 0x0020 | 1 |  | Status flag byte. |', result)
+
+    def test_generate_predefined_data_without_documentation(self):
+        """Predefined data blocks omit description column when none are provided."""
+        self.mock_doc_model.general_docs = {
+            'hardware': {
+                'address_size': 16,
+                'word_size': 8
+            }
+        }
+        self.mock_doc_model.predefined_data = [
+            {
+                'name': 'BUFFER',
+                'address': 0x10,
+                'size': 8,
+                'value': 0,
+                'documented': False
+            }
+        ]
+
+        generator = MarkdownGenerator(self.mock_doc_model, verbose=0)
+        result = generator.generate()
+
+        self.assertIn('## Predefined Data', result)
+        self.assertIn('| Name | Address | Size (Bytes) | Value |', result)
+        self.assertNotIn('| Name | Address | Size (Bytes) | Value | Description |', result)
 
     def test_macros_calling_syntax_from_operands(self):
         """Macros render calling syntax using their configured operands."""
@@ -592,8 +653,8 @@ class TestMarkdownGenerator(unittest.TestCase):
                 ],
                 'examples': [
                     {
-                        'description': 'Load immediate',
-                        'details': 'Load the value 42',
+                        'title': 'Load immediate',
+                        'description': 'Load the value 42',
                         'code': 'lda #42'
                     }
                 ],

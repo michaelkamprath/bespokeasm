@@ -47,6 +47,11 @@ class MarkdownGenerator:
         if constants_section:
             sections.append(constants_section)
 
+        # Predefined data section
+        data_section = self._generate_predefined_data_section()
+        if data_section:
+            sections.append(data_section)
+
         # Operand sets section
         if getattr(self.doc_model, 'operand_sets', None):
             operand_sets_section = self._generate_operand_sets_section()
@@ -63,6 +68,11 @@ class MarkdownGenerator:
         macro_docs = getattr(self.doc_model, 'macro_docs', {})
         if macro_docs:
             sections.append(self._generate_macros_section())
+
+        # Examples section
+        general_examples = getattr(self.doc_model, 'general_docs', {}).get('examples') or []
+        if general_examples:
+            sections.append(self._generate_examples_section(general_examples))
 
         return '\n\n'.join(filter(None, sections))
 
@@ -331,10 +341,6 @@ class MarkdownGenerator:
         if general.get('flags'):
             sections.append(self._generate_flags_section(general['flags']))
 
-        # Examples
-        if general.get('examples'):
-            sections.append(self._generate_general_examples_section(general['examples']))
-
         # Compatibility
         compatibility_section = self._generate_compatibility_section(general)
         if compatibility_section:
@@ -482,6 +488,52 @@ class MarkdownGenerator:
             return ''
 
         return '\n\n'.join(['## Predefined Constants', table])
+
+    def _generate_predefined_data_section(self) -> str:
+        """Generate the predefined data section of the documentation."""
+        data_blocks = getattr(self.doc_model, 'predefined_data', None) or []
+        if not data_blocks:
+            return ''
+
+        hardware = getattr(self.doc_model, 'general_docs', {}).get('hardware', {})
+        address_size = hardware.get('address_size')
+        word_size = hardware.get('word_size')
+        address_width = self._hex_width_for_address_size(address_size)
+        value_width = self._hex_width_for_address_size(word_size)
+
+        headers = ['Name', 'Address', 'Size (Bytes)', 'Value', 'Description']
+        alignments = ['left', 'left', 'left', 'left', 'left']
+        rows: list[list[str]] = []
+
+        for data_block in data_blocks:
+            name = data_block.get('name') or ''
+            name_cell = f'`{name}`' if name else ''
+
+            address = data_block.get('address')
+            address_hex = self._format_hex_value(address, address_width)
+
+            size = data_block.get('size')
+            size_cell = str(size) if size is not None else ''
+
+            value = data_block.get('value')
+            value_hex = self._format_hex_value(value, value_width)
+
+            documented = data_block.get('documented', False)
+            description = data_block.get('description') if documented else None
+
+            rows.append([
+                name_cell,
+                address_hex,
+                size_cell,
+                value_hex,
+                description or ''
+            ])
+
+        table = self._generate_markdown_table(headers, rows, column_alignments=alignments)
+        if not table:
+            return ''
+
+        return '\n\n'.join(['## Predefined Data', table])
 
     def _generate_operand_set_table(self, operands: list[dict[str, Any]]) -> str:
         """Generate the per-operand table for an operand set."""
@@ -744,21 +796,21 @@ class MarkdownGenerator:
 
         return '\n\n'.join(sections)
 
-    def _generate_general_examples_section(self, examples: list[dict[str, str]]) -> str:
-        """Generate the Examples subsection."""
+    def _generate_examples_section(self, examples: list[dict[str, str]]) -> str:
+        """Generate the Examples section."""
         if not examples:
             return ''
 
-        sections = ['### Examples']
+        sections = ['# Examples']
 
         for example in examples:
             example_sections = []
 
-            if example.get('description'):
-                example_sections.append(f"#### {example['description']}")
+            if example.get('title'):
+                example_sections.append(f"## {example['title']}")
 
-            if example.get('details'):
-                example_sections.append(example['details'])
+            if example.get('description'):
+                example_sections.append(example['description'])
 
             if example.get('code'):
                 example_sections.append(f"```assembly\n{example['code']}\n```")
@@ -1053,11 +1105,11 @@ class MarkdownGenerator:
         for example in examples:
             example_sections = []
 
-            if example.get('description'):
-                example_sections.append(f"##### {example['description']}")
+            if example.get('title'):
+                example_sections.append(f"##### {example['title']}")
 
-            if example.get('details'):
-                example_sections.append(example['details'])
+            if example.get('description'):
+                example_sections.append(example['description'])
 
             if example.get('code'):
                 example_sections.append(f"```assembly\n{example['code']}\n```")

@@ -26,8 +26,8 @@ general:
     description: Ben Eater SAP-1
     details:
     examples:
-      - description: Multiply two memory operands and show the product
-        details: Uses repeated addition so the multiplier value stored at `$0F` decrements to zero while the partial sum in `$0C` accumulates the product; set addresses `$0E`/`$0F` before running, then reset `factor_b` to change operands.
+      - title: Multiply two memory operands and show the product
+        description: Uses repeated addition so the multiplier value stored at `$0F` decrements to zero while the partial sum in `$0C` accumulates the product; set addresses `$0E`/`$0F` before running, then reset `factor_b` to change operands.
         code: |-
           ; Multiply the bytes stored at addresses $0E and $0F, emit the product on the OUT register
           #require __LANGUAGE_NAME__ == eater-sap1
