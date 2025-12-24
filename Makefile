@@ -1,4 +1,3 @@
-
 PYTHON := $(shell if [ -x ".venv/bin/python" ]; then echo ".venv/bin/python"; elif command -v python3 >/dev/null 2>&1; then echo "python3"; else echo "python"; fi)
 PYINSTALLER_DIST := dist
 PYINSTALLER_NAME := bespokeasm
@@ -19,8 +18,10 @@ flake8:
 	flake8 ./src/ ./test/ --count --max-line-length=127 --statistics
 
 pyinstaller:
-	$(PYTHON) -m PyInstaller --onefile --name $(PYINSTALLER_NAME) \
-		--distpath $(PYINSTALLER_DIST) --collect-all bespokeasm \
+	PYTHONPATH=./src $(PYTHON) -m PyInstaller --onefile --name $(PYINSTALLER_NAME) \
+		--distpath $(PYINSTALLER_DIST) --paths src --collect-all bespokeasm \
+		--add-data "src/bespokeasm/configgen/sublime/resources:bespokeasm/configgen/sublime/resources" \
+		--add-data "src/bespokeasm/configgen/vscode/resources:bespokeasm/configgen/vscode/resources" \
 		src/bespokeasm/__main__.py
 	VERSION=$$($(PYTHON) -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])"); \
 	OS_NAME=$$(uname -s); \
@@ -33,6 +34,8 @@ pyinstaller:
 	ARCH=$$(uname -m); \
 	EXT=""; \
 	if [ "$$PLATFORM" = "windows" ]; then EXT=".exe"; fi; \
+	printf "L\nQ\n" | $(PYTHON) -m PyInstaller.utils.cliutils.archive_viewer "$(PYINSTALLER_DIST)/$(PYINSTALLER_NAME)$${EXT}" 2>/dev/null | rg -q "bespokeasm/configgen/sublime/resources/sublime-syntax\\.yaml" || { echo "ERROR: Missing Sublime resource files in PyInstaller bundle."; exit 1; }; \
+	printf "L\nQ\n" | $(PYTHON) -m PyInstaller.utils.cliutils.archive_viewer "$(PYINSTALLER_DIST)/$(PYINSTALLER_NAME)$${EXT}" 2>/dev/null | rg -q "bespokeasm/configgen/vscode/resources/package\\.json" || { echo "ERROR: Missing VS Code resource files in PyInstaller bundle."; exit 1; }; \
 	SRC="$(PYINSTALLER_DIST)/$(PYINSTALLER_NAME)$${EXT}"; \
 	DEST="$(PYINSTALLER_DIST)/$(PYINSTALLER_NAME)-$${VERSION}-$${PLATFORM}-$${ARCH}$${EXT}"; \
 	mv "$$SRC" "$$DEST"
