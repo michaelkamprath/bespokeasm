@@ -23,6 +23,8 @@ class DocumentationModel:
 
         # Parse documentation sections
         self.general_docs = self._parse_general_documentation()
+        self.predefined_memory_zones = self._parse_predefined_memory_zones()
+        self.predefined_constants = self._parse_predefined_constants()
         self.operand_sets = self._parse_operand_sets_documentation()
         self.instruction_docs = self._parse_instruction_documentation()
         self.macro_docs = self._parse_macro_documentation()
@@ -115,6 +117,91 @@ class DocumentationModel:
             'flags': self._parse_flags(general_config.get('flags'), doc_config.get('flags')),
             'examples': self._parse_examples(doc_config.get('examples', []))
         }
+
+    def _parse_predefined_memory_zones(self) -> list[dict[str, Any]]:
+        """
+        Parse predefined memory zones documentation from the configuration.
+
+        Returns:
+            List of memory zone documentation entries.
+        """
+        predefined_config = self._config.get('predefined', {})
+        memory_zones_config = predefined_config.get('memory_zones', [])
+
+        if memory_zones_config is None:
+            return []
+
+        if not isinstance(memory_zones_config, list):
+            if self.verbose:
+                click.echo('Warning: predefined.memory_zones must be a list of memory zone entries.')
+            return []
+
+        memory_zones: list[dict[str, Any]] = []
+        for index, zone in enumerate(memory_zones_config):
+            if not isinstance(zone, dict):
+                if self.verbose:
+                    click.echo('Warning: memory zone entries must be dictionaries.')
+                continue
+
+            doc_config = zone.get('documentation') if isinstance(zone.get('documentation'), dict) else None
+            documented = doc_config is not None
+            title = doc_config.get('title') if doc_config else None
+            description = doc_config.get('description') if doc_config else None
+
+            memory_zones.append({
+                'name': zone.get('name'),
+                'start': zone.get('start'),
+                'end': zone.get('end'),
+                'title': title,
+                'description': description,
+                'documented': documented,
+                'config_index': index
+            })
+
+        return memory_zones
+
+    def _parse_predefined_constants(self) -> list[dict[str, Any]]:
+        """
+        Parse predefined constants documentation from the configuration.
+
+        Returns:
+            List of constant documentation entries.
+        """
+        predefined_config = self._config.get('predefined', {})
+        constants_config = predefined_config.get('constants', [])
+
+        if constants_config is None:
+            return []
+
+        if not isinstance(constants_config, list):
+            if self.verbose:
+                click.echo('Warning: predefined.constants must be a list of constant entries.')
+            return []
+
+        constants: list[dict[str, Any]] = []
+        for index, constant in enumerate(constants_config):
+            if not isinstance(constant, dict):
+                if self.verbose:
+                    click.echo('Warning: constant entries must be dictionaries.')
+                continue
+
+            doc_config = constant.get('documentation') if isinstance(constant.get('documentation'), dict) else None
+            documented = doc_config is not None
+            doc_type = doc_config.get('type') if doc_config else None
+            size = doc_config.get('size') if doc_config else None
+            description = doc_config.get('description') if doc_config else None
+
+            constants.append({
+                'name': constant.get('name'),
+                'value': constant.get('value'),
+                'type': doc_type,
+                'size': size,
+                'description': description,
+                'documented': documented,
+                'config_index': index
+            })
+
+        return constants
 
     def _parse_addressing_modes(self, addressing_modes: dict[str, Any]) -> list[dict[str, str]]:
         """

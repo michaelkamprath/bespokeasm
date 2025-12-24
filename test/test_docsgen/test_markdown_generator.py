@@ -30,6 +30,8 @@ class TestMarkdownGenerator(unittest.TestCase):
         }
         self.mock_doc_model.instruction_docs = {}
         self.mock_doc_model.operand_sets = []
+        self.mock_doc_model.predefined_memory_zones = []
+        self.mock_doc_model.predefined_constants = []
         self.mock_doc_model.macro_docs = {}
         self.mock_doc_model.get_macros_by_category = Mock(return_value={})
 
@@ -201,6 +203,128 @@ class TestMarkdownGenerator(unittest.TestCase):
 
         self.assertIn('### Register Set', result)
         self.assertIn('| Symbol |', result)
+
+    def test_generate_predefined_memory_zones_with_documentation(self):
+        """Predefined memory zones render with documentation and hex ranges."""
+        self.mock_doc_model.general_docs = {
+            'hardware': {
+                'address_size': 16
+            }
+        }
+        self.mock_doc_model.predefined_memory_zones = [
+            {
+                'name': 'ZERO_PAGE',
+                'start': 0,
+                'end': 255,
+                'title': 'Zero Page',
+                'description': 'Fast access memory.',
+                'documented': True
+            },
+            {
+                'name': 'ROM',
+                'start': '0x8000',
+                'end': '0xFFFF',
+                'title': None,
+                'description': 'Read-only memory.',
+                'documented': True
+            }
+        ]
+
+        generator = MarkdownGenerator(self.mock_doc_model, verbose=0)
+        result = generator.generate()
+
+        self.assertIn('## Predefined Memory Zones', result)
+        self.assertIn('| Name | Start | End | Title | Description |', result)
+        self.assertIn('| `ZERO_PAGE` | 0x0000 | 0x00FF | Zero Page | Fast access memory. |', result)
+        self.assertIn('| `ROM` | 0x8000 | 0xFFFF | ROM | Read-only memory. |', result)
+
+    def test_generate_predefined_memory_zones_without_documentation(self):
+        """Predefined memory zones omit documentation columns when none are provided."""
+        self.mock_doc_model.general_docs = {
+            'hardware': {
+                'address_size': 16
+            }
+        }
+        self.mock_doc_model.predefined_memory_zones = [
+            {
+                'name': 'ZERO_PAGE',
+                'start': 0,
+                'end': 255,
+                'documented': False
+            }
+        ]
+
+        generator = MarkdownGenerator(self.mock_doc_model, verbose=0)
+        result = generator.generate()
+
+        self.assertIn('## Predefined Memory Zones', result)
+        self.assertIn('| Name | Start | End |', result)
+        self.assertNotIn('| Name | Start | End | Title | Description |', result)
+
+    def test_generate_predefined_constants_with_documentation(self):
+        """Predefined constants render with documentation and hex values."""
+        self.mock_doc_model.general_docs = {
+            'hardware': {
+                'address_size': 16
+            }
+        }
+        self.mock_doc_model.predefined_constants = [
+            {
+                'name': '_Start',
+                'value': 0x1000,
+                'type': 'subroutine',
+                'size': None,
+                'description': 'Program entry point.',
+                'documented': True
+            },
+            {
+                'name': '_Prompt',
+                'value': '0x1003',
+                'type': 'variable',
+                'size': 1,
+                'description': 'Text prompt.',
+                'documented': True
+            },
+            {
+                'name': '_Vector',
+                'value': 0x2000,
+                'type': 'address',
+                'size': None,
+                'description': 'Interrupt vector address.',
+                'documented': True
+            }
+        ]
+
+        generator = MarkdownGenerator(self.mock_doc_model, verbose=0)
+        result = generator.generate()
+
+        self.assertIn('## Predefined Constants', result)
+        self.assertIn('| Name | Value | Type | Size (Words) | Description |', result)
+        self.assertIn('| `_Start` | 0x1000 | subroutine |  | Program entry point. |', result)
+        self.assertIn('| `_Prompt` | 0x1003 | variable | 1 | Text prompt. |', result)
+        self.assertIn('| `_Vector` | 0x2000 | address |  | Interrupt vector address. |', result)
+
+    def test_generate_predefined_constants_without_documentation(self):
+        """Predefined constants omit documentation columns when none are provided."""
+        self.mock_doc_model.general_docs = {
+            'hardware': {
+                'address_size': 16
+            }
+        }
+        self.mock_doc_model.predefined_constants = [
+            {
+                'name': '_Start',
+                'value': 0x1000,
+                'documented': False
+            }
+        ]
+
+        generator = MarkdownGenerator(self.mock_doc_model, verbose=0)
+        result = generator.generate()
+
+        self.assertIn('## Predefined Constants', result)
+        self.assertIn('| Name | Value |', result)
+        self.assertNotIn('| Name | Value | Type | Size (Words) | Description |', result)
 
     def test_macros_calling_syntax_from_operands(self):
         """Macros render calling syntax using their configured operands."""

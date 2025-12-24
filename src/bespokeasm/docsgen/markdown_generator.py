@@ -37,6 +37,16 @@ class MarkdownGenerator:
         if self._has_general_documentation():
             sections.append(self._generate_general_section())
 
+        # Predefined memory zones section
+        memory_zones_section = self._generate_predefined_memory_zones_section()
+        if memory_zones_section:
+            sections.append(memory_zones_section)
+
+        # Predefined constants section
+        constants_section = self._generate_predefined_constants_section()
+        if constants_section:
+            sections.append(constants_section)
+
         # Operand sets section
         if getattr(self.doc_model, 'operand_sets', None):
             operand_sets_section = self._generate_operand_sets_section()
@@ -176,6 +186,53 @@ class MarkdownGenerator:
         if alignment == 'center':
             return ':-:'
         return '---'
+
+    @staticmethod
+    def _format_hex_value(value: Any, width: int | None = None) -> str:
+        """Format a numeric value as hexadecimal for documentation output."""
+        if value is None:
+            return ''
+
+        if isinstance(value, str):
+            raw = value.strip()
+            if not raw:
+                return ''
+            try:
+                number = int(raw, 0)
+            except ValueError:
+                return raw
+            return MarkdownGenerator._format_hex_number(number, width)
+
+        try:
+            number = int(value)
+        except (TypeError, ValueError):
+            return str(value)
+
+        return MarkdownGenerator._format_hex_number(number, width)
+
+    @staticmethod
+    def _format_hex_number(number: int, width: int | None) -> str:
+        """Format a signed integer as hex with optional zero padding."""
+        abs_value = abs(number)
+        if width:
+            hex_body = f'{abs_value:0{width}X}'
+        else:
+            hex_body = f'{abs_value:X}'
+        prefix = f'0x{hex_body}'
+        return prefix if number >= 0 else f'-{prefix}'
+
+    @staticmethod
+    def _hex_width_for_address_size(address_size: Any) -> int | None:
+        """Calculate hex digit width for an address size, if aligned to nibbles."""
+        if address_size is None:
+            return None
+        try:
+            bits = int(address_size)
+        except (TypeError, ValueError):
+            return None
+        if bits <= 0 or bits % 4 != 0:
+            return None
+        return bits // 4
 
     def _generate_attribute_table(self, category: str, rows: list[tuple[str, str]]) -> str:
         """Generate a two-column attribute/value table with left alignment."""
@@ -330,6 +387,101 @@ class MarkdownGenerator:
             sections.append('\n\n'.join(filter(None, subsection_parts)))
 
         return '\n\n'.join(sections)
+
+    def _generate_predefined_memory_zones_section(self) -> str:
+        """Generate the predefined memory zones section of the documentation."""
+        memory_zones = getattr(self.doc_model, 'predefined_memory_zones', None) or []
+        if not memory_zones:
+            return ''
+
+        address_size = (
+            getattr(self.doc_model, 'general_docs', {})
+            .get('hardware', {})
+            .get('address_size')
+        )
+        hex_width = self._hex_width_for_address_size(address_size)
+
+        headers = ['Name', 'Start', 'End', 'Title', 'Description']
+        alignments = ['left', 'left', 'left', 'left', 'left']
+        rows: list[list[str]] = []
+
+        for zone in memory_zones:
+            name = zone.get('name') or ''
+            name_cell = f'`{name}`' if name else ''
+
+            start = zone.get('start')
+            end = zone.get('end')
+            start_hex = self._format_hex_value(start, hex_width)
+            end_hex = self._format_hex_value(end, hex_width)
+
+            documented = zone.get('documented', False)
+            title = None
+            description = None
+            if documented:
+                title = zone.get('title') or name
+                description = zone.get('description')
+
+            rows.append([
+                name_cell,
+                start_hex,
+                end_hex,
+                title or '',
+                description or ''
+            ])
+
+        table = self._generate_markdown_table(headers, rows, column_alignments=alignments)
+        if not table:
+            return ''
+
+        return '\n\n'.join(['## Predefined Memory Zones', table])
+
+    def _generate_predefined_constants_section(self) -> str:
+        """Generate the predefined constants section of the documentation."""
+        constants = getattr(self.doc_model, 'predefined_constants', None) or []
+        if not constants:
+            return ''
+
+        address_size = (
+            getattr(self.doc_model, 'general_docs', {})
+            .get('hardware', {})
+            .get('address_size')
+        )
+        hex_width = self._hex_width_for_address_size(address_size)
+
+        headers = ['Name', 'Value', 'Type', 'Size (Words)', 'Description']
+        alignments = ['left', 'left', 'left', 'left', 'left']
+        rows: list[list[str]] = []
+
+        for constant in constants:
+            name = constant.get('name') or ''
+            name_cell = f'`{name}`' if name else ''
+
+            value = constant.get('value')
+            value_hex = self._format_hex_value(value, hex_width)
+
+            documented = constant.get('documented', False)
+            const_type = None
+            size = None
+            description = None
+            if documented:
+                const_type = constant.get('type')
+                if const_type == 'variable':
+                    size = constant.get('size')
+                description = constant.get('description')
+
+            rows.append([
+                name_cell,
+                value_hex,
+                const_type or '',
+                str(size) if size is not None else '',
+                description or ''
+            ])
+
+        table = self._generate_markdown_table(headers, rows, column_alignments=alignments)
+        if not table:
+            return ''
+
+        return '\n\n'.join(['## Predefined Constants', table])
 
     def _generate_operand_set_table(self, operands: list[dict[str, Any]]) -> str:
         """Generate the per-operand table for an operand set."""

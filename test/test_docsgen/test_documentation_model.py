@@ -25,6 +25,8 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertEqual(model.general_docs['addressing_modes'], [])
         self.assertEqual(model.general_docs['flags'], [])
         self.assertEqual(model.general_docs['examples'], [])
+        self.assertEqual(model.predefined_memory_zones, [])
+        self.assertEqual(model.predefined_constants, [])
         self.assertEqual(model.operand_sets, [])
         self.assertEqual(model.instruction_docs, {})
         self.assertEqual(model.macro_docs, {})
@@ -358,6 +360,7 @@ class TestDocumentationModel(unittest.TestCase):
         register_set = operand_sets_map['register_operands']
         self.assertEqual(register_set['title'], 'General Registers')
         self.assertEqual(register_set['category'], 'Registers')
+
         self.assertEqual(register_set['description'], 'General purpose registers.')
         self.assertEqual(register_set['details'], 'Used for arithmetic operations.')
         self.assertEqual([op['name'] for op in register_set['operands']], ['reg_b', 'reg_a'])
@@ -417,6 +420,90 @@ class TestDocumentationModel(unittest.TestCase):
         offset_set = operand_sets_map['offset_addr']
         offset_operand = offset_set['operands'][0]
         self.assertEqual(offset_operand['value'], 'numeric expression valued between -127 and 128 expressed as 8 bit value')
+
+    def test_parse_predefined_memory_zones_documentation(self):
+        """Predefined memory zones documentation is parsed with optional metadata."""
+        self.mock_isa_model._config = {
+            'predefined': {
+                'memory_zones': [
+                    {
+                        'name': 'ZERO_PAGE',
+                        'start': 0,
+                        'end': 255,
+                        'documentation': {
+                            'title': 'Zero Page',
+                            'description': 'Fast access memory.'
+                        }
+                    },
+                    {
+                        'name': 'ROM',
+                        'start': '0x8000',
+                        'end': '0xFFFF'
+                    }
+                ]
+            }
+        }
+
+        model = DocumentationModel(self.mock_isa_model, verbose=0)
+        memory_zones = model.predefined_memory_zones
+        self.assertEqual(len(memory_zones), 2)
+
+        zero_page = memory_zones[0]
+        self.assertEqual(zero_page['name'], 'ZERO_PAGE')
+        self.assertEqual(zero_page['start'], 0)
+        self.assertEqual(zero_page['end'], 255)
+        self.assertEqual(zero_page['title'], 'Zero Page')
+        self.assertEqual(zero_page['description'], 'Fast access memory.')
+        self.assertTrue(zero_page['documented'])
+
+        rom_zone = memory_zones[1]
+        self.assertEqual(rom_zone['name'], 'ROM')
+        self.assertEqual(rom_zone['start'], '0x8000')
+        self.assertEqual(rom_zone['end'], '0xFFFF')
+        self.assertIsNone(rom_zone['title'])
+        self.assertIsNone(rom_zone['description'])
+        self.assertFalse(rom_zone['documented'])
+
+    def test_parse_predefined_constants_documentation(self):
+        """Predefined constants documentation is parsed with optional metadata."""
+        self.mock_isa_model._config = {
+            'predefined': {
+                'constants': [
+                    {
+                        'name': '_Start',
+                        'value': 0x1000,
+                        'documentation': {
+                            'type': 'subroutine',
+                            'description': 'Program entry point.'
+                        }
+                    },
+                    {
+                        'name': '_Prompt',
+                        'value': '0x1003'
+                    }
+                ]
+            }
+        }
+
+        model = DocumentationModel(self.mock_isa_model, verbose=0)
+        constants = model.predefined_constants
+        self.assertEqual(len(constants), 2)
+
+        start_const = constants[0]
+        self.assertEqual(start_const['name'], '_Start')
+        self.assertEqual(start_const['value'], 0x1000)
+        self.assertEqual(start_const['type'], 'subroutine')
+        self.assertIsNone(start_const['size'])
+        self.assertEqual(start_const['description'], 'Program entry point.')
+        self.assertTrue(start_const['documented'])
+
+        prompt_const = constants[1]
+        self.assertEqual(prompt_const['name'], '_Prompt')
+        self.assertEqual(prompt_const['value'], '0x1003')
+        self.assertIsNone(prompt_const['type'])
+        self.assertIsNone(prompt_const['size'])
+        self.assertIsNone(prompt_const['description'])
+        self.assertFalse(prompt_const['documented'])
 
     def test_register_documentation_from_list(self):
         """Registers provided as a list are converted into name-only documentation entries."""

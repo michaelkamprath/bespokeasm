@@ -67,6 +67,23 @@ Each operand set entry in the configuration file (see the [Instruction Set Confi
 
 The individual operands within an operand set continue to use the [Operand Documentation](#operand-documentation) fields (`mode`, `description`, `details`). When both levels are present, the generated documentation will introduce each operand set using the fields above and then tabulate its member operands, leveraging the per-operand metadata to populate the table.
 
+### Predefined Memory Zone Documentation
+Each entry in `predefined.memory_zones` (see the [Instruction Set Configuration File](https://github.com/michaelkamprath/bespokeasm/wiki/Instruction-Set-Configuration-File#predefined) wiki page) may include an optional `documentation` field that describes the memory zone in generated ISA docs.
+
+| Option Key | Value Type | Description |
+| --- | --- | --- |
+| `title` | string | _Optional_ A friendly display name for the memory zone. Falls back to the zone `name` when not provided. |
+| `description` | string | A short summary of the memory zone's purpose or usage. |
+
+### Predefined Constant Documentation
+Each entry in `predefined.constants` (see the [Instruction Set Configuration File](https://github.com/michaelkamprath/bespokeasm/wiki/Instruction-Set-Configuration-File#predefined) wiki page) may include an optional `documentation` field that describes the constant in generated ISA docs.
+
+| Option Key | Value Type | Description |
+| --- | --- | --- |
+| `type` | string | The constant type. Allowed values are `subroutine`, `variable`, or `address`. |
+| `size` | integer | _Optional_ Size in bytes for `variable` constants. Required when `type` is `variable`. |
+| `description` | string | A short summary of the constant's meaning or usage. |
+
 # Generated Documentation
 
 ## Markdown Documentation Page
@@ -79,9 +96,11 @@ The markdown documentation page will have the following overall structure:
 
 1. **Document Header** - ISA name (from `general.identifier.name`) and description (from `general.documentation.description` if present)
 2. **General Information Section** - Comprehensive information from the entire `general` section including hardware architecture, configuration details, and custom documentation if present
-3. **Operand Sets Section** - Documents each configured operand set with narrative context and a per-operand table
-4. **Instructions Section** - Organized by category with detailed instruction documentation
-5. **Macros Section** - Organized by category with detailed macro documentation using the same layout as instructions
+3. **Predefined Memory Zones Section** - Documents the `predefined.memory_zones` entries declared in the configuration file
+4. **Predefined Constants Section** - Documents the `predefined.constants` entries declared in the configuration file
+5. **Operand Sets Section** - Documents each configured operand set with narrative context and a per-operand table
+6. **Instructions Section** - Organized by category with detailed instruction documentation
+7. **Macros Section** - Organized by category with detailed macro documentation using the same layout as instructions
 
 ### General Information Section
 
@@ -130,8 +149,34 @@ The General Information section will include comprehensive details from the enti
 #### Compatibility
 - **Minimum BespokeASM Version** - From `general.min_version` (required field)
 
+### Predefined Memory Zones Section
+The predefined memory zones section is emitted immediately after the General Information section and before the `# Operand Sets` section. It begins with the markdown header `## Predefined Memory Zones`. This section is generated only when `predefined.memory_zones` is present and contains at least one entry (documentation fields remain optional).
+
+Each memory zone is rendered as a table row with the following default columns:
+- `Name` - The memory zone `name`, rendered as inline code.
+- `Start` - The `start` value rendered as hexadecimal.
+- `End` - The `end` value rendered as hexadecimal.
+- `Title` - Populated from `documentation.title` when present (falls back to the zone name when absent).
+- `Description` - Populated from `documentation.description` when present.
+
+Hexadecimal values should be zero-padded to match the ISA address size when `general.address_size` is available (for example, 16-bit address space renders `0x0000`). When the address size is missing or not divisible by 4, render the shortest hexadecimal representation.
+
+Column inclusion follows the [Table Column Optimization](#table-column-optimization) guidance. When no zone supplies a `documentation` field, the `Title` and `Description` columns are omitted and only `Name`, `Start`, and `End` are shown.
+
+### Predefined Constants Section
+The predefined constants section is emitted immediately after the Predefined Memory Zones section and before the `# Operand Sets` section. It begins with the markdown header `## Predefined Constants`. This section is generated only when `predefined.constants` is present and contains at least one entry (documentation fields remain optional).
+
+Each constant is rendered as a table row with the following default columns:
+- `Name` - The constant `name`, rendered as inline code.
+- `Value` - The constant `value` rendered as hexadecimal. Hex values should be zero-padded to match the ISA address size when `general.address_size` is available (for example, 16-bit address space renders `0x0000`). When the address size is missing or not divisible by 4, render the shortest hexadecimal representation.
+- `Type` - Populated from `documentation.type`.
+- `Size (Words)` - Populated from `documentation.size` when the type is `variable`.
+- `Description` - Populated from `documentation.description` when present.
+
+Column inclusion follows the [Table Column Optimization](#table-column-optimization) guidance. When no constant supplies a `documentation` field, the `Type`, `Size`, and `Description` columns are omitted and only `Name` and `Value` are shown.
+
 ### Operand Sets Section
-The operand sets section is emitted immediately after the General Information section and before the `# Instructions` section. It begins with the markdown header `## Operand Sets`. Each operand set documented in the ISA configuration is rendered as a separate `### `<operand set key>` - <operand set title>` subsection (if `documentation.title` is provided). If no title is provided, the header is simply `### `<operand set key>`` with the key rendered as inline code. Operand sets are ordered first by `documentation.category` (alphabetical, with uncategorized sets listed last) and then by display name.
+The operand sets section is emitted immediately after the Predefined Constants section and before the `# Instructions` section. It begins with the markdown header `## Operand Sets`. Each operand set documented in the ISA configuration is rendered as a separate `### `<operand set key>` - <operand set title>` subsection (if `documentation.title` is provided). If no title is provided, the header is simply `### `<operand set key>`` with the key rendered as inline code. Operand sets are ordered first by `documentation.category` (alphabetical, with uncategorized sets listed last) and then by display name.
 
 For each operand set subsection:
 1. **Category Label** — When `documentation.category` is present, emit an italicized line `*Category: <category>*` directly beneath the heading.
