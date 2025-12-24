@@ -30,6 +30,19 @@ Each instruction entry in the configuration file (as documented in the [Instruct
 | `modifies` | array | _Optional_ An array of dictionaries each representing a register or memory location that is modified by the instruction. Each dictionary has the following keys:<ul><li>`register` - The register that is modified. The value of this key is the name of the register.</li><li>`memory` - The memory location that is modified. The value of this key is the name of the memory location.</li><li>`flag` - The flag that is modified. The value of this key is the name of the flag.</li><li>`description` - A short description of the modification.</li><li>`details` - _Optional_ A detailed description of the modification. Markdown text is allowed.</li></ul><p>Each `modifies`dictionary must contain exact one of the keys `register`, `memory`, or `flag`, and the `description` field, and `details` field is optional. |
 | `examples` | array | _Optional_ An array of example usages of the instruction. Each example is a dictionary with the following keys:<ul><li>`description` - A short description of the example.</li><li>`details` - _Optional_ A detailed description of the example. Markdown text is allowed.</li><li>`code` - The code of the example instruction.</li></ul><p>Examples are used to show how the instruction can be used in practice. They should be concise and to the point. |
 
+### Macro Documentation
+Instruction macros may also include documentation, using the same schema as instructions. When a macro is defined with the dictionary-style configuration (macro name maps to an object), an optional `documentation` field can be provided alongside the `variants` list. The fields are identical to those in [Instruction Documentation](#instruction-documentation):
+
+| Option Key | Value Type | Description |
+| --- | --- | --- |
+| `category` | string | The category of the macro. Used to group macros together in the documentation page. |
+| `title` | string | A short title or summary of the macro. |
+| `details` | string | _Optional_ A detailed description of the macro. Markdown text is allowed. |
+| `modifies` | array | _Optional_ An array of dictionaries describing registers, memory locations, or flags modified by the macro. Same structure as instructions. |
+| `examples` | array | _Optional_ An array of macro usage examples. Same structure as instructions. |
+
+Variant-level documentation is also supported: each entry in the macro `variants` list may include its own `documentation` block with the same keys. Legacy list-style macro configurations remain supported; they simply cannot carry macro-level documentation because the list form has no place for a `documentation` key.
+
 ### Operand Documentation
 Each operand entry in the configuration file (as documented in the [Instruction Set Configuration File](https://github.com/michaelkamprath/bespokeasm/wiki/Instruction-Set-Configuration-File#operands) wiki page) must be able to describe the operand in a way that is easy to understand and use. It will do this by adding an optional `documentation` field to the operand entry. The `documentation` field will be a dictionary with the following keys:
 
@@ -68,6 +81,7 @@ The markdown documentation page will have the following overall structure:
 2. **General Information Section** - Comprehensive information from the entire `general` section including hardware architecture, configuration details, and custom documentation if present
 3. **Operand Sets Section** - Documents each configured operand set with narrative context and a per-operand table
 4. **Instructions Section** - Organized by category with detailed instruction documentation
+5. **Macros Section** - Organized by category with detailed macro documentation using the same layout as instructions
 
 ### General Information Section
 
@@ -219,6 +233,10 @@ If the instruction has an `examples` field under the instruction's documentation
 <example details formatted as markdown text>
 <example code formatted as markdown code block>
 ```
+
+### Macro Documentation Section
+
+Macro documentation is emitted under a dedicated `# Macros` heading. Macros are grouped by their `documentation.category` (or `Uncategorized` when absent) using `## <category>` subsections. Each macro uses the same presentation as instructions: a `### \`<mnemonic>\` : <title>` heading when a title is present, followed by shared description/details, per-variant calling syntax and `where` tables derived from the macro’s operand configuration, and optional `Modifies` and `Examples` subsections. Variant-level documentation from individual entries in the macro `variants` list is rendered within the corresponding version block just like instruction variants. Macros without documentation are still listed with a placeholder message when documentation is generated.
 
 ## CLI Command Implementation
 

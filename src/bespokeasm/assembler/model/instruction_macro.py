@@ -79,9 +79,11 @@ class InstructionMacro(InstructionBase):
                 registers: set[str],
                 word_size: int,
                 word_segment_size: int,
+                documentation: str | None = None,
             ) -> None:
         super().__init__(mnemonic, default_multi_word_endian, default_intra_word_endian, registers)
         self._config = macro_config
+        self._documentation = documentation
 
         variant_num = 0
         self._variants: list[InstructionMacroVariant] = []
@@ -104,6 +106,10 @@ class InstructionMacro(InstructionBase):
     @property
     def variants(self) -> list[InstructionMacroVariant]:
         return self._variants
+
+    @property
+    def documentation(self) -> str | None:
+        return self._documentation
 
     def __str__(self) -> str:
         return f'InstructionMacro<{self._mnemonic}>'

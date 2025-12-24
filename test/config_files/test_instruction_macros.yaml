@@ -242,51 +242,53 @@ instructions:
                   register: sp
 macros:
   push2:
-    - operands:
-        count: 1
-        specific_operands:
-          immediate:
-            list:
-              uint16:
-                type: numeric
-                argument:
-                  size: 16
-                  word_align: true
-      instructions:
-        - "push ((@ARG(0)) >> 8)"
-        - "push ((@ARG(0)) & 0x00FF)"
-    - operands:
-        count: 1
-        specific_operands:
-          ij_reg:
-            list:
-              ij:
-                type: indirect_register
-                register: ij
-                offset:
-                  max: 127
-                  min: -128
-                  size: 8
-                  word_align: true
-      instructions:
-        - "push [@REG(0) + (@ARG(0)+1)]"
-        - "push [@REG(0) + (@ARG(0))]"
-    - operands:
-        count: 1
-        specific_operands:
-          stack_pointer:
-            list:
-              sp:
-                type: indirect_register
-                register: sp
-                offset:
-                  max: 127
-                  min: -128
-                  size: 8
-                  word_align: true
-      instructions:
-        - "push [@REG(0) + (@ARG(0)+1)]"
-        - "push [@REG(0) + (@ARG(0)+1)]"
+    documentation: Example macro using dictionary form for tests
+    variants:
+      - operands:
+          count: 1
+          specific_operands:
+            immediate:
+              list:
+                uint16:
+                  type: numeric
+                  argument:
+                    size: 16
+                    word_align: true
+        instructions:
+          - "push ((@ARG(0)) >> 8)"
+          - "push ((@ARG(0)) & 0x00FF)"
+      - operands:
+          count: 1
+          specific_operands:
+            ij_reg:
+              list:
+                ij:
+                  type: indirect_register
+                  register: ij
+                  offset:
+                    max: 127
+                    min: -128
+                    size: 8
+                    word_align: true
+        instructions:
+          - "push [@REG(0) + (@ARG(0)+1)]"
+          - "push [@REG(0) + (@ARG(0))]"
+      - operands:
+          count: 1
+          specific_operands:
+            stack_pointer:
+              list:
+                sp:
+                  type: indirect_register
+                  register: sp
+                  offset:
+                    max: 127
+                    min: -128
+                    size: 8
+                    word_align: true
+        instructions:
+          - "push [@REG(0) + (@ARG(0)+1)]"
+          - "push [@REG(0) + (@ARG(0)+1)]"
   mov2:
     - operands:
         count: 2

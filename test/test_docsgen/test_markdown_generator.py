@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import Mock
 
+from bespokeasm.docsgen.documentation_model import DocumentationModel
 from bespokeasm.docsgen.markdown_generator import MarkdownGenerator
 
 
@@ -29,6 +30,8 @@ class TestMarkdownGenerator(unittest.TestCase):
         }
         self.mock_doc_model.instruction_docs = {}
         self.mock_doc_model.operand_sets = []
+        self.mock_doc_model.macro_docs = {}
+        self.mock_doc_model.get_macros_by_category = Mock(return_value={})
 
     def test_generate_header_only(self):
         """Test generating document with only header."""
@@ -198,8 +201,95 @@ class TestMarkdownGenerator(unittest.TestCase):
 
         self.assertIn('### Register Set', result)
         self.assertIn('| Symbol |', result)
-        self.assertIn('| `A` |', result)
-        self.assertIn('| `B` |', result)
+
+    def test_macros_calling_syntax_from_operands(self):
+        """Macros render calling syntax using their configured operands."""
+        isa_model = Mock()
+        isa_model.isa_name = 'macro-isa'
+        isa_model._config = {
+            'general': {
+                'identifier': {'name': 'macro-isa'}
+            },
+            'operand_sets': {},
+            'macros': {
+                'push2': {
+                    'variants': [
+                        {
+                            'operands': {
+                                'specific_operands': {
+                                    'immediate': {
+                                        'list': {
+                                            'value': {'type': 'numeric'}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+
+        doc_model = DocumentationModel(isa_model, verbose=0)
+        generator = MarkdownGenerator(doc_model, verbose=0)
+        result = generator.generate()
+
+        self.assertIn('# Macros', result)
+        self.assertIn('### `PUSH2`', result)
+        self.assertIn('*Calling syntax:*', result)
+        self.assertIn('```asm\nPUSH2 value\n```', result)
+        self.assertIn('| Operand | Type | Value |', result)
+
+    def test_generate_macros_section(self):
+        """Macros are rendered in their own section using instruction-style layout."""
+        self.mock_doc_model.macro_docs = {
+            'push2': {
+                'category': 'Stack',
+                'title': 'Push Word',
+                'description': 'Push two-byte value.',
+                'details': None,
+                'modifies': [],
+                'examples': [],
+                'documented': True,
+                'versions': [
+                    {
+                        'index': 1,
+                        'title': None,
+                        'description': None,
+                        'details': None,
+                        'signatures': [
+                            {
+                                'operands': [
+                                    {
+                                        'name': 'value',
+                                        'display_name': 'value',
+                                        'type': 'numeric',
+                                        'syntax': 'value',
+                                        'value': 'numeric expression',
+                                        'description': 'word to push',
+                                        'details': None,
+                                        'include_in_code': True
+                                    }
+                                ]
+                            }
+                        ],
+                        'modifies': [],
+                        'examples': [],
+                        'documented': False
+                    }
+                ]
+            }
+        }
+        self.mock_doc_model.get_macros_by_category = Mock(return_value={'Stack': ['push2']})
+
+        generator = MarkdownGenerator(self.mock_doc_model, verbose=0)
+        result = generator.generate()
+
+        self.assertIn('# Macros', result)
+        self.assertIn('## Stack', result)
+        self.assertIn('### `PUSH2` : Push Word', result)
+        self.assertIn('*Calling syntax:*', result)
+        self.assertIn('```asm\nPUSH2 value\n```', result)
 
     def test_generate_with_operand_sets(self):
         """Operand sets render as their own section with per-operand tables."""

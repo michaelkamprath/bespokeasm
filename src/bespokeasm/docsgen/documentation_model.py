@@ -25,6 +25,7 @@ class DocumentationModel:
         self.general_docs = self._parse_general_documentation()
         self.operand_sets = self._parse_operand_sets_documentation()
         self.instruction_docs = self._parse_instruction_documentation()
+        self.macro_docs = self._parse_macro_documentation()
 
     @property
     def isa_name(self) -> str:
@@ -777,10 +778,8 @@ class DocumentationModel:
                 doc_config = {}
 
             documented = bool(doc_config)
-            if documented:
-                category = doc_config.get('category', 'Uncategorized')
-            else:
-                category = 'Uncategorized'
+            raw_category = doc_config.get('category') if documented else None
+            category = raw_category if isinstance(raw_category, str) and raw_category.strip() else 'Uncategorized'
 
             categories.add(category)
 
@@ -822,6 +821,58 @@ class DocumentationModel:
 
         return instruction_docs
 
+    def _parse_macro_documentation(self) -> dict[str, Any]:
+        """
+        Parse macro documentation from the configuration.
+
+        Returns:
+            Dictionary mapping macro names to their documentation.
+        """
+        macros_config = self._config.get('macros', {}) or {}
+        operand_sets_config = self._config.get('operand_sets', {})
+        macro_docs: dict[str, Any] = {}
+        categories: set[str] = set()
+
+        for macro_name, macro_config in macros_config.items():
+            doc_config = macro_config.get('documentation') if isinstance(macro_config, dict) else {}
+            if not isinstance(doc_config, dict):
+                doc_config = {}
+
+            documented = bool(doc_config)
+            raw_category = doc_config.get('category') if documented else None
+            category = raw_category if isinstance(raw_category, str) and raw_category.strip() else 'Uncategorized'
+            categories.add(category)
+
+            versions = self._build_macro_versions(macro_config, operand_sets_config)
+
+            macro_docs[macro_name] = {
+                'category': category,
+                'title': doc_config.get('title') if documented else None,
+                'description': doc_config.get('description') if documented else None,
+                'details': doc_config.get('details') if documented else None,
+                'modifies': self._parse_modifies(doc_config.get('modifies', [])) if documented else [],
+                'examples': self._parse_examples(doc_config.get('examples', [])) if documented else [],
+                'documented': documented,
+                'versions': versions
+            }
+
+            if not documented and self.verbose >= 2:
+                click.echo(f'No documentation found for macro: {macro_name}')
+
+        if self.verbose:
+            documented_count = sum(
+                1 for doc in macro_docs.values()
+                if doc.get('documented', False)
+            )
+            click.echo(
+                f'Processed {len(macro_docs)} macros; '
+                f'{documented_count} with documentation'
+            )
+            if categories:
+                click.echo(f"Macro categories found: {', '.join(sorted(categories))}")
+
+        return macro_docs
+
     def _build_instruction_versions(
         self,
         mnemonic: str,
@@ -854,6 +905,71 @@ class DocumentationModel:
 
         if not version_sources:
             # Ensure at least one version so the syntax block can be emitted even without operands.
+            version_sources.append({
+                'operands': None,
+                'documentation': None
+            })
+
+        versions: list[dict[str, Any]] = []
+        for index, version_source in enumerate(version_sources, start=1):
+            operands_config = version_source.get('operands') if isinstance(version_source, dict) else None
+            doc_config_raw = version_source.get('documentation') if isinstance(version_source, dict) else None
+            doc_config = doc_config_raw if isinstance(doc_config_raw, dict) else {}
+            documented = bool(doc_config)
+
+            signatures = self._build_instruction_signatures(
+                operands_config,
+                operand_sets_config
+            )
+            versions.append({
+                'index': index,
+                'signatures': signatures,
+                'title': doc_config.get('title') if documented else None,
+                'description': doc_config.get('description') if documented else None,
+                'details': doc_config.get('details') if documented else None,
+                'modifies': self._parse_modifies(doc_config.get('modifies', [])) if documented else [],
+                'examples': self._parse_examples(doc_config.get('examples', [])) if documented else [],
+                'documented': documented
+            })
+
+        return versions
+
+    def _build_macro_versions(
+        self,
+        macro_config: Any,
+        operand_sets_config: dict[str, Any]
+    ) -> list[dict[str, Any]]:
+        """
+        Build the ordered list of operand signatures for a macro across all variants.
+        Supports both legacy list form and dictionary form with a `variants` list.
+        """
+        version_sources: list[dict[str, Any]] = []
+
+        variants = None
+        if isinstance(macro_config, dict):
+            if 'operands' in macro_config:
+                version_sources.append({
+                    'operands': macro_config.get('operands'),
+                    'documentation': None
+                })
+            variants = macro_config.get('variants')
+        elif isinstance(macro_config, list):
+            variants = macro_config
+        else:
+            if self.verbose:
+                click.echo(f'Warning: Macro configuration for "{macro_config}" is not a list or dictionary.')
+
+        if isinstance(variants, list):
+            for variant in variants:
+                if isinstance(variant, dict):
+                    version_sources.append({
+                        'operands': variant.get('operands'),
+                        'documentation': variant.get('documentation')
+                    })
+                elif self.verbose:
+                    click.echo('Warning: Macro variant is not a dictionary. Skipping operand extraction.')
+
+        if not version_sources:
             version_sources.append({
                 'operands': None,
                 'documentation': None
@@ -1091,6 +1207,25 @@ class DocumentationModel:
             categories[category].append(instr_name)
 
         # Sort instruction names within each category
+        for category in categories:
+            categories[category].sort()
+
+        return categories
+
+    def get_macros_by_category(self) -> dict[str, list[str]]:
+        """
+        Get macros organized by category.
+
+        Returns:
+            Dictionary mapping category names to lists of macro names
+        """
+        categories: dict[str, list[str]] = {}
+        for macro_name, macro_doc in self.macro_docs.items():
+            category = macro_doc['category']
+            if category not in categories:
+                categories[category] = []
+            categories[category].append(macro_name)
+
         for category in categories:
             categories[category].sort()
 

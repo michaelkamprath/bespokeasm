@@ -74,23 +74,25 @@ class InstructionSet(dict[str, InstructionBase]):
         if self._macros_config is not None:
             # build a list of macros first so a macro can't be defined based on other macros
             macro_list: list[InstructionMacro] = []
-            for mnemonic, macro_config_list in self._macros_config.items():
+            for mnemonic, macro_config in self._macros_config.items():
                 mnemonic = mnemonic.lower()
                 if mnemonic in lower_keywords:
                     sys.exit(f'ERROR - ISA configuration defined instruction "{mnemonic}" which is also a BespokeASM keyword')
                 # check macro mnemonic is not in existing instructions
                 if mnemonic in self:
                     sys.exit(f'ERROR - Macro "{mnemonic}" has same mnemonic as a configured instruction.')
+                variants, documentation = self._parse_macro_config(mnemonic, macro_config)
                 macro_list.append(
                     InstructionMacro(
                         mnemonic,
-                        macro_config_list,
+                        variants,
                         operand_set_collection,
                         default_multi_word_endian,
                         default_intra_word_endian,
                         registers,
                         word_size,
                         word_segment_size,
+                        documentation=documentation,
                     )
                 )
             for macro in macro_list:
@@ -117,3 +119,23 @@ class InstructionSet(dict[str, InstructionBase]):
     @property
     def macro_mnemonics(self) -> set[str]:
         return self._macro_mnemonics
+
+    def _parse_macro_config(self, mnemonic: str, macro_config: object) -> tuple[list[dict], str | None]:
+        '''Normalize macro configuration to support both legacy list and new dictionary forms.'''
+        if isinstance(macro_config, list):
+            variants = macro_config
+            documentation = None
+        elif isinstance(macro_config, dict):
+            if 'variants' not in macro_config:
+                sys.exit(
+                    f'ERROR - Macro "{mnemonic}" configuration uses dictionary form and must contain a "variants" list.'
+                )
+            variants = macro_config['variants']
+            documentation = macro_config.get('documentation')
+        else:
+            sys.exit(f'ERROR - Macro "{mnemonic}" configuration must be a list or a dictionary.')
+
+        if not isinstance(variants, list):
+            sys.exit(f'ERROR - Macro "{mnemonic}" configuration "variants" entry must be a list.')
+
+        return variants, documentation

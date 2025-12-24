@@ -27,6 +27,7 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertEqual(model.general_docs['examples'], [])
         self.assertEqual(model.operand_sets, [])
         self.assertEqual(model.instruction_docs, {})
+        self.assertEqual(model.macro_docs, {})
 
     def test_parse_general_documentation(self):
         """Test parsing general documentation section."""
@@ -133,6 +134,103 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertEqual(examples[0]['description'], 'Basic example')
         self.assertEqual(examples[0]['code'], 'lda #5')
         self.assertEqual(examples[0]['details'], 'Load immediate value')
+
+    def test_parse_macro_documentation(self):
+        """Macro documentation matches instruction-style fields and variant parsing."""
+        self.mock_isa_model._config = {
+            'operand_sets': {},
+            'macros': {
+                'push2': {
+                    'documentation': {
+                        'category': 'Stack',
+                        'title': 'Push Word',
+                        'description': 'Pushes a 16-bit value.',
+                        'details': 'Expands to two pushes.',
+                        'examples': [{'description': 'push', 'code': 'push2 $1234'}]
+                    },
+                    'variants': [
+                        {
+                            'operands': {
+                                'specific_operands': {
+                                    'immediate': {
+                                        'list': {
+                                            'value': {
+                                                'type': 'numeric'
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            'documentation': {
+                                'title': 'Immediate',
+                                'description': 'Immediate 16-bit value.'
+                            }
+                        }
+                    ]
+                },
+                'mov2': [
+                    {
+                        'operands': {
+                            'specific_operands': {
+                                'address_pair': {
+                                    'list': {
+                                        'src': {'type': 'indirect_numeric'},
+                                        'dst': {'type': 'indirect_numeric'}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+
+        model = DocumentationModel(self.mock_isa_model, verbose=0)
+
+        self.assertIn('push2', model.macro_docs)
+        push2_doc = model.macro_docs['push2']
+        self.assertTrue(push2_doc['documented'])
+        self.assertEqual(push2_doc['category'], 'Stack')
+        self.assertEqual(push2_doc['title'], 'Push Word')
+        self.assertEqual(push2_doc['description'], 'Pushes a 16-bit value.')
+        self.assertEqual(push2_doc['details'], 'Expands to two pushes.')
+        self.assertEqual(len(push2_doc['versions']), 1)
+        self.assertEqual(push2_doc['versions'][0]['title'], 'Immediate')
+        self.assertEqual(push2_doc['versions'][0]['description'], 'Immediate 16-bit value.')
+        self.assertEqual(len(push2_doc['versions'][0]['signatures']), 1)
+        self.assertEqual(push2_doc['versions'][0]['signatures'][0]['operands'][0]['type'], 'numeric')
+
+        mov2_doc = model.macro_docs['mov2']
+        self.assertFalse(mov2_doc['documented'])
+        self.assertEqual(mov2_doc['category'], 'Uncategorized')
+        self.assertEqual(len(mov2_doc['versions']), 1)
+        self.assertEqual(len(mov2_doc['versions'][0]['signatures'][0]['operands']), 2)
+
+    def test_macro_category_defaults_when_none(self):
+        """A None category is treated as Uncategorized instead of breaking sorting."""
+        self.mock_isa_model._config = {
+            'operand_sets': {},
+            'macros': {
+                'noop': {
+                    'documentation': {
+                        'category': None,
+                        'description': 'does nothing'
+                    },
+                    'variants': [
+                        {
+                            'operands': {
+                                'specific_operands': {
+                                    'none': {'list': {}}
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+
+        model = DocumentationModel(self.mock_isa_model, verbose=0)
+        self.assertEqual(model.macro_docs['noop']['category'], 'Uncategorized')
 
     def test_parse_operand_sets_documentation(self):
         """Operand set documentation is parsed with ordering, syntax, and auto details."""

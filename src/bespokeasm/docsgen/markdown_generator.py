@@ -49,6 +49,11 @@ class MarkdownGenerator:
         elif self.verbose:
             click.echo('Warning: No instruction documentation found')
 
+        # Macros section
+        macro_docs = getattr(self.doc_model, 'macro_docs', {})
+        if macro_docs:
+            sections.append(self._generate_macros_section())
+
         return '\n\n'.join(filter(None, sections))
 
     def _optimize_table_columns(
@@ -624,23 +629,44 @@ class MarkdownGenerator:
 
         return '\n\n'.join(sections)
 
-    def _generate_category_section(self, category: str, instructions: list[str]) -> str:
+    def _generate_macros_section(self) -> str:
+        """Generate the macros section organized by category."""
+        sections = ['# Macros']
+
+        categories = self.doc_model.get_macros_by_category()
+        for category in sorted(categories.keys()):
+            sections.append(self._generate_category_section(
+                category,
+                categories[category],
+                doc_map=self.doc_model.macro_docs
+            ))
+
+        return '\n\n'.join(sections)
+
+    def _generate_category_section(
+        self,
+        category: str,
+        operations: list[str],
+        doc_map: dict[str, Any] | None = None
+    ) -> str:
         """
         Generate a category section with its instructions.
 
         Args:
             category: The category name
-            instructions: List of instruction names in this category
+            operations: List of instruction or macro names in this category
+            doc_map: Documentation map keyed by operation mnemonic
 
         Returns:
             The markdown content for this category
         """
+        doc_map = doc_map or self.doc_model.instruction_docs
         sections = [f'## {category.title()}']
 
-        num_instructions = len(instructions)
-        for index, instruction in enumerate(instructions):
-            instruction_doc = self.doc_model.instruction_docs[instruction]
-            sections.append(self._generate_instruction_documentation(instruction, instruction_doc))
+        num_instructions = len(operations)
+        for index, operation in enumerate(operations):
+            instruction_doc = doc_map[operation]
+            sections.append(self._generate_instruction_documentation(operation, instruction_doc))
             if index < num_instructions - 1:
                 sections.append('---')
 

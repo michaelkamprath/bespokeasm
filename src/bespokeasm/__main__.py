@@ -514,11 +514,14 @@ def entry_point():
     known_subcommands = {
         'compile',
         'update_config',
+        'update-config',
         'docs',
         'generate_extension',
+        'generate-extension',
         'vscode',
         'sublime',
         'vim',
+        'install_completion',
         'install-completion',
     }
     first_non_option = next((arg for arg in args if not arg.startswith('-')), None)
