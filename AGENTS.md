@@ -50,7 +50,6 @@ The most recent version of documentation can be found at the [BespokeASM Wiki](h
 
 ### Configuration Features
 - ISA configs seed predefined constants, data blocks, memory zones, and preprocessor symbols; these are injected into global label scope before compilation.
-- `AssemblerModel.update_config_dict_to_latest` upgrades legacy config structures while preserving ruamel.yaml formatting and numeric representations via utilities in `src/bespokeasm/utilities.py`.
 
 ### Entry Point
 - Main CLI: `src/bespokeasm/__main__.py`

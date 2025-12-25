@@ -5,15 +5,12 @@ from pathlib import Path
 import click
 from bespokeasm import BESPOKEASM_VERSION_STR
 from bespokeasm.assembler.engine import Assembler
-from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.cli_completion import AutoOptionGroup
 from bespokeasm.cli_completion import OptionForwardingCommand
 from bespokeasm.configgen.sublime import SublimeConfigGenerator
 from bespokeasm.configgen.vim import VimConfigGenerator
 from bespokeasm.configgen.vscode import VSCodeConfigGenerator
 from bespokeasm.docsgen import DocumentationGenerator
-from bespokeasm.utilities import dump_yaml_with_formatting
-from bespokeasm.utilities import load_yaml_with_format_preservation
 from click.shell_completion import get_completion_class
 
 
@@ -225,69 +222,6 @@ def compile(
         macro_symbol,
     )
     asm.assemble_bytecode()
-
-
-@main.command(cls=OptionForwardingCommand, short_help='update an ISA configuration file to the latest format')
-@click.option(
-    '--config-file', '-c', required=True,
-    type=click.Path(dir_okay=False, exists=True),
-    help='The filepath to the instruction set configuration file (YAML or JSON).'
-)
-@click.option(
-    '--output-file', '-o',
-    type=click.Path(dir_okay=False),
-    help='The filepath to write the updated configuration file. Defaults to stdout.'
-)
-def update_config(config_file, output_file):
-    """Update an older ISA configuration file to the latest format and output the result."""
-    import sys
-    import os
-    import json
-    # Load config
-    config_file = os.path.abspath(os.path.expanduser(config_file))
-    if config_file.endswith('.json'):
-        with open(config_file) as f:
-            config_dict = json.load(f)
-        input_format = 'json'
-    elif config_file.endswith('.yaml') or config_file.endswith('.yml'):
-        with open(config_file) as f:
-            config_dict = load_yaml_with_format_preservation(f.read())
-        input_format = 'yaml'
-    else:
-        click.echo('ERROR: Unknown config file type. Must be .yaml, .yml, or .json.', err=True)
-        sys.exit(1)
-    # Update config
-    updated_dict = AssemblerModel.update_config_dict_to_latest(config_dict)
-    # Check for changes
-    if updated_dict == config_dict:
-        click.echo(
-            'No changes were made to the configuration file.',
-            err=True,
-        )
-        return
-    # Determine output format
-    if output_file:
-        output_file = os.path.abspath(os.path.expanduser(output_file))
-        if output_file.endswith('.json'):
-            output_format = 'json'
-        elif output_file.endswith('.yaml') or output_file.endswith('.yml'):
-            output_format = 'yaml'
-        else:
-            # Default to input format if extension is unknown
-            output_format = input_format
-        with open(output_file, 'w') as f:
-            if output_format == 'json':
-                json.dump(updated_dict, f, indent=2)
-            else:
-                dump_yaml_with_formatting(updated_dict, f)
-        click.echo(f'Updated configuration written to {output_file}')
-    else:
-        # No output file specified: use input format for stdout
-        if input_format == 'json':
-            json.dump(updated_dict, sys.stdout, indent=2)
-            print()  # Ensure newline at end
-        else:
-            dump_yaml_with_formatting(updated_dict, sys.stdout)
 
 
 @main.command(cls=OptionForwardingCommand, short_help='generate markdown documentation for an ISA')
@@ -513,8 +447,6 @@ def entry_point():
     # If a known subcommand is present, run as-is; otherwise assume compile by default.
     known_subcommands = {
         'compile',
-        'update_config',
-        'update-config',
         'docs',
         'generate_extension',
         'generate-extension',

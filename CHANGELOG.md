@@ -21,7 +21,9 @@ Changes that are planned but not implemented yet:
 ## [Unreleased]
 - Fixed a bug in handling comparisons to preprocessor language version symbols.
 - Added GitHub action to automatically create stand-alone binaries upon release, or create them locally using the Makefile.
-- Added command to install shell tab completions for  **BespokeASM*.
+- Added command to install shell tab completions for  **BespokeASM**.
+- Added the ability to create a markdown file documenting the configured instruction set in a human- and AI-readable format. Intended use is to provide AI coding agents with documentation of the assembly language and how to use it. Use in combination with [the general **BespokeASM** syntax documentation](https://github.com/michaelkamprath/bespokeasm/wiki/Assembly-Language-Syntax). Consider this feature as "beta", as the format and completeness of the generated output will evolve.
+- Removed the unmaintained `update-config` command.
 
 ## [0.6.0]
 - Added support for instruction aliases: you can now specify an `aliases` field (a list of alternative mnemonics) in an instruction's configuration. All aliases are globally unique, are accepted as valid mnemonics in assembly source, and generate the same code as the root mnemonic. This does not apply to macros.
