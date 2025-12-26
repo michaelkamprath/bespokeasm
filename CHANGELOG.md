@@ -19,6 +19,8 @@ Changes that are planned but not implemented yet:
 
 
 ## [Unreleased]
+
+## [0.7.0]
 - Fixed a bug in handling comparisons to preprocessor language version symbols.
 - Added GitHub action to automatically create stand-alone binaries upon release, or create them locally using the Makefile.
 - Added command to install shell tab completions for  **BespokeASM**.
@@ -195,7 +197,8 @@ First tracked released
 * Enabled the `reverse_argument_order` instruction option be applied to a specific operand configuration. This slightly changed the configuration file format.
 * Added ability for instructions with operands to have a single "empty operand" variant, e.g., `pop`
 
-[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.7.0...HEAD
+[0.6.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/michaelkamprath/bespokeasm/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.4.2...v0.5.0
