@@ -30,6 +30,7 @@ jobs:
         run: python -m build --wheel
       - name: Should upload release assets
         id: upload-check
+        shell: bash
         run: |
           if [ "${{ github.event_name }}" = "release" ] && \
              [ "${{ github.event.action }}" = "published" ] && \
