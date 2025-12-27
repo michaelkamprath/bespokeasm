@@ -28,20 +28,8 @@ jobs:
           python -m pip install build
       - name: Build wheel
         run: python -m build --wheel
-      - name: Should upload release assets
-        id: upload-check
-        shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "release" ] && \
-             [ "${{ github.event.action }}" = "published" ] && \
-             [ "${{ github.actor }}" != "nektos/act" ] && \
-             [ "${{ env.SKIP_RELEASE_UPLOAD }}" != "true" ]; then
-            echo "upload=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "upload=false" >> "$GITHUB_OUTPUT"
-          fi
       - name: Upload wheel to release
-        if: steps.upload-check.outputs.upload == 'true'
+        if: github.event_name == 'release' && github.event.action == 'published' && github.actor != 'nektos/act' && env.SKIP_RELEASE_UPLOAD != 'true'
         uses: softprops/action-gh-release@v1
         with:
           files: dist/*.whl
@@ -90,19 +78,8 @@ jobs:
           DEST="dist/bespokeasm-${APP_VERSION}-${PLATFORM}-${ARCH}${EXT}"
           mv "$SRC" "$DEST"
           echo "ASSET_PATH=$DEST" >> "$GITHUB_ENV"
-      - name: Should upload release assets
-        id: upload-check
-        run: |
-          if [ "${{ github.event_name }}" = "release" ] && \
-             [ "${{ github.event.action }}" = "published" ] && \
-             [ "${{ github.actor }}" != "nektos/act" ] && \
-             [ "${{ env.SKIP_RELEASE_UPLOAD }}" != "true" ]; then
-            echo "upload=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "upload=false" >> "$GITHUB_OUTPUT"
-          fi
       - name: Upload binary to release
-        if: ${{ steps.upload-check.outputs.upload == 'true' }}
+        if: github.event_name == 'release' && github.event.action == 'published' && github.actor != 'nektos/act' && env.SKIP_RELEASE_UPLOAD != 'true'
         uses: softprops/action-gh-release@v1
         with:
           files: ${{ env.ASSET_PATH }}
@@ -152,19 +129,8 @@ jobs:
           DEST="dist/bespokeasm-${APP_VERSION}-${PLATFORM}-${ARCH}${EXT}"
           mv "$SRC" "$DEST"
           echo "ASSET_PATH=$DEST" >> "$GITHUB_ENV"
-      - name: Should upload release assets
-        id: upload-check
-        run: |
-          if [ "${{ github.event_name }}" = "release" ] && \
-             [ "${{ github.event.action }}" = "published" ] && \
-             [ "${{ github.actor }}" != "nektos/act" ] && \
-             [ "${{ env.SKIP_RELEASE_UPLOAD }}" != "true" ]; then
-            echo "upload=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "upload=false" >> "$GITHUB_OUTPUT"
-          fi
       - name: Upload binary to release
-        if: ${{ steps.upload-check.outputs.upload == 'true' }}
+        if: github.event_name == 'release' && github.event.action == 'published' && github.actor != 'nektos/act' && env.SKIP_RELEASE_UPLOAD != 'true'
         uses: softprops/action-gh-release@v1
         with:
           files: ${{ env.ASSET_PATH }}
@@ -176,9 +142,12 @@ jobs:
     name: PyInstaller ${{ matrix.os }}
     if: github.actor != 'nektos/act'
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     strategy:
       matrix:
-        os: [macos-latest, macos-13, windows-latest]
+        os: [macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
       - name: Read project metadata
@@ -217,19 +186,8 @@ jobs:
           DEST="dist/bespokeasm-${APP_VERSION}-${PLATFORM}-${ARCH}${EXT}"
           mv "$SRC" "$DEST"
           echo "ASSET_PATH=$DEST" >> "$GITHUB_ENV"
-      - name: Should upload release assets
-        id: upload-check
-        run: |
-          if [ "${{ github.event_name }}" = "release" ] && \
-             [ "${{ github.event.action }}" = "published" ] && \
-             [ "${{ github.actor }}" != "nektos/act" ] && \
-             [ "${{ env.SKIP_RELEASE_UPLOAD }}" != "true" ]; then
-            echo "upload=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "upload=false" >> "$GITHUB_OUTPUT"
-          fi
       - name: Upload binary to release
-        if: ${{ steps.upload-check.outputs.upload == 'true' }}
+        if: github.event_name == 'release' && github.event.action == 'published' && github.actor != 'nektos/act' && env.SKIP_RELEASE_UPLOAD != 'true'
         uses: softprops/action-gh-release@v1
         with:
           files: ${{ env.ASSET_PATH }}
