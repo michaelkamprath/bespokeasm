@@ -1,0 +1,13 @@
+#require __LANGUAGE_NAME__ == slu4-min64x4-redux-asm
+#require __LANGUAGE_VERSION__ >= 1.4.0
+
+
+
+.org 0 "USER_APPS"
+init:
+    spinit
+main:
+    jps _Print "Hello, World!"      ; jump to print function
+
+end:
+    jpa _Prompt                     ; jump to prompt function

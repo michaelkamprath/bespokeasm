@@ -1,0 +1,125 @@
+; Prime Number Calculator
+;  This program calculates prime numbers using the algorithm documented here:
+;       https://en.wikipedia.org/wiki/Primality_test
+;
+#require __LANGUAGE_NAME__ == slu4-min64x4-redux-asm
+#require __LANGUAGE_VERSION__ >= 1.4.0
+
+.memzone ZERO_PAGE_APPS
+#mute
+_n_value:            .zero 4
+_current_i_val:      .zero 4
+_temp_val:           .zero 4
+_isquared:           .zero 4
+
+
+#unmute
+
+.org 0 "USER_APPS"
+start:
+    ; init N-value to 1
+    m4iq 1,_n_value+0
+.n_loop:
+    phsi 0
+    phsq _n_value
+    jps is_prime32
+    pls4
+    pls cpi 1 beq .print_is_prime
+    jpa .increment_n
+.print_is_prime:
+    phsq _n_value jps print_uint32 pls4
+    jps _Print " is prime!\n"
+    ; jps _WaitInput
+.increment_n:
+    inq _n_value
+    jpa .n_loop
+
+; is_prime32
+;   determines wither the passed uint32 is a prime
+;
+;   Arguments
+;       sp+3 : the value to determine if prime (4 bytes)
+;       sp+7 : a place holder for return boolean
+;
+;   returns
+;       sp+7 : 0 or 1 depending on whether N  is prime
+is_prime32:
+    ; first check for 2 or 3
+    lds 3 cpi 0 bne .modulo_two        ; check top byte of N for 0
+    lds 4 cpi 0 bne .modulo_two        ; check top byte of N for 0
+    lds 5 cpi 0 bne .modulo_two        ; check top byte of N for 0
+    lds 6 cpi 3 beq .is_prime          ; check N==3
+    cpi 2 beq .is_prime                ; check N==2
+    cpi 1 beq .is_not_prime            ; check N==1
+    cpi 0 beq .is_not_prime            ; check N==0
+.modulo_two:
+    lds 6 lr1 bcc .is_not_prime        ; see if N's least signficant bit is even or odd
+.modulo_three:
+    phs4i 3                           ; place divisor on stack
+    phs4s (3+4)                       ; place dividend on stack (from stack)
+    jps divide32
+    pls4
+    ; check if remainder is 0
+    phs4i 0 jps compare_uint32ss pls4
+    pls4
+    beq .is_not_prime
+.loop_init:
+    ; set i-value (long) to 5
+    cll _current_i_val          ; clear all of I
+    mib 5, _current_i_val+0     ; copy 5 in to LSB
+.loop:
+    phs4a _current_i_val
+    phs4a _current_i_val
+    jps multiply_uint32
+    ; high 4 bytes of result should be 0 since we are only doing 32 bit N
+    lds 1 cpi 0 bne .iteration_loop_done
+    lds 2 cpi 0 bne .iteration_loop_done
+    lds 3 cpi 0 bne .iteration_loop_done
+    lds 4 cpi 0 bne .iteration_loop_done
+    pls4
+    ms4l 1,_isquared
+    pls4
+    phs4a _isquared phs4s 3+4 jps compare_uint32ss pls4 pls4
+    ; if I*I > N, we are done
+    bgt .loop_done_is_prime
+.n_gte_i_squared:
+    ; now check various modulos.
+    ; check N % I == 0
+    phs4a _current_i_val   ; I
+    phs4s (3+4)            ; N
+    jps divide32
+    pls4                   ; quotient
+    phs4i 0
+    jps compare_uint32ss
+    pls4
+    pls4
+    beq .loop_done_is_not_prime
+    ; check N % (I+2) == 0
+    mll _current_i_val,_temp_val
+    aiq 2, _temp_val
+    phs4a _temp_val
+    phs4s (3+4)
+    jps divide32
+    pls4                   ; quotient
+    phs4i 0
+    jps compare_uint32ss
+    pls4                   ; zero
+    pls4                   ; remainder
+    beq .loop_done_is_not_prime
+    ; add 6 to I and loop
+    aiq 6, _current_i_val
+    jpa .loop
+.iteration_loop_done:
+    ; get rid of I*I stack
+    pls4
+    pls4
+.loop_done_is_prime:
+.is_prime:
+    ldi 1 sds 7
+    rts
+.loop_done_is_not_prime:
+.is_not_prime:
+    ldi 0 sds 7
+    rts
+#include "math32lib.min64x4r"
+#include "stringlib.min64x4r"

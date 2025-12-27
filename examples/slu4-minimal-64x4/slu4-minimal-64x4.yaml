@@ -5532,7 +5532,7 @@ macros:
           - "phs"
     documentation:
       category: Stack Management
-      title: Push Word in Memory onto Stack
+      title: Push Long in Memory onto Stack
       description: push 4 bytes at an absolute address onto the stack
   phsptr:
     # push an immediate absolute address to the stack per MinOS calling convention
@@ -5651,7 +5651,7 @@ macros:
           - "pls"
     documentation:
       category: Stack Management
-      title: pull 2 bytes from the stack
+      title: Pulls 2 bytes from the stack
   pls4:
     variants:
       - operands:
@@ -5663,7 +5663,7 @@ macros:
           - "pls"
     documentation:
       category: Arithmetic
-      title: pls4
+      title: Pulls 4 bytes from the stack
   mws2:
     # move 2-byte word at absolute address to stack at offset
     # stack is arranged as big-endian, word at abs address is little-endian
@@ -5719,7 +5719,6 @@ macros:
       category: Stack Management
       title: move 2 bytes from stack to zero-page word
   mvs2:
-    # move 4 bytes from zero-page word to stack starting at passed offset
     # stack is arranged as big-endian, word in zero-page is little-endian
     variants:
       - operands:
@@ -5735,7 +5734,7 @@ macros:
           - "sts @ARG(1)+1"
     documentation:
       category: Stack Management
-      title: move 4 bytes from zero-page word to stack starting at passed offset
+      title: Move word from zero-page to stack at offset
   ms4q:
     # move 4 bytes from stack starting at passed offset to zero-page long
     # stack is arranged as big-endian, long in zero-page is little-endian
