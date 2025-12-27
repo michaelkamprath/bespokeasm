@@ -302,6 +302,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Read project metadata
         id: meta
+        shell: bash
         run: |
           eval "$(python - <<'PY'
           import re, tomllib
