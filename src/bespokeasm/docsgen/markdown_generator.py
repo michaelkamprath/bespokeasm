@@ -285,8 +285,6 @@ class MarkdownGenerator:
         general = self.doc_model.general_docs
 
         # Check for custom documentation fields
-        if general.get('details'):
-            return True
         if general.get('addressing_modes'):
             return True
         if general.get('flags'):
@@ -379,10 +377,6 @@ class MarkdownGenerator:
             description = operand_set.get('description')
             if description:
                 subsection_parts.append(description)
-
-            details = operand_set.get('details')
-            if details:
-                subsection_parts.append(details)
 
             table = self._generate_operand_set_table(operand_set.get('operands', []))
             if table:
@@ -543,8 +537,8 @@ class MarkdownGenerator:
         addressing_modes = getattr(self.doc_model, 'general_docs', {}).get('addressing_modes') or []
         addressing_mode_header = '[Addressing Mode](#addressing-modes)' if addressing_modes else 'Addressing Mode'
 
-        headers = ['Operand', 'Syntax', 'Value', addressing_mode_header, 'Description', 'Details']
-        alignments = ['left', 'left', 'left', 'left', 'left', 'left']
+        headers = ['Operand', 'Syntax', 'Value', addressing_mode_header, 'Description']
+        alignments = ['left', 'left', 'left', 'left', 'left']
         rows: list[list[str]] = []
 
         for operand in operands:
@@ -578,11 +572,7 @@ class MarkdownGenerator:
             if description:
                 description = description.replace('\n', '<br>')
 
-            details = operand.get('details') or ''
-            if details:
-                details = details.replace('\n', '<br>')
-
-            rows.append([operand_cell, syntax_cell, value_cell, mode_cell, description, details])
+            rows.append([operand_cell, syntax_cell, value_cell, mode_cell, description])
 
         table = self._generate_markdown_table(headers, rows, column_alignments=alignments)
         if not table:
@@ -613,9 +603,6 @@ class MarkdownGenerator:
         table = self._generate_attribute_table('ISA', rows)
 
         sections = ['### ISA Overview', table]
-
-        if general.get('details'):
-            sections.append(general['details'])
 
         return '\n\n'.join(sections)
 
@@ -651,10 +638,10 @@ class MarkdownGenerator:
         """Generate the Endianness Configuration subsection."""
         rows: list[tuple[str, str]] = []
 
-        multi_word = endianness.get('multi_word_endianness', 'big')
+        multi_word = endianness.get('multi_word_endian', 'big')
         rows.append(('Multi-Word Endianness', f'`{multi_word}`'))
 
-        intra_word = endianness.get('intra_word_endianness', 'big')
+        intra_word = endianness.get('intra_word_endian', 'big')
         rows.append(('Intra-Word Endianness', f'`{intra_word}`'))
 
         if not rows:
@@ -690,7 +677,7 @@ class MarkdownGenerator:
             return ''
 
         has_title = any(reg.get('title') for reg in registers)
-        has_description = any((reg.get('description') or reg.get('details')) for reg in registers)
+        has_description = any(reg.get('description') for reg in registers)
         has_size = any(reg.get('size') is not None for reg in registers)
 
         headers = ['Symbol']
@@ -718,10 +705,6 @@ class MarkdownGenerator:
             if has_description:
                 description_value = register.get('description') or ''
                 description = str(description_value).replace('\n', '<br>') if description_value else ''
-                details = register.get('details')
-                if details:
-                    details_text = str(details).replace('\n', '<br>')
-                    description = f'{description}<br><br>{details_text}' if description else details_text
                 row.append(description)
 
             if has_size:
@@ -753,15 +736,23 @@ class MarkdownGenerator:
         sections = ['### Addressing Modes']
 
         # Prepare table data
-        headers = ['Mode', 'Description', 'Details']
+        has_title = any(mode.get('title') for mode in addressing_modes)
+        headers = ['Mode']
+        if has_title:
+            headers.append('Title')
+        headers.append('Description')
         rows = []
 
         for mode in addressing_modes:
-            details = mode.get('details', '').replace('\n', '<br>') if mode.get('details') else ''
             description = mode.get('description', '').replace('\n', '<br>')
             mode_name = mode.get('name', '')
             mode_cell = f'`{mode_name}`' if mode_name else ''
-            rows.append([mode_cell, description, details])
+            row = [mode_cell]
+            if has_title:
+                title = mode.get('title') or ''
+                row.append(str(title).replace('\n', '<br>') if title else '')
+            row.append(description)
+            rows.append(row)
 
         # Generate optimized table
         table = self._generate_markdown_table(headers, rows)
@@ -778,16 +769,15 @@ class MarkdownGenerator:
         sections = ['### Flags']
 
         # Prepare table data
-        headers = ['Name', 'Symbol', 'Description', 'Details']
+        headers = ['Name', 'Symbol', 'Description']
         rows = []
 
         for flag in flags:
             symbol = flag.get('symbol', '') if flag.get('symbol') else ''
             if symbol:
                 symbol = f'`{symbol}`'
-            details = flag.get('details', '').replace('\n', '<br>') if flag.get('details') else ''
             description = flag.get('description', '').replace('\n', '<br>')
-            rows.append([flag['name'], symbol, description, details])
+            rows.append([flag['name'], symbol, description])
 
         # Generate optimized table
         table = self._generate_markdown_table(headers, rows)
@@ -842,7 +832,8 @@ class MarkdownGenerator:
             sections.append(self._generate_category_section(
                 category,
                 categories[category],
-                doc_map=self.doc_model.macro_docs
+                doc_map=self.doc_model.macro_docs,
+                include_missing_doc_notice=False
             ))
 
         return '\n\n'.join(sections)
@@ -851,7 +842,8 @@ class MarkdownGenerator:
         self,
         category: str,
         operations: list[str],
-        doc_map: dict[str, Any] | None = None
+        doc_map: dict[str, Any] | None = None,
+        include_missing_doc_notice: bool = True
     ) -> str:
         """
         Generate a category section with its instructions.
@@ -870,13 +862,24 @@ class MarkdownGenerator:
         num_instructions = len(operations)
         for index, operation in enumerate(operations):
             instruction_doc = doc_map[operation]
-            sections.append(self._generate_instruction_documentation(operation, instruction_doc))
+            sections.append(
+                self._generate_instruction_documentation(
+                    operation,
+                    instruction_doc,
+                    include_missing_doc_notice=include_missing_doc_notice
+                )
+            )
             if index < num_instructions - 1:
                 sections.append('---')
 
         return '\n\n'.join(sections)
 
-    def _generate_instruction_documentation(self, instruction_name: str, instruction_doc: dict[str, Any]) -> str:
+    def _generate_instruction_documentation(
+        self,
+        instruction_name: str,
+        instruction_doc: dict[str, Any],
+        include_missing_doc_notice: bool = True
+    ) -> str:
         """
         Generate documentation for a single instruction.
 
@@ -898,15 +901,12 @@ class MarkdownGenerator:
 
         documented = instruction_doc.get('documented', True)
 
-        if not documented:
+        if not documented and include_missing_doc_notice:
             sections.append('*Documentation not provided.*')
 
-        # Shared description and details
+        # Shared description
         if instruction_doc.get('description'):
             sections.append(instruction_doc['description'])
-
-        if instruction_doc.get('details'):
-            sections.append(instruction_doc['details'])
 
         # Operand syntax by version
         versions = instruction_doc.get('versions') or []
@@ -986,10 +986,6 @@ class MarkdownGenerator:
         if version_description:
             lines.append(version_description)
 
-        version_details = version_data.get('details')
-        if version_details:
-            lines.append(version_details)
-
         signatures = version_data.get('signatures') or []
         if not signatures:
             signatures = [{'operands': []}]
@@ -1034,8 +1030,8 @@ class MarkdownGenerator:
         if not operands:
             return ''
 
-        headers = ['Operand', 'Type', 'Value', 'Description', 'Details']
-        alignments = ['left', 'left', 'left', 'left', 'left']
+        headers = ['Operand', 'Type', 'Value', 'Description']
+        alignments = ['left', 'left', 'left', 'left']
         rows: list[list[str]] = []
 
         display_names = display_names or []
@@ -1060,13 +1056,7 @@ class MarkdownGenerator:
             else:
                 description_cell = str(description_value).replace('\n', '<br>')
 
-            details = operand.get('details')
-            if details is None:
-                details_cell = ''
-            else:
-                details_cell = str(details).replace('\n', '<br>')
-
-            rows.append([operand_cell, operand_type, value_cell, description_cell, details_cell])
+            rows.append([operand_cell, operand_type, value_cell, description_cell])
 
         return self._generate_markdown_table(headers, rows, column_alignments=alignments)
 
@@ -1078,15 +1068,14 @@ class MarkdownGenerator:
         sections = ['#### Modifies']
 
         # Prepare table data
-        headers = ['Type', 'Target', 'Description', 'Details']
+        headers = ['Type', 'Target', 'Description']
         rows = []
 
         for modify in modifies:
             modify_type = modify.get('type', '').title()
             target = modify.get('target', '')
             description = modify.get('description', '').replace('\n', '<br>')
-            details = modify.get('details', '').replace('\n', '<br>') if modify.get('details') else ''
-            rows.append([modify_type, target, description, details])
+            rows.append([modify_type, target, description])
 
         # Generate optimized table
         table = self._generate_markdown_table(headers, rows)

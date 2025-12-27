@@ -1,6 +1,5 @@
 import re
 import sys
-import warnings
 from functools import cached_property
 
 from bespokeasm.assembler.bytecode.parts import ExpressionByteCodePart
@@ -45,7 +44,7 @@ class IndirectRegisterOperand(RegisterOperand):
                     f'ERROR - configuration for indirect register operand "{self.register}" is '
                     f'missing "size" setting.'
                 )
-            if 'word_align' not in self._config['offset'] and 'byte_align' not in self._config['offset']:
+            if 'word_align' not in self._config['offset']:
                 sys.exit(
                     f'ERROR - configuration for indirect register operand "{self.register}" is '
                     f'missing "word_align" setting.'
@@ -68,15 +67,6 @@ class IndirectRegisterOperand(RegisterOperand):
 
     @property
     def offset_word_align(self) -> bool:
-        if 'word_align' not in self._config['offset']:
-            warnings.warn(
-                f"The 'byte_align' option for offset configuration in operand configuration {self} is "
-                f'deprecated and will be removed in a future version. '
-                f"Replace with 'word_align'.",
-                DeprecationWarning,
-                stacklevel=2
-            )
-            return self._config['offset']['byte_align']
         return self._config['offset']['word_align']
 
     @property

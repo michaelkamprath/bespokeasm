@@ -13,7 +13,7 @@ general :
     - sp
     - ij
     - mar
-  min_version: "0.5.0"
+  min_version: "0.7.0"
 predefined:
   constants:
     - name: predefined_value1

@@ -21,7 +21,6 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertEqual(model.isa_name, 'test-isa')
         self.assertIsNone(model.isa_description)
         self.assertEqual(model.general_docs['description'], None)
-        self.assertEqual(model.general_docs['details'], None)
         self.assertEqual(model.general_docs['addressing_modes'], [])
         self.assertEqual(model.general_docs['flags'], [])
         self.assertEqual(model.general_docs['examples'], [])
@@ -53,8 +52,7 @@ class TestDocumentationModel(unittest.TestCase):
                 'flags': {
                     'C': {
                         'name': 'carry',
-                        'description': 'Carry flag',
-                        'details': 'Set on arithmetic overflow'
+                        'description': 'Carry flag'
                     },
                     'Z': {
                         'name': 'zero',
@@ -63,7 +61,6 @@ class TestDocumentationModel(unittest.TestCase):
                 },
                 'documentation': {
                     'description': 'Test ISA Description',
-                    'details': 'Detailed information about the ISA',
                     'addressing_modes': {
                         'immediate': {
                             'description': 'Immediate addressing',
@@ -89,17 +86,16 @@ class TestDocumentationModel(unittest.TestCase):
         # Test general documentation
         self.assertEqual(model.isa_description, 'Test ISA Description')
         self.assertEqual(model.general_docs['description'], 'Test ISA Description')
-        self.assertEqual(model.general_docs['details'], 'Detailed information about the ISA')
 
         # Test addressing modes
         addressing_modes = model.general_docs['addressing_modes']
         self.assertEqual(len(addressing_modes), 2)
         self.assertEqual(addressing_modes[0]['name'], 'immediate')
-        self.assertEqual(addressing_modes[0]['description'], 'Immediate addressing')
-        self.assertEqual(addressing_modes[0]['details'], 'Load value directly')
+        self.assertEqual(addressing_modes[0]['title'], 'Immediate addressing')
+        self.assertEqual(addressing_modes[0]['description'], 'Load value directly')
         self.assertEqual(addressing_modes[1]['name'], 'register')
-        self.assertEqual(addressing_modes[1]['description'], 'Register addressing')
-        self.assertIsNone(addressing_modes[1]['details'])
+        self.assertEqual(addressing_modes[1]['title'], 'Register addressing')
+        self.assertEqual(addressing_modes[1]['description'], '')
 
         # Test registers
         registers = model.general_docs['registers']
@@ -107,17 +103,14 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertEqual(registers[0]['name'], 'A')
         self.assertEqual(registers[0]['title'], 'Accumulator')
         self.assertEqual(registers[0]['description'], 'Primary working register.')
-        self.assertIsNone(registers[0]['details'])
         self.assertEqual(registers[0]['size'], 8)
         self.assertEqual(registers[1]['name'], 'SP')
         self.assertEqual(registers[1]['title'], 'Stack Pointer')
         self.assertEqual(registers[1]['description'], 'Holds the top of stack address.')
-        self.assertIsNone(registers[1]['details'])
         self.assertEqual(registers[1]['size'], 16)
         self.assertEqual(registers[2]['name'], 'X')
         self.assertIsNone(registers[2]['title'])
         self.assertIsNone(registers[2]['description'])
-        self.assertIsNone(registers[2]['details'])
         self.assertEqual(registers[2]['size'], 12)
 
         # Test flags
@@ -126,7 +119,6 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertEqual(flags[0]['name'], 'carry')
         self.assertEqual(flags[0]['symbol'], 'C')
         self.assertEqual(flags[0]['description'], 'Carry flag')
-        self.assertEqual(flags[0]['details'], 'Set on arithmetic overflow')
         self.assertEqual(flags[1]['name'], 'zero')
         self.assertEqual(flags[1]['symbol'], 'Z')
         self.assertEqual(flags[1]['description'], 'Zero flag')
@@ -148,7 +140,6 @@ class TestDocumentationModel(unittest.TestCase):
                         'category': 'Stack',
                         'title': 'Push Word',
                         'description': 'Pushes a 16-bit value.',
-                        'details': 'Expands to two pushes.',
                         'examples': [{'title': 'push', 'code': 'push2 $1234'}]
                     },
                     'variants': [
@@ -196,7 +187,6 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertEqual(push2_doc['category'], 'Stack')
         self.assertEqual(push2_doc['title'], 'Push Word')
         self.assertEqual(push2_doc['description'], 'Pushes a 16-bit value.')
-        self.assertEqual(push2_doc['details'], 'Expands to two pushes.')
         self.assertEqual(len(push2_doc['versions']), 1)
         self.assertEqual(push2_doc['versions'][0]['title'], 'Immediate')
         self.assertEqual(push2_doc['versions'][0]['description'], 'Immediate 16-bit value.')
@@ -243,8 +233,7 @@ class TestDocumentationModel(unittest.TestCase):
                     'documentation': {
                         'title': 'General Registers',
                         'category': 'Registers',
-                        'description': 'General purpose registers.',
-                        'details': 'Used for arithmetic operations.',
+                        'description': 'General purpose registers. Used for arithmetic operations.',
                         'operand_order': ['reg_b', 'reg_a']
                     },
                     'operand_values': {
@@ -254,8 +243,7 @@ class TestDocumentationModel(unittest.TestCase):
                             'documentation': {
                                 'title': 'Register A',
                                 'mode': 'Register',
-                                'description': 'Accumulator register',
-                                'details': 'Used frequently.'
+                                'description': 'Accumulator register. Used frequently.'
                             }
                         },
                         'reg_b': {
@@ -362,32 +350,29 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertEqual(register_set['title'], 'General Registers')
         self.assertEqual(register_set['category'], 'Registers')
 
-        self.assertEqual(register_set['description'], 'General purpose registers.')
-        self.assertEqual(register_set['details'], 'Used for arithmetic operations.')
+        self.assertEqual(register_set['description'], 'General purpose registers. Used for arithmetic operations.')
         self.assertEqual([op['name'] for op in register_set['operands']], ['reg_b', 'reg_a'])
         self.assertEqual(register_set['operands'][0]['syntax'], 'b')
         self.assertEqual(register_set['operands'][0]['value'], 'register `b`')
         self.assertEqual(register_set['operands'][0]['mode'], 'Register')
         self.assertTrue(register_set['operands'][0]['mode_from_doc'])
         self.assertEqual(register_set['operands'][0]['description'], 'Index register')
-        self.assertIsNone(register_set['operands'][0]['details'])
         self.assertEqual(register_set['operands'][0]['title'], 'Register B')
         self.assertEqual(register_set['operands'][1]['syntax'], 'a')
         self.assertEqual(register_set['operands'][1]['value'], 'register `a`')
-        self.assertEqual(register_set['operands'][1]['details'], 'Used frequently.')
+        self.assertEqual(register_set['operands'][1]['description'], 'Accumulator register. Used frequently.')
         self.assertEqual(register_set['operands'][1]['title'], 'Register A')
         self.assertTrue(register_set['operands'][1]['mode_from_doc'])
 
         zero_page_set = operand_sets_map['zero_page']
         self.assertIsNone(zero_page_set['description'])
-        self.assertIsNone(zero_page_set['details'])
         self.assertEqual(len(zero_page_set['operands']), 1)
         zp_operand = zero_page_set['operands'][0]
         self.assertEqual(zp_operand['mode'], 'Address')
         self.assertFalse(zp_operand['mode_from_doc'])
         self.assertEqual(zp_operand['syntax'], 'zp_addr')
         self.assertEqual(zp_operand['value'], 'numeric expression')
-        self.assertIn('Valid within `ZERO_PAGE` memory zone.', zp_operand['details'])
+        self.assertIn('Valid within `ZERO_PAGE` memory zone.', zp_operand['description'])
         self.assertIsNone(zp_operand['title'])
 
         enum_set = operand_sets_map['enum_values']
@@ -396,10 +381,10 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertEqual(enum_operand['mode'], 'Numeric Enumeration')
         self.assertFalse(enum_operand['mode_from_doc'])
         self.assertIsNone(enum_operand['title'])
-        self.assertIsNone(enum_operand['description'])
+        self.assertIsNotNone(enum_operand['description'])
         self.assertEqual(enum_operand['syntax'], 'enum')
         self.assertEqual(enum_operand['value'], 'numeric values: `0`, `1`, `2`')
-        self.assertIn('Possible values: `0`, `1`, `2`.', enum_operand['details'])
+        self.assertIn('Possible values: `0`, `1`, `2`.', enum_operand['description'])
 
         memory_set = operand_sets_map['memory_operands']
         self.assertIsNone(memory_set['description'])
@@ -563,7 +548,6 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertEqual(registers[0]['name'], 'A')
         self.assertIsNone(registers[0]['title'])
         self.assertIsNone(registers[0]['description'])
-        self.assertIsNone(registers[0]['details'])
         self.assertEqual(registers[0]['size'], 8)
 
     def test_parse_general_documentation_legacy_flags(self):
@@ -594,8 +578,7 @@ class TestDocumentationModel(unittest.TestCase):
             'operand_sets': {
                 'imm8': {
                     'documentation': {
-                        'description': '8-bit immediate value',
-                        'details': 'Unsigned literal constrained to 0-255.'
+                        'description': '8-bit immediate value. Unsigned literal constrained to 0-255.'
                     }
                 }
             },
@@ -611,7 +594,6 @@ class TestDocumentationModel(unittest.TestCase):
                         'category': 'Data Movement',
                         'title': 'Load accumulator',
                         'description': 'Transfers a literal into the accumulator.',
-                        'details': 'Load a value into the accumulator register',
                         'modifies': [
                             {
                                 'register': 'A',
@@ -677,7 +659,6 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertEqual(lda_doc['category'], 'Data Movement')
         self.assertEqual(lda_doc['title'], 'Load accumulator')
         self.assertEqual(lda_doc['description'], 'Transfers a literal into the accumulator.')
-        self.assertEqual(lda_doc['details'], 'Load a value into the accumulator register')
         self.assertTrue(lda_doc['documented'])
         self.assertEqual(len(lda_doc['versions']), 1)
         lda_signature = lda_doc['versions'][0]['signatures'][0]
@@ -685,10 +666,9 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertEqual(len(lda_signature['operands']), 1)
         self.assertEqual(lda_signature['operands'][0]['name'], 'imm8')
         self.assertEqual(lda_signature['operands'][0]['type'], 'operand_set')
-        self.assertEqual(lda_signature['operands'][0]['description'], '8-bit immediate value')
         self.assertEqual(
-            lda_signature['operands'][0]['details'],
-            'Unsigned literal constrained to 0-255.'
+            lda_signature['operands'][0]['description'],
+            '8-bit immediate value. Unsigned literal constrained to 0-255.'
         )
 
         # Test modifies
@@ -713,7 +693,6 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertEqual(add_doc['category'], 'Arithmetic')
         self.assertEqual(add_doc['title'], 'Add to accumulator')
         self.assertIsNone(add_doc['description'])
-        self.assertIsNone(add_doc['details'])
         self.assertEqual(add_doc['modifies'], [])
         self.assertEqual(add_doc['examples'], [])
         self.assertTrue(add_doc['documented'])
@@ -733,7 +712,6 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertEqual(nop_doc['category'], 'Uncategorized')
         self.assertIsNone(nop_doc['title'])
         self.assertIsNone(nop_doc['description'])
-        self.assertIsNone(nop_doc['details'])
         self.assertEqual(nop_doc['modifies'], [])
         self.assertEqual(nop_doc['examples'], [])
         self.assertFalse(nop_doc['documented'])

@@ -12,11 +12,10 @@ The general documentastion is mostly implied by the configuration of the `genera
 | Option Key | Value Type | Description |
 | --- | --- | --- |
 | `description` | string | A short description of the instruction set architecture. |
-| `details` | string | _Optional_ A detailed description of the instruction set architecture. Markdown text is allowed. |
-| `addressing_modes` | dictionary | _Optional_ A dictionary of addressing modes. The keys are the addressing mode names and the values are dictionaries with the following keys:<ul><li>`description` - A short description of the addressing mode.</li><li>`details` - _Optional_ A detailed description of the addressing mode. Markdown text is allowed.</li></ul>The keys in this dictionary are used by the `mode` field in the [Operand Documentation](#operand-documentation) section. Note that while there is corelation between an instruction set's addressing modes and **BespokeASM**'s operand types, an operand type describes how *BespokeASM* will parse the operand value when assembling an instruction, while an addressing mode describes how the operand value is used in the instruction set and ultimately in the hardware the assembled bytecode is executed on and is not a **BespokeASM** concept. |
+| `addressing_modes` | dictionary | _Optional_ A dictionary of addressing modes. The keys are addressing mode names and the values are dictionaries with `title` and `description` strings. The keys in this dictionary are used by the `mode` field in the [Operand Documentation](#operand-documentation) section. Note that while there is corelation between an instruction set's addressing modes and **BespokeASM**'s operand types, an operand type describes how *BespokeASM* will parse the operand value when assembling an instruction, while an addressing mode describes how the operand value is used in the instruction set and ultimately in the hardware the assembled bytecode is executed on and is not a **BespokeASM** concept. Legacy configurations map `description` to `title` and `details` to `description`. |
 | `examples` | array | _Optional_ An array of example instructions. Each example is a dictionary with the following keys:<ul><li>`title` - A short title for the example.</li><li>`description` - _Optional_ A detailed description of the example. Markdown text is allowed.</li><li>`code` - The code of the example instruction.</li></ul><p>Examples are used to show how the instruction set can be used in practice. They should be used to demonstrate the use of the instruction set in a way that is easy to understand and use. |
 
-Flag documentation is defined directly in the `general.flags` dictionary rather than inside the `documentation` subsection. Each entry in that dictionary is keyed by the flag symbol and contains the remaining metadata (for example, `description` and optional `details`).
+Flag documentation is defined directly in the `general.flags` dictionary rather than inside the `documentation` subsection. Each entry in that dictionary is keyed by the flag symbol and contains the remaining metadata (for example, `description`).
 
 
 ### Instruction Documentation
@@ -26,8 +25,8 @@ Each instruction entry in the configuration file (as documented in the [Instruct
 | --- | --- | --- |
 | `category` | string | The category of the instruction. This is used to group instructions together in the documentation page.  Categories include things like "Data Movement", "Arithmetic", "Control Flow", "Memory", "I/O", "Bitwise", etc. There is no absolute constraint on the categories, but they should be used to group instructions together in a way that is easy to understand and use, and the catefory titles should be concise and descriptive. |
 | `title` | string | A short title or summary of the instruction. |
-| `details` | string | _Optional_ A detailed description of the instruction. Markdown text is allowed. |
-| `modifies` | array | _Optional_ An array of dictionaries each representing a register or memory location that is modified by the instruction. Each dictionary has the following keys:<ul><li>`register` - The register that is modified. The value of this key is the name of the register.</li><li>`memory` - The memory location that is modified. The value of this key is the name of the memory location.</li><li>`flag` - The flag that is modified. The value of this key is the name of the flag.</li><li>`description` - A short description of the modification.</li><li>`details` - _Optional_ A detailed description of the modification. Markdown text is allowed.</li></ul><p>Each `modifies`dictionary must contain exact one of the keys `register`, `memory`, or `flag`, and the `description` field, and `details` field is optional. |
+| `description` | string | _Optional_ A detailed description of the instruction. Markdown text is allowed. |
+| `modifies` | array | _Optional_ An array of dictionaries each representing a register or memory location that is modified by the instruction. Each dictionary has the following keys:<ul><li>`register` - The register that is modified. The value of this key is the name of the register.</li><li>`memory` - The memory location that is modified. The value of this key is the name of the memory location.</li><li>`flag` - The flag that is modified. The value of this key is the name of the flag.</li><li>`description` - A short description of the modification.</li></ul><p>Each `modifies`dictionary must contain exact one of the keys `register`, `memory`, or `flag`, and the `description` field. |
 | `examples` | array | _Optional_ An array of example usages of the instruction. Each example is a dictionary with the following keys:<ul><li>`title` - A short title for the example.</li><li>`description` - _Optional_ A detailed description of the example. Markdown text is allowed.</li><li>`code` - The code of the example instruction.</li></ul><p>Examples are used to show how the instruction can be used in practice. They should be concise and to the point. |
 
 ### Macro Documentation
@@ -37,7 +36,7 @@ Instruction macros may also include documentation, using the same schema as inst
 | --- | --- | --- |
 | `category` | string | The category of the macro. Used to group macros together in the documentation page. |
 | `title` | string | A short title or summary of the macro. |
-| `details` | string | _Optional_ A detailed description of the macro. Markdown text is allowed. |
+| `description` | string | _Optional_ A detailed description of the macro. Markdown text is allowed. |
 | `modifies` | array | _Optional_ An array of dictionaries describing registers, memory locations, or flags modified by the macro. Same structure as instructions. |
 | `examples` | array | _Optional_ An array of macro usage examples. Same structure as instructions. |
 
@@ -51,8 +50,7 @@ Each operand entry in the configuration file (as documented in the [Instruction 
 | `title` | string | _Optional_ A friendly display name for the operand. Falls back to the operand key when not provided. |
 | `syntax_example` | string | _Optional_ A literal example of how this operand should appear in assembly syntax. When present, this string is used verbatim in calling syntax blocks, `where` tables, and operand set tables instead of any auto-derived placeholder. |
 | `mode` | string | A short string representing the aaddressing mode of the operand. For example 'register', 'immediate', 'memory', 'flag', etc. The value of this field is the key in the `addressing_modes` dictionary in the [General Documentation](#general-documentation) section. |
-| `description` | string | A short description of the operand. |
-| `details` | string | _Optional_ A detailed description of the operand. Markdown text is allowed. When omitted, certain operand types (for example `numeric_enumeration`) will auto-populate the documentation with helpful metadata such as the list of valid enumeration values. |
+| `description` | string | A short description of the operand. Auto-generated notes for some operand types (for example `numeric_enumeration`) are appended when no description is provided. |
 
 ### Operand Set Documentation
 Each operand set entry in the configuration file (see the [Instruction Set Configuration File](https://github.com/michaelkamprath/bespokeasm/wiki/Instruction-Set-Configuration-File#operand-sets) wiki page) may include an optional `documentation` field alongside its `operand_values`. This dictionary describes the operand set as a whole so that generated documentation can introduce the set before listing the individual operands.
@@ -62,10 +60,9 @@ Each operand set entry in the configuration file (see the [Instruction Set Confi
 | `title` | string | _Optional_ A friendly display name for the operand set. Falls back to the operand set key when not provided. |
 | `category` | string | _Optional_ A grouping label (for example “Registers”, “Addressing”, “Literals”) used to cluster operand sets within the generated documentation. |
 | `description` | string | A short sentence summarizing the operand set’s role. |
-| `details` | string | _Optional_ Extended markdown content describing nuances, encoding notes, or architectural constraints for the operand set. Markdown text is allowed. |
 | `operand_order` | array[string] | _Optional_ Ordered list of operand keys from `operand_values` that dictates how operands are presented in documentation. Defaults to the configuration order if omitted. |
 
-The individual operands within an operand set continue to use the [Operand Documentation](#operand-documentation) fields (`mode`, `description`, `details`). When both levels are present, the generated documentation will introduce each operand set using the fields above and then tabulate its member operands, leveraging the per-operand metadata to populate the table.
+The individual operands within an operand set continue to use the [Operand Documentation](#operand-documentation) fields (`mode`, `description`). When both levels are present, the generated documentation will introduce each operand set using the fields above and then tabulate its member operands, leveraging the per-operand metadata to populate the table.
 
 ### Predefined Memory Zone Documentation
 Each entry in `predefined.memory_zones` (see the [Instruction Set Configuration File](https://github.com/michaelkamprath/bespokeasm/wiki/Instruction-Set-Configuration-File#predefined) wiki page) may include an optional `documentation` field that describes the memory zone in generated ISA docs.
@@ -120,7 +117,6 @@ The General Information section will include comprehensive details from the enti
 - **Version** - From `general.identifier.version` (if present)
 - **File Extension** - From `general.identifier.extension` (if present). Values are rendered using the `*.ext` convention (e.g., `*.sap1`).
 - **Description** - From `general.documentation.description` (if present)
-- **Details** - From `general.documentation.details` (if present, rendered as markdown immediately after the table)
 
 #### Hardware Architecture Details
 - **Address Size** - From `general.address_size` (required field)
@@ -130,8 +126,8 @@ The General Information section will include comprehensive details from the enti
 - **Origin Address** - From `general.origin` (shown as **Default Origin Address** when the value is `0`)
 
 #### Endianness Configuration
-- **Multi-Word Endianness** - From `general.multi_word_endianness` (defaults to "big" if not specified)
-- **Intra-Word Endianness** - From `general.intra_word_endianness` (defaults to "big" if not specified)
+- **Multi-Word Endianness** - From `general.multi_word_endian` (defaults to "big" if not specified)
+- **Intra-Word Endianness** - From `general.intra_word_endian` (defaults to "big" if not specified)
 - Note: If the deprecated `general.endian` field is present, it should be reported with a deprecation warning
 
 #### String and Data Handling
@@ -143,11 +139,11 @@ The General Information section will include comprehensive details from the enti
 #### Register Set
 **Registers** - If the `registers` section of the `general` configuration is present, then the set of registers is documented in a table that always includes a `Symbol` column and conditionally includes the following columns when data is available for at least one register:
 * `Title` — Populated from the register's `title` attribute.
-* `Description` — Populated from the register's `description` attribute (with the optional `details` value appended).
+* `Description` — Populated from the register's `description` attribute.
 * `Bit Size` — Populated from the register's configured `size`.
 
 #### Addressing Modes
-- **Addressing Modes** - Table of addressing modes from `general.documentation.addressing_modes` (if present)
+- **Addressing Modes** - Table of addressing modes from `general.documentation.addressing_modes` (if present). Includes a Title column when at least one addressing mode defines `title`.
 
 #### Flags
 - **Flags** - Table of flags from `general.flags` (if present). Each flag entry is keyed by its symbol, and the symbol is rendered as inline code in the table.
@@ -198,14 +194,13 @@ The operand sets section is emitted immediately after the Predefined Data sectio
 
 For each operand set subsection:
 1. **Category Label** — When `documentation.category` is present, emit an italicized line `*Category: <category>*` directly beneath the heading.
-2. **Summary** — Render `documentation.description` as a short lead-in paragraph, followed by `documentation.details` as multi-line markdown when available.
+2. **Summary** — Render `documentation.description` as a short lead-in paragraph.
 3. **Operand Table** — Emit a table where each row represents an operand from the operand set. Rows are ordered by `documentation.operand_order` when provided; otherwise the operands preserve the configuration file order. The default table columns are:
    - `Operand` — The operand key from `operand_values`, rendered as inline code.
    - `Syntax` — Shows how the operand would be written in source code. Prefer `operand_values.<operand>.documentation.syntax_example` when provided; otherwise derive the syntax from the operand’s configuration using the rules in [Operand Syntax Resolution](#operand-syntax-resolution). Syntax is reused in calling syntax placeholders when present so bracketed/decorated forms surface there.
    - `Value` — Summarizes the underlying target or constraint (register name, numeric range, enumeration tokens). Decorators stay in `Syntax`; `Value` shows the plain register name for register-backed operands and the allowed range for numeric bytecode, etc.
    - `Mode` — Populated from the operand’s `documentation.mode`. The column header links to the Addressing Modes section only when `general.documentation.addressing_modes` is present; otherwise the header is plain text.
    - `Description` — Populated from the operand’s `documentation.description`.
-   - `Details` — Populated from the operand’s `documentation.details`, allowing inline markdown.
 
    Column inclusion follows the [Table Column Optimization](#table-column-optimization) guidance. If every operand lacks a value for a column, that column is omitted entirely.
 
@@ -255,7 +250,6 @@ Each instruction's documentation will be prefaced with a markdown section header
 
 Immediately after the instruction heading, render the shared narrative elements that apply to all operand signatures:
 - Emit `documentation.description` as a short lead-in paragraph.
-- Follow with `documentation.details`, when provided, as multiline markdown.
 
 Once the shared description is in place, evaluate the operand signatures defined for the instruction. Signatures can come from the top-level `operands` configuration, from entries in the `variants` list, or both. The generator treats these configurations as an ordered list of versions:
 
@@ -265,18 +259,18 @@ Once the shared description is in place, evaluate the operand signatures defined
 
 When more than one signature exists, insert a subheading `#### Version <N>` for each version. If the variant provides a `documentation.title`, append it after the version number with a colon separator (for example, `#### Version 2 : LOAD REGISTER A, KL`). These subheadings appear immediately after the shared description (and before any `Modifies` or `Examples` subsections). For instructions with only one signature, omit the subheading and apply the Version&nbsp;1 layout directly under the shared description.
 
-Variant-level documentation is fully supported. Any `documentation` fields present on a variant (e.g., `documentation.title`, `documentation.description`, `documentation.details`, `documentation.modifies`, `documentation.examples`) are rendered within that version’s section in the same format used for instruction-level documentation. This allows each operand signature to carry its own narrative, modifiers, and examples without affecting the shared instruction description.
+Variant-level documentation is fully supported. Any `documentation` fields present on a variant (e.g., `documentation.title`, `documentation.description`, `documentation.modifies`, `documentation.examples`) are rendered within that version’s section in the same format used for instruction-level documentation. This allows each operand signature to carry its own narrative, modifiers, and examples without affecting the shared instruction description.
 
 Inside each version section, emit a syntax summary that makes the callable form of that signature explicit. The syntax block follows this structure:
 
 1. Render an italicized lead-in line `*Calling syntax:*`.
 2. Emit an `````asm```` code block that shows the mnemonic followed by its operands in source order, separated by `, ` to match the [assembly language syntax](https://github.com/michaelkamprath/bespokeasm/wiki/Assembly-Language-Syntax#general-assembler-syntax). Each operand string is resolved using [Operand Syntax Resolution](#operand-syntax-resolution), favoring any `documentation.syntax_example` that has been provided.
-3. When at least one operand placeholder is present, add a `where` paragraph followed by a markdown table describing each operand. The default columns are `Operand`, `Type`, `Value`, and `Description`, with an optional `Details` column included only when any operand surfaces `documentation.details` or auto-generated notes. The `Operand` column echoes the syntax string used in the code block (adding ordered suffixes when a signature repeats the same operand position), the `Type` column reflects the configured operand type, and the `Value` column summarizes the literal token or numeric constraints implied by the configuration (for example, the concrete register name, `[reg+offset]`, an allowed enumeration token, or the numeric min/max for `numeric_bytecode`). Descriptions and details prefer author-provided documentation but may be augmented with derived information. Column inclusion continues to follow the [Table Column Optimization](#table-column-optimization) rules.
+3. When at least one operand placeholder is present, add a `where` paragraph followed by a markdown table describing each operand. The default columns are `Operand`, `Type`, `Value`, and `Description`. The `Operand` column echoes the syntax string used in the code block (adding ordered suffixes when a signature repeats the same operand position), the `Type` column reflects the configured operand type, and the `Value` column summarizes the literal token or numeric constraints implied by the configuration (for example, the concrete register name, `[reg+offset]`, an allowed enumeration token, or the numeric min/max for `numeric_bytecode`). Descriptions prefer author-provided documentation but may be augmented with derived information. Column inclusion continues to follow the [Table Column Optimization](#table-column-optimization) rules.
 
 Operand placeholders and table rows are derived from the instruction version's operand configuration:
 
-- **Specific operands**: For each entry in `specific_operands`, emit a dedicated syntax block. Operands appear in the order of the `list` dictionary. The `Operand` column uses the resolved syntax string (with numeric suffixes appended only when the same operand position appears multiple times), the `Type` column is populated from that operand's configured `type`, and the `Value`/`Description`/`Details` columns combine derived constraints (register name, enumeration token, numeric bounds, addressing wrapper) with any text from the operand's `documentation` stanza. If an operand uses the `empty` type, omit it from the mnemonic output while still documenting it in the table so that readers understand the implicit behavior.
-- **Operand sets**: When `operand_sets` are used (and no overlapping `specific_operands` override the combination), emit a syntax block whose operand placeholders come from the resolved syntax of each set entry. The `Type` column for these rows is the literal string `operand_set`, and the description data is sourced from the operand set's documentation (`operand_sets.<set name>.documentation.description` with optional `details`). If an operand set lacks documentation, leave the description blank in this table—the Operand Sets section already clarifies the set's members and behavior. When an operand set has exactly one operand value, the calling syntax and table use that member’s syntax/name/value/type instead of the set key.
+- **Specific operands**: For each entry in `specific_operands`, emit a dedicated syntax block. Operands appear in the order of the `list` dictionary. The `Operand` column uses the resolved syntax string (with numeric suffixes appended only when the same operand position appears multiple times), the `Type` column is populated from that operand's configured `type`, and the `Value`/`Description` columns combine derived constraints (register name, enumeration token, numeric bounds, addressing wrapper) with any text from the operand's `documentation` stanza. If an operand uses the `empty` type, omit it from the mnemonic output while still documenting it in the table so that readers understand the implicit behavior.
+- **Operand sets**: When `operand_sets` are used (and no overlapping `specific_operands` override the combination), emit a syntax block whose operand placeholders come from the resolved syntax of each set entry. The `Type` column for these rows is the literal string `operand_set`, and the description data is sourced from the operand set's documentation (`operand_sets.<set name>.documentation.description`). If an operand set lacks documentation, leave the description blank in this table—the Operand Sets section already clarifies the set's members and behavior. When an operand set has exactly one operand value, the calling syntax and table use that member’s syntax/name/value/type instead of the set key.
 - **Mixed configurations**: When both `specific_operands` and `operand_sets` are present, list all `specific_operands` variants first (preserving configuration order) and then emit the operand set signature that applies when no specific variant matches.
 
 For instruction versions with zero operands, still render the `*Calling syntax:*` lead-in and a single-line code block containing only the mnemonic. In this case the `where` paragraph and operand table are omitted.
@@ -285,7 +279,6 @@ After all version sections are rendered, if the instruction has a `modifies` fie
 - `Type` - The type of modification (Register, Memory, or Flag).
 - `Target` - The target that is modified (register name, memory location, or flag name).
 - `Description` - The description of the modification.
-- `Details` - The detailed description of the modification.
 
 Note: Column inclusion follows the [Table Column Optimization](#table-column-optimization) rules - empty columns will be omitted from the generated table. Once the `Modifies` and `Examples` subsections (if present) are emitted for an instruction, insert a horizontal rule (`---`) before documenting the next instruction in the category. This provides clear separation between instruction entries without interrupting the syntax section itself.
 
@@ -299,7 +292,7 @@ If the instruction has an `examples` field under the instruction's documentation
 
 ### Macro Documentation Section
 
-Macro documentation is emitted under a dedicated `# Macros` heading. Macros are grouped by their `documentation.category` (or `Uncategorized` when absent) using `## <category>` subsections. Each macro uses the same presentation as instructions: a `### \`<mnemonic>\` : <title>` heading when a title is present, followed by shared description/details, per-variant calling syntax and `where` tables derived from the macro’s operand configuration, and optional `Modifies` and `Examples` subsections. Variant-level documentation from individual entries in the macro `variants` list is rendered within the corresponding version block just like instruction variants. Macros without documentation are still listed with a placeholder message when documentation is generated.
+Macro documentation is emitted under a dedicated `# Macros` heading. Macros are grouped by their `documentation.category` (or `Uncategorized` when absent) using `## <category>` subsections. Each macro uses the same presentation as instructions: a `### \`<mnemonic>\` : <title>` heading when a title is present, followed by shared description, per-variant calling syntax and `where` tables derived from the macro’s operand configuration, and optional `Modifies` and `Examples` subsections. Variant-level documentation from individual entries in the macro `variants` list is rendered within the corresponding version block just like instruction variants. Macros without documentation are still listed, but no placeholder text is emitted for the documentation section.
 
 ### Examples Section
 General examples from `general.documentation.examples` are emitted at the end of the markdown file, after the Macros section. The section begins with the header `# Examples` and follows the same formatting rules used elsewhere in the documentation:
@@ -350,7 +343,6 @@ The documentation generator must handle the following error conditions gracefull
 
 #### Documentation Content Errors
 - **Missing documentation fields**: Gracefully skip missing optional documentation fields without error
-- **Invalid markdown in details**: Preserve content as-is but warn if verbose mode is enabled
 - **Empty categories**: Skip empty instruction categories in output
 - **Malformed examples**: Skip individual malformed examples but process others
 

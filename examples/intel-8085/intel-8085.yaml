@@ -1,7 +1,7 @@
 description: Intel 8085
 general:
   address_size: 16
-  multi_word_endianness: little
+  multi_word_endian: little
   registers:
     - a
     - b
@@ -21,7 +21,7 @@ general:
     name: intel-8085-asm
     version: "0.1.0"
     extension: a85
-  min_version: 0.5.0
+  min_version: 0.7.0
 operand_sets:
   8_bit_source:
     operand_values:
@@ -155,7 +155,7 @@ operand_sets:
         type: numeric
         argument:
           size: 16
-          byte_align: true
+          word_align: true
           endian: little
   uint8_no_bytecode:
     operand_values:
@@ -163,7 +163,7 @@ operand_sets:
         type: numeric
         argument:
           size: 8
-          byte_align: true
+          word_align: true
 instructions:
   # General
   nop:
@@ -943,7 +943,7 @@ instructions:
                 size: 3
                 max: 7
                 min: 0
-                byte_align: false
+                word_align: false
   push:
     variants:
       # Push a register pair to the stack

@@ -1,20 +1,20 @@
 description: KENBAK-1 ISA
 general:
   address_size: 8
-  multi_word_endianness: big
+  multi_word_endian: big
   registers:
     a:
       title: "`A` Register"
-      details: Primary ALU register
+      description: Primary ALU register
     b:
       title: "`B` Register"
-      details: Secondary ALU register
+      description: Secondary ALU register
     x:
       title: Indexing Register
-      details: The contents of the `x` register are used in the `indexed` address mode.
+      description: The contents of the `x` register are used in the `indexed` address mode.
     output:
       title: Output Register
-      details: This register controls the Console Data Lamps when the computer is in the Run state.
+      description: This register controls the Console Data Lamps when the computer is in the Run state.
     pc:
       title: Program Counter
   flags:
@@ -33,31 +33,31 @@ general:
   documentation:
     addressing_modes:
       register:
-        description: register
-        details: the operand is a register.
+        title: Register
+        description: the operand is a register.
       immediate:
-        description: immediate value
-        details: the operand is the contents of the second word of the instruction.
+        title: Immediate Value
+        description: the operand is the contents of the second word of the instruction.
       memory:
-        description: address of a value in memory
-        details: the second word of the instruction is the address of the operand.
+        title: Address of a Value in Memory
+        description: the second word of the instruction is the address of the operand.
       indirect:
-        description: address to an address of a value in memory
-        details: the second word of the instruction is the address of the address of the operand.
+        title: Address to an Address of a Value in Memory
+        description: the second word of the instruction is the address of the address of the operand.
       indexed:
-        description: index value added to `X` register
-        details: >
+        title: Index Value Added to `X` Register
+        description: >
           the contents of the second word of the instruction are added to the contents of the `X`
           Register to form the address of the operand.
       indirect_indexed:
-        description: address to index value added to `X` register
-        details: >
+        title: Address to index value added to `X` register
+        description: >
           the contents of the second word of the instruction are used as an address pointer to the
           contents of another, second, location. The contents of this second location are added to the
           contents of the `X` Register to form the address of the operand.
       numeric_enumeration:
-        description: mapped integer values
-        details: >
+        title: Mapped Integer Values
+        description: >
           There is a set of allowed integer values for the operand, and each integer value is mapped
           to a specific meaning and thus byte code value.
 predefined:
@@ -327,7 +327,7 @@ instructions:
     documentation:
       category: data movement
       title: Load Data
-      details:  Copies the value indicated by the second operand to the location indicated by the first operand.
+      description:  Copies the value indicated by the second operand to the location indicated by the first operand.
   add:
     bytecode:
       value: 0
@@ -341,7 +341,7 @@ instructions:
     documentation:
       category: arithmetic
       title: Addition
-      details: >
+      description: >
         The contents of the designated register and the second operand
         are added together and the sum is placed in the designated register. The value indicated by
         second operand is unchanged in the memory (unless the operand was the
@@ -366,7 +366,7 @@ instructions:
     documentation:
       category: arithmetic
       title: Subtraction
-      details: >
+      description: >
         The value indicated by the second operand is subtracted from the designated
         register and the difference is placed in the designated register. The value indicated by
         second operand is unchanged in the memory (unless the operand was the
@@ -390,7 +390,7 @@ instructions:
     documentation:
       category: arithmetic
       title: Logical Product
-      details: >
+      description: >
         Each bit of the value indicated by the operand is AND'ed with the corresponding
         bit of the `A` Register, and the result is placed in the `A` Register replacing the previous contents.
       modifies:
@@ -408,7 +408,7 @@ instructions:
     documentation:
       category: arithmetic
       title: Logical Sum
-      details: >
+      description: >
         Each bit of the value indicated by the operand is OR'ed with the corresponding
         bit of the `A` Register, and the result is placed in the `A` Register replacing the previous contents.
       modifies:
@@ -426,7 +426,7 @@ instructions:
     documentation:
       category: arithmetic
       title: Load Complement
-      details: >
+      description: >
         The `A` Register is loaded with the arithmetic complement
         (the value obtained by subtracting from zero) of the operand. This
         replaces the previous contents of the `A` Register. The operand is unchanged
@@ -480,7 +480,7 @@ instructions:
     documentation:
       category: control
       title: Jump and Mark Direct
-      details: >
+      description: >
         Transfers program flow to a subroutine, with the return address being recorded in the first 2 bytes of the subroutine (the "mark")
         and the program counter `pc` being updated to the address 2 bytes beyond the subroutine's address.
         The soubroutine is "returned" from by doing a Jumop Direct with the defered subroutine address (i.e., `jm [[subroutine_label]]`).

@@ -2,7 +2,7 @@ description: slu4 Minimal 64x4 Home Computer
 general:
   address_size: 16
   page_size: 256
-  multi_word_endianness: little
+  multi_word_endian: little
   registers:
     a:
       title: Accumulator
@@ -5533,7 +5533,7 @@ macros:
     documentation:
       category: Stack Management
       title: Push Word in Memory onto Stack
-      details: push 4 bytes at an absolute address onto the stack
+      description: push 4 bytes at an absolute address onto the stack
   phsptr:
     # push an immediate absolute address to the stack per MinOS calling convention
     variants:

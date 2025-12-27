@@ -163,13 +163,9 @@ class OperandWithArgument(Operand):
     @property
     def argument_word_align(self) -> bool:
         if 'word_align' not in self._config['argument']:
-            warnings.warn(
-                f"The 'byte_align' option for argument configuration in operand configuration {self} is "
-                f"deprecated and will be removed in a future version. Replace with 'word_align'.",
-                DeprecationWarning,
-                stacklevel=2
+            sys.exit(
+                f'ERROR: Operand {self} does not have a configured argument word_align setting'
             )
-            return self._config['argument']['byte_align']
         return self._config['argument']['word_align']
 
     @property

@@ -77,8 +77,8 @@ class DocumentationModel:
 
         # Parse endianness configuration
         endianness = {
-            'multi_word_endianness': general_config.get('multi_word_endianness', 'big'),
-            'intra_word_endianness': general_config.get('intra_word_endianness', 'big'),
+            'multi_word_endian': general_config.get('multi_word_endian', 'big'),
+            'intra_word_endian': general_config.get('intra_word_endian', 'big'),
             'deprecated_endian': general_config.get('endian')  # deprecated field
         }
 
@@ -96,7 +96,6 @@ class DocumentationModel:
             'isa_version': identifier.get('version'),
             'file_extension': identifier.get('extension', 'asm'),
             'description': doc_config.get('description'),
-            'details': doc_config.get('details'),
 
             # Hardware architecture
             'hardware': hardware,
@@ -264,10 +263,15 @@ class DocumentationModel:
         modes = []
         for name, data in addressing_modes.items():
             if isinstance(data, dict):
+                title = data.get('title')
+                description = data.get('description')
+                if title is None and 'title' not in data:
+                    title = data.get('description')
+                    description = data.get('details')
                 modes.append({
                     'name': name,
-                    'description': data.get('description', ''),
-                    'details': data.get('details')
+                    'title': title,
+                    'description': description or ''
                 })
             elif self.verbose:
                 click.echo(f"Warning: Invalid addressing mode format for '{name}'")
@@ -282,7 +286,7 @@ class DocumentationModel:
             general_config: General section of ISA configuration
 
         Returns:
-            List of register documentation entries including name, description, details, and size.
+            List of register documentation entries including name, title, description, and size.
         """
         registers_config = general_config.get('registers')
         if registers_config is None:
@@ -298,24 +302,11 @@ class DocumentationModel:
                         click.echo(f'Warning: Register "{name}" configuration should be a dictionary.')
                     info = {}
 
-                title = info.get('title')
-                description = info.get('description')
-                details = info.get('details')
-
-                # Backward compatibility: treat legacy description as title when title absent.
-                if title is None and description is not None and 'title' not in info:
-                    title = description
-                    description = details
-                    details = None
-
-                size = info.get('size', default_word_size)
-
                 register_docs.append({
                     'name': name,
-                    'title': title,
-                    'description': description,
-                    'details': details,
-                    'size': size
+                    'title': info.get('title'),
+                    'description': info.get('description'),
+                    'size': info.get('size', default_word_size)
                 })
         else:
             try:
@@ -330,7 +321,6 @@ class DocumentationModel:
                     'name': name,
                     'title': None,
                     'description': None,
-                    'details': None,
                     'size': default_word_size
                 })
 
@@ -369,8 +359,7 @@ class DocumentationModel:
                 parsed_flags.append({
                     'name': name,
                     'symbol': symbol,
-                    'description': data.get('description', ''),
-                    'details': data.get('details')
+                    'description': data.get('description', '')
                 })
         else:
             if self.verbose:
@@ -395,8 +384,6 @@ class DocumentationModel:
                 description = example.get('description')
                 if title is None and 'title' not in example:
                     title = example.get('description', '')
-                    description = example.get('details')
-
                 parsed_examples.append({
                     'title': title or '',
                     'description': description,
@@ -439,19 +426,17 @@ class DocumentationModel:
                 mode_from_doc = bool(operand_doc.get('mode'))
                 mode = operand_doc.get('mode') or self._default_mode_from_type(operand_type)
                 description = operand_doc.get('description')
-
-                details = operand_doc.get('details')
                 auto_details = self._derive_operand_auto_details(
                     operand_type,
                     operand_config,
-                    bool(details)
+                    bool(description)
                 )
                 if auto_details:
-                    combined_details = []
-                    if details:
-                        combined_details.append(details)
-                    combined_details.extend(auto_details)
-                    details = '\n\n'.join(filter(None, combined_details))
+                    combined_description = []
+                    if description:
+                        combined_description.append(description)
+                    combined_description.extend(auto_details)
+                    description = '\n\n'.join(filter(None, combined_description))
 
                 syntax = self._derive_operand_syntax(
                     operand_name,
@@ -472,7 +457,6 @@ class DocumentationModel:
                     'mode': mode,
                     'mode_from_doc': mode_from_doc,
                     'description': description,
-                    'details': details,
                     'syntax': syntax,
                     'value': value_summary,
                     'config_order': operand_index
@@ -495,7 +479,6 @@ class DocumentationModel:
 
             documented = bool(doc_config)
             description = doc_config.get('description')
-            details = doc_config.get('details')
 
             if not documented:
                 description = None
@@ -505,7 +488,6 @@ class DocumentationModel:
                 'title': doc_config.get('title'),
                 'category': doc_config.get('category'),
                 'description': description,
-                'details': details,
                 'operands': operands,
                 'documented': documented,
                 'config_index': set_index
@@ -863,9 +845,9 @@ class DocumentationModel:
     def _derive_operand_auto_details(
         operand_type: str | None,
         operand_config: dict[str, Any],
-        has_manual_details: bool
+        has_manual_description: bool
     ) -> list[str]:
-        """Generate automatic detail notes for specific operand configurations."""
+        """Generate automatic description notes for specific operand configurations."""
         notes: list[str] = []
         operand_type = operand_type or ''
 
@@ -886,7 +868,7 @@ class DocumentationModel:
             if operand_config.get('use_curly_braces'):
                 notes.append('Relative address operand uses curly brace notation.')
 
-        if operand_type == 'numeric_enumeration' and not has_manual_details:
+        if operand_type == 'numeric_enumeration' and not has_manual_description:
             literals = DocumentationModel._collect_enumeration_literals(operand_config)
             if literals:
                 formatted = ', '.join(f'`{literal}`' for literal in literals)
@@ -918,11 +900,6 @@ class DocumentationModel:
 
             categories.add(category)
 
-            title = doc_config.get('title')
-            if title is None and 'description' in doc_config:
-                # Backward compatibility for legacy field name
-                title = doc_config.get('description')
-
             versions = self._build_instruction_versions(
                 instr_name,
                 instr_config,
@@ -931,9 +908,8 @@ class DocumentationModel:
 
             instruction_docs[instr_name] = {
                 'category': category,
-                'title': title if documented else None,
+                'title': doc_config.get('title') if documented else None,
                 'description': doc_config.get('description') if documented else None,
-                'details': doc_config.get('details') if documented else None,
                 'modifies': self._parse_modifies(doc_config.get('modifies', [])) if documented else [],
                 'examples': self._parse_examples(doc_config.get('examples', [])) if documented else [],
                 'documented': documented,
@@ -984,7 +960,6 @@ class DocumentationModel:
                 'category': category,
                 'title': doc_config.get('title') if documented else None,
                 'description': doc_config.get('description') if documented else None,
-                'details': doc_config.get('details') if documented else None,
                 'modifies': self._parse_modifies(doc_config.get('modifies', [])) if documented else [],
                 'examples': self._parse_examples(doc_config.get('examples', [])) if documented else [],
                 'documented': documented,
@@ -1061,7 +1036,6 @@ class DocumentationModel:
                 'signatures': signatures,
                 'title': doc_config.get('title') if documented else None,
                 'description': doc_config.get('description') if documented else None,
-                'details': doc_config.get('details') if documented else None,
                 'modifies': self._parse_modifies(doc_config.get('modifies', [])) if documented else [],
                 'examples': self._parse_examples(doc_config.get('examples', [])) if documented else [],
                 'documented': documented
@@ -1126,7 +1100,6 @@ class DocumentationModel:
                 'signatures': signatures,
                 'title': doc_config.get('title') if documented else None,
                 'description': doc_config.get('description') if documented else None,
-                'details': doc_config.get('details') if documented else None,
                 'modifies': self._parse_modifies(doc_config.get('modifies', [])) if documented else [],
                 'examples': self._parse_examples(doc_config.get('examples', [])) if documented else [],
                 'documented': documented
@@ -1164,7 +1137,6 @@ class DocumentationModel:
                     operand_type_value = operand_info.get('type')
                     operand_type = str(operand_type_value) if operand_type_value is not None else ''
                     description = operand_doc.get('description')
-                    details = operand_doc.get('details')
 
                     syntax = self._derive_operand_syntax(
                         operand_name,
@@ -1182,14 +1154,14 @@ class DocumentationModel:
                     auto_details = self._derive_operand_auto_details(
                         operand_type,
                         operand_info,
-                        bool(details)
+                        bool(description)
                     )
                     if auto_details:
-                        combined_details = []
-                        if details:
-                            combined_details.append(details)
-                        combined_details.extend(auto_details)
-                        details = '\n\n'.join(filter(None, combined_details))
+                        combined_description = []
+                        if description:
+                            combined_description.append(description)
+                        combined_description.extend(auto_details)
+                        description = '\n\n'.join(filter(None, combined_description))
 
                     operands.append({
                         'name': operand_name,
@@ -1198,7 +1170,6 @@ class DocumentationModel:
                         'syntax': syntax,
                         'value': value_summary,
                         'description': description,
-                        'details': details,
                         'include_in_code': operand_type != 'empty'
                     })
 
@@ -1226,10 +1197,8 @@ class DocumentationModel:
                     doc_config = set_doc_config.get('documentation') if isinstance(set_doc_config, dict) else None
                     if isinstance(doc_config, dict):
                         description = doc_config.get('description')
-                        details = doc_config.get('details')
                     else:
                         description = None
-                        details = None
 
                     # Derive a representative syntax/value when the operand set has a single member
                     syntax_value = set_name
@@ -1266,7 +1235,6 @@ class DocumentationModel:
                         'syntax': syntax_value,
                         'value': value_summary,
                         'description': description,
-                        'details': details,
                         'include_in_code': True
                     })
 
@@ -1303,8 +1271,7 @@ class DocumentationModel:
                 modify_entry = {
                     'type': None,
                     'target': None,
-                    'description': modify.get('description', ''),
-                    'details': modify.get('details')
+                    'description': modify.get('description', '')
                 }
 
                 if 'register' in modify:

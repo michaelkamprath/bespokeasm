@@ -1,7 +1,7 @@
 description: Test Multiple Instruction Operands
 general :
   address_size: 16
-  multi_word_endianness: little
+  multi_word_endian: little
   identifier:
     name: bespokeasm-test
     version: "0.2.0"
@@ -9,7 +9,7 @@ general :
     - a
     - b
     - c
-  min_version: "0.5.0"
+  min_version: "0.7.0"
 operand_sets:
   register:
     operand_values:

@@ -18,7 +18,6 @@ class TestMarkdownGenerator(unittest.TestCase):
         # Default empty documentation with full structure expected by generator
         self.mock_doc_model.general_docs = {
             'description': None,
-            'details': None,
             'addressing_modes': [],
             'flags': [],
             'examples': [],
@@ -62,31 +61,27 @@ class TestMarkdownGenerator(unittest.TestCase):
         """Test generating document with general documentation."""
         self.mock_doc_model.general_docs = {
             'description': 'Test ISA Description',
-            'details': 'This is a detailed description\nwith multiple lines.',
             'addressing_modes': [
                 {
                     'name': 'immediate',
-                    'description': 'Immediate addressing',
-                    'details': 'Load value directly'
+                    'title': 'Immediate addressing',
+                    'description': 'Load value directly'
                 },
                 {
                     'name': 'register',
-                    'description': 'Register addressing',
-                    'details': None
+                    'title': 'Register addressing'
                 }
             ],
             'flags': [
                 {
                     'name': 'carry',
                     'symbol': 'C',
-                    'description': 'Carry flag',
-                    'details': 'Set on overflow'
+                    'description': 'Carry flag'
                 },
                 {
                     'name': 'zero',
                     'symbol': None,
-                    'description': 'Zero flag',
-                    'details': None
+                    'description': 'Zero flag'
                 }
             ],
             'examples': [
@@ -107,7 +102,6 @@ class TestMarkdownGenerator(unittest.TestCase):
                     'name': 'X',
                     'title': None,
                     'description': None,
-                    'details': None,
                     'size': None
                 }
             ]
@@ -120,19 +114,18 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.assertIn('# test-isa', result)
         self.assertIn('Test ISA Description', result)
         self.assertIn('## General Information', result)
-        self.assertIn('This is a detailed description\nwith multiple lines.', result)
 
         # Verify addressing modes table
         self.assertIn('### Addressing Modes', result)
-        self.assertIn('| Mode | Description | Details |', result)
+        self.assertIn('| Mode | Title | Description |', result)
         self.assertIn('| `immediate` | Immediate addressing | Load value directly |', result)
         self.assertIn('| `register` | Register addressing |  |', result)
 
         # Verify flags table
         self.assertIn('### Flags', result)
-        self.assertIn('| Name | Symbol | Description | Details |', result)
-        self.assertIn('| carry | `C` | Carry flag | Set on overflow |', result)
-        self.assertIn('| zero |  | Zero flag |  |', result)
+        self.assertIn('| Name | Symbol | Description |', result)
+        self.assertIn('| carry | `C` | Carry flag |', result)
+        self.assertIn('| zero |  | Zero flag |', result)
 
         # Verify examples
         self.assertIn('# Examples', result)
@@ -159,14 +152,12 @@ class TestMarkdownGenerator(unittest.TestCase):
                 'name': 'SP',
                 'title': 'Stack Pointer',
                 'description': 'Manages stack pointer.',
-                'details': None,
                 'size': 16
             },
             {
                 'name': 'X',
                 'title': None,
                 'description': None,
-                'details': None,
                 'size': None
             }
         ]
@@ -187,14 +178,12 @@ class TestMarkdownGenerator(unittest.TestCase):
                 'name': 'A',
                 'title': None,
                 'description': None,
-                'details': None,
                 'size': None
             },
             {
                 'name': 'B',
                 'title': None,
                 'description': None,
-                'details': None,
                 'size': None
             }
         ]
@@ -432,7 +421,6 @@ class TestMarkdownGenerator(unittest.TestCase):
                 'category': 'Stack',
                 'title': 'Push Word',
                 'description': 'Push two-byte value.',
-                'details': None,
                 'modifies': [],
                 'examples': [],
                 'documented': True,
@@ -441,7 +429,6 @@ class TestMarkdownGenerator(unittest.TestCase):
                         'index': 1,
                         'title': None,
                         'description': None,
-                        'details': None,
                         'signatures': [
                             {
                                 'operands': [
@@ -452,7 +439,6 @@ class TestMarkdownGenerator(unittest.TestCase):
                                         'syntax': 'value',
                                         'value': 'numeric expression',
                                         'description': 'word to push',
-                                        'details': None,
                                         'include_in_code': True
                                     }
                                 ]
@@ -476,6 +462,28 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.assertIn('*Calling syntax:*', result)
         self.assertIn('```asm\nPUSH2 value\n```', result)
 
+    def test_generate_macros_section_without_documentation(self):
+        """Macros without documentation omit the placeholder message."""
+        self.mock_doc_model.macro_docs = {
+            'foo': {
+                'category': 'Uncategorized',
+                'title': None,
+                'description': None,
+                'modifies': [],
+                'examples': [],
+                'documented': False,
+                'versions': []
+            }
+        }
+        self.mock_doc_model.get_macros_by_category = Mock(return_value={'Uncategorized': ['foo']})
+
+        generator = MarkdownGenerator(self.mock_doc_model, verbose=0)
+        result = generator.generate()
+
+        self.assertIn('# Macros', result)
+        self.assertIn('### `FOO`', result)
+        self.assertNotIn('*Documentation not provided.*', result)
+
     def test_generate_with_operand_sets(self):
         """Operand sets render as their own section with per-operand tables."""
         self.mock_doc_model.operand_sets = [
@@ -483,8 +491,7 @@ class TestMarkdownGenerator(unittest.TestCase):
                 'key': 'register_operands',
                 'title': 'General Registers',
                 'category': 'Registers',
-                'description': 'General purpose registers.',
-                'details': 'Used for arithmetic operations.',
+                'description': 'General purpose registers. Used for arithmetic operations.',
                 'config_index': 0,
                 'operands': [
                     {
@@ -494,8 +501,7 @@ class TestMarkdownGenerator(unittest.TestCase):
                         'value': 'register `a`',
                         'mode': 'Register',
                         'mode_from_doc': True,
-                        'description': 'Accumulator',
-                        'details': 'Primary register.'
+                        'description': 'Accumulator. Primary register.'
                     },
                     {
                         'name': 'reg_b',
@@ -504,8 +510,7 @@ class TestMarkdownGenerator(unittest.TestCase):
                         'value': 'register `b`',
                         'mode': 'Register',
                         'mode_from_doc': True,
-                        'description': 'Index register',
-                        'details': None
+                        'description': 'Index register'
                     }
                 ]
             },
@@ -514,7 +519,6 @@ class TestMarkdownGenerator(unittest.TestCase):
                 'title': None,
                 'category': None,
                 'description': None,
-                'details': None,
                 'config_index': 1,
                 'operands': [
                     {
@@ -523,8 +527,7 @@ class TestMarkdownGenerator(unittest.TestCase):
                         'value': 'numeric expression',
                         'mode': 'Address',
                         'mode_from_doc': False,
-                        'description': None,
-                        'details': 'Valid within `ZERO_PAGE` memory zone.'
+                        'description': 'Valid within `ZERO_PAGE` memory zone.'
                     }
                 ]
             },
@@ -533,7 +536,6 @@ class TestMarkdownGenerator(unittest.TestCase):
                 'title': 'Enumerated Values',
                 'category': None,
                 'description': None,
-                'details': None,
                 'config_index': 2,
                 'operands': [
                     {
@@ -542,8 +544,7 @@ class TestMarkdownGenerator(unittest.TestCase):
                         'value': 'numeric values: `0`, `1`, `2`',
                         'mode': 'Numeric Enumeration',
                         'mode_from_doc': False,
-                        'description': None,
-                        'details': 'Possible values: `0`, `1`, `2`.'
+                        'description': 'Possible values: `0`, `1`, `2`.'
                     }
                 ]
             },
@@ -552,7 +553,6 @@ class TestMarkdownGenerator(unittest.TestCase):
                 'title': 'Memory Operands',
                 'category': None,
                 'description': None,
-                'details': None,
                 'config_index': 3,
                 'operands': [
                     {
@@ -562,8 +562,7 @@ class TestMarkdownGenerator(unittest.TestCase):
                         'value': 'register `x`',
                         'mode': 'indirect_indexed',
                         'mode_from_doc': True,
-                        'description': None,
-                        'details': None
+                        'description': None
                     }
                 ]
             },
@@ -572,7 +571,6 @@ class TestMarkdownGenerator(unittest.TestCase):
                 'title': 'Limited Number',
                 'category': None,
                 'description': None,
-                'details': None,
                 'config_index': 4,
                 'operands': [
                     {
@@ -581,8 +579,7 @@ class TestMarkdownGenerator(unittest.TestCase):
                         'value': 'numeric expression valued between 0 and 0x7 expressed as 3 bit value',
                         'mode': 'numeric',
                         'mode_from_doc': False,
-                        'description': None,
-                        'details': None
+                        'description': None
                     }
                 ]
             }
@@ -594,15 +591,14 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.assertIn('## Operand Sets', result)
         self.assertIn('### `register_operands` - General Registers', result)
         self.assertIn('*Category: Registers*', result)
-        self.assertIn('General purpose registers.', result)
-        self.assertIn('Used for arithmetic operations.', result)
+        self.assertIn('General purpose registers. Used for arithmetic operations.', result)
         self.assertIn(
-            '| Register A (`reg_a`) | `a` | register `a` | `Register` | Accumulator | Primary register. |',
+            '| Register A (`reg_a`) | `a` | register `a` | `Register` | Accumulator. Primary register. |',
             result
         )
-        self.assertIn('| Operand | Syntax | Value | Addressing Mode | Description | Details |', result)
+        self.assertIn('| Operand | Syntax | Value | Addressing Mode | Description |', result)
         self.assertIn(
-            '| Register B (`reg_b`) | `b` | register `b` | `Register` | Index register |  |',
+            '| Register B (`reg_b`) | `b` | register `b` | `Register` | Index register |',
             result
         )
         self.assertIn('### `enum_values` - Enumerated Values', result)
@@ -636,19 +632,16 @@ class TestMarkdownGenerator(unittest.TestCase):
                 'category': 'Data Movement',
                 'title': 'Load accumulator',
                 'description': 'Transfers a literal into A.',
-                'details': 'Load a value into the accumulator register',
                 'modifies': [
                     {
                         'type': 'register',
                         'target': 'A',
-                        'description': 'Loaded with operand value',
-                        'details': None
+                        'description': 'Loaded with operand value'
                     },
                     {
                         'type': 'flag',
                         'target': 'Z',
-                        'description': 'Set if result is zero',
-                        'details': 'Zero flag behavior'
+                        'description': 'Set if result is zero'
                     }
                 ],
                 'examples': [
@@ -673,7 +666,6 @@ class TestMarkdownGenerator(unittest.TestCase):
                                         'syntax': 'imm8',
                                         'value': '8-bit immediate',
                                         'description': '8-bit immediate value.',
-                                        'details': None,
                                         'include_in_code': True
                                     }
                                 ]
@@ -685,7 +677,6 @@ class TestMarkdownGenerator(unittest.TestCase):
             'add': {
                 'category': 'Arithmetic',
                 'title': 'Add to accumulator',
-                'details': None,
                 'modifies': [],
                 'examples': [],
                 'documented': True,
@@ -703,7 +694,6 @@ class TestMarkdownGenerator(unittest.TestCase):
                                         'syntax': 'r0',
                                         'value': 'register `r0`',
                                         'description': 'Destination register.',
-                                        'details': None,
                                         'include_in_code': True
                                     },
                                     {
@@ -712,7 +702,6 @@ class TestMarkdownGenerator(unittest.TestCase):
                                         'syntax': 'numeric_expression',
                                         'value': 'numeric_expression',
                                         'description': 'Immediate value.',
-                                        'details': None,
                                         'include_in_code': True
                                     }
                                 ]
@@ -724,7 +713,6 @@ class TestMarkdownGenerator(unittest.TestCase):
             'sta': {
                 'category': 'Data Movement',
                 'title': 'Store accumulator',
-                'details': None,
                 'modifies': [],
                 'examples': [],
                 'documented': True,
@@ -768,7 +756,6 @@ class TestMarkdownGenerator(unittest.TestCase):
 
         # Verify detailed instruction content
         self.assertIn('Transfers a literal into A.', result)
-        self.assertIn('Load a value into the accumulator register', result)
         self.assertIn('*Calling syntax:*', result)
         self.assertIn('```asm\nLDA imm8\n```', result)
         self.assertIn('```asm\nADD r0, numeric_expression\n```', result)
@@ -780,9 +767,9 @@ class TestMarkdownGenerator(unittest.TestCase):
 
         # Verify modifies table
         self.assertIn('#### Modifies', result)
-        self.assertIn('| Type | Target | Description | Details |', result)
-        self.assertIn('| Register | A | Loaded with operand value |  |', result)
-        self.assertIn('| Flag | Z | Set if result is zero | Zero flag behavior |', result)
+        self.assertIn('| Type | Target | Description |', result)
+        self.assertIn('| Register | A | Loaded with operand value |', result)
+        self.assertIn('| Flag | Z | Set if result is zero |', result)
 
         # Verify examples
         self.assertIn('#### Examples', result)
@@ -797,7 +784,6 @@ class TestMarkdownGenerator(unittest.TestCase):
                 'category': 'Uncategorized',
                 'title': None,
                 'description': None,
-                'details': None,
                 'modifies': [],
                 'examples': [],
                 'documented': False,
@@ -834,7 +820,6 @@ class TestMarkdownGenerator(unittest.TestCase):
                 'category': 'Data Movement',
                 'title': 'Mixed operand instruction',
                 'description': None,
-                'details': None,
                 'modifies': [],
                 'examples': [],
                 'documented': True,
@@ -850,7 +835,6 @@ class TestMarkdownGenerator(unittest.TestCase):
                                         'name': 'reg',
                                         'type': 'register',
                                         'description': None,
-                                        'details': None,
                                         'include_in_code': True
                                     }
                                 ]
@@ -868,7 +852,6 @@ class TestMarkdownGenerator(unittest.TestCase):
                                         'name': 'imm',
                                         'type': 'operand_set',
                                         'description': None,
-                                        'details': None,
                                         'include_in_code': True
                                     }
                                 ]
@@ -897,7 +880,6 @@ class TestMarkdownGenerator(unittest.TestCase):
                 'category': 'Arithmetic',
                 'title': None,
                 'description': None,
-                'details': None,
                 'modifies': [],
                 'examples': [],
                 'documented': True,
@@ -913,14 +895,12 @@ class TestMarkdownGenerator(unittest.TestCase):
                                         'name': 'absolute_address',
                                         'type': 'operand_set',
                                         'description': None,
-                                        'details': None,
                                         'include_in_code': True
                                     },
                                     {
                                         'name': 'absolute_address',
                                         'type': 'operand_set',
                                         'description': None,
-                                        'details': None,
                                         'include_in_code': True
                                     }
                                 ]
@@ -960,20 +940,18 @@ class TestMarkdownGenerator(unittest.TestCase):
         """Test that newlines in table cells are properly escaped."""
         self.mock_doc_model.general_docs = {
             'description': None,
-            'details': None,
             'addressing_modes': [
                 {
                     'name': 'test',
-                    'description': 'Line 1\nLine 2',
-                    'details': 'Detail 1\nDetail 2'
+                    'title': 'Short label',
+                    'description': 'Line 1\nLine 2'
                 }
             ],
             'flags': [
                 {
                     'name': 'test_flag',
                     'symbol': 'T',
-                    'description': 'Flag line 1\nFlag line 2',
-                    'details': 'Flag detail 1\nFlag detail 2'
+                    'description': 'Flag line 1\nFlag line 2'
                 }
             ],
             'examples': []
@@ -983,8 +961,8 @@ class TestMarkdownGenerator(unittest.TestCase):
         result = generator.generate()
 
         # Verify newlines are converted to <br> in table cells
-        self.assertIn('| `test` | Line 1<br>Line 2 | Detail 1<br>Detail 2 |', result)
-        self.assertIn('| test_flag | `T` | Flag line 1<br>Flag line 2 | Flag detail 1<br>Flag detail 2 |', result)
+        self.assertIn('| `test` | Short label | Line 1<br>Line 2 |', result)
+        self.assertIn('| test_flag | `T` | Flag line 1<br>Flag line 2 |', result)
 
     def test_modifies_table_without_details_column(self):
         """Test that modifies table omits Details column when no entries have details."""
@@ -992,19 +970,16 @@ class TestMarkdownGenerator(unittest.TestCase):
             'nop': {
                 'category': 'Operations',
                 'title': 'No operation',
-                'details': None,
                 'modifies': [
                     {
                         'type': 'register',
                         'target': 'pc',
-                        'description': 'Incremented',
-                        'details': None
+                        'description': 'Incremented'
                     },
                     {
                         'type': 'flag',
                         'target': 'cycles',
-                        'description': 'Consumed',
-                        'details': None
+                        'description': 'Consumed'
                     }
                 ],
                 'examples': []
@@ -1025,19 +1000,17 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.assertIn('| Register | pc | Incremented |', result)
         self.assertIn('| Flag | cycles | Consumed |', result)
 
-    def test_modifies_table_with_details_column(self):
-        """Test that modifies table includes Details column when at least one entry has details."""
+    def test_modifies_table_ignores_details(self):
+        """Modifies table ignores details even when provided."""
         self.mock_doc_model.instruction_docs = {
             'lda': {
                 'category': 'Data Movement',
                 'title': 'Load accumulator',
-                'details': None,
                 'modifies': [
                     {
                         'type': 'register',
                         'target': 'A',
-                        'description': 'Loaded with value',
-                        'details': None
+                        'description': 'Loaded with value'
                     },
                     {
                         'type': 'flag',
@@ -1058,10 +1031,11 @@ class TestMarkdownGenerator(unittest.TestCase):
         generator = MarkdownGenerator(self.mock_doc_model, verbose=0)
         result = generator.generate()
 
-        # Verify modifies table has 4 columns (includes Details column)
-        self.assertIn('| Type | Target | Description | Details |', result)
-        self.assertIn('| Register | A | Loaded with value |  |', result)
-        self.assertIn('| Flag | Z | Set if zero | Detailed flag behavior |', result)
+        # Verify modifies table ignores details column
+        self.assertIn('| Type | Target | Description |', result)
+        self.assertNotIn('| Type | Target | Description | Details |', result)
+        self.assertIn('| Register | A | Loaded with value |', result)
+        self.assertIn('| Flag | Z | Set if zero |', result)
 
     def test_numeric_bytecode_value_column(self):
         """Numeric bytecode operands show value range without duplicating details."""
@@ -1069,7 +1043,6 @@ class TestMarkdownGenerator(unittest.TestCase):
             'lr': {
                 'category': 'Data Movement',
                 'title': 'Load register',
-                'details': None,
                 'modifies': [],
                 'examples': [],
                 'documented': True,
@@ -1087,7 +1060,6 @@ class TestMarkdownGenerator(unittest.TestCase):
                                         'syntax': 'a',
                                         'value': 'register `a`',
                                         'description': None,
-                                        'details': None,
                                         'include_in_code': True
                                     },
                                     {
@@ -1096,7 +1068,6 @@ class TestMarkdownGenerator(unittest.TestCase):
                                         'syntax': 'scratchpad_regs',
                                         'value': 'numeric expression valued between 0 and 0xB',
                                         'description': None,
-                                        'details': None,
                                         'include_in_code': True
                                     }
                                 ]
@@ -1123,7 +1094,6 @@ class TestMarkdownGenerator(unittest.TestCase):
             'lr': {
                 'category': 'Data Movement',
                 'title': 'Load register',
-                'details': None,
                 'modifies': [],
                 'examples': [],
                 'documented': True,
@@ -1141,7 +1111,6 @@ class TestMarkdownGenerator(unittest.TestCase):
                                         'syntax': 'a',
                                         'value': 'register `a`',
                                         'description': None,
-                                        'details': None,
                                         'include_in_code': True
                                     }
                                 ]
@@ -1169,12 +1138,7 @@ class TestMarkdownGenerator(unittest.TestCase):
         # Per new requirements, always show general section (contains config details)
         self.assertTrue(generator._has_general_documentation())
 
-        # With details
-        self.mock_doc_model.general_docs['details'] = 'Some details'
-        self.assertTrue(generator._has_general_documentation())
-
         # Reset and test with addressing modes
-        self.mock_doc_model.general_docs['details'] = None
         self.mock_doc_model.general_docs['addressing_modes'] = [{'name': 'test'}]
         self.assertTrue(generator._has_general_documentation())
 

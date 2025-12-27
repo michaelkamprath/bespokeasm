@@ -1,7 +1,7 @@
 description: MOSTEK 3870
 general:
   address_size: 12
-  multi_word_endianness: big
+  multi_word_endian: big
   registers:
     # accumulator
     - a
@@ -34,7 +34,7 @@ general:
     name: mostek-3870-asm
     version: "0.1.0"
     extension: af8
-  min_version: 0.5.0
+  min_version: 0.7.0
 operand_sets:
   nval3:
     operand_values:
@@ -1090,102 +1090,119 @@ instructions:
                   register: j
 macros:
   jmps:
-    # jump to an address stored in two consecutive scratchpads
-    # operand is location of start of two consecutive scratchpads
-    - operands:
-        count: 1
-        specific_operands:
-          immediate:
-            list:
-              sp_addr:
-                type: numeric
-                argument:
-                  size: 8
-                  word_align: true
-      instructions:
-        - "li (@ARG(0)+0)"
-        - "lr is,a"
-        - "lr a,[is]+"
-        - "lr qu,a"
-        - "lr a,[is]"
-        - "lr ql,a"
-        - "lr p0,q"
+    documentation:
+      title: Jump to address in scratchpad
+      description: jump to an address stored in two consecutive scratchpads. The operand is location of start of two consecutive scratchpads.
+    variants:
+      - operands:
+          count: 1
+          specific_operands:
+            immediate:
+              list:
+                sp_addr:
+                  type: numeric
+                  argument:
+                    size: 8
+                    word_align: true
+        instructions:
+          - "li (@ARG(0)+0)"
+          - "lr is,a"
+          - "lr a,[is]+"
+          - "lr qu,a"
+          - "lr a,[is]"
+          - "lr ql,a"
+          - "lr p0,q"
   incs:
-    # increment scratchpad value
-    # destroys A register value
-    - operands:
-        count: 1
-        operand_sets:
-          list:
-            - sreg
-      instructions:
-        - "lr a,@OP(0)"
-        - "inc"
-        - "lr @OP(0),a"
-    - operands:
-        count: 1
-        specific_operands:
-          indirect_is:
+    documentation:
+      title: Increment scratchpad value
+      modifies:
+        - register: a
+          description: undefined modification
+    variants:
+      - operands:
+          count: 1
+          operand_sets:
             list:
-              indirect_is:
-                type: indirect_register
-                register: is
-      instructions:
-        - "lr a,[@REG(0)]"
-        - "inc"
-        - "lr [@REG(0)],a"
-    - operands:
-        count: 1
-        specific_operands:
-          is:
-            list:
-              is:
-                type: register
-                register: is
-      instructions:
-        - "lr a,@REG(0)"
-        - "inc"
-        - "lr @REG(0),a"
+              - sreg
+        instructions:
+          - "lr a,@OP(0)"
+          - "inc"
+          - "lr @OP(0),a"
+        documentation:
+          title: Increment Scratchpad Register
+      - operands:
+          count: 1
+          specific_operands:
+            indirect_is:
+              list:
+                indirect_is:
+                  type: indirect_register
+                  register: is
+        instructions:
+          - "lr a,[@REG(0)]"
+          - "inc"
+          - "lr [@REG(0)],a"
+        documentation:
+          title: Increment Value Pointed To By Indirect Scratchpad Register
+      - operands:
+          count: 1
+          specific_operands:
+            is:
+              list:
+                is:
+                  type: register
+                  register: is
+        instructions:
+          - "lr a,@REG(0)"
+          - "inc"
+          - "lr @REG(0),a"
+        documentation:
+          title: Increment Indirect Scratchpad Register
   lris:
-    - operands:
-        # copies value at scratch pad location "addr" to register A
-        # lr a, SCRATCH_PAD_ADDR
-        count: 2
-        specific_operands:
-          to_reg_a:
-            list:
-              a_reg:
-                type: register
-                register: a
-              isar_addr:
-                type: numeric
-                argument:
-                  size: 8
-                  word_align: true
-      instructions:
-        - "li @OP(1)"
-        - "lr is,a"
-        - "lr a,[is]"
+    documentation:
+      title: Copy scratchpad location value to `A`
+    variants:
+      - operands:
+          # copies value at scratch pad location "addr" to register A
+          # lr a, SCRATCH_PAD_ADDR
+          count: 2
+          specific_operands:
+            to_reg_a:
+              list:
+                a_reg:
+                  type: register
+                  register: a
+                isar_addr:
+                  type: numeric
+                  argument:
+                    size: 8
+                    word_align: true
+        instructions:
+          - "li @OP(1)"
+          - "lr is,a"
+          - "lr a,[is]"
   liis:
-    # copies immediate value to scratch pad location "addr"
-    - operands:
-        # li SCRATCH_PAD_ADDR, IMMEDIATE_VALUE
-        count: 2
-        specific_operands:
-          immediate_to_isar:
-            list:
-              isar_addr:
-                type: numeric
-                argument:
-                  size: 8
-                  word_align: true
-              immediate_value:
-                type: numeric
-                argument:
-                  size: 8
-                  word_align: true
-      instructions:
-        - "li @OP(0)"
-        - "lr is,a"
-        - "li @OP(1)"
-        - "lr [is],a"
+    documentation:
+      title: Copy immediate value to specific scratch pad location
+    variants:
+      - operands:
+          # li SCRATCH_PAD_ADDR, IMMEDIATE_VALUE
+          count: 2
+          specific_operands:
+            immediate_to_isar:
+              list:
+                isar_addr:
+                  type: numeric
+                  argument:
+                    size: 8
+                    word_align: true
+                immediate_value:
+                  type: numeric
+                  argument:
+                    size: 8
+                    word_align: true
+        instructions:
+          - "li @OP(0)"
+          - "lr is,a"
+          - "li @OP(1)"
+          - "lr [is],a"

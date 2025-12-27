@@ -1,0 +1,44 @@
+; Ben Eater SAP-1: integer division using repeated subtraction
+;
+; Division counts how many times one value can be removed from another.
+; This routine repeatedly subtracts the divisor stored at $0F from the
+; dividend stored at $0E until the remainder would go negative. Each
+; successful subtraction increments a quotient counter at $0D, which is
+; then presented on the OUT register while the remainder is left in $0E.
+#require __LANGUAGE_NAME__ == eater-sap1
+#require __LANGUAGE_VERSION__ >= 1.0.0
+
+one = 1
+
+.org $00
+    LDA divisor
+    JZ finalize             ; handle divide-by-zero by outputting 0
+
+loop:
+    LDA dividend
+    SUB divisor
+    JC subtract_ok
+
+finalize:
+    LDA quotient
+    OUT
+    HLT
+
+subtract_ok:
+    STA dividend            ; update remainder
+    LDI one
+    ADD quotient
+    STA quotient
+    JMP loop
+
+.org $0D
+quotient:
+    .byte $00               ; quotient accumulator
+
+.org $0E
+dividend:
+    .byte $00               ; dividend input; holds remainder at end
+
+.org $0F
+divisor:
+    .byte $00               ; divisor input; must be non-zero for valid division

@@ -162,7 +162,7 @@ class TestLanguageVersionEvaluator(unittest.TestCase):
             '''
             description: Numeric Comparison Test ISA
             general:
-              min_version: 0.5.0
+              min_version: 0.7.0
               address_size: 4
               identifier:
                 name: numeric_comparison_test

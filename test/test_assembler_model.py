@@ -431,9 +431,9 @@ class TestConfigObject(unittest.TestCase):
         bad_config = {
             'description': 'Duplicate mnemonic/alias',
             'general': {
-                'min_version': '0.5.0',
+                'min_version': '0.7.0',
                 'address_size': 8,
-                'multi_word_endianness': 'little',
+                'multi_word_endian': 'little',
                 'registers': [],
                 'identifier': {'name': 'bad', 'version': '0.1.0'}
             },

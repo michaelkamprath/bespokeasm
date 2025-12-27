@@ -9,14 +9,14 @@ operand_sets:
       int8:
         type: numeric
         argument:
-          byte_align: true
+          word_align: true
           size: 8
   address:
     operand_values:
       addr:
         type: numeric
         argument:
-          byte_align: true
+          word_align: true
           size: 16
 instructions:
   nop:

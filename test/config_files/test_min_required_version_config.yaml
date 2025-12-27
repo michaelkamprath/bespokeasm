@@ -1,6 +1,6 @@
 general :
   address_size: 16
-  multi_word_endianness: little
+  multi_word_endian: little
   min_version: 1000.0.0
 registers:
 operand_sets:

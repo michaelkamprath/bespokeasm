@@ -195,7 +195,7 @@ class AssemblerModel:
     def endian(self) -> Literal['little', 'big']:
         warnings.warn(
             "The 'endian' general configuration option is deprecated and will be removed in a "
-            "future version. Replace with 'multi_word_endianness'.",
+            "future version. Replace with 'multi_word_endian'.",
             DeprecationWarning,
             stacklevel=2
         )
@@ -206,17 +206,31 @@ class AssemblerModel:
 
     @property
     def intra_word_endianness(self) -> Literal['little', 'big']:
+        if 'intra_word_endian' in self._config['general']:
+            return self._config['general']['intra_word_endian']
         if 'intra_word_endianness' in self._config['general']:
+            warnings.warn(
+                "The 'intra_word_endianness' general configuration option is deprecated and will be removed in a "
+                "future version. Replace with 'intra_word_endian'.",
+                DeprecationWarning,
+                stacklevel=2
+            )
             return self._config['general']['intra_word_endianness']
-        else:
-            return 'big'
+        return 'big'
 
     @property
     def multi_word_endianness(self) -> Literal['little', 'big']:
+        if 'multi_word_endian' in self._config['general']:
+            return self._config['general']['multi_word_endian']
         if 'multi_word_endianness' in self._config['general']:
+            warnings.warn(
+                "The 'multi_word_endianness' general configuration option is deprecated and will be removed in a "
+                "future version. Replace with 'multi_word_endian'.",
+                DeprecationWarning,
+                stacklevel=2
+            )
             return self._config['general']['multi_word_endianness']
-        else:
-            return 'big'
+        return 'big'
 
     @property
     def string_byte_packing(self) -> bool:
