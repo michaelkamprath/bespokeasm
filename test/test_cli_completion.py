@@ -1,7 +1,9 @@
+import shutil
 import subprocess
 from textwrap import dedent
 
 import click.shell_completion as sc
+import pytest
 from bespokeasm.__main__ import _inject_zsh_nosort
 from bespokeasm.__main__ import main
 from click.shell_completion import get_completion_class
@@ -76,6 +78,8 @@ def test_zsh_completion_script_prettifies_root_commands():
 
 
 def test_zsh_formatting_outputs_rows_per_option_in_zsh():
+    if shutil.which('zsh') is None:
+        pytest.skip('zsh not available on PATH')
     comp_cls = get_completion_class('zsh')
     comp = comp_cls(main, {}, 'bespokeasm', '_BESPOKEASM_COMPLETE')
     script = _inject_zsh_nosort(comp.source())
@@ -116,6 +120,8 @@ _bespokeasm_completion
 
 
 def test_zsh_formatting_outputs_rows_per_compile_option_set_in_zsh():
+    if shutil.which('zsh') is None:
+        pytest.skip('zsh not available on PATH')
     comp_cls = get_completion_class('zsh')
     comp = comp_cls(main, {}, 'bespokeasm', '_BESPOKEASM_COMPLETE')
     script = _inject_zsh_nosort(comp.source())

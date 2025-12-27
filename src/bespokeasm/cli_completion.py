@@ -1,7 +1,7 @@
 import click
 
 
-def _option_help_with_metavar(param: click.Option, opt_name: str) -> str:
+def _option_help_with_metavar(param: click.Option, opt_name: str, ctx=None) -> str:
     """Format help text with metavar or enable/disable prefix for flags."""
     help_text = param.help or ''
     parts = []
@@ -11,7 +11,10 @@ def _option_help_with_metavar(param: click.Option, opt_name: str) -> str:
     if param.is_flag and param.secondary_opts:
         parts.append('[enable]' if opt_name in param.opts else '[disable]')
     elif not param.is_flag:
-        metavar = param.make_metavar()
+        try:
+            metavar = param.make_metavar(ctx)
+        except TypeError:
+            metavar = param.make_metavar()
         if metavar:
             parts.append(f'[{metavar}]')
 
@@ -42,7 +45,7 @@ class AutoOptionHelpCommand(click.Command):
 
                 for name in [*param.opts, *param.secondary_opts]:
                     if name.startswith(incomplete):
-                        help_text = _option_help_with_metavar(param, name)
+                        help_text = _option_help_with_metavar(param, name, ctx)
                         item = click.shell_completion.CompletionItem(name, help=help_text)
                         option_items.append((not getattr(param, 'required', False), name.lower(), item))
 
@@ -75,7 +78,7 @@ class OptionForwardingCommand(AutoOptionHelpCommand):
                 continue
             for opt in param.opts + param.secondary_opts:
                 if (not incomplete or opt.startswith(incomplete)) and opt not in seen:
-                    help_text = _option_help_with_metavar(param, opt)
+                    help_text = _option_help_with_metavar(param, opt, ctx)
                     option_items.append(
                         (
                             not getattr(param, 'required', False),
