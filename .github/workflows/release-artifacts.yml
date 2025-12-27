@@ -17,47 +17,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Read project metadata
         id: meta
-        run: |
-          eval "$(python - <<'PY'
-          from pathlib import Path
-          import re
-          FALLBACK_PY = "3.11"
-          FALLBACK_APP = "0.0.0"
-          text = Path("pyproject.toml").read_text()
-          tomllib = None
-          try:
-              import tomllib as _tomllib  # py3.11+
-              tomllib = _tomllib
-          except ImportError:
-              try:
-                  import tomli as _tomllib  # external fallback
-                  tomllib = _tomllib
-              except ImportError:
-                  tomllib = None
-          if tomllib:
-              data = tomllib.loads(text)
-              req = data.get("project", {}).get("requires-python", "")
-              ver = data.get("project", {}).get("version", "")
-          else:
-              req = ""
-              ver = ""
-              m_req = re.search(r'^requires-python\s*=\s*"([^"]+)"', text, re.M)
-              if m_req:
-                  req = m_req.group(1)
-              m_ver = re.search(r'^version\s*=\s*"([^"]+)"', text, re.M)
-              if m_ver:
-                  ver = m_ver.group(1)
-          match = re.search(r"(\d+\.\d+)", req)
-          py_version = match.group(1) if match else FALLBACK_PY
-          if not ver:
-              ver = FALLBACK_APP
-          print(f'PY_VERSION={py_version}')
-          print(f'APP_VERSION={ver}')
-          PY
-          )"
-          echo "version=$PY_VERSION" >> "$GITHUB_OUTPUT"
-          echo "app_version=$APP_VERSION" >> "$GITHUB_OUTPUT"
-          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
+        run: python scripts/read_project_metadata.py
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -95,47 +55,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Read project metadata
         id: meta
-        run: |
-          eval "$(python - <<'PY'
-          from pathlib import Path
-          import re
-          FALLBACK_PY = "3.11"
-          FALLBACK_APP = "0.0.0"
-          text = Path("pyproject.toml").read_text()
-          tomllib = None
-          try:
-              import tomllib as _tomllib  # py3.11+
-              tomllib = _tomllib
-          except ImportError:
-              try:
-                  import tomli as _tomllib  # external fallback
-                  tomllib = _tomllib
-              except ImportError:
-                  tomllib = None
-          if tomllib:
-              data = tomllib.loads(text)
-              req = data.get("project", {}).get("requires-python", "")
-              ver = data.get("project", {}).get("version", "")
-          else:
-              req = ""
-              ver = ""
-              m_req = re.search(r'^requires-python\s*=\s*"([^"]+)"', text, re.M)
-              if m_req:
-                  req = m_req.group(1)
-              m_ver = re.search(r'^version\s*=\s*"([^"]+)"', text, re.M)
-              if m_ver:
-                  ver = m_ver.group(1)
-          match = re.search(r"(\d+\.\d+)", req)
-          py_version = match.group(1) if match else FALLBACK_PY
-          if not ver:
-              ver = FALLBACK_APP
-          print(f'PY_VERSION={py_version}')
-          print(f'APP_VERSION={ver}')
-          PY
-          )"
-          echo "version=$PY_VERSION" >> "$GITHUB_OUTPUT"
-          echo "app_version=$APP_VERSION" >> "$GITHUB_OUTPUT"
-          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
+        run: python scripts/read_project_metadata.py
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -197,47 +117,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Read project metadata
         id: meta
-        run: |
-          eval "$(python - <<'PY'
-          from pathlib import Path
-          import re
-          FALLBACK_PY = "3.11"
-          FALLBACK_APP = "0.0.0"
-          text = Path("pyproject.toml").read_text()
-          tomllib = None
-          try:
-              import tomllib as _tomllib  # py3.11+
-              tomllib = _tomllib
-          except ImportError:
-              try:
-                  import tomli as _tomllib  # external fallback
-                  tomllib = _tomllib
-              except ImportError:
-                  tomllib = None
-          if tomllib:
-              data = tomllib.loads(text)
-              req = data.get("project", {}).get("requires-python", "")
-              ver = data.get("project", {}).get("version", "")
-          else:
-              req = ""
-              ver = ""
-              m_req = re.search(r'^requires-python\s*=\s*"([^"]+)"', text, re.M)
-              if m_req:
-                  req = m_req.group(1)
-              m_ver = re.search(r'^version\s*=\s*"([^"]+)"', text, re.M)
-              if m_ver:
-                  ver = m_ver.group(1)
-          match = re.search(r"(\d+\.\d+)", req)
-          py_version = match.group(1) if match else FALLBACK_PY
-          if not ver:
-              ver = FALLBACK_APP
-          print(f'PY_VERSION={py_version}')
-          print(f'APP_VERSION={ver}')
-          PY
-          )"
-          echo "version=$PY_VERSION" >> "$GITHUB_OUTPUT"
-          echo "app_version=$APP_VERSION" >> "$GITHUB_OUTPUT"
-          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
+        run: python scripts/read_project_metadata.py
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -302,23 +182,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Read project metadata
         id: meta
-        shell: bash
-        run: |
-          eval "$(python - <<'PY'
-          import re, tomllib
-          data = tomllib.load(open("pyproject.toml", "rb"))
-          req = data["project"]["requires-python"]
-          ver = data["project"]["version"]
-          match = re.search(r"(\d+\.\d+)", req)
-          if not match:
-              raise SystemExit("Unable to parse requires-python")
-          print(f'PY_VERSION={match.group(1)}')
-          print(f'APP_VERSION={ver}')
-          PY
-          )"
-          echo "version=$PY_VERSION" >> "$GITHUB_OUTPUT"
-          echo "app_version=$APP_VERSION" >> "$GITHUB_OUTPUT"
-          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
+        run: python scripts/read_project_metadata.py
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
