@@ -101,6 +101,7 @@ _describe() {
 }
 compadd() { :; }
 __SCRIPT__
+hash -p /bin/true bespokeasm
 words=(bespokeasm compile -)
 CURRENT=3
 _bespokeasm_completion
@@ -152,6 +153,7 @@ _describe() {
 }
 compadd() { :; }
 __SCRIPT__
+hash -p /bin/true bespokeasm
 words=(bespokeasm compile -)
 CURRENT=3
 _bespokeasm_completion
