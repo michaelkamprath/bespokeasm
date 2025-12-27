@@ -524,46 +524,34 @@ class TestLineObject(unittest.TestCase):
 
         preprocessor = Preprocessor()
 
-        # labels with constants should now be allowed
-        objs = LineOjectFactory.parse_line(
-            lineid,
-            'the_label: const = 3 ; label with constant',
-            isa_model,
-            label_values,
-            active_named_scopes,
-            memzone_mngr.global_zone,
-            memzone_mngr,
-            preprocessor,
-            ConditionStack(),
-            0,
-        )
-        self.assertEqual(len(objs), 2, 'should return two line objects')
-        self.assertIsInstance(objs[0], LabelLine, 'first object should be a label')
-        self.assertIsInstance(objs[1], LabelLine, 'second object should be a constant assignment')
-        self.assertEqual(objs[0].get_label(), 'the_label')
-        self.assertEqual(objs[1].get_label(), 'const')
-        self.assertEqual(objs[1].get_value(), 3)
-        self.assertEqual(objs[1].comment, 'label with constant')
+        # multiple labels on a single line should be rejected
+        with self.assertRaises(SystemExit, msg='only one label per line is allowed'):
+            LineOjectFactory.parse_line(
+                lineid,
+                'the_label: const = 3 ; label with constant',
+                isa_model,
+                label_values,
+                active_named_scopes,
+                memzone_mngr.global_zone,
+                memzone_mngr,
+                preprocessor,
+                ConditionStack(),
+                0,
+            )
 
-        # labels with other labels should now be allowed
-        objs = LineOjectFactory.parse_line(
-            lineid,
-            'the_label: the_second_label: ; label with another label',
-            isa_model,
-            label_values,
-            active_named_scopes,
-            memzone_mngr.global_zone,
-            memzone_mngr,
-            preprocessor,
-            ConditionStack(),
-            0,
-        )
-        self.assertEqual(len(objs), 2, 'should return two line objects')
-        self.assertIsInstance(objs[0], LabelLine, 'first object should be a label')
-        self.assertIsInstance(objs[1], LabelLine, 'second object should be a label')
-        self.assertEqual(objs[0].get_label(), 'the_label')
-        self.assertEqual(objs[1].get_label(), 'the_second_label')
-        self.assertEqual(objs[1].comment, 'label with another label')
+        with self.assertRaises(SystemExit, msg='multiple labels on one line are invalid'):
+            LineOjectFactory.parse_line(
+                lineid,
+                'the_label: the_second_label: ; label with another label',
+                isa_model,
+                label_values,
+                active_named_scopes,
+                memzone_mngr.global_zone,
+                memzone_mngr,
+                preprocessor,
+                ConditionStack(),
+                0,
+            )
 
     def test_valid_labels(self):
         self.assertTrue(is_valid_label('a_str'), 'valid label')
@@ -1004,21 +992,19 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(len(lol4), 1, 'There should be 2 parsed instructions')
         self.assertIsInstance(lol4[0], InstructionLine)
 
-        lol5 = LineOjectFactory.parse_line(
-            lineid,
-            'the_label: const = 3 ; label with constant',
-            isa_model,
-            TestLineObject.label_values,
-            TestLineObject.active_named_scopes,
-            memzone_mngr.global_zone,
-            memzone_mngr,
-            preprocessor,
-            ConditionStack(),
-            0,
-        )
-        self.assertEqual(len(lol5), 2, 'There should be 2 parsed instructions')
-        self.assertIsInstance(lol5[0], LabelLine)
-        self.assertIsInstance(lol5[1], LabelLine)
+        with self.assertRaises(SystemExit, msg='only one label allowed per line'):
+            LineOjectFactory.parse_line(
+                lineid,
+                'the_label: const = 3 ; label with constant',
+                isa_model,
+                TestLineObject.label_values,
+                TestLineObject.active_named_scopes,
+                memzone_mngr.global_zone,
+                memzone_mngr,
+                preprocessor,
+                ConditionStack(),
+                0,
+            )
 
         # anythin after an instruction other than an instruction os not supported (yet)
         with self.assertRaises(SystemExit, msg='this instruction should fail'):

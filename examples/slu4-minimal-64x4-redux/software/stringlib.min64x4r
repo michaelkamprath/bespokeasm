@@ -1,0 +1,194 @@
+; String Library
+;   various routines for manipulating strings
+;
+#require __LANGUAGE_NAME__ == slu4-min64x4-redux-asm
+#require __LANGUAGE_VERSION__ >= 1.4.0
+; Zero Page Usage
+.memzone ZERO_PAGE_LIBS
+#mute
+_counter:               .byte 0
+_digit_counter:         .byte 0
+_carry_bit:             .byte 0
+_tmp_Ptr1:              .2byte 0
+_tmp_Ptr2:              .2byte 0
+_working_mem5:          .zero 5
+
+#emit
+.memzone USER_APPS
+
+; cstr_reverse
+;   Reverses the ordering of all characters in the cstr.
+;
+;   Arguments
+;       sp+3 : buffer address to cstr. Should be mutable, and less than 255 characters.
+;
+;   Returns
+;       sp+3 : The contents of the buffer are reverse.
+;
+; TODO - check to see if there is enough room in the stack to do this operation.
+;
+.align
+cstr_reverse:
+    lds 3+0 sdz _tmp_Ptr1+1
+    lds 3+1 sdz _tmp_Ptr1+0
+    mvv _tmp_Ptr1,_tmp_Ptr2
+    clz _counter
+.push_loop:
+    cit 0,_tmp_Ptr1 feq .init_pop_loop
+    ldt _tmp_Ptr1 phs
+    inz _counter
+    inv _tmp_Ptr1
+    fpa .push_loop
+.init_pop_loop:
+.pop_loop:
+    ciz 0,_counter feq .end
+    pls sdt _tmp_Ptr2
+    inv _tmp_Ptr2
+    dez _counter
+    fpa .pop_loop
+.end:
+    rts
+
+
+; uint32_to_decimal_cstr
+;
+;   converts the passed uint32 value to a decimal formatted cstr.
+;
+;   Arguments
+;       sp+3 : the uint32 value (4 byte)
+;       sp+7 : buffer address (2 bytes)
+;       sp+9 : buffer size (1 byte)
+;
+;   Returns
+;       writes binary string to buffer. Will reset all other values in buffer to null (0)
+;       updates sp+9 top the character length of the decimal string
+;       resets sp+7 to the buffer address that the null char was written to
+;
+
+uint32_to_decimal_cstr:
+    ; set up working stack:
+    ;   little endian
+    ;   0 : low word (4 bytes)  --> value
+    ;   4 : high word (4 bytes) --> becomes remainder
+    ; init carry bit
+    clz _carry_bit
+    ; init working memory
+    ms4q 3,_working_mem5+0
+    clz _working_mem5+4
+    ; init digit counter
+    miz 0,_digit_counter
+    ; init buffer pointer
+    ms2v 7,_tmp_Ptr1
+.outer_loop:
+    ; first check to see if we are done
+    ciz 0,_working_mem5+3 bne .greater_than_10
+    ciz 0,_working_mem5+2 bne .greater_than_10
+    ciz 0,_working_mem5+1 bne .greater_than_10
+    ciz 9,_working_mem5+0 ble .last_digit
+.greater_than_10:
+.outer_loop_continue:
+    miz 32,_counter         ; init loop counter
+.div_loop:
+    ; shift working stack left 1 bit and add in carry bit
+    jps .div_lsl40
+    azz _carry_bit,_working_mem5+0
+    clz _carry_bit
+    ; check to see if upper word by is >= 10. Assume high word won't be >255.
+    ; if 10 is subtractable from high byte, proceed with subtraction, otherwise continue loop
+    ciz 9,_working_mem5+4 ble .div_loop_continue
+.div_loop_subtraction:
+    ; just need to subtract one byte
+    siz 10,_working_mem5+4
+    ; set carry bit flag
+    miz 1,_carry_bit
+.div_loop_continue:
+    dez _counter
+    ciz 0,_counter bne .div_loop
+.div_loop_remainder:
+    ; we are done with this digit. High byte is the /10 remainder, or the current digit
+    ; get character of remainder by adding value to '0' ($30)
+    ldz _working_mem5+4 adi $30
+    ; store character in buffer
+    sdt _tmp_Ptr1                       ; set next buffer position to character
+    ; do one more rotation before next loop
+    jps .div_lsl40
+    azz _carry_bit,_working_mem5+0
+    clz _carry_bit                      ; clear carry bit
+    clz _working_mem5+4                 ; clear remainder
+    ; prepare for next noop
+    inz _digit_counter
+    ; no 32-bit number will be greater than 10 digits. check for error.
+    ciz 10,_digit_counter bgt .err_buffer_size
+    ; prep for next loop
+    inv _tmp_Ptr1
+    jpa .outer_loop
+.last_digit:
+    ; get character of remainder
+    ldz _working_mem5+0 adi $30
+    ; store character in buffer
+    sdt _tmp_Ptr1
+    inz _digit_counter
+    ; no 32-bit number will be greater than 10 digits. check for error.
+    ciz 10,_digit_counter bgt .err_buffer_size
+    ; set null character
+    inv _tmp_Ptr1
+    mit 0,_tmp_Ptr1
+    ; save charastring endcter position to stack
+    ldz _tmp_Ptr1+0 phs
+    ldz _tmp_Ptr1+1 phs
+    ; finally need to reverse digits
+    phs2s 7+2               ; get original buffer address
+    jps cstr_reverse
+    pls2
+    ; write string end position to return buffer address
+    ms2v 1,_tmp_Ptr1
+    pls2
+    mvs2 _tmp_Ptr1,7
+    ldz _digit_counter sds 9            ; move character count to return size
+    rts
+; .div_lsl40
+;
+;   local method for shifting _working_mem5 left 1 bit
+.div_lsl40:
+    llz _working_mem5+0
+    rlz _working_mem5+1
+    rlz _working_mem5+2
+    rlz _working_mem5+3
+    rlz _working_mem5+4
+    rts
+.err_buffer_size:
+    ; print error message
+    jps _Print "\nERROR: 32-bit digit conversion overflowed\n\n"
+    jpa _Prompt
+
+
+; print_uint32
+;   prints the passed unsigned 4 byte integer in decimal format
+;
+;   Arguments:
+;       sp + 3 : 32-bit value to print (4 bytes) big endian
+;
+BUFFER_SIZE = 32
+print_uint32:
+    phsi BUFFER_SIZE
+    phsptr .buffer
+    phs4s (3+3)
+    jps uint32_to_decimal_cstr
+    pls4
+    pls2
+    pls
+    phs2i .buffer jps _PrintPtr pls2
+    rts
+.buffer: .zero BUFFER_SIZE
+
+
+_print_working_memory:
+    jps _Print "working mem = "
+    ldz _working_mem5+4 jas _PrintHex
+    jps _Print " "
+    ldz _working_mem5+3 jas _PrintHex
+    ldz _working_mem5+2 jas _PrintHex
+    ldz _working_mem5+1 jas _PrintHex
+    ldz _working_mem5+0 jas _PrintHex
+    jps _Print "\n"
+    rts

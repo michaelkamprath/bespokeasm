@@ -1,0 +1,372 @@
+---
+name: Release artifacts
+
+'on':
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  wheel:
+    name: Build wheel for pipx
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read project metadata
+        id: meta
+        run: |
+          eval "$(python - <<'PY'
+          from pathlib import Path
+          import re
+          FALLBACK_PY = "3.11"
+          FALLBACK_APP = "0.0.0"
+          text = Path("pyproject.toml").read_text()
+          tomllib = None
+          try:
+              import tomllib as _tomllib  # py3.11+
+              tomllib = _tomllib
+          except ImportError:
+              try:
+                  import tomli as _tomllib  # external fallback
+                  tomllib = _tomllib
+              except ImportError:
+                  tomllib = None
+          if tomllib:
+              data = tomllib.loads(text)
+              req = data.get("project", {}).get("requires-python", "")
+              ver = data.get("project", {}).get("version", "")
+          else:
+              req = ""
+              ver = ""
+              m_req = re.search(r'^requires-python\s*=\s*"([^"]+)"', text, re.M)
+              if m_req:
+                  req = m_req.group(1)
+              m_ver = re.search(r'^version\s*=\s*"([^"]+)"', text, re.M)
+              if m_ver:
+                  ver = m_ver.group(1)
+          match = re.search(r"(\d+\.\d+)", req)
+          py_version = match.group(1) if match else FALLBACK_PY
+          if not ver:
+              ver = FALLBACK_APP
+          print(f'PY_VERSION={py_version}')
+          print(f'APP_VERSION={ver}')
+          PY
+          )"
+          echo "version=$PY_VERSION" >> "$GITHUB_OUTPUT"
+          echo "app_version=$APP_VERSION" >> "$GITHUB_OUTPUT"
+          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ steps.meta.outputs.version }}
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build
+      - name: Build wheel
+        run: python -m build --wheel
+      - name: Should upload release assets
+        id: upload-check
+        run: |
+          if [ "${{ github.event_name }}" = "release" ] && \
+             [ "${{ github.event.action }}" = "published" ] && \
+             [ "${{ github.actor }}" != "nektos/act" ] && \
+             [ "${{ env.SKIP_RELEASE_UPLOAD }}" != "true" ]; then
+            echo "upload=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "upload=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Upload wheel to release
+        if: steps.upload-check.outputs.upload == 'true'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/*.whl
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  pyinstaller-linux:
+    name: PyInstaller linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read project metadata
+        id: meta
+        run: |
+          eval "$(python - <<'PY'
+          from pathlib import Path
+          import re
+          FALLBACK_PY = "3.11"
+          FALLBACK_APP = "0.0.0"
+          text = Path("pyproject.toml").read_text()
+          tomllib = None
+          try:
+              import tomllib as _tomllib  # py3.11+
+              tomllib = _tomllib
+          except ImportError:
+              try:
+                  import tomli as _tomllib  # external fallback
+                  tomllib = _tomllib
+              except ImportError:
+                  tomllib = None
+          if tomllib:
+              data = tomllib.loads(text)
+              req = data.get("project", {}).get("requires-python", "")
+              ver = data.get("project", {}).get("version", "")
+          else:
+              req = ""
+              ver = ""
+              m_req = re.search(r'^requires-python\s*=\s*"([^"]+)"', text, re.M)
+              if m_req:
+                  req = m_req.group(1)
+              m_ver = re.search(r'^version\s*=\s*"([^"]+)"', text, re.M)
+              if m_ver:
+                  ver = m_ver.group(1)
+          match = re.search(r"(\d+\.\d+)", req)
+          py_version = match.group(1) if match else FALLBACK_PY
+          if not ver:
+              ver = FALLBACK_APP
+          print(f'PY_VERSION={py_version}')
+          print(f'APP_VERSION={ver}')
+          PY
+          )"
+          echo "version=$PY_VERSION" >> "$GITHUB_OUTPUT"
+          echo "app_version=$APP_VERSION" >> "$GITHUB_OUTPUT"
+          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ steps.meta.outputs.version }}
+      - name: Install dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install .
+          python -m pip install pyinstaller
+      - name: Build standalone binary
+        shell: bash
+        run: |
+          python -m PyInstaller --onefile --name bespokeasm \
+            --distpath dist --collect-all bespokeasm \
+            src/bespokeasm/__main__.py
+      - name: Rename artifact with platform
+        shell: bash
+        run: |
+          OS_NAME=$(uname -s)
+          case "$OS_NAME" in
+            Linux*) PLATFORM=linux ;;
+            Darwin*) PLATFORM=macos ;;
+            MINGW*|MSYS*|CYGWIN*) PLATFORM=windows ;;
+            *) PLATFORM=unknown ;;
+          esac
+          ARCH=$(uname -m)
+          EXT=""
+          if [ "$PLATFORM" = "windows" ]; then EXT=".exe"; fi
+          SRC="dist/bespokeasm${EXT}"
+          DEST="dist/bespokeasm-${APP_VERSION}-${PLATFORM}-${ARCH}${EXT}"
+          mv "$SRC" "$DEST"
+          echo "ASSET_PATH=$DEST" >> "$GITHUB_ENV"
+      - name: Should upload release assets
+        id: upload-check
+        run: |
+          if [ "${{ github.event_name }}" = "release" ] && \
+             [ "${{ github.event.action }}" = "published" ] && \
+             [ "${{ github.actor }}" != "nektos/act" ] && \
+             [ "${{ env.SKIP_RELEASE_UPLOAD }}" != "true" ]; then
+            echo "upload=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "upload=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Upload binary to release
+        if: ${{ steps.upload-check.outputs.upload == 'true' }}
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ env.ASSET_PATH }}
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  pyinstaller-linux-arm:
+    name: PyInstaller linux-arm64
+    if: github.actor != 'nektos/act'
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read project metadata
+        id: meta
+        run: |
+          eval "$(python - <<'PY'
+          from pathlib import Path
+          import re
+          FALLBACK_PY = "3.11"
+          FALLBACK_APP = "0.0.0"
+          text = Path("pyproject.toml").read_text()
+          tomllib = None
+          try:
+              import tomllib as _tomllib  # py3.11+
+              tomllib = _tomllib
+          except ImportError:
+              try:
+                  import tomli as _tomllib  # external fallback
+                  tomllib = _tomllib
+              except ImportError:
+                  tomllib = None
+          if tomllib:
+              data = tomllib.loads(text)
+              req = data.get("project", {}).get("requires-python", "")
+              ver = data.get("project", {}).get("version", "")
+          else:
+              req = ""
+              ver = ""
+              m_req = re.search(r'^requires-python\s*=\s*"([^"]+)"', text, re.M)
+              if m_req:
+                  req = m_req.group(1)
+              m_ver = re.search(r'^version\s*=\s*"([^"]+)"', text, re.M)
+              if m_ver:
+                  ver = m_ver.group(1)
+          match = re.search(r"(\d+\.\d+)", req)
+          py_version = match.group(1) if match else FALLBACK_PY
+          if not ver:
+              ver = FALLBACK_APP
+          print(f'PY_VERSION={py_version}')
+          print(f'APP_VERSION={ver}')
+          PY
+          )"
+          echo "version=$PY_VERSION" >> "$GITHUB_OUTPUT"
+          echo "app_version=$APP_VERSION" >> "$GITHUB_OUTPUT"
+          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ steps.meta.outputs.version }}
+      - name: Install dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install .
+          python -m pip install pyinstaller
+      - name: Build standalone binary
+        shell: bash
+        run: |
+          python -m PyInstaller --onefile --name bespokeasm \
+            --distpath dist --collect-all bespokeasm \
+            src/bespokeasm/__main__.py
+      - name: Rename artifact with platform
+        shell: bash
+        run: |
+          OS_NAME=$(uname -s)
+          case "$OS_NAME" in
+            Linux*) PLATFORM=linux ;;
+            Darwin*) PLATFORM=macos ;;
+            MINGW*|MSYS*|CYGWIN*) PLATFORM=windows ;;
+            *) PLATFORM=unknown ;;
+          esac
+          ARCH=$(uname -m)
+          EXT=""
+          if [ "$PLATFORM" = "windows" ]; then EXT=".exe"; fi
+          SRC="dist/bespokeasm${EXT}"
+          DEST="dist/bespokeasm-${APP_VERSION}-${PLATFORM}-${ARCH}${EXT}"
+          mv "$SRC" "$DEST"
+          echo "ASSET_PATH=$DEST" >> "$GITHUB_ENV"
+      - name: Should upload release assets
+        id: upload-check
+        run: |
+          if [ "${{ github.event_name }}" = "release" ] && \
+             [ "${{ github.event.action }}" = "published" ] && \
+             [ "${{ github.actor }}" != "nektos/act" ] && \
+             [ "${{ env.SKIP_RELEASE_UPLOAD }}" != "true" ]; then
+            echo "upload=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "upload=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Upload binary to release
+        if: ${{ steps.upload-check.outputs.upload == 'true' }}
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ env.ASSET_PATH }}
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  pyinstaller-other:
+    name: PyInstaller ${{ matrix.os }}
+    if: github.actor != 'nektos/act'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, macos-13, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read project metadata
+        id: meta
+        run: |
+          eval "$(python - <<'PY'
+          import re, tomllib
+          data = tomllib.load(open("pyproject.toml", "rb"))
+          req = data["project"]["requires-python"]
+          ver = data["project"]["version"]
+          match = re.search(r"(\d+\.\d+)", req)
+          if not match:
+              raise SystemExit("Unable to parse requires-python")
+          print(f'PY_VERSION={match.group(1)}')
+          print(f'APP_VERSION={ver}')
+          PY
+          )"
+          echo "version=$PY_VERSION" >> "$GITHUB_OUTPUT"
+          echo "app_version=$APP_VERSION" >> "$GITHUB_OUTPUT"
+          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ steps.meta.outputs.version }}
+      - name: Install dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install .
+          python -m pip install pyinstaller
+      - name: Build standalone binary
+        shell: bash
+        run: |
+          python -m PyInstaller --onefile --name bespokeasm \
+            --distpath dist --collect-all bespokeasm \
+            src/bespokeasm/__main__.py
+      - name: Rename artifact with platform
+        shell: bash
+        run: |
+          OS_NAME=$(uname -s)
+          case "$OS_NAME" in
+            Linux*) PLATFORM=linux ;;
+            Darwin*) PLATFORM=macos ;;
+            MINGW*|MSYS*|CYGWIN*) PLATFORM=windows ;;
+            *) PLATFORM=unknown ;;
+          esac
+          ARCH=$(uname -m)
+          EXT=""
+          if [ "$PLATFORM" = "windows" ]; then EXT=".exe"; fi
+          SRC="dist/bespokeasm${EXT}"
+          DEST="dist/bespokeasm-${APP_VERSION}-${PLATFORM}-${ARCH}${EXT}"
+          mv "$SRC" "$DEST"
+          echo "ASSET_PATH=$DEST" >> "$GITHUB_ENV"
+      - name: Should upload release assets
+        id: upload-check
+        run: |
+          if [ "${{ github.event_name }}" = "release" ] && \
+             [ "${{ github.event.action }}" = "published" ] && \
+             [ "${{ github.actor }}" != "nektos/act" ] && \
+             [ "${{ env.SKIP_RELEASE_UPLOAD }}" != "true" ]; then
+            echo "upload=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "upload=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Upload binary to release
+        if: ${{ steps.upload-check.outputs.upload == 'true' }}
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ env.ASSET_PATH }}
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

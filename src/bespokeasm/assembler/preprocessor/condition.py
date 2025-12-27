@@ -110,6 +110,36 @@ class IfPreprocessorCondition(PreprocessorCondition):
         raise ValueError('Cannot set parent of an IfPreprocessorCondition')
 
     def _evaluate_condition(self, preprocessor: Preprocessor) -> bool:
+        # Check if this is a PURE language version expression (not mixed with other symbols)
+        from bespokeasm.assembler.preprocessor.language_version_evaluator import LanguageVersionEvaluator
+        import sys
+
+        # Check for mixed expressions by examining LHS and RHS separately
+        lhs_has_lang_symbols = LanguageVersionEvaluator.contains_language_version_symbols(self._lhs_expression)
+        rhs_has_lang_symbols = LanguageVersionEvaluator.contains_language_version_symbols(self._rhs_expression)
+
+        # Check for mixed indicators in LHS or RHS
+        mixed_indicators = ['&&', '||', '&', '|', '^', '(', ')']
+        lhs_has_mixed = any(indicator in self._lhs_expression for indicator in mixed_indicators)
+        rhs_has_mixed = any(indicator in self._rhs_expression for indicator in mixed_indicators)
+
+        if (lhs_has_lang_symbols or rhs_has_lang_symbols) and (lhs_has_mixed or rhs_has_mixed):
+            # Mixed expression detected - provide helpful error message
+            expression = f'{self._lhs_expression} {self._operator} {self._rhs_expression}'
+            sys.exit(
+                f'ERROR: {self._line} - Mixed expressions containing language version symbols are not supported. '
+                f'Expression "{expression}" contains both language version symbols and complex operators/grouping. '
+                f'Use separate #if blocks for each condition instead.'
+            )
+
+        expression = f'{self._lhs_expression} {self._operator} {self._rhs_expression}'
+        if LanguageVersionEvaluator.contains_language_version_symbols(expression):
+            # Check if it's a pure language version expression or mixed
+            if LanguageVersionEvaluator.is_pure_language_version_expression(expression):
+                # Use the shared language version evaluator for pure expressions
+                return LanguageVersionEvaluator.evaluate_expression(expression, preprocessor, self._line)
+
+        # Fall back to original evaluation logic for non-language-version expressions
         lhs_resolved = preprocessor.resolve_symbols(self._line, self._lhs_expression)
         rhs_resolved = preprocessor.resolve_symbols(self._line, self._rhs_expression)
 

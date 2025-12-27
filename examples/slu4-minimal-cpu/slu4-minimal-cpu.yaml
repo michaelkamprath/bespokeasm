@@ -1,7 +1,7 @@
 description: slu4 Minimal UART CPU
 general:
   address_size: 16
-  multi_word_endianness: little
+  multi_word_endian: little
   registers:
     - a
   origin: 0x8000
@@ -9,7 +9,7 @@ general:
     name: slu4-mincpu-asm
     version: "1.5.1"
     extension: min-asm
-  min_version: 0.5.0
+  min_version: 0.7.0
 operand_sets:
   immediate:
     operand_values:
@@ -17,21 +17,21 @@ operand_sets:
         type: numeric
         argument:
           size: 8
-          byte_align: true
+          word_align: true
   absolute_address:
     operand_values:
       a_address:
         type: numeric
         argument:
           size: 16
-          byte_align: true
+          word_align: true
   relative_address:
     operand_values:
       r_address:
         type: numeric
         argument:
           size: 16
-          byte_align: true
+          word_align: true
 predefined:
   constants:
     - name: os_Start
@@ -632,7 +632,7 @@ macros:
                 type: numeric
                 argument:
                   size: 16
-                  byte_align: true
+                  word_align: true
       instructions:
         - "ldi BYTE0(@ARG(0))"
         - "phs"
@@ -660,7 +660,7 @@ macros:
                 type: numeric
                 argument:
                   size: 32
-                  byte_align: true
+                  word_align: true
       instructions:
         - "ldi BYTE0(@ARG(0))"
         - "phs"

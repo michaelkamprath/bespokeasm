@@ -12,7 +12,7 @@ general:
   identifier:
     name: test_16bit_data_words
     version: "0.1.0"
-  min_version: "0.5.0"
+  min_version: "0.7.0"
 operand_sets:
   16_bit_source:
     operand_values:

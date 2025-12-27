@@ -1,0 +1,19 @@
+; Add the bytes stored at addresses $0E and $0F, show the sum on the OUT register
+#require __LANGUAGE_NAME__ == eater-sap1
+#require __LANGUAGE_VERSION__ >= 1.0.0
+
+.org $0
+
+start:
+    LDA value_a       ; load byte at address $0E into A
+    ADD value_b       ; add byte at address $0F to A
+    OUT               ; present the sum on the output register
+    HLT               ; halt execution once the result is shown
+
+.org $0E
+
+value_a:
+    .byte $05         ; first addend (example value)
+
+value_b:
+    .byte $03         ; second addend (example value)

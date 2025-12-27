@@ -88,7 +88,7 @@ class ColorScheme:
 DEFAULT_COLOR_SCHEME = ColorScheme(
     colors={
         # Global/theme colors
-        SyntaxElement.BACKGROUND: '#222222',
+        SyntaxElement.BACKGROUND: '#111111',
         SyntaxElement.FOREGROUND: '#EEEEEE',
         SyntaxElement.CARET: '#BBBBBB',
         SyntaxElement.SELECTION: '#294f7a',

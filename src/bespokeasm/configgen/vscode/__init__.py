@@ -248,19 +248,21 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             # remove the registers syntax
             del grammar_json['repository']['registers']
 
-        # handled predefined labels
+        # handled predefined labels and built-in constants
+        from bespokeasm.assembler.keywords import BUILTIN_CONSTANTS_SET
         predefined_labels = self.model.predefined_labels
-        if len(predefined_labels) > 0:
+        all_constants = list(predefined_labels) + list(BUILTIN_CONSTANTS_SET)
+        if len(all_constants) > 0:
             if self.verbose > 2:
-                print(f'  adding syntax for a total of {len(predefined_labels)} predefined labels')
-            # update the registers syntax
+                print(f'  adding syntax for a total of {len(all_constants)} predefined labels and built-in constants')
+            # update the compiler constants syntax
             grammar_json['repository']['compiler_labels']['match'] = self._replace_token_with_regex_list(
                 grammar_json['repository']['compiler_labels']['match'],
                 '##COMPILERCONSTANTS##',
-                predefined_labels
+                all_constants
             )
         else:
-            # remove the registers syntax
+            # remove the compiler constants syntax
             del grammar_json['repository']['compiler_labels']
 
         # handle bespokeasm directives

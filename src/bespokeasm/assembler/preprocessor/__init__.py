@@ -4,11 +4,17 @@ import sys
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.preprocessor.symbol import PreprocessorSymbol
 from bespokeasm.assembler.preprocessor.symbol import SYMBOL_PATTERN
+from packaging import version
 
 
 class Preprocessor:
-    def __init__(self, predefined_symbols: dict[str, str] = {}) -> None:
+    def __init__(self, predefined_symbols: dict[str, str] = {}, isa_model=None) -> None:
         self._symbols: dict[str, PreprocessorSymbol] = {}
+
+        # Add built-in language version symbols if ISA model is provided
+        if isa_model is not None:
+            self._add_language_version_symbols(isa_model)
+
         for symbol_def in predefined_symbols:
             if 'name' not in symbol_def:
                 sys.exit(
@@ -77,3 +83,54 @@ class Preprocessor:
             return self.resolve_symbols(line_id, line_str, updated_resolved_symbols)
         else:
             return line_str
+
+    def _add_language_version_symbols(self, isa_model) -> None:
+        """Add built-in preprocessor symbols for language version information."""
+        # Add language name symbol
+        self._symbols['__LANGUAGE_NAME__'] = PreprocessorSymbol(
+            '__LANGUAGE_NAME__',
+            isa_model.isa_name
+        )
+
+        # Add complete version string symbol
+        self._symbols['__LANGUAGE_VERSION__'] = PreprocessorSymbol(
+            '__LANGUAGE_VERSION__',
+            isa_model.isa_version
+        )
+
+        # Parse version to get individual components
+        try:
+            version_obj = version.parse(isa_model.isa_version)
+
+            # Add major version number
+            self._symbols['__LANGUAGE_VERSION_MAJOR__'] = PreprocessorSymbol(
+                '__LANGUAGE_VERSION_MAJOR__',
+                str(version_obj.major)
+            )
+
+            # Add minor version number
+            self._symbols['__LANGUAGE_VERSION_MINOR__'] = PreprocessorSymbol(
+                '__LANGUAGE_VERSION_MINOR__',
+                str(version_obj.minor)
+            )
+
+            # Add patch version number
+            self._symbols['__LANGUAGE_VERSION_PATCH__'] = PreprocessorSymbol(
+                '__LANGUAGE_VERSION_PATCH__',
+                str(version_obj.micro)
+            )
+
+        except Exception:
+            # If version parsing fails, set defaults
+            self._symbols['__LANGUAGE_VERSION_MAJOR__'] = PreprocessorSymbol(
+                '__LANGUAGE_VERSION_MAJOR__',
+                '0'
+            )
+            self._symbols['__LANGUAGE_VERSION_MINOR__'] = PreprocessorSymbol(
+                '__LANGUAGE_VERSION_MINOR__',
+                '0'
+            )
+            self._symbols['__LANGUAGE_VERSION_PATCH__'] = PreprocessorSymbol(
+                '__LANGUAGE_VERSION_PATCH__',
+                '0'
+            )

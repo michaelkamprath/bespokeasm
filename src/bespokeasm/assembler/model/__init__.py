@@ -69,8 +69,14 @@ class AssemblerModel:
         self._isa_name = self._isa_name.strip().replace(' ', '_')
         self._isa_version = self._isa_version.strip()
         # set up registers
-        registers = self._config['general'].get('registers', [])
-        self._registers = set(registers if registers is not None else [])
+        registers_config = self._config['general'].get('registers')
+        if isinstance(registers_config, dict):
+            register_names = list(registers_config.keys())
+        elif registers_config is None:
+            register_names = []
+        else:
+            register_names = list(registers_config)
+        self._registers = set(register_names)
         # check to see if any registers named with a keyword
         for reg in self._registers:
             if reg in ASSEMBLER_KEYWORD_SET:
@@ -189,7 +195,7 @@ class AssemblerModel:
     def endian(self) -> Literal['little', 'big']:
         warnings.warn(
             "The 'endian' general configuration option is deprecated and will be removed in a "
-            "future version. Replace with 'multi_word_endianness'.",
+            "future version. Replace with 'multi_word_endian'.",
             DeprecationWarning,
             stacklevel=2
         )
@@ -200,17 +206,31 @@ class AssemblerModel:
 
     @property
     def intra_word_endianness(self) -> Literal['little', 'big']:
+        if 'intra_word_endian' in self._config['general']:
+            return self._config['general']['intra_word_endian']
         if 'intra_word_endianness' in self._config['general']:
+            warnings.warn(
+                "The 'intra_word_endianness' general configuration option is deprecated and will be removed in a "
+                "future version. Replace with 'intra_word_endian'.",
+                DeprecationWarning,
+                stacklevel=2
+            )
             return self._config['general']['intra_word_endianness']
-        else:
-            return 'big'
+        return 'big'
 
     @property
     def multi_word_endianness(self) -> Literal['little', 'big']:
+        if 'multi_word_endian' in self._config['general']:
+            return self._config['general']['multi_word_endian']
         if 'multi_word_endianness' in self._config['general']:
+            warnings.warn(
+                "The 'multi_word_endianness' general configuration option is deprecated and will be removed in a "
+                "future version. Replace with 'multi_word_endian'.",
+                DeprecationWarning,
+                stacklevel=2
+            )
             return self._config['general']['multi_word_endianness']
-        else:
-            return 'big'
+        return 'big'
 
     @property
     def string_byte_packing(self) -> bool:
@@ -346,116 +366,3 @@ class AssemblerModel:
     @property
     def allow_embedded_strings(self) -> bool:
         return self._config['general'].get('allow_embedded_strings', False)
-
-    @staticmethod
-    def update_config_dict_to_latest(config_dict: dict) -> dict:
-        """
-        Given a config dict (as loaded from YAML/JSON), return a new dict updated to the latest config format.
-        Applies upgrades based on the min_version field in the general section (if present).
-        """
-        from packaging import version
-        from bespokeasm.utilities import CommentedMap, CommentedSeq
-
-        def _update_recursive(obj, parent_key=None, in_general=False):
-            if isinstance(obj, dict) or isinstance(obj, CommentedMap):
-                result = obj.__class__() if isinstance(obj, CommentedMap) else {}
-                for key, value in obj.items():
-                    # Key renames and conversions
-                    if in_general:
-                        if key == 'endian':
-                            result['multi_word_endianness'] = value
-                            # Transfer comments if using ruamel.yaml
-                            if isinstance(obj, CommentedMap) and isinstance(result, CommentedMap):
-                                if hasattr(obj, 'ca') and hasattr(result, 'ca'):
-                                    # Copy comments from old key to new key
-                                    if key in obj.ca.items:
-                                        result.ca.items['multi_word_endianness'] = obj.ca.items[key]
-                        elif key == 'byte_size':
-                            result['word_size'] = value
-                            if isinstance(obj, CommentedMap) and isinstance(result, CommentedMap):
-                                if hasattr(obj, 'ca') and hasattr(result, 'ca'):
-                                    if key in obj.ca.items:
-                                        result.ca.items['word_size'] = obj.ca.items[key]
-                        elif key == 'byte_align':
-                            result['word_align'] = value
-                            if isinstance(obj, CommentedMap) and isinstance(result, CommentedMap):
-                                if hasattr(obj, 'ca') and hasattr(result, 'ca'):
-                                    if key in obj.ca.items:
-                                        result.ca.items['word_align'] = obj.ca.items[key]
-                        else:
-                            result[key] = _update_recursive(value, key, in_general=True)
-                            # Copy comments for non-renamed keys
-                            if isinstance(obj, CommentedMap) and isinstance(result, CommentedMap):
-                                if hasattr(obj, 'ca') and hasattr(result, 'ca'):
-                                    if key in obj.ca.items:
-                                        result.ca.items[key] = obj.ca.items[key]
-                    elif key == 'byte_align':
-                        result['word_align'] = value
-                        if isinstance(obj, CommentedMap) and isinstance(result, CommentedMap):
-                            if hasattr(obj, 'ca') and hasattr(result, 'ca'):
-                                if key in obj.ca.items:
-                                    result.ca.items['word_align'] = obj.ca.items[key]
-                    elif key == 'endian':
-                        result['multi_word_endian'] = value
-                        if isinstance(obj, CommentedMap) and isinstance(result, CommentedMap):
-                            if hasattr(obj, 'ca') and hasattr(result, 'ca'):
-                                if key in obj.ca.items:
-                                    result.ca.items['multi_word_endian'] = obj.ca.items[key]
-                    elif key == 'memory' and parent_key == 'predefined':
-                        result['data'] = _update_recursive(value, 'data')
-                        if isinstance(obj, CommentedMap) and isinstance(result, CommentedMap):
-                            if hasattr(obj, 'ca') and hasattr(result, 'ca'):
-                                if key in obj.ca.items:
-                                    result.ca.items['data'] = obj.ca.items[key]
-                    else:
-                        # Recurse, and detect if we're in the general section
-                        result[key] = _update_recursive(value, key, in_general=(key == 'general'))
-                        # Copy comments for non-renamed keys
-                        if isinstance(obj, CommentedMap) and isinstance(result, CommentedMap):
-                            if hasattr(obj, 'ca') and hasattr(result, 'ca'):
-                                if key in obj.ca.items:
-                                    result.ca.items[key] = obj.ca.items[key]
-                return result
-            elif isinstance(obj, list) or isinstance(obj, CommentedSeq):
-                if isinstance(obj, CommentedSeq):
-                    result = obj.__class__()
-                    for item in obj:
-                        result.append(_update_recursive(item, parent_key))
-                    return result
-                else:
-                    return [_update_recursive(item, parent_key) for item in obj]
-            else:
-                # Always use the original value for leaves
-                return obj
-
-        updated = _update_recursive(config_dict)
-
-        # Preserve file-level comments if using ruamel.yaml
-        if isinstance(config_dict, CommentedMap) and isinstance(updated, CommentedMap):
-            if hasattr(config_dict, 'ca') and hasattr(updated, 'ca'):
-                # Copy file-level comments
-                if hasattr(config_dict.ca, 'comment') and config_dict.ca.comment:
-                    updated.ca.comment = config_dict.ca.comment
-
-        general = updated.setdefault('general', {})
-        min_version = general.get('min_version', None)
-
-        # If no min_version, or min_version < 0.5.0, apply 0.5.0+ upgrades
-        if min_version is None or version.parse(str(min_version)) < version.parse('0.5.0'):
-            # Set defaults for new fields if missing
-            if 'multi_word_endianness' not in general:
-                general['multi_word_endianness'] = 'big'
-            if 'word_size' not in general:
-                general['word_size'] = 8
-            if 'word_segment_size' not in general:
-                general['word_segment_size'] = general['word_size']
-            # Remove any other deprecated fields if present
-            for deprecated in ['endian', 'byte_size', 'byte_align']:
-                if deprecated in general:
-                    del general[deprecated]
-
-        # Always update min_version to the current minimum required
-        from bespokeasm import BESPOKEASM_VERSION_STR
-        general['min_version'] = BESPOKEASM_VERSION_STR
-
-        return updated

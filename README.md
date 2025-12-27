@@ -6,6 +6,34 @@ This is a customizable byte code assembler that allows for the definition of cus
 **NOTE - This project should be considered to be in "beta" status. It should be stable, but features are subject to change.**
 
 ## Usage
+Once installed, assembly code can be compiled in this manner:
+
+```sh
+ bespokeasm compile -c isa-config.yaml awesome-code.asm
+```
+
+Note that supplying an instruction set configuration file is required via the `-c` option. The binary byte code image will be written to `<asm-file-basename>.bin`, though this can be changed with the `-o` option. Add `--pretty-print` to the command to get a human readable output.
+
+### Installation Options
+
+#### Standalone binary (PyInstaller build)
+
+- Download the platform file from the GitHub Releases page (e.g., `bespokeasm-<version>-linux-x86_64`, `bespokeasm-<version>-macos-arm64`, `bespokeasm-<version>-macos-x86_64`, or `bespokeasm-<version>-windows-x86_64.exe`).
+- On Linux/macOS, ensure it’s executable: chmod +x bespokeasm.
+- Run directly from a terminal, no Python needed: ./bespokeasm -c <config.yaml> <source.asm> -n -p.
+- To place it on your PATH:
+  - Linux/macOS: rename or symlink to `bespokeasm` in a PATH dir (e.g., `sudo ln -sf /path/to/bespokeasm-macos-x86_64 /usr/local/bin/bespokeasm` or `mv bespokeasm-linux-x86_64 ~/bin/bespokeasm`).
+  - Windows: rename to `bespokeasm.exe` or create a shortcut in a PATH folder (e.g., `C:\\Users\\<you>\\AppData\\Local\\Microsoft\\WindowsApps`) or add the download folder to PATH.
+- Upgrading: download the new platform binary, replace the target of your symlink or overwrite the file in your PATH, and re-run `chmod +x` on Linux/macOS if needed.
+
+#### pipx (isolated install using a wheel)
+- Prerequisite: Python 3.11+ with pipx installed. If needed: python3 -m pip install --user pipx then python3 -m pipx ensurepath (restart shell).
+- Download the wheel from the GitHub Releases page (e.g., `bespokeasm-<version>-py3-none-any.whl`).
+- Install: pipx install ./bespokeasm-<version>-py3-none-any.whl.
+- Use the CLI from anywhere: bespokeasm -c <config.yaml> <source.asm> -n -p.
+- To update, reinstall with the newer wheel; to remove, pipx uninstall bespokeasm.
+
+#### Install From Source
 To install, clone this repository and install using `pip`.
 
 ```sh
@@ -21,16 +49,16 @@ cd bespokeasm
 python3 -m venv .venv/bespokeasm
 source .venv/bespokeasm/bin/activate
 pip install .
-bespokeasm —version
+bespokeasm --version
 ```
 
-Once installed, assembly code can be compiled in this manner:
+Be sure to activate the virtual environment whenever you want to use BespokeASM.
+
+For development (building wheels/binaries), install dev tools in your venv:
 
 ```sh
- bespokeasm compile -c isa-config.yaml awesome-code.asm
+pip install ".[dev]"
 ```
-
-Note that supplying an instruction set configuration file is required via the `-c` option. The binary byte code image will be written to `<asm-file-basename>.bin`, though this can be changed with the `-o` option. Add `--pretty-print` to the command to get a human readable output.
 
 ### Installing Syntax Highlighting
 #### Visual Studio Code
@@ -38,6 +66,8 @@ BespokeASM can generate a syntax highlighting extension for [Visual Studio Code]
 ```sh
 bespokeasm generate-extension vscode -c isa-config.yaml
 ```
+
+For [Cursor](https://cursor.com/), add the `-d ~/.cursor/` options.
 #### Sublime Text
 BespokeASM can generate a syntax highlighting extension for [Sublime Text](https://www.sublimetext.com) that will properly highlight the instruction mnemonics and other aspects of the assembly language configured in the instruction set architecture configuration file. To generate the `.sublime-package` file:
 ```sh

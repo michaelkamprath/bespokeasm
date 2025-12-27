@@ -1,0 +1,32 @@
+; Fibonacci sequence generator for Ben Eater SAP-1
+; Emits each term to the OUT register until the 8-bit sum would overflow
+#require __LANGUAGE_NAME__ == eater-sap1
+#require __LANGUAGE_VERSION__ >= 1.0.0
+
+.org $0
+
+fibonacci_loop:
+    LDA current        ; load current Fibonacci value
+    OUT                ; display current value
+    ADD next           ; compute next = current + next
+    JC done            ; stop once the 8-bit sum would overflow
+    STA scratch        ; hold the newly computed term
+    LDA next
+    STA current        ; shift previous "next" into "current"
+    LDA scratch
+    STA next           ; place the new term into "next"
+    JMP fibonacci_loop
+
+done:
+    HLT
+
+.org $0C
+
+current:
+    .byte $00          ; F0 = 0
+
+next:
+    .byte $01          ; F1 = 1
+
+scratch:
+    .byte $00          ; temporary workspace for the freshly computed term

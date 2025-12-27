@@ -12,7 +12,7 @@ class TestAssemblerModelDefaults(unittest.TestCase):
         self.minimal_config = {
             'general': {
                 'address_size': 16,
-                'min_version': '0.5.0',
+                'min_version': '0.7.0',
                 'instructions': {},
                 'operand_sets': {},
             },
@@ -52,7 +52,7 @@ class TestAssemblerModelDefaults(unittest.TestCase):
                 'string_byte_packing': True,
                 'string_byte_packing_fill': 0xAB,
                 'cstr_terminator': 0x55,
-                'min_version': '0.5.0',
+                'min_version': '0.7.0',
             },
             'instructions': {},
             'operand_sets': {},

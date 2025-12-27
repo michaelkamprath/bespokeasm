@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bespokeasm"
-version = "0.6.0"
+version = "0.7.0"
 authors = [
   { name="Michael Kamprath", email="michael@kamprath.net" },
 ]
@@ -25,6 +25,13 @@ dependencies = [
     "pre-commit",
     "click-default-group",
     "ruamel.yaml",
+]
+
+[project.optional-dependencies]
+dev = [
+    "build",
+    "pipx",
+    "pyinstaller",
 ]
 
 [project.urls]

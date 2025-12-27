@@ -78,6 +78,7 @@ class PreprocessorLineFactory:
                         comment,
                         current_memzone,
                         isa_model,
+                        preprocessor,
                         log_verbosity
                     )]
 

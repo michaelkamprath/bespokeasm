@@ -187,19 +187,21 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             # remove the registers syntax
             del syntax_dict['contexts']['registers']
 
-        # handle compiler predefined labels
+        # handle compiler predefined labels and built-in constants
+        from bespokeasm.assembler.keywords import BUILTIN_CONSTANTS_SET
         predefined_labels = self.model.predefined_labels
-        if len(predefined_labels) > 0:
+        all_constants = list(predefined_labels) + list(BUILTIN_CONSTANTS_SET)
+        if len(all_constants) > 0:
             if self.verbose > 2:
-                print(f'  adding syntax for a total of {len(predefined_labels)} predefined labels')
-            # update the registers syntax
+                print(f'  adding syntax for a total of {len(all_constants)} predefined labels and built-in constants')
+            # update the compiler constants syntax
             syntax_dict['contexts']['compiler_labels'][0]['match'] = self._replace_token_with_regex_list(
                 syntax_dict['contexts']['compiler_labels'][0]['match'],
                 '##COMPILERCONSTANTS##',
-                predefined_labels,
+                all_constants,
             )
         else:
-            # remove the registers syntax
+            # remove the compiler constants syntax
             del syntax_dict['contexts']['compiler_labels']
 
         # compiler directives

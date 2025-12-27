@@ -100,7 +100,7 @@ class TestListingPrettyPrinter(unittest.TestCase):
                     'address_size': address_size,
                     'endian': 'big',
                     'registers': [],
-                    'min_version': '0.5.0',
+                    'min_version': '0.7.0',
                     'string_byte_packing': False,
                     'string_byte_packing_fill': 0,
                 },

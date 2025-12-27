@@ -5,6 +5,8 @@
 ; bouncing algorithm doesn't handle being too tightly contaied and so
 ; the boucing will "tunnel" through the barrier in those cases ;-)
 ;
+#require __LANGUAGE_NAME__ == kenbak-1
+#require __LANGUAGE_VERSION__ >= 1.0.2
 
 start:
     ld a, 1

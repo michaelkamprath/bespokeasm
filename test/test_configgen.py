@@ -7,6 +7,8 @@ import shutil
 import tempfile
 import unittest
 
+from bespokeasm.configgen.color_scheme import DEFAULT_COLOR_SCHEME
+from bespokeasm.configgen.color_scheme import SyntaxElement
 from bespokeasm.configgen.sublime import SublimeConfigGenerator
 from bespokeasm.configgen.vim import VimConfigGenerator
 from bespokeasm.configgen.vscode import VSCodeConfigGenerator
@@ -649,9 +651,11 @@ class TestConfigurationGeneration(unittest.TestCase):
             syn = f.read()
 
         # Test Normal highlight group with background and foreground
+        bg_color = DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.BACKGROUND)
+        fg_color = DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.FOREGROUND)
         self.assertRegex(
             syn,
-            r'hi\s+Normal\s+guifg=#EEEEEE\s+guibg=#222222\s+ctermfg=\d+\s+ctermbg=\d+',
+            rf'hi\s+Normal\s+guifg={re.escape(fg_color)}\s+guibg={re.escape(bg_color)}\s+ctermfg=\d+\s+ctermbg=\d+',
             'Normal highlight should set both foreground and background colors'
         )
 
@@ -690,5 +694,129 @@ class TestConfigurationGeneration(unittest.TestCase):
             r'ctermbg=NONE\s+gui=bold\s+cterm=bold',
             'Bracket highlight should maintain bold styling while inheriting background'
         )
+
+        shutil.rmtree(test_dir)
+
+    def test_builtin_constants_in_sublime_syntax(self):
+        """Test that built-in language version constants are included in Sublime syntax highlighting."""
+        test_dir = tempfile.mkdtemp()
+        config_file = pkg_resources.files(config_files).joinpath('eater-sap1-isa.yaml')
+        configgen = SublimeConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            'test-lang',
+            '1.0.0',
+            'testasm',
+        )
+
+        configgen.generate()
+
+        # Extract the generated package and check content
+        import zipfile
+        package_file = os.path.join(test_dir, 'test-lang.sublime-package')
+        self.assertIsFile(package_file)
+
+        extract_dir = os.path.join(test_dir, 'extracted')
+        with zipfile.ZipFile(package_file, 'r') as zip_ref:
+            zip_ref.extractall(extract_dir)
+
+        syntax_fp = os.path.join(extract_dir, 'test-lang.sublime-syntax')
+        self.assertIsFile(syntax_fp)
+
+        with open(syntax_fp) as yaml_file:
+            yaml_loader = YAML()
+            syntax_dict = yaml_loader.load(yaml_file)
+
+        # Check that compiler_labels context exists and contains language version symbols
+        self.assertIn('compiler_labels', syntax_dict['contexts'], 'compiler_labels context should exist')
+        compiler_labels_match = syntax_dict['contexts']['compiler_labels'][0]['match']
+
+        # Verify all built-in constants are in the match pattern
+        from bespokeasm.assembler.keywords import BUILTIN_CONSTANTS_SET
+        for constant in BUILTIN_CONSTANTS_SET:
+            self.assertIn(constant, compiler_labels_match, f'{constant} should be in compiler labels match pattern')
+
+        # Verify the scope is constant.language
+        self.assertEqual(
+            syntax_dict['contexts']['compiler_labels'][0]['scope'],
+            'constant.language',
+            'Built-in constants should have constant.language scope'
+        )
+
+        shutil.rmtree(test_dir)
+
+    def test_builtin_constants_in_vscode_syntax(self):
+        """Test that built-in language version constants are included in VSCode syntax highlighting."""
+        test_dir = tempfile.mkdtemp()
+        config_file = pkg_resources.files(config_files).joinpath('eater-sap1-isa.yaml')
+        configgen = VSCodeConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            'test-lang',
+            '1.0.0',
+            'testasm',
+        )
+
+        configgen.generate()
+
+        extension_dirpath = os.path.join(str(test_dir), 'extensions')
+        grammar_fp = os.path.join(extension_dirpath, 'test-lang', 'syntaxes', 'tmGrammar.json')
+        self.assertIsFile(grammar_fp)
+
+        with open(grammar_fp) as json_file:
+            grammar_dict = json.load(json_file)
+
+        # Check that compiler_labels exists in repository
+        self.assertIn('compiler_labels', grammar_dict['repository'], 'compiler_labels should exist in repository')
+        compiler_labels_match = grammar_dict['repository']['compiler_labels']['match']
+
+        # Verify all built-in constants are in the match pattern
+        from bespokeasm.assembler.keywords import BUILTIN_CONSTANTS_SET
+        for constant in BUILTIN_CONSTANTS_SET:
+            self.assertIn(constant, compiler_labels_match, f'{constant} should be in compiler labels match pattern')
+
+        # Verify the name/scope
+        self.assertEqual(
+            grammar_dict['repository']['compiler_labels']['name'],
+            'constant.language',
+            'Built-in constants should have constant.language name'
+        )
+
+        shutil.rmtree(test_dir)
+
+    def test_builtin_constants_in_vim_syntax(self):
+        """Test that built-in language version constants are included in Vim syntax highlighting."""
+        test_dir = tempfile.mkdtemp()
+        config_file = pkg_resources.files(config_files).joinpath('eater-sap1-isa.yaml')
+        configgen = VimConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            'test-lang',
+            '1.0.0',
+            'testasm',
+        )
+
+        configgen.generate()
+
+        vim_ft = (configgen.language_id.replace('-', '').lower())
+        syntax_fp = os.path.join(str(test_dir), 'syntax', f'{vim_ft}.vim')
+        self.assertIsFile(syntax_fp)
+
+        with open(syntax_fp) as f:
+            syn = f.read()
+
+        # Check for CompilerLabel syntax match that includes built-in constants
+        m = re.search(rf'^syn\s+match\s+{re.escape(vim_ft)}CompilerLabel\s+/(.+)/$', syn, re.MULTILINE)
+        self.assertIsNotNone(m, 'CompilerLabel match line should exist')
+        compiler_labels_pattern = m.group(1)
+
+        # Verify all built-in constants are in the pattern
+        from bespokeasm.assembler.keywords import BUILTIN_CONSTANTS_SET
+        for constant in BUILTIN_CONSTANTS_SET:
+            # Vim doesn't escape underscores in this context
+            self.assertIn(constant, compiler_labels_pattern, f'{constant} should be in Vim compiler labels pattern')
 
         shutil.rmtree(test_dir)

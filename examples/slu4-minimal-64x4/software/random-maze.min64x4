@@ -5,7 +5,8 @@
 ;
 ;       https://10print.org
 ;
-#require "slu4-min64x4-asm >= 1.1.0"
+#require __LANGUAGE_NAME__ == slu4-min64x4-asm
+#require __LANGUAGE_VERSION__ >= 1.1.0
 
 LEFT_WALL_CHAR = $1E
 RIGHT_WALL_CHAR = $1F

@@ -20,10 +20,18 @@ Changes that are planned but not implemented yet:
 
 ## [Unreleased]
 
+## [0.7.0]
+- Fixed a bug in handling comparisons to preprocessor language version symbols.
+- Added GitHub action to automatically create stand-alone binaries upon release, or create them locally using the Makefile.
+- Added command to install shell tab completions for  **BespokeASM**.
+- Added the ability to create a markdown file documenting the configured instruction set in a human- and AI-readable format. Intended use is to provide AI coding agents with documentation of the assembly language and how to use it. Use in combination with [the general **BespokeASM** syntax documentation](https://github.com/michaelkamprath/bespokeasm/wiki/Assembly-Language-Syntax). Consider this feature as "beta", as the format and completeness of the generated output will evolve.
+- Removed the unmaintained `update-config` command.
+
 ## [0.6.0]
 - Added support for instruction aliases: you can now specify an `aliases` field (a list of alternative mnemonics) in an instruction's configuration. All aliases are globally unique, are accepted as valid mnemonics in assembly source, and generate the same code as the root mnemonic. This does not apply to macros.
 - Added `#print` preprocessor directive for compile-time messages with optional verbosity gating and honoring conditional/mute controls.
 - Added Vim syntax highlighting generator via `bespokeasm generate-extension vim`. This creates Vim `syntax/` and `ftdetect/` files for your ISA.
+- Added support for built-in language version symbols in `#require`, `#if`, and `#elif` preprocessor directives.
 - Added **named label scopes** feature: Create custom symbol namespaces with user-defined prefixes that can be shared across files. Use `#create-scope "name" prefix="prefix_"`, `#use-scope "name"`, and `#deactivate-scope "name"` directives. Supports library workflows where scopes can be used before being defined.
 - Fixed a bug where `#include` directives were not properly processed when they were inside a conditional block.
 - Fixed a test isolation issue where instruction pattern caching caused pytest failures when different ISA configurations were used across test files.
@@ -189,7 +197,8 @@ First tracked released
 * Enabled the `reverse_argument_order` instruction option be applied to a specific operand configuration. This slightly changed the configuration file format.
 * Added ability for instructions with operands to have a single "empty operand" variant, e.g., `pop`
 
-[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.7.0...HEAD
+[0.6.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/michaelkamprath/bespokeasm/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.4.2...v0.5.0

@@ -1,5 +1,6 @@
 import os
 import unittest
+from unittest.mock import patch
 
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.line_identifier import LineIdentifier
@@ -103,6 +104,71 @@ class TestIntelHexPrettyPrinter(unittest.TestCase):
         printer = IntelHexPrettyPrinter([org_line], self.model, True)
         output = printer.pretty_print().replace('\r\n', '\n').strip()
         self.assertEqual(output, ':00000001FF')
+
+    def test_pretty_print_puts_called_for_words(self):
+        class RecordingIntelHex:
+            """Minimal IntelHex stand-in capturing puts/write calls."""
+            def __init__(self):
+                self.put_calls = []
+                self.write_hex_file_called = False
+
+            def puts(self, address, data):
+                self.put_calls.append((address, data))
+
+            def write_hex_file(self, output):
+                self.write_hex_file_called = True
+                output.write(':DONE\n')
+
+            def dump(self, tofile):  # pragma: no cover - not used in this helper
+                raise AssertionError('dump should not be called')
+
+        line_id = LineIdentifier(1, 'main.asm')
+        words = [Word(0xAA, 8), Word(0xBB, 8)]
+        line = DummyLineWithWords(
+            line_id, 'data', '', self.memzone, 8, 8, 'big', 'big', words, 0x20
+        )
+        stub_hex = RecordingIntelHex()
+        with patch('bespokeasm.assembler.pretty_printer.intelhex.IntelHex', return_value=stub_hex):
+            printer = IntelHexPrettyPrinter([line], self.model, True)
+            output = printer.pretty_print()
+        expected_data = Word.words_to_bytes(words).decode('latin-')
+        # Ensure the printer feeds real instruction bytes to IntelHex and uses the hex writer path.
+        self.assertEqual(stub_hex.put_calls, [(0x20, expected_data)])
+        self.assertTrue(stub_hex.write_hex_file_called)
+        self.assertEqual(output, ':DONE\n')
+
+    def test_pretty_print_skips_muted_lines_and_uses_dump(self):
+        class RecordingIntelHex:
+            """IntelHex stub tracking whether dump was invoked."""
+            def __init__(self):
+                self.put_calls = []
+                self.dump_called = False
+
+            def puts(self, address, data):
+                self.put_calls.append((address, data))
+
+            def write_hex_file(self, output):  # pragma: no cover - not used in this helper
+                raise AssertionError('write_hex_file should not be called')
+
+            def dump(self, tofile):
+                self.dump_called = True
+                tofile.write('dumped\n')
+
+        line_id = LineIdentifier(1, 'main.asm')
+        words = [Word(0xCC, 8)]
+        line = DummyLineWithWords(
+            line_id, 'data', '', self.memzone, 8, 8, 'big', 'big', words, 0x30
+        )
+        line._is_muted = True
+        org_line = AddressOrgLine(line_id, '.org', '', '0x40', 'GLOBAL', MemoryZoneManager(4, 0))
+        stub_hex = RecordingIntelHex()
+        with patch('bespokeasm.assembler.pretty_printer.intelhex.IntelHex', return_value=stub_hex):
+            printer = IntelHexPrettyPrinter([line, org_line], self.model, False)
+            output = printer.pretty_print()
+        # Verify muted lines (and directives) skip byte emission while the dump fallback still produces output.
+        self.assertEqual(stub_hex.put_calls, [])
+        self.assertTrue(stub_hex.dump_called)
+        self.assertEqual(output, 'dumped\n')
 
 
 if __name__ == '__main__':

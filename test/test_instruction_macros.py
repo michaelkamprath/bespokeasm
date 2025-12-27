@@ -45,6 +45,36 @@ class TestInstructionMacros(unittest.TestCase):
     def setUp(self) -> None:
         InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN = None
 
+    def test_macro_documentation_and_config_forms(self):
+        push2_macro = self.isa_model.instructions.get('push2')
+        self.assertIsNotNone(push2_macro, 'push2 macro should be loaded')
+        self.assertEqual(
+            push2_macro.documentation,
+            'Example macro using dictionary form for tests',
+            'dictionary-form macro should preserve documentation',
+        )
+        mov2_macro = self.isa_model.instructions.get('mov2')
+        self.assertIsNotNone(mov2_macro, 'mov2 macro should be loaded')
+        self.assertIsNone(
+            mov2_macro.documentation,
+            'legacy list-form macro should default documentation to None',
+        )
+
+    def test_macro_instruction_sequences_loaded(self):
+        push2_macro = self.isa_model.instructions.get('push2')
+        self.assertEqual(
+            push2_macro.variants[0]._variant_config['instructions'],
+            ['push ((@ARG(0)) >> 8)', 'push ((@ARG(0)) & 0x00FF)'],
+            'dictionary-form macro should preserve instruction sequence',
+        )
+
+        mov2_macro = self.isa_model.instructions.get('mov2')
+        self.assertEqual(
+            mov2_macro.variants[0]._variant_config['instructions'],
+            ['mov [@ARG(0)],[@ARG(1)]', 'mov [@ARG(0) + 1],[@ARG(1) + 1]'],
+            'legacy-form macro should preserve instruction sequence',
+        )
+
     def test_macro_parsing_numeric_args(self):
         isa_model = self.isa_model
         memzone = self.memzone

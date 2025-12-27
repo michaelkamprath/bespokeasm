@@ -5,7 +5,8 @@
 ; the more unique programming techniques of the KENBAK-1, such as jump
 ; and mark.
 ;
-#require "kenbak-1 >= 1.0.0"
+#require __LANGUAGE_NAME__ == kenbak-1
+#require __LANGUAGE_VERSION__ >= 1.0.2
 
 DELAY_COUNT = 255
 
