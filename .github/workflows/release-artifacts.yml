@@ -147,7 +147,7 @@ jobs:
         shell: bash
     strategy:
       matrix:
-        os: [macos-latest, windows-latest]
+        os: [macos-latest, macos-15-intel, windows-latest]
     steps:
       - uses: actions/checkout@v4
       - name: Read project metadata
