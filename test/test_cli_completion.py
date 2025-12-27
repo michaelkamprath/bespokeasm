@@ -94,8 +94,8 @@ def test_zsh_formatting_outputs_rows_per_option_in_zsh():
 
     zsh_template = dedent(
         r'''
-        autoload -U compinit colors && compinit && colors
         typeset -gA compstate
+compdef() { :; }
 _describe() {
     print -l -- "${_pretty[@]}"
 }
@@ -145,8 +145,8 @@ def test_zsh_formatting_outputs_rows_per_compile_option_set_in_zsh():
 
     zsh_template = dedent(
         r'''
-        autoload -U compinit colors && compinit && colors
         typeset -gA compstate
+compdef() { :; }
 _describe() {
     print -l -- "${_pretty[@]}"
 }
