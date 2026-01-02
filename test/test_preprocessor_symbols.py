@@ -1,4 +1,6 @@
 import importlib.resources as pkg_resources
+import os
+import tempfile
 import unittest
 
 from bespokeasm.assembler.assembly_file import AssemblyFile
@@ -9,7 +11,9 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object.factory import LineOjectFactory
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
+from bespokeasm.assembler.line_object.preprocessor_line.condition_line import ConditionLine
 from bespokeasm.assembler.line_object.preprocessor_line.define_symbol import DefineSymbolLine
+from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.preprocessor import Preprocessor
@@ -378,6 +382,58 @@ class TestPreprocessorSymbols(unittest.TestCase):
         self.assertTrue(stack.is_muted, 'condition should be True')
         stack.process_condition(UnmutePreprocessorCondition('#unmute', LineIdentifier('test_muting', 8)), preprocessor)
         self.assertFalse(stack.is_muted, 'condition should be False')
+
+    def test_emit_aliases_unmute(self):
+        """Doc: Preprocessor > Bytecode Emission Control - #emit acts as an alias of #unmute."""
+        preprocessor = Preprocessor()
+        stack = ConditionStack()
+        memzone = MemoryZone(16, 0, 0xFFFF, 'GLOBAL')
+
+        ConditionLine(LineIdentifier(1, 'test_emit_alias'), '#mute', '', memzone, preprocessor, stack)
+        self.assertTrue(stack.is_muted, 'mute should be True')
+        ConditionLine(LineIdentifier(2, 'test_emit_alias'), '#emit', '', memzone, preprocessor, stack)
+        self.assertFalse(stack.is_muted, 'emit should unmute')
+
+    def test_mute_does_not_apply_to_included_files(self):
+        """Doc: Preprocessor > Bytecode Emission Control - #mute is file-local and does not affect includes."""
+        fp = pkg_resources.files(config_files).joinpath('test_instruction_operands.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        label_scope = GlobalLabelScope(isa_model.registers)
+        memzone_manager = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
+        preprocessor = Preprocessor()
+        named_scope_manager = NamedScopeManager()
+
+        main_source = '\n'.join([
+            '#mute',
+            '#include "included.asm"',
+            '#unmute',
+        ])
+        include_source = 'included_label: .byte 1\n'
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            main_path = os.path.join(temp_dir, 'main.asm')
+            include_path = os.path.join(temp_dir, 'included.asm')
+            with open(main_path, 'w') as handle:
+                handle.write(main_source)
+            with open(include_path, 'w') as handle:
+                handle.write(include_source)
+
+            asm_file = AssemblyFile(main_path, label_scope, named_scope_manager)
+            line_objects = asm_file.load_line_objects(
+                isa_model,
+                {temp_dir},
+                memzone_manager,
+                preprocessor,
+                0,
+            )
+            included_lines = [lo for lo in line_objects if lo.line_id.filename == include_path]
+            self.assertTrue(included_lines, 'included file should produce line objects')
+            for lobj in included_lines:
+                self.assertFalse(lobj.is_muted, 'mute should not apply to included file')
 
     def test_conditional_muting(self):
         """Demonstrate that conditional compilation controls the mute/unmute preprocessor directives."""

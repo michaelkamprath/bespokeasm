@@ -88,6 +88,10 @@ class TestExpression(unittest.TestCase):
             parse_expression(1212, '32/b10').get_value(labels, scopes, 3),
             16, 'test binary math: 32/b10'
         )
+        self.assertEqual(
+            parse_expression(1212, '7CH').get_value(labels, scopes, 4),
+            0x7C, 'test hex suffix parsing: 7CH'
+        )
 
     def test_expression_result_integer_casting(self):
         # resolved values are cast to an integer, truncating the fractional part
@@ -247,6 +251,30 @@ class TestExpression(unittest.TestCase):
             parse_expression(line_id, "(' ' + ' ')").get_value(labels, scopes, 1),
             64, "(' ' + ' ') = 64"
         )
+
+    def test_invalid_character_ordinals(self):
+        """Doc: Numeric Literals > Single Character Ordinals - only single-quoted single characters are valid."""
+        labels = TestExpression.label_values
+        scopes = ActiveNamedScopeList(NamedScopeManager())
+        with self.assertRaisesRegex(SyntaxError, 'only single-character ordinals'):
+            parse_expression(1212, "'AB'").get_value(labels, scopes, 1)
+        with self.assertRaisesRegex(SyntaxError, 'double-quoted strings are not valid'):
+            parse_expression(1212, '"A"').get_value(labels, scopes, 1)
+
+    def test_expression_error_messages(self):
+        """Doc: Numeric Expressions - invalid tokens should report actionable error messages."""
+        labels = TestExpression.label_values
+        scopes = ActiveNamedScopeList(NamedScopeManager())
+        with self.assertRaisesRegex(SyntaxError, 'unterminated character literal'):
+            parse_expression(1212, "'A").get_value(labels, scopes, 1)
+        with self.assertRaisesRegex(SyntaxError, 'boolean operators'):
+            parse_expression(1212, '1 && 2').get_value(labels, scopes, 1)
+        with self.assertRaisesRegex(SyntaxError, 'boolean operators'):
+            parse_expression(1212, '1 || 2').get_value(labels, scopes, 1)
+        with self.assertRaisesRegex(SyntaxError, 'brackets are not supported'):
+            parse_expression(1212, '[1]').get_value(labels, scopes, 1)
+        with self.assertRaisesRegex(SyntaxError, 'invalid token'):
+            parse_expression(1212, '1:2').get_value(labels, scopes, 1)
 
     def test_negative_values(self):
         line_id = LineIdentifier(1927, 'test_character_ordinals_in_expressions')
