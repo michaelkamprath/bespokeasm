@@ -19,6 +19,7 @@ Changes that are planned but not implemented yet:
 
 
 ## [Unreleased]
+* Added support to the VSCode language exntsion for editor hovers for mnemonics, labels, and constants; plus improved semantic syntax highlighting that differentiations label and constant defintion from label and constant usage.
 
 ## [0.7.0]
 - Fixed a bug in handling comparisons to preprocessor language version symbols.

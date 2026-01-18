@@ -53,12 +53,12 @@ class TestConfigurationGeneration(unittest.TestCase):
             package_json = json.load(json_file)
         self.assertEqual(
             package_json['name'],
-            'bespokeasm-test',
-            'package name should be modified ISA name'
+            'bespokeasm-test-assembly',
+            'package name should be based on language ID'
         )
         self.assertEqual(
             package_json['displayName'],
-            'Little Endian Line Creation',
+            f'{configgen.language_name} (BespokeASM)',
             'display name should be correct'
         )
         self.assertEqual(
@@ -82,6 +82,33 @@ class TestConfigurationGeneration(unittest.TestCase):
             'language ID should be modified ISA name'
         )
         self.assertEqual(
+            package_json['main'],
+            './extension.js',
+            'extension entry point should be set'
+        )
+        hover_config = package_json['contributes']['configuration']['properties']
+        hover_prefix = f'bespokeasm.{package_json["contributes"]["languages"][0]["id"]}.hover'
+        self.assertIn(f'{hover_prefix}.mnemonics', hover_config)
+        self.assertIn(f'{hover_prefix}.labels', hover_config)
+        self.assertIn(f'{hover_prefix}.constants', hover_config)
+        self.assertTrue(hover_config[f'{hover_prefix}.mnemonics']['default'])
+        self.assertTrue(hover_config[f'{hover_prefix}.labels']['default'])
+        self.assertTrue(hover_config[f'{hover_prefix}.constants']['default'])
+        self.assertEqual(
+            package_json['activationEvents'],
+            ['onLanguage:bespokeasm-test-assembly'],
+            'activation event should target the language'
+        )
+        self.assertIn('semanticTokenScopes', package_json['contributes'])
+        self.assertEqual(
+            package_json['contributes']['semanticTokenScopes'][0]['language'],
+            'bespokeasm-test-assembly',
+            'semantic token language should be updated'
+        )
+        token_scopes = package_json['contributes']['semanticTokenScopes'][0]['scopes']
+        self.assertIn('constant', token_scopes)
+        self.assertIn('constant.definition', token_scopes)
+        self.assertEqual(
             package_json['contributes']['snippets'][0]['language'],
             'bespokeasm-test-assembly',
             'language ID should be modified ISA name'
@@ -95,6 +122,24 @@ class TestConfigurationGeneration(unittest.TestCase):
             grammar_json['repository']['instructions']['begin'],
             ['\\blda\\b', '\\badd\\b', '\\bset\\b', '\\bbig\\b', '\\bhlt\\b'],
             'instructions'
+        )
+        instructions_patterns = grammar_json['repository']['instructions']['patterns']
+        pattern_includes = [
+            entry['include']
+            for entry in instructions_patterns
+            if isinstance(entry, dict) and 'include' in entry
+        ]
+        self.assertNotIn('#constant_usages', pattern_includes)
+        self.assertNotIn('constant_usages', grammar_json['repository'])
+        self.assertNotIn('#operands_variables', pattern_includes)
+
+        # TODO: Remove label usage from TextMate grammar once semantic tokens handle constants.
+        # This currently fails because label usage rules match constants in usage positions.
+        self.assertNotIn('#label_usages', pattern_includes)
+        self.assertEqual(
+            grammar_json['repository']['operands_variables']['match'],
+            '(?<!\\w)([A-Za-z][\\w\\d_]*)\\b',
+            'operand variables should not match dot/underscore-prefixed labels'
         )
         # there should be no macros for this ISA
         self.assertFalse(
@@ -111,6 +156,26 @@ class TestConfigurationGeneration(unittest.TestCase):
 
         self.assertIsFile(os.path.join(extension_dirpath, 'bespokeasm-test', 'snippets.json'))
         self.assertIsFile(os.path.join(extension_dirpath, 'bespokeasm-test', 'language-configuration.json'))
+        self.assertIsFile(os.path.join(extension_dirpath, 'bespokeasm-test', 'extension.js'))
+        self.assertIsFile(os.path.join(extension_dirpath, 'bespokeasm-test', 'label_hover.js'))
+        self.assertIsFile(os.path.join(extension_dirpath, 'bespokeasm-test', 'constants_hover.js'))
+        with open(os.path.join(extension_dirpath, 'bespokeasm-test', 'extension.js')) as js_file:
+            js_content = js_file.read()
+        self.assertIn('bespokeasm.openLabelDefinition', js_content)
+        self.assertIn('bespokeasm.openConstantDefinition', js_content)
+        self.assertIn('editor.action.goToLocations', js_content)
+        self.assertIn('buildDefinitionHover', js_content)
+        self.assertIn('1 << tokenModifiers.get(\'definition\')', js_content)
+
+        docs_fp = os.path.join(extension_dirpath, 'bespokeasm-test', 'instruction-docs.json')
+        self.assertIsFile(docs_fp)
+        with open(docs_fp) as json_file:
+            docs_json = json.load(json_file)
+        self.assertIn('instructions', docs_json)
+        self.assertIn('macros', docs_json)
+        self.assertIn('LDA', docs_json['instructions'])
+        self.assertIn('### `LDA`', docs_json['instructions']['LDA'])
+        self.assertIn('Documentation not provided.', docs_json['instructions']['LDA'])
 
         shutil.rmtree(test_dir)
 
@@ -138,8 +203,8 @@ class TestConfigurationGeneration(unittest.TestCase):
             package_json = json.load(json_file)
         self.assertEqual(
             package_json['name'],
-            'tester-assembly',
-            'package name should be modified ISA name'
+            'tester-assembly-assembly',
+            'package name should be based on language ID'
         )
         self.assertEqual(
             package_json['contributes']['languages'][0]['id'],
@@ -160,6 +225,22 @@ class TestConfigurationGeneration(unittest.TestCase):
             package_json['contributes']['snippets'][0]['language'],
             'tester-assembly-assembly',
             'language ID should be modified ISA name'
+        )
+        self.assertEqual(
+            package_json['main'],
+            './extension.js',
+            'extension entry point should be set'
+        )
+        self.assertEqual(
+            package_json['activationEvents'],
+            ['onLanguage:tester-assembly-assembly'],
+            'activation event should target the language'
+        )
+        self.assertIn('semanticTokenScopes', package_json['contributes'])
+        self.assertEqual(
+            package_json['contributes']['semanticTokenScopes'][0]['language'],
+            'tester-assembly-assembly',
+            'semantic token language should be updated'
         )
         self.assertEqual(
             package_json['contributes']['snippets'][0]['language'],
@@ -184,6 +265,43 @@ class TestConfigurationGeneration(unittest.TestCase):
 
         self.assertIsFile(os.path.join(extension_dirpath, 'tester-assembly', 'snippets.json'))
         self.assertIsFile(os.path.join(extension_dirpath, 'tester-assembly', 'language-configuration.json'))
+        self.assertIsFile(os.path.join(extension_dirpath, 'tester-assembly', 'extension.js'))
+
+        docs_fp = os.path.join(extension_dirpath, 'tester-assembly', 'instruction-docs.json')
+        self.assertIsFile(docs_fp)
+        with open(docs_fp) as json_file:
+            docs_json = json.load(json_file)
+        self.assertIn('instructions', docs_json)
+        self.assertIn('macros', docs_json)
+        self.assertIn('NOP', docs_json['instructions'])
+        self.assertIn('### `NOP`', docs_json['instructions']['NOP'])
+        self.assertIn('Documentation not provided.', docs_json['instructions']['NOP'])
+
+    def test_vscode_configgen_with_macros(self):
+        test_dir = tempfile.mkdtemp()
+        config_file = pkg_resources.files(config_files).joinpath('test_instruction_macros.yaml')
+        configgen = VSCodeConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            None,
+            None,
+            'asmtest',
+        )
+
+        configgen.generate()
+
+        extension_dirpath = os.path.join(str(test_dir), 'extensions')
+        docs_fp = os.path.join(extension_dirpath, 'bespokeasm-test', 'instruction-docs.json')
+        self.assertIsFile(docs_fp)
+        with open(docs_fp) as json_file:
+            docs_json = json.load(json_file)
+
+        self.assertIn('instructions', docs_json)
+        self.assertIn('macros', docs_json)
+        self.assertIn('PUSH2', docs_json['macros'])
+        self.assertIn('### `PUSH2`', docs_json['macros']['PUSH2'])
+        self.assertNotIn('Documentation not provided.', docs_json['macros']['PUSH2'])
 
         shutil.rmtree(test_dir)
 

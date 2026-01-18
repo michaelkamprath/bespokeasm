@@ -12,6 +12,8 @@ from bespokeasm.assembler.keywords import PREPROCESSOR_DIRECTIVES_SET
 from bespokeasm.configgen import LanguageConfigGenerator
 from bespokeasm.configgen.color_scheme import DEFAULT_COLOR_SCHEME
 from bespokeasm.configgen.color_scheme import SyntaxElement
+from bespokeasm.docsgen import build_documentation_model
+from bespokeasm.docsgen.markdown_generator import MarkdownGenerator
 
 
 class VSCodeConfigGenerator(LanguageConfigGenerator):
@@ -40,7 +42,8 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.BINARY_NUMBER, 'constant.numeric.integer.binary', 'Numbers - Binary'),
             (SyntaxElement.DECIMAL_NUMBER, 'constant.numeric.integer.decimal', 'Numbers - Decimal'),
             (SyntaxElement.CHARACTER_NUMBER, 'constant.numeric.character', 'Numbers - Character'),
-            (SyntaxElement.LABEL_NAME, 'variable.other.label', 'Labels'),
+            (SyntaxElement.LABEL_DEFINITION, 'variable.other.label.definition', 'Label Definitions'),
+            (SyntaxElement.LABEL_USAGE, 'variable.other.label.usage', 'Label Usages'),
             (SyntaxElement.PUNCTUATION_STRING, 'punctuation.definition.string', 'String Punctuation'),
             (SyntaxElement.STRING, 'string.quoted', 'Strings'),
             (SyntaxElement.STRING_ESCAPE, 'constant.character.escape', 'Strings - Escaped Characters'),
@@ -49,7 +52,8 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.INSTRUCTION, 'variable.function.instruction', 'Functions - Instruction'),
             (SyntaxElement.MACRO, 'variable.function.macro', 'Functions - Macro'),
             (SyntaxElement.REGISTER, 'variable.language', 'Variables - Language'),
-            (SyntaxElement.CONSTANT_NAME, 'variable.other.constant', 'Variables - Constant'),
+            (SyntaxElement.CONSTANT_DEFINITION, 'variable.other.constant.definition', 'Constants - Definition'),
+            (SyntaxElement.CONSTANT_USAGE, 'variable.other.constant.usage', 'Constants - Usage'),
             (SyntaxElement.COMPILER_LABEL, 'constant.language', 'Variables - Language Defined'),
             (SyntaxElement.PREPROCESSOR, 'keyword.control.preprocessor', 'Keyword - Preprocessor'),
             (SyntaxElement.DATA_TYPE, 'storage.type', 'Data Types'),
@@ -101,68 +105,34 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
 
         return rules
 
-    def _generate_tmtheme_xml(self, language_id: str) -> str:
-        """Generate tmTheme XML content by mapping generic syntax elements to VS Code scopes."""
+    def _generate_theme_json(self, language_id: str) -> dict:
+        """Generate a JSON theme with semantic highlighting enabled."""
         color_rules = self._generate_vscode_color_rules()
 
-        # Build the XML structure
-        xml_parts = [
-            '<?xml version="1.0" encoding="UTF-8"?>',
-            '<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
-            '<plist version="1.0">',
-            '<dict>',
-            '    <key>name</key>',
-            f'    <string>{language_id} Color Scheme</string>',
-            '    <key>settings</key>',
-            '    <array>',
-            '        <!-- Global settings -->',
-            '        <dict>',
-            '            <key>settings</key>',
-            '            <dict>',
-            '                <key>background</key>',
-            f'                <string>{DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.BACKGROUND)}</string>',
-            '                <key>foreground</key>',
-            f'                <string>{DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.FOREGROUND)}</string>',
-            '                <key>caret</key>',
-            f'                <string>{DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.CARET)}</string>',
-            '            </dict>',
-            '        </dict>',
-            '        <!-- Scope styles -->'
-        ]
-
-        # Add each color rule
+        token_colors = []
         for rule in color_rules:
-            xml_parts.extend([
-                '        <dict>',
-                '            <key>name</key>',
-                f'            <string>{rule["name"]}</string>',
-                '            <key>scope</key>',
-                f'            <string>{rule["scope"]}</string>',
-                '            <key>settings</key>',
-                '            <dict>',
-                '                <key>foreground</key>',
-                f'                <string>{rule["settings"]["foreground"]}</string>'
-            ])
-
-            # Add font style if present
+            entry = {
+                'name': rule['name'],
+                'scope': rule['scope'],
+                'settings': {
+                    'foreground': rule['settings']['foreground']
+                }
+            }
             if 'font_style' in rule['settings']:
-                xml_parts.extend([
-                    '                <key>font_style</key>',
-                    f'                <string>{rule["settings"]["font_style"]}</string>'
-                ])
+                entry['settings']['fontStyle'] = rule['settings']['font_style']
+            token_colors.append(entry)
 
-            xml_parts.extend([
-                '            </dict>',
-                '        </dict>'
-            ])
-
-        xml_parts.extend([
-            '    </array>',
-            '</dict>',
-            '</plist>'
-        ])
-
-        return '\n'.join(xml_parts)
+        return {
+            'name': f'{language_id} Color Scheme',
+            'type': 'dark',
+            'semanticHighlighting': True,
+            'colors': {
+                'editor.background': DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.BACKGROUND),
+                'editor.foreground': DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.FOREGROUND),
+                'editorCursor.foreground': DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.CARET)
+            },
+            'tokenColors': token_colors
+        }
 
     def generate(self) -> None:
         extension_name = self.language_name
@@ -180,18 +150,32 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             package_json = json.load(json_file)
 
         scope_name = 'source.' + self.language_id
-        theme_filename = self.language_id + '.tmTheme'
-        package_json['name'] = self.language_name
-        package_json['displayName'] = self.model.description
+        theme_filename = self.language_id + '-theme.json'
+        package_json['name'] = package_json['name'].replace('##LANGUAGE_ID##', self.language_id)
+        package_json['displayName'] = package_json['displayName'].replace('##LANGUAGE_NAME##', self.language_name)
         package_json['version'] = self.language_version
         package_json['contributes']['languages'][0]['id'] = self.language_id
         package_json['contributes']['languages'][0]['extensions'] = ['.'+self.code_extension]
         package_json['contributes']['grammars'][0]['language'] = self.language_id
         package_json['contributes']['grammars'][0]['scopeName'] = scope_name
         package_json['contributes']['snippets'][0]['language'] = self.language_id
+        package_json['activationEvents'] = [f'onLanguage:{self.language_id}']
+        package_json['main'] = './extension.js'
+        if 'semanticTokenScopes' in package_json['contributes']:
+            for entry in package_json['contributes']['semanticTokenScopes']:
+                if isinstance(entry, dict) and entry.get('language') == '##LANGUAGE_ID##':
+                    entry['language'] = self.language_id
         package_json['contributes']['themes'][0]['label'] = \
             package_json['contributes']['themes'][0]['label'].replace('##LANGUAGE_ID##', self.language_name)
         package_json['contributes']['themes'][0]['path'] = './' + theme_filename
+        config_block = package_json['contributes'].get('configuration')
+        if config_block:
+            config_block['title'] = config_block['title'].replace('##LANGUAGE_NAME##', self.language_name)
+            properties = config_block.get('properties', {})
+            updated_properties = {}
+            for key, value in properties.items():
+                updated_properties[key.replace('##LANGUAGE_ID##', self.language_id)] = value
+            config_block['properties'] = updated_properties
 
         package_fp = os.path.join(extension_dir_path, 'package.json')
         with open(package_fp, 'w', encoding='utf-8') as f:
@@ -307,9 +291,53 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
         if self.verbose > 1:
             print(f'  generated {os.path.basename(str(fp))}')
 
+        fp = pkg_resources.files(resources).joinpath('extension.js')
+        shutil.copy(str(fp), extension_dir_path)
+        if self.verbose > 1:
+            print(f'  generated {os.path.basename(str(fp))}')
+
+        fp = pkg_resources.files(resources).joinpath('label_hover.js')
+        shutil.copy(str(fp), extension_dir_path)
+        if self.verbose > 1:
+            print(f'  generated {os.path.basename(str(fp))}')
+
+        fp = pkg_resources.files(resources).joinpath('constants_hover.js')
+        shutil.copy(str(fp), extension_dir_path)
+        if self.verbose > 1:
+            print(f'  generated {os.path.basename(str(fp))}')
+
         # Generate theme file from central color configuration
-        color_theme_xml = self._generate_tmtheme_xml(self.language_id)
-        with open(os.path.join(extension_dir_path, theme_filename), 'w') as theme_file:
-            theme_file.write(color_theme_xml)
+        theme_json = self._generate_theme_json(self.language_id)
+        with open(os.path.join(extension_dir_path, theme_filename), 'w', encoding='utf-8') as theme_file:
+            json.dump(theme_json, theme_file, ensure_ascii=False, indent=2)
             if self.verbose > 1:
                 print(f'  generated {theme_filename}')
+
+        doc_model = build_documentation_model(self.model, self.verbose)
+        markdown_generator = MarkdownGenerator(doc_model, self.verbose)
+        instruction_docs = {
+            name.upper(): markdown_generator.generate_instruction_markdown(
+                name,
+                doc,
+                add_header_rule=True
+            )
+            for name, doc in doc_model.instruction_docs.items()
+        }
+        macro_docs = {
+            name.upper(): markdown_generator.generate_instruction_markdown(
+                name,
+                doc,
+                include_missing_doc_notice=False,
+                add_header_rule=True
+            )
+            for name, doc in doc_model.macro_docs.items()
+        }
+        hover_docs = {
+            'instructions': instruction_docs,
+            'macros': macro_docs
+        }
+        docs_fp = os.path.join(extension_dir_path, 'instruction-docs.json')
+        with open(docs_fp, 'w', encoding='utf-8') as docs_file:
+            json.dump(hover_docs, docs_file, ensure_ascii=False, indent=2)
+            if self.verbose > 1:
+                print(f'  generated {os.path.basename(docs_fp)}')
