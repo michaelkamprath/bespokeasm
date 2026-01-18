@@ -157,6 +157,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIsFile(os.path.join(extension_dirpath, 'bespokeasm-test', 'snippets.json'))
         self.assertIsFile(os.path.join(extension_dirpath, 'bespokeasm-test', 'language-configuration.json'))
         self.assertIsFile(os.path.join(extension_dirpath, 'bespokeasm-test', 'extension.js'))
+        self.assertIsFile(os.path.join(extension_dirpath, 'bespokeasm-test', 'include_files.js'))
         self.assertIsFile(os.path.join(extension_dirpath, 'bespokeasm-test', 'label_hover.js'))
         self.assertIsFile(os.path.join(extension_dirpath, 'bespokeasm-test', 'constants_hover.js'))
         with open(os.path.join(extension_dirpath, 'bespokeasm-test', 'extension.js')) as js_file:
@@ -378,6 +379,31 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIsFile(os.path.join(test_tmp_dir, 'bespokeasm-test.sublime-color-scheme'))
         self.assertIsFile(os.path.join(test_tmp_dir, 'bespokeasm-test__cstr.sublime-snippet'))
         self.assertIsFile(os.path.join(test_tmp_dir, 'bespokeasm-test__include.sublime-snippet'))
+        self.assertIsFile(os.path.join(test_tmp_dir, 'bespokeasm_hover.py'))
+        settings_fp = os.path.join(test_tmp_dir, 'bespokeasm-test.sublime-settings')
+        self.assertIsFile(settings_fp)
+        with open(settings_fp) as settings_file:
+            settings_json = json.load(settings_file)
+        self.assertTrue(settings_json['hover']['mnemonics'])
+        self.assertTrue(settings_json['hover']['labels'])
+        self.assertTrue(settings_json['hover']['constants'])
+        self.assertTrue(settings_json['semantic_highlighting'])
+        hover_colors_fp = os.path.join(test_tmp_dir, 'hover-colors.json')
+        self.assertIsFile(hover_colors_fp)
+        with open(hover_colors_fp) as colors_file:
+            colors_json = json.load(colors_file)
+        self.assertIn('instruction', colors_json)
+        self.assertIn('parameter', colors_json)
+        self.assertIn('number', colors_json)
+        self.assertIn('punctuation', colors_json)
+        docs_fp = os.path.join(test_tmp_dir, 'instruction-docs.json')
+        self.assertIsFile(docs_fp)
+        with open(docs_fp) as json_file:
+            docs_json = json.load(json_file)
+        self.assertIn('instructions', docs_json)
+        self.assertIn('macros', docs_json)
+        self.assertIn('LDA', docs_json['instructions'])
+        self.assertIn('### `LDA`', docs_json['instructions']['LDA'])
         shutil.rmtree(test_tmp_dir)
 
         # now test generating the zip file
@@ -465,6 +491,30 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIsFile(os.path.join(test_tmp_dir, 'tester-assembly.sublime-color-scheme'))
         self.assertIsFile(os.path.join(test_tmp_dir, 'tester-assembly__cstr.sublime-snippet'))
         self.assertIsFile(os.path.join(test_tmp_dir, 'tester-assembly__include.sublime-snippet'))
+        self.assertIsFile(os.path.join(test_tmp_dir, 'bespokeasm_hover.py'))
+        settings_fp = os.path.join(test_tmp_dir, 'tester-assembly.sublime-settings')
+        self.assertIsFile(settings_fp)
+        with open(settings_fp) as settings_file:
+            settings_json = json.load(settings_file)
+        self.assertTrue(settings_json['hover']['mnemonics'])
+        self.assertTrue(settings_json['hover']['labels'])
+        self.assertTrue(settings_json['hover']['constants'])
+        self.assertTrue(settings_json['semantic_highlighting'])
+        hover_colors_fp = os.path.join(test_tmp_dir, 'hover-colors.json')
+        self.assertIsFile(hover_colors_fp)
+        with open(hover_colors_fp) as colors_file:
+            colors_json = json.load(colors_file)
+        self.assertIn('instruction', colors_json)
+        self.assertIn('parameter', colors_json)
+        self.assertIn('number', colors_json)
+        self.assertIn('punctuation', colors_json)
+        docs_fp = os.path.join(test_tmp_dir, 'instruction-docs.json')
+        self.assertIsFile(docs_fp)
+        with open(docs_fp) as json_file:
+            docs_json = json.load(json_file)
+        self.assertIn('instructions', docs_json)
+        self.assertIn('macros', docs_json)
+        self.assertIn('NOP', docs_json['instructions'])
         shutil.rmtree(test_tmp_dir)
 
         # now test generating the zip file

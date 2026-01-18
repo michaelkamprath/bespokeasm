@@ -4,6 +4,7 @@ const vscode = require('vscode');
 
 const labelHover = require('./label_hover');
 const constantsHover = require('./constants_hover');
+const includeFiles = require('./include_files');
 const tokenTypes = new Map([['label', 0], ['constant', 1]]);
 const tokenModifiers = new Map([['definition', 0]]);
 const semanticLegend = new vscode.SemanticTokensLegend(
@@ -43,7 +44,10 @@ function buildLabelDefinitionMap(document) {
   const entries = [{ uri: document.uri, lines }];
   const baseDir = document.uri.fsPath ? path.dirname(document.uri.fsPath) : null;
   if (baseDir) {
-    const includes = collectIncludedFiles(lines, baseDir);
+    const includes = includeFiles.collectIncludedFiles(lines, baseDir).map((entry) => ({
+      uri: vscode.Uri.file(entry.path),
+      lines: entry.lines
+    }));
     entries.push(...includes);
   }
 
@@ -59,35 +63,14 @@ function buildConstantDefinitionMap(document) {
   const entries = [{ uri: document.uri, lines }];
   const baseDir = document.uri.fsPath ? path.dirname(document.uri.fsPath) : null;
   if (baseDir) {
-    const includes = collectIncludedFiles(lines, baseDir);
+    const includes = includeFiles.collectIncludedFiles(lines, baseDir).map((entry) => ({
+      uri: vscode.Uri.file(entry.path),
+      lines: entry.lines
+    }));
     entries.push(...includes);
   }
 
   return constantsHover.buildConstantDefinitionMapFromFiles(entries);
-}
-
-function collectIncludedFiles(lines, baseDir) {
-  const entries = [];
-  for (const line of lines) {
-    const includePath = labelHover.parseIncludePath(line);
-    if (!includePath) {
-      continue;
-    }
-    const resolved = path.isAbsolute(includePath)
-      ? includePath
-      : path.resolve(baseDir, includePath);
-    try {
-      const contents = fs.readFileSync(resolved, 'utf8');
-      const includeLines = contents.split(/\r?\n/);
-      entries.push({
-        uri: vscode.Uri.file(resolved),
-        lines: includeLines
-      });
-    } catch (error) {
-      console.error('Failed to load include file:', resolved, error);
-    }
-  }
-  return entries;
 }
 
 function buildDefinitionHover(label, location, uri) {

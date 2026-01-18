@@ -296,6 +296,11 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
         if self.verbose > 1:
             print(f'  generated {os.path.basename(str(fp))}')
 
+        fp = pkg_resources.files(resources).joinpath('include_files.js')
+        shutil.copy(str(fp), extension_dir_path)
+        if self.verbose > 1:
+            print(f'  generated {os.path.basename(str(fp))}')
+
         fp = pkg_resources.files(resources).joinpath('label_hover.js')
         shutil.copy(str(fp), extension_dir_path)
         if self.verbose > 1:

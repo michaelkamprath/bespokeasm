@@ -85,3 +85,51 @@ console.log(JSON.stringify({{
         self.assertTrue(payload['constUsage'])
         self.assertFalse(payload['constUsage2'])
         self.assertEqual(payload['includeLabelLoc']['line'], 0)
+
+    def test_vscode_collect_includes_transitive(self):
+        node_path = shutil.which('node')  # type: ignore[name-defined]
+        if not node_path:
+            self.skipTest('node is not available to run label hover tests')
+
+        helper_path = (
+            pl.Path(__file__).resolve().parent.parent
+            / 'src'
+            / 'bespokeasm'
+            / 'configgen'
+            / 'vscode'
+            / 'resources'
+            / 'include_files.js'
+        )
+        self.assertTrue(helper_path.is_file(), f'missing helper: {helper_path}')
+
+        script = f"""
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const includeFiles = require('{helper_path.as_posix()}');
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bespokeasm-'));
+const mainPath = path.join(tmpDir, 'main.asm');
+const firstPath = path.join(tmpDir, 'first.asm');
+const secondPath = path.join(tmpDir, 'second.asm');
+const otherPath = path.join(tmpDir, 'other.asm');
+fs.writeFileSync(mainPath, '#include \"first.asm\"\\n');
+fs.writeFileSync(firstPath, '#include \"second.asm\"\\nfirst:\\n');
+fs.writeFileSync(secondPath, 'second:\\n');
+fs.writeFileSync(otherPath, 'other:\\n');
+const lines = fs.readFileSync(mainPath, 'utf8').split(/\\r?\\n/);
+const entries = includeFiles.collectIncludedFiles(lines, tmpDir);
+console.log(JSON.stringify({{
+  paths: entries.map((entry) => path.basename(entry.path))
+}}));
+"""
+        result = subprocess.run(
+            [node_path, '-e', script],
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        payload = json.loads(result.stdout.strip())
+        self.assertIn('first.asm', payload['paths'])
+        self.assertIn('second.asm', payload['paths'])
+        self.assertNotIn('other.asm', payload['paths'])
+        self.assertEqual(len(payload['paths']), 2)

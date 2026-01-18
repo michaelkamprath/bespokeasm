@@ -1,0 +1,9 @@
+{
+  "hover": {
+    "mnemonics": true,
+    "labels": true,
+    "constants": true
+  },
+  "semantic_highlighting": true,
+  "color_scheme": "Packages/##LANGUAGE_NAME##/##LANGUAGE_NAME##.sublime-color-scheme"
+}
