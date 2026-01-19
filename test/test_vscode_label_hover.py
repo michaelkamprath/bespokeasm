@@ -2,10 +2,21 @@ import json
 import pathlib as pl
 import shutil
 import subprocess
+import tempfile
 import unittest
+
+from bespokeasm.utilities import PATTERN_ALLOWED_LABELS
 
 
 class TestVSCodeLabelHover(unittest.TestCase):
+    def _label_pattern(self) -> str:
+        pattern = PATTERN_ALLOWED_LABELS.pattern
+        if pattern.startswith('^'):
+            pattern = pattern[1:]
+        if pattern.endswith('$'):
+            pattern = pattern[:-1]
+        return pattern
+
     def test_label_hover_helpers(self):
         node_path = shutil.which('node')  # type: ignore[name-defined]
         if not node_path:
@@ -22,9 +33,22 @@ class TestVSCodeLabelHover(unittest.TestCase):
         )
         self.assertTrue(helper_path.is_file(), f'missing helper: {helper_path}')
 
+        label_pattern = self._label_pattern()
+        temp_dir = tempfile.mkdtemp()
+        label_helper_path = pl.Path(temp_dir) / 'label_hover.js'
+        constants_helper_path = pl.Path(temp_dir) / 'constants_hover.js'
+        label_helper_path.write_text(
+            helper_path.read_text().replace('##LABEL_PATTERN##', label_pattern),
+            encoding='utf-8'
+        )
+        constants_helper_path.write_text(
+            (helper_path.parent / 'constants_hover.js').read_text().replace('##LABEL_PATTERN##', label_pattern),
+            encoding='utf-8'
+        )
+
         script = f"""
-const helper = require('{helper_path.as_posix()}');
-const constants = require('{(helper_path.parent / "constants_hover.js").as_posix()}');
+const helper = require('{label_helper_path.as_posix()}');
+const constants = require('{constants_helper_path.as_posix()}');
 const lines = ['start:', '  jmp start', '.local:', '  jmp .local', '_file:', '  jmp _file'];
 const map = helper.buildLabelDefinitionMap(lines);
 const start = helper.getLabelLocation(map, 'start');
@@ -85,6 +109,7 @@ console.log(JSON.stringify({{
         self.assertTrue(payload['constUsage'])
         self.assertFalse(payload['constUsage2'])
         self.assertEqual(payload['includeLabelLoc']['line'], 0)
+        shutil.rmtree(temp_dir)
 
     def test_vscode_collect_includes_transitive(self):
         node_path = shutil.which('node')  # type: ignore[name-defined]

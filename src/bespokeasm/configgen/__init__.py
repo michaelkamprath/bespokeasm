@@ -1,6 +1,7 @@
 import re
 
 from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.utilities import PATTERN_ALLOWED_LABELS
 
 
 class LanguageConfigGenerator:
@@ -77,3 +78,17 @@ class LanguageConfigGenerator:
 
         with open(file_path, 'w') as file:
             file.write(modified_content)
+
+    def _label_pattern(self) -> str:
+        pattern = PATTERN_ALLOWED_LABELS.pattern
+        if pattern.startswith('^'):
+            pattern = pattern[1:]
+        if pattern.endswith('$'):
+            pattern = pattern[:-1]
+        return pattern
+
+    def _mnemonic_pattern(self) -> str:
+        mnemonics = list(self.model.instruction_mnemonics) + list(self.model.macro_mnemonics)
+        if not mnemonics:
+            return '(?!)'
+        return self._replace_token_with_regex_list('##MNEMONICS##', '##MNEMONICS##', mnemonics)

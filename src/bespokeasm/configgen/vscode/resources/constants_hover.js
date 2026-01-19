@@ -1,7 +1,7 @@
 const labelHover = require('./label_hover');
 
 function findConstantDefinition(line) {
-  const match = line.match(/^\s*([A-Za-z][\w\d_]*)\s*(?:=|\bEQU\b)/);
+  const match = line.match(/^\s*(##LABEL_PATTERN##)\s*(?:=|\bEQU\b)/);
   return match ? match[1] : null;
 }
 

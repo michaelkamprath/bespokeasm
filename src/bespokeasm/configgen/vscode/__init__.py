@@ -292,7 +292,8 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             print(f'  generated {os.path.basename(str(fp))}')
 
         fp = pkg_resources.files(resources).joinpath('extension.js')
-        shutil.copy(str(fp), extension_dir_path)
+        extension_fp = os.path.join(extension_dir_path, 'extension.js')
+        shutil.copy(str(fp), extension_fp)
         if self.verbose > 1:
             print(f'  generated {os.path.basename(str(fp))}')
 
@@ -302,14 +303,23 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             print(f'  generated {os.path.basename(str(fp))}')
 
         fp = pkg_resources.files(resources).joinpath('label_hover.js')
-        shutil.copy(str(fp), extension_dir_path)
+        label_hover_fp = os.path.join(extension_dir_path, 'label_hover.js')
+        shutil.copy(str(fp), label_hover_fp)
         if self.verbose > 1:
             print(f'  generated {os.path.basename(str(fp))}')
 
         fp = pkg_resources.files(resources).joinpath('constants_hover.js')
-        shutil.copy(str(fp), extension_dir_path)
+        constants_hover_fp = os.path.join(extension_dir_path, 'constants_hover.js')
+        shutil.copy(str(fp), constants_hover_fp)
         if self.verbose > 1:
             print(f'  generated {os.path.basename(str(fp))}')
+
+        label_pattern = self._label_pattern()
+        mnemonic_pattern = self._mnemonic_pattern()
+        self._replace_token_in_file(extension_fp, '##LABEL_PATTERN##', label_pattern)
+        self._replace_token_in_file(extension_fp, '##MNEMONIC_PATTERN##', mnemonic_pattern)
+        self._replace_token_in_file(label_hover_fp, '##LABEL_PATTERN##', label_pattern)
+        self._replace_token_in_file(constants_hover_fp, '##LABEL_PATTERN##', label_pattern)
 
         # Generate theme file from central color configuration
         theme_json = self._generate_theme_json(self.language_id)

@@ -1,5 +1,5 @@
 function findLabelDefinition(line) {
-  const match = line.match(/^\s*([A-Za-z][\w\d_]*|[._][\w\d_]+)\s*:/);
+  const match = line.match(/^\s*(##LABEL_PATTERN##)\s*:/);
   return match ? match[1] : null;
 }
 

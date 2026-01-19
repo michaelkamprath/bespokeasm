@@ -356,6 +356,8 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         hover_plugin_fp = os.path.join(destination_dir, hover_plugin)
         shutil.copy(str(fp), hover_plugin_fp)
         self._replace_token_in_file(hover_plugin_fp, '##PACKAGE_NAME##', self.language_name)
+        self._replace_token_in_file(hover_plugin_fp, '##LABEL_PATTERN##', self._label_pattern())
+        self._replace_token_in_file(hover_plugin_fp, '##MNEMONIC_PATTERN##', self._mnemonic_pattern())
         if self.verbose > 1:
             print(f'  generated {hover_plugin}')
 

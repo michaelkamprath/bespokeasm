@@ -147,7 +147,7 @@ function buildSemanticTokens(document) {
       builder.push(line, start, constDef.length, constantType, definitionModifier);
     }
 
-    const regex = /([A-Za-z][\w\d_]*|[._][\w\d_]+)/g;
+    const regex = /(##LABEL_PATTERN##)/g;
     let match;
     while ((match = regex.exec(text)) !== null) {
       const word = match[1];
@@ -191,7 +191,7 @@ function activate(context) {
 
   const instructionDocs = hoverDocs.instructions || {};
   const macroDocs = hoverDocs.macros || {};
-  const wordPattern = /[A-Za-z][\w\d_]*|[._][\w\d_]+/;
+  const wordPattern = /(?:##MNEMONIC_PATTERN##|##LABEL_PATTERN##)/i;
   const provider = {
     provideHover(document, position) {
       const hoverSettings = getHoverSettings(document, languageId);

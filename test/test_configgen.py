@@ -23,6 +23,25 @@ class TestConfigurationGeneration(unittest.TestCase):
         if not pl.Path(path).resolve().is_file():
             raise AssertionError('File does not exist: %s' % str(path))
 
+    def _assert_constant_definition_pattern(self, pattern: str, source_name: str) -> None:
+        compiled = re.compile(pattern)
+        cases = {
+            'FOO EQU 1': 'FOO',
+            '_FOO EQU 1': '_FOO',
+            '.foo EQU 1': '.foo',
+            'FOO = 1': 'FOO',
+            '_FOO = 1': '_FOO',
+            '.foo = 1': '.foo',
+        }
+        for line, expected in cases.items():
+            match = compiled.match(line)
+            self.assertIsNotNone(match, f'{source_name} should match {line!r}')
+            self.assertEqual(match.group(1), expected, f'{source_name} should capture {expected!r}')
+
+        invalid_cases = ['__bad EQU 1', '..bad = 1', '1bad = 1']
+        for line in invalid_cases:
+            self.assertIsNone(compiled.match(line), f'{source_name} should reject {line!r}')
+
     def _assert_grouped_item_list(self, item_str: str, target_list: list[str], test_name: str) -> None:
         match = re.search(r'^.*(?<=[\w\)])?\((?:\?\:)?(.*)\)', item_str, re.IGNORECASE)
         self.assertIsNotNone(match, f'{test_name} match should be found')
@@ -866,6 +885,125 @@ class TestConfigurationGeneration(unittest.TestCase):
         )
 
         shutil.rmtree(test_dir)
+
+    def test_constant_definition_hover_patterns(self):
+        test_dir = tempfile.mkdtemp()
+        config_file = pkg_resources.files(config_files).joinpath('test_instruction_line_creation_little_endian.yaml')
+        configgen = VSCodeConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            None,
+            None,
+            'asmtest',
+        )
+        configgen.generate()
+        constants_fp = os.path.join(
+            str(test_dir),
+            'extensions',
+            'bespokeasm-test',
+            'constants_hover.js',
+        )
+        self.assertIsFile(constants_fp)
+        with open(constants_fp) as js_file:
+            js_content = js_file.read()
+        js_match = re.search(r'line\.match\(/(.+?)/\)', js_content)
+        self.assertIsNotNone(js_match, 'constants hover regex should be present')
+        self._assert_constant_definition_pattern(
+            js_match.group(1),
+            'vscode constants_hover.js',
+        )
+        shutil.rmtree(test_dir)
+
+        test_destination_dir = tempfile.mkdtemp()
+        test_tmp_dir = tempfile.mkdtemp()
+        configgen = SublimeConfigGenerator(
+            str(config_file),
+            0,
+            str(test_destination_dir),
+            None,
+            None,
+            'asmtest',
+        )
+        configgen._generate_files_in_dir(test_tmp_dir)
+        hover_plugin = f"bespokeasm_hover_{re.sub(r'[^0-9A-Za-z_]', '_', 'bespokeasm-test')}.py"
+        hover_fp = os.path.join(test_tmp_dir, hover_plugin)
+        self.assertIsFile(hover_fp)
+        with open(hover_fp) as hover_file:
+            hover_content = hover_file.read()
+        sublime_match = re.search(
+            r'CONSTANT_DEFINITION_PATTERN\s*=\s*re\.compile\(r\'([^\']+)\'\)',
+            hover_content,
+        )
+        self.assertIsNotNone(sublime_match, 'sublime hover regex should be present')
+        self._assert_constant_definition_pattern(
+            sublime_match.group(1),
+            'sublime hover plugin',
+        )
+        shutil.rmtree(test_tmp_dir)
+        shutil.rmtree(test_destination_dir)
+
+    def test_hover_mnemonic_pattern_matches_dotted_instruction(self):
+        config_file = (
+            pl.Path(__file__).resolve().parent.parent
+            / 'examples'
+            / 'slu4-minimal-64x4'
+            / 'slu4-minimal-64x4.yaml'
+        )
+        test_dir = tempfile.mkdtemp()
+        configgen = VSCodeConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            None,
+            None,
+            'asmtest',
+        )
+        configgen.generate()
+        extension_fp = os.path.join(
+            str(test_dir),
+            'extensions',
+            'slu4-min64x4-asm',
+            'extension.js',
+        )
+        self.assertIsFile(extension_fp)
+        with open(extension_fp) as js_file:
+            js_content = js_file.read()
+        js_match = re.search(r'const wordPattern = /(.+?)/i;', js_content)
+        self.assertIsNotNone(js_match, 'wordPattern should be present in extension.js')
+        vscode_word_pattern = re.compile(js_match.group(1), re.IGNORECASE)
+        match = vscode_word_pattern.search('  AN.Z $10')
+        self.assertIsNotNone(match, 'VSCode wordPattern should match dotted mnemonic')
+        self.assertEqual(match.group(0), 'AN.Z')
+        shutil.rmtree(test_dir)
+
+        test_destination_dir = tempfile.mkdtemp()
+        test_tmp_dir = tempfile.mkdtemp()
+        configgen = SublimeConfigGenerator(
+            str(config_file),
+            0,
+            str(test_destination_dir),
+            None,
+            None,
+            'asmtest',
+        )
+        configgen._generate_files_in_dir(test_tmp_dir)
+        hover_plugin = f"bespokeasm_hover_{re.sub(r'[^0-9A-Za-z_]', '_', 'slu4-min64x4-asm')}.py"
+        hover_fp = os.path.join(test_tmp_dir, hover_plugin)
+        self.assertIsFile(hover_fp)
+        with open(hover_fp) as hover_file:
+            hover_content = hover_file.read()
+        sublime_match = re.search(
+            r'WORD_PATTERN\s*=\s*re\.compile\(r\'([^\']+)\'',
+            hover_content,
+        )
+        self.assertIsNotNone(sublime_match, 'WORD_PATTERN should be present in hover plugin')
+        sublime_word_pattern = re.compile(sublime_match.group(1), re.IGNORECASE)
+        match = sublime_word_pattern.search('  AN.Z $10')
+        self.assertIsNotNone(match, 'Sublime wordPattern should match dotted mnemonic')
+        self.assertEqual(match.group(0), 'AN.Z')
+        shutil.rmtree(test_tmp_dir)
+        shutil.rmtree(test_destination_dir)
 
     def test_builtin_constants_in_sublime_syntax(self):
         """Test that built-in language version constants are included in Sublime syntax highlighting."""

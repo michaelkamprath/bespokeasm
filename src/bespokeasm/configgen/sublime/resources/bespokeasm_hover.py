@@ -11,9 +11,9 @@ import sublime
 import sublime_plugin
 
 
-WORD_PATTERN = re.compile(r'[A-Za-z][\w\d_]*|[._][\w\d_]+')
-LABEL_DEFINITION_PATTERN = re.compile(r'^\s*([A-Za-z][\w\d_]*|[._][\w\d_]+)\s*:')
-CONSTANT_DEFINITION_PATTERN = re.compile(r'^\s*([A-Za-z][\w\d_]*)\s*(?:=|\bEQU\b)')
+WORD_PATTERN = re.compile(r'(?:##MNEMONIC_PATTERN##|##LABEL_PATTERN##)', re.IGNORECASE)
+LABEL_DEFINITION_PATTERN = re.compile(r'^\s*(##LABEL_PATTERN##)\s*:')
+CONSTANT_DEFINITION_PATTERN = re.compile(r'^\s*(##LABEL_PATTERN##)\s*(?:=|\bEQU\b)')
 INCLUDE_PATTERN = re.compile(r'^\s*#include\s+(?:"([^"]+)"|<([^>]+)>|(\S+))', re.IGNORECASE)
 PACKAGE_NAME = '##PACKAGE_NAME##'
 
