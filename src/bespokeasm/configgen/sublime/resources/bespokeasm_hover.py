@@ -15,6 +15,7 @@ WORD_PATTERN = re.compile(r'[A-Za-z][\w\d_]*|[._][\w\d_]+')
 LABEL_DEFINITION_PATTERN = re.compile(r'^\s*([A-Za-z][\w\d_]*|[._][\w\d_]+)\s*:')
 CONSTANT_DEFINITION_PATTERN = re.compile(r'^\s*([A-Za-z][\w\d_]*)\s*(?:=|\bEQU\b)')
 INCLUDE_PATTERN = re.compile(r'^\s*#include\s+(?:"([^"]+)"|<([^>]+)>|(\S+))', re.IGNORECASE)
+PACKAGE_NAME = '##PACKAGE_NAME##'
 
 LABEL_USAGE_SCOPE = 'variable.other.label.usage'
 CONSTANT_USAGE_SCOPE = 'variable.other.constant.usage'
@@ -24,6 +25,12 @@ TABLE_HEADER_COLOR = '#D98C8C'
 TABLE_CELL_BOUNDARY_PIXELS = 2
 TABLE_ROW_VERT_MARGIN_PIXELS = 1
 TABLE_CELL_BOUNDARY_COLOR = '#5F748A'
+TABLE_MAX_COLUMN_CHARS = 32
+TABLE_MAX_DESCRIPTION_CHARS = 48
+TABLE_MIN_COLUMN_CHARS = 6
+TABLE_MAX_TOTAL_CHARS = 120
+TABLE_CELL_LEFT_PAD = 1
+TABLE_CELL_RIGHT_PAD = 2
 DEFAULT_HOVER_COLORS = {
     'instruction': INSTRUCTION_COLOR,
     'parameter': '#abd7ed',
@@ -36,6 +43,8 @@ DEFAULT_HOVER_SETTINGS = {
     'labels': True,
     'constants': True,
 }
+DEFAULT_HOVER_MAX_WIDTH = 900
+HOVER_VIEWPORT_MARGIN = 80
 DEFAULT_SEMANTIC_HIGHLIGHTING = True
 
 _DOCS_CACHE = {}
@@ -47,7 +56,18 @@ _PENDING_SEMANTIC = set()
 def _is_bespokeasm_view(view):
     if not view or view.is_scratch() or view.settings().get('is_widget'):
         return False
-    return view.match_selector(0, 'source.bespokeasm')
+    if not view.match_selector(0, 'source.bespokeasm'):
+        return False
+    expected = _get_expected_package_name()
+    if expected:
+        return _get_package_name(view) == expected
+    return True
+
+
+def _get_expected_package_name():
+    if not PACKAGE_NAME or '##PACKAGE_NAME##' in PACKAGE_NAME:
+        return None
+    return PACKAGE_NAME
 
 
 def _get_package_name(view):
@@ -60,11 +80,11 @@ def _get_package_settings(view):
     package_name = _get_package_name(view)
     if not package_name:
         return None
-    return sublime.load_settings(f'{package_name}.sublime-settings')
+    return sublime.load_settings('{}.sublime-settings'.format(package_name))
 
 
 def _get_hover_setting(view, key, default):
-    view_key = f'bespokeasm.hover.{key}'
+    view_key = 'bespokeasm.hover.{}'.format(key)
     if view.settings().has(view_key):
         return bool(view.settings().get(view_key))
     settings = _get_package_settings(view)
@@ -73,6 +93,36 @@ def _get_hover_setting(view, key, default):
         if isinstance(hover_settings, dict) and key in hover_settings:
             return bool(hover_settings.get(key))
     return default
+
+
+def _get_hover_numeric_setting(view, key, default=None):
+    view_key = 'bespokeasm.hover.{}'.format(key)
+    if view.settings().has(view_key):
+        value = view.settings().get(view_key)
+        if isinstance(value, (int, float)):
+            return int(value)
+    settings = _get_package_settings(view)
+    if settings:
+        hover_settings = settings.get('hover') or {}
+        if isinstance(hover_settings, dict) and key in hover_settings:
+            value = hover_settings.get(key)
+            if isinstance(value, (int, float)):
+                return int(value)
+    return default
+
+
+def _get_hover_max_width(view, default_width):
+    configured = _get_hover_numeric_setting(view, 'max_width')
+    if configured is not None and configured > 0:
+        return configured
+    viewport_width = 0
+    try:
+        viewport_width = int(view.viewport_extent()[0])
+    except Exception:
+        viewport_width = 0
+    if viewport_width > 0:
+        return max(320, viewport_width - HOVER_VIEWPORT_MARGIN)
+    return default_width
 
 
 def _get_semantic_setting(view):
@@ -92,7 +142,7 @@ def _load_instruction_docs(view):
     cached = _DOCS_CACHE.get(package_name)
     if cached is not None:
         return cached
-    resource_path = f'Packages/{package_name}/instruction-docs.json'
+    resource_path = 'Packages/{}/instruction-docs.json'.format(package_name)
     try:
         raw = sublime.load_resource(resource_path)
         docs = json.loads(raw)
@@ -109,7 +159,7 @@ def _load_hover_colors(view):
     cached = _COLOR_CACHE.get(package_name)
     if cached is not None:
         return cached
-    resource_path = f'Packages/{package_name}/hover-colors.json'
+    resource_path = 'Packages/{}/hover-colors.json'.format(package_name)
     try:
         raw = sublime.load_resource(resource_path)
         colors = json.loads(raw)
@@ -229,9 +279,9 @@ def _build_definition_hover(name, location, current_path):
     path = location.get('path') or current_path
     filename = os.path.basename(path) if path else 'file'
     if path and current_path and os.path.normcase(path) == os.path.normcase(current_path):
-        location_text = f'Defined at line {line_num}.'
+        location_text = 'Defined at line {}.'.format(line_num)
     else:
-        location_text = f'Defined at line {line_num} in {filename}.'
+        location_text = 'Defined at line {} in {}.'.format(line_num, filename)
     if path:
         cmd = _build_hover_link(path, line_num, location.get('col', 0) + 1)
         return '<p><code>{}</code>: {} <a href="{}">Go to definition</a></p>'.format(
@@ -239,7 +289,7 @@ def _build_definition_hover(name, location, current_path):
             location_text,
             cmd
         )
-    return f'<p><code>{name}</code>: {location_text}</p>'
+    return '<p><code>{}</code>: {}</p>'.format(name, location_text)
 
 
 def _build_hover_link(path, line_num, column):
@@ -262,7 +312,7 @@ def _handle_hover_navigate(view, href):
         col = int(params.get('col', [1])[0])
         window = view.window()
         if window:
-            window.open_file(f'{path}:{line}:{col}', sublime.ENCODED_POSITION)
+            window.open_file('{}:{}:{}'.format(path, line, col), sublime.ENCODED_POSITION)
         return
     if parsed.scheme in ('http', 'https', 'file'):
         window = view.window()
@@ -280,8 +330,6 @@ def _show_popup(view, html, location, max_width):
 
 
 def _render_markdown(markdown_text, hover_colors):
-    if hasattr(sublime, 'markdown_to_html'):
-        return sublime.markdown_to_html(markdown_text)
     return _markdown_to_minihtml(markdown_text, hover_colors)
 
 
@@ -298,14 +346,14 @@ def _markdown_to_minihtml(markdown_text, hover_colors):
         if not paragraph_lines:
             return
         text = '<br>'.join(paragraph_lines)
-        html_parts.append(f'<p>{_render_inline(text)}</p>')
+        html_parts.append('<p>{}</p>'.format(_render_inline(text)))
         paragraph_lines[:] = []
 
     def flush_list():
         if not list_items:
             return
-        items = ''.join(f'<li>{_render_inline(item)}</li>' for item in list_items)
-        html_parts.append(f'<ul>{items}</ul>')
+        items = ''.join('<li>{}</li>'.format(_render_inline(item)) for item in list_items)
+        html_parts.append('<ul>{}</ul>'.format(items))
         list_items[:] = []
 
     def flush_table():
@@ -397,7 +445,7 @@ def _render_inline(text, code_color=INLINE_CODE_COLOR):
     escaped = html.escape(text)
     escaped = re.sub(
         r'`([^`]+)`',
-        fr'<code style="color:{code_color};">\1</code>',
+        r'<code style="color:{};">\1</code>'.format(code_color),
         escaped
     )
     escaped = re.sub(r'\*\*([^*]+)\*\*', r'<strong>\1</strong>', escaped)
@@ -439,11 +487,11 @@ def _render_code_block(lines, hover_colors):
             else:
                 color = punctuation_color
             escaped = html.escape(token)
-            parts.append(f'<span style="color:{color};">{escaped}</span>')
+            parts.append('<span style="color:{};">{}</span>'.format(color, escaped))
         rendered_lines.append(''.join(parts))
 
     html_lines = '<br>'.join(rendered_lines)
-    return f'<div style="font-family: monospace;">{html_lines}</div>'
+    return '<div style="font-family: monospace;">{}</div>'.format(html_lines)
 
 
 def _is_table_row(line):
@@ -498,6 +546,36 @@ def _render_table(rows):
         text = text.replace('*', '')
         return len(text)
 
+    def wrap_text(text, width):
+        if text is None:
+            return ['']
+        raw = str(text).strip()
+        if not raw:
+            return ['']
+        if width <= 0:
+            return [raw]
+        tokens = re.findall(r'\S+|\s+', raw)
+        lines = []
+        current = ''
+        for token in tokens:
+            if token.isspace():
+                if current:
+                    current += ' '
+                continue
+            candidate = '{} {}'.format(current, token) if current else token
+            if display_length(candidate) <= width:
+                current = candidate
+                continue
+            if current:
+                lines.append(current)
+            while display_length(token) > width:
+                lines.append(token[:width])
+                token = token[width:]
+            current = token
+        if current:
+            lines.append(current)
+        return lines if lines else ['']
+
     table_rows = []
     if header:
         table_rows.append(header)
@@ -507,19 +585,50 @@ def _render_table(rows):
         row + [''] * (column_count - len(row))
         for row in table_rows
     ]
-    widths = [
+    raw_widths = [
         max(display_length(cell) for cell in column)
         for column in zip(*padded_rows)
     ] if column_count else []
-    widths = [max(width, 1) for width in widths]
+    widths = list(raw_widths)
+    last_idx = column_count - 1
+    wrap_columns = set()
+    if header:
+        for idx, cell in enumerate(header):
+            label = str(cell).strip().lower()
+            if label in ('description', 'value'):
+                wrap_columns.add(idx)
+    capped = []
+    overflow_columns = set()
+    for idx, width in enumerate(widths):
+        max_width = TABLE_MAX_DESCRIPTION_CHARS if idx == last_idx else TABLE_MAX_COLUMN_CHARS
+        if width > max_width:
+            overflow_columns.add(idx)
+        capped.append(min(max(width, TABLE_MIN_COLUMN_CHARS), max_width))
+    widths = capped
 
-    def render_cell(cell, width, is_header, is_last):
-        text = _render_inline(cell) if cell else '&nbsp;'
-        cell_len = display_length(cell)
-        padding_spaces = max(width - cell_len, 0) if cell is not None else width
-        padding_html = '&nbsp;' * padding_spaces
-        spacer = '&nbsp;&nbsp;'
-        border_style = f'border-right:{TABLE_CELL_BOUNDARY_PIXELS}px solid {TABLE_CELL_BOUNDARY_COLOR};' \
+    total_width = sum(widths)
+    total_width += (TABLE_CELL_LEFT_PAD + TABLE_CELL_RIGHT_PAD) * column_count
+    total_width += TABLE_CELL_BOUNDARY_PIXELS * max(column_count - 1, 0)
+    allow_wrapping = total_width > TABLE_MAX_TOTAL_CHARS or bool(overflow_columns & wrap_columns)
+    wrap_set = set()
+    if allow_wrapping:
+        if overflow_columns:
+            wrap_set = wrap_columns & overflow_columns
+        elif header and last_idx >= 0:
+            label = str(header[last_idx]).strip().lower()
+            if label == 'description':
+                wrap_set.add(last_idx)
+
+    def render_cell_line(line, width, is_header, is_last):
+        rendered = _render_inline(line) if line else ''
+        line_len = display_length(line) if line else 0
+        prefix = '&nbsp;' * TABLE_CELL_LEFT_PAD
+        spacer = '&nbsp;' * TABLE_CELL_RIGHT_PAD
+        padding_html = '&nbsp;' * max(width - line_len, 0)
+        border_style = 'border-right:{}px solid {};'.format(
+            TABLE_CELL_BOUNDARY_PIXELS,
+            TABLE_CELL_BOUNDARY_COLOR
+        ) \
             if not is_last else ''
         style = (
             'display:inline-block;vertical-align:top;'
@@ -534,29 +643,50 @@ def _render_table(rows):
                     TABLE_CELL_BOUNDARY_COLOR,
                     TABLE_HEADER_COLOR,
                 )
-        return '<span style="{style}">&nbsp;{text}{pad}{spacer}</span>'.format(
+        return '<span style="{style}">{prefix}{text}{pad}{spacer}</span>'.format(
             style=style,
-            text=text,
+            prefix=prefix,
+            text=rendered,
             pad=padding_html,
             spacer=spacer
         )
 
-    def render_row(cells, is_header):
+    def render_row_line(cells, is_header):
         spans = []
         for idx, cell in enumerate(cells):
-            spans.append(render_cell(cell, widths[idx], is_header, idx == len(cells) - 1))
+            spans.append(render_cell_line(cell, widths[idx], is_header, idx == len(cells) - 1))
         return '<div>{}</div>'.format(''.join(spans))
+
+    def render_wrapped_row(cells):
+        wrapped = []
+        for idx, cell in enumerate(cells):
+            if allow_wrapping and idx in wrap_set:
+                wrapped.append(wrap_text(cell, widths[idx]))
+            else:
+                wrapped.append([cell if cell is not None else ''])
+        if wrapped:
+            max_lines = max(len(lines) for lines in wrapped) or 1
+        else:
+            max_lines = 1
+        parts = []
+        for line_idx in range(max_lines):
+            line_cells = [
+                lines[line_idx] if line_idx < len(lines) else ''
+                for lines in wrapped
+            ]
+            parts.append(render_row_line(line_cells, False))
+        return ''.join(parts)
 
     parts = ['<div style="font-family: monospace;">']
     if header:
-        parts.append(render_row(padded_rows[0], True))
-        parts.append(f'<div style="margin:{TABLE_CELL_BOUNDARY_PIXELS+2}px 0;"></div>')
+        parts.append(render_row_line(padded_rows[0], True))
+        parts.append('<div style="margin:{}px 0;"></div>'.format(TABLE_CELL_BOUNDARY_PIXELS + 2))
         body_start = 1
     else:
         body_start = 0
     for row in padded_rows[body_start:]:
-        parts.append(render_row(row, False))
-        parts.append(f'<div style="margin:{TABLE_ROW_VERT_MARGIN_PIXELS}px 0;"></div>')
+        parts.append(render_wrapped_row(row))
+        parts.append('<div style="margin:{}px 0;"></div>'.format(TABLE_ROW_VERT_MARGIN_PIXELS))
     parts.append('</div>')
     return ''.join(parts)
 
@@ -652,7 +782,8 @@ class BespokeAsmHoverListener(sublime_plugin.EventListener):
             if doc:
                 hover_colors = _load_hover_colors(view)
                 html = _render_markdown(doc, hover_colors)
-                _show_popup(view, html, point, 900)
+                max_width = _get_hover_max_width(view, DEFAULT_HOVER_MAX_WIDTH)
+                _show_popup(view, html, point, max_width)
                 return
 
         state = _get_view_state(view)
@@ -661,14 +792,16 @@ class BespokeAsmHoverListener(sublime_plugin.EventListener):
         ):
             location = state['constant_map'][token]
             html = _build_definition_hover(token, location, view.file_name())
-            _show_popup(view, html, point, 600)
+            max_width = _get_hover_max_width(view, DEFAULT_HOVER_MAX_WIDTH)
+            _show_popup(view, html, point, max_width)
             return
         if hover_labels and token in state['label_map'] and not _is_definition_at_point(
             view, point, token, LABEL_DEFINITION_PATTERN
         ):
             location = state['label_map'][token]
             html = _build_definition_hover(token, location, view.file_name())
-            _show_popup(view, html, point, 600)
+            max_width = _get_hover_max_width(view, DEFAULT_HOVER_MAX_WIDTH)
+            _show_popup(view, html, point, max_width)
 
 
 class BespokeAsmSemanticListener(sublime_plugin.EventListener):

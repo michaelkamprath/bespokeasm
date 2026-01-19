@@ -36,6 +36,22 @@ def test_sublime_mnemonic_hover_table_renders_div_table():
     assert 'zp_addr' in html
 
 
+def test_sublime_hover_wraps_only_for_description_overflow():
+    hover = _load_sublime_hover_module()
+    markdown = (
+        '| Operand | Type | Description |\n'
+        '| --- | --- | --- |\n'
+        '| `op` | register | short |\n'
+        '| `op2` | register | this description is intentionally long and should wrap |\n'
+    )
+
+    html = hover._markdown_to_minihtml(markdown, {})
+
+    assert '<div style="font-family: monospace;">' in html
+    assert 'description' in html.lower()
+    assert '&nbsp;' in html
+
+
 def test_sublime_collect_includes_transitive():
     hover = _load_sublime_hover_module()
     with tempfile.TemporaryDirectory() as temp_dir:

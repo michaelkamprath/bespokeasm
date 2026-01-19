@@ -1,6 +1,7 @@
 import importlib.resources as pkg_resources
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -121,6 +122,10 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         })
 
         return rules
+
+    def _hover_plugin_filename(self) -> str:
+        safe_name = re.sub(r'[^0-9A-Za-z_]', '_', self.language_name or 'bespokeasm')
+        return f'bespokeasm_hover_{safe_name}.py'
 
     def generate(self) -> None:
         if self.verbose >= 1:
@@ -347,9 +352,12 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             print(f'  generated {os.path.basename(keymap_fp)}')
 
         fp = pkg_resources.files(resources).joinpath('bespokeasm_hover.py')
-        shutil.copy(str(fp), os.path.join(destination_dir, 'bespokeasm_hover.py'))
+        hover_plugin = self._hover_plugin_filename()
+        hover_plugin_fp = os.path.join(destination_dir, hover_plugin)
+        shutil.copy(str(fp), hover_plugin_fp)
+        self._replace_token_in_file(hover_plugin_fp, '##PACKAGE_NAME##', self.language_name)
         if self.verbose > 1:
-            print('  generated bespokeasm_hover.py')
+            print(f'  generated {hover_plugin}')
 
         fp = pkg_resources.files(resources).joinpath('sublime-settings.json')
         settings_fp = os.path.join(destination_dir, f'{self.language_name}.sublime-settings')

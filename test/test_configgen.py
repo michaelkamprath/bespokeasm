@@ -379,7 +379,8 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIsFile(os.path.join(test_tmp_dir, 'bespokeasm-test.sublime-color-scheme'))
         self.assertIsFile(os.path.join(test_tmp_dir, 'bespokeasm-test__cstr.sublime-snippet'))
         self.assertIsFile(os.path.join(test_tmp_dir, 'bespokeasm-test__include.sublime-snippet'))
-        self.assertIsFile(os.path.join(test_tmp_dir, 'bespokeasm_hover.py'))
+        hover_plugin = f"bespokeasm_hover_{re.sub(r'[^0-9A-Za-z_]', '_', 'bespokeasm-test')}.py"
+        self.assertIsFile(os.path.join(test_tmp_dir, hover_plugin))
         settings_fp = os.path.join(test_tmp_dir, 'bespokeasm-test.sublime-settings')
         self.assertIsFile(settings_fp)
         with open(settings_fp) as settings_file:
@@ -491,7 +492,8 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIsFile(os.path.join(test_tmp_dir, 'tester-assembly.sublime-color-scheme'))
         self.assertIsFile(os.path.join(test_tmp_dir, 'tester-assembly__cstr.sublime-snippet'))
         self.assertIsFile(os.path.join(test_tmp_dir, 'tester-assembly__include.sublime-snippet'))
-        self.assertIsFile(os.path.join(test_tmp_dir, 'bespokeasm_hover.py'))
+        hover_plugin = f"bespokeasm_hover_{re.sub(r'[^0-9A-Za-z_]', '_', 'tester-assembly')}.py"
+        self.assertIsFile(os.path.join(test_tmp_dir, hover_plugin))
         settings_fp = os.path.join(test_tmp_dir, 'tester-assembly.sublime-settings')
         self.assertIsFile(settings_fp)
         with open(settings_fp) as settings_file:
