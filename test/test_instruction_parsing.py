@@ -431,6 +431,64 @@ class TestInstructionParsing(unittest.TestCase):
             bad1.label_scope = TestInstructionParsing.label_values
             bad1.generate_words()
 
+    def test_decorator_operands_and_negative_offsets(self):
+        """Doc: Addressing Modes > Decorators; Addressing Modes > Indirect Register - decorators and +/- offsets."""
+        fp = pkg_resources.files(config_files).joinpath('test_decorator_operands.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
+        lineid = LineIdentifier(77, 'test_decorator_operands_and_negative_offsets')
+        label_scope = GlobalLabelScope(isa_model.registers)
+        active_scopes = ActiveNamedScopeList(NamedScopeManager())
+
+        decorator_cases = {
+            'a+': 1,
+            'a-': 2,
+            '++a': 3,
+            '--a': 4,
+            'a!': 5,
+            'a@': 6,
+        }
+        for operand, opcode in decorator_cases.items():
+            ins = InstructionLine.factory(
+                lineid,
+                f'use {operand}',
+                'decorator',
+                isa_model,
+                memzone_mngr.global_zone,
+                memzone_mngr,
+            )
+            ins.set_start_address(0x100)
+            ins.label_scope = label_scope
+            ins.active_named_scopes = active_scopes
+            ins.generate_words()
+            self.assertEqual(
+                ins.get_words(),
+                [Word(0x10, 8, 8, 'big'), Word(opcode, 8, 8, 'big')],
+                f'decorator {operand} should be parsed and encoded',
+            )
+
+        neg_offset = InstructionLine.factory(
+            lineid,
+            'load [sp-2]',
+            'neg offset',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+        neg_offset.set_start_address(0x100)
+        neg_offset.label_scope = label_scope
+        neg_offset.active_named_scopes = active_scopes
+        neg_offset.generate_words()
+        self.assertEqual(
+            neg_offset.get_words(),
+            [Word(0x20, 8, 8, 'big'), Word(0x07, 8, 8, 'big'), Word(0xFE, 8, 8, 'big')],
+            'negative indirect register offsets should be accepted',
+        )
+
     def test_label_parsing(self):
         fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')
         isa_model = AssemblerModel(str(fp), 0)

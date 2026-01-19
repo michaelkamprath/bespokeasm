@@ -1,4 +1,6 @@
 import importlib.resources as pkg_resources
+import os
+import tempfile
 import unittest
 
 from bespokeasm.assembler.bytecode.word import Word
@@ -273,6 +275,40 @@ class TestAssemblerEngine(unittest.TestCase):
             2,
         )
         self.assertEqual(bytecode, bytearray([0xAB, 0xCD]), '4-bit words should be packed into bytes correctly')
+
+    def test_address_overlap_is_fatal(self):
+        """Doc: Memory Zones - overlapping bytecode at the same absolute address is a fatal error."""
+        fp = pkg_resources.files(config_files).joinpath('test_instruction_operands.yaml')
+        config_path = str(fp)
+        asm_source = '\n'.join([
+            '.org $00',
+            '.byte $01',
+            '.org $00',
+            '.byte $02',
+        ])
+        with tempfile.TemporaryDirectory() as temp_dir:
+            asm_path = os.path.join(temp_dir, 'overlap.asm')
+            with open(asm_path, 'w') as handle:
+                handle.write(asm_source)
+
+            assembler = Assembler(
+                source_file=asm_path,
+                config_file=config_path,
+                generate_binary=False,
+                output_file=None,
+                binary_start=None,
+                binary_end=None,
+                binary_fill_value=0,
+                enable_pretty_print=False,
+                pretty_print_format=None,
+                pretty_print_output=None,
+                is_verbose=0,
+                include_paths=[temp_dir],
+                predefined=[],
+            )
+            with self.assertRaises(SystemExit) as ctx:
+                assembler.assemble_bytecode()
+            self.assertIn('overlaps', str(ctx.exception))
 
     def test_generate_bytes_from_line_objects_4bit_words_with_fill(self):
         # Simulate a 4-bit word ISA with a gap, so fill_word is used and must be packed

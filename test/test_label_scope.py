@@ -1,8 +1,11 @@
 import importlib.resources as pkg_resources
+import os
+import tempfile
 import unittest
 from collections import defaultdict
 
 from bespokeasm.assembler.assembly_file import AssemblyFile
+from bespokeasm.assembler.engine import Assembler
 from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.label_scope import LabelScopeType
@@ -168,3 +171,72 @@ class TestLabelScope(unittest.TestCase):
         self.assertEqual(line_objs[10].label_scope.reference, 'label3')
         self.assertEqual(line_objs[11].label_scope.type, LabelScopeType.FILE, '.memzone should reset label scope to FILE')
         self.assertEqual(line_objs[12].label_scope.type, LabelScopeType.FILE)
+
+    def test_local_label_before_any_non_local_is_error(self):
+        """Doc: Labels > Label Scope > Local - locals cannot appear before first non-local label."""
+        fp = pkg_resources.files(config_files).joinpath('test_instruction_operands.yaml')
+        config_path = str(fp)
+        asm_source = '\n'.join([
+            '.local_only:',
+            '  .byte 1',
+        ])
+        with tempfile.TemporaryDirectory() as temp_dir:
+            asm_path = os.path.join(temp_dir, 'locals_first.asm')
+            with open(asm_path, 'w') as handle:
+                handle.write(asm_source)
+
+            assembler = Assembler(
+                source_file=asm_path,
+                config_file=config_path,
+                generate_binary=False,
+                output_file=None,
+                binary_start=None,
+                binary_end=None,
+                binary_fill_value=0,
+                enable_pretty_print=False,
+                pretty_print_format=None,
+                pretty_print_output=None,
+                is_verbose=0,
+                include_paths=[temp_dir],
+                predefined=[],
+            )
+            with self.assertRaises(SystemExit) as ctx:
+                assembler.assemble_bytecode()
+            self.assertIn('low of scope', str(ctx.exception))
+
+    def test_local_label_after_org_is_error(self):
+        """Doc: Labels > Label Scope > Local - locals cannot appear between .org and next non-local label."""
+        fp = pkg_resources.files(config_files).joinpath('test_instruction_operands.yaml')
+        config_path = str(fp)
+        asm_source = '\n'.join([
+            'start:',
+            '  .byte 1',
+            '.org $10',
+            '.local_after_org:',
+            '  .byte 2',
+            'next:',
+            '  .byte 3',
+        ])
+        with tempfile.TemporaryDirectory() as temp_dir:
+            asm_path = os.path.join(temp_dir, 'locals_after_org.asm')
+            with open(asm_path, 'w') as handle:
+                handle.write(asm_source)
+
+            assembler = Assembler(
+                source_file=asm_path,
+                config_file=config_path,
+                generate_binary=False,
+                output_file=None,
+                binary_start=None,
+                binary_end=None,
+                binary_fill_value=0,
+                enable_pretty_print=False,
+                pretty_print_format=None,
+                pretty_print_output=None,
+                is_verbose=0,
+                include_paths=[temp_dir],
+                predefined=[],
+            )
+            with self.assertRaises(SystemExit) as ctx:
+                assembler.assemble_bytecode()
+            self.assertIn('low of scope', str(ctx.exception))

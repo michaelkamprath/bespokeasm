@@ -17,7 +17,7 @@
     "constants": {
       "captures": {
         "1": {
-          "name": "variable.other.constant"
+          "name": "variable.other.constant.definition"
         },
         "2": {
           "name": "keyword.operator.assignment"
@@ -46,6 +46,9 @@
         },
         {
           "include": "#compiler_labels"
+        },
+        {
+          "include": "#label_usages"
         },
         {
           "include": "#numeric-values"
@@ -86,6 +89,9 @@
               "include": "#compiler_labels"
             },
             {
+              "include": "#label_usages"
+            },
+            {
               "include": "#operands_variables"
             }
           ]
@@ -118,6 +124,9 @@
               "include": "#compiler_labels"
             },
             {
+              "include": "#label_usages"
+            },
+            {
               "include": "#operands_variables"
             }
           ]
@@ -145,6 +154,9 @@
         },
         {
           "include": "#compiler_labels"
+        },
+        {
+          "include": "#label_usages"
         },
         {
           "include": "#operands_variables"
@@ -175,6 +187,9 @@
         },
         {
           "include": "#compiler_labels"
+        },
+        {
+          "include": "#label_usages"
         },
         {
           "include": "#numeric-values"
@@ -231,9 +246,6 @@
           "include": "#indirect-addressing"
         },
         {
-          "include": "#operands_variables"
-        },
-        {
           "match": "\\,",
           "name": "punctuation.separator"
         }
@@ -244,7 +256,7 @@
         {
           "captures": {
             "1": {
-              "name": "variable.other.label.global"
+              "name": "variable.other.label.definition"
             },
             "2": {
               "name": "punctuation.definition.variable.colon.label"
@@ -255,7 +267,7 @@
         {
           "captures": {
             "1": {
-              "name": "variable.other.label.local"
+              "name": "variable.other.label.definition"
             },
             "2": {
               "name": "punctuation.definition.variable.colon.label"
@@ -266,13 +278,29 @@
         {
           "captures": {
             "1": {
-              "name": "variable.other.label.file"
+              "name": "variable.other.label.definition"
             },
             "2": {
               "name": "punctuation.definition.variable.colon.label"
             }
           },
           "match": "(_{1}[\\w\\d_]*)(\\:)"
+        }
+      ]
+    },
+    "label_usages": {
+      "patterns": [
+        {
+          "match": "\\b[a-zA-Z][\\w\\d_]*\\b",
+          "name": "variable.other.label.usage"
+        },
+        {
+          "match": "\\.[\\w\\d_]+\\b",
+          "name": "variable.other.label.usage"
+        },
+        {
+          "match": "_[\\w\\d_]+\\b",
+          "name": "variable.other.label.usage"
         }
       ]
     },
@@ -309,9 +337,6 @@
         },
         {
           "include": "#indirect-addressing"
-        },
-        {
-          "include": "#operands_variables"
         },
         {
           "match": "\\,",
@@ -386,7 +411,7 @@
       ]
     },
     "operands_variables": {
-      "match": "(?<!\\w)((?:\\.|_|\\w){1}[\\w\\d_]*)\\b",
+      "match": "(?<!\\w)([A-Za-z][\\w\\d_]*)\\b",
       "name": "variable.parameter.instruction"
     },
     "operators": {

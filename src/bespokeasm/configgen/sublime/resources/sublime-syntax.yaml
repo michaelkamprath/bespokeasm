@@ -3,7 +3,7 @@
 file_extensions:
   - ##FILEEXTENSION##
 scope: source.bespokeasm.##FILEEXTENSION##
-verson: 2
+version: 2
 
 contexts:
   main:
@@ -14,19 +14,19 @@ contexts:
     - include: compiler_labels
     - match: ^\s*(\w*)(?:\s*)?(\=|EQU)
       captures:
-        1: variable.other.constant
+        1: variable.other.constant variable.other.constant.definition
         2: keyword.operator.assignment
     - match: ([a-zA-Z]{1}[\w\d_]*)(\:)
       captures:
-        1: variable.other.label.global
+        1: variable.other.label.global variable.other.label.definition
         2: punctuation.definition.variable.colon.label
     - match: (\.{1}[\w\d_]*)(\:)
       captures:
-        1: variable.other.label.local
+        1: variable.other.label.local variable.other.label.definition
         2: punctuation.definition.variable.colon.label
     - match: (_{1}[\w\d_]*)(\:)
       captures:
-        1: variable.other.label.file
+        1: variable.other.label.file variable.other.label.definition
         2: punctuation.definition.variable.colon.label
     - match: \;
       scope: punctuation.definition.comment

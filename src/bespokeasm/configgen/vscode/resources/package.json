@@ -26,6 +26,64 @@
         "path": "./snippets.json"
       }
     ],
+    "configuration": {
+      "title": "##LANGUAGE_NAME##",
+      "properties": {
+        "bespokeasm.##LANGUAGE_ID##.hover.mnemonics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable instruction and macro hover documentation.",
+          "scope": "language-overridable"
+        },
+        "bespokeasm.##LANGUAGE_ID##.hover.labels": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable label definition hovers.",
+          "scope": "language-overridable"
+        },
+        "bespokeasm.##LANGUAGE_ID##.hover.constants": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable constant definition hovers.",
+          "scope": "language-overridable"
+        }
+      }
+    },
+    "semanticTokenTypes": [
+      {
+        "id": "label",
+        "superType": "variable"
+      },
+      {
+        "id": "constant",
+        "superType": "variable"
+      }
+    ],
+    "semanticTokenModifiers": [
+      {
+        "id": "definition",
+        "superType": "declaration"
+      }
+    ],
+    "semanticTokenScopes": [
+      {
+        "language": "##LANGUAGE_ID##",
+        "scopes": {
+          "label": [
+            "variable.other.label.usage"
+          ],
+          "label.definition": [
+            "variable.other.label.definition"
+          ],
+          "constant": [
+            "variable.other.constant.usage"
+          ],
+          "constant.definition": [
+            "variable.other.constant.definition"
+          ]
+        }
+      }
+    ],
     "themes": [
       {
         "label": "##LANGUAGE_ID## Theme",
@@ -34,11 +92,11 @@
       }
     ]
   },
-  "displayName": "BespokeASM Assembly",
+  "displayName": "##LANGUAGE_NAME## (BespokeASM)",
   "engines": {
     "vscode": ">=0.9.0-pre.1"
   },
-  "name": "putey-assembly",
+  "name": "##LANGUAGE_ID##",
   "publisher": "bespokeasm",
   "version": "0.0.1"
 }

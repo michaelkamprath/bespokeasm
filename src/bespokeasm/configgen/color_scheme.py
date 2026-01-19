@@ -30,6 +30,8 @@ class SyntaxElement(Enum):
 
     # Labels and identifiers
     LABEL_NAME = 'label_name'
+    LABEL_DEFINITION = 'label_definition'
+    LABEL_USAGE = 'label_usage'
     PUNCTUATION_LABEL_COLON = 'label_colon'
 
     # Strings and escapes
@@ -47,6 +49,8 @@ class SyntaxElement(Enum):
     # Variables and constants
     REGISTER = 'register'
     CONSTANT_NAME = 'constant_name'
+    CONSTANT_DEFINITION = 'constant_definition'
+    CONSTANT_USAGE = 'constant_usage'
     COMPILER_LABEL = 'compiler_label'
     PARAMETER = 'parameter'
 
@@ -102,6 +106,8 @@ DEFAULT_COLOR_SCHEME = ColorScheme(
 
         # Labels and identifiers
         SyntaxElement.LABEL_NAME: '#278ed8',
+        SyntaxElement.LABEL_DEFINITION: '#278ed8',
+        SyntaxElement.LABEL_USAGE: '#7fcaff',
         SyntaxElement.PUNCTUATION_LABEL_COLON: '#ed80a2',
 
         # Strings and escapes
@@ -119,6 +125,8 @@ DEFAULT_COLOR_SCHEME = ColorScheme(
         # Variables and constants
         SyntaxElement.REGISTER: '#2ea9d2',
         SyntaxElement.CONSTANT_NAME: '#abd7ed',
+        SyntaxElement.CONSTANT_DEFINITION: '#29e768',
+        SyntaxElement.CONSTANT_USAGE: '#6fe797',
         SyntaxElement.COMPILER_LABEL: '#abedc1',
         SyntaxElement.PARAMETER: '#abd7ed',
 

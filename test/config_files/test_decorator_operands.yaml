@@ -1,0 +1,98 @@
+description: Test Decorated Operand Parsing
+general:
+  min_version: "0.7.0"
+  address_size: 16
+  multi_word_endian: little
+  registers:
+    - a
+    - sp
+  identifier:
+    name: decorator-test
+    version: "0.1.0"
+operand_sets:
+  decorated_regs:
+    operand_values:
+      a_plus:
+        type: register
+        register: a
+        bytecode:
+          value: 1
+          size: 8
+        decorator:
+          type: plus
+          is_prefix: false
+      a_minus:
+        type: register
+        register: a
+        bytecode:
+          value: 2
+          size: 8
+        decorator:
+          type: minus
+          is_prefix: false
+      a_plus_plus:
+        type: register
+        register: a
+        bytecode:
+          value: 3
+          size: 8
+        decorator:
+          type: plus_plus
+          is_prefix: true
+      a_minus_minus:
+        type: register
+        register: a
+        bytecode:
+          value: 4
+          size: 8
+        decorator:
+          type: minus_minus
+          is_prefix: true
+      a_exclaim:
+        type: register
+        register: a
+        bytecode:
+          value: 5
+          size: 8
+        decorator:
+          type: exclamation
+          is_prefix: false
+      a_at:
+        type: register
+        register: a
+        bytecode:
+          value: 6
+          size: 8
+        decorator:
+          type: at
+          is_prefix: false
+  indirect_sp_with_offset:
+    operand_values:
+      sp_indirect:
+        type: indirect_register
+        register: sp
+        bytecode:
+          value: 7
+          size: 8
+        offset:
+          size: 8
+          word_align: true
+instructions:
+  use:
+    bytecode:
+      value: 0x10
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - decorated_regs
+  load:
+    bytecode:
+      value: 0x20
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - indirect_sp_with_offset

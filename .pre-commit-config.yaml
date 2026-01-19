@@ -32,6 +32,8 @@ repos:
     hooks:
     -   id: pyupgrade
         args: [--py311-plus]
+        language_version: python3.11
+        exclude: ^src/bespokeasm/configgen/sublime/resources/bespokeasm_hover\.py$
 -   repo: https://github.com/asottile/reorder-python-imports
     rev: v3.15.0
     hooks:

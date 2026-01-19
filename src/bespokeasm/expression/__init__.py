@@ -202,8 +202,45 @@ TOKEN_MAPPINGS = {
 
 def _lexical_analysis(line_id: LineIdentifier, s: str) -> list[ExpressionNode]:
     tokens = []
-    expression_parts = re.findall(EXPRESSION_PARTS_PATTERN, s)
-    for part in expression_parts:
+    if '&&' in s or '||' in s:
+        raise SyntaxError(
+            f"ERROR: {line_id} - boolean operators '&&' and '||' are not supported in expressions"
+        )
+    if '[' in s or ']' in s:
+        raise SyntaxError(
+            f'ERROR: {line_id} - brackets are not supported in numeric expressions'
+        )
+    if s.count("'") % 2 != 0:
+        raise SyntaxError(
+            f"ERROR: {line_id} - unterminated character literal (use single quotes like 'A')"
+        )
+    if s.count('"') % 2 != 0:
+        raise SyntaxError(
+            f'ERROR: {line_id} - unterminated string literal (double quotes are not valid in expressions)'
+        )
+    if re.search(r'"[^"]*"', s):
+        raise SyntaxError(
+            f'ERROR: {line_id} - double-quoted strings are not valid in expressions '
+            "(use single-character ordinals like 'A')"
+        )
+    for match in re.finditer(r"'([^']*)'", s):
+        literal = match.group(1)
+        if len(literal) == 0:
+            raise SyntaxError(
+                f"ERROR: {line_id} - empty character literal is not valid (use single-character ordinals like 'A')"
+            )
+        if len(literal) > 1:
+            raise SyntaxError(
+                f"ERROR: {line_id} - only single-character ordinals are supported (use 'A')"
+            )
+    last_end = 0
+    for match in re.finditer(EXPRESSION_PARTS_PATTERN, s):
+        if match.start() > last_end:
+            gap = s[last_end:match.start()]
+            if gap.strip():
+                gap_str = gap.strip()
+                raise SyntaxError(f'ERROR: {line_id} - invalid token: {gap_str}')
+        part = match.group(0)
         if part in TOKEN_MAPPINGS:
             token_type = TOKEN_MAPPINGS[part]
             token = ExpressionNode(token_type, value=part)
@@ -216,6 +253,10 @@ def _lexical_analysis(line_id: LineIdentifier, s: str) -> list[ExpressionNode]:
         else:
             sys.exit(f'ERROR: {line_id} - invalid token: {part}')
         tokens.append(token)
+        last_end = match.end()
+    if s[last_end:].strip():
+        gap_str = s[last_end:].strip()
+        raise SyntaxError(f'ERROR: {line_id} - invalid token: {gap_str}')
     tokens.append(ExpressionNode(TokenType.T_END))
     return tokens
 

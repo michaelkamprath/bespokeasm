@@ -149,7 +149,7 @@ class AssemblyFile:
         return line_objects
 
     PATTERN_INCLUDE_FILE = re.compile(
-        r'^\#include\s+(?:\'|\")([\w\.\-\_]+)(?:\'|\")',
+        r'^\#include\s+(?:\'|\")([\w\.\-_/]+)(?:\'|\")',
         flags=re.IGNORECASE | re.MULTILINE
     )
 
@@ -166,9 +166,10 @@ class AssemblyFile:
             ) -> list[LineObject]:
         label_match = re.search(AssemblyFile.PATTERN_INCLUDE_FILE, line_str)
         if label_match is not None:
+            include_paths_with_current = [os.path.dirname(self.filename), *include_paths]
             new_filepath = self._locate_filename(
                     label_match.group(1).strip(),
-                    include_paths,
+                    include_paths_with_current,
                     line_id
                 )
             if new_filepath in assembly_files_used:
@@ -185,11 +186,16 @@ class AssemblyFile:
         else:
             sys.exit(f'ERROR: {line_id} - Improperly formatted include directive')
 
-    def _locate_filename(self, filename: str, include_paths: set[str], line_id: LineIdentifier) -> str:
+    def _locate_filename(self, filename: str, include_paths: list[str], line_id: LineIdentifier) -> str:
         '''locates the filename in the include paths, and returns the full file path. Errors if file name is ambiguous.'''
         filepath = None
+        checked_dirs: set[str] = set()
         for include_dir in include_paths:
-            found_path = os.path.join(include_dir, filename)
+            real_include_dir = os.path.realpath(include_dir)
+            if real_include_dir in checked_dirs:
+                continue
+            checked_dirs.add(real_include_dir)
+            found_path = os.path.normpath(os.path.join(include_dir, filename))
             if os.path.exists(found_path):
                 if filepath is None:
                     filepath = found_path

@@ -76,6 +76,35 @@ class MarkdownGenerator:
 
         return '\n\n'.join(filter(None, sections))
 
+    def generate_instruction_markdown(
+        self,
+        instruction_name: str,
+        instruction_doc: dict[str, Any],
+        include_missing_doc_notice: bool = True,
+        table_style: str = 'markdown',
+        add_header_rule: bool = False
+    ) -> str:
+        """
+        Generate markdown documentation for a single instruction.
+
+        Args:
+            instruction_name: The instruction mnemonic
+            instruction_doc: The instruction documentation data
+            include_missing_doc_notice: Whether to include a missing doc notice
+            table_style: "markdown" or "ascii" for table rendering
+            add_header_rule: Whether to add a horizontal rule after the header
+
+        Returns:
+            The markdown content for the instruction
+        """
+        return self._generate_instruction_documentation(
+            instruction_name,
+            instruction_doc,
+            include_missing_doc_notice=include_missing_doc_notice,
+            table_style=table_style,
+            add_header_rule=add_header_rule
+        )
+
     def _optimize_table_columns(
         self,
         headers: list[str],
@@ -878,7 +907,9 @@ class MarkdownGenerator:
         self,
         instruction_name: str,
         instruction_doc: dict[str, Any],
-        include_missing_doc_notice: bool = True
+        include_missing_doc_notice: bool = True,
+        table_style: str = 'markdown',
+        add_header_rule: bool = False
     ) -> str:
         """
         Generate documentation for a single instruction.
@@ -898,6 +929,8 @@ class MarkdownGenerator:
         if instruction_doc.get('title'):
             header += f" : {instruction_doc['title']}"
         sections.append(header)
+        if add_header_rule:
+            sections.append('---')
 
         documented = instruction_doc.get('documented', True)
 
@@ -915,14 +948,18 @@ class MarkdownGenerator:
             version_section = self._generate_instruction_version_section(
                 mnemonic,
                 version,
-                include_heading=multi_version
+                include_heading=multi_version,
+                table_style=table_style
             )
             if version_section:
                 sections.append(version_section)
 
         # Modifies table
         if instruction_doc.get('modifies'):
-            sections.append(self._generate_modifies_table(instruction_doc['modifies']))
+            sections.append(self._generate_modifies_table(
+                instruction_doc['modifies'],
+                table_style=table_style
+            ))
 
         # Examples
         if instruction_doc.get('examples'):
@@ -969,7 +1006,8 @@ class MarkdownGenerator:
         self,
         mnemonic: str,
         version_data: dict[str, Any],
-        include_heading: bool
+        include_heading: bool,
+        table_style: str = 'markdown'
     ) -> str:
         """Generate the syntax documentation for a single instruction version."""
         lines: list[str] = []
@@ -1008,13 +1046,20 @@ class MarkdownGenerator:
 
             lines.append(f'```asm\n{syntax_line}\n```')
 
-            operand_table = self._generate_instruction_operand_table(operands, display_names)
+            operand_table = self._generate_instruction_operand_table(
+                operands,
+                display_names,
+                table_style=table_style
+            )
             if operand_table:
                 lines.append('where')
                 lines.append(operand_table)
 
         if version_data.get('modifies'):
-            lines.append(self._generate_modifies_table(version_data['modifies']))
+            lines.append(self._generate_modifies_table(
+                version_data['modifies'],
+                table_style=table_style
+            ))
 
         if version_data.get('examples'):
             lines.append(self._generate_instruction_examples(version_data['examples']))
@@ -1024,7 +1069,8 @@ class MarkdownGenerator:
     def _generate_instruction_operand_table(
         self,
         operands: list[dict[str, Any]],
-        display_names: list[str] | None = None
+        display_names: list[str] | None = None,
+        table_style: str = 'markdown'
     ) -> str:
         """Build the operand table for an instruction signature."""
         if not operands:
@@ -1058,9 +1104,11 @@ class MarkdownGenerator:
 
             rows.append([operand_cell, operand_type, value_cell, description_cell])
 
+        if table_style == 'ascii':
+            return self._generate_ascii_table(headers, rows)
         return self._generate_markdown_table(headers, rows, column_alignments=alignments)
 
-    def _generate_modifies_table(self, modifies: list[dict[str, str]]) -> str:
+    def _generate_modifies_table(self, modifies: list[dict[str, str]], table_style: str = 'markdown') -> str:
         """Generate a table of what the instruction modifies."""
         if not modifies:
             return ''
@@ -1078,11 +1126,70 @@ class MarkdownGenerator:
             rows.append([modify_type, target, description])
 
         # Generate optimized table
-        table = self._generate_markdown_table(headers, rows)
+        if table_style == 'ascii':
+            table = self._generate_ascii_table(headers, rows)
+        else:
+            table = self._generate_markdown_table(headers, rows)
         if table:
             sections.append(table)
 
         return '\n\n'.join(sections)
+
+    def _generate_ascii_table(
+        self,
+        headers: list[str],
+        rows: list[list[str]]
+    ) -> str:
+        """Generate a fixed-width ASCII table for hover rendering."""
+        if not headers or not rows:
+            return ''
+
+        sanitized_rows = [
+            [self._sanitize_ascii_cell(cell) for cell in row]
+            for row in rows
+        ]
+        sanitized_headers = [self._sanitize_ascii_cell(cell) for cell in headers]
+
+        column_count = len(sanitized_headers)
+        padded_rows = [
+            row + [''] * (column_count - len(row))
+            for row in sanitized_rows
+        ]
+
+        widths = [
+            max(len(sanitized_headers[idx]), *(len(row[idx]) for row in padded_rows))
+            for idx in range(column_count)
+        ]
+
+        def render_separator() -> str:
+            segments = ['+' + '-' * (width + 2) for width in widths]
+            return ''.join(segments) + '+'
+
+        def render_row(values: list[str]) -> str:
+            cells = [
+                f' {value.ljust(widths[idx])} '
+                for idx, value in enumerate(values)
+            ]
+            return '|' + '|'.join(cells) + '|'
+
+        lines = [render_separator(), render_row(sanitized_headers), render_separator()]
+        for row in padded_rows:
+            lines.append(render_row(row))
+        lines.append(render_separator())
+
+        return '```\n' + '\n'.join(lines) + '\n```'
+
+    @staticmethod
+    def _sanitize_ascii_cell(value: Any) -> str:
+        """Normalize a cell value for ASCII table rendering."""
+        if value is None:
+            return ''
+        text = str(value)
+        return (
+            text.replace('<br>', ' / ')
+            .replace('\n', ' / ')
+            .replace('\r', '')
+        ).strip()
 
     def _generate_instruction_examples(self, examples: list[dict[str, str]]) -> str:
         """Generate examples for an instruction."""

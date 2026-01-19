@@ -1217,6 +1217,33 @@ class TestLineObject(unittest.TestCase):
                 0,
             )
 
+    def test_multiple_instructions_per_line(self):
+        """Doc: General Assembler Syntax - multiple instructions may share a line."""
+        fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
+        lineid = LineIdentifier(77, 'test_multiple_instructions_per_line')
+        preprocessor = Preprocessor()
+
+        line_objs = LineOjectFactory.parse_line(
+            lineid,
+            'nop nop',
+            isa_model,
+            TestLineObject.label_values,
+            TestLineObject.active_named_scopes,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+            preprocessor,
+            ConditionStack(),
+            0,
+        )
+        self.assertEqual(len(line_objs), 2, 'two instructions should be parsed on one line')
+        self.assertTrue(all(isinstance(lo, InstructionLine) for lo in line_objs), 'both should be instructions')
+
     def test_embedded_string_bugs(self):
         fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
         isa_model = AssemblerModel(str(fp), 0)
