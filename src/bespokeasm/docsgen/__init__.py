@@ -105,3 +105,8 @@ class DocumentationGenerator:
             sys.exit(f'ERROR: Permission denied writing to: {output_path}')
         except OSError as e:
             sys.exit(f'ERROR: Failed to write output file: {e}')
+
+
+def build_documentation_model(assembler_model: AssemblerModel, verbose: int = 0) -> DocumentationModel:
+    """Build a DocumentationModel from an already-loaded assembler model."""
+    return DocumentationModel(assembler_model, verbose)

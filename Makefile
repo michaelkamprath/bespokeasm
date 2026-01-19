@@ -18,6 +18,10 @@ flake8:
 	flake8 ./src/ ./test/ --count --max-line-length=127 --statistics
 
 pyinstaller:
+	# Requires that ripgrep `rg` is installed in host system. See: https://github.com/BurntSushi/ripgrep
+	# Also requires `pyinstaller` in the current python environment. `pip install pyinstaller`
+	@command -v rg >/dev/null 2>&1 || { echo "ERROR: ripgrep (rg) is not installed. Install from https://github.com/BurntSushi/ripgrep"; exit 1; }
+	@$(PYTHON) -m PyInstaller --version >/dev/null 2>&1 || { echo "ERROR: pyinstaller is not installed in the current Python environment. Install with: pip install pyinstaller"; exit 1; }
 	PYTHONPATH=./src $(PYTHON) -m PyInstaller --onefile --name $(PYINSTALLER_NAME) \
 		--distpath $(PYINSTALLER_DIST) --paths src --collect-all bespokeasm \
 		--add-data "src/bespokeasm/configgen/sublime/resources:bespokeasm/configgen/sublime/resources" \

@@ -8,6 +8,7 @@ from bespokeasm.assembler.assembly_file import AssemblyFile
 from bespokeasm.assembler.label_scope import LabelScopeType
 from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
+from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.preprocessor import Preprocessor
@@ -199,11 +200,70 @@ _file_local_label: .byte 10
             self.preprocessor,
             0  # log_verbosity
         )
-
-        # Verify that the mathlib16 scope was properly created and used
         mathlib_def = self.named_scope_manager.get_scope_definition('mathlib16')
-        self.assertIsNotNone(mathlib_def)
-        self.assertEqual(mathlib_def.prefix, 'ml16_')
+        self.assertIsNotNone(mathlib_def, 'mathlib16 scope should be created by included file')
+        self.assertEqual(mathlib_def.prefix, 'ml16_', 'mathlib16 prefix should match')
+        jmp_lines = [
+            lobj for lobj in line_objects
+            if isinstance(lobj, InstructionLine) and lobj.instruction == 'jmp ml16_signed_multiply'
+        ]
+        self.assertEqual(len(jmp_lines), 1, 'jmp to mathlib16 label should be parsed')
+        self.assertIn('mathlib16', jmp_lines[0].active_named_scopes, 'mathlib16 scope should be active in main file')
+
+    def test_create_scope_auto_activates(self):
+        """Doc: Labels > Named Label Scopes > Creating a Named Scope - create-scope activates the scope."""
+        source = '\n'.join([
+            '#create-scope "lib" prefix="lib_"',
+            'lib_label: .byte 1',
+            'ld a, b, c',
+        ])
+        asm_path = os.path.join(self.test_code_dir, 'auto_activate.asm')
+        with open(asm_path, 'w') as handle:
+            handle.write(source)
+
+        asm_file = AssemblyFile(asm_path, self.global_scope, self.named_scope_manager)
+        line_objects = asm_file.load_line_objects(
+            self.isa_model,
+            {self.test_code_dir},
+            self.memzone_manager,
+            self.preprocessor,
+            0,
+        )
+
+        labeled_lines = [
+            lo for lo in line_objects
+            if isinstance(lo, LabelLine) and lo.get_label() == 'lib_label'
+        ]
+        self.assertEqual(len(labeled_lines), 1, 'lib_label should be parsed')
+        self.assertIn('lib', labeled_lines[0].active_named_scopes, 'create-scope should auto-activate')
+
+    def test_use_scope_does_not_project_into_includes(self):
+        """Doc: Labels > Named Label Scopes > Using a Named Scope - #use-scope is file-local."""
+        main_source = '\n'.join([
+            '#use-scope "lib"',
+            '#include "libfile.asm"',
+            'ld a, b, c',
+        ])
+        include_source = 'lib_label: .byte 1\n'
+        main_path = os.path.join(self.test_code_dir, 'main.asm')
+        include_path = os.path.join(self.test_code_dir, 'libfile.asm')
+        with open(main_path, 'w') as handle:
+            handle.write(main_source)
+        with open(include_path, 'w') as handle:
+            handle.write(include_source)
+
+        asm_file = AssemblyFile(main_path, self.global_scope, self.named_scope_manager)
+        line_objects = asm_file.load_line_objects(
+            self.isa_model,
+            {self.test_code_dir},
+            self.memzone_manager,
+            self.preprocessor,
+            0,
+        )
+        included_lines = [lo for lo in line_objects if lo.line_id.filename == include_path]
+        self.assertTrue(included_lines, 'included file should produce line objects')
+        for lobj in included_lines:
+            self.assertNotIn('lib', lobj.active_named_scopes, 'use-scope should not affect included file')
 
         # Verify the scope is active in the main file
         for lobj in line_objects:

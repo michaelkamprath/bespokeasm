@@ -228,6 +228,82 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.assertIn('| `ZERO_PAGE` | 0x0000 | 0x00FF | Zero Page | Fast access memory. |', result)
         self.assertIn('| `ROM` | 0x8000 | 0xFFFF | ROM | Read-only memory. |', result)
 
+    def test_generate_instruction_markdown_with_documentation(self):
+        """Instruction markdown includes headers, syntax, modifies, and examples."""
+        instruction_doc = {
+            'documented': True,
+            'title': 'Load Accumulator',
+            'description': 'Loads a value into the accumulator.',
+            'versions': [
+                {
+                    'index': 1,
+                    'documented': True,
+                    'signatures': [
+                        {
+                            'operands': [
+                                {
+                                    'name': 'src',
+                                    'type': 'register',
+                                    'syntax': 'r',
+                                    'value': 'register `A`',
+                                    'description': 'Source register.',
+                                    'include_in_code': True
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            'modifies': [
+                {
+                    'type': 'register',
+                    'target': 'A',
+                    'description': 'Updated with source value.'
+                }
+            ],
+            'examples': [
+                {
+                    'title': 'Simple load',
+                    'code': 'lda a'
+                }
+            ]
+        }
+
+        generator = MarkdownGenerator(self.mock_doc_model, verbose=0)
+        result = generator.generate_instruction_markdown('lda', instruction_doc, add_header_rule=True)
+
+        self.assertIn('### `LDA` : Load Accumulator', result)
+        self.assertIn('---', result)
+        self.assertIn('Loads a value into the accumulator.', result)
+        self.assertIn('```asm\nLDA r\n```', result)
+        self.assertIn('#### Modifies', result)
+        self.assertIn('| Register | A | Updated with source value. |', result)
+        self.assertIn('#### Examples', result)
+        self.assertIn('```assembly\nlda a\n```', result)
+
+    def test_generate_instruction_markdown_missing_docs(self):
+        """Instruction markdown includes missing documentation notice."""
+        instruction_doc = {
+            'documented': False,
+            'versions': [
+                {
+                    'index': 1,
+                    'documented': False,
+                    'signatures': [
+                        {
+                            'operands': []
+                        }
+                    ]
+                }
+            ]
+        }
+
+        generator = MarkdownGenerator(self.mock_doc_model, verbose=0)
+        result = generator.generate_instruction_markdown('nop', instruction_doc)
+
+        self.assertIn('### `NOP`', result)
+        self.assertIn('Documentation not provided.', result)
+
     def test_generate_predefined_memory_zones_without_documentation(self):
         """Predefined memory zones omit documentation columns when none are provided."""
         self.mock_doc_model.general_docs = {

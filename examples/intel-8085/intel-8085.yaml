@@ -390,11 +390,11 @@ instructions:
     # move immediate
     # Bit format 00xxx110, xxx = register
     bytecode:
-        value: 0
-        size: 2
-        suffix:
-          value: 6
-          size: 3
+      value: 0
+      size: 2
+      suffix:
+        value: 6
+        size: 3
     operands:
       count: 2
       operand_sets:

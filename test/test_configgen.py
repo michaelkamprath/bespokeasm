@@ -23,6 +23,25 @@ class TestConfigurationGeneration(unittest.TestCase):
         if not pl.Path(path).resolve().is_file():
             raise AssertionError('File does not exist: %s' % str(path))
 
+    def _assert_constant_definition_pattern(self, pattern: str, source_name: str) -> None:
+        compiled = re.compile(pattern)
+        cases = {
+            'FOO EQU 1': 'FOO',
+            '_FOO EQU 1': '_FOO',
+            '.foo EQU 1': '.foo',
+            'FOO = 1': 'FOO',
+            '_FOO = 1': '_FOO',
+            '.foo = 1': '.foo',
+        }
+        for line, expected in cases.items():
+            match = compiled.match(line)
+            self.assertIsNotNone(match, f'{source_name} should match {line!r}')
+            self.assertEqual(match.group(1), expected, f'{source_name} should capture {expected!r}')
+
+        invalid_cases = ['__bad EQU 1', '..bad = 1', '1bad = 1']
+        for line in invalid_cases:
+            self.assertIsNone(compiled.match(line), f'{source_name} should reject {line!r}')
+
     def _assert_grouped_item_list(self, item_str: str, target_list: list[str], test_name: str) -> None:
         match = re.search(r'^.*(?<=[\w\)])?\((?:\?\:)?(.*)\)', item_str, re.IGNORECASE)
         self.assertIsNotNone(match, f'{test_name} match should be found')
@@ -53,12 +72,12 @@ class TestConfigurationGeneration(unittest.TestCase):
             package_json = json.load(json_file)
         self.assertEqual(
             package_json['name'],
-            'bespokeasm-test',
-            'package name should be modified ISA name'
+            'bespokeasm-test-assembly',
+            'package name should be based on language ID'
         )
         self.assertEqual(
             package_json['displayName'],
-            'Little Endian Line Creation',
+            f'{configgen.language_name} (BespokeASM)',
             'display name should be correct'
         )
         self.assertEqual(
@@ -82,6 +101,33 @@ class TestConfigurationGeneration(unittest.TestCase):
             'language ID should be modified ISA name'
         )
         self.assertEqual(
+            package_json['main'],
+            './extension.js',
+            'extension entry point should be set'
+        )
+        hover_config = package_json['contributes']['configuration']['properties']
+        hover_prefix = f'bespokeasm.{package_json["contributes"]["languages"][0]["id"]}.hover'
+        self.assertIn(f'{hover_prefix}.mnemonics', hover_config)
+        self.assertIn(f'{hover_prefix}.labels', hover_config)
+        self.assertIn(f'{hover_prefix}.constants', hover_config)
+        self.assertTrue(hover_config[f'{hover_prefix}.mnemonics']['default'])
+        self.assertTrue(hover_config[f'{hover_prefix}.labels']['default'])
+        self.assertTrue(hover_config[f'{hover_prefix}.constants']['default'])
+        self.assertEqual(
+            package_json['activationEvents'],
+            ['onLanguage:bespokeasm-test-assembly'],
+            'activation event should target the language'
+        )
+        self.assertIn('semanticTokenScopes', package_json['contributes'])
+        self.assertEqual(
+            package_json['contributes']['semanticTokenScopes'][0]['language'],
+            'bespokeasm-test-assembly',
+            'semantic token language should be updated'
+        )
+        token_scopes = package_json['contributes']['semanticTokenScopes'][0]['scopes']
+        self.assertIn('constant', token_scopes)
+        self.assertIn('constant.definition', token_scopes)
+        self.assertEqual(
             package_json['contributes']['snippets'][0]['language'],
             'bespokeasm-test-assembly',
             'language ID should be modified ISA name'
@@ -95,6 +141,24 @@ class TestConfigurationGeneration(unittest.TestCase):
             grammar_json['repository']['instructions']['begin'],
             ['\\blda\\b', '\\badd\\b', '\\bset\\b', '\\bbig\\b', '\\bhlt\\b'],
             'instructions'
+        )
+        instructions_patterns = grammar_json['repository']['instructions']['patterns']
+        pattern_includes = [
+            entry['include']
+            for entry in instructions_patterns
+            if isinstance(entry, dict) and 'include' in entry
+        ]
+        self.assertNotIn('#constant_usages', pattern_includes)
+        self.assertNotIn('constant_usages', grammar_json['repository'])
+        self.assertNotIn('#operands_variables', pattern_includes)
+
+        # TODO: Remove label usage from TextMate grammar once semantic tokens handle constants.
+        # This currently fails because label usage rules match constants in usage positions.
+        self.assertNotIn('#label_usages', pattern_includes)
+        self.assertEqual(
+            grammar_json['repository']['operands_variables']['match'],
+            '(?<!\\w)([A-Za-z][\\w\\d_]*)\\b',
+            'operand variables should not match dot/underscore-prefixed labels'
         )
         # there should be no macros for this ISA
         self.assertFalse(
@@ -111,6 +175,27 @@ class TestConfigurationGeneration(unittest.TestCase):
 
         self.assertIsFile(os.path.join(extension_dirpath, 'bespokeasm-test', 'snippets.json'))
         self.assertIsFile(os.path.join(extension_dirpath, 'bespokeasm-test', 'language-configuration.json'))
+        self.assertIsFile(os.path.join(extension_dirpath, 'bespokeasm-test', 'extension.js'))
+        self.assertIsFile(os.path.join(extension_dirpath, 'bespokeasm-test', 'include_files.js'))
+        self.assertIsFile(os.path.join(extension_dirpath, 'bespokeasm-test', 'label_hover.js'))
+        self.assertIsFile(os.path.join(extension_dirpath, 'bespokeasm-test', 'constants_hover.js'))
+        with open(os.path.join(extension_dirpath, 'bespokeasm-test', 'extension.js')) as js_file:
+            js_content = js_file.read()
+        self.assertIn('bespokeasm.openLabelDefinition', js_content)
+        self.assertIn('bespokeasm.openConstantDefinition', js_content)
+        self.assertIn('editor.action.goToLocations', js_content)
+        self.assertIn('buildDefinitionHover', js_content)
+        self.assertIn('1 << tokenModifiers.get(\'definition\')', js_content)
+
+        docs_fp = os.path.join(extension_dirpath, 'bespokeasm-test', 'instruction-docs.json')
+        self.assertIsFile(docs_fp)
+        with open(docs_fp) as json_file:
+            docs_json = json.load(json_file)
+        self.assertIn('instructions', docs_json)
+        self.assertIn('macros', docs_json)
+        self.assertIn('LDA', docs_json['instructions'])
+        self.assertIn('### `LDA`', docs_json['instructions']['LDA'])
+        self.assertIn('Documentation not provided.', docs_json['instructions']['LDA'])
 
         shutil.rmtree(test_dir)
 
@@ -138,8 +223,8 @@ class TestConfigurationGeneration(unittest.TestCase):
             package_json = json.load(json_file)
         self.assertEqual(
             package_json['name'],
-            'tester-assembly',
-            'package name should be modified ISA name'
+            'tester-assembly-assembly',
+            'package name should be based on language ID'
         )
         self.assertEqual(
             package_json['contributes']['languages'][0]['id'],
@@ -160,6 +245,22 @@ class TestConfigurationGeneration(unittest.TestCase):
             package_json['contributes']['snippets'][0]['language'],
             'tester-assembly-assembly',
             'language ID should be modified ISA name'
+        )
+        self.assertEqual(
+            package_json['main'],
+            './extension.js',
+            'extension entry point should be set'
+        )
+        self.assertEqual(
+            package_json['activationEvents'],
+            ['onLanguage:tester-assembly-assembly'],
+            'activation event should target the language'
+        )
+        self.assertIn('semanticTokenScopes', package_json['contributes'])
+        self.assertEqual(
+            package_json['contributes']['semanticTokenScopes'][0]['language'],
+            'tester-assembly-assembly',
+            'semantic token language should be updated'
         )
         self.assertEqual(
             package_json['contributes']['snippets'][0]['language'],
@@ -184,6 +285,43 @@ class TestConfigurationGeneration(unittest.TestCase):
 
         self.assertIsFile(os.path.join(extension_dirpath, 'tester-assembly', 'snippets.json'))
         self.assertIsFile(os.path.join(extension_dirpath, 'tester-assembly', 'language-configuration.json'))
+        self.assertIsFile(os.path.join(extension_dirpath, 'tester-assembly', 'extension.js'))
+
+        docs_fp = os.path.join(extension_dirpath, 'tester-assembly', 'instruction-docs.json')
+        self.assertIsFile(docs_fp)
+        with open(docs_fp) as json_file:
+            docs_json = json.load(json_file)
+        self.assertIn('instructions', docs_json)
+        self.assertIn('macros', docs_json)
+        self.assertIn('NOP', docs_json['instructions'])
+        self.assertIn('### `NOP`', docs_json['instructions']['NOP'])
+        self.assertIn('Documentation not provided.', docs_json['instructions']['NOP'])
+
+    def test_vscode_configgen_with_macros(self):
+        test_dir = tempfile.mkdtemp()
+        config_file = pkg_resources.files(config_files).joinpath('test_instruction_macros.yaml')
+        configgen = VSCodeConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            None,
+            None,
+            'asmtest',
+        )
+
+        configgen.generate()
+
+        extension_dirpath = os.path.join(str(test_dir), 'extensions')
+        docs_fp = os.path.join(extension_dirpath, 'bespokeasm-test', 'instruction-docs.json')
+        self.assertIsFile(docs_fp)
+        with open(docs_fp) as json_file:
+            docs_json = json.load(json_file)
+
+        self.assertIn('instructions', docs_json)
+        self.assertIn('macros', docs_json)
+        self.assertIn('PUSH2', docs_json['macros'])
+        self.assertIn('### `PUSH2`', docs_json['macros']['PUSH2'])
+        self.assertNotIn('Documentation not provided.', docs_json['macros']['PUSH2'])
 
         shutil.rmtree(test_dir)
 
@@ -260,6 +398,32 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIsFile(os.path.join(test_tmp_dir, 'bespokeasm-test.sublime-color-scheme'))
         self.assertIsFile(os.path.join(test_tmp_dir, 'bespokeasm-test__cstr.sublime-snippet'))
         self.assertIsFile(os.path.join(test_tmp_dir, 'bespokeasm-test__include.sublime-snippet'))
+        hover_plugin = f"bespokeasm_hover_{re.sub(r'[^0-9A-Za-z_]', '_', 'bespokeasm-test')}.py"
+        self.assertIsFile(os.path.join(test_tmp_dir, hover_plugin))
+        settings_fp = os.path.join(test_tmp_dir, 'bespokeasm-test.sublime-settings')
+        self.assertIsFile(settings_fp)
+        with open(settings_fp) as settings_file:
+            settings_json = json.load(settings_file)
+        self.assertTrue(settings_json['hover']['mnemonics'])
+        self.assertTrue(settings_json['hover']['labels'])
+        self.assertTrue(settings_json['hover']['constants'])
+        self.assertTrue(settings_json['semantic_highlighting'])
+        hover_colors_fp = os.path.join(test_tmp_dir, 'hover-colors.json')
+        self.assertIsFile(hover_colors_fp)
+        with open(hover_colors_fp) as colors_file:
+            colors_json = json.load(colors_file)
+        self.assertIn('instruction', colors_json)
+        self.assertIn('parameter', colors_json)
+        self.assertIn('number', colors_json)
+        self.assertIn('punctuation', colors_json)
+        docs_fp = os.path.join(test_tmp_dir, 'instruction-docs.json')
+        self.assertIsFile(docs_fp)
+        with open(docs_fp) as json_file:
+            docs_json = json.load(json_file)
+        self.assertIn('instructions', docs_json)
+        self.assertIn('macros', docs_json)
+        self.assertIn('LDA', docs_json['instructions'])
+        self.assertIn('### `LDA`', docs_json['instructions']['LDA'])
         shutil.rmtree(test_tmp_dir)
 
         # now test generating the zip file
@@ -347,6 +511,31 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIsFile(os.path.join(test_tmp_dir, 'tester-assembly.sublime-color-scheme'))
         self.assertIsFile(os.path.join(test_tmp_dir, 'tester-assembly__cstr.sublime-snippet'))
         self.assertIsFile(os.path.join(test_tmp_dir, 'tester-assembly__include.sublime-snippet'))
+        hover_plugin = f"bespokeasm_hover_{re.sub(r'[^0-9A-Za-z_]', '_', 'tester-assembly')}.py"
+        self.assertIsFile(os.path.join(test_tmp_dir, hover_plugin))
+        settings_fp = os.path.join(test_tmp_dir, 'tester-assembly.sublime-settings')
+        self.assertIsFile(settings_fp)
+        with open(settings_fp) as settings_file:
+            settings_json = json.load(settings_file)
+        self.assertTrue(settings_json['hover']['mnemonics'])
+        self.assertTrue(settings_json['hover']['labels'])
+        self.assertTrue(settings_json['hover']['constants'])
+        self.assertTrue(settings_json['semantic_highlighting'])
+        hover_colors_fp = os.path.join(test_tmp_dir, 'hover-colors.json')
+        self.assertIsFile(hover_colors_fp)
+        with open(hover_colors_fp) as colors_file:
+            colors_json = json.load(colors_file)
+        self.assertIn('instruction', colors_json)
+        self.assertIn('parameter', colors_json)
+        self.assertIn('number', colors_json)
+        self.assertIn('punctuation', colors_json)
+        docs_fp = os.path.join(test_tmp_dir, 'instruction-docs.json')
+        self.assertIsFile(docs_fp)
+        with open(docs_fp) as json_file:
+            docs_json = json.load(json_file)
+        self.assertIn('instructions', docs_json)
+        self.assertIn('macros', docs_json)
+        self.assertIn('NOP', docs_json['instructions'])
         shutil.rmtree(test_tmp_dir)
 
         # now test generating the zip file
@@ -696,6 +885,125 @@ class TestConfigurationGeneration(unittest.TestCase):
         )
 
         shutil.rmtree(test_dir)
+
+    def test_constant_definition_hover_patterns(self):
+        test_dir = tempfile.mkdtemp()
+        config_file = pkg_resources.files(config_files).joinpath('test_instruction_line_creation_little_endian.yaml')
+        configgen = VSCodeConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            None,
+            None,
+            'asmtest',
+        )
+        configgen.generate()
+        constants_fp = os.path.join(
+            str(test_dir),
+            'extensions',
+            'bespokeasm-test',
+            'constants_hover.js',
+        )
+        self.assertIsFile(constants_fp)
+        with open(constants_fp) as js_file:
+            js_content = js_file.read()
+        js_match = re.search(r'line\.match\(/(.+?)/\)', js_content)
+        self.assertIsNotNone(js_match, 'constants hover regex should be present')
+        self._assert_constant_definition_pattern(
+            js_match.group(1),
+            'vscode constants_hover.js',
+        )
+        shutil.rmtree(test_dir)
+
+        test_destination_dir = tempfile.mkdtemp()
+        test_tmp_dir = tempfile.mkdtemp()
+        configgen = SublimeConfigGenerator(
+            str(config_file),
+            0,
+            str(test_destination_dir),
+            None,
+            None,
+            'asmtest',
+        )
+        configgen._generate_files_in_dir(test_tmp_dir)
+        hover_plugin = f"bespokeasm_hover_{re.sub(r'[^0-9A-Za-z_]', '_', 'bespokeasm-test')}.py"
+        hover_fp = os.path.join(test_tmp_dir, hover_plugin)
+        self.assertIsFile(hover_fp)
+        with open(hover_fp) as hover_file:
+            hover_content = hover_file.read()
+        sublime_match = re.search(
+            r'CONSTANT_DEFINITION_PATTERN\s*=\s*re\.compile\(r\'([^\']+)\'\)',
+            hover_content,
+        )
+        self.assertIsNotNone(sublime_match, 'sublime hover regex should be present')
+        self._assert_constant_definition_pattern(
+            sublime_match.group(1),
+            'sublime hover plugin',
+        )
+        shutil.rmtree(test_tmp_dir)
+        shutil.rmtree(test_destination_dir)
+
+    def test_hover_mnemonic_pattern_matches_dotted_instruction(self):
+        config_file = (
+            pl.Path(__file__).resolve().parent.parent
+            / 'examples'
+            / 'slu4-minimal-64x4'
+            / 'slu4-minimal-64x4.yaml'
+        )
+        test_dir = tempfile.mkdtemp()
+        configgen = VSCodeConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            None,
+            None,
+            'asmtest',
+        )
+        configgen.generate()
+        extension_fp = os.path.join(
+            str(test_dir),
+            'extensions',
+            'slu4-min64x4-asm',
+            'extension.js',
+        )
+        self.assertIsFile(extension_fp)
+        with open(extension_fp) as js_file:
+            js_content = js_file.read()
+        js_match = re.search(r'const wordPattern = /(.+?)/i;', js_content)
+        self.assertIsNotNone(js_match, 'wordPattern should be present in extension.js')
+        vscode_word_pattern = re.compile(js_match.group(1), re.IGNORECASE)
+        match = vscode_word_pattern.search('  AN.Z $10')
+        self.assertIsNotNone(match, 'VSCode wordPattern should match dotted mnemonic')
+        self.assertEqual(match.group(0), 'AN.Z')
+        shutil.rmtree(test_dir)
+
+        test_destination_dir = tempfile.mkdtemp()
+        test_tmp_dir = tempfile.mkdtemp()
+        configgen = SublimeConfigGenerator(
+            str(config_file),
+            0,
+            str(test_destination_dir),
+            None,
+            None,
+            'asmtest',
+        )
+        configgen._generate_files_in_dir(test_tmp_dir)
+        hover_plugin = f"bespokeasm_hover_{re.sub(r'[^0-9A-Za-z_]', '_', 'slu4-min64x4-asm')}.py"
+        hover_fp = os.path.join(test_tmp_dir, hover_plugin)
+        self.assertIsFile(hover_fp)
+        with open(hover_fp) as hover_file:
+            hover_content = hover_file.read()
+        sublime_match = re.search(
+            r'WORD_PATTERN\s*=\s*re\.compile\(r\'([^\']+)\'',
+            hover_content,
+        )
+        self.assertIsNotNone(sublime_match, 'WORD_PATTERN should be present in hover plugin')
+        sublime_word_pattern = re.compile(sublime_match.group(1), re.IGNORECASE)
+        match = sublime_word_pattern.search('  AN.Z $10')
+        self.assertIsNotNone(match, 'Sublime wordPattern should match dotted mnemonic')
+        self.assertEqual(match.group(0), 'AN.Z')
+        shutil.rmtree(test_tmp_dir)
+        shutil.rmtree(test_destination_dir)
 
     def test_builtin_constants_in_sublime_syntax(self):
         """Test that built-in language version constants are included in Sublime syntax highlighting."""

@@ -1,6 +1,7 @@
 import importlib.resources as pkg_resources
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -14,6 +15,8 @@ from bespokeasm.assembler.keywords import PREPROCESSOR_DIRECTIVES_SET
 from bespokeasm.configgen import LanguageConfigGenerator
 from bespokeasm.configgen.color_scheme import DEFAULT_COLOR_SCHEME
 from bespokeasm.configgen.color_scheme import SyntaxElement
+from bespokeasm.docsgen import build_documentation_model
+from bespokeasm.docsgen.markdown_generator import MarkdownGenerator
 from ruamel.yaml import YAML
 
 
@@ -43,6 +46,8 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.BINARY_NUMBER, 'constant.numeric.integer.binary', 'Numbers - Binary'),
             (SyntaxElement.DECIMAL_NUMBER, 'constant.numeric.integer.decimal', 'Numbers - Decimal'),
             (SyntaxElement.CHARACTER_NUMBER, 'constant.numeric.character', 'Numbers - Character'),
+            (SyntaxElement.LABEL_DEFINITION, 'variable.other.label.definition', 'Labels - Definitions'),
+            # (SyntaxElement.LABEL_USAGE, 'variable.other.label.usage', 'Labels - Usages'),
             (SyntaxElement.LABEL_NAME, 'variable.other.label', 'Labels'),
             (SyntaxElement.PUNCTUATION_STRING, 'punctuation.definition.string', 'String Punctuation'),
             (SyntaxElement.STRING, 'string.quoted', 'Strings'),
@@ -52,6 +57,8 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.INSTRUCTION, 'variable.function.instruction', 'Instruction Functions'),
             (SyntaxElement.MACRO, 'variable.function.macro', 'Macro Functions'),
             (SyntaxElement.REGISTER, 'variable.language', 'Variables - Language'),
+            (SyntaxElement.CONSTANT_DEFINITION, 'variable.other.constant.definition', 'Constants - Definitions'),
+            # (SyntaxElement.CONSTANT_USAGE, 'variable.other.constant.usage', 'Constants - Usages'),
             (SyntaxElement.CONSTANT_NAME, 'variable.other.constant', 'Variables - Constant'),
             (SyntaxElement.COMPILER_LABEL, 'constant.language', 'Variables - Language Defined'),
             (SyntaxElement.PREPROCESSOR, 'keyword.control.preprocessor', 'Keyword - Preprocessor'),
@@ -75,6 +82,22 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             })
 
         # Special rules with additional styling
+        label_usage_color = DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.LABEL_USAGE)
+        rules.append({
+            'foreground': label_usage_color,
+            'name': 'Labels - Usages',
+            'scope': 'variable.other.label.usage',
+            'background': f'color({label_usage_color} alpha(0.05))',
+        })
+
+        constant_usage_color = DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.CONSTANT_USAGE)
+        rules.append({
+            'foreground': constant_usage_color,
+            'name': 'Constants - Usages',
+            'scope': 'variable.other.constant.usage',
+            'background': f'color({constant_usage_color} alpha(0.05))',
+        })
+
         bracket_color = DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.BRACKET)
         rules.append({
             'font_style': 'bold',
@@ -99,6 +122,10 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         })
 
         return rules
+
+    def _hover_plugin_filename(self) -> str:
+        safe_name = re.sub(r'[^0-9A-Za-z_]', '_', self.language_name or 'bespokeasm')
+        return f'bespokeasm_hover_{safe_name}.py'
 
     def generate(self) -> None:
         if self.verbose >= 1:
@@ -274,6 +301,47 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         if self.verbose > 1:
             print(f'  generated {os.path.basename(color_scheme_fp)}')
 
+        doc_model = build_documentation_model(self.model, self.verbose)
+        markdown_generator = MarkdownGenerator(doc_model, self.verbose)
+        instruction_docs = {
+            name.upper(): markdown_generator.generate_instruction_markdown(
+                name,
+                doc,
+                add_header_rule=True
+            )
+            for name, doc in doc_model.instruction_docs.items()
+        }
+        macro_docs = {
+            name.upper(): markdown_generator.generate_instruction_markdown(
+                name,
+                doc,
+                include_missing_doc_notice=False,
+                add_header_rule=True
+            )
+            for name, doc in doc_model.macro_docs.items()
+        }
+        hover_docs = {
+            'instructions': instruction_docs,
+            'macros': macro_docs
+        }
+        docs_fp = os.path.join(destination_dir, 'instruction-docs.json')
+        with open(docs_fp, 'w', encoding='utf-8') as docs_file:
+            json.dump(hover_docs, docs_file, ensure_ascii=False, indent=2)
+            if self.verbose > 1:
+                print(f'  generated {os.path.basename(docs_fp)}')
+
+        hover_colors = {
+            'instruction': DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.INSTRUCTION),
+            'parameter': DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.PARAMETER),
+            'number': DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.DECIMAL_NUMBER),
+            'punctuation': DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.PUNCTUATION_SEPARATOR),
+        }
+        hover_colors_fp = os.path.join(destination_dir, 'hover-colors.json')
+        with open(hover_colors_fp, 'w', encoding='utf-8') as colors_file:
+            json.dump(hover_colors, colors_file, ensure_ascii=False, indent=2)
+            if self.verbose > 1:
+                print(f'  generated {os.path.basename(hover_colors_fp)}')
+
         # copy keymap files over
         keymap_fp = os.path.join(destination_dir, 'Default.sublime-keymap')
         fp = pkg_resources.files(resources).joinpath('sublime-keymap.json')
@@ -282,6 +350,23 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         self._replace_token_in_file(keymap_fp, '##FILEEXTENSION##', self.code_extension)
         if self.verbose > 1:
             print(f'  generated {os.path.basename(keymap_fp)}')
+
+        fp = pkg_resources.files(resources).joinpath('bespokeasm_hover.py')
+        hover_plugin = self._hover_plugin_filename()
+        hover_plugin_fp = os.path.join(destination_dir, hover_plugin)
+        shutil.copy(str(fp), hover_plugin_fp)
+        self._replace_token_in_file(hover_plugin_fp, '##PACKAGE_NAME##', self.language_name)
+        self._replace_token_in_file(hover_plugin_fp, '##LABEL_PATTERN##', self._label_pattern())
+        self._replace_token_in_file(hover_plugin_fp, '##MNEMONIC_PATTERN##', self._mnemonic_pattern())
+        if self.verbose > 1:
+            print(f'  generated {hover_plugin}')
+
+        fp = pkg_resources.files(resources).joinpath('sublime-settings.json')
+        settings_fp = os.path.join(destination_dir, f'{self.language_name}.sublime-settings')
+        shutil.copy(str(fp), settings_fp)
+        self._replace_token_in_file(settings_fp, '##LANGUAGE_NAME##', self.language_name)
+        if self.verbose > 1:
+            print(f'  generated {os.path.basename(settings_fp)}')
 
         # copy all snippet, macro, and preference files
         for filename in [path.name for path in pkg_resources.files(resources).iterdir()]:
