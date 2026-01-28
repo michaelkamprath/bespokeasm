@@ -318,11 +318,89 @@ class TestPreprocessorSymbols(unittest.TestCase):
         self.assertEqual(actual_no_compile_lines, expected_no_compile_lines, 'no compile lines should be 9, 12, 18, 22, 26')
 
         # symbol replacement
-        #   line 16 is "mov a, SYMBOL2", should become "mov a, 0"
-        #   line 18 is "mov a, SYMBOL1", should become "mov a, 1"
-
+        #   line 16 is active: "mov a, SYMBOL2" should become "mov a, 0"
+        #   line 18 is inactive: should remain unexpanded
         self.assertEqual(line_objs[16].instruction, 'mov a, 0', 'line 16 should be "mov a, 0"')
-        self.assertEqual(line_objs[18].instruction, 'mov a, 1', 'line 18 should be "mov a, 1"')
+        self.assertEqual(line_objs[18].instruction, 'mov a, SYMBOL1', 'line 18 should remain unexpanded')
+
+    def test_ifdef_undefined_symbol_is_inactive(self):
+        fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        label_scope = GlobalLabelScope(isa_model.registers)
+        memzone_manager = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones
+        )
+        preprocessor = Preprocessor()
+        named_scope_manager = NamedScopeManager()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            asm_content = """
+#ifdef UNDEFINED_SYMBOL_SHOULD_NOT_EXIST
+nop
+#endif
+nop
+"""
+            asm_fp = os.path.join(temp_dir, 'test_ifdef_undefined.asm')
+            with open(asm_fp, 'w') as f:
+                f.write(asm_content)
+
+            asm_obj = AssemblyFile(asm_fp, label_scope, named_scope_manager)
+            line_objs = asm_obj.load_line_objects(
+                isa_model,
+                {temp_dir},
+                memzone_manager,
+                preprocessor,
+                0,
+            )
+
+        nop_lines = [lo for lo in line_objs if lo.instruction == 'nop']
+        self.assertEqual(len(nop_lines), 2, 'should capture both nop lines')
+        self.assertFalse(nop_lines[0].compilable, 'nop inside undefined #ifdef should be inactive')
+        self.assertTrue(nop_lines[1].compilable, 'nop outside #ifdef should be active')
+
+    def test_inactive_ifdef_does_not_evaluate_constants(self):
+        fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')
+        isa_model = AssemblerModel(str(fp), 0)
+        label_scope = GlobalLabelScope(isa_model.registers)
+        memzone_manager = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones
+        )
+        preprocessor = Preprocessor()
+        named_scope_manager = NamedScopeManager()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            asm_content = """
+#ifdef UNDEFINED_SYMBOL_SHOULD_NOT_EXIST
+BAD_CONST = 1 + UNKNOWN_VALUE
+#endif
+nop
+"""
+            asm_fp = os.path.join(temp_dir, 'test_ifdef_undefined_constant.asm')
+            with open(asm_fp, 'w') as f:
+                f.write(asm_content)
+
+            asm_obj = AssemblyFile(asm_fp, label_scope, named_scope_manager)
+            try:
+                line_objs = asm_obj.load_line_objects(
+                    isa_model,
+                    {temp_dir},
+                    memzone_manager,
+                    preprocessor,
+                    0,
+                )
+            except SystemExit as exc:
+                self.fail(f'inactive #ifdef should not evaluate constants: {exc}')
+
+        compilable_instructions = [
+            lo for lo in line_objs
+            if isinstance(lo, InstructionLine) and lo.compilable
+        ]
+        self.assertEqual(len(compilable_instructions), 1, 'only nop should be compiled')
+        self.assertEqual(compilable_instructions[0].instruction, 'nop', 'compiled nop should be outside #ifdef')
 
     def test_condition_stack(self):
         stack = ConditionStack()

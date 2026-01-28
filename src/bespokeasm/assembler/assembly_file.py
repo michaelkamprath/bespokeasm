@@ -21,6 +21,7 @@ from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object.directive_line.factory import SetMemoryZoneLine
 from bespokeasm.assembler.line_object.factory import LineOjectFactory
 from bespokeasm.assembler.line_object.label_line import LabelLine
+from bespokeasm.assembler.line_object.preprocessor_line.condition_line import CONDITIONAL_LINE_PREFIX_LIST
 from bespokeasm.assembler.line_object.preprocessor_line.condition_line import ConditionLine
 from bespokeasm.assembler.line_object.preprocessor_line.create_scope import CreateScopeLine
 from bespokeasm.assembler.line_object.preprocessor_line.deactivate_scope import DeactivateScopeLine
@@ -93,6 +94,21 @@ class AssemblyFile:
                             continue
 
                         lobj_list: list[LineObject] = []
+                        is_conditional_directive = line_str.startswith(tuple(CONDITIONAL_LINE_PREFIX_LIST))
+                        if not condition_stack.currently_active(preprocessor) and not is_conditional_directive:
+                            comment_str = ''
+                            comment_match = re.search(LineOjectFactory.PATTERN_COMMENTS, line_str)
+                            if comment_match is not None:
+                                comment_str = comment_match.group(1).strip()
+                            instruction_str = ''
+                            instruction_match = re.search(LineOjectFactory.PATTERN_INSTRUCTION_CONTENT, line_str)
+                            if instruction_match is not None:
+                                instruction_str = instruction_match.group(1).strip()
+                            line_obj = LineObject(line_id, instruction_str, comment_str, current_memzone)
+                            line_obj.compilable = False
+                            line_obj.is_muted = condition_stack.is_muted
+                            line_objects.append(line_obj)
+                            continue
                         # parse the line
                         lobj_list.extend(LineOjectFactory.parse_line(
                             line_id,
