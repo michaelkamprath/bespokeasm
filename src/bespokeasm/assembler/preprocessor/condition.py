@@ -62,6 +62,10 @@ class PreprocessorCondition:
     def parent(self) -> PreprocessorCondition:
         return self._parent
 
+    @property
+    def line_id(self) -> LineIdentifier:
+        return self._line
+
     def _check_and_set_parent(self, parent: PreprocessorCondition):
         self._parent = parent
 

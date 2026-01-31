@@ -9,12 +9,14 @@ from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManag
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object import LineWithWords
+from bespokeasm.assembler.line_object.directive_line.fill_data import FillUntilDataLine
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.line_object.predefined_data import PredefinedDataLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.pretty_printer.factory import PrettyPrinterFactory
+from bespokeasm.assembler.warning_reporter import WarningReporter
 
 
 class Assembler:
@@ -33,6 +35,7 @@ class Assembler:
                 is_verbose: int,
                 include_paths: list[str],
                 predefined: list[str],
+                warnings_as_errors: bool = False,
             ):
         self._source_file = source_file
         self._output_file = output_file
@@ -48,10 +51,12 @@ class Assembler:
         self._model = AssemblerModel(self._config_file, self._verbose)
         self._include_paths = include_paths
         self._predefined_symbols = predefined
+        self._warnings_as_errors = warnings_as_errors
 
     def assemble_bytecode(self):
         # Create the named scope manager for this assembly session
-        named_scope_manager = NamedScopeManager()
+        warning_reporter = WarningReporter(self._warnings_as_errors)
+        named_scope_manager = NamedScopeManager(warning_reporter)
 
         global_label_scope = self._model.global_label_scope
         memzone_manager = MemoryZoneManager(
@@ -116,7 +121,7 @@ class Assembler:
         if self._verbose > 1:
             print(f'Source will be searched in the following include directories: {include_dirs}')
 
-        asm_file = AssemblyFile(self._source_file, global_label_scope, named_scope_manager)
+        asm_file = AssemblyFile(self._source_file, global_label_scope, named_scope_manager, warning_reporter)
         line_obs: list[LineObject] = asm_file.load_line_objects(
             self._model,
             include_dirs,
@@ -136,7 +141,13 @@ class Assembler:
                 sys.exit(f'ERROR: {lobj.line_id} - INTERNAL line object address is None. Memory zone = {lobj.memory_zone}')
 
             try:
-                lobj.memory_zone.current_address = lobj.address + lobj.word_count
+                word_count = lobj.word_count
+                if isinstance(lobj, FillUntilDataLine) and word_count == 0:
+                    warning_reporter.warn(
+                        lobj.line_id,
+                        '.zerountil target address is before the current address; no bytes emitted',
+                    )
+                lobj.memory_zone.current_address = lobj.address + word_count
             except ValueError as e:
                 sys.exit(f'ERROR: {lobj.line_id} - {str(e)}')
 

@@ -1,4 +1,6 @@
+import contextlib
 import importlib.resources as pkg_resources
+import io
 import os
 import tempfile
 import unittest
@@ -501,17 +503,20 @@ nop
                 handle.write(include_source)
 
             asm_file = AssemblyFile(main_path, label_scope, named_scope_manager)
-            line_objects = asm_file.load_line_objects(
-                isa_model,
-                {temp_dir},
-                memzone_manager,
-                preprocessor,
-                0,
-            )
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                line_objects = asm_file.load_line_objects(
+                    isa_model,
+                    {temp_dir},
+                    memzone_manager,
+                    preprocessor,
+                    0,
+                )
             included_lines = [lo for lo in line_objects if lo.line_id.filename == include_path]
             self.assertTrue(included_lines, 'included file should produce line objects')
             for lobj in included_lines:
                 self.assertFalse(lobj.is_muted, 'mute should not apply to included file')
+            self.assertIn('#include does not inherit #mute', stderr.getvalue())
 
     def test_conditional_muting(self):
         """Demonstrate that conditional compilation controls the mute/unmute preprocessor directives."""

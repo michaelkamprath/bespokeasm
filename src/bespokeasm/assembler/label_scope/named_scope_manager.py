@@ -6,6 +6,7 @@ import sys
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.label_scope import LabelScopeType
 from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.warning_reporter import WarningReporter
 
 
 class NamedLabelScope(LabelScope):
@@ -36,10 +37,15 @@ class NamedLabelScope(LabelScope):
 class NamedScopeManager:
     """Manages named label scopes throughout the assembly process."""
 
-    def __init__(self):
+    def __init__(self, warning_reporter: WarningReporter | None = None):
         # Global scope definitions: {scope_name: NamedScopeDefinition}
         self._scope_definitions: dict[str, NamedLabelScope] = {}
         self._used_prefixes: set[str] = set()
+        self._warning_reporter = warning_reporter or WarningReporter(False)
+
+    @property
+    def warning_reporter(self) -> WarningReporter:
+        return self._warning_reporter
 
     def create_scope(self, name: str, prefix: str, defined_at: LineIdentifier) -> None:
         """Create a new named scope definition."""
@@ -71,10 +77,10 @@ class NamedScopeManager:
             if existing_scope is not None:
                 if existing_scope.name == name:
                     # warn if same scope
-                    print(
-                        f"WARNING: {defined_at} - Scope '{name}' defined with prefix '{prefix}' "
+                    self._warning_reporter.warn(
+                        defined_at,
+                        f"Scope '{name}' defined with prefix '{prefix}' "
                         f'but is already defined at {existing_scope.defined_at}',
-                        file=sys.stderr,
                     )
                 else:
                     # error if different scope

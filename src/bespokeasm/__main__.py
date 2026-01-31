@@ -186,6 +186,12 @@ def main():
         help='Predefine name as macro. Assigning name with value may be done with "name=value" syntax. '
              'Multiple can be seperately specified.'
     )
+@click.option(
+        '--warnings-as-errors', '-W',
+        is_flag=True,
+        default=False,
+        help='Treat warnings as errors and stop compilation.'
+    )
 def compile(
             asm_file,
             config_file,
@@ -199,7 +205,8 @@ def compile(
             pretty_print_output,
             verbose,
             include_path,
-            macro_symbol
+            macro_symbol,
+            warnings_as_errors,
         ):
     if output_file is None:
         output_file = os.path.splitext(asm_file)[0] + '.bin'
@@ -220,6 +227,7 @@ def compile(
         pretty_print, pretty_print_format, pretty_print_output, verbose,
         include_path,
         macro_symbol,
+        warnings_as_errors,
     )
     asm.assemble_bytecode()
 

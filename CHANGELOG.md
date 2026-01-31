@@ -20,8 +20,9 @@ Changes that are planned but not implemented yet:
 
 ## [Unreleased]
 * Added support to the VSCode and Sublime Text language extensions for editor hovers for mnemonics, labels, and constants; plus improved semantic syntax highlighting that differentiations label and constant defintion from label and constant usage.
-* Updated the `#include` preprocessor directive to allow relative paths in the specified included file. Teh relative paths are resulved relative to the file currently being compiled.
+* Updated the `#include` preprocessor directive to allow relative paths in the specified included file. The relative paths are resolved relative to the file currently being compiled.
 * Fixed bug where conditional compilation was not handling constant definition correctly.
+* Added user warnings for scenarios that wouldn't prevent a successful compilation but are potentionally an unintended bug by the user. Warnings can be elevated to errors with the `-W` command line option.
 
 ## [0.7.0]
 - Fixed a bug in handling comparisons to preprocessor language version symbols.

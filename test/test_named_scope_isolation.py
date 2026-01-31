@@ -240,6 +240,7 @@ _file_local_label: .byte 10
     def test_use_scope_does_not_project_into_includes(self):
         """Doc: Labels > Named Label Scopes > Using a Named Scope - #use-scope is file-local."""
         main_source = '\n'.join([
+            '#create-scope "lib" prefix="lib_"',
             '#use-scope "lib"',
             '#include "libfile.asm"',
             'ld a, b, c',

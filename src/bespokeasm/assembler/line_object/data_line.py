@@ -185,6 +185,15 @@ class DataLine(LineWithWords):
             value_size = DataLine.DIRECTIVE_VALUE_BYTE_SIZE[self._directive]
             value_mask = DataLine.DIRECTIVE_VALUE_MASK[self._directive]
             masked_val = arg_val & value_mask
+            if (
+                self._directive in ('.byte', '.2byte', '.4byte', '.8byte')
+                and self.warning_reporter is not None
+                and masked_val != arg_val
+            ):
+                self.warning_reporter.warn(
+                    self.line_id,
+                    f'Data value {arg_val} truncated to {masked_val} for {self._directive}',
+                )
             # If value size <= word size, put in its own word, zero-extended
             if value_size <= self._word_size // 8:
                 # Place in least significant bits, zero-extended
