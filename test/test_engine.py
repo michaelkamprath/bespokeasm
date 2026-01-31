@@ -4,6 +4,7 @@ import tempfile
 import unittest
 
 from bespokeasm.assembler.bytecode.word import Word
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.engine import Assembler
 from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
@@ -25,10 +26,11 @@ from test import config_files
 class TestAssemblerEngine(unittest.TestCase):
     def setUp(self):
         InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN = None
+        self.diagnostic_reporter = DiagnosticReporter()
 
     def test_generate_bytes_from_line_objects_8bit_words(self):
         fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -37,8 +39,8 @@ class TestAssemblerEngine(unittest.TestCase):
 
         label_values = GlobalLabelScope(isa_model.registers)
         label_values.set_label_value('a_const', 40, 1)
-        preprocessor = Preprocessor()
-        condition_stack = ConditionStack()
+        preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
+        condition_stack = ConditionStack(self.diagnostic_reporter)
         line_objects: list[LineObject] = []
 
         # this should generate the following bytes: 0x00
@@ -48,7 +50,7 @@ class TestAssemblerEngine(unittest.TestCase):
                 'nop ; do nothing',
                 isa_model,
                 label_values,
-                ActiveNamedScopeList(NamedScopeManager()),
+                ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter)),
                 memzone_mngr.global_zone,
                 memzone_mngr,
                 preprocessor,
@@ -64,7 +66,7 @@ class TestAssemblerEngine(unittest.TestCase):
                 'the_byte: .byte 0x88 ; label and instruction',
                 isa_model,
                 label_values,
-                ActiveNamedScopeList(NamedScopeManager()),
+                ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter)),
                 memzone_mngr.global_zone,
                 memzone_mngr,
                 preprocessor,
@@ -81,7 +83,7 @@ class TestAssemblerEngine(unittest.TestCase):
                 'the_instr: mov a, [the_byte] ; label and instruction',
                 isa_model,
                 label_values,
-                ActiveNamedScopeList(NamedScopeManager()),
+                ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter)),
                 memzone_mngr.global_zone,
                 memzone_mngr,
                 preprocessor,
@@ -92,7 +94,7 @@ class TestAssemblerEngine(unittest.TestCase):
 
         # "assemble" the line objects to a dictionary
         line_dict: dict[int, LineObject] = {}
-        active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
+        active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         for lobj in line_objects:
             lobj.set_start_address(lobj.memory_zone.current_address)
             lobj.memory_zone.current_address = lobj.address + lobj.word_count
@@ -127,7 +129,7 @@ class TestAssemblerEngine(unittest.TestCase):
 
     def test_generate_bytes_from_line_objects_16bit_words(self):
         fp = pkg_resources.files(config_files).joinpath('test_16bit_data_words.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -136,8 +138,8 @@ class TestAssemblerEngine(unittest.TestCase):
 
         label_values = GlobalLabelScope(isa_model.registers)
         label_values.set_label_value('a_const', 40, 1)
-        preprocessor = Preprocessor()
-        condition_stack = ConditionStack()
+        preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
+        condition_stack = ConditionStack(self.diagnostic_reporter)
         line_objects: list[LineObject] = []
 
         line_objects.extend(
@@ -146,7 +148,7 @@ class TestAssemblerEngine(unittest.TestCase):
                 'nop ; do nothing',
                 isa_model,
                 label_values,
-                ActiveNamedScopeList(NamedScopeManager()),
+                ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter)),
                 memzone_mngr.global_zone,
                 memzone_mngr,
                 preprocessor,
@@ -161,7 +163,7 @@ class TestAssemblerEngine(unittest.TestCase):
                 'mov [$1234], [$8899] ; move it',
                 isa_model,
                 label_values,
-                ActiveNamedScopeList(NamedScopeManager()),
+                ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter)),
                 memzone_mngr.global_zone,
                 memzone_mngr,
                 preprocessor,
@@ -176,7 +178,7 @@ class TestAssemblerEngine(unittest.TestCase):
                 'my_label: push [$1234] ; push it real good',
                 isa_model,
                 label_values,
-                ActiveNamedScopeList(NamedScopeManager()),
+                ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter)),
                 memzone_mngr.global_zone,
                 memzone_mngr,
                 preprocessor,
@@ -191,7 +193,7 @@ class TestAssemblerEngine(unittest.TestCase):
                 'jmp my_label ; get out of here',
                 isa_model,
                 label_values,
-                ActiveNamedScopeList(NamedScopeManager()),
+                ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter)),
                 memzone_mngr.global_zone,
                 memzone_mngr,
                 preprocessor,
@@ -202,7 +204,7 @@ class TestAssemblerEngine(unittest.TestCase):
 
         # "assemble" the line objects to a dictionary
         line_dict: dict[int, LineObject] = {}
-        active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
+        active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         for lobj in line_objects:
             lobj.set_start_address(lobj.memory_zone.current_address)
             lobj.memory_zone.current_address = lobj.address + lobj.word_count

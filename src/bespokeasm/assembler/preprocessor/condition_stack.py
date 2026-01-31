@@ -1,3 +1,4 @@
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.condition import EndifPreprocessorCondition
 from bespokeasm.assembler.preprocessor.condition import MutePreprocessorCondition
@@ -6,9 +7,12 @@ from bespokeasm.assembler.preprocessor.condition import UnmutePreprocessorCondit
 
 
 class ConditionStack:
-    def __init__(self):
+    def __init__(self, diagnostic_reporter: DiagnosticReporter):
+        if diagnostic_reporter is None:
+            raise ValueError('DiagnosticReporter is required for ConditionStack')
         self._stack: list[PreprocessorCondition] = []
         self._mute_counter = 0
+        self._diagnostic_reporter = diagnostic_reporter
 
     def process_condition(self, condition: PreprocessorCondition, preprocessor: Preprocessor):
         if isinstance(condition, EndifPreprocessorCondition):
@@ -20,6 +24,11 @@ class ConditionStack:
                 self._increment_mute_counter()
         elif isinstance(condition, UnmutePreprocessorCondition):
             if self.currently_active(preprocessor):
+                if self._mute_counter == 0:
+                    self._diagnostic_reporter.warn(
+                        condition.line_id,
+                        '#unmute has no effect (no active #mute)',
+                    )
                 self._decrement_mute_counter()
         elif condition.is_dependent:
             # a dependent condition pops the current condition and makes it the parent to the new condition.
@@ -47,3 +56,7 @@ class ConditionStack:
     def is_muted(self) -> bool:
         """Returns True if the current condition stack is muted."""
         return self._mute_counter > 0
+
+    @property
+    def mute_depth(self) -> int:
+        return self._mute_counter

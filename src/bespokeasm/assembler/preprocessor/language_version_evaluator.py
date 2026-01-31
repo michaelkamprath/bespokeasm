@@ -10,7 +10,6 @@ encounter language version symbols.
 import sys
 
 from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
-from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 
 
@@ -165,11 +164,12 @@ class LanguageVersionEvaluator:
             try:
                 expr_node = parse_expression(line_id, resolved)
                 if len(expr_node.contained_labels()) == 0:
+                    active_scopes = ActiveNamedScopeList.empty(preprocessor.diagnostic_reporter)
                     result = expr_node.get_value(
                         None,
                         # named scopes aren't used in preprocessor symbols, so use a
                         # and empty scope list here.
-                        ActiveNamedScopeList(NamedScopeManager()),
+                        active_scopes,
                         line_id,
                     )
                     return bool(result)
@@ -202,7 +202,7 @@ class LanguageVersionEvaluator:
                 rhs_value = rhs_resolved
             else:
                 # Numeric comparison
-                active_scopes = ActiveNamedScopeList(NamedScopeManager())
+                active_scopes = ActiveNamedScopeList.empty(preprocessor.diagnostic_reporter)
                 lhs_value = lhs_expression.get_value(None, active_scopes, line_id)
                 rhs_value = rhs_expression.get_value(None, active_scopes, line_id)
         except Exception:

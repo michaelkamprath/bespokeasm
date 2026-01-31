@@ -25,7 +25,6 @@ class DefineSymbolLine(PreprocessorLine):
         memzone_manager: MemoryZoneManager,
         isa_model: AssemblerModel,
         preprocessor: Preprocessor,
-        log_verbosity: int
     ) -> None:
         '''Defines a new preprocessor symbol.'''
         super().__init__(line_id, instruction, comment, memzone)
@@ -40,8 +39,13 @@ class DefineSymbolLine(PreprocessorLine):
                     sys.exit(f'ERROR - {line_id}: Invalid preprocessor symbol definition.')
             except ValueError:
                 sys.exit(f'ERROR - {line_id}: Preprocessor symbol {define_match.group(1)} is defined multiple times.')
-            if log_verbosity >= 2:
-                print(f'INFO - {line_id}: Defined preprocessor symbol {self._symbol.name} = {self._symbol.value}')
+            if isa_model is None:
+                raise ValueError('AssemblerModel is required for DefineSymbolLine')
+            isa_model.diagnostic_reporter.info(
+                line_id,
+                f'Defined preprocessor symbol {self._symbol.name} = {self._symbol.value}',
+                min_verbosity=2,
+            )
         else:
             sys.exit(f'ERROR - {line_id}: Invalid preprocessor symbol definition: {instruction}')
 

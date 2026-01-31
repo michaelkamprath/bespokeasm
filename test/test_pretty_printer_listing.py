@@ -4,6 +4,7 @@ import tempfile
 import unittest
 
 from bespokeasm.assembler.bytecode.word import Word
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object import LineWithWords
@@ -32,7 +33,8 @@ class TestListingPrettyPrinter(unittest.TestCase):
         config_path = os.path.join(
             os.path.dirname(__file__), 'config_files', 'test_instruction_list_creation_isa.json'
         )
-        self.model = AssemblerModel(config_path, 0)
+        self.diagnostic_reporter = DiagnosticReporter()
+        self.model = AssemblerModel(config_path, 0, self.diagnostic_reporter)
         self.memzone = MemoryZone(4, 0, 15, 'GLOBAL')
 
     def test_pretty_print_basic_ordered(self):
@@ -115,7 +117,7 @@ class TestListingPrettyPrinter(unittest.TestCase):
             with tempfile.NamedTemporaryFile('w+', suffix='.json', delete=False) as tf:
                 json.dump(make_config(addr_size, word_size), tf)
                 tf.flush()
-                model = AssemblerModel(tf.name, 0)
+                model = AssemblerModel(tf.name, 0, self.diagnostic_reporter)
                 memzone = MemoryZone(addr_size, 0, 2 ** addr_size - 1, 'GLOBAL')
                 line_id = LineIdentifier(1, 'main.asm')
                 line = LineObject(line_id, 'nop', 'header test', memzone)

@@ -43,8 +43,7 @@ class PreprocessorLineFactory:
                         comment,
                         current_memzone,
                         isa_model,
-                        active_named_scopes.named_scope_manager,
-                        log_verbosity
+                        active_named_scopes.named_scope_manager
                     )]
 
         if instruction.startswith('#use-scope '):
@@ -55,8 +54,7 @@ class PreprocessorLineFactory:
                         current_memzone,
                         isa_model,
                         active_named_scopes.named_scope_manager,
-                        filename,
-                        log_verbosity
+                        filename
                     )]
 
         if instruction.startswith('#deactivate-scope '):
@@ -67,8 +65,7 @@ class PreprocessorLineFactory:
                         current_memzone,
                         isa_model,
                         active_named_scopes.named_scope_manager,
-                        filename,
-                        log_verbosity
+                        filename
                     )]
 
         if instruction.startswith('#require '):
@@ -78,8 +75,7 @@ class PreprocessorLineFactory:
                         comment,
                         current_memzone,
                         isa_model,
-                        preprocessor,
-                        log_verbosity
+                        preprocessor
                     )]
 
         if instruction.startswith('#create_memzone '):
@@ -90,7 +86,6 @@ class PreprocessorLineFactory:
                         current_memzone,
                         memzone_manager,
                         isa_model,
-                        log_verbosity,
                     )]
 
         if instruction.startswith('#define '):
@@ -102,7 +97,6 @@ class PreprocessorLineFactory:
                         memzone_manager,
                         isa_model,
                         preprocessor,
-                        log_verbosity,
                     )]
         if instruction.startswith('#print '):
             return [PrintLine(

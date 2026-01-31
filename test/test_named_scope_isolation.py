@@ -5,6 +5,7 @@ import tempfile
 import unittest
 
 from bespokeasm.assembler.assembly_file import AssemblyFile
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.label_scope import LabelScopeType
 from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
@@ -22,16 +23,17 @@ class TestNamedScopeIsolation(unittest.TestCase):
     def setUp(self):
         # Reset instruction pattern cache for test isolation
         InstructionLine.reset_instruction_pattern_cache()
+        self.diagnostic_reporter = DiagnosticReporter()
 
         self.config_file = str(pkg_resources.files(config_files).joinpath('test_instruction_operands.yaml'))
         self.test_code_dir = os.path.join(tempfile.gettempdir(), 'test_code')
         os.makedirs(self.test_code_dir, exist_ok=True)
 
         # Create the assembler model
-        self.isa_model = AssemblerModel(self.config_file, 0)
+        self.isa_model = AssemblerModel(self.config_file, 0, self.diagnostic_reporter)
 
         # Create named scope manager
-        self.named_scope_manager = NamedScopeManager()
+        self.named_scope_manager = NamedScopeManager(self.diagnostic_reporter)
 
         # Create global label scope with named scope manager
         self.global_scope = self.isa_model.global_label_scope
@@ -44,7 +46,7 @@ class TestNamedScopeIsolation(unittest.TestCase):
         )
 
         # Create preprocessor
-        self.preprocessor = Preprocessor(self.isa_model.predefined_symbols)
+        self.preprocessor = Preprocessor(self.isa_model.predefined_symbols, diagnostic_reporter=self.diagnostic_reporter)
 
     def tearDown(self):
         # Clean up temporary directory and all its contents
@@ -107,7 +109,12 @@ _file_local_label: .byte 10
             f.write(library_content)
 
         # Create assembly file
-        asm_file = AssemblyFile(main_file, self.global_scope, self.named_scope_manager)
+        asm_file = AssemblyFile(
+            main_file,
+            self.global_scope,
+            self.named_scope_manager,
+            self.named_scope_manager.diagnostic_reporter,
+        )
 
         # Load line objects
         include_paths = {self.test_code_dir}
@@ -186,7 +193,12 @@ _file_local_label: .byte 10
             f.write(library_content)
 
         # Create assembly file
-        asm_file = AssemblyFile(main_file, self.global_scope, self.named_scope_manager)
+        asm_file = AssemblyFile(
+            main_file,
+            self.global_scope,
+            self.named_scope_manager,
+            self.named_scope_manager.diagnostic_reporter,
+        )
 
         # Load line objects
         include_paths = {self.test_code_dir}
@@ -221,7 +233,12 @@ _file_local_label: .byte 10
         with open(asm_path, 'w') as handle:
             handle.write(source)
 
-        asm_file = AssemblyFile(asm_path, self.global_scope, self.named_scope_manager)
+        asm_file = AssemblyFile(
+            asm_path,
+            self.global_scope,
+            self.named_scope_manager,
+            self.named_scope_manager.diagnostic_reporter,
+        )
         line_objects = asm_file.load_line_objects(
             self.isa_model,
             {self.test_code_dir},
@@ -240,6 +257,7 @@ _file_local_label: .byte 10
     def test_use_scope_does_not_project_into_includes(self):
         """Doc: Labels > Named Label Scopes > Using a Named Scope - #use-scope is file-local."""
         main_source = '\n'.join([
+            '#create-scope "lib" prefix="lib_"',
             '#use-scope "lib"',
             '#include "libfile.asm"',
             'ld a, b, c',
@@ -252,7 +270,12 @@ _file_local_label: .byte 10
         with open(include_path, 'w') as handle:
             handle.write(include_source)
 
-        asm_file = AssemblyFile(main_path, self.global_scope, self.named_scope_manager)
+        asm_file = AssemblyFile(
+            main_path,
+            self.global_scope,
+            self.named_scope_manager,
+            self.named_scope_manager.diagnostic_reporter,
+        )
         line_objects = asm_file.load_line_objects(
             self.isa_model,
             {self.test_code_dir},

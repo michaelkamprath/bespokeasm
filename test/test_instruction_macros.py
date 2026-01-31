@@ -2,6 +2,7 @@ import importlib.resources as pkg_resources
 import unittest
 
 from bespokeasm.assembler.bytecode.word import Word
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.label_scope import LabelScopeType
@@ -27,7 +28,7 @@ class TestInstructionMacros(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         fp = pkg_resources.files(config_files).joinpath('test_instruction_macros.yaml')
-        cls.isa_model = AssemblerModel(str(fp), 0)
+        cls.isa_model = AssemblerModel(str(fp), 0, DiagnosticReporter())
 
         global_scope = cls.isa_model.global_label_scope
         global_scope.set_label_value('var1', 0x4589, 1)
@@ -44,6 +45,7 @@ class TestInstructionMacros(unittest.TestCase):
 
     def setUp(self) -> None:
         InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN = None
+        self.diagnostic_reporter = DiagnosticReporter()
 
     def test_macro_documentation_and_config_forms(self):
         push2_macro = self.isa_model.instructions.get('push2')
@@ -395,14 +397,14 @@ class TestInstructionMacros(unittest.TestCase):
 
     def test_macro_expansion_with_alias_mnemonic(self):
         fp = pkg_resources.files(config_files).joinpath('test_macro_with_alias.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
-        named_scope_manager = NamedScopeManager()
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
+        named_scope_manager = NamedScopeManager(self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
             isa_model.predefined_memory_zones if hasattr(isa_model, 'predefined_memory_zones') else [],
         )
-        preprocessor = Preprocessor()
+        preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
         label_scope = GlobalLabelScope(set())
         # Assemble a line that uses the macro
         macro_line_obj = LineOjectFactory.parse_line(

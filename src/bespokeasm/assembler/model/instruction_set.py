@@ -20,6 +20,7 @@ class InstructionSet(dict[str, InstructionBase]):
                 registers: set[str],
                 word_size: int,
                 word_segment_size: int,
+                diagnostic_reporter,
             ):
         self._instructions_config = instructions_config
         self._macros_config = macros_config
@@ -55,6 +56,7 @@ class InstructionSet(dict[str, InstructionBase]):
                 registers,
                 word_size,
                 word_segment_size,
+                diagnostic_reporter,
             )
             self[mnemonic] = instr_obj
             self._instruction_mnemonics.add(mnemonic)
@@ -92,6 +94,7 @@ class InstructionSet(dict[str, InstructionBase]):
                         registers,
                         word_size,
                         word_segment_size,
+                        diagnostic_reporter,
                         documentation=documentation,
                     )
                 )

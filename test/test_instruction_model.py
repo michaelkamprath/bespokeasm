@@ -2,12 +2,14 @@ import unittest
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.model.instruction import Instruction
 from bespokeasm.assembler.model.instruction import InstructionVariant
 
 
 class TestInstructionVariant(unittest.TestCase):
     def setUp(self):
+        self.diagnostic_reporter = DiagnosticReporter()
         self.defaults = {
             'mnemonic': 'OP',
             # Use a MagicMock so variants can reference operand collection without invoking real parsing logic.
@@ -17,6 +19,7 @@ class TestInstructionVariant(unittest.TestCase):
             'registers': set(),
             'word_size': 8,
             'word_segment_size': 8,
+            'diagnostic_reporter': self.diagnostic_reporter,
         }
 
     def _make_variant(self, config, variant_num=0):
@@ -30,6 +33,7 @@ class TestInstructionVariant(unittest.TestCase):
             variant_num,
             self.defaults['word_size'],
             self.defaults['word_segment_size'],
+            self.defaults['diagnostic_reporter'],
         )
 
     def test_variant_requires_bytecode_for_base(self):
@@ -88,6 +92,7 @@ class TestInstructionVariant(unittest.TestCase):
 
 class TestInstruction(unittest.TestCase):
     def setUp(self):
+        self.diagnostic_reporter = DiagnosticReporter()
         self.defaults = {
             'mnemonic': 'OP',
             # MagicMock lets Instruction pass an operand set collection without touching real data.
@@ -97,6 +102,7 @@ class TestInstruction(unittest.TestCase):
             'registers': set(),
             'word_size': 8,
             'word_segment_size': 8,
+            'diagnostic_reporter': self.diagnostic_reporter,
         }
 
     def _make_instruction(self, config):
@@ -109,6 +115,7 @@ class TestInstruction(unittest.TestCase):
             self.defaults['registers'],
             self.defaults['word_size'],
             self.defaults['word_segment_size'],
+            self.defaults['diagnostic_reporter'],
         )
 
     def test_instruction_collects_variants(self):

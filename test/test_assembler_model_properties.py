@@ -2,6 +2,7 @@ import os
 import tempfile
 import unittest
 
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.model import AssemblerModel
 from ruamel.yaml import YAML
 
@@ -24,13 +25,14 @@ class TestAssemblerModelDefaults(unittest.TestCase):
         self.tempfile = tempfile.NamedTemporaryFile('w+', delete=False, suffix='.yaml')
         self.yaml.dump(self.minimal_config, self.tempfile)
         self.tempfile.flush()
+        self.diagnostic_reporter = DiagnosticReporter()
 
     def tearDown(self):
         self.tempfile.close()
         os.unlink(self.tempfile.name)
 
     def test_defaults(self):
-        model = AssemblerModel(self.tempfile.name, 0)
+        model = AssemblerModel(self.tempfile.name, 0, self.diagnostic_reporter)
         self.assertFalse(model.string_byte_packing, 'string_byte_packing should default to False')
         self.assertEqual(model.string_byte_packing_fill, 0, 'string_byte_packing_fill should default to 0')
         self.assertEqual(model.cstr_terminator, 0, 'cstr_terminator should default to 0')
@@ -60,7 +62,7 @@ class TestAssemblerModelDefaults(unittest.TestCase):
         temp = tempfile.NamedTemporaryFile('w+', delete=False, suffix='.yaml')
         self.yaml.dump(config, temp)
         temp.flush()
-        model = AssemblerModel(temp.name, 0)
+        model = AssemblerModel(temp.name, 0, self.diagnostic_reporter)
         self.assertTrue(model.string_byte_packing, 'string_byte_packing should be True when set')
         self.assertEqual(model.string_byte_packing_fill, 0xAB, 'string_byte_packing_fill should match config')
         self.assertEqual(model.cstr_terminator, 0x55, 'cstr_terminator should match config')

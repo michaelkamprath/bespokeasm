@@ -24,6 +24,10 @@ class AddressOrgLine(SetMemoryZoneLine):
         self._address_expr: ExpressionNode = parse_expression(line_id, address_expression)
 
     @property
+    def has_explicit_memzone_name(self) -> bool:
+        return self._parsed_memzone_name is not None
+
+    @property
     def address(self) -> int:
         """Returns the adjusted address value set by the .org directive.
         """

@@ -4,13 +4,13 @@ import re
 import sys
 
 from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
-from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import INSTRUCTION_EXPRESSION_PATTERN
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.symbol import SYMBOL_PATTERN
 from bespokeasm.expression import ExpressionNode
 from bespokeasm.expression import parse_expression
+
 
 # NOTE: the order of the RHS expressions is important, as it determines the order of evaluation. Need to parse the
 #       quoted strings first, then the expressions.
@@ -61,6 +61,10 @@ class PreprocessorCondition:
     @property
     def parent(self) -> PreprocessorCondition:
         return self._parent
+
+    @property
+    def line_id(self) -> LineIdentifier:
+        return self._line
 
     def _check_and_set_parent(self, parent: PreprocessorCondition):
         self._parent = parent
@@ -153,8 +157,9 @@ class IfPreprocessorCondition(PreprocessorCondition):
         else:
             # can do a numeric comparison. Note that label scopes and active named scopes are not used here as
             # preprocessor conditions are not evaluated in a specific context.
-            lhs_value = lhs_expression.get_value(None, ActiveNamedScopeList(NamedScopeManager()), self._line)
-            rhs_value = rhs_expression.get_value(None, ActiveNamedScopeList(NamedScopeManager()), self._line)
+            active_scopes = ActiveNamedScopeList.empty(preprocessor.diagnostic_reporter)
+            lhs_value = lhs_expression.get_value(None, active_scopes, self._line)
+            rhs_value = rhs_expression.get_value(None, active_scopes, self._line)
 
         if self._operator == '==':
             return lhs_value == rhs_value

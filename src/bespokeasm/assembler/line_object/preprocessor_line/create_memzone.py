@@ -28,7 +28,6 @@ class CreateMemzoneLine(PreprocessorLine):
         memzone: MemoryZone,
         memzone_manager: MemoryZoneManager,
         isa_model: AssemblerModel,
-        log_verbosity: int
     ) -> None:
         '''Creates a new memory zone based on the #create_memzone line'''
         super().__init__(line_id, instruction, comment, memzone)
@@ -37,11 +36,14 @@ class CreateMemzoneLine(PreprocessorLine):
             self._name = memzone_match.group(1).strip()
             self._start_addr = parse_numeric_string(memzone_match.group(2))
             self._end_addr = parse_numeric_string(memzone_match.group(3))
-            if log_verbosity > 2:
-                print(
-                    f'Creating memory zone "{self._name}" with start address {self._start_addr} '
-                    f'and end address {self._end_addr}'
-                )
+            if isa_model is None:
+                raise ValueError('AssemblerModel is required for CreateMemzoneLine')
+            isa_model.diagnostic_reporter.info(
+                line_id,
+                f'Creating memory zone "{self._name}" with start address {self._start_addr} '
+                f'and end address {self._end_addr}',
+                min_verbosity=3,
+            )
             try:
                 memzone_manager.create_zone(
                     isa_model.address_size,

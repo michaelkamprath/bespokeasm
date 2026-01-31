@@ -30,6 +30,7 @@ class RegisterOperand(Operand):
         regsiters: set[str],
         word_size: int,
         word_segment_size: int,
+        diagnostic_reporter,
     ):
         super().__init__(
             operand_id,
@@ -38,6 +39,7 @@ class RegisterOperand(Operand):
             default_intra_word_endian,
             word_size,
             word_segment_size,
+            diagnostic_reporter,
         )
         if self.register not in regsiters:
             sys.exit(f'ERROR - ISA configation declares register based operand {self} but the '

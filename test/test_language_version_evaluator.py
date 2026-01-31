@@ -11,6 +11,7 @@ import tempfile
 import textwrap
 import unittest
 
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.preprocessor import Preprocessor
@@ -25,8 +26,13 @@ class TestLanguageVersionEvaluator(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         fp = pkg_resources.files(config_files).joinpath('eater-sap1-isa.yaml')
-        self.isa_model = AssemblerModel(str(fp), 0)
-        self.preprocessor = Preprocessor(self.isa_model.predefined_symbols, self.isa_model)
+        self.diagnostic_reporter = DiagnosticReporter()
+        self.isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
+        self.preprocessor = Preprocessor(
+            self.isa_model.predefined_symbols,
+            self.isa_model,
+            diagnostic_reporter=self.diagnostic_reporter,
+        )
         self.line_id = LineIdentifier(1, 'test_language_version_evaluator')
 
     def test_contains_language_version_symbols(self):
@@ -192,8 +198,8 @@ class TestLanguageVersionEvaluator(unittest.TestCase):
             tmp_path = tmp_file.name
 
         try:
-            isa_model = AssemblerModel(tmp_path, 0)
-            preprocessor = Preprocessor(isa_model.predefined_symbols, isa_model)
+            isa_model = AssemblerModel(tmp_path, 0, self.diagnostic_reporter)
+            preprocessor = Preprocessor(isa_model.predefined_symbols, isa_model, diagnostic_reporter=self.diagnostic_reporter)
             line_id = LineIdentifier(1, 'numeric_comparison_test')
 
             # With numeric semantics, 10 < 2 should be False; current bug returns True.
@@ -209,7 +215,7 @@ class TestLanguageVersionEvaluator(unittest.TestCase):
     def test_integration_with_different_isa_models(self):
         """Test evaluator works with different ISA model configurations."""
         # Create a preprocessor without ISA model
-        preprocessor_no_isa = Preprocessor()
+        preprocessor_no_isa = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
 
         # Test that language version symbols don't exist
         with self.assertRaises(SystemExit):
@@ -266,8 +272,8 @@ class TestLanguageVersionEvaluator(unittest.TestCase):
         from bespokeasm.assembler.preprocessor.condition import IfPreprocessorCondition
 
         fp = pkg_resources.files(config_files).joinpath('eater-sap1-isa.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
-        preprocessor = Preprocessor(isa_model.predefined_symbols, isa_model)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
+        preprocessor = Preprocessor(isa_model.predefined_symbols, isa_model, diagnostic_reporter=self.diagnostic_reporter)
 
         # Create condition with mixed expression (this should succeed)
         condition = IfPreprocessorCondition(

@@ -15,6 +15,7 @@ class EmptyOperand(Operand):
         default_intra_word_endian: str,
         word_size: int,
         word_segment_size: int,
+        diagnostic_reporter,
     ):
         super().__init__(
             operand_id,
@@ -23,6 +24,7 @@ class EmptyOperand(Operand):
             default_intra_word_endian,
             word_size,
             word_segment_size,
+            diagnostic_reporter,
         )
 
     def __str__(self):

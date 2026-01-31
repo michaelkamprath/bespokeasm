@@ -3,6 +3,7 @@ import unittest
 from unittest.mock import patch
 
 from bespokeasm.assembler.bytecode.word import Word
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.assembler.line_object.directive_line.address import AddressOrgLine
@@ -37,7 +38,8 @@ class TestIntelHexPrettyPrinter(unittest.TestCase):
         config_path = os.path.join(
             os.path.dirname(__file__), 'config_files', 'test_instruction_list_creation_isa.json'
         )
-        self.model = AssemblerModel(config_path, 0)
+        self.diagnostic_reporter = DiagnosticReporter()
+        self.model = AssemblerModel(config_path, 0, self.diagnostic_reporter)
         self.memzone = MemoryZone(4, 0, 15, 'GLOBAL')
 
     def test_init_word_size_error(self):
@@ -45,7 +47,8 @@ class TestIntelHexPrettyPrinter(unittest.TestCase):
             os.path.join(
                 os.path.dirname(__file__), 'config_files', 'test_instruction_list_creation_isa.json'
             ),
-            0
+            0,
+            self.diagnostic_reporter,
         )
         model._config['general']['word_size'] = 4
         with self.assertRaises(SystemExit):

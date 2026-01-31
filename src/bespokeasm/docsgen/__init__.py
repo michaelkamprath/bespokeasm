@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 
 import click
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.model import AssemblerModel
 
 from .documentation_model import DocumentationModel
@@ -69,7 +70,7 @@ class DocumentationGenerator:
     def _load_isa_model(self) -> None:
         """Load and validate the ISA configuration model."""
         try:
-            self._model = AssemblerModel(self._config_file_path, self._verbose)
+            self._model = AssemblerModel(self._config_file_path, self._verbose, DiagnosticReporter())
         except FileNotFoundError:
             sys.exit(f'ERROR: Configuration file not found: {self._config_file_path}')
         except Exception as e:

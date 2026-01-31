@@ -25,6 +25,7 @@ class LineObject:
         self._compilable = True
         self._is_muted = False
         self._active_named_scopes = None
+        self._diagnostic_reporter = None
 
     def __repr__(self):
         return str(self)
@@ -88,6 +89,14 @@ class LineObject:
     @property
     def memory_zone(self) -> MemoryZone:
         return self._memzone
+
+    @property
+    def diagnostic_reporter(self):
+        return self._diagnostic_reporter
+
+    @diagnostic_reporter.setter
+    def diagnostic_reporter(self, value):
+        self._diagnostic_reporter = value
 
     @property
     def compilable(self) -> bool:

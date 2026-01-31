@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+from unittest.mock import ANY
 from unittest.mock import Mock
 from unittest.mock import patch
 
@@ -250,7 +251,7 @@ Adds the operand to the accumulator register.
         self.assertEqual(content, markdown_content)
 
         # Verify the correct methods were called
-        mock_asm_model.assert_called_once_with(self.config_file, 0)
+        mock_asm_model.assert_called_once_with(self.config_file, 0, ANY)
         mock_doc_model.assert_called_once_with(mock_asm_instance, 0)
         mock_md_gen.assert_called_once_with(mock_doc_instance, 0)
         mock_md_instance.generate.assert_called_once()

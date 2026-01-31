@@ -4,6 +4,7 @@ import tempfile
 import unittest
 
 from bespokeasm.assembler.assembly_file import AssemblyFile
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
@@ -18,18 +19,24 @@ class TestIncludePaths(unittest.TestCase):
     def setUp(self) -> None:
         InstructionLine.reset_instruction_pattern_cache()
         fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')
-        self.isa_model = AssemblerModel(str(fp), 0)
-        self.named_scope_manager = NamedScopeManager()
+        self.diagnostic_reporter = DiagnosticReporter()
+        self.isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
+        self.named_scope_manager = NamedScopeManager(self.diagnostic_reporter)
         self.memzone_mngr = MemoryZoneManager(
             self.isa_model.address_size,
             self.isa_model.default_origin,
             self.isa_model.predefined_memory_zones,
         )
         self.global_scope = GlobalLabelScope(self.isa_model.registers)
-        self.preprocessor = Preprocessor()
+        self.preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
 
     def _load_line_objects(self, filename: str, include_paths: set[str]):
-        asm_file = AssemblyFile(filename, self.global_scope, self.named_scope_manager)
+        asm_file = AssemblyFile(
+            filename,
+            self.global_scope,
+            self.named_scope_manager,
+            self.named_scope_manager.diagnostic_reporter,
+        )
         return asm_file.load_line_objects(
             self.isa_model,
             include_paths,

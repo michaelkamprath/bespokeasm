@@ -5,6 +5,7 @@ import unittest
 from collections import defaultdict
 
 from bespokeasm.assembler.assembly_file import AssemblyFile
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.engine import Assembler
 from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.label_scope import LabelScope
@@ -24,6 +25,7 @@ from test import test_code
 class TestLabelScope(unittest.TestCase):
     def setUp(self):
         InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN = None
+        self.diagnostic_reporter = DiagnosticReporter()
 
     def test_single_layer_scope(self):
         ls1 = GlobalLabelScope(set())
@@ -114,17 +116,17 @@ class TestLabelScope(unittest.TestCase):
 
     def test_line_object_scope_assignment(self):
         fp = pkg_resources.files(config_files).joinpath('test_memory_zones.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         label_scope = GlobalLabelScope(isa_model.registers)
         memzone_manager = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
             isa_model.predefined_memory_zones
         )
-        preprocessor = Preprocessor()
-        named_scope_manager = NamedScopeManager()
+        preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
+        named_scope_manager = NamedScopeManager(self.diagnostic_reporter)
         asm_fp = pkg_resources.files(test_code).joinpath('test_line_object_scope_assignment.asm')
-        asm_obj = AssemblyFile(asm_fp, label_scope, named_scope_manager)
+        asm_obj = AssemblyFile(asm_fp, label_scope, named_scope_manager, named_scope_manager.diagnostic_reporter)
 
         try:
             line_objs: list[LineObject] = asm_obj.load_line_objects(

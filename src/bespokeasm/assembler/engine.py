@@ -1,14 +1,15 @@
 import os
-import sys
 
 import click
 from bespokeasm.assembler.assembly_file import AssemblyFile
 from bespokeasm.assembler.bytecode.word import Word
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.label_scope import LabelScopeType
 from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object import LineWithWords
+from bespokeasm.assembler.line_object.directive_line.fill_data import FillUntilDataLine
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.line_object.predefined_data import PredefinedDataLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
@@ -33,6 +34,7 @@ class Assembler:
                 is_verbose: int,
                 include_paths: list[str],
                 predefined: list[str],
+                warnings_as_errors: bool = False,
             ):
         self._source_file = source_file
         self._output_file = output_file
@@ -45,13 +47,19 @@ class Assembler:
         self._verbose = is_verbose
         self._binary_start = binary_start
         self._binary_end = binary_end
-        self._model = AssemblerModel(self._config_file, self._verbose)
         self._include_paths = include_paths
         self._predefined_symbols = predefined
+        self._warnings_as_errors = warnings_as_errors
+        self._diagnostic_reporter = DiagnosticReporter(
+            warnings_as_errors=self._warnings_as_errors,
+            verbosity=self._verbose,
+        )
+        self._model = AssemblerModel(self._config_file, self._verbose, self._diagnostic_reporter)
 
     def assemble_bytecode(self):
         # Create the named scope manager for this assembly session
-        named_scope_manager = NamedScopeManager()
+        diagnostic_reporter = self._diagnostic_reporter
+        named_scope_manager = NamedScopeManager(diagnostic_reporter)
 
         global_label_scope = self._model.global_label_scope
         memzone_manager = MemoryZoneManager(
@@ -61,7 +69,11 @@ class Assembler:
         )
 
         # create preprocessor
-        preprocessor: Preprocessor = Preprocessor(self._model.predefined_symbols, self._model)
+        preprocessor: Preprocessor = Preprocessor(
+            self._model.predefined_symbols,
+            self._model,
+            diagnostic_reporter=self._diagnostic_reporter,
+        )
         # add any predefined macros from the command line
         preprocessor.add_cli_symbols(self._predefined_symbols)
 
@@ -114,9 +126,13 @@ class Assembler:
                 deduplicated_dirs.append(left_path)
         include_dirs = set(deduplicated_dirs)
         if self._verbose > 1:
-            print(f'Source will be searched in the following include directories: {include_dirs}')
+            diagnostic_reporter.info(
+                None,
+                f'Source will be searched in the following include directories: {include_dirs}',
+                min_verbosity=2,
+            )
 
-        asm_file = AssemblyFile(self._source_file, global_label_scope, named_scope_manager)
+        asm_file = AssemblyFile(self._source_file, global_label_scope, named_scope_manager, diagnostic_reporter)
         line_obs: list[LineObject] = asm_file.load_line_objects(
             self._model,
             include_dirs,
@@ -126,19 +142,35 @@ class Assembler:
         )
 
         if self._verbose > 2:
-            click.echo(f'Found {len(line_obs)} lines across all source files')
+            diagnostic_reporter.info(
+                None,
+                f'Found {len(line_obs)} lines across all source files',
+                min_verbosity=3,
+            )
 
         compilable_line_obs: list[LineObject] = [lobj for lobj in line_obs if lobj.compilable]
         # First pass: assign addresses to labels
         for lobj in compilable_line_obs:
             lobj.set_start_address(lobj.memory_zone.current_address)
             if lobj.address is None:
-                sys.exit(f'ERROR: {lobj.line_id} - INTERNAL line object address is None. Memory zone = {lobj.memory_zone}')
+                diagnostic_reporter.error(
+                    lobj.line_id,
+                    f'INTERNAL line object address is None. Memory zone = {lobj.memory_zone}',
+                )
 
             try:
-                lobj.memory_zone.current_address = lobj.address + lobj.word_count
+                word_count = lobj.word_count
+                if isinstance(lobj, FillUntilDataLine) and word_count == 0:
+                    diagnostic_reporter.warn(
+                        lobj.line_id,
+                        '.zerountil target address is before the current address; no bytes emitted',
+                    )
+                lobj.memory_zone.current_address = lobj.address + word_count
             except ValueError as e:
-                sys.exit(f'ERROR: {lobj.line_id} - {str(e)}')
+                diagnostic_reporter.error(
+                    lobj.line_id,
+                    str(e),
+                )
 
             if isinstance(lobj, LabelLine) and not lobj.is_constant:
                 # Address labels: try to add to named scope first (only if in same file as scope creation)
@@ -170,7 +202,11 @@ class Assembler:
 
         # second pass: build the machine code and check for overlaps
         if self._verbose > 2:
-            print('\nProcessing lines:')
+            diagnostic_reporter.info(
+                None,
+                '\nProcessing lines:',
+                min_verbosity=3,
+            )
         bytecode = bytearray()
         last_line = None
 
@@ -178,14 +214,19 @@ class Assembler:
             if isinstance(lobj, LineWithWords):
                 lobj.generate_words()
             if self._verbose > 2:
-                click.echo(f'Processing {lobj.line_id} = {lobj} at address ${lobj.address:x}')
+                diagnostic_reporter.info(
+                    None,
+                    f'Processing {lobj.line_id} = {lobj} at address ${lobj.address:x}',
+                    min_verbosity=3,
+                )
             if isinstance(lobj, LineWithWords):
                 if last_line is not None and (last_line.address + last_line.word_count) > lobj.address:
-                    sys.exit(
-                        f'ERROR: {lobj.line_id} - Address of byte code at this line overlaps with bytecode from '
+                    diagnostic_reporter.error(
+                        lobj.line_id,
+                        'Address of byte code at this line overlaps with bytecode from '
                         f'line <{last_line.line_id}> at address {hex(lobj.address)}\n'
                         f'  memory zone of current line <{lobj.line_id}> = {lobj.memory_zone}\n'
-                        f'  memory zone of other line <{last_line.line_id}> = {last_line.memory_zone}\n'
+                        f'  memory zone of other line <{last_line.line_id}> = {last_line.memory_zone}',
                     )
                 last_line = lobj
 
@@ -210,7 +251,11 @@ class Assembler:
             with open(self._output_file, 'wb') as f:
                 f.write(bytecode)
         elif self._verbose > 1:
-            print('NOT writing byte code to binary image.')
+            diagnostic_reporter.info(
+                None,
+                'NOT writing byte code to binary image.',
+                min_verbosity=2,
+            )
 
         if self._enable_pretty_print:
             pprinter = PrettyPrinterFactory.getPrettyPrinter(

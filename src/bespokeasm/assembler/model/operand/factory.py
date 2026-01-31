@@ -28,6 +28,7 @@ class OperandFactory:
         registers: set[str],
         word_size: int,
         word_segment_size: int,
+        diagnostic_reporter,
     ) -> Operand:
         type_str = arg_config_dict['type']
         if type_str == 'numeric':
@@ -38,6 +39,7 @@ class OperandFactory:
                 default_intra_word_endian,
                 word_size,
                 word_segment_size,
+                diagnostic_reporter,
             )
         elif type_str == 'register':
             return register.RegisterOperand(
@@ -47,7 +49,8 @@ class OperandFactory:
                 default_intra_word_endian,
                 registers,
                 word_size,
-                word_segment_size
+                word_segment_size,
+                diagnostic_reporter,
             )
         elif type_str == 'indexed_register':
             return indexed_register.IndexedRegisterOperand(
@@ -58,6 +61,7 @@ class OperandFactory:
                 registers,
                 word_size,
                 word_segment_size,
+                diagnostic_reporter,
             )
         elif type_str == 'indirect_register':
             return indirect_register.IndirectRegisterOperand(
@@ -68,6 +72,7 @@ class OperandFactory:
                 registers,
                 word_size,
                 word_segment_size,
+                diagnostic_reporter,
             )
         elif type_str == 'indirect_indexed_register':
             return indirect_indexed_register.IndirectIndexedRegisterOperand(
@@ -78,6 +83,7 @@ class OperandFactory:
                 registers,
                 word_size,
                 word_segment_size,
+                diagnostic_reporter,
             )
         elif type_str == 'indirect_numeric':
             return indirect_numeric.IndirectNumericOperand(
@@ -87,6 +93,7 @@ class OperandFactory:
                 default_intra_word_endian,
                 word_size,
                 word_segment_size,
+                diagnostic_reporter,
             )
         elif type_str == 'deferred_numeric':
             return deferred_numeric.DeferredNumericOperand(
@@ -96,6 +103,7 @@ class OperandFactory:
                 default_intra_word_endian,
                 word_size,
                 word_segment_size,
+                diagnostic_reporter,
             )
         elif type_str == 'enumeration':
             return enumeration_operand.EnumerationOperand(
@@ -106,6 +114,7 @@ class OperandFactory:
                 registers,
                 word_size,
                 word_segment_size,
+                diagnostic_reporter,
             )
         elif type_str == 'numeric_enumeration':
             return numeric_enumeration.NumericEnumerationOperand(
@@ -116,6 +125,7 @@ class OperandFactory:
                 registers,
                 word_size,
                 word_segment_size,
+                diagnostic_reporter,
             )
         elif type_str == 'numeric_bytecode':
             return numeric_bytecode.NumericBytecode(
@@ -125,6 +135,7 @@ class OperandFactory:
                 default_intra_word_endian,
                 word_size,
                 word_segment_size,
+                diagnostic_reporter,
             )
         elif type_str == 'address':
             return address.AddressOperand(
@@ -134,6 +145,7 @@ class OperandFactory:
                 default_intra_word_endian,
                 word_size,
                 word_segment_size,
+                diagnostic_reporter,
             )
         elif type_str == 'relative_address':
             return relative_address.RelativeAddressOperand(
@@ -143,6 +155,7 @@ class OperandFactory:
                 default_intra_word_endian,
                 word_size,
                 word_segment_size,
+                diagnostic_reporter,
             )
         elif type_str == 'empty':
             return empty.EmptyOperand(
@@ -152,6 +165,7 @@ class OperandFactory:
                 default_intra_word_endian,
                 word_size,
                 word_segment_size,
+                diagnostic_reporter,
             )
         else:
             sys.exit(f'ERROR - Operand {operand_id} was configured with unknown type "{type_str}"')

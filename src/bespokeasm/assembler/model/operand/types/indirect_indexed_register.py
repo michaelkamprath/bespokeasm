@@ -15,6 +15,7 @@ class IndirectIndexedRegisterOperand(IndexedRegisterOperand):
         regsiters: set[str],
         word_size: int,
         word_segment_size: int,
+        diagnostic_reporter,
     ) -> None:
         super().__init__(
             operand_id,
@@ -24,6 +25,7 @@ class IndirectIndexedRegisterOperand(IndexedRegisterOperand):
             regsiters,
             word_size,
             word_segment_size,
+            diagnostic_reporter,
         )
 
     def __str__(self):
