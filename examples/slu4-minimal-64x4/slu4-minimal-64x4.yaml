@@ -5857,13 +5857,15 @@ macros:
               - zero_page
               - zero_page
         instructions:
-          - "azz @ARG(0)+0,@ARG(1)+0"
-          - "ldz @ARG(0)+1"
-          - "ac.z @ARG(1)+1"
-          - "ldz @ARG(0)+2"
-          - "ac.z @ARG(1)+2"
-          - "ldz @ARG(0)+3"
-          - "ac.z @ARG(1)+3"
+          - "azz @ARG(0)+0,@ARG(1)+0"   # 6 cycles
+          - "ldz @ARG(0)+1"             # 3 cycles
+          - "ac.z @ARG(1)+1"            # 4 cycles
+          - "ldz @ARG(0)+2"             # 3 cycles
+          - "ac.z @ARG(1)+2"            # 4 cycles
+          - "ldz @ARG(0)+3"             # 3 cycles
+          - "ac.z @ARG(1)+3"            # 4 cycles
+        documentation:
+          cycles: 27
     documentation:
       category: Arithmetic
       title: add two zero-page longs. result in second zero page operand
@@ -5877,11 +5879,13 @@ macros:
               - zero_page
               - zero_page
         instructions:
-          - "svv @ARG(0)+0,@ARG(1)+0"
-          - "ldz @ARG(0)+2"
-          - "sc.z @ARG(1)+2"
-          - "ldz @ARG(0)+3"
-          - "sc.z @ARG(1)+3"
+          - "svv @ARG(0)+0,@ARG(1)+0"   # 14 cycles
+          - "ldz @ARG(0)+2"             # 3 cycles
+          - "sc.z @ARG(1)+2"            # 5 cycles
+          - "ldz @ARG(0)+3"             # 3 cycles
+          - "sc.z @ARG(1)+3"            # 5 cycles
+        documentation:
+          cycles: 30
     documentation:
       category: Arithmetic
       title: subtract two zero-page longs. *Q2 = *Q2 - Q1
@@ -5895,8 +5899,10 @@ macros:
               - zero_page
               - zero_page
         instructions:
-          - "mvv @ARG(0)+0,@ARG(1)+0"
-          - "mvv @ARG(0)+2,@ARG(1)+2"
+          - "mvv @ARG(0)+0,@ARG(1)+0"     # 7 cycles
+          - "mvv @ARG(0)+2,@ARG(1)+2"     # 7 cycles
+        documentation:
+          cycles: 14
     documentation:
       category: Memory Movement
       title: move zero-page long to zero-page long
@@ -5910,10 +5916,12 @@ macros:
               - absolute_address
               - absolute_address
         instructions:
-          - "mbb @ARG(0)+0,@ARG(1)+0"
-          - "mbb @ARG(0)+1,@ARG(1)+1"
-          - "mbb @ARG(0)+2,@ARG(1)+2"
-          - "mbb @ARG(0)+3,@ARG(1)+3"
+          - "mbb @ARG(0)+0,@ARG(1)+0"     # 9 cycles
+          - "mbb @ARG(0)+1,@ARG(1)+1"     # 9 cycles
+          - "mbb @ARG(0)+2,@ARG(1)+2"     # 9 cycles
+          - "mbb @ARG(0)+3,@ARG(1)+3"     # 9 cycles
+        documentation:
+          cycles: 36
     documentation:
       category: Memory Movement
       title: move long from abs address to abs address
@@ -5927,8 +5935,10 @@ macros:
               - absolute_address
               - zero_page
         instructions:
-          - "mwv @ARG(0)+0,@ARG(1)+0"
-          - "mwv @ARG(0)+2,@ARG(1)+2"
+          - "mwv @ARG(0)+0,@ARG(1)+0"     # 9 cycles
+          - "mwv @ARG(0)+2,@ARG(1)+2"     # 9 cycles
+        documentation:
+          cycles: 18
     documentation:
       category: Memory Movement
       title: move long from abs address to zero-page long
@@ -5956,8 +5966,10 @@ macros:
               - immediate_32bit
               - zero_page
         instructions:
-          - "miv @ARG(0) & $0000FFFF ,@ARG(1)+0"
-          - "miv (@ARG(0) & $FFFF0000) >> 16,@ARG(1)+2"
+          - "miv @ARG(0) & $0000FFFF ,@ARG(1)+0"            # 6 cycles
+          - "miv (@ARG(0) & $FFFF0000) >> 16,@ARG(1)+2"     # 6 cycles
+        documentation:
+          cycles: 12
     documentation:
       category: Memory Movement
       title: move 4 bytes long from immediate to zero-page long
