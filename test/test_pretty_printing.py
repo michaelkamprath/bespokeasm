@@ -2,6 +2,7 @@ import importlib.resources as pkg_resources
 import unittest
 
 from bespokeasm.assembler.bytecode.word import Word
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
@@ -21,6 +22,7 @@ class TestPrettyPrinting(unittest.TestCase):
 
     def setUp(self):
         InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN = None
+        self.diagnostic_reporter = DiagnosticReporter()
 
     def tearDown(self):
         InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN = None
@@ -124,7 +126,7 @@ class TestPrettyPrinting(unittest.TestCase):
 
     def test_listing_prints_original_mnemonic(self):
         fp = pkg_resources.files(config_files).joinpath('test_instruction_aliases.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -139,8 +141,8 @@ class TestPrettyPrinting(unittest.TestCase):
             'nop',      # control
         ]
         line_objs = []
-        preprocessor = Preprocessor()
-        active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
+        preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
+        active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         label_scope = GlobalLabelScope(set())
         for i, line in enumerate(lines, 1):
             line_obj = LineOjectFactory.parse_line(

@@ -1,5 +1,7 @@
 import unittest
+from unittest.mock import Mock
 
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object.preprocessor_line.create_scope import CreateScopeLine
@@ -11,11 +13,13 @@ from bespokeasm.assembler.memory_zone import MemoryZone
 class TestNamedScopeDirectives(unittest.TestCase):
 
     def setUp(self):
-        self.named_scope_manager = NamedScopeManager()
+        self.diagnostic_reporter = DiagnosticReporter()
+        self.named_scope_manager = NamedScopeManager(self.diagnostic_reporter)
         self.line_id = LineIdentifier(1, 'test.asm')
         self.memzone = MemoryZone(16, 0, 1000, 'test')  # address_bits, start, end, name
         # Create a minimal ISA model for testing
-        self.isa_model = None  # We'll mock this as needed
+        self.isa_model = Mock()
+        self.isa_model.diagnostic_reporter = self.diagnostic_reporter
 
     def test_create_scope_line_basic(self):
         """Test CreateScopeLine with basic syntax."""
@@ -28,7 +32,6 @@ class TestNamedScopeDirectives(unittest.TestCase):
             self.memzone,
             self.isa_model,
             self.named_scope_manager,
-            0
         )
 
         self.assertEqual(line.scope_name, 'test_scope')
@@ -50,7 +53,6 @@ class TestNamedScopeDirectives(unittest.TestCase):
             self.memzone,
             self.isa_model,
             self.named_scope_manager,
-            0
         )
 
         self.assertEqual(line.scope_name, 'test_scope')
@@ -68,7 +70,6 @@ class TestNamedScopeDirectives(unittest.TestCase):
                 self.memzone,
                 self.isa_model,
                 self.named_scope_manager,
-                0
             )
 
     def test_create_scope_line_empty_name(self):
@@ -83,7 +84,6 @@ class TestNamedScopeDirectives(unittest.TestCase):
                 self.memzone,
                 self.isa_model,
                 self.named_scope_manager,
-                0
             )
 
     def test_create_scope_line_period_prefix_error(self):
@@ -98,7 +98,6 @@ class TestNamedScopeDirectives(unittest.TestCase):
                 self.memzone,
                 self.isa_model,
                 self.named_scope_manager,
-                0
             )
 
     def test_use_scope_line_basic(self):
@@ -116,7 +115,6 @@ class TestNamedScopeDirectives(unittest.TestCase):
             self.isa_model,
             self.named_scope_manager,
             'test.asm',
-            0
         )
 
         self.assertEqual(line.scope_name, 'test_scope')
@@ -135,7 +133,6 @@ class TestNamedScopeDirectives(unittest.TestCase):
                 self.isa_model,
                 self.named_scope_manager,
                 'test.asm',
-                0
             )
 
     def test_deactivate_scope_line_basic(self):
@@ -153,7 +150,6 @@ class TestNamedScopeDirectives(unittest.TestCase):
             self.isa_model,
             self.named_scope_manager,
             'test.asm',
-            0
         )
 
         self.assertEqual(line.scope_name, 'test_scope')
@@ -171,7 +167,6 @@ class TestNamedScopeDirectives(unittest.TestCase):
                 self.isa_model,
                 self.named_scope_manager,
                 'test.asm',
-                0
             )
 
     def test_complete_workflow(self):
@@ -184,7 +179,6 @@ class TestNamedScopeDirectives(unittest.TestCase):
             self.memzone,
             self.isa_model,
             self.named_scope_manager,
-            0
         )
 
         # Use scope
@@ -196,7 +190,6 @@ class TestNamedScopeDirectives(unittest.TestCase):
             self.isa_model,
             self.named_scope_manager,
             'test.asm',
-            0
         )
 
         # Deactivate scope
@@ -208,7 +201,6 @@ class TestNamedScopeDirectives(unittest.TestCase):
             self.isa_model,
             self.named_scope_manager,
             'test.asm',
-            0
         )
 
         # But scope definition should still exist

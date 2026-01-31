@@ -9,9 +9,8 @@ from __future__ import annotations
 
 import os
 import re
-import sys
 
-import click
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.label_scope import LabelScopeType
 from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
@@ -32,7 +31,6 @@ from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
-from bespokeasm.assembler.warning_reporter import WarningReporter
 
 
 class AssemblyFile:
@@ -41,11 +39,13 @@ class AssemblyFile:
                 filename: str,
                 parent_label_scope: LabelScope,
                 named_scope_manager: NamedScopeManager,
-                warning_reporter: WarningReporter | None = None,
+                diagnostic_reporter: DiagnosticReporter,
             ) -> None:
+        if diagnostic_reporter is None:
+            raise ValueError('DiagnosticReporter is required for AssemblyFile')
         self._filename = filename
         self._named_scope_manager = named_scope_manager
-        self._warning_reporter = warning_reporter or named_scope_manager.warning_reporter
+        self._diagnostic_reporter = diagnostic_reporter
         self._used_named_scopes: list[tuple[str, LineIdentifier]] = []
         self._defined_named_scopes: set[str] = set()
         self._label_scope = LabelScope(
@@ -79,7 +79,7 @@ class AssemblyFile:
                 line_num = 0
                 current_scope = self.label_scope
                 current_memzone = memzone_manager.global_zone
-                condition_stack = ConditionStack(self._warning_reporter)
+                condition_stack = ConditionStack(self._diagnostic_reporter)
                 active_named_scopes = ActiveNamedScopeList(self._named_scope_manager)
                 for line in f:
                     line_num += 1
@@ -93,7 +93,7 @@ class AssemblyFile:
                             # Only process the #include if the current conditional block is active
                             if condition_stack.currently_active(preprocessor):
                                 if condition_stack.is_muted:
-                                    self._warning_reporter.warn(
+                                    self._diagnostic_reporter.warn(
                                         line_id,
                                         '#include does not inherit #mute; included file will emit bytecode',
                                     )
@@ -150,7 +150,7 @@ class AssemblyFile:
                                     self._defined_named_scopes.add(lobj.scope_name)
                                 elif isinstance(lobj, UseScopeLine):
                                     if active_named_scopes and active_named_scopes[0] == lobj.scope_name:
-                                        self._warning_reporter.warn(
+                                        self._diagnostic_reporter.warn(
                                             lobj.line_id,
                                             f'Named scope "{lobj.scope_name}" is already active; '
                                             '#use-scope has no effect'
@@ -158,7 +158,7 @@ class AssemblyFile:
                                     self._used_named_scopes.append((lobj.scope_name, lobj.line_id))
                                 elif isinstance(lobj, DeactivateScopeLine):
                                     if lobj.scope_name not in active_named_scopes:
-                                        self._warning_reporter.warn(
+                                        self._diagnostic_reporter.warn(
                                             lobj.line_id,
                                             f'Named scope "{lobj.scope_name}" is not active; '
                                             '#deactivate-scope has no effect'
@@ -174,7 +174,7 @@ class AssemblyFile:
                                         and not lobj.has_explicit_memzone_name
                                         and current_memzone.name != GLOBAL_ZONE_NAME
                                     ):
-                                        self._warning_reporter.warn(
+                                        self._diagnostic_reporter.warn(
                                             lobj.line_id,
                                             f'.org without a memzone name uses an absolute address; '
                                             f'current memzone is "{current_memzone.name}"',
@@ -187,7 +187,7 @@ class AssemblyFile:
                                     active_named_scopes.deactivate_named_scope(lobj.scope_name)
                                 lobj.label_scope = current_scope
                                 lobj.active_named_scopes = active_named_scopes
-                                lobj.warning_reporter = self._warning_reporter
+                                lobj.diagnostic_reporter = self._diagnostic_reporter
                                 # setting constants now so they can be used when evaluating lines later.
                                 if isinstance(lobj, LabelLine) and lobj.is_constant:
                                     # first check if label belongs to an active named scope
@@ -202,14 +202,20 @@ class AssemblyFile:
                                         lobj.label_scope.set_label_value(lobj.get_label(), lobj.get_value(), lobj.line_id)
                             line_objects.append(lobj)
         except FileNotFoundError:
-            sys.exit(f'ERROR: Compilation file "{self.filename}" not found.')
+            self._diagnostic_reporter.error(
+                None,
+                f'Compilation file "{self.filename}" not found.',
+            )
 
-        if log_verbosity > 1:
-            click.echo(f'Found {len(line_objects)} lines in source file {self.filename}')
+        self._diagnostic_reporter.info(
+            None,
+            f'Found {len(line_objects)} lines in source file {self.filename}',
+            min_verbosity=2,
+        )
 
         if condition_stack.is_muted:
             line_id = LineIdentifier(line_num if line_num > 0 else 1, filename=self.filename)
-            self._warning_reporter.warn(
+            self._diagnostic_reporter.warn(
                 line_id,
                 'File ended while muted; bytecode emission remains suppressed',
             )
@@ -241,12 +247,15 @@ class AssemblyFile:
                     line_id
                 )
             if new_filepath in assembly_files_used:
-                sys.exit(f'ERROR: {line_id} - assembly file included multiple times')
+                self._diagnostic_reporter.error(
+                    line_id,
+                    'assembly file included multiple times',
+                )
             file_obj = AssemblyFile(
                 new_filepath,
                 self.label_scope.parent,
                 self._named_scope_manager,
-                self._warning_reporter,
+                self._diagnostic_reporter,
             )
             include_line_objects = file_obj.load_line_objects(
                 isa_model,
@@ -259,7 +268,10 @@ class AssemblyFile:
             self._defined_named_scopes.update(file_obj._defined_named_scopes)
             return include_line_objects
         else:
-            sys.exit(f'ERROR: {line_id} - Improperly formatted include directive')
+            self._diagnostic_reporter.error(
+                line_id,
+                'Improperly formatted include directive',
+            )
 
     def _locate_filename(self, filename: str, include_paths: list[str], line_id: LineIdentifier) -> str:
         '''locates the filename in the include paths, and returns the full file path. Errors if file name is ambiguous.'''
@@ -275,15 +287,21 @@ class AssemblyFile:
                 if filepath is None:
                     filepath = found_path
                 else:
-                    sys.exit(f'ERROR: {line_id} - include file "{filename}" can be found multiple times in include paths')
+                    self._diagnostic_reporter.error(
+                        line_id,
+                        f'include file "{filename}" can be found multiple times in include paths',
+                    )
         if filepath is None:
-            sys.exit(f'ERROR: {line_id} - could not find file "{filename}" to include')
+            self._diagnostic_reporter.error(
+                line_id,
+                f'could not find file "{filename}" to include',
+            )
         return filepath
 
     def _emit_missing_scope_warnings(self) -> None:
         for scope_name, line_id in self._used_named_scopes:
             if scope_name not in self._defined_named_scopes:
-                self._warning_reporter.warn(
+                self._diagnostic_reporter.warn(
                     line_id,
                     f'Named scope "{scope_name}" used with #use-scope but not defined in this file or its includes'
                 )

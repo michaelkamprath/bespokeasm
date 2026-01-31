@@ -24,7 +24,6 @@ class CreateScopeLine(PreprocessorLine):
         memzone: MemoryZone,
         isa_model: AssemblerModel,
         named_scope_manager: NamedScopeManager,
-        log_verbosity: int
     ) -> None:
         """Create a new named scope definition."""
         super().__init__(line_id, instruction, comment, memzone)
@@ -46,8 +45,13 @@ class CreateScopeLine(PreprocessorLine):
             self._scope_name = scope_name
             self._prefix = prefix
 
-            if log_verbosity >= 2:
-                print(f'INFO: {line_id} - Created named scope "{scope_name}" with prefix "{prefix}"')
+            if isa_model is None:
+                raise ValueError('AssemblerModel is required for CreateScopeLine')
+            isa_model.diagnostic_reporter.info(
+                line_id,
+                f'Created named scope "{scope_name}" with prefix "{prefix}"',
+                min_verbosity=2,
+            )
 
         else:
             sys.exit(f'ERROR: {line_id} - Invalid #create-scope directive syntax: {instruction}')

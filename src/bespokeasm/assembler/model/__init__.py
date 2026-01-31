@@ -2,13 +2,13 @@ import json
 import os
 import re
 import sys
-import warnings
 from functools import cached_property
 from typing import Literal
 
 import click
 from bespokeasm import BESPOKEASM_MIN_REQUIRED_STR
 from bespokeasm import BESPOKEASM_VERSION_STR
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.keywords import ASSEMBLER_KEYWORD_SET
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.label_scope import LabelScopeType
@@ -23,8 +23,16 @@ from ruamel.yaml import YAML
 class AssemblerModel:
     _config: dict
 
-    def __init__(self, config_file_path: str, is_verbose: int):
+    def __init__(
+        self,
+        config_file_path: str,
+        is_verbose: int,
+        diagnostic_reporter: DiagnosticReporter,
+    ):
         self._config_file = config_file_path
+        if diagnostic_reporter is None:
+            raise ValueError('DiagnosticReporter is required for AssemblerModel')
+        self._diagnostic_reporter = diagnostic_reporter
         self._global_label_scope = None
 
         if config_file_path.endswith('.json'):
@@ -88,6 +96,7 @@ class AssemblerModel:
             self.registers,
             self.word_size,
             self.word_segment_size,
+            self._diagnostic_reporter,
         )
         self._instructions = InstructionSet(
                 self._config['instructions'],
@@ -98,6 +107,7 @@ class AssemblerModel:
                 self.registers,
                 self.word_size,
                 self.word_segment_size,
+                self._diagnostic_reporter,
             )
 
     def _validate_config(self, is_verbose: int) -> None:
@@ -178,6 +188,10 @@ class AssemblerModel:
         return self._config.get('description', 'BespokeASM Assembly')
 
     @property
+    def diagnostic_reporter(self) -> DiagnosticReporter:
+        return self._diagnostic_reporter
+
+    @property
     def isa_name(self) -> str:
         '''Name of language defined by this ISA model. Defaults to configuration file basename.'''
         return self._isa_name
@@ -193,11 +207,11 @@ class AssemblerModel:
 
     @property
     def endian(self) -> Literal['little', 'big']:
-        warnings.warn(
+        self._diagnostic_reporter.warn(
+            None,
             "The 'endian' general configuration option is deprecated and will be removed in a "
             "future version. Replace with 'multi_word_endian'.",
-            DeprecationWarning,
-            stacklevel=2
+            category='deprecation',
         )
         if 'endian' in self._config['general']:
             return self._config['general']['endian']
@@ -209,11 +223,11 @@ class AssemblerModel:
         if 'intra_word_endian' in self._config['general']:
             return self._config['general']['intra_word_endian']
         if 'intra_word_endianness' in self._config['general']:
-            warnings.warn(
+            self._diagnostic_reporter.warn(
+                None,
                 "The 'intra_word_endianness' general configuration option is deprecated and will be removed in a "
                 "future version. Replace with 'intra_word_endian'.",
-                DeprecationWarning,
-                stacklevel=2
+                category='deprecation',
             )
             return self._config['general']['intra_word_endianness']
         return 'big'
@@ -223,11 +237,11 @@ class AssemblerModel:
         if 'multi_word_endian' in self._config['general']:
             return self._config['general']['multi_word_endian']
         if 'multi_word_endianness' in self._config['general']:
-            warnings.warn(
+            self._diagnostic_reporter.warn(
+                None,
                 "The 'multi_word_endianness' general configuration option is deprecated and will be removed in a "
                 "future version. Replace with 'multi_word_endian'.",
-                DeprecationWarning,
-                stacklevel=2
+                category='deprecation',
             )
             return self._config['general']['multi_word_endianness']
         return 'big'

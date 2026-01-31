@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import os
-import sys
 
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.label_scope import LabelScopeType
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.warning_reporter import WarningReporter
 
 
 class NamedLabelScope(LabelScope):
@@ -37,39 +36,48 @@ class NamedLabelScope(LabelScope):
 class NamedScopeManager:
     """Manages named label scopes throughout the assembly process."""
 
-    def __init__(self, warning_reporter: WarningReporter | None = None):
+    def __init__(self, diagnostic_reporter: DiagnosticReporter):
+        if diagnostic_reporter is None:
+            raise ValueError('DiagnosticReporter is required for NamedScopeManager')
         # Global scope definitions: {scope_name: NamedScopeDefinition}
         self._scope_definitions: dict[str, NamedLabelScope] = {}
         self._used_prefixes: set[str] = set()
-        self._warning_reporter = warning_reporter or WarningReporter(False)
+        self._diagnostic_reporter = diagnostic_reporter
 
     @property
-    def warning_reporter(self) -> WarningReporter:
-        return self._warning_reporter
+    def diagnostic_reporter(self) -> DiagnosticReporter:
+        return self._diagnostic_reporter
 
     def create_scope(self, name: str, prefix: str, defined_at: LineIdentifier) -> None:
         """Create a new named scope definition."""
         # Validate scope name
         if not name or ' ' in name or '\t' in name:
-            sys.exit(f"ERROR: {defined_at} - Scope name '{name}' cannot contain whitespace")
+            self._diagnostic_reporter.error(
+                defined_at,
+                f"Scope name '{name}' cannot contain whitespace",
+            )
 
         # Validate prefix
         if not prefix or ' ' in prefix or '\t' in prefix:
-            sys.exit(
-                f"ERROR: {defined_at} - Scope prefix '{prefix}' cannot contain whitespace"
+            self._diagnostic_reporter.error(
+                defined_at,
+                f"Scope prefix '{prefix}' cannot contain whitespace",
             )
 
         # Validate prefix doesn't start with '.' to avoid confusion with local scope
         if prefix.startswith('.'):
-            sys.exit(
-                f"ERROR: {defined_at} - Scope prefix '{prefix}' cannot start with '.'"
-                ' as this conflicts with local scope syntax'
+            self._diagnostic_reporter.error(
+                defined_at,
+                f"Scope prefix '{prefix}' cannot start with '.' as this conflicts with local scope syntax",
             )
 
         # Check for duplicate scope name
         if name in self._scope_definitions:
             existing_def = self._scope_definitions[name]
-            sys.exit(f"ERROR: {defined_at} - Scope '{name}' already defined at {existing_def.defined_at}")
+            self._diagnostic_reporter.error(
+                defined_at,
+                f"Scope '{name}' already defined at {existing_def.defined_at}",
+            )
 
         # Check for duplicate prefix (warn if same scope, error if different scope)
         if prefix in self._used_prefixes:
@@ -77,16 +85,17 @@ class NamedScopeManager:
             if existing_scope is not None:
                 if existing_scope.name == name:
                     # warn if same scope
-                    self._warning_reporter.warn(
+                    self._diagnostic_reporter.warn(
                         defined_at,
                         f"Scope '{name}' defined with prefix '{prefix}' "
                         f'but is already defined at {existing_scope.defined_at}',
                     )
                 else:
                     # error if different scope
-                    sys.exit(
-                        f"ERROR: {defined_at} - Scope '{name}' defined with prefix '{prefix}' that "
-                        f"is already used by scope '{existing_scope.name}' defined at {existing_scope.defined_at}"
+                    self._diagnostic_reporter.error(
+                        defined_at,
+                        f"Scope '{name}' defined with prefix '{prefix}' that "
+                        f"is already used by scope '{existing_scope.name}' defined at {existing_scope.defined_at}",
                     )
 
         # Create the scope definition
@@ -173,6 +182,11 @@ class NamedScopeManager:
 
 class ActiveNamedScopeList(list[str]):
     """Convenience class to manage active named scopes when processing an assembly file."""
+
+    @classmethod
+    def empty(cls, diagnostic_reporter: DiagnosticReporter) -> ActiveNamedScopeList:
+        """Create an empty active named scope list for preprocessor evaluation."""
+        return cls(NamedScopeManager(diagnostic_reporter))
 
     def __init__(self, named_scope_manager: NamedScopeManager):
         super().__init__()

@@ -2,6 +2,7 @@ import importlib.resources as pkg_resources
 import unittest
 
 from bespokeasm.assembler.bytecode.word import Word
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.label_scope import LabelScopeType
@@ -34,15 +35,16 @@ class TestInstructionParsing(unittest.TestCase):
         local_scope.set_label_value('.local_var', 10, 3)
         local_scope.set_label_value('.loop', 0x8020, 3)
         cls.label_values = local_scope
-        cls.active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
 
     def setUp(self):
         InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN = None
+        self.diagnostic_reporter = DiagnosticReporter()
+        self.active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
 
     def test_instruction_character_set_parsing(self):
         # test instructions with periods in them
         fp = pkg_resources.files(config_files).joinpath('test_instructions_with_periods.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -73,7 +75,7 @@ class TestInstructionParsing(unittest.TestCase):
 
     def test_instruction_variant_matching(self):
         fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -203,7 +205,7 @@ class TestInstructionParsing(unittest.TestCase):
 
     def test_operand_decorators(self):
         fp = pkg_resources.files(config_files).joinpath('test_indirect_indexed_register_operands.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -268,7 +270,7 @@ class TestInstructionParsing(unittest.TestCase):
 
     def test_indexed_register_operands(self):
         fp = pkg_resources.files(config_files).joinpath('test_indirect_indexed_register_operands.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -307,7 +309,7 @@ class TestInstructionParsing(unittest.TestCase):
 
     def test_indirect_indexed_regsiter_operands(self):
         fp = pkg_resources.files(config_files).joinpath('test_indirect_indexed_register_operands.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -434,7 +436,7 @@ class TestInstructionParsing(unittest.TestCase):
     def test_decorator_operands_and_negative_offsets(self):
         """Doc: Addressing Modes > Decorators; Addressing Modes > Indirect Register - decorators and +/- offsets."""
         fp = pkg_resources.files(config_files).joinpath('test_decorator_operands.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -442,7 +444,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
         lineid = LineIdentifier(77, 'test_decorator_operands_and_negative_offsets')
         label_scope = GlobalLabelScope(isa_model.registers)
-        active_scopes = ActiveNamedScopeList(NamedScopeManager())
+        active_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
 
         decorator_cases = {
             'a+': 1,
@@ -491,16 +493,16 @@ class TestInstructionParsing(unittest.TestCase):
 
     def test_label_parsing(self):
         fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
             isa_model.predefined_memory_zones,
         )
-        active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
+        active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
 
         lineid = LineIdentifier(42, 'test_label_parsing')
-        preprocessor = Preprocessor()
+        preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
 
         l1: LineObject = LineOjectFactory.parse_line(
             lineid,
@@ -511,7 +513,7 @@ class TestInstructionParsing(unittest.TestCase):
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
-            ConditionStack(),
+            ConditionStack(self.diagnostic_reporter),
             0,
         )[0]
         self.assertIsInstance(l1, LabelLine)
@@ -527,7 +529,7 @@ class TestInstructionParsing(unittest.TestCase):
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
-            ConditionStack(),
+            ConditionStack(self.diagnostic_reporter),
             0,
         )[0]
         l2.set_start_address(42)
@@ -545,7 +547,7 @@ class TestInstructionParsing(unittest.TestCase):
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
-            ConditionStack(),
+            ConditionStack(self.diagnostic_reporter),
             0,
         )[0]
         l3.set_start_address(42)
@@ -556,7 +558,7 @@ class TestInstructionParsing(unittest.TestCase):
 
     def test_operand_bytecode_ordering(self):
         fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -597,7 +599,7 @@ class TestInstructionParsing(unittest.TestCase):
 
     def test_deferred_operands(self):
         fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -638,7 +640,7 @@ class TestInstructionParsing(unittest.TestCase):
 
     def test_instruction_bytecode_suffixes(self):
         fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -664,7 +666,7 @@ class TestInstructionParsing(unittest.TestCase):
 
     def test_enumeration_operand(self):
         fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -690,13 +692,13 @@ class TestInstructionParsing(unittest.TestCase):
 
     def test_numeric_bytecode_operand(self):
         fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
             isa_model.predefined_memory_zones,
         )
-        active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
+        active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
 
         lineid = LineIdentifier(33, 'test_numeric_bytecode_operand')
 
@@ -768,13 +770,13 @@ class TestInstructionParsing(unittest.TestCase):
 
     def test_numeric_enumeration_operand(self):
         fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
             isa_model.predefined_memory_zones,
         )
-        active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
+        active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         lineid = LineIdentifier(33, 'test_numeric_enumeration_operand')
 
         t1 = InstructionLine.factory(
@@ -820,7 +822,7 @@ class TestInstructionParsing(unittest.TestCase):
 
     def test_expressions_in_operations(self):
         fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -858,7 +860,7 @@ class TestInstructionParsing(unittest.TestCase):
 
     def test_case_insentive_instructions(self):
         fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -884,7 +886,7 @@ class TestInstructionParsing(unittest.TestCase):
 
     def test_operand_order(self):
         fp = pkg_resources.files(config_files).joinpath('test_instruction_operands.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -948,7 +950,7 @@ class TestInstructionParsing(unittest.TestCase):
 
     def test_operand_expression(self):
         fp = pkg_resources.files(config_files).joinpath('test_instruction_operands.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -972,7 +974,7 @@ class TestInstructionParsing(unittest.TestCase):
 
     def test_relative_address_operand(self):
         fp = pkg_resources.files(config_files).joinpath('test_instruction_operands.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -1066,7 +1068,7 @@ class TestInstructionParsing(unittest.TestCase):
 
     def test_valid_address_operand_enforcement(self):
         fp = pkg_resources.files(config_files).joinpath('test_valid_address_enforcement.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -1120,7 +1122,7 @@ class TestInstructionParsing(unittest.TestCase):
         from bespokeasm.assembler.model.operand.types.address import AddressByteCodePart
 
         fp = pkg_resources.files(config_files).joinpath('test_valid_address_enforcement.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size, isa_model.default_origin, isa_model.predefined_memory_zones,
         )
@@ -1141,7 +1143,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model.word_size,
             isa_model.word_segment_size,
         )
-        value1 = bc1.get_value(TestInstructionParsing.label_values, TestInstructionParsing.active_named_scopes, 0x2010, 32)
+        value1 = bc1.get_value(TestInstructionParsing.label_values, self.active_named_scopes, 0x2010, 32)
         self.assertEqual(value1, 0x2020, 'byte code should match')
 
         # now, test argument value generation with LSB slicing
@@ -1158,11 +1160,11 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model.word_size,
             isa_model.word_segment_size,
         )
-        value2 = bc2.get_value(TestInstructionParsing.label_values, TestInstructionParsing.active_named_scopes, 0x2010, 32)
+        value2 = bc2.get_value(TestInstructionParsing.label_values, self.active_named_scopes, 0x2010, 32)
         self.assertEqual(value2, 0x45, 'byte code should match')
 
         with self.assertRaises(ValueError, msg="address MSBs don't match"):
-            bc2.get_value(TestInstructionParsing.label_values, TestInstructionParsing.active_named_scopes, 0x2250, 32)
+            bc2.get_value(TestInstructionParsing.label_values, self.active_named_scopes, 0x2250, 32)
 
         # test 16-bit slize with a 32-bit address
         bc3 = AddressByteCodePart(
@@ -1178,10 +1180,10 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model.word_size,
             isa_model.word_segment_size,
         )
-        value3 = bc3.get_value(TestInstructionParsing.label_values, TestInstructionParsing.active_named_scopes, 0x19451000, 32)
+        value3 = bc3.get_value(TestInstructionParsing.label_values, self.active_named_scopes, 0x19451000, 32)
         self.assertEqual(value3, 0x8899, 'byte code should match')
         with self.assertRaises(ValueError, msg="address MSBs don't match"):
-            bc3.get_value(TestInstructionParsing.label_values, TestInstructionParsing.active_named_scopes, 0x20241000, 32)
+            bc3.get_value(TestInstructionParsing.label_values, self.active_named_scopes, 0x20241000, 32)
 
         #  test error conditions
         # error case: extraneous comparison operators ignored
@@ -1207,7 +1209,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
         t1.set_start_address(0x2F10)
         t1.label_scope = TestInstructionParsing.label_values
-        t1.active_named_scopes = TestInstructionParsing.active_named_scopes
+        t1.active_named_scopes = self.active_named_scopes
         self.assertIsInstance(t1, InstructionLine)
         self.assertEqual(t1.word_count, 2, 'has 2 words')
         t1.generate_words()
@@ -1232,7 +1234,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
         t2.set_start_address(0x2F10)
         t2.label_scope = TestInstructionParsing.label_values
-        t2.active_named_scopes = TestInstructionParsing.active_named_scopes
+        t2.active_named_scopes = self.active_named_scopes
         self.assertIsInstance(t2, InstructionLine)
         self.assertEqual(t2.word_count, 3, 'has 3 words')
         t2.generate_words()
@@ -1253,7 +1255,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
         t3.set_start_address(0x2F10)
         t3.label_scope = TestInstructionParsing.label_values
-        t3.active_named_scopes = TestInstructionParsing.active_named_scopes
+        t3.active_named_scopes = self.active_named_scopes
         self.assertIsInstance(t3, InstructionLine)
         self.assertEqual(t3.word_count, 3, 'has 3 words')
         t3.generate_words()
@@ -1274,7 +1276,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
         t4.set_start_address(0x2F10)
         t4.label_scope = TestInstructionParsing.label_values
-        t4.active_named_scopes = TestInstructionParsing.active_named_scopes
+        t4.active_named_scopes = self.active_named_scopes
         self.assertIsInstance(t4, InstructionLine)
         self.assertEqual(t4.word_count, 3, 'has 3 words')
         with self.assertRaises(SystemExit, msg='address not in target memory zone'):
@@ -1282,7 +1284,7 @@ class TestInstructionParsing(unittest.TestCase):
 
     def test_instruction_parsing_16bit_word(self):
         fp = pkg_resources.files(config_files).joinpath('test_16bit_data_words.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -1310,7 +1312,7 @@ class TestInstructionParsing(unittest.TestCase):
 
     def test_instruction_aliases(self):
         fp = pkg_resources.files(config_files).joinpath('test_instruction_aliases.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -1364,7 +1366,7 @@ class TestInstructionParsing(unittest.TestCase):
 
     def test_instruction_multiple_aliases(self):
         fp = pkg_resources.files(config_files).joinpath('test_instruction_aliases.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,

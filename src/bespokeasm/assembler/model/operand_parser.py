@@ -131,6 +131,7 @@ class SpecificOperandsModel:
             registers: set[str],
             word_size: int,
             word_segment_size: int,
+            diagnostic_reporter,
         ):
             self._config = config
             self._operands = [
@@ -142,6 +143,7 @@ class SpecificOperandsModel:
                     registers,
                     word_size,
                     word_segment_size,
+                    diagnostic_reporter,
                 )
                 for arg_type_id, arg_type_conf in self._config.get('list', {}).items()
             ]
@@ -189,6 +191,7 @@ class SpecificOperandsModel:
         registers: set[str],
         word_size: int,
         word_segment_size: int,
+        diagnostic_reporter,
     ):
         self._specific_operands = [
             SpecificOperandsModel.SpecificOperandConfig(
@@ -198,6 +201,7 @@ class SpecificOperandsModel:
                 registers,
                 word_size,
                 word_segment_size,
+                diagnostic_reporter,
             )
             for arg_confing_dict in config.values()
         ]
@@ -283,6 +287,7 @@ class OperandParser:
                 registers: set[str],
                 word_size: int,
                 word_segment_size: int,
+                diagnostic_reporter,
             ):
         if instruction_operands_config is not None:
             self._config = instruction_operands_config
@@ -299,6 +304,7 @@ class OperandParser:
                 registers,
                 word_size,
                 word_segment_size,
+                diagnostic_reporter,
             )
         else:
             self._specific_operands_model = None

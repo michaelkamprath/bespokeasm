@@ -82,6 +82,7 @@ class RelativeAddressOperand(OperandWithArgument):
         default_intra_word_endian: str,
         word_size: int,
         word_segment_size: int,
+        diagnostic_reporter,
         require_arg: bool = True,
     ) -> None:
         super().__init__(
@@ -91,7 +92,8 @@ class RelativeAddressOperand(OperandWithArgument):
             default_intra_word_endian,
             word_size,
             word_segment_size,
-            require_arg,
+            diagnostic_reporter,
+            require_arg=require_arg,
         )
 
     def __str__(self):

@@ -24,6 +24,7 @@ class IndirectRegisterOperand(RegisterOperand):
         regsiters: set[str],
         word_size: int,
         word_segment_size: int,
+        diagnostic_reporter,
     ) -> None:
         super().__init__(
             operand_id,
@@ -33,6 +34,7 @@ class IndirectRegisterOperand(RegisterOperand):
             regsiters,
             word_size,
             word_segment_size,
+            diagnostic_reporter,
         )
         self._parse_pattern = re.compile(
             fr'^{self.match_pattern}$',

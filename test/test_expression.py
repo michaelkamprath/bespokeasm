@@ -1,5 +1,6 @@
 import unittest
 
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
@@ -20,10 +21,13 @@ class TestExpression(unittest.TestCase):
         cls.label_values.set_label_value('MAX_N', 20, line)
         cls.label_values.set_label_value('BYTECODE_LL0', 0x07, line)
 
+    def setUp(self):
+        self.diagnostic_reporter = DiagnosticReporter()
+
     def test_expression_parsing(self):
         line_id = LineIdentifier(1212, 'test_expression_parsing')
         labels = TestExpression.label_values
-        scopes = ActiveNamedScopeList(NamedScopeManager())
+        scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
 
         self.assertEqual(
             parse_expression(line_id, '1 + 2').get_value(labels, scopes, 1),
@@ -75,7 +79,7 @@ class TestExpression(unittest.TestCase):
 
     def test_expression_numeric_types(self):
         labels = TestExpression.label_values
-        scopes = ActiveNamedScopeList(NamedScopeManager())
+        scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         self.assertEqual(
             parse_expression(1212, '$100/0x80').get_value(labels, scopes, 1),
             2, 'test hexadecimal math: $100/0x80'
@@ -96,7 +100,7 @@ class TestExpression(unittest.TestCase):
     def test_expression_result_integer_casting(self):
         # resolved values are cast to an integer, truncating the fractional part
         labels = TestExpression.label_values
-        scopes = ActiveNamedScopeList(NamedScopeManager())
+        scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         self.assertEqual(
             parse_expression(1212, 'value_1/5').get_value(labels, scopes, 1),
             2, 'test rounding: 12/5 = 2'
@@ -108,7 +112,7 @@ class TestExpression(unittest.TestCase):
 
     def test_bitwise_operators(self):
         labels = TestExpression.label_values
-        scopes = ActiveNamedScopeList(NamedScopeManager())
+        scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         self.assertEqual(
             parse_expression(111, 'b11110000&b10101010').get_value(labels, scopes, 1),
             int('10100000', 2),
@@ -145,7 +149,7 @@ class TestExpression(unittest.TestCase):
 
     def test_bit_shifting(self):
         labels = TestExpression.label_values
-        scopes = ActiveNamedScopeList(NamedScopeManager())
+        scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         self.assertEqual(
             parse_expression(111, '1 << 3').get_value(labels, scopes, 1),
             8, '1 << 3 = 8'
@@ -174,7 +178,7 @@ class TestExpression(unittest.TestCase):
     def test_unary_byte_value_extractor(self):
         line_id = LineIdentifier(777, 'test_unary_byte_value_extractor')
         labels = TestExpression.label_values
-        scopes = ActiveNamedScopeList(NamedScopeManager())
+        scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
 
         self.assertEqual(
             parse_expression(line_id, 'LSB( $1234 )').get_value(labels, scopes, 1),
@@ -234,7 +238,7 @@ class TestExpression(unittest.TestCase):
     def test_character_ordinals_in_expressions(self):
         line_id = LineIdentifier(888, 'test_character_ordinals_in_expressions')
         labels = TestExpression.label_values
-        scopes = ActiveNamedScopeList(NamedScopeManager())
+        scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         self.assertEqual(
             parse_expression(line_id, "'a'").get_value(labels, scopes, 1),
             97, "'a' = 97"
@@ -255,7 +259,7 @@ class TestExpression(unittest.TestCase):
     def test_invalid_character_ordinals(self):
         """Doc: Numeric Literals > Single Character Ordinals - only single-quoted single characters are valid."""
         labels = TestExpression.label_values
-        scopes = ActiveNamedScopeList(NamedScopeManager())
+        scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         with self.assertRaisesRegex(SyntaxError, 'only single-character ordinals'):
             parse_expression(1212, "'AB'").get_value(labels, scopes, 1)
         with self.assertRaisesRegex(SyntaxError, 'double-quoted strings are not valid'):
@@ -264,7 +268,7 @@ class TestExpression(unittest.TestCase):
     def test_expression_error_messages(self):
         """Doc: Numeric Expressions - invalid tokens should report actionable error messages."""
         labels = TestExpression.label_values
-        scopes = ActiveNamedScopeList(NamedScopeManager())
+        scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         with self.assertRaisesRegex(SyntaxError, 'unterminated character literal'):
             parse_expression(1212, "'A").get_value(labels, scopes, 1)
         with self.assertRaisesRegex(SyntaxError, 'boolean operators'):
@@ -279,7 +283,7 @@ class TestExpression(unittest.TestCase):
     def test_negative_values(self):
         line_id = LineIdentifier(1927, 'test_character_ordinals_in_expressions')
         labels = TestExpression.label_values
-        scopes = ActiveNamedScopeList(NamedScopeManager())
+        scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
 
         self.assertEqual(
             parse_expression(line_id, '-21').get_value(labels, scopes, 1),
@@ -308,7 +312,7 @@ class TestExpression(unittest.TestCase):
     def test_unknown_expression_parts(self):
         line_id = LineIdentifier(1928, 'test_unknown_expression_parts')
         labels = TestExpression.label_values
-        scopes = ActiveNamedScopeList(NamedScopeManager())
+        scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
 
         with self.assertRaises(SystemExit, msg='extraneous comparison operator'):
             parse_expression(line_id, '<$2024').get_value(labels, scopes, 1)

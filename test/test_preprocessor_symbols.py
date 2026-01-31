@@ -6,6 +6,7 @@ import tempfile
 import unittest
 
 from bespokeasm.assembler.assembly_file import AssemblyFile
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
@@ -35,9 +36,10 @@ from test import test_code
 class TestPreprocessorSymbols(unittest.TestCase):
     def setUp(self):
         InstructionLine.reset_instruction_pattern_cache()
+        self.diagnostic_reporter = DiagnosticReporter()
 
     def test_proprocessor_resolve_symbols(self):
-        preprocessor = Preprocessor()
+        preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
         preprocessor.create_symbol('s1', '57')
         preprocessor.create_symbol('s2', 's1*2')
 
@@ -80,7 +82,7 @@ class TestPreprocessorSymbols(unittest.TestCase):
             def evaluate(self, preprocessor: Preprocessor) -> bool:
                 return False
 
-        preprocessor = Preprocessor()
+        preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
         preprocessor.create_symbol('s1', '57')
         preprocessor.create_symbol('s2', 's1*2')
         preprocessor.create_symbol('s3', '57')
@@ -174,7 +176,7 @@ class TestPreprocessorSymbols(unittest.TestCase):
 
     def test_define_symbol_line_objects(self):
         fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -182,9 +184,9 @@ class TestPreprocessorSymbols(unittest.TestCase):
         )
 
         global_scope = GlobalLabelScope(set())
-        active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
+        active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         lineid = LineIdentifier(12, 'test_define_symbol_line_objects')
-        preprocessor = Preprocessor()
+        preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
 
         l1: LineObject = LineOjectFactory.parse_line(
             lineid,
@@ -195,7 +197,7 @@ class TestPreprocessorSymbols(unittest.TestCase):
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
-            ConditionStack(),
+            ConditionStack(self.diagnostic_reporter),
             0,
         )[0]
         self.assertTrue(isinstance(l1, DefineSymbolLine), 'l1 should be a DefineSymbolLine')
@@ -216,7 +218,7 @@ class TestPreprocessorSymbols(unittest.TestCase):
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
-            ConditionStack(),
+            ConditionStack(self.diagnostic_reporter),
             0,
         )[0]
         self.assertTrue(isinstance(l2, DefineSymbolLine), 'l1 should be a DefineSymbolLine')
@@ -240,7 +242,7 @@ class TestPreprocessorSymbols(unittest.TestCase):
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
-            ConditionStack(),
+            ConditionStack(self.diagnostic_reporter),
             0,
         )[0]
         self.assertTrue(isinstance(l3, DefineSymbolLine), '3 should be a DefineSymbolLine')
@@ -265,7 +267,7 @@ class TestPreprocessorSymbols(unittest.TestCase):
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
-            ConditionStack(),
+            ConditionStack(self.diagnostic_reporter),
             0,
         )[0]
         self.assertTrue(isinstance(l4, DefineSymbolLine), 'l4 should be a DefineSymbolLine')
@@ -279,18 +281,18 @@ class TestPreprocessorSymbols(unittest.TestCase):
 
     def test_compilation_control_and_symbol_replacement(self):
         fp = pkg_resources.files(config_files).joinpath('test_compilation_control.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         label_scope = GlobalLabelScope(isa_model.registers)
         memzone_manager = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
             isa_model.predefined_memory_zones
         )
-        preprocessor = Preprocessor()
-        named_scope_manager = NamedScopeManager()
+        preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
+        named_scope_manager = NamedScopeManager(self.diagnostic_reporter)
 
         asm_fp = pkg_resources.files(test_code).joinpath('test_compilation_control.asm')
-        asm_obj = AssemblyFile(asm_fp, label_scope, named_scope_manager)
+        asm_obj = AssemblyFile(asm_fp, label_scope, named_scope_manager, named_scope_manager.diagnostic_reporter)
 
         try:
             line_objs: list[LineObject] = asm_obj.load_line_objects(
@@ -327,15 +329,15 @@ class TestPreprocessorSymbols(unittest.TestCase):
 
     def test_ifdef_undefined_symbol_is_inactive(self):
         fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         label_scope = GlobalLabelScope(isa_model.registers)
         memzone_manager = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
             isa_model.predefined_memory_zones
         )
-        preprocessor = Preprocessor()
-        named_scope_manager = NamedScopeManager()
+        preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
+        named_scope_manager = NamedScopeManager(self.diagnostic_reporter)
 
         with tempfile.TemporaryDirectory() as temp_dir:
             asm_content = """
@@ -348,7 +350,7 @@ nop
             with open(asm_fp, 'w') as f:
                 f.write(asm_content)
 
-            asm_obj = AssemblyFile(asm_fp, label_scope, named_scope_manager)
+            asm_obj = AssemblyFile(asm_fp, label_scope, named_scope_manager, named_scope_manager.diagnostic_reporter)
             line_objs = asm_obj.load_line_objects(
                 isa_model,
                 {temp_dir},
@@ -364,15 +366,15 @@ nop
 
     def test_inactive_ifdef_does_not_evaluate_constants(self):
         fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         label_scope = GlobalLabelScope(isa_model.registers)
         memzone_manager = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
             isa_model.predefined_memory_zones
         )
-        preprocessor = Preprocessor()
-        named_scope_manager = NamedScopeManager()
+        preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
+        named_scope_manager = NamedScopeManager(self.diagnostic_reporter)
 
         with tempfile.TemporaryDirectory() as temp_dir:
             asm_content = """
@@ -385,7 +387,7 @@ nop
             with open(asm_fp, 'w') as f:
                 f.write(asm_content)
 
-            asm_obj = AssemblyFile(asm_fp, label_scope, named_scope_manager)
+            asm_obj = AssemblyFile(asm_fp, label_scope, named_scope_manager, named_scope_manager.diagnostic_reporter)
             try:
                 line_objs = asm_obj.load_line_objects(
                     isa_model,
@@ -405,8 +407,8 @@ nop
         self.assertEqual(compilable_instructions[0].instruction, 'nop', 'compiled nop should be outside #ifdef')
 
     def test_condition_stack(self):
-        stack = ConditionStack()
-        preprocessor = Preprocessor()
+        stack = ConditionStack(self.diagnostic_reporter)
+        preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
         preprocessor.create_symbol('s1', '57')
         preprocessor.create_symbol('s2', 's1*2')
         preprocessor.create_symbol('s3', '57')
@@ -444,8 +446,8 @@ nop
         self.assertTrue(stack.currently_active(preprocessor), 'condition should be True')
 
     def test_muting(self):
-        stack = ConditionStack()
-        preprocessor = Preprocessor()
+        stack = ConditionStack(self.diagnostic_reporter)
+        preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
 
         self.assertFalse(stack.is_muted, 'initial condition should be False')
         stack.process_condition(MutePreprocessorCondition('#mute', LineIdentifier('test_muting', 1)), preprocessor)
@@ -465,8 +467,8 @@ nop
 
     def test_emit_aliases_unmute(self):
         """Doc: Preprocessor > Bytecode Emission Control - #emit acts as an alias of #unmute."""
-        preprocessor = Preprocessor()
-        stack = ConditionStack()
+        preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
+        stack = ConditionStack(self.diagnostic_reporter)
         memzone = MemoryZone(16, 0, 0xFFFF, 'GLOBAL')
 
         ConditionLine(LineIdentifier(1, 'test_emit_alias'), '#mute', '', memzone, preprocessor, stack)
@@ -477,15 +479,15 @@ nop
     def test_mute_does_not_apply_to_included_files(self):
         """Doc: Preprocessor > Bytecode Emission Control - #mute is file-local and does not affect includes."""
         fp = pkg_resources.files(config_files).joinpath('test_instruction_operands.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         label_scope = GlobalLabelScope(isa_model.registers)
         memzone_manager = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
             isa_model.predefined_memory_zones,
         )
-        preprocessor = Preprocessor()
-        named_scope_manager = NamedScopeManager()
+        preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
+        named_scope_manager = NamedScopeManager(self.diagnostic_reporter)
 
         main_source = '\n'.join([
             '#mute',
@@ -502,7 +504,7 @@ nop
             with open(include_path, 'w') as handle:
                 handle.write(include_source)
 
-            asm_file = AssemblyFile(main_path, label_scope, named_scope_manager)
+            asm_file = AssemblyFile(main_path, label_scope, named_scope_manager, named_scope_manager.diagnostic_reporter)
             stderr = io.StringIO()
             with contextlib.redirect_stderr(stderr):
                 line_objects = asm_file.load_line_objects(
@@ -521,8 +523,8 @@ nop
     def test_conditional_muting(self):
         """Demonstrate that conditional compilation controls the mute/unmute preprocessor directives."""
         # if a #mute is inside a false condition, it should not mute
-        stack = ConditionStack()
-        preprocessor = Preprocessor()
+        stack = ConditionStack(self.diagnostic_reporter)
+        preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
         preprocessor.create_symbol('s1', '57')
         preprocessor.create_symbol('s2', 's1*2')
 
@@ -557,10 +559,10 @@ nop
     def test_builtin_language_version_symbols(self):
         """Test that built-in language version symbols are automatically created."""
         fp = pkg_resources.files(config_files).joinpath('eater-sap1-isa.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
 
         # Create preprocessor with ISA model to get built-in symbols
-        preprocessor = Preprocessor(isa_model.predefined_symbols, isa_model)
+        preprocessor = Preprocessor(isa_model.predefined_symbols, isa_model, diagnostic_reporter=self.diagnostic_reporter)
 
         # Test that all expected built-in symbols exist
         self.assertIsNotNone(preprocessor.get_symbol('__LANGUAGE_NAME__'), '__LANGUAGE_NAME__ should be defined')
@@ -592,10 +594,10 @@ nop
     def test_language_version_symbols_in_conditions(self):
         """Test that language version symbols work in conditional compilation."""
         fp = pkg_resources.files(config_files).joinpath('eater-sap1-isa.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
 
         # Create preprocessor with ISA model
-        preprocessor = Preprocessor(isa_model.predefined_symbols, isa_model)
+        preprocessor = Preprocessor(isa_model.predefined_symbols, isa_model, diagnostic_reporter=self.diagnostic_reporter)
 
         line_id = LineIdentifier(1, 'test_language_version_symbols_in_conditions')
 
@@ -628,7 +630,7 @@ nop
         from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 
         fp = pkg_resources.files(config_files).joinpath('eater-sap1-isa.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
 
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
@@ -636,7 +638,7 @@ nop
             isa_model.predefined_memory_zones,
         )
 
-        preprocessor = Preprocessor(isa_model.predefined_symbols, isa_model)
+        preprocessor = Preprocessor(isa_model.predefined_symbols, isa_model, diagnostic_reporter=self.diagnostic_reporter)
         line_id = LineIdentifier(1, 'test_require_directive_legacy_format')
 
         # Test valid legacy format - should not raise SystemExit
@@ -648,7 +650,6 @@ nop
                 memzone_mngr.global_zone,
                 isa_model,
                 preprocessor,
-                0
             )
         except SystemExit:
             self.fail('Valid legacy #require should not raise SystemExit')
@@ -662,7 +663,6 @@ nop
                 memzone_mngr.global_zone,
                 isa_model,
                 preprocessor,
-                0
             )
 
         # Test invalid version requirement - should raise SystemExit
@@ -674,7 +674,6 @@ nop
                 memzone_mngr.global_zone,
                 isa_model,
                 preprocessor,
-                0
             )
 
     def test_require_directive_symbol_format(self):
@@ -683,7 +682,7 @@ nop
         from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 
         fp = pkg_resources.files(config_files).joinpath('eater-sap1-isa.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
 
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
@@ -691,7 +690,7 @@ nop
             isa_model.predefined_memory_zones,
         )
 
-        preprocessor = Preprocessor(isa_model.predefined_symbols, isa_model)
+        preprocessor = Preprocessor(isa_model.predefined_symbols, isa_model, diagnostic_reporter=self.diagnostic_reporter)
         line_id = LineIdentifier(1, 'test_require_directive_symbol_format')
 
         # Test valid symbol-based format - should not raise SystemExit
@@ -703,7 +702,6 @@ nop
                 memzone_mngr.global_zone,
                 isa_model,
                 preprocessor,
-                0
             )
         except SystemExit:
             self.fail('Valid version major #require should not raise SystemExit')
@@ -717,7 +715,6 @@ nop
                 memzone_mngr.global_zone,
                 isa_model,
                 preprocessor,
-                0
             )
 
         # Test implied format (symbol only, implies != 0) - use patch version since it's 1
@@ -729,7 +726,6 @@ nop
                 memzone_mngr.global_zone,
                 isa_model,
                 preprocessor,
-                0
             )
         except SystemExit:
             self.fail('Valid implied #require should not raise SystemExit')
@@ -743,7 +739,6 @@ nop
                 memzone_mngr.global_zone,
                 isa_model,
                 preprocessor,
-                0
             )
 
     def test_require_directive_symbol_format_basic(self):
@@ -757,7 +752,7 @@ nop
     def test_language_version_symbols_without_isa_model(self):
         """Test that preprocessor works without ISA model (no built-in symbols)."""
         # Create preprocessor without ISA model
-        preprocessor = Preprocessor()
+        preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
 
         # Test that built-in symbols don't exist
         self.assertIsNone(preprocessor.get_symbol('__LANGUAGE_NAME__'), '__LANGUAGE_NAME__ should not be defined')
@@ -786,7 +781,7 @@ nop
 
         # Test with different version formats
         mock_model_1 = MockISAModel('test-lang', '2.1.0')
-        preprocessor_1 = Preprocessor([], mock_model_1)
+        preprocessor_1 = Preprocessor([], mock_model_1, diagnostic_reporter=self.diagnostic_reporter)
 
         self.assertEqual(preprocessor_1.get_symbol('__LANGUAGE_NAME__').value, 'test-lang')
         self.assertEqual(preprocessor_1.get_symbol('__LANGUAGE_VERSION__').value, '2.1.0')
@@ -796,7 +791,7 @@ nop
 
         # Test with pre-release version
         mock_model_2 = MockISAModel('test-lang-2', '1.0.0-alpha.1')
-        preprocessor_2 = Preprocessor([], mock_model_2)
+        preprocessor_2 = Preprocessor([], mock_model_2, diagnostic_reporter=self.diagnostic_reporter)
 
         self.assertEqual(preprocessor_2.get_symbol('__LANGUAGE_NAME__').value, 'test-lang-2')
         self.assertEqual(preprocessor_2.get_symbol('__LANGUAGE_VERSION__').value, '1.0.0-alpha.1')
@@ -806,7 +801,7 @@ nop
 
         # Test with invalid version (should fall back to defaults)
         mock_model_3 = MockISAModel('test-lang-3', 'invalid-version')
-        preprocessor_3 = Preprocessor([], mock_model_3)
+        preprocessor_3 = Preprocessor([], mock_model_3, diagnostic_reporter=self.diagnostic_reporter)
 
         self.assertEqual(preprocessor_3.get_symbol('__LANGUAGE_NAME__').value, 'test-lang-3')
         self.assertEqual(preprocessor_3.get_symbol('__LANGUAGE_VERSION__').value, 'invalid-version')

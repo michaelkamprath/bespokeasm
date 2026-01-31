@@ -157,4 +157,4 @@ class DirectiveLine:
             isa_model.cstr_terminator,
             isa_model.string_byte_packing,
             isa_model.string_byte_packing_fill,
-        )
+            diagnostic_reporter=isa_model.diagnostic_reporter)

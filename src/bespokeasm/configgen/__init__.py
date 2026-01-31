@@ -1,5 +1,6 @@
 import re
 
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.utilities import PATTERN_ALLOWED_LABELS
 
@@ -14,7 +15,7 @@ class LanguageConfigGenerator:
                 language_version: str,
                 code_extension: str,
             ) -> None:
-        self._model = AssemblerModel(config_file_path, is_verbose)
+        self._model = AssemblerModel(config_file_path, is_verbose, DiagnosticReporter())
         self._verbose = is_verbose
         self._export_dir = export_dir
         self._language_name = self.model.isa_name if language_name is None else language_name

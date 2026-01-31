@@ -28,6 +28,7 @@ class IndexedRegisterOperand(RegisterOperand):
         regsiters: set[str],
         word_size: int,
         word_segment_size: int,
+        diagnostic_reporter,
     ) -> None:
         super().__init__(
             operand_id,
@@ -37,6 +38,7 @@ class IndexedRegisterOperand(RegisterOperand):
             regsiters,
             word_size,
             word_segment_size,
+            diagnostic_reporter,
         )
         self._index_operand_list = []
         op_match_patterns = []
@@ -49,6 +51,7 @@ class IndexedRegisterOperand(RegisterOperand):
                 regsiters,
                 word_size,
                 word_segment_size,
+                diagnostic_reporter,
             )
             if op.null_operand:
                 sys.exit(f'ERROR: indirect indexed register operand "{operand_id}" configured with a empty index "{op_id}".')

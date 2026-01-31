@@ -2,6 +2,7 @@ import importlib.resources as pkg_resources
 import unittest
 
 from bespokeasm.assembler.bytecode.word import Word
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.label_scope import LabelScopeType
@@ -40,17 +41,29 @@ class TestLineObject(unittest.TestCase):
         local_scope = LabelScope(LabelScopeType.LOCAL, global_scope, 'TestInstructionParsing')
         local_scope.set_label_value('.local_var', 10, lineid)
         cls.label_values = local_scope
-        cls.active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
 
     def setUp(self):
         InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN = None
+        self.diagnostic_reporter = DiagnosticReporter()
+        self.active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
 
     def test_data_line_creation(self):
         label_values = GlobalLabelScope(set())
         label_values.set_label_value('test1', 0x1234, 1)
         memzone = MemoryZone(16, 0, 2**16 - 1, 'GLOBAL')
 
-        d1 = DataLine.factory(27, ' .byte $de, $ad, 0xbe, $ef', 'steak', memzone, 8, 8, 'big', 'big', '\0',)
+        d1 = DataLine.factory(
+            27,
+            ' .byte $de, $ad, 0xbe, $ef',
+            'steak',
+            memzone,
+            8,
+            8,
+            'big',
+            'big',
+            '\0',
+            diagnostic_reporter=self.diagnostic_reporter,
+        )
         d1.label_scope = label_values
         d1.generate_words()
         self.assertIsInstance(d1, DataLine)
@@ -67,7 +80,18 @@ class TestLineObject(unittest.TestCase):
             '$deadbeef',
         )
 
-        d2 = DataLine.factory(38, ' .byte test1, 12', 'label mania', memzone, 8, 8, 'big', 'big', '\0',)
+        d2 = DataLine.factory(
+            38,
+            ' .byte test1, 12',
+            'label mania',
+            memzone,
+            8,
+            8,
+            'big',
+            'big',
+            '\0',
+            diagnostic_reporter=self.diagnostic_reporter,
+        )
         d2.label_scope = label_values
         d2.generate_words()
         self.assertIsInstance(d2, DataLine)
@@ -79,7 +103,18 @@ class TestLineObject(unittest.TestCase):
             'should slice first byte',
         )
 
-        d3 = DataLine.factory(38, ' .byte test1, , 12', 'label mania', memzone, 8, 8, 'big', 'big', '\0',)
+        d3 = DataLine.factory(
+            38,
+            ' .byte test1,  12',
+            'label mania',
+            memzone,
+            8,
+            8,
+            'big',
+            'big',
+            '\0',
+            diagnostic_reporter=self.diagnostic_reporter,
+        )
         d3.label_scope = label_values
         d3.generate_words()
         self.assertIsInstance(d3, DataLine)
@@ -91,7 +126,18 @@ class TestLineObject(unittest.TestCase):
             'should slice first byte, ignore bad argument',
         )
 
-        d4 = DataLine.factory(38, ' .byte b1110', 'label mania', memzone, 8, 8, 'big', 'big', '\0',)
+        d4 = DataLine.factory(
+            38,
+            ' .byte b1110',
+            'label mania',
+            memzone,
+            8,
+            8,
+            'big',
+            'big',
+            '\0',
+            diagnostic_reporter=self.diagnostic_reporter,
+        )
         d4.label_scope = label_values
         d4.generate_words()
         self.assertIsInstance(d4, DataLine)
@@ -105,7 +151,18 @@ class TestLineObject(unittest.TestCase):
 
         test_str = 'that\'s a test'
         d5_values = [ord(c) for c in test_str]
-        d5 = DataLine.factory(42, f' .byte "{test_str}"', 'string of bytes', memzone, 8, 8, 'big', 'big', 0,)
+        d5 = DataLine.factory(
+            42,
+            f' .byte "{test_str}"',
+            'string of bytes',
+            memzone,
+            8,
+            8,
+            'big',
+            'big',
+            0,
+            diagnostic_reporter=self.diagnostic_reporter,
+        )
         d5.label_scope = label_values
         d5.generate_words()
         self.assertIsInstance(d5, DataLine)
@@ -119,7 +176,18 @@ class TestLineObject(unittest.TestCase):
 
         d5a_values = [ord(c) for c in test_str]
         d5a_values.extend([0])
-        d5a = DataLine.factory(42, f' .cstr "{test_str}"', 'string of bytes', memzone, 8, 8, 'big', 'big', 0,)
+        d5a = DataLine.factory(
+            42,
+            f' .cstr "{test_str}"',
+            'string of bytes',
+            memzone,
+            8,
+            8,
+            'big',
+            'big',
+            0,
+            diagnostic_reporter=self.diagnostic_reporter,
+        )
         d5a.label_scope = label_values
         d5a.generate_words()
         self.assertIsInstance(d5a, DataLine)
@@ -133,7 +201,18 @@ class TestLineObject(unittest.TestCase):
 
         d6a_values = [ord(c) for c in test_str]
         d6a_values.extend([0])
-        d6a = DataLine.factory(42, f' .asciiz "{test_str}"', 'string of bytes', memzone, 8, 8, 'big', 'big', 0,)
+        d6a = DataLine.factory(
+            42,
+            f' .asciiz "{test_str}"',
+            'string of bytes',
+            memzone,
+            8,
+            8,
+            'big',
+            'big',
+            0,
+            diagnostic_reporter=self.diagnostic_reporter,
+        )
         d6a.label_scope = label_values
         d6a.generate_words()
         self.assertIsInstance(d6a, DataLine)
@@ -145,7 +224,18 @@ class TestLineObject(unittest.TestCase):
             'character string matches',
         )
 
-        d6 = DataLine.factory(38, ' .2byte test1, 12', '2 byte label mania', memzone, 8, 8, 'big', 'little', 0,)
+        d6 = DataLine.factory(
+            38,
+            ' .2byte test1, 12',
+            '2 byte label mania',
+            memzone,
+            8,
+            8,
+            'big',
+            'little',
+            0,
+            diagnostic_reporter=self.diagnostic_reporter,
+        )
         d6.label_scope = label_values
         d6.generate_words()
         self.assertIsInstance(d6, DataLine)
@@ -153,13 +243,26 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(d6.word_count, 4, 'data line has 4 words for 8-bit words')
         self.assertEqual(
             d6.get_words(),
-            [Word(0x34, 8, 8, 'big'), Word(0x12, 8, 8, 'big'), Word(0x0c, 8, 8, 'big'), Word(0, 8, 8, 'big')],
+            [
+                Word(0x34, 8, 8, 'big'),
+                Word(0x12, 8, 8, 'big'),
+                Word(0x0c, 8, 8, 'big'),
+                Word(0, 8, 8, 'big'),
+            ],
             'should slice first two bytes',
         )
 
         d7 = DataLine.factory(
-            38, '.4byte %11110111011001010100001100100001, $1945', '4 byte label mania',
-            memzone, 8, 8, 'big', 'little', 0,
+            38,
+            '.4byte %11110111011001010100001100100001, $1945',
+            '4 byte label mania',
+            memzone,
+            8,
+            8,
+            'big',
+            'little',
+            0,
+            diagnostic_reporter=self.diagnostic_reporter,
         )
         d7.label_scope = label_values
         d7.generate_words()
@@ -182,8 +285,16 @@ class TestLineObject(unittest.TestCase):
         )
 
         d8 = DataLine.factory(
-            38, '.4byte %11110111011001010100001100100001, $1945', '4 byte label mania',
-            memzone, 8, 8, 'big', 'big', '\0',
+            38,
+            '.4byte %11110111011001010100001100100001, $1945',
+            '4 byte label mania',
+            memzone,
+            8,
+            8,
+            'big',
+            'big',
+            '\0',
+            diagnostic_reporter=self.diagnostic_reporter,
         )
         d8.label_scope = label_values
         d8.generate_words()
@@ -205,7 +316,18 @@ class TestLineObject(unittest.TestCase):
             'should have each 4 byte numbe in big endian'
         )
 
-        d9 = DataLine.factory(38, '.4byte 0x0123456789abcdef', 'data masked!', memzone, 8, 8, 'big', 'little', '\0',)
+        d9 = DataLine.factory(
+            38,
+            '.4byte 0x0123456789abcdef',
+            'data masked!',
+            memzone,
+            8,
+            8,
+            'big',
+            'little',
+            '\0',
+            diagnostic_reporter=self.diagnostic_reporter,
+        )
         d9.label_scope = label_values
         d9.generate_words()
         self.assertIsInstance(d9, DataLine)
@@ -231,8 +353,7 @@ class TestLineObject(unittest.TestCase):
             8,
             'big',
             'little',
-            0,
-        )
+            0,  diagnostic_reporter=self.diagnostic_reporter)
         d9a.label_scope = label_values
         d9a.generate_words()
         self.assertIsInstance(d9a, DataLine)
@@ -256,7 +377,18 @@ class TestLineObject(unittest.TestCase):
         # ensure spaces in strings aren't truncated
         test_str2 = ' space '
         d10_values = [ord(c) for c in test_str2]
-        d10 = DataLine.factory(42, f' .byte "{test_str2}"', 'string of bytes', memzone, 8, 8, 'big', 'big', 0,)
+        d10 = DataLine.factory(
+            42,
+            f' .byte "{test_str2}"',
+            'string of bytes',
+            memzone,
+            8,
+            8,
+            'big',
+            'big',
+            0,
+            diagnostic_reporter=self.diagnostic_reporter,
+        )
         d10.label_scope = label_values
         d10.generate_words()
         self.assertIsInstance(d10, DataLine)
@@ -271,7 +403,18 @@ class TestLineObject(unittest.TestCase):
         # test escapes in strings
         d11_values = [0x20, 0x01, 0x20, 0x09, 0x20, 0x0A, 0x00]
         # must double escape escape sequences here because this is in python
-        d11 = DataLine.factory(38, '.cstr " \\x01 \\t \\n"', 'escape reality', memzone, 8, 8, 'big', 'big', 0,)
+        d11 = DataLine.factory(
+            38,
+            '.cstr " \\x01 \\t \\n"',
+            'escape reality',
+            memzone,
+            8,
+            8,
+            'big',
+            'big',
+            0,
+            diagnostic_reporter=self.diagnostic_reporter,
+        )
         d11.label_scope = label_values
         d11.generate_words()
         self.assertIsInstance(d11, DataLine)
@@ -293,8 +436,7 @@ class TestLineObject(unittest.TestCase):
             8,
             'big',
             'big',
-            0,
-        )
+            0,  diagnostic_reporter=self.diagnostic_reporter)
         label_values.set_label_value('PSAV', 0x1234, LineIdentifier(1, 'test_d12'))
         d12.label_scope = label_values
         d12.generate_words()
@@ -308,10 +450,32 @@ class TestLineObject(unittest.TestCase):
         )
 
         with self.assertRaises(SystemExit, msg='this instruction should fail'):
-            DataLine.factory(42, ' .cstr 0x42', 'bad cstr usage', memzone, 8, 8, 'big', 'big', 0,)
+            DataLine.factory(
+                42,
+                ' .cstr 0x42',
+                'bad cstr usage',
+                memzone,
+                8,
+                8,
+                'big',
+                'big',
+                0,
+                diagnostic_reporter=self.diagnostic_reporter,
+            )
 
         # test initialiation with negative numbers
-        d13 = DataLine.factory(38, '.4byte -5', 'neg five', memzone, 8, 8, 'big', 'big', 0,)
+        d13 = DataLine.factory(
+            38,
+            '.4byte -5',
+            'neg five',
+            memzone,
+            8,
+            8,
+            'big',
+            'big',
+            0,
+            diagnostic_reporter=self.diagnostic_reporter,
+        )
         d13.label_scope = label_values
         d13.generate_words()
         self.assertIsInstance(d13, DataLine)
@@ -329,7 +493,7 @@ class TestLineObject(unittest.TestCase):
         label_values.set_label_value('MY_VALUE', 20, 1)
         register_set = {'a', 'b', 'sp', 'mar'}
         memzone = MemoryZone(16, 0, 2**16 - 1, 'GLOBAL')
-        active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
+        active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
 
         l1: LabelLine = LabelLine.factory(
             13, 'my_label:', 'cool comment', register_set, label_values, active_named_scopes, memzone
@@ -422,7 +586,7 @@ class TestLineObject(unittest.TestCase):
 
     def test_label_line_with_instruction(self):
         fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -431,10 +595,10 @@ class TestLineObject(unittest.TestCase):
 
         label_values = GlobalLabelScope(isa_model.registers)
         label_values.set_label_value('a_const', 40, 1)
-        active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
+        active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         lineid = LineIdentifier(123, 'test_label_line_with_instruction')
 
-        preprocessor = Preprocessor()
+        preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
 
         # test data line on label line
         objs1: list[LineObject] = LineOjectFactory.parse_line(
@@ -446,7 +610,7 @@ class TestLineObject(unittest.TestCase):
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
-            ConditionStack(),
+            ConditionStack(self.diagnostic_reporter),
             0,
         )
         self.assertEqual(len(objs1), 2, 'there should be two instructions')
@@ -472,7 +636,7 @@ class TestLineObject(unittest.TestCase):
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
-            ConditionStack(),
+            ConditionStack(self.diagnostic_reporter),
             0,
         )
         self.assertEqual(len(objs2), 2, 'there should be two instructions')
@@ -501,7 +665,7 @@ class TestLineObject(unittest.TestCase):
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
-            ConditionStack(),
+            ConditionStack(self.diagnostic_reporter),
             0,
         )
         self.assertEqual(len(objs3), 1, 'there should be two instructions')
@@ -510,7 +674,7 @@ class TestLineObject(unittest.TestCase):
 
     def test_peculiar_label_line_situations(self):
         fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -519,10 +683,10 @@ class TestLineObject(unittest.TestCase):
 
         label_values = GlobalLabelScope(isa_model.registers)
         label_values.set_label_value('a_const', 40, 1)
-        active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
+        active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         lineid = LineIdentifier(123, 'test_unallowed_label_line_situations')
 
-        preprocessor = Preprocessor()
+        preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
 
         # multiple labels on a single line should be rejected
         with self.assertRaises(SystemExit, msg='only one label per line is allowed'):
@@ -535,7 +699,7 @@ class TestLineObject(unittest.TestCase):
                 memzone_mngr.global_zone,
                 memzone_mngr,
                 preprocessor,
-                ConditionStack(),
+                ConditionStack(self.diagnostic_reporter),
                 0,
             )
 
@@ -549,7 +713,7 @@ class TestLineObject(unittest.TestCase):
                 memzone_mngr.global_zone,
                 memzone_mngr,
                 preprocessor,
-                ConditionStack(),
+                ConditionStack(self.diagnostic_reporter),
                 0,
             )
 
@@ -566,7 +730,7 @@ class TestLineObject(unittest.TestCase):
 
     def test_instruction_line_creation(self):
         fp = pkg_resources.files(config_files).joinpath('test_instruction_list_creation_isa.json')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -688,7 +852,7 @@ class TestLineObject(unittest.TestCase):
 
     def test_bad_instruction_lines(self):
         fp = pkg_resources.files(config_files).joinpath('register_argument_exmaple_config.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(isa_model.address_size, isa_model.default_origin)
 
         # this instruction should fail because register A is not configured to be an
@@ -710,7 +874,7 @@ class TestLineObject(unittest.TestCase):
 
     def test_instruction_line_creation_little_endian(self):
         fp = pkg_resources.files(config_files).joinpath('test_instruction_line_creation_little_endian.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -784,7 +948,7 @@ class TestLineObject(unittest.TestCase):
 
     def test_specifc_configured_operands(self):
         fp = pkg_resources.files(config_files).joinpath('register_argument_exmaple_config.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -855,10 +1019,10 @@ class TestLineObject(unittest.TestCase):
     def test_test_line_object_factory(self):
         label_values = GlobalLabelScope(set())
         label_values.set_label_value('test1', 0x1234, 1)
-        active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
+        active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         line_id = LineIdentifier(33, 'test_test_line_object_factory')
         fp = pkg_resources.files(config_files).joinpath('test_instruction_line_creation_little_endian.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(isa_model.address_size, isa_model.default_origin)
 
         lo1: list[LineObject] = LineOjectFactory.parse_line(
@@ -869,8 +1033,8 @@ class TestLineObject(unittest.TestCase):
             active_named_scopes,
             memzone_mngr.global_zone,
             memzone_mngr,
-            Preprocessor(),
-            ConditionStack(),
+            Preprocessor(diagnostic_reporter=self.diagnostic_reporter),
+            ConditionStack(self.diagnostic_reporter),
             0,
         )
         self.assertEqual(len(lo1), 1, 'only one instruction to parse')
@@ -888,7 +1052,7 @@ class TestLineObject(unittest.TestCase):
 
     def test_compound_instruction_line(self):
         fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -896,18 +1060,18 @@ class TestLineObject(unittest.TestCase):
         )
 
         lineid = LineIdentifier(55, 'test_compound_instruction_line')
-        preprocessor = Preprocessor()
+        preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
 
         lol1 = LineOjectFactory.parse_line(
             lineid,
             'start: ADD .local_var+7',
             isa_model,
             TestLineObject.label_values,
-            TestLineObject.active_named_scopes,
+            self.active_named_scopes,
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
-            ConditionStack(),
+            ConditionStack(self.diagnostic_reporter),
             0,
         )
         self.assertEqual(len(lol1), 2, 'There should be two parsed instructions')
@@ -922,11 +1086,11 @@ class TestLineObject(unittest.TestCase):
             '.org $20 prog_start: ld x, [var1]',
             isa_model,
             TestLineObject.label_values,
-            TestLineObject.active_named_scopes,
+            self.active_named_scopes,
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
-            ConditionStack(),
+            ConditionStack(self.diagnostic_reporter),
             0,
         )
         self.assertEqual(len(lol2), 3, 'There should be 3 parsed instructions')
@@ -944,11 +1108,11 @@ class TestLineObject(unittest.TestCase):
             'ld x, [var1] add 47',
             isa_model,
             TestLineObject.label_values,
-            TestLineObject.active_named_scopes,
+            self.active_named_scopes,
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
-            ConditionStack(),
+            ConditionStack(self.diagnostic_reporter),
             0,
         )
         self.assertEqual(len(lol3), 2, 'There should be 2 parsed instructions')
@@ -962,11 +1126,11 @@ class TestLineObject(unittest.TestCase):
             'ADD nope_str&$00FF            NOP',
             isa_model,
             TestLineObject.label_values,
-            TestLineObject.active_named_scopes,
+            self.active_named_scopes,
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
-            ConditionStack(),
+            ConditionStack(self.diagnostic_reporter),
             0,
         )
         self.assertEqual(len(lol4), 2, 'There should be 2 parsed instructions')
@@ -982,11 +1146,11 @@ class TestLineObject(unittest.TestCase):
             'ADD 5+something_to_add',
             isa_model,
             TestLineObject.label_values,
-            TestLineObject.active_named_scopes,
+            self.active_named_scopes,
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
-            ConditionStack(),
+            ConditionStack(self.diagnostic_reporter),
             0,
         )
         self.assertEqual(len(lol4), 1, 'There should be 2 parsed instructions')
@@ -998,11 +1162,11 @@ class TestLineObject(unittest.TestCase):
                 'the_label: const = 3 ; label with constant',
                 isa_model,
                 TestLineObject.label_values,
-                TestLineObject.active_named_scopes,
+                self.active_named_scopes,
                 memzone_mngr.global_zone,
                 memzone_mngr,
                 preprocessor,
-                ConditionStack(),
+                ConditionStack(self.diagnostic_reporter),
                 0,
             )
 
@@ -1013,17 +1177,17 @@ class TestLineObject(unittest.TestCase):
                     'ADD nope_str&$00FF       newLabel:',
                     isa_model,
                     TestLineObject.label_values,
-                    TestLineObject.active_named_scopes,
+                    self.active_named_scopes,
                     memzone_mngr.global_zone,
                     memzone_mngr,
                     preprocessor,
-                    ConditionStack(),
+                    ConditionStack(self.diagnostic_reporter),
                     0,
                 )
 
     def test_multiple_instuction_lines_with_org(self):
         fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -1031,7 +1195,7 @@ class TestLineObject(unittest.TestCase):
         )
 
         lineid = LineIdentifier(55, 'test_multiple_instuction_lines_with_org')
-        preprocessor = Preprocessor()
+        preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
 
         # test .org directive then a label
         lol1 = LineOjectFactory.parse_line(
@@ -1039,11 +1203,11 @@ class TestLineObject(unittest.TestCase):
             '.org $20 prog_start: foo $1234',   # having an instruction follow a lable is OK
             isa_model,
             TestLineObject.label_values,
-            TestLineObject.active_named_scopes,
+            self.active_named_scopes,
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
-            ConditionStack(),
+            ConditionStack(self.diagnostic_reporter),
             0,
         )
         self.assertEqual(len(lol1), 3, 'There should be 2 parsed instructions')
@@ -1074,11 +1238,11 @@ class TestLineObject(unittest.TestCase):
             'prog_start: .org $20',     # having an instruction follow an org is not supported
             isa_model,
             TestLineObject.label_values,
-            TestLineObject.active_named_scopes,
+            self.active_named_scopes,
             memzone_mngr2.global_zone,
             memzone_mngr2,
             preprocessor,
-            ConditionStack(),
+            ConditionStack(self.diagnostic_reporter),
             0,
         )
 
@@ -1096,7 +1260,7 @@ class TestLineObject(unittest.TestCase):
 
     def test_unknown_instruction(self):
         fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -1111,17 +1275,17 @@ class TestLineObject(unittest.TestCase):
                     '  madeup my_val ; my_comment',
                     isa_model,
                     TestLineObject.label_values,
-                    TestLineObject.active_named_scopes,
+                    self.active_named_scopes,
                     memzone_mngr.global_zone,
                     memzone_mngr,
-                    Preprocessor(),
-                    ConditionStack(),
+                    Preprocessor(diagnostic_reporter=self.diagnostic_reporter),
+                    ConditionStack(self.diagnostic_reporter),
                     0,
                 )
 
     def test_embedded_string_lines(self):
         fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         # force embedded strings to be allowed
         isa_model._config['general']['allow_embedded_strings'] = True
         memzone_mngr = MemoryZoneManager(
@@ -1178,11 +1342,11 @@ class TestLineObject(unittest.TestCase):
             'add 5 "this is a test" nop',
             isa_model,
             TestLineObject.label_values,
-            TestLineObject.active_named_scopes,
+            self.active_named_scopes,
             memzone_mngr.global_zone,
             memzone_mngr,
-            Preprocessor(),
-            ConditionStack(),
+            Preprocessor(diagnostic_reporter=self.diagnostic_reporter),
+            ConditionStack(self.diagnostic_reporter),
             0,
         )
         self.assertEqual(len(lo1), 3, 'There should be 3 parsed instructions')
@@ -1209,36 +1373,36 @@ class TestLineObject(unittest.TestCase):
                 'add 5 "this is a test" nop',
                 isa_model,
                 TestLineObject.label_values,
-                TestLineObject.active_named_scopes,
+                self.active_named_scopes,
                 memzone_mngr.global_zone,
                 memzone_mngr,
-                Preprocessor(),
-                ConditionStack(),
+                Preprocessor(diagnostic_reporter=self.diagnostic_reporter),
+                ConditionStack(self.diagnostic_reporter),
                 0,
             )
 
     def test_multiple_instructions_per_line(self):
         """Doc: General Assembler Syntax - multiple instructions may share a line."""
         fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
             isa_model.predefined_memory_zones,
         )
         lineid = LineIdentifier(77, 'test_multiple_instructions_per_line')
-        preprocessor = Preprocessor()
+        preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
 
         line_objs = LineOjectFactory.parse_line(
             lineid,
             'nop nop',
             isa_model,
             TestLineObject.label_values,
-            TestLineObject.active_named_scopes,
+            self.active_named_scopes,
             memzone_mngr.global_zone,
             memzone_mngr,
             preprocessor,
-            ConditionStack(),
+            ConditionStack(self.diagnostic_reporter),
             0,
         )
         self.assertEqual(len(line_objs), 2, 'two instructions should be parsed on one line')
@@ -1246,7 +1410,7 @@ class TestLineObject(unittest.TestCase):
 
     def test_embedded_string_bugs(self):
         fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         # force embedded strings to be allowed
         isa_model._config['general']['allow_embedded_strings'] = True
         memzone_mngr = MemoryZoneManager(
@@ -1287,11 +1451,11 @@ class TestLineObject(unittest.TestCase):
             'add 5 "this is a test\nof new lines" nop ; comments',
             isa_model,
             TestLineObject.label_values,
-            TestLineObject.active_named_scopes,
+            self.active_named_scopes,
             memzone_mngr.global_zone,
             memzone_mngr,
-            Preprocessor(),
-            ConditionStack(),
+            Preprocessor(diagnostic_reporter=self.diagnostic_reporter),
+            ConditionStack(self.diagnostic_reporter),
             0,
         )
         self.assertEqual(len(lo1), 3, 'There should be 3 parsed instructions')
@@ -1303,7 +1467,7 @@ class TestLineObject(unittest.TestCase):
     def test_multiple_embedded_stringa_bug(self):
         # ensure that a single line of code can correctly parse multiple embedded strings
         fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         isa_model._config['general']['allow_embedded_strings'] = True
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
@@ -1320,11 +1484,11 @@ class TestLineObject(unittest.TestCase):
             'add VALUE2 "string 1" nop "string 2" nop',
             isa_model,
             TestLineObject.label_values,
-            TestLineObject.active_named_scopes,
+            self.active_named_scopes,
             memzone_mngr.global_zone,
             memzone_mngr,
-            Preprocessor(),
-            ConditionStack(),
+            Preprocessor(diagnostic_reporter=self.diagnostic_reporter),
+            ConditionStack(self.diagnostic_reporter),
             0,
         )
         self.assertEqual(len(lo2), 5, 'There should be 5 parsed instructions')

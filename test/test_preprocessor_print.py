@@ -3,6 +3,7 @@ import unittest
 from unittest.mock import patch
 
 from bespokeasm.assembler.assembly_file import AssemblyFile
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
@@ -18,20 +19,23 @@ from test import test_code
 
 
 class TestPreprocessorPrint(unittest.TestCase):
+    def setUp(self):
+        self.diagnostic_reporter = DiagnosticReporter()
+
     def _load_file(self, asm_filename: str, log_verbosity: int):
         fp = pkg_resources.files(config_files).joinpath('test_compilation_control.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
             isa_model.predefined_memory_zones,
         )
         label_scope = GlobalLabelScope(isa_model.registers)
-        preprocessor = Preprocessor()
-        named_scope_manager = NamedScopeManager()
+        preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
+        named_scope_manager = NamedScopeManager(self.diagnostic_reporter)
 
         asm_fp = pkg_resources.files(test_code).joinpath(asm_filename)
-        asm_obj = AssemblyFile(asm_fp, label_scope, named_scope_manager)
+        asm_obj = AssemblyFile(asm_fp, label_scope, named_scope_manager, named_scope_manager.diagnostic_reporter)
 
         return asm_obj.load_line_objects(
             isa_model,
@@ -43,15 +47,15 @@ class TestPreprocessorPrint(unittest.TestCase):
 
     def _model_and_state(self):
         fp = pkg_resources.files(config_files).joinpath('test_compilation_control.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
             isa_model.predefined_memory_zones,
         )
         label_scope = GlobalLabelScope(isa_model.registers)
-        preprocessor = Preprocessor()
-        active_named_scopes = ActiveNamedScopeList(NamedScopeManager())
+        preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
+        active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         return isa_model, memzone_mngr, label_scope, preprocessor, active_named_scopes
 
     def test_print_basic_always(self):
@@ -106,7 +110,10 @@ class TestPreprocessorPrint(unittest.TestCase):
                 memzone_mngr,
                 preprocessor,
                 # a fresh condition stack defaults to active and unmuted
-                __import__('bespokeasm.assembler.preprocessor.condition_stack', fromlist=['ConditionStack']).ConditionStack(),
+                __import__(
+                    'bespokeasm.assembler.preprocessor.condition_stack',
+                    fromlist=['ConditionStack'],
+                ).ConditionStack(self.diagnostic_reporter),
                 0,
             )
             self.assertEqual(len(objs), 1, 'one line object should be produced')
@@ -128,7 +135,10 @@ class TestPreprocessorPrint(unittest.TestCase):
                 memzone_mngr.global_zone,
                 memzone_mngr,
                 preprocessor,
-                __import__('bespokeasm.assembler.preprocessor.condition_stack', fromlist=['ConditionStack']).ConditionStack(),
+                __import__(
+                    'bespokeasm.assembler.preprocessor.condition_stack',
+                    fromlist=['ConditionStack'],
+                ).ConditionStack(self.diagnostic_reporter),
                 2,
             )
             calls_low = [c.args[0] for c in mock_echo_low.call_args_list if isinstance(c.args[0], str)]
@@ -144,7 +154,10 @@ class TestPreprocessorPrint(unittest.TestCase):
                 memzone_mngr.global_zone,
                 memzone_mngr,
                 preprocessor,
-                __import__('bespokeasm.assembler.preprocessor.condition_stack', fromlist=['ConditionStack']).ConditionStack(),
+                __import__(
+                    'bespokeasm.assembler.preprocessor.condition_stack',
+                    fromlist=['ConditionStack'],
+                ).ConditionStack(self.diagnostic_reporter),
                 3,
             )
             calls_high = [c.args[0] for c in mock_echo_high.call_args_list if isinstance(c.args[0], str)]

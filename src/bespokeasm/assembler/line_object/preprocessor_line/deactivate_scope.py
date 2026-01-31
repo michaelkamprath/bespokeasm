@@ -25,7 +25,6 @@ class DeactivateScopeLine(PreprocessorLine):
         isa_model: AssemblerModel,
         named_scope_manager: NamedScopeManager,
         filename: str,
-        log_verbosity: int
     ) -> None:
         """Deactivate a named scope for the current file."""
         super().__init__(line_id, instruction, comment, memzone)
@@ -41,8 +40,12 @@ class DeactivateScopeLine(PreprocessorLine):
             self._scope_name = scope_name
             self._filename = filename
 
-            if log_verbosity >= 2:
-                print(f'INFO: {line_id} - Deactivated named scope "{scope_name}" for file "{filename}"')
+            if isa_model is not None:
+                isa_model.diagnostic_reporter.info(
+                    line_id,
+                    f'Deactivated named scope "{scope_name}" for file "{filename}"',
+                    min_verbosity=2,
+                )
         else:
             sys.exit(f'ERROR: {line_id} - Invalid #deactivate-scope directive syntax: {instruction}')
 

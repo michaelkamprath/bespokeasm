@@ -22,6 +22,7 @@ class NumericEnumerationOperand(NumericExpressionOperand):
         registers: set[str],
         word_size: int,
         word_segment_size: int,
+        diagnostic_reporter,
     ) -> None:
         super().__init__(
             operand_id,
@@ -30,7 +31,8 @@ class NumericEnumerationOperand(NumericExpressionOperand):
             default_intra_word_endian,
             word_size,
             word_segment_size,
-            False,
+            diagnostic_reporter,
+            require_arg=False,
         )
         self._bytecode_dictionary = None
         if self.has_bytecode:

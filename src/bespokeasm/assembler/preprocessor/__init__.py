@@ -1,6 +1,7 @@
 import re
 import sys
 
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.preprocessor.symbol import PreprocessorSymbol
 from bespokeasm.assembler.preprocessor.symbol import SYMBOL_PATTERN
@@ -8,7 +9,16 @@ from packaging import version
 
 
 class Preprocessor:
-    def __init__(self, predefined_symbols: dict[str, str] = {}, isa_model=None) -> None:
+    def __init__(
+        self,
+        predefined_symbols: dict[str, str] = {},
+        isa_model=None,
+        *,
+        diagnostic_reporter: DiagnosticReporter,
+    ) -> None:
+        if diagnostic_reporter is None:
+            raise ValueError('DiagnosticReporter is required for Preprocessor')
+        self._diagnostic_reporter = diagnostic_reporter
         self._symbols: dict[str, PreprocessorSymbol] = {}
 
         # Add built-in language version symbols if ISA model is provided
@@ -28,6 +38,10 @@ class Preprocessor:
                     f'ERROR: Preprocessor symbol {symbol_def["name"]} is defined multiple times in '
                     f'instruction set configuration YAML file.'
                 )
+
+    @property
+    def diagnostic_reporter(self):
+        return self._diagnostic_reporter
 
     def add_cli_symbols(self, cli_symbols: list[str]) -> None:
         for symbol_str in cli_symbols:

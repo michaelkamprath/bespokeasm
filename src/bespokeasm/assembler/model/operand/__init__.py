@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import enum
 import sys
-import warnings
 
 from bespokeasm.assembler.bytecode.parts import ByteCodePart
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 
@@ -40,13 +40,17 @@ class Operand:
         default_intra_word_endian,
         word_size,
         word_segment_size,
+        diagnostic_reporter: DiagnosticReporter,
     ):
+        if diagnostic_reporter is None:
+            raise ValueError('DiagnosticReporter is required for Operand construction')
         self._id = operand_id
         self._config = arg_config_dict
         self._default_multi_word_endian = default_multi_word_endian
         self._default_intra_word_endian = default_intra_word_endian
         self._word_size = word_size
         self._word_segment_size = word_segment_size
+        self._diagnostic_reporter = diagnostic_reporter
 
     def __repr__(self):
         return str(self)
@@ -136,6 +140,7 @@ class OperandWithArgument(Operand):
         default_intra_word_endian,
         word_size,
         word_segment_size,
+        diagnostic_reporter: DiagnosticReporter,
         require_arg: bool = True,
     ) -> None:
         super().__init__(
@@ -145,6 +150,7 @@ class OperandWithArgument(Operand):
             default_intra_word_endian,
             word_size,
             word_segment_size,
+            diagnostic_reporter,
         )
         if require_arg and 'argument' not in self._config:
             sys.exit(f'ERROR: configuration for numeric operand {self} does not have an argument configuration')
@@ -170,12 +176,12 @@ class OperandWithArgument(Operand):
 
     @property
     def argument_endian(self) -> str:
-        warnings.warn(
+        self._diagnostic_reporter.warn(
+            None,
             f"The 'endian' option for argument configuration in operand configuration {self} is "
             f'deprecated and will be removed in a future version. '
             f"Replace with 'multi_word_endian' and 'intra_word_endian'.",
-            DeprecationWarning,
-            stacklevel=2
+            category='deprecation',
         )
         return self.argument_multi_word_endian
 

@@ -19,6 +19,7 @@ class OperandSet:
         regsiters: set[str],
         word_size: int,
         word_segment_size: int,
+        diagnostic_reporter,
     ) -> None:
         self._name = name
         self._config = config_dict
@@ -32,6 +33,7 @@ class OperandSet:
                 regsiters,
                 word_size,
                 word_segment_size,
+                diagnostic_reporter,
             )
             if operand.null_operand:
                 # null operands not supported in operand sets. must use specific operand configuration.
@@ -93,6 +95,7 @@ class OperandSetCollection(dict):
         registers: set[str],
         word_size: int,
         word_segment_size: int,
+        diagnostic_reporter,
     ) -> None:
         super().__init__(self)
         for set_name, set_config in config_dict.items():
@@ -104,6 +107,7 @@ class OperandSetCollection(dict):
                 registers,
                 word_size,
                 word_segment_size,
+                diagnostic_reporter,
             )
 
     def __repr__(self) -> str:

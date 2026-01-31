@@ -97,6 +97,7 @@ class AddressOperand(NumericExpressionOperand):
         default_intra_word_endian: str,
         word_size: int,
         word_segment_size: int,
+        diagnostic_reporter,
     ) -> None:
         super().__init__(
             operand_id,
@@ -105,6 +106,8 @@ class AddressOperand(NumericExpressionOperand):
             default_intra_word_endian,
             word_size,
             word_segment_size,
+            diagnostic_reporter,
+            require_arg=True,
         )
 
     def __str__(self):

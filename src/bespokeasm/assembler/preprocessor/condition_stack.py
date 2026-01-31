@@ -1,16 +1,18 @@
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.condition import EndifPreprocessorCondition
 from bespokeasm.assembler.preprocessor.condition import MutePreprocessorCondition
 from bespokeasm.assembler.preprocessor.condition import PreprocessorCondition
 from bespokeasm.assembler.preprocessor.condition import UnmutePreprocessorCondition
-from bespokeasm.assembler.warning_reporter import WarningReporter
 
 
 class ConditionStack:
-    def __init__(self, warning_reporter: WarningReporter | None = None):
+    def __init__(self, diagnostic_reporter: DiagnosticReporter):
+        if diagnostic_reporter is None:
+            raise ValueError('DiagnosticReporter is required for ConditionStack')
         self._stack: list[PreprocessorCondition] = []
         self._mute_counter = 0
-        self._warning_reporter = warning_reporter or WarningReporter(False)
+        self._diagnostic_reporter = diagnostic_reporter
 
     def process_condition(self, condition: PreprocessorCondition, preprocessor: Preprocessor):
         if isinstance(condition, EndifPreprocessorCondition):
@@ -23,7 +25,7 @@ class ConditionStack:
         elif isinstance(condition, UnmutePreprocessorCondition):
             if self.currently_active(preprocessor):
                 if self._mute_counter == 0:
-                    self._warning_reporter.warn(
+                    self._diagnostic_reporter.warn(
                         condition.line_id,
                         '#unmute has no effect (no active #mute)',
                     )

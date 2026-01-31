@@ -18,6 +18,7 @@ class NumericBytecode(Operand):
         default_intra_word_endian: str,
         word_size: int,
         word_segment_size: int,
+        diagnostic_reporter,
     ):
         super().__init__(
             operand_id,
@@ -26,6 +27,7 @@ class NumericBytecode(Operand):
             default_intra_word_endian,
             word_size,
             word_segment_size,
+            diagnostic_reporter,
         )
         # validate config
         if self.bytecode_max < self.bytecode_min:

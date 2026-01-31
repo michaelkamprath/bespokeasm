@@ -3,6 +3,7 @@ import unittest
 
 import bespokeasm.assembler.model.operand_set as AS
 from bespokeasm.assembler.bytecode.word import Word
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.label_scope import LabelScopeType
 from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
@@ -32,17 +33,27 @@ class TestConfigObject(unittest.TestCase):
         cls.label_values.set_label_value('label1', 2, 1)
         cls.label_values.set_label_value('LABEL2', 0xF0, 2)
 
+    def setUp(self):
+        self.diagnostic_reporter = DiagnosticReporter()
+
     def test_argument_set_construction(self):
         yaml_loader = YAML()
         conf1 = yaml_loader.load(self._eater_sap1_config_str)
-        arg_collection1 = AS.OperandSetCollection(conf1['operand_sets'], 'big', 'big', set(), 8, 8,)
+        reporter = self.diagnostic_reporter
+        arg_collection1 = AS.OperandSetCollection(conf1['operand_sets'], 'big', 'big', set(), 8, 8, reporter)
         self.assertEqual(len(arg_collection1), 2, 'there are 2 argument sets')
         self.assertTrue('integer' in arg_collection1)
         self.assertTrue('address' in arg_collection1)
 
         conf2 = yaml_loader.load(self._register_argument_config_str)
         arg_collection2 = AS.OperandSetCollection(
-            conf2['operand_sets'], 'little', 'little', {'a', 'i', 'j', 'sp', 'ij', 'mar'}, 8, 8,
+            conf2['operand_sets'],
+            'little',
+            'little',
+            {'a', 'i', 'j', 'sp', 'ij', 'mar'},
+            8,
+            8,
+            reporter,
         )
         self.assertEqual(len(arg_collection2), 4, 'there are 4 argument sets')
         self.assertTrue('8_bit_source' in arg_collection2)
@@ -52,9 +63,9 @@ class TestConfigObject(unittest.TestCase):
 
     def test_instruction_parsing(self):
         fp = pkg_resources.files(config_files).joinpath('eater-sap1-isa.yaml')
-        model1 = AssemblerModel(str(fp), 0)
+        model1 = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(model1.address_size, model1.default_origin)
-        named_scope_manager = NamedScopeManager()
+        named_scope_manager = NamedScopeManager(self.diagnostic_reporter)
 
         test_line_id = LineIdentifier(1212, 'test_instruction_parsing')
 
@@ -104,7 +115,7 @@ class TestConfigObject(unittest.TestCase):
         )
 
         fp = pkg_resources.files(config_files).joinpath('register_argument_exmaple_config.yaml')
-        model2 = AssemblerModel(str(fp), 0)
+        model2 = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr2 = MemoryZoneManager(model2.address_size, model2.default_origin)
 
         piA = InstructioParser.parse_instruction(
@@ -375,23 +386,23 @@ class TestConfigObject(unittest.TestCase):
     def test_bad_registers_in_configuratin(self):
         fp = pkg_resources.files(config_files).joinpath('test_bad_registers_in_configuratin.yaml')
         with self.assertRaises(SystemExit, msg='model configuration should not specify prohibited register names'):
-            AssemblerModel(str(fp), 0)
+            AssemblerModel(str(fp), 0, self.diagnostic_reporter)
 
     def test_min_required_version(self):
         fp = pkg_resources.files(config_files).joinpath('test_min_required_version_config.yaml')
         with self.assertRaises(SystemExit, msg='the min version check should fail'):
-            AssemblerModel(str(fp), 0)
+            AssemblerModel(str(fp), 0, self.diagnostic_reporter)
 
     def test_predefined_entities(self):
         fp = pkg_resources.files(config_files).joinpath('test_compiler_features.yaml')
-        model = AssemblerModel(str(fp), 0)
+        model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
 
         self.assertSetEqual(set(model.predefined_labels), {'CONST1', 'CONST2', 'buffer'}, 'label set should equal')
         self.assertSetEqual(model.registers, {'a', 'b', 'x'}, 'registers should include documented names')
 
     def test_mnemonic_lists(self):
         fp = pkg_resources.files(config_files).joinpath('test_instruction_macros.yaml')
-        model = AssemblerModel(str(fp), 0)
+        model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
 
         self.assertSetEqual(
             model.instruction_mnemonics,
@@ -415,7 +426,7 @@ class TestConfigObject(unittest.TestCase):
 
     def test_word_size_and_segment_size(self):
         fp = pkg_resources.files(config_files).joinpath('test_16bit_data_words.yaml')
-        model = AssemblerModel(str(fp), 0)
+        model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         self.assertEqual(model.word_size, 16, 'word size should match')
         self.assertEqual(model.word_segment_size, 16, 'word segment size should match')
         self.assertEqual(model.intra_word_endianness, 'big', 'intra-word endianness should match')
@@ -457,7 +468,7 @@ class TestConfigObject(unittest.TestCase):
             tmp_path = tmp.name
         try:
             with self.assertRaises(SystemExit) as cm:
-                AssemblerModel(tmp_path, 0)
+                AssemblerModel(tmp_path, 0, self.diagnostic_reporter)
             self.assertIn('Duplicate mnemonic or alias found: "jsr"', str(cm.exception))
         finally:
             os.remove(tmp_path)

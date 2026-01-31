@@ -24,6 +24,7 @@ class EnumerationOperand(OperandWithArgument):
         registers: set[str],
         word_size: int,
         word_segment_size: int,
+        diagnostic_reporter,
     ):
         super().__init__(
             operand_id,
@@ -32,6 +33,8 @@ class EnumerationOperand(OperandWithArgument):
             default_intra_word_endian,
             word_size,
             word_segment_size,
+            True,
+            diagnostic_reporter,
         )
         self._bytecode_dictionary = None
         if self.has_bytecode:

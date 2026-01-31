@@ -5,6 +5,7 @@ from bespokeasm.assembler.bytecode.parts import CompositeByteCodePart
 from bespokeasm.assembler.bytecode.parts import ExpressionByteCodePart
 from bespokeasm.assembler.bytecode.parts import NumericByteCodePart
 from bespokeasm.assembler.bytecode.word import Word
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
@@ -12,6 +13,9 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 
 
 class TestBytecodeObjects(unittest.TestCase):
+
+    def setUp(self):
+        self.diagnostic_reporter = DiagnosticReporter()
 
     def test_bytecode_assembly(self):
         test_line_id = LineIdentifier(88, 'test_bytecode_assembly')
@@ -29,7 +33,7 @@ class TestBytecodeObjects(unittest.TestCase):
 
         ai1 = AssembledInstruction(123, parts1, 8, 8, 'big', 'big')
         self.assertEqual(ai1.word_count, 1)
-        words1 = ai1.get_words(label_values, ActiveNamedScopeList(NamedScopeManager()), 0x8000, 1)
+        words1 = ai1.get_words(label_values, ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter)), 0x8000, 1)
         self.assertEqual(words1, [Word(0xff, 8, 8, 'big')], 'generated words should match')
 
         parts2 = [
@@ -41,7 +45,7 @@ class TestBytecodeObjects(unittest.TestCase):
 
         ai2 = AssembledInstruction(456, parts2, 8, 8, 'big', 'big')
         self.assertEqual(ai2.word_count, 8)
-        words2 = ai2.get_words(label_values, ActiveNamedScopeList(NamedScopeManager()), 0x8000, 8)
+        words2 = ai2.get_words(label_values, ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter)), 0x8000, 8)
         self.assertEqual(
             words2,
             [
@@ -71,25 +75,53 @@ class TestBytecodeObjects(unittest.TestCase):
         c1 = CompositeByteCodePart([p1, p2], False, 'big', 'big', test_line_id, 8, 8)
         self.assertEqual(5, c1.value_size, 'bit size should match')
         self.assertEqual(
-            7, c1.get_value(label_values, ActiveNamedScopeList(NamedScopeManager()), 0x8000, 5), 'value should match'
+            7,
+            c1.get_value(
+                label_values,
+                ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter)),
+                0x8000,
+                5,
+            ),
+            'value should match'
         )
 
         c2 = CompositeByteCodePart([p2, p1], False, 'big', 'big', test_line_id, 8, 8)
         self.assertEqual(5, c2.value_size, 'bit size should match')
         self.assertEqual(
-            25, c2.get_value(label_values, ActiveNamedScopeList(NamedScopeManager()), 0x8000, 5), 'value should match'
+            25,
+            c2.get_value(
+                label_values,
+                ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter)),
+                0x8000,
+                5,
+            ),
+            'value should match'
         )
 
         c3 = CompositeByteCodePart([p1, p2, p3], False, 'big', 'big', test_line_id, 8, 8)
         self.assertEqual(9, c3.value_size, 'bit size should match')
         self.assertEqual(
-            127, c3.get_value(label_values, ActiveNamedScopeList(NamedScopeManager()), 0x8000, 9), 'value should match'
+            127,
+            c3.get_value(
+                label_values,
+                ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter)),
+                0x8000,
+                9,
+            ),
+            'value should match'
         )
 
         c4 = CompositeByteCodePart([p1, p2, p1], False, 'big', 'big', test_line_id, 8, 8)
         self.assertEqual(8, c4.value_size, 'bit size should match')
         self.assertEqual(
-            57, c4.get_value(label_values, ActiveNamedScopeList(NamedScopeManager()), 0x8000, 8), 'value should match'
+            57,
+            c4.get_value(
+                label_values,
+                ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter)),
+                0x8000,
+                8,
+            ),
+            'value should match'
         )
 
     def test_compact_parts_to_words(self):
@@ -104,7 +136,14 @@ class TestBytecodeObjects(unittest.TestCase):
         ]
 
         words = CompositeByteCodePart.compact_parts_to_words(
-            parts, 8, 8, 'big', label_values, ActiveNamedScopeList(NamedScopeManager()), 0x8000, 1
+            parts,
+            8,
+            8,
+            'big',
+            label_values,
+            ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter)),
+            0x8000,
+            1,
         )
         self.assertEqual(
             words,
@@ -120,7 +159,14 @@ class TestBytecodeObjects(unittest.TestCase):
             NumericByteCodePart(3, 4, False, 'big', 'big', test_line_id, 16, 8),
         ]
         words = CompositeByteCodePart.compact_parts_to_words(
-            parts, 16, 8, 'big', label_values, ActiveNamedScopeList(NamedScopeManager()), 0x8000, 1
+            parts,
+            16,
+            8,
+            'big',
+            label_values,
+            ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter)),
+            0x8000,
+            1,
         )
         self.assertEqual(
             words,
@@ -136,7 +182,14 @@ class TestBytecodeObjects(unittest.TestCase):
             NumericByteCodePart(3, 8, False, 'big', 'big', test_line_id, 32, 8),
         ]
         words = CompositeByteCodePart.compact_parts_to_words(
-            parts, 32, 8, 'big', label_values, ActiveNamedScopeList(NamedScopeManager()), 0x8000, 1
+            parts,
+            32,
+            8,
+            'big',
+            label_values,
+            ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter)),
+            0x8000,
+            1,
         )
         self.assertEqual(
             words,
@@ -166,7 +219,7 @@ class TestBytecodeObjects(unittest.TestCase):
             'big',
         )
         self.assertEqual(ai1.word_count, 1)
-        words1 = ai1.get_words(label_values, ActiveNamedScopeList(NamedScopeManager()), 0x8000, 1)
+        words1 = ai1.get_words(label_values, ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter)), 0x8000, 1)
         self.assertEqual(words1, [Word(0xff00, 16, 8, 'big')], 'generated words should match')
 
         test_line_id = LineIdentifier(2, 'test_bytecode_assembly_16bit_word')
@@ -186,7 +239,7 @@ class TestBytecodeObjects(unittest.TestCase):
             'big',
         )
         self.assertEqual(ai2.word_count, 5)
-        words2 = ai2.get_words(label_values, ActiveNamedScopeList(NamedScopeManager()), 0x8000, 8)
+        words2 = ai2.get_words(label_values, ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter)), 0x8000, 8)
         self.assertEqual(
             words2,
             [

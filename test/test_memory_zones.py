@@ -4,6 +4,7 @@ import tempfile
 import unittest
 
 from bespokeasm.assembler.assembly_file import AssemblyFile
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.label_scope import GlobalLabelScope
 from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
@@ -19,6 +20,7 @@ from test import test_code
 class TestMemoryZones(unittest.TestCase):
     def setUp(self):
         InstructionLine.reset_instruction_pattern_cache()
+        self.diagnostic_reporter = DiagnosticReporter()
 
     def test_memory_zone_obj(self):
         z1 = MemoryZone(16, 0, 0x7FFF, 'test_zone_1')
@@ -27,20 +29,20 @@ class TestMemoryZones(unittest.TestCase):
 
     def test_memory_zone_creation(self):
         fp = pkg_resources.files(config_files).joinpath('test_memory_zones.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         label_scope = GlobalLabelScope(isa_model.registers)
         memzone_manager = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
             isa_model.predefined_memory_zones
         )
-        preprocessor = Preprocessor()
-        named_scope_manager = NamedScopeManager()
+        preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
+        named_scope_manager = NamedScopeManager(self.diagnostic_reporter)
         self.assertEqual(memzone_manager.global_zone.start, 0x0100, 'global zone starts at $0100')
         self.assertEqual(memzone_manager.global_zone.end, 0xDFFF, 'global zone ends at $DFFF')
 
         asm_fp = pkg_resources.files(test_code).joinpath('test_memory_zones.asm')
-        asm_obj = AssemblyFile(asm_fp, label_scope, named_scope_manager)
+        asm_obj = AssemblyFile(asm_fp, label_scope, named_scope_manager, named_scope_manager.diagnostic_reporter)
 
         line_objs = asm_obj.load_line_objects(
             isa_model,
@@ -67,7 +69,7 @@ class TestMemoryZones(unittest.TestCase):
 
     def test_invalid_memory_zones(self):
         fp = pkg_resources.files(config_files).joinpath('test_memory_zones.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_manager = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -86,15 +88,15 @@ class TestMemoryZones(unittest.TestCase):
     def test_include_resets_memzone_to_global(self):
         """Doc: Memory Zones > Memory Zone Scope - included files compile into GLOBAL and caller memzone resumes."""
         fp = pkg_resources.files(config_files).joinpath('test_memory_zones.yaml')
-        isa_model = AssemblerModel(str(fp), 0)
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         label_scope = GlobalLabelScope(isa_model.registers)
         memzone_manager = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
             isa_model.predefined_memory_zones
         )
-        preprocessor = Preprocessor()
-        named_scope_manager = NamedScopeManager()
+        preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
+        named_scope_manager = NamedScopeManager(self.diagnostic_reporter)
 
         main_source = '\n'.join([
             '#create_memzone variables $3000 $47FF',
@@ -113,7 +115,7 @@ class TestMemoryZones(unittest.TestCase):
             with open(include_path, 'w') as handle:
                 handle.write(include_source)
 
-            asm_obj = AssemblyFile(main_path, label_scope, named_scope_manager)
+            asm_obj = AssemblyFile(main_path, label_scope, named_scope_manager, named_scope_manager.diagnostic_reporter)
             line_objs = asm_obj.load_line_objects(
                 isa_model,
                 {temp_dir},

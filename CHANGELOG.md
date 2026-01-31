@@ -23,6 +23,7 @@ Changes that are planned but not implemented yet:
 * Updated the `#include` preprocessor directive to allow relative paths in the specified included file. The relative paths are resolved relative to the file currently being compiled.
 * Fixed bug where conditional compilation was not handling constant definition correctly.
 * Added user warnings for scenarios that wouldn't prevent a successful compilation but are potentionally an unintended bug by the user. Warnings can be elevated to errors with the `-W` command line option.
+* Consolidated all error, warning, and info handling into a centralized manager class. This will allwo more consistent behavior in the future.
 
 ## [0.7.0]
 - Fixed a bug in handling comparisons to preprocessor language version symbols.

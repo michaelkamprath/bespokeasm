@@ -49,6 +49,8 @@ class DataLine(LineWithWords):
             cstr_terminator: int = 0,
             string_byte_packing: bool = False,
             string_byte_packing_fill: int = 0,
+            *,
+            diagnostic_reporter,
     ) -> LineWithWords:
         """Tries to match the passed line string to the data directive pattern.
         If succcessful, returns a constructed DataLine object. If not, None is
@@ -89,6 +91,7 @@ class DataLine(LineWithWords):
                 multi_word_endianness,
                 string_byte_packing,
                 string_byte_packing_fill,
+                diagnostic_reporter=diagnostic_reporter,
             )
         else:
             return None
@@ -107,6 +110,8 @@ class DataLine(LineWithWords):
             multi_word_endianness: Literal['little', 'big'],
             string_byte_packing: bool = False,
             string_byte_packing_fill: int = 0,
+            *,
+            diagnostic_reporter,
     ) -> None:
         super().__init__(
             line_id,
@@ -118,6 +123,9 @@ class DataLine(LineWithWords):
             intra_word_endianness,
             multi_word_endianness,
         )
+        if diagnostic_reporter is None:
+            raise ValueError('DiagnosticReporter is required for DataLine')
+        self.diagnostic_reporter = diagnostic_reporter
         self._arg_value_list = value_list
         self._directive = directive_str
         self._string_byte_packing = string_byte_packing
@@ -187,10 +195,9 @@ class DataLine(LineWithWords):
             masked_val = arg_val & value_mask
             if (
                 self._directive in ('.byte', '.2byte', '.4byte', '.8byte')
-                and self.warning_reporter is not None
                 and masked_val != arg_val
             ):
-                self.warning_reporter.warn(
+                self.diagnostic_reporter.warn(
                     self.line_id,
                     f'Data value {arg_val} truncated to {masked_val} for {self._directive}',
                 )
