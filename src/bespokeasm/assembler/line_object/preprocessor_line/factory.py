@@ -8,6 +8,7 @@ from bespokeasm.assembler.line_object.preprocessor_line.create_memzone import Cr
 from bespokeasm.assembler.line_object.preprocessor_line.create_scope import CreateScopeLine
 from bespokeasm.assembler.line_object.preprocessor_line.deactivate_scope import DeactivateScopeLine
 from bespokeasm.assembler.line_object.preprocessor_line.define_symbol import DefineSymbolLine
+from bespokeasm.assembler.line_object.preprocessor_line.error_line import ErrorLine
 from bespokeasm.assembler.line_object.preprocessor_line.print_line import PrintLine
 from bespokeasm.assembler.line_object.preprocessor_line.required_language import RequiredLanguageLine
 from bespokeasm.assembler.line_object.preprocessor_line.use_scope import UseScopeLine
@@ -76,6 +77,16 @@ class PreprocessorLineFactory:
                         current_memzone,
                         isa_model,
                         preprocessor
+                    )]
+
+        if instruction == '#error' or instruction.startswith('#error '):
+            return [ErrorLine(
+                        line_id,
+                        instruction,
+                        comment,
+                        current_memzone,
+                        preprocessor,
+                        condition_stack,
                     )]
 
         if instruction.startswith('#create_memzone '):
