@@ -86,6 +86,28 @@ class TestDataLineWordSizes(unittest.TestCase):
         self.assertEqual(len(words), 2)
         self.assertEqual([w.value for w in words], [0x0304, 0x0102])
 
+    def test_16byte_directive_32bit_word_multiword_big_endian(self):
+        d = self._make_data('.16byte 0x0123456789abcdeffedcba9876543210', 32, 'big', 'big')
+        d.label_scope = self.label_scope
+        d.generate_words()
+        words = d.get_words()
+        self.assertEqual(len(words), 4)
+        self.assertEqual(
+            [w.value for w in words],
+            [0x01234567, 0x89abcdef, 0xfedcba98, 0x76543210],
+        )
+
+    def test_16byte_directive_32bit_word_multiword_little_endian(self):
+        d = self._make_data('.16byte 0x0123456789abcdeffedcba9876543210', 32, 'big', 'little')
+        d.label_scope = self.label_scope
+        d.generate_words()
+        words = d.get_words()
+        self.assertEqual(len(words), 4)
+        self.assertEqual(
+            [w.value for w in words],
+            [0x76543210, 0xfedcba98, 0x89abcdef, 0x01234567],
+        )
+
     def test_byte_directive_32bit_word(self):
         d = self._make_data('.byte $01, $02, $03, $04', 32, 'big', 'big')
         d.label_scope = self.label_scope
@@ -145,6 +167,16 @@ class TestDataLineWordSizes(unittest.TestCase):
         d = self._make_data('.4byte $01020304', 32, 'big', 'big')
         d.label_scope = self.label_scope
         self.assertEqual(d.word_count, 1)
+
+        # .16byte on 32-bit word, should have word_count == 4
+        d = self._make_data('.16byte 0x0123456789abcdeffedcba9876543210', 32, 'big', 'big')
+        d.label_scope = self.label_scope
+        self.assertEqual(d.word_count, 4)
+
+        # .16byte on 64-bit word, should have word_count == 2
+        d = self._make_data('.16byte 0x0123456789abcdeffedcba9876543210', 64, 'big', 'big')
+        d.label_scope = self.label_scope
+        self.assertEqual(d.word_count, 2)
 
         # .cstr "AB" on 8-bit word, should have word_count == 3
         d = self._make_data('.cstr "AB"', 8, 'big', 'big')

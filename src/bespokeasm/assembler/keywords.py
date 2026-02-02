@@ -4,7 +4,7 @@ COMPILER_DIRECTIVES_SET = {
 
 BYTECODE_DIRECTIVES_SET = {
     'fill', 'zero', 'zerountil',
-    'byte', '2byte', '4byte', '8byte', 'cstr', 'asciiz',
+    'byte', '2byte', '4byte', '8byte', '16byte', 'cstr', 'asciiz',
 }
 
 PREPROCESSOR_DIRECTIVES_SET = {

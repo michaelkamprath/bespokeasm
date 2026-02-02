@@ -14,7 +14,7 @@ from bespokeasm.expression import parse_expression
 
 class DataLine(LineWithWords):
     PATTERN_DATA_DIRECTIVE = re.compile(
-        r'^(\.byte|\.2byte|\.4byte|\.8byte|\.cstr|\.asciiz)\b\s*(?:(?P<quote>[\"\'])((?:\\(?P=quote)|.)*)(?P=quote)'
+        r'^(\.byte|\.2byte|\.4byte|\.8byte|\.16byte|\.cstr|\.asciiz)\b\s*(?:(?P<quote>[\"\'])((?:\\(?P=quote)|.)*)(?P=quote)'
         r'|({}(?:\s*\,{})*))'.format(INSTRUCTION_EXPRESSION_PATTERN, INSTRUCTION_EXPRESSION_PATTERN),
         flags=re.IGNORECASE | re.MULTILINE
     )
@@ -24,6 +24,7 @@ class DataLine(LineWithWords):
         '.2byte': 2,
         '.4byte': 4,
         '.8byte': 8,
+        '.16byte': 16,
         '.cstr': 1,
         '.asciiz': 1,
     }
@@ -33,6 +34,7 @@ class DataLine(LineWithWords):
         '.2byte': 0xFFFF,
         '.4byte': 0xFFFFFFFF,
         '.8byte': 0xFFFFFFFFFFFFFFFF,
+        '.16byte': 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF,
         '.cstr': 0xFF,
         '.asciiz': 0xFF,
     }
@@ -194,7 +196,7 @@ class DataLine(LineWithWords):
             value_mask = DataLine.DIRECTIVE_VALUE_MASK[self._directive]
             masked_val = arg_val & value_mask
             if (
-                self._directive in ('.byte', '.2byte', '.4byte', '.8byte')
+                self._directive in ('.byte', '.2byte', '.4byte', '.8byte', '.16byte')
                 and masked_val != arg_val
             ):
                 self.diagnostic_reporter.warn(

@@ -19,6 +19,7 @@ Changes that are planned but not implemented yet:
 
 
 ## [Unreleased]
+* Added `.16byte` data directive to emit 16-byte values with configured multi-word endianness.
 
 ## [0.7.1]
 * Added support to the VSCode and Sublime Text language extensions for editor hovers for mnemonics, labels, and constants; plus improved semantic syntax highlighting that differentiations label and constant defintion from label and constant usage.

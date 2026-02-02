@@ -377,7 +377,7 @@ class TestConfigurationGeneration(unittest.TestCase):
             syntax_dict['contexts']['data_types_directives'][0]['match'],
             [
                 '\\.fill', '\\.zero', '\\.zerountil', '\\.byte', '\\.2byte',
-                '\\.4byte', '\\.8byte', '\\.cstr', '\\.asciiz',
+                '\\.4byte', '\\.8byte', '\\.16byte', '\\.cstr', '\\.asciiz',
             ],
             'data type directives'
         )
@@ -489,7 +489,7 @@ class TestConfigurationGeneration(unittest.TestCase):
             syntax_dict['contexts']['data_types_directives'][0]['match'],
             [
                 '\\.fill', '\\.zero', '\\.zerountil',
-                '\\.byte', '\\.2byte', '\\.4byte', '\\.8byte',
+                '\\.byte', '\\.2byte', '\\.4byte', '\\.8byte', '\\.16byte',
                 '\\.cstr', '\\.asciiz',
             ],
             'data type directives'
@@ -727,7 +727,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertRegex(syn, rf'syn\s+match\s+{re.escape(vim_ft)}Directive\s+/.+\\.memzone\\>/', 'directive .memzone present')
         self.assertRegex(syn, rf'syn\s+match\s+{re.escape(vim_ft)}Directive\s+/.+\\.align\\>/', 'directive .align present')
         # Data types
-        for dt in ['fill', 'zero', 'zerountil', 'byte', '2byte', '4byte', '8byte', 'cstr', 'asciiz']:
+        for dt in ['fill', 'zero', 'zerountil', 'byte', '2byte', '4byte', '8byte', '16byte', 'cstr', 'asciiz']:
             self.assertRegex(
                 syn,
                 rf'syn\s+match\s+{re.escape(vim_ft)}DataType\s+/.+\\.{re.escape(dt)}\\>/',
