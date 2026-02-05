@@ -1,0 +1,35 @@
+; Times-2 loop for Ben Eater SAP-1 Enhanced
+; For each starting value, doubles via SHL until overflow, then increments start.
+; Base wraps from 255 back to 1.
+;
+; Memory map (16 bytes total)
+;   $00-$0B : code
+;   $0F     : base
+
+#require __LANGUAGE_NAME__ == eater-sap1-enahanced
+#require __LANGUAGE_VERSION__ >= 1.0.0
+
+.org $0
+init:
+    LDI 1           ; start base at 1
+    STA base
+
+outer:
+    LDA base        ; seed inner loop with base
+
+inner:
+    OUT             ; show value
+    SHL             ; A <<= 1
+    JZ next_base    ; overflow -> advance base
+    JMP inner
+
+next_base:
+    LDA base
+    ADI 1           ; base += 1
+    JZ init         ; wrap 255 -> 1
+    STA base
+    JMP outer
+
+.org $0F
+base:
+    .byte $00
