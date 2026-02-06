@@ -1,6 +1,5 @@
 ; Fibonacci loop for Ben Eater SAP-1 Enhanced
 ; Outputs consecutive Fibonacci values and restarts on 8-bit overflow.
-#
 ; Memory map (16 bytes total)
 ;   $00-$0A : code
 ;   $0C     : cur

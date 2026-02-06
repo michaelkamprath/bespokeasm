@@ -4,15 +4,21 @@ from textwrap import dedent
 
 import click.shell_completion as sc
 import pytest
+from bespokeasm import completion_cli
 from bespokeasm.__main__ import _inject_zsh_nosort
+from bespokeasm.__main__ import entry_point
 from bespokeasm.__main__ import main
 from click.shell_completion import get_completion_class
 
 
-def _zsh_completions(args, incomplete):
+def _zsh_completions_for(cli, args, incomplete):
     """Return completion items for given args/incomplete without relying on env vars."""
-    comp = sc.ZshComplete(main, {}, 'bespokeasm', '_BESPOKEASM_COMPLETE')
+    comp = sc.ZshComplete(cli, {}, 'bespokeasm', '_BESPOKEASM_COMPLETE')
     return comp.get_completions(args, incomplete)
+
+
+def _zsh_completions(args, incomplete):
+    return _zsh_completions_for(main, args, incomplete)
 
 
 def test_compile_option_completions_are_unique_and_show_required_metavars():
@@ -64,6 +70,19 @@ def test_generate_extension_vscode_and_sublime_have_required_config_option():
         values = {item.value: item.help or '' for item in items}
         assert '--config-file' in values
         assert '[required]' in values['--config-file']
+
+
+def test_completion_cli_matches_main_compile_completions():
+    main_items = _zsh_completions_for(main, ['compile'], '-')
+    completion_items = _zsh_completions_for(completion_cli.main, ['compile'], '-')
+    assert {(item.value, item.help) for item in main_items} == {(item.value, item.help) for item in completion_items}
+
+
+def test_entry_point_routes_completion_invocations(monkeypatch):
+    sentinel = object()
+    monkeypatch.setenv('_BESPOKEASM_COMPLETE', 'zsh_complete')
+    monkeypatch.setattr(completion_cli, 'entry_point', lambda: sentinel)
+    assert entry_point() is sentinel
 
 
 def test_zsh_completion_script_prettifies_root_commands():
