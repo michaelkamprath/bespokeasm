@@ -1,5 +1,6 @@
 import sys
 
+from bespokeasm.cli import _inject_zsh_nosort  # noqa: F401
 from bespokeasm.cli import _is_completion_invocation
 from bespokeasm.cli import build_cli
 from bespokeasm.cli import CommandHandlers
