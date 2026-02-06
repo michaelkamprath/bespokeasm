@@ -17,8 +17,6 @@ It's important to note that the SAP-1 uses a 4-bit memory address and thus has o
 ### Instructions - Original
 This section contains the instruction set as Ben Eater created in his video series. Code written to this instruction set can be compile with the [eater-sap1-isa.yaml](./eater-sap1-isa.yaml) **BespokeASM** instruction set configuration file. Files with original instruction set code should have an extenions of `.sap1`.
 
-The control EEPROMs can be programmed for the ehanced isntruction set with the EEPROM prgorammer from Ben Eater's video series using the [microcode_eeprom_with_flags_enhanced.ino](./microcode_eeprom_with_flags_enhanced.ino) Arduino program.
-
 All instructions are expressed by the following notation:
 
 ```asm
@@ -42,6 +40,8 @@ mnemonic operand1
 
 ### Instructions - Extended
 This section describes an extension to the original instruction set. It is a superate of the original instruction, filling the unused bytecodes of the original instruction set. Code written to this instruction set can be compile with the [eater-sap1-enhanced-isa.yaml](./eater-sap1-enhanced-isa.yaml) **BespokeASM** instruction set configuration file. Files with extended instruction set code should have an extenions of `.sap1e`, that original instruction set code (`.sap1`) are compilable by the extended instruction set configuration file too.
+
+The control EEPROMs can be programmed for the enhanced isntruction set with the EEPROM programmer from Ben Eater's video series using the [microcode_eeprom_with_flags_enhanced.ino](./microcode_eeprom_with_flags_enhanced.ino) Arduino program.
 
 All instructions are expressed by the following notation:
 
