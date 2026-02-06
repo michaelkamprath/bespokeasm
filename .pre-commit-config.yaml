@@ -28,14 +28,14 @@ repos:
     -   id: flake8
         args: [--max-line-length=127]
 -   repo: https://github.com/asottile/pyupgrade
-    rev: v3.20.0
+    rev: v3.21.2
     hooks:
     -   id: pyupgrade
         args: [--py311-plus]
         language_version: python3.11
         exclude: ^src/bespokeasm/configgen/sublime/resources/bespokeasm_hover\.py$
 -   repo: https://github.com/asottile/reorder-python-imports
-    rev: v3.15.0
+    rev: v3.16.0
     hooks:
     -   id: reorder-python-imports
         args: [--py311-plus]
