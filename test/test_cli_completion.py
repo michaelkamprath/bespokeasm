@@ -5,9 +5,9 @@ from textwrap import dedent
 import click.shell_completion as sc
 import pytest
 from bespokeasm import completion_cli
-from bespokeasm.__main__ import _inject_zsh_nosort
 from bespokeasm.__main__ import entry_point
 from bespokeasm.__main__ import main
+from bespokeasm.cli import _inject_zsh_nosort
 from click.shell_completion import get_completion_class
 
 

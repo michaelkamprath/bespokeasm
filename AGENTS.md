@@ -52,9 +52,11 @@ The most recent version of documentation can be found at the [BespokeASM Wiki](h
 - ISA configs seed predefined constants, data blocks, memory zones, and preprocessor symbols; these are injected into global label scope before compilation.
 
 ### Entry Point
-- Main CLI: `src/bespokeasm/__main__.py`
-- Primary commands: `compile`, `generate-extension`
-- Uses click for command-line interface with default group behavior
+- Main entry: `src/bespokeasm/__main__.py` (builds the CLI via `src/bespokeasm/cli.py` and lazy-imported handlers)
+- Completion entry: `src/bespokeasm/completion_cli.py` (used when `_is_completion_invocation()` is set for fast shell completion)
+- Primary commands: `compile`, `docs`, `generate-extension`, `install-completion` (with `vscode`, `sublime`, `vim` under `generate-extension`)
+- Backward-compat: if no subcommand is provided, `compile` is injected
+- CLI implementation uses [Click](https://click.palletsprojects.com/en/stable/) (`click`) for command parsing and shell completion support
 
 ### Versioning
 When updating the release version, the version numbers in the following files should be updated:
@@ -78,11 +80,7 @@ Release checklist:
 - If the virtual environment is new, install the dependencies with `pip install -r requirements.txt` from the root of the project.
 - IMPORTANT: The virtual environment is used for all development activities. Always activate the virtual environment before running any development commands.
 
-### Testing
-- use `pytest` to run the unit tests. The virtual environment must be active for this to work.
-- Run with: `pytest -q`
-
-### Linting and Formatting
-Install hooks once into the active virtual environment with `pre-commit install`.
-
-`pre-commit` is used for linting and formatting. It is configured to run automatically on commit. The configuration can be found in the `.pre-commit-config.yaml` file in this repository. `pre-commit` should be run on all code changes before committing. To run `pre-commit` manually, use `pre-commit run --all-files` after activating the virtual environment. If the `pre-commit` command yields any errors, fix them before committing.
+### Project Coding Best Practices
+- Keep shell completion paths lightweight by avoiding heavy imports at CLI import time; route completion invocations to `completion_cli.entry_point()` and lazily import heavy modules inside command handlers.
+- If helpers move between modules, update tests to import from the new module rather than re-exporting unused symbols just for tests.
+- Always run `pre-commit run --all-files` and `pytest -q` after changes to properly lint and test the code. Ensure the Python virtual environment is active before running them.
