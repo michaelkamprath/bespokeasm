@@ -150,3 +150,34 @@ DEFAULT_COLOR_SCHEME = ColorScheme(
         SyntaxElement.PARENTHESIS: '#dc81e4',
     }
 )
+
+
+# Hover styling color keys consumed by generated editor extensions.
+HOVER_COLOR_ELEMENT_MAP: dict[str, SyntaxElement] = {
+    'instruction': SyntaxElement.INSTRUCTION,
+    'compiler_label': SyntaxElement.COMPILER_LABEL,
+    'label_usage': SyntaxElement.LABEL_USAGE,
+    'constant_usage': SyntaxElement.CONSTANT_USAGE,
+    'parameter': SyntaxElement.PARAMETER,
+    'number': SyntaxElement.DECIMAL_NUMBER,
+    'punctuation': SyntaxElement.PUNCTUATION_SEPARATOR,
+}
+
+
+# Hover UI colors that are not direct syntax token colors.
+HOVER_UI_COLOR_DEFAULTS: dict[str, str] = {
+    'inline_code': '#6fb1ff',
+    'table_header': '#D98C8C',
+    'table_boundary': '#5F748A',
+}
+
+
+def build_hover_color_map(color_scheme: ColorScheme | None = None) -> dict[str, str]:
+    """Build the hover color palette from the central color scheme."""
+    scheme = color_scheme or DEFAULT_COLOR_SCHEME
+    hover_colors = {
+        key: scheme.get_color(syntax_element)
+        for key, syntax_element in HOVER_COLOR_ELEMENT_MAP.items()
+    }
+    hover_colors.update(HOVER_UI_COLOR_DEFAULTS)
+    return hover_colors

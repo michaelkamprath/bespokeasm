@@ -105,6 +105,200 @@ class MarkdownGenerator:
             add_header_rule=add_header_rule
         )
 
+    def generate_predefined_hover_docs(self) -> dict[str, dict[str, str]]:
+        """
+        Generate hover markdown for documented predefined entities.
+
+        Returns:
+            Dictionary with hover docs grouped by predefined category.
+        """
+        return {
+            'constants': self._generate_predefined_constant_hover_docs(),
+            'data': self._generate_predefined_data_hover_docs(),
+            'memory_zones': self._generate_predefined_memory_zone_hover_docs(),
+        }
+
+    def _generate_predefined_constant_hover_docs(self) -> dict[str, str]:
+        constants = getattr(self.doc_model, 'predefined_constants', None) or []
+        address_size = (
+            getattr(self.doc_model, 'general_docs', {})
+            .get('hardware', {})
+            .get('address_size')
+        )
+        hex_width = self._hex_width_for_address_size(address_size)
+        singular_unit, plural_unit = self._hover_size_units()
+
+        docs: dict[str, str] = {}
+        for constant in constants:
+            if not constant.get('documented', False):
+                continue
+
+            name = constant.get('name')
+            if not name:
+                continue
+
+            value_text = self._format_hex_value(constant.get('value'), hex_width)
+            rows: list[tuple[str, str]] = []
+            if value_text:
+                rows.append(('Value', f'`{value_text}`'))
+
+            const_type = constant.get('type')
+            if const_type:
+                rows.append(('Type', f'`{const_type}`'))
+
+            if const_type == 'variable' and constant.get('size') is not None:
+                size_text = self._format_quantity_with_units(constant.get('size'), singular_unit, plural_unit)
+                if size_text:
+                    rows.append(('Size', size_text))
+
+            description = constant.get('description')
+            docs[name] = self._generate_predefined_hover_markdown(
+                name,
+                'Predefined Constant',
+                description,
+                rows
+            )
+
+        return docs
+
+    def _generate_predefined_data_hover_docs(self) -> dict[str, str]:
+        data_blocks = getattr(self.doc_model, 'predefined_data', None) or []
+        hardware = getattr(self.doc_model, 'general_docs', {}).get('hardware', {})
+        address_width = self._hex_width_for_address_size(hardware.get('address_size'))
+        value_width = self._hex_width_for_address_size(hardware.get('word_size'))
+        singular_unit, plural_unit = self._hover_size_units()
+
+        docs: dict[str, str] = {}
+        for data_block in data_blocks:
+            if not data_block.get('documented', False):
+                continue
+
+            name = data_block.get('name')
+            if not name:
+                continue
+
+            rows: list[tuple[str, str]] = []
+
+            address_text = self._format_hex_value(data_block.get('address'), address_width)
+            if address_text:
+                rows.append(('Address', f'`{address_text}`'))
+
+            size_text = self._format_quantity_with_units(data_block.get('size'), singular_unit, plural_unit)
+            if size_text:
+                rows.append(('Size', size_text))
+
+            fill_value = data_block.get('value')
+            if fill_value is not None:
+                fill_text = self._format_hex_value(fill_value, value_width)
+                if fill_text:
+                    rows.append(('Fill Value', f'`{fill_text}`'))
+
+            description = data_block.get('description')
+            docs[name] = self._generate_predefined_hover_markdown(
+                name,
+                'Predefined Data Block',
+                description,
+                rows
+            )
+
+        return docs
+
+    def _generate_predefined_memory_zone_hover_docs(self) -> dict[str, str]:
+        memory_zones = getattr(self.doc_model, 'predefined_memory_zones', None) or []
+        address_size = (
+            getattr(self.doc_model, 'general_docs', {})
+            .get('hardware', {})
+            .get('address_size')
+        )
+        hex_width = self._hex_width_for_address_size(address_size)
+
+        docs: dict[str, str] = {}
+        for zone in memory_zones:
+            if not zone.get('documented', False):
+                continue
+
+            name = zone.get('name')
+            if not name:
+                continue
+
+            rows: list[tuple[str, str]] = []
+
+            start_text = self._format_hex_value(zone.get('start'), hex_width)
+            if start_text:
+                rows.append(('Start', f'`{start_text}`'))
+
+            end_text = self._format_hex_value(zone.get('end'), hex_width)
+            if end_text:
+                rows.append(('End', f'`{end_text}`'))
+
+            zone_title = zone.get('title') or 'Predefined Memory Zone'
+            description = zone.get('description')
+            docs[name] = self._generate_predefined_hover_markdown(
+                name,
+                str(zone_title),
+                description,
+                rows
+            )
+
+        return docs
+
+    def _generate_predefined_hover_markdown(
+        self,
+        name: str,
+        title: str,
+        description: str | None,
+        rows: list[tuple[str, str]],
+    ) -> str:
+        sections = [f'### `{name}` : {title}', '---']
+        if description:
+            sections.append(str(description))
+
+        table_rows = [[f'**{label}**', value] for label, value in rows if value]
+        table = self._generate_markdown_table(
+            ['Attribute', 'Value'],
+            table_rows,
+            column_alignments=['left', 'left']
+        )
+        if table:
+            sections.append(table)
+
+        return '\n\n'.join(sections)
+
+    def _hover_size_units(self) -> tuple[str, str]:
+        """
+        Return singular/plural size units used for hover text.
+
+        Hover sizing follows user-facing convention:
+        - 8-bit words => bytes
+        - non-8-bit words => words
+        """
+        word_size = (
+            getattr(self.doc_model, 'general_docs', {})
+            .get('hardware', {})
+            .get('word_size', 8)
+        )
+        try:
+            if int(word_size) == 8:
+                return 'byte', 'bytes'
+        except (TypeError, ValueError):
+            pass
+        return 'word', 'words'
+
+    @staticmethod
+    def _format_quantity_with_units(value: Any, singular_unit: str, plural_unit: str) -> str:
+        if value is None:
+            return ''
+
+        try:
+            quantity = int(value)
+            unit = singular_unit if quantity == 1 else plural_unit
+            return f'{quantity} {unit}'
+        except (TypeError, ValueError):
+            text = str(value).strip()
+            if not text:
+                return ''
+            return f'{text} {plural_unit}'
+
     def _optimize_table_columns(
         self,
         headers: list[str],

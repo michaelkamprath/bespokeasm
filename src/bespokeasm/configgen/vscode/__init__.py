@@ -349,7 +349,8 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
         }
         hover_docs = {
             'instructions': instruction_docs,
-            'macros': macro_docs
+            'macros': macro_docs,
+            'predefined': markdown_generator.generate_predefined_hover_docs(),
         }
         docs_fp = os.path.join(extension_dir_path, 'instruction-docs.json')
         with open(docs_fp, 'w', encoding='utf-8') as docs_file:

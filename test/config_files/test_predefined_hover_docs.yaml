@@ -1,0 +1,41 @@
+description: Test Predefined Hover Documentation
+general:
+  min_version: "0.7.0"
+  address_size: 16
+  word_size: 16
+  identifier:
+    name: predefined-hover-test
+    version: "0.1.0"
+predefined:
+  constants:
+    - name: VAR_BUF
+      value: 0x1000
+      documentation:
+        type: variable
+        size: 2
+        description: Buffer variable.
+    - name: ENTRY
+      value: 0x2000
+      documentation:
+        type: subroutine
+        description: Program entry point.
+  data:
+    - name: SCREEN
+      address: 0x4000
+      size: 4
+      value: 0
+      documentation:
+        description: Screen buffer.
+  memory_zones:
+    - name: USER_RAM
+      start: 0x3000
+      end: 0x7FFF
+      documentation:
+        title: User RAM
+        description: User workspace.
+operand_sets: {}
+instructions:
+  nop:
+    bytecode:
+      value: 0
+      size: 16

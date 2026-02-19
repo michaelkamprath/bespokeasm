@@ -19,24 +19,30 @@ PACKAGE_NAME = '##PACKAGE_NAME##'
 
 LABEL_USAGE_SCOPE = 'variable.other.label.usage'
 CONSTANT_USAGE_SCOPE = 'variable.other.constant.usage'
-INSTRUCTION_COLOR = '#ffa83f'
-INLINE_CODE_COLOR = '#6fb1ff'
-TABLE_HEADER_COLOR = '#D98C8C'
 TABLE_CELL_BOUNDARY_PIXELS = 2
 TABLE_ROW_VERT_MARGIN_PIXELS = 1
-TABLE_CELL_BOUNDARY_COLOR = '#5F748A'
 TABLE_MAX_COLUMN_CHARS = 32
 TABLE_MAX_DESCRIPTION_CHARS = 48
 TABLE_MIN_COLUMN_CHARS = 6
 TABLE_MAX_TOTAL_CHARS = 120
 TABLE_CELL_LEFT_PAD = 1
 TABLE_CELL_RIGHT_PAD = 2
+HOVER_EXTRA_BOTTOM_PADDING_PIXELS = 8
 DEFAULT_HOVER_COLORS = {
-    'instruction': INSTRUCTION_COLOR,
-    'parameter': '#abd7ed',
-    'number': '#fffd80',
-    'punctuation': '#ed80a2',
+    'instruction': '##HOVER_COLOR_INSTRUCTION##',
+    'compiler_label': '##HOVER_COLOR_COMPILER_LABEL##',
+    'label_usage': '##HOVER_COLOR_LABEL_USAGE##',
+    'constant_usage': '##HOVER_COLOR_CONSTANT_USAGE##',
+    'parameter': '##HOVER_COLOR_PARAMETER##',
+    'number': '##HOVER_COLOR_NUMBER##',
+    'punctuation': '##HOVER_COLOR_PUNCTUATION##',
+    'inline_code': '##HOVER_COLOR_INLINE_CODE##',
+    'table_header': '##HOVER_COLOR_TABLE_HEADER##',
+    'table_boundary': '##HOVER_COLOR_TABLE_BOUNDARY##',
 }
+INLINE_CODE_COLOR = DEFAULT_HOVER_COLORS['inline_code']
+TABLE_HEADER_COLOR = DEFAULT_HOVER_COLORS['table_header']
+TABLE_CELL_BOUNDARY_COLOR = DEFAULT_HOVER_COLORS['table_boundary']
 
 DEFAULT_HOVER_SETTINGS = {
     'mnemonics': True,
@@ -274,22 +280,27 @@ def _is_definition_at_point(view, point, token, pattern):
     return start <= column < end
 
 
-def _build_definition_hover(name, location, current_path):
+def _build_definition_hover(name, location, current_path, token_color=None):
     line_num = location.get('line', 0) + 1
     path = location.get('path') or current_path
     filename = os.path.basename(path) if path else 'file'
+    escaped_name = html.escape(name)
+    if token_color:
+        code_html = '<code style="color:{};">{}</code>'.format(html.escape(token_color), escaped_name)
+    else:
+        code_html = '<code>{}</code>'.format(escaped_name)
     if path and current_path and os.path.normcase(path) == os.path.normcase(current_path):
         location_text = 'Defined at line {}.'.format(line_num)
     else:
         location_text = 'Defined at line {} in {}.'.format(line_num, filename)
     if path:
         cmd = _build_hover_link(path, line_num, location.get('col', 0) + 1)
-        return '<p><code>{}</code>: {} <a href="{}">Go to definition</a></p>'.format(
-            name,
+        return '<p>{}: {} <a href="{}">Go to definition</a></p>'.format(
+            code_html,
             location_text,
             cmd
         )
-    return '<p><code>{}</code>: {}</p>'.format(name, location_text)
+    return '<p>{}: {}</p>'.format(code_html, location_text)
 
 
 def _build_hover_link(path, line_num, column):
@@ -321,12 +332,17 @@ def _handle_hover_navigate(view, href):
 
 
 def _show_popup(view, html, location, max_width):
+    wrapped_html = _with_hover_padding(html)
     view.show_popup(
-        html,
+        wrapped_html,
         location=location,
         max_width=max_width,
         on_navigate=lambda href: _handle_hover_navigate(view, href)
     )
+
+
+def _with_hover_padding(html):
+    return '<div style="padding:0 0 {}px 0;">{}</div>'.format(HOVER_EXTRA_BOTTOM_PADDING_PIXELS, html)
 
 
 def _render_markdown(markdown_text, hover_colors):
@@ -404,7 +420,11 @@ def _markdown_to_minihtml(markdown_text, hover_colors):
             flush_list()
             flush_table()
             level = len(heading_match.group(1))
-            content = _render_inline(heading_match.group(2), code_color=INSTRUCTION_COLOR)
+            heading_text = heading_match.group(2)
+            content = _render_inline(
+                heading_text,
+                code_color=_heading_code_color(heading_text, hover_colors)
+            )
             html_parts.append('<h{0}>{1}</h{0}>'.format(level, content))
             continue
 
@@ -453,8 +473,14 @@ def _render_inline(text, code_color=INLINE_CODE_COLOR):
     return escaped
 
 
+def _heading_code_color(heading_text, hover_colors):
+    if re.search(r':\s*Predefined Constant\s*$', heading_text):
+        return hover_colors.get('compiler_label', DEFAULT_HOVER_COLORS['compiler_label'])
+    return hover_colors.get('instruction', DEFAULT_HOVER_COLORS['instruction'])
+
+
 def _render_code_block(lines, hover_colors):
-    instruction_color = hover_colors.get('instruction', INSTRUCTION_COLOR)
+    instruction_color = hover_colors.get('instruction', DEFAULT_HOVER_COLORS['instruction'])
     parameter_color = hover_colors.get('parameter', DEFAULT_HOVER_COLORS['parameter'])
     number_color = hover_colors.get('number', DEFAULT_HOVER_COLORS['number'])
     punctuation_color = hover_colors.get('punctuation', DEFAULT_HOVER_COLORS['punctuation'])
@@ -775,6 +801,10 @@ class BespokeAsmHoverListener(sublime_plugin.EventListener):
         hover_labels = _get_hover_setting(view, 'labels', DEFAULT_HOVER_SETTINGS['labels'])
         hover_constants = _get_hover_setting(view, 'constants', DEFAULT_HOVER_SETTINGS['constants'])
         docs = _load_instruction_docs(view)
+        predefined_docs = docs.get('predefined', {}) if docs else {}
+        predefined_constant_docs = predefined_docs.get('constants', {})
+        predefined_data_docs = predefined_docs.get('data', {})
+        predefined_memory_zone_docs = predefined_docs.get('memory_zones', {})
         if docs and hover_mnemonics:
             instruction_docs = docs.get('instructions', {})
             macro_docs = docs.get('macros', {})
@@ -791,17 +821,37 @@ class BespokeAsmHoverListener(sublime_plugin.EventListener):
             view, point, token, CONSTANT_DEFINITION_PATTERN
         ):
             location = state['constant_map'][token]
-            html = _build_definition_hover(token, location, view.file_name())
+            hover_colors = _load_hover_colors(view)
+            constant_color = hover_colors.get('constant_usage', DEFAULT_HOVER_COLORS['constant_usage'])
+            html = _build_definition_hover(token, location, view.file_name(), token_color=constant_color)
             max_width = _get_hover_max_width(view, DEFAULT_HOVER_MAX_WIDTH)
             _show_popup(view, html, point, max_width)
             return
+        if hover_constants and token not in state['constant_map']:
+            doc = predefined_constant_docs.get(token)
+            if doc:
+                hover_colors = _load_hover_colors(view)
+                html = _render_markdown(doc, hover_colors)
+                max_width = _get_hover_max_width(view, DEFAULT_HOVER_MAX_WIDTH)
+                _show_popup(view, html, point, max_width)
+                return
         if hover_labels and token in state['label_map'] and not _is_definition_at_point(
             view, point, token, LABEL_DEFINITION_PATTERN
         ):
             location = state['label_map'][token]
-            html = _build_definition_hover(token, location, view.file_name())
+            hover_colors = _load_hover_colors(view)
+            label_color = hover_colors.get('label_usage', DEFAULT_HOVER_COLORS['label_usage'])
+            html = _build_definition_hover(token, location, view.file_name(), token_color=label_color)
             max_width = _get_hover_max_width(view, DEFAULT_HOVER_MAX_WIDTH)
             _show_popup(view, html, point, max_width)
+            return
+        if hover_labels and token not in state['label_map']:
+            doc = predefined_data_docs.get(token) or predefined_memory_zone_docs.get(token)
+            if doc:
+                hover_colors = _load_hover_colors(view)
+                html = _render_markdown(doc, hover_colors)
+                max_width = _get_hover_max_width(view, DEFAULT_HOVER_MAX_WIDTH)
+                _show_popup(view, html, point, max_width)
 
 
 class BespokeAsmSemanticListener(sublime_plugin.EventListener):

@@ -117,6 +117,61 @@ function buildConstantHover(constant, location, uri) {
   return markdown;
 }
 
+function getSemanticSearchRanges(text) {
+  const ranges = [];
+  let segmentStart = 0;
+  let inQuote = null;
+  let escaped = false;
+
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (inQuote) {
+      if (escaped) {
+        escaped = false;
+      } else if (ch === '\\') {
+        escaped = true;
+      } else if (ch === inQuote) {
+        inQuote = null;
+        segmentStart = i + 1;
+      }
+      continue;
+    }
+
+    if (ch === '"' || ch === '\'') {
+      if (segmentStart < i) {
+        ranges.push({ start: segmentStart, end: i });
+      }
+      inQuote = ch;
+      continue;
+    }
+
+    if (ch === ';') {
+      if (segmentStart < i) {
+        ranges.push({ start: segmentStart, end: i });
+      }
+      return ranges;
+    }
+  }
+
+  if (!inQuote && segmentStart < text.length) {
+    ranges.push({ start: segmentStart, end: text.length });
+  }
+  return ranges;
+}
+
+function isOffsetInCodeRegion(text, offset) {
+  if (offset < 0 || offset >= text.length) {
+    return false;
+  }
+  const ranges = getSemanticSearchRanges(text);
+  for (const range of ranges) {
+    if (offset >= range.start && offset < range.end) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function buildSemanticTokens(document) {
   const labelMap = buildLabelDefinitionMap(document);
   const labels = new Set(labelMap.keys());
@@ -147,21 +202,26 @@ function buildSemanticTokens(document) {
       builder.push(line, start, constDef.length, constantType, definitionModifier);
     }
 
-    const regex = /(##LABEL_PATTERN##)/g;
-    let match;
-    while ((match = regex.exec(text)) !== null) {
-      const word = match[1];
-      if (constants.has(word)) {
-        if (!(constDef && word === constDef && match.index === text.indexOf(constDef))) {
-          builder.push(line, match.index, word.length, constantType, 0);
-          continue;
+    const searchRanges = getSemanticSearchRanges(text);
+    for (const range of searchRanges) {
+      const segment = text.slice(range.start, range.end);
+      const regex = /(##LABEL_PATTERN##)/g;
+      let match;
+      while ((match = regex.exec(segment)) !== null) {
+        const word = match[1];
+        const offset = range.start + match.index;
+        if (constants.has(word)) {
+          if (!(constDef && word === constDef && offset === text.indexOf(constDef))) {
+            builder.push(line, offset, word.length, constantType, 0);
+            continue;
+          }
         }
-      }
-      if (labels.has(word)) {
-        if (def && word === def && match.index === text.indexOf(def)) {
-          continue;
+        if (labels.has(word)) {
+          if (def && word === def && offset === text.indexOf(def)) {
+            continue;
+          }
+          builder.push(line, offset, word.length, labelType, 0);
         }
-        builder.push(line, match.index, word.length, labelType, 0);
       }
     }
   }
@@ -178,6 +238,12 @@ function getHoverSettings(document, languageId) {
   };
 }
 
+function buildMarkdownHover(doc) {
+  const markdown = new vscode.MarkdownString(doc);
+  markdown.isTrusted = false;
+  return markdown;
+}
+
 function activate(context) {
   const languageId = getLanguageId(context);
   if (!languageId) {
@@ -191,12 +257,21 @@ function activate(context) {
 
   const instructionDocs = hoverDocs.instructions || {};
   const macroDocs = hoverDocs.macros || {};
+  const predefinedDocs = hoverDocs.predefined || {};
+  const predefinedConstantDocs = predefinedDocs.constants || {};
+  const predefinedDataDocs = predefinedDocs.data || {};
+  const predefinedMemoryZoneDocs = predefinedDocs.memory_zones || {};
   const wordPattern = /(?:##MNEMONIC_PATTERN##|##LABEL_PATTERN##)/i;
   const provider = {
     provideHover(document, position) {
       const hoverSettings = getHoverSettings(document, languageId);
       const range = document.getWordRangeAtPosition(position, wordPattern);
       if (!range) {
+        return null;
+      }
+
+      const lineText = document.lineAt(position.line).text;
+      if (!isOffsetInCodeRegion(lineText, range.start.character)) {
         return null;
       }
 
@@ -209,45 +284,53 @@ function activate(context) {
         const key = token.toUpperCase();
         const doc = instructionDocs[key] || macroDocs[key];
         if (doc) {
-          const markdown = new vscode.MarkdownString(doc);
-          markdown.isTrusted = false;
-          return new vscode.Hover(markdown, range);
+          return new vscode.Hover(buildMarkdownHover(doc), range);
         }
       }
 
       if (hoverSettings.constants) {
         const constantMap = buildConstantDefinitionMap(document);
         const constantLocation = constantsHover.getConstantLocation(constantMap, token);
-        if (constantLocation &&
-            !constantsHover.isDefinitionAtLocation(
-              constantMap,
-              token,
-              range.start.line,
-              range.start.character,
-              document.uri
-            )) {
-          const markdown = buildConstantHover(token, constantLocation, document.uri);
-          return new vscode.Hover(markdown, range);
+        if (constantLocation) {
+          if (!constantsHover.isDefinitionAtLocation(
+            constantMap,
+            token,
+            range.start.line,
+            range.start.character,
+            document.uri
+          )) {
+            const markdown = buildConstantHover(token, constantLocation, document.uri);
+            return new vscode.Hover(markdown, range);
+          }
+        } else {
+          const predefinedConstantDoc = predefinedConstantDocs[token];
+          if (predefinedConstantDoc) {
+            return new vscode.Hover(buildMarkdownHover(predefinedConstantDoc), range);
+          }
         }
       }
 
       if (hoverSettings.labels) {
         const labelMap = buildLabelDefinitionMap(document);
         const labelLocation = labelHover.getLabelLocation(labelMap, token);
-        if (!labelLocation) {
-          return null;
+        if (labelLocation) {
+          if (labelHover.isDefinitionAtLocation(
+            labelMap,
+            token,
+            range.start.line,
+            range.start.character,
+            document.uri
+          )) {
+            return null;
+          }
+          const markdown = buildDefinitionHover(token, labelLocation, document.uri);
+          return new vscode.Hover(markdown, range);
         }
-        if (labelHover.isDefinitionAtLocation(
-          labelMap,
-          token,
-          range.start.line,
-          range.start.character,
-          document.uri
-        )) {
-          return null;
+
+        const predefinedLabelDoc = predefinedDataDocs[token] || predefinedMemoryZoneDocs[token];
+        if (predefinedLabelDoc) {
+          return new vscode.Hover(buildMarkdownHover(predefinedLabelDoc), range);
         }
-        const markdown = buildDefinitionHover(token, labelLocation, document.uri);
-        return new vscode.Hover(markdown, range);
       }
       return null;
     }

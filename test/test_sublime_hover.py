@@ -73,3 +73,25 @@ def test_sublime_collect_includes_transitive():
         assert 'first.asm' in paths
         assert 'second.asm' in paths
         assert 'unrelated.asm' not in paths
+
+
+def test_sublime_predefined_constant_heading_uses_compiler_label_color():
+    hover = _load_sublime_hover_module()
+    markdown = '### `_Start` : Predefined Constant'
+    html = hover._markdown_to_minihtml(markdown, {'compiler_label': '#12AB34', 'instruction': '#445566'})
+    assert '<code style="color:#12AB34;">_Start</code>' in html
+
+
+def test_sublime_definition_hover_uses_usage_colors():
+    hover = _load_sublime_hover_module()
+    location = {'line': 4, 'col': 2, 'path': '/tmp/example.asm'}
+    html = hover._build_definition_hover('target', location, '/tmp/current.asm', token_color='#123456')
+    assert '<code style="color:#123456;">target</code>' in html
+    assert 'Go to definition' in html
+
+
+def test_sublime_hover_adds_bottom_padding_wrapper():
+    hover = _load_sublime_hover_module()
+    wrapped = hover._with_hover_padding('<p>content</p>')
+    assert 'padding:0 0 8px 0' in wrapped
+    assert '<p>content</p>' in wrapped

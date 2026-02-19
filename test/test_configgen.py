@@ -7,6 +7,7 @@ import shutil
 import tempfile
 import unittest
 
+from bespokeasm.configgen.color_scheme import build_hover_color_map
 from bespokeasm.configgen.color_scheme import DEFAULT_COLOR_SCHEME
 from bespokeasm.configgen.color_scheme import SyntaxElement
 from bespokeasm.configgen.sublime import SublimeConfigGenerator
@@ -186,6 +187,10 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIn('editor.action.goToLocations', js_content)
         self.assertIn('buildDefinitionHover', js_content)
         self.assertIn('1 << tokenModifiers.get(\'definition\')', js_content)
+        self.assertIn('function getSemanticSearchRanges', js_content)
+        self.assertIn('function isOffsetInCodeRegion', js_content)
+        self.assertIn("if (ch === ';')", js_content)
+        self.assertIn('if (!isOffsetInCodeRegion(lineText, range.start.character))', js_content)
 
         docs_fp = os.path.join(extension_dirpath, 'bespokeasm-test', 'instruction-docs.json')
         self.assertIsFile(docs_fp)
@@ -193,6 +198,13 @@ class TestConfigurationGeneration(unittest.TestCase):
             docs_json = json.load(json_file)
         self.assertIn('instructions', docs_json)
         self.assertIn('macros', docs_json)
+        self.assertIn('predefined', docs_json)
+        self.assertIn('constants', docs_json['predefined'])
+        self.assertIn('data', docs_json['predefined'])
+        self.assertIn('memory_zones', docs_json['predefined'])
+        self.assertEqual({}, docs_json['predefined']['constants'])
+        self.assertEqual({}, docs_json['predefined']['data'])
+        self.assertEqual({}, docs_json['predefined']['memory_zones'])
         self.assertIn('LDA', docs_json['instructions'])
         self.assertIn('### `LDA`', docs_json['instructions']['LDA'])
         self.assertIn('Documentation not provided.', docs_json['instructions']['LDA'])
@@ -293,6 +305,13 @@ class TestConfigurationGeneration(unittest.TestCase):
             docs_json = json.load(json_file)
         self.assertIn('instructions', docs_json)
         self.assertIn('macros', docs_json)
+        self.assertIn('predefined', docs_json)
+        self.assertIn('constants', docs_json['predefined'])
+        self.assertIn('data', docs_json['predefined'])
+        self.assertIn('memory_zones', docs_json['predefined'])
+        self.assertEqual({}, docs_json['predefined']['constants'])
+        self.assertEqual({}, docs_json['predefined']['data'])
+        self.assertEqual({}, docs_json['predefined']['memory_zones'])
         self.assertIn('NOP', docs_json['instructions'])
         self.assertIn('### `NOP`', docs_json['instructions']['NOP'])
         self.assertIn('Documentation not provided.', docs_json['instructions']['NOP'])
@@ -319,10 +338,70 @@ class TestConfigurationGeneration(unittest.TestCase):
 
         self.assertIn('instructions', docs_json)
         self.assertIn('macros', docs_json)
+        self.assertIn('predefined', docs_json)
+        self.assertIn('constants', docs_json['predefined'])
+        self.assertIn('data', docs_json['predefined'])
+        self.assertIn('memory_zones', docs_json['predefined'])
         self.assertIn('PUSH2', docs_json['macros'])
         self.assertIn('### `PUSH2`', docs_json['macros']['PUSH2'])
         self.assertNotIn('Documentation not provided.', docs_json['macros']['PUSH2'])
+        self.assertEqual({}, docs_json['predefined']['constants'])
+        self.assertEqual({}, docs_json['predefined']['data'])
+        self.assertEqual({}, docs_json['predefined']['memory_zones'])
 
+        shutil.rmtree(test_dir)
+
+    def test_configgen_predefined_hover_docs(self):
+        test_dir = tempfile.mkdtemp()
+        config_file = pkg_resources.files(config_files).joinpath('test_predefined_hover_docs.yaml')
+
+        vscode_configgen = VSCodeConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            None,
+            None,
+            'asmtest',
+        )
+        vscode_configgen.generate()
+
+        extension_dirpath = os.path.join(str(test_dir), 'extensions')
+        docs_fp = os.path.join(extension_dirpath, 'predefined-hover-test', 'instruction-docs.json')
+        self.assertIsFile(docs_fp)
+        with open(docs_fp) as json_file:
+            docs_json = json.load(json_file)
+
+        self.assertIn('predefined', docs_json)
+        self.assertIn('VAR_BUF', docs_json['predefined']['constants'])
+        self.assertIn('SCREEN', docs_json['predefined']['data'])
+        self.assertIn('USER_RAM', docs_json['predefined']['memory_zones'])
+        self.assertIn('### `VAR_BUF` : Predefined Constant', docs_json['predefined']['constants']['VAR_BUF'])
+        self.assertIn('| **Size** | 2 words |', docs_json['predefined']['constants']['VAR_BUF'])
+        self.assertIn('| **Size** | 4 words |', docs_json['predefined']['data']['SCREEN'])
+        self.assertIn('### `USER_RAM` : User RAM', docs_json['predefined']['memory_zones']['USER_RAM'])
+
+        sublime_tmp_dir = tempfile.mkdtemp()
+        sublime_configgen = SublimeConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            None,
+            None,
+            'asmtest',
+        )
+        sublime_configgen._generate_files_in_dir(sublime_tmp_dir)
+
+        sublime_docs_fp = os.path.join(sublime_tmp_dir, 'instruction-docs.json')
+        self.assertIsFile(sublime_docs_fp)
+        with open(sublime_docs_fp) as json_file:
+            sublime_docs_json = json.load(json_file)
+
+        self.assertIn('VAR_BUF', sublime_docs_json['predefined']['constants'])
+        self.assertIn('| **Size** | 2 words |', sublime_docs_json['predefined']['constants']['VAR_BUF'])
+        self.assertIn('SCREEN', sublime_docs_json['predefined']['data'])
+        self.assertIn('USER_RAM', sublime_docs_json['predefined']['memory_zones'])
+
+        shutil.rmtree(sublime_tmp_dir)
         shutil.rmtree(test_dir)
 
     def test_sublime_configgen_no_registers(self):
@@ -408,20 +487,30 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertTrue(settings_json['hover']['labels'])
         self.assertTrue(settings_json['hover']['constants'])
         self.assertTrue(settings_json['semantic_highlighting'])
+        expected_hover_colors = build_hover_color_map(DEFAULT_COLOR_SCHEME)
         hover_colors_fp = os.path.join(test_tmp_dir, 'hover-colors.json')
         self.assertIsFile(hover_colors_fp)
         with open(hover_colors_fp) as colors_file:
             colors_json = json.load(colors_file)
-        self.assertIn('instruction', colors_json)
-        self.assertIn('parameter', colors_json)
-        self.assertIn('number', colors_json)
-        self.assertIn('punctuation', colors_json)
+        self.assertDictEqual(expected_hover_colors, colors_json)
+        hover_plugin_fp = os.path.join(test_tmp_dir, hover_plugin)
+        with open(hover_plugin_fp) as hover_plugin_file:
+            hover_plugin_content = hover_plugin_file.read()
+        self.assertNotIn('##HOVER_COLOR_', hover_plugin_content)
+        self.assertIn(expected_hover_colors['instruction'], hover_plugin_content)
         docs_fp = os.path.join(test_tmp_dir, 'instruction-docs.json')
         self.assertIsFile(docs_fp)
         with open(docs_fp) as json_file:
             docs_json = json.load(json_file)
         self.assertIn('instructions', docs_json)
         self.assertIn('macros', docs_json)
+        self.assertIn('predefined', docs_json)
+        self.assertIn('constants', docs_json['predefined'])
+        self.assertIn('data', docs_json['predefined'])
+        self.assertIn('memory_zones', docs_json['predefined'])
+        self.assertEqual({}, docs_json['predefined']['constants'])
+        self.assertEqual({}, docs_json['predefined']['data'])
+        self.assertEqual({}, docs_json['predefined']['memory_zones'])
         self.assertIn('LDA', docs_json['instructions'])
         self.assertIn('### `LDA`', docs_json['instructions']['LDA'])
         shutil.rmtree(test_tmp_dir)
@@ -521,20 +610,30 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertTrue(settings_json['hover']['labels'])
         self.assertTrue(settings_json['hover']['constants'])
         self.assertTrue(settings_json['semantic_highlighting'])
+        expected_hover_colors = build_hover_color_map(DEFAULT_COLOR_SCHEME)
         hover_colors_fp = os.path.join(test_tmp_dir, 'hover-colors.json')
         self.assertIsFile(hover_colors_fp)
         with open(hover_colors_fp) as colors_file:
             colors_json = json.load(colors_file)
-        self.assertIn('instruction', colors_json)
-        self.assertIn('parameter', colors_json)
-        self.assertIn('number', colors_json)
-        self.assertIn('punctuation', colors_json)
+        self.assertDictEqual(expected_hover_colors, colors_json)
+        hover_plugin_fp = os.path.join(test_tmp_dir, hover_plugin)
+        with open(hover_plugin_fp) as hover_plugin_file:
+            hover_plugin_content = hover_plugin_file.read()
+        self.assertNotIn('##HOVER_COLOR_', hover_plugin_content)
+        self.assertIn(expected_hover_colors['instruction'], hover_plugin_content)
         docs_fp = os.path.join(test_tmp_dir, 'instruction-docs.json')
         self.assertIsFile(docs_fp)
         with open(docs_fp) as json_file:
             docs_json = json.load(json_file)
         self.assertIn('instructions', docs_json)
         self.assertIn('macros', docs_json)
+        self.assertIn('predefined', docs_json)
+        self.assertIn('constants', docs_json['predefined'])
+        self.assertIn('data', docs_json['predefined'])
+        self.assertIn('memory_zones', docs_json['predefined'])
+        self.assertEqual({}, docs_json['predefined']['constants'])
+        self.assertEqual({}, docs_json['predefined']['data'])
+        self.assertEqual({}, docs_json['predefined']['memory_zones'])
         self.assertIn('NOP', docs_json['instructions'])
         shutil.rmtree(test_tmp_dir)
 

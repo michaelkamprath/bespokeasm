@@ -38,13 +38,13 @@
         "bespokeasm.##LANGUAGE_ID##.hover.labels": {
           "type": "boolean",
           "default": true,
-          "description": "Enable label definition hovers.",
+          "description": "Enable label definition hovers and predefined label documentation hovers.",
           "scope": "language-overridable"
         },
         "bespokeasm.##LANGUAGE_ID##.hover.constants": {
           "type": "boolean",
           "default": true,
-          "description": "Enable constant definition hovers.",
+          "description": "Enable constant definition hovers and predefined constant documentation hovers.",
           "scope": "language-overridable"
         }
       }

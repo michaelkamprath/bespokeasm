@@ -452,6 +452,88 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.assertIn('| Name | Address | Size (Bytes) | Value |', result)
         self.assertNotIn('| Name | Address | Size (Bytes) | Value | Description |', result)
 
+    def test_generate_predefined_hover_docs_uses_words_for_non_8bit_word_sizes(self):
+        self.mock_doc_model.general_docs = {
+            'hardware': {
+                'address_size': 16,
+                'word_size': 16,
+            }
+        }
+        self.mock_doc_model.predefined_constants = [
+            {
+                'name': 'VAR_BUF',
+                'value': 0x1000,
+                'type': 'variable',
+                'size': 2,
+                'description': 'Buffer variable.',
+                'documented': True,
+            }
+        ]
+        self.mock_doc_model.predefined_data = [
+            {
+                'name': 'SCREEN',
+                'address': 0x4000,
+                'size': 4,
+                'value': 0,
+                'description': 'Screen buffer.',
+                'documented': True,
+            }
+        ]
+        self.mock_doc_model.predefined_memory_zones = [
+            {
+                'name': 'USER_RAM',
+                'start': 0x3000,
+                'end': 0x7FFF,
+                'title': 'User RAM',
+                'description': 'User workspace.',
+                'documented': True,
+            }
+        ]
+
+        generator = MarkdownGenerator(self.mock_doc_model, verbose=0)
+        docs = generator.generate_predefined_hover_docs()
+
+        self.assertIn('VAR_BUF', docs['constants'])
+        self.assertIn('### `VAR_BUF` : Predefined Constant', docs['constants']['VAR_BUF'])
+        self.assertIn('| **Size** | 2 words |', docs['constants']['VAR_BUF'])
+        self.assertIn('### `SCREEN` : Predefined Data Block', docs['data']['SCREEN'])
+        self.assertIn('| **Size** | 4 words |', docs['data']['SCREEN'])
+        self.assertIn('### `USER_RAM` : User RAM', docs['memory_zones']['USER_RAM'])
+
+    def test_generate_predefined_hover_docs_uses_bytes_for_8bit_words(self):
+        self.mock_doc_model.general_docs = {
+            'hardware': {
+                'address_size': 16,
+                'word_size': 8,
+            }
+        }
+        self.mock_doc_model.predefined_constants = [
+            {
+                'name': 'BUFFER_PTR',
+                'value': 0x0010,
+                'type': 'variable',
+                'size': 1,
+                'description': 'Pointer.',
+                'documented': True,
+            }
+        ]
+        self.mock_doc_model.predefined_data = [
+            {
+                'name': 'BUFFER',
+                'address': 0x0020,
+                'size': 8,
+                'value': 0x00,
+                'description': 'Byte buffer.',
+                'documented': True,
+            }
+        ]
+
+        generator = MarkdownGenerator(self.mock_doc_model, verbose=0)
+        docs = generator.generate_predefined_hover_docs()
+
+        self.assertIn('| **Size** | 1 byte |', docs['constants']['BUFFER_PTR'])
+        self.assertIn('| **Size** | 8 bytes |', docs['data']['BUFFER'])
+
     def test_macros_calling_syntax_from_operands(self):
         """Macros render calling syntax using their configured operands."""
         isa_model = Mock()

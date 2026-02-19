@@ -13,6 +13,7 @@ from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET
 from bespokeasm.assembler.keywords import EXPRESSION_FUNCTIONS_SET
 from bespokeasm.assembler.keywords import PREPROCESSOR_DIRECTIVES_SET
 from bespokeasm.configgen import LanguageConfigGenerator
+from bespokeasm.configgen.color_scheme import build_hover_color_map
 from bespokeasm.configgen.color_scheme import DEFAULT_COLOR_SCHEME
 from bespokeasm.configgen.color_scheme import SyntaxElement
 from bespokeasm.docsgen import build_documentation_model
@@ -322,7 +323,8 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         }
         hover_docs = {
             'instructions': instruction_docs,
-            'macros': macro_docs
+            'macros': macro_docs,
+            'predefined': markdown_generator.generate_predefined_hover_docs(),
         }
         docs_fp = os.path.join(destination_dir, 'instruction-docs.json')
         with open(docs_fp, 'w', encoding='utf-8') as docs_file:
@@ -330,12 +332,7 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             if self.verbose > 1:
                 print(f'  generated {os.path.basename(docs_fp)}')
 
-        hover_colors = {
-            'instruction': DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.INSTRUCTION),
-            'parameter': DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.PARAMETER),
-            'number': DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.DECIMAL_NUMBER),
-            'punctuation': DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.PUNCTUATION_SEPARATOR),
-        }
+        hover_colors = build_hover_color_map(DEFAULT_COLOR_SCHEME)
         hover_colors_fp = os.path.join(destination_dir, 'hover-colors.json')
         with open(hover_colors_fp, 'w', encoding='utf-8') as colors_file:
             json.dump(hover_colors, colors_file, ensure_ascii=False, indent=2)
@@ -358,6 +355,20 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         self._replace_token_in_file(hover_plugin_fp, '##PACKAGE_NAME##', self.language_name)
         self._replace_token_in_file(hover_plugin_fp, '##LABEL_PATTERN##', self._label_pattern())
         self._replace_token_in_file(hover_plugin_fp, '##MNEMONIC_PATTERN##', self._mnemonic_pattern())
+        hover_color_tokens = {
+            '##HOVER_COLOR_INSTRUCTION##': hover_colors['instruction'],
+            '##HOVER_COLOR_COMPILER_LABEL##': hover_colors['compiler_label'],
+            '##HOVER_COLOR_LABEL_USAGE##': hover_colors['label_usage'],
+            '##HOVER_COLOR_CONSTANT_USAGE##': hover_colors['constant_usage'],
+            '##HOVER_COLOR_PARAMETER##': hover_colors['parameter'],
+            '##HOVER_COLOR_NUMBER##': hover_colors['number'],
+            '##HOVER_COLOR_PUNCTUATION##': hover_colors['punctuation'],
+            '##HOVER_COLOR_INLINE_CODE##': hover_colors['inline_code'],
+            '##HOVER_COLOR_TABLE_HEADER##': hover_colors['table_header'],
+            '##HOVER_COLOR_TABLE_BOUNDARY##': hover_colors['table_boundary'],
+        }
+        for token, color in hover_color_tokens.items():
+            self._replace_token_in_file(hover_plugin_fp, token, color)
         if self.verbose > 1:
             print(f'  generated {hover_plugin}')
 

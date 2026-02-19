@@ -381,25 +381,25 @@ predefined:
       documentation:
         type: variable
         size: 2
-        description: "Address used to pass 2-byte X1 location to system graphics functiona, such as `_Line` or `_SetPixel`"
+        description: "Address used to pass 2-byte X1 location to system graphics functions, such as `_Line` or `_SetPixel`"
     - name: GRAPHICS_Y1
       value: 0x0082
       documentation:
         type: variable
         size: 1
-        description: "Address used to pass 1-byte Y1 location to system graphics functiona, such as `_Line` or `_SetPixel`"
+        description: "Address used to pass 1-byte Y1 location to system graphics functions, such as `_Line` or `_SetPixel`"
     - name: GRAPHICS_X2
       value: 0x0083
       documentation:
         type: variable
         size: 2
-        description: "Address used to pass 2-byte X2 location to system graphics functiona, such as `_Line`"
+        description: "Address used to pass 2-byte X2 location to system graphics functions, such as `_Line`"
     - name: GRAPHICS_Y2
       value: 0x0085
       documentation:
         type: variable
         size: 1
-        description: "Address used to pass 1-byte Y2 location to system graphics functiona, such as `_Line`"
+        description: "Address used to pass 1-byte Y2 location to system graphics functions, such as `_Line`"
 instructions:
   nop:
     # No operation
