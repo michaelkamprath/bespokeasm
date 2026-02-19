@@ -23,6 +23,8 @@ Changes that are planned but not implemented yet:
 * Added `#error` preprocessor directive for compile-time errors with optional message.
 * Added an enhanced instruction set for the Ben Eater SAP-1 example
 * Improved the performance of the shell completions
+* Added documentation hovers in the language extensions for VSCode and Sublime Text that show the documentation (if provided) for `predefined` values in the instruction set configuration file.
+* Improved the UX of Sublime Text hovers.
 
 ## [0.7.1]
 * Added support to the VSCode and Sublime Text language extensions for editor hovers for mnemonics, labels, and constants; plus improved semantic syntax highlighting that differentiations label and constant defintion from label and constant usage.
