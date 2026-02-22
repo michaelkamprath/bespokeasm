@@ -304,7 +304,7 @@ predefined:
       value: 0xf042
       documentation:
         type: subroutine
-        description: Prints a char at the cursor position (advancing)
+        description: Prints a char at the cursor position (advancing) passed in regsister `A`
     - name: _Print
       value: 0xf045
       documentation:
@@ -314,17 +314,17 @@ predefined:
       value: 0xf048
       documentation:
         type: subroutine
-        description: Prints a zero-terminated string at an address
+        description: Prints a zero-terminated string at an address passed on the stack
     - name: _PrintHex
       value: 0xf04b
       documentation:
         type: subroutine
-        description: Prints a HEX number (advancing)
+        description: Prints a HEX number (advancing) passed in regsister `A`
     - name: _SetPixel
       value: 0xf04e
       documentation:
         type: subroutine
-        description: Sets a pixel at position (x, y)
+        description: "Sets a pixel at position (x: `GRAPHICS_X1`, y: `GRAPHICS_Y`)"
     - name: _Line
       value: 0xf051
       documentation:
@@ -334,12 +334,12 @@ predefined:
       value: 0xf054
       documentation:
         type: subroutine
-        description: Draws a rectangle at (x, y) of size (w, h)
+        description: "Draws a rectangle at (x: `GRAPHICS_X1`, y: `GRAPHICS_Y`) of size (w: `GRAPHICS_X2`, h: `GRAPHICS_Y2`)"
     - name: _ClearPixel
       value: 0xf057
       documentation:
         type: subroutine
-        description: Clears a pixel at position (x, y)
+        description: "Clears a pixel at position (x: `GRAPHICS_X1`, y: `GRAPHICS_Y`)"
     - name: _XPos
       value: 0x00c0
       documentation:

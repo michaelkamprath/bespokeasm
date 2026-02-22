@@ -53,7 +53,8 @@ class AutoOptionHelpCommand(click.Command):
             results.extend(item for _, _, item in option_items)
 
         # Include base completions (commands, etc.) while avoiding duplicates.
-        base_results = click.core.BaseCommand.shell_complete(self, ctx, incomplete)
+        # Delegate to Click's current Command completion implementation.
+        base_results = click.Command.shell_complete(self, ctx, incomplete)
         seen_values = {item.value for item in results}
         for item in base_results:
             if item.value in seen_values:
