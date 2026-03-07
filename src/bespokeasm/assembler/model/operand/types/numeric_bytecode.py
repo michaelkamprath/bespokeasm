@@ -1,3 +1,4 @@
+import re
 import sys
 
 from bespokeasm.assembler.bytecode.parts import ExpressionByteCodePartWithValidation
@@ -7,6 +8,7 @@ from bespokeasm.assembler.model.operand import Operand
 from bespokeasm.assembler.model.operand import OperandType
 from bespokeasm.assembler.model.operand import ParsedOperand
 from bespokeasm.expression import EXPRESSION_PARTS_PATTERN
+from bespokeasm.utilities import PATTERN_CHARACTER_ORDINAL
 
 
 class NumericBytecode(Operand):
@@ -66,8 +68,9 @@ class NumericBytecode(Operand):
         register_labels: set[str],
         memzone_manager: MemoryZoneManager,
     ) -> ParsedOperand:
+        operand_without_char_literals = re.sub(PATTERN_CHARACTER_ORDINAL, '', operand)
         # do not match if expression contains square bracks
-        if '[' in operand or ']' in operand:
+        if '[' in operand_without_char_literals or ']' in operand_without_char_literals:
             return None
 
         bytecode_part = ExpressionByteCodePartWithValidation(

@@ -255,6 +255,22 @@ class TestExpression(unittest.TestCase):
             parse_expression(line_id, "(' ' + ' ')").get_value(labels, scopes, 1),
             64, "(' ' + ' ') = 64"
         )
+        self.assertEqual(
+            parse_expression(line_id, "'\"'").get_value(labels, scopes, 1),
+            34, "'\"' = 34"
+        )
+        self.assertEqual(
+            parse_expression(line_id, "'['").get_value(labels, scopes, 1),
+            91, "'[' = 91"
+        )
+        self.assertEqual(
+            parse_expression(line_id, "']'").get_value(labels, scopes, 1),
+            93, "']' = 93"
+        )
+        self.assertEqual(
+            parse_expression(line_id, "'\\''").get_value(labels, scopes, 1),
+            39, "'\\'' = 39"
+        )
 
     def test_invalid_character_ordinals(self):
         """Doc: Numeric Literals > Single Character Ordinals - only single-quoted single characters are valid."""

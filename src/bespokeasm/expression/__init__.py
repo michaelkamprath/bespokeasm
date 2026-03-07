@@ -17,11 +17,13 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.utilities import is_string_numeric
 from bespokeasm.utilities import is_valid_label
 from bespokeasm.utilities import parse_numeric_string
+from bespokeasm.utilities import PATTERN_CHARACTER_ORDINAL
 from bespokeasm.utilities import PATTERN_HEX
 
 EXPRESSION_PARTS_PATTERN = \
-    r'(?:(?:\%|b)[01]+|{}|\d+|[\+\-\*\/\&\|\^\(\)]|>>|<<|%|LSB\(|BYTE\d\(|(?:\.|_)?\w+|\'.\'|[><])'.format(
-        PATTERN_HEX
+    r'(?:(?:\%|b)[01]+|{}|\d+|[\+\-\*\/\&\|\^\(\)]|>>|<<|%|LSB\(|BYTE\d\(|(?:\.|_)?\w+|{}|[><])'.format(
+        PATTERN_HEX,
+        PATTERN_CHARACTER_ORDINAL,
     )
 
 
@@ -201,38 +203,25 @@ TOKEN_MAPPINGS = {
 
 
 def _lexical_analysis(line_id: LineIdentifier, s: str) -> list[ExpressionNode]:
+    expression_without_char_literals = _strip_character_ordinals_for_validation(line_id, s)
     tokens = []
-    if '&&' in s or '||' in s:
+    if '&&' in expression_without_char_literals or '||' in expression_without_char_literals:
         raise SyntaxError(
             f"ERROR: {line_id} - boolean operators '&&' and '||' are not supported in expressions"
         )
-    if '[' in s or ']' in s:
+    if '[' in expression_without_char_literals or ']' in expression_without_char_literals:
         raise SyntaxError(
             f'ERROR: {line_id} - brackets are not supported in numeric expressions'
         )
-    if s.count("'") % 2 != 0:
-        raise SyntaxError(
-            f"ERROR: {line_id} - unterminated character literal (use single quotes like 'A')"
-        )
-    if s.count('"') % 2 != 0:
+    if expression_without_char_literals.count('"') % 2 != 0:
         raise SyntaxError(
             f'ERROR: {line_id} - unterminated string literal (double quotes are not valid in expressions)'
         )
-    if re.search(r'"[^"]*"', s):
+    if re.search(r'"[^"]*"', expression_without_char_literals):
         raise SyntaxError(
             f'ERROR: {line_id} - double-quoted strings are not valid in expressions '
             "(use single-character ordinals like 'A')"
         )
-    for match in re.finditer(r"'([^']*)'", s):
-        literal = match.group(1)
-        if len(literal) == 0:
-            raise SyntaxError(
-                f"ERROR: {line_id} - empty character literal is not valid (use single-character ordinals like 'A')"
-            )
-        if len(literal) > 1:
-            raise SyntaxError(
-                f"ERROR: {line_id} - only single-character ordinals are supported (use 'A')"
-            )
     last_end = 0
     for match in re.finditer(EXPRESSION_PARTS_PATTERN, s):
         if match.start() > last_end:
@@ -259,6 +248,51 @@ def _lexical_analysis(line_id: LineIdentifier, s: str) -> list[ExpressionNode]:
         raise SyntaxError(f'ERROR: {line_id} - invalid token: {gap_str}')
     tokens.append(ExpressionNode(TokenType.T_END))
     return tokens
+
+
+def _strip_character_ordinals_for_validation(line_id: LineIdentifier, expression: str) -> str:
+    stripped_expression: list[str] = []
+    index = 0
+    while index < len(expression):
+        if expression[index] != "'":
+            stripped_expression.append(expression[index])
+            index += 1
+            continue
+
+        index += 1
+        if index >= len(expression):
+            raise SyntaxError(
+                f"ERROR: {line_id} - unterminated character literal (use single quotes like 'A')"
+            )
+        if expression[index] == "'":
+            raise SyntaxError(
+                f"ERROR: {line_id} - empty character literal is not valid (use single-character ordinals like 'A')"
+            )
+
+        if expression[index] == '\\':
+            index += 1
+            if index >= len(expression):
+                raise SyntaxError(
+                    f"ERROR: {line_id} - unterminated character literal (use single quotes like 'A')"
+                )
+        index += 1
+
+        if index >= len(expression):
+            raise SyntaxError(
+                f"ERROR: {line_id} - unterminated character literal (use single quotes like 'A')"
+            )
+        if expression[index] != "'":
+            if "'" in expression[index:]:
+                raise SyntaxError(
+                    f"ERROR: {line_id} - only single-character ordinals are supported (use 'A')"
+                )
+            raise SyntaxError(
+                f"ERROR: {line_id} - unterminated character literal (use single quotes like 'A')"
+            )
+        index += 1
+        stripped_expression.append('0')
+
+    return ''.join(stripped_expression)
 
 
 def _parse_e(line_id: LineIdentifier, tokens: list[ExpressionNode]) -> ExpressionNode:

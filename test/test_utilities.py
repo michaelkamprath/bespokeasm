@@ -16,6 +16,7 @@ class TestUtilities(unittest.TestCase):
         self.assertEqual(parse_numeric_string("'1'"), 49, 'character ordinal: \'1\' = 49')
         self.assertEqual(parse_numeric_string('b10011001'), 0x99, 'binary interger: 0x99')
         self.assertEqual(parse_numeric_string("' '"), 32, 'character ordinal: \' \' = 32')
+        self.assertEqual(parse_numeric_string("'\\''"), 39, 'character ordinal: \'\\\'\' = 39')
 
         with self.assertRaises(ValueError, msg='only integer numeric values are supported'):
             parse_numeric_string('nan')
@@ -35,6 +36,7 @@ class TestUtilities(unittest.TestCase):
         self.assertFalse(is_string_numeric('$'), 'the prefix alon is not numeric')
         self.assertTrue(is_string_numeric('08FH'), 'string is numeric (hexadecimal)')
         self.assertTrue(is_string_numeric("'1'"), 'string is numeric (character ordinal)')
+        self.assertTrue(is_string_numeric("'\\''"), 'escaped single quote ordinal is numeric')
         self.assertFalse(is_string_numeric("'12'"), 'character ordinal can only be one character long')
         self.assertFalse(is_string_numeric('0b10011001'), 'binary numbers do not strt with "0b"')
 

@@ -1310,6 +1310,42 @@ class TestInstructionParsing(unittest.TestCase):
             'instruction byte should match',
         )
 
+    def test_numeric_immediate_accepts_special_character_ordinals(self):
+        fp = pkg_resources.files(config_files).joinpath('test_instruction_operands.yaml')
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
+
+        test_cases = [
+            ("adi '\"'", 34),
+            ("adi '['", 91),
+            ("adi ']'", 93),
+            ("adi '\\''", 39),
+        ]
+        for instruction, expected_ordinal in test_cases:
+            ins = InstructionLine.factory(
+                149,
+                instruction,
+                '',
+                isa_model,
+                memzone_mngr.global_zone,
+                memzone_mngr,
+            )
+            ins.set_start_address(0)
+            ins.label_scope = TestInstructionParsing.label_values
+            ins.generate_words()
+            self.assertEqual(
+                ins.get_words(),
+                [
+                    Word(0xA2, 8, 8, isa_model.intra_word_endianness),
+                    Word(expected_ordinal, 8, 8, isa_model.intra_word_endianness),
+                ],
+                f'{instruction} should assemble with immediate value {expected_ordinal}',
+            )
+
     def test_instruction_aliases(self):
         fp = pkg_resources.files(config_files).joinpath('test_instruction_aliases.yaml')
         isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)

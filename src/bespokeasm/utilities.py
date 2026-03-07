@@ -6,9 +6,13 @@ from ruamel.yaml.comments import CommentedSeq
 
 
 PATTERN_HEX = r'(?:\$|0x)[0-9a-fA-F]+|[0-9a-fA-F]+H\b'
-PATTERN_NUMERIC = fr'(?:{PATTERN_HEX}|(?:b|%)[01]+|\d+|\'.\')'
+PATTERN_CHARACTER_ORDINAL = r"'(?:[^'\\]|\\.)'"
+PATTERN_NUMERIC = fr'(?:{PATTERN_HEX}|(?:b|%)[01]+|\d+|{PATTERN_CHARACTER_ORDINAL})'
 PATTERN_NUMERIC_COMPILED = re.compile(f'^({PATTERN_NUMERIC})$', flags=re.IGNORECASE | re.MULTILINE)
-PATTERN_CHARACTER_ORDINAL = re.compile(r'\'(.)\'', flags=re.IGNORECASE | re.MULTILINE)
+PATTERN_CHARACTER_ORDINAL_COMPILED = re.compile(
+    f'^{PATTERN_CHARACTER_ORDINAL}$',
+    flags=re.IGNORECASE | re.MULTILINE,
+)
 
 
 def parse_numeric_string(numeric_str: str) -> int:
@@ -27,10 +31,16 @@ def parse_numeric_string(numeric_str: str) -> int:
     elif numeric_str.startswith('b') or numeric_str.startswith('%'):
         return int(numeric_str[1:], 2)
     elif numeric_str.startswith('\'') or numeric_str.startswith('"'):
-        match = re.match(PATTERN_CHARACTER_ORDINAL, numeric_str)
+        match = re.match(PATTERN_CHARACTER_ORDINAL_COMPILED, numeric_str)
         if match is None:
             raise ValueError(f'Invalid character literal: {numeric_str}')
-        return ord(match.group(1))
+        try:
+            decoded_literal = bytes(numeric_str[1:-1], 'utf-8').decode('unicode_escape')
+        except UnicodeDecodeError as decode_error:
+            raise ValueError(f'Invalid character literal: {numeric_str}') from decode_error
+        if len(decoded_literal) != 1:
+            raise ValueError(f'Invalid character literal: {numeric_str}')
+        return ord(decoded_literal)
     else:
         return int(numeric_str)
 

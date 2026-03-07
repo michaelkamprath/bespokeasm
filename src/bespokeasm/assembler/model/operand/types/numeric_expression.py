@@ -8,6 +8,7 @@ from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model.operand import OperandType
 from bespokeasm.assembler.model.operand import OperandWithArgument
 from bespokeasm.assembler.model.operand import ParsedOperand
+from bespokeasm.utilities import PATTERN_CHARACTER_ORDINAL
 
 
 class NumericExpressionOperand(OperandWithArgument):
@@ -99,8 +100,9 @@ class NumericExpressionOperand(OperandWithArgument):
         register_labels: set[str],
         memzone_manager: MemoryZoneManager,
     ) -> ParsedOperand:
+        operand_without_char_literals = re.sub(PATTERN_CHARACTER_ORDINAL, '', operand)
         # do not match if expression contains square brack or curly braces
-        punctuation_match = re.search(r'[\[\]\{\}]+', operand)
+        punctuation_match = re.search(r'[\[\]\{\}]+', operand_without_char_literals)
         if punctuation_match is not None:
             return None
         try:
