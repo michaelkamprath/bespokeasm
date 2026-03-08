@@ -1,6 +1,7 @@
 import re
 import sys
 
+from bespokeasm import BESPOKEASM_VERSION_STR
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.preprocessor.symbol import PreprocessorSymbol
@@ -20,6 +21,9 @@ class Preprocessor:
             raise ValueError('DiagnosticReporter is required for Preprocessor')
         self._diagnostic_reporter = diagnostic_reporter
         self._symbols: dict[str, PreprocessorSymbol] = {}
+
+        # Add built-in BespokeASM version symbol
+        self._add_bespokeasm_version_symbol()
 
         # Add built-in language version symbols if ISA model is provided
         if isa_model is not None:
@@ -97,6 +101,13 @@ class Preprocessor:
             return self.resolve_symbols(line_id, line_str, updated_resolved_symbols)
         else:
             return line_str
+
+    def _add_bespokeasm_version_symbol(self) -> None:
+        """Add built-in preprocessor symbol for current BespokeASM version."""
+        self._symbols['__BESPOKEASM_VERSION__'] = PreprocessorSymbol(
+            '__BESPOKEASM_VERSION__',
+            BESPOKEASM_VERSION_STR
+        )
 
     def _add_language_version_symbols(self, isa_model) -> None:
         """Add built-in preprocessor symbols for language version information."""

@@ -5,6 +5,7 @@ import os
 import tempfile
 import unittest
 
+from bespokeasm import BESPOKEASM_VERSION_STR
 from bespokeasm.assembler.assembly_file import AssemblyFile
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.label_scope import GlobalLabelScope
@@ -579,6 +580,10 @@ nop
             preprocessor.get_symbol('__LANGUAGE_VERSION_PATCH__'),
             '__LANGUAGE_VERSION_PATCH__ should be defined'
         )
+        self.assertIsNotNone(
+            preprocessor.get_symbol('__BESPOKEASM_VERSION__'),
+            '__BESPOKEASM_VERSION__ should be defined'
+        )
 
         # Test symbol values (test config uses filename as language name and defaults to 0.0.1)
         self.assertEqual(
@@ -590,6 +595,11 @@ nop
         self.assertEqual(preprocessor.get_symbol('__LANGUAGE_VERSION_MAJOR__').value, '0', 'Major version should be 0')
         self.assertEqual(preprocessor.get_symbol('__LANGUAGE_VERSION_MINOR__').value, '0', 'Minor version should be 0')
         self.assertEqual(preprocessor.get_symbol('__LANGUAGE_VERSION_PATCH__').value, '1', 'Patch version should be 1')
+        self.assertEqual(
+            preprocessor.get_symbol('__BESPOKEASM_VERSION__').value,
+            BESPOKEASM_VERSION_STR,
+            'BespokeASM version should match package version'
+        )
 
     def test_language_version_symbols_in_conditions(self):
         """Test that language version symbols work in conditional compilation."""
@@ -706,6 +716,19 @@ nop
         except SystemExit:
             self.fail('Valid version major #require should not raise SystemExit')
 
+        # Test valid BespokeASM version requirement - should not raise SystemExit
+        try:
+            RequiredLanguageLine(
+                line_id,
+                '#require __BESPOKEASM_VERSION__ >= 0.0.1',
+                '',
+                memzone_mngr.global_zone,
+                isa_model,
+                preprocessor,
+            )
+        except SystemExit:
+            self.fail('Valid BespokeASM version #require should not raise SystemExit')
+
         # Test invalid version requirement - should raise SystemExit
         with self.assertRaises(SystemExit):
             RequiredLanguageLine(
@@ -769,6 +792,15 @@ nop
             preprocessor.get_symbol('__LANGUAGE_VERSION_PATCH__'),
             '__LANGUAGE_VERSION_PATCH__ should not be defined'
         )
+        self.assertIsNotNone(
+            preprocessor.get_symbol('__BESPOKEASM_VERSION__'),
+            '__BESPOKEASM_VERSION__ should always be defined'
+        )
+        self.assertEqual(
+            preprocessor.get_symbol('__BESPOKEASM_VERSION__').value,
+            BESPOKEASM_VERSION_STR,
+            '__BESPOKEASM_VERSION__ should match package version'
+        )
 
     def test_language_version_symbols_edge_cases(self):
         """Test edge cases for language version symbol creation."""
@@ -788,6 +820,7 @@ nop
         self.assertEqual(preprocessor_1.get_symbol('__LANGUAGE_VERSION_MAJOR__').value, '2')
         self.assertEqual(preprocessor_1.get_symbol('__LANGUAGE_VERSION_MINOR__').value, '1')
         self.assertEqual(preprocessor_1.get_symbol('__LANGUAGE_VERSION_PATCH__').value, '0')
+        self.assertEqual(preprocessor_1.get_symbol('__BESPOKEASM_VERSION__').value, BESPOKEASM_VERSION_STR)
 
         # Test with pre-release version
         mock_model_2 = MockISAModel('test-lang-2', '1.0.0-alpha.1')
@@ -798,6 +831,7 @@ nop
         self.assertEqual(preprocessor_2.get_symbol('__LANGUAGE_VERSION_MAJOR__').value, '1')
         self.assertEqual(preprocessor_2.get_symbol('__LANGUAGE_VERSION_MINOR__').value, '0')
         self.assertEqual(preprocessor_2.get_symbol('__LANGUAGE_VERSION_PATCH__').value, '0')
+        self.assertEqual(preprocessor_2.get_symbol('__BESPOKEASM_VERSION__').value, BESPOKEASM_VERSION_STR)
 
         # Test with invalid version (should fall back to defaults)
         mock_model_3 = MockISAModel('test-lang-3', 'invalid-version')
@@ -808,3 +842,4 @@ nop
         self.assertEqual(preprocessor_3.get_symbol('__LANGUAGE_VERSION_MAJOR__').value, '0')
         self.assertEqual(preprocessor_3.get_symbol('__LANGUAGE_VERSION_MINOR__').value, '0')
         self.assertEqual(preprocessor_3.get_symbol('__LANGUAGE_VERSION_PATCH__').value, '0')
+        self.assertEqual(preprocessor_3.get_symbol('__BESPOKEASM_VERSION__').value, BESPOKEASM_VERSION_STR)

@@ -2,7 +2,8 @@
 Language Version Expression Evaluator
 
 This module provides functionality to evaluate language version expressions that use
-built-in preprocessor symbols like __LANGUAGE_NAME__, __LANGUAGE_VERSION_MAJOR__, etc.
+built-in preprocessor symbols like __LANGUAGE_NAME__, __LANGUAGE_VERSION_MAJOR__,
+and __BESPOKEASM_VERSION__.
 
 The evaluator is used by #if, #elif, and #require preprocessor directives when they
 encounter language version symbols.
@@ -16,13 +17,14 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 class LanguageVersionEvaluator:
     """Evaluates language version expressions to boolean values."""
 
-    # Built-in language version symbols
+    # Built-in version symbols
     LANGUAGE_VERSION_SYMBOLS = {
         '__LANGUAGE_NAME__',
         '__LANGUAGE_VERSION__',
         '__LANGUAGE_VERSION_MAJOR__',
         '__LANGUAGE_VERSION_MINOR__',
-        '__LANGUAGE_VERSION_PATCH__'
+        '__LANGUAGE_VERSION_PATCH__',
+        '__BESPOKEASM_VERSION__',
     }
 
     @classmethod
@@ -159,7 +161,7 @@ class LanguageVersionEvaluator:
             # Check if language version symbols were not resolved
             for symbol in cls.LANGUAGE_VERSION_SYMBOLS:
                 if symbol in resolved:
-                    sys.exit(f'ERROR: {line_id} - Language version symbol {symbol} is not defined (ISA model may be missing)')
+                    sys.exit(f'ERROR: {line_id} - Version symbol {symbol} is not defined')
 
             try:
                 expr_node = parse_expression(line_id, resolved)
@@ -188,7 +190,10 @@ class LanguageVersionEvaluator:
         for symbol in cls.LANGUAGE_VERSION_SYMBOLS:
             if symbol in lhs_resolved or symbol in rhs_resolved:
                 # Symbol was not resolved, meaning it doesn't exist
-                sys.exit(f'ERROR: {line_id} - Language version symbol {symbol} is not defined (ISA model may be missing)')
+                preprocessor.diagnostic_reporter.error(
+                    line_id,
+                    f'Version symbol {symbol} is not defined',
+                )
 
         # Try to parse both sides as expressions
         try:
