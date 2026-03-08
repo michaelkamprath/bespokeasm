@@ -1674,6 +1674,20 @@ class TestInstructionParsing(unittest.TestCase):
             non_word_aligned.get_operand_label_addresses()
         self.assertIn('non-word-aligned', str(non_word_aligned_error.exception))
 
+        zero_width = InstructionLine.factory(
+            LineIdentifier(32, 'test_operand_label_non_word_alignment_and_word_full_validation'),
+            'badzero @zero_err:$1234',
+            '',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+        self.assertIsInstance(zero_width, InstructionLine)
+        zero_width.set_start_address(0x10)
+        with self.assertRaises(ValueError) as zero_width_error:
+            zero_width.get_operand_label_addresses()
+        self.assertIn('emits zero bits', str(zero_width_error.exception))
+
     def test_instruction_multiple_aliases(self):
         fp = pkg_resources.files(config_files).joinpath('test_instruction_aliases.yaml')
         isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)

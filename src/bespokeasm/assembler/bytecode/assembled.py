@@ -92,6 +92,11 @@ class AssembledInstruction:
                     f'Operand label "{binding.label}" is invalid because '
                     f'its operand argument starts at non-word-aligned bit offset {start_bit_offset}.'
                 )
+            if binding.bytecode_part.value_size == 0:
+                raise ValueError(
+                    f'Operand label "{binding.label}" is invalid because '
+                    'the annotated operand argument emits zero bits.'
+                )
             if binding.bytecode_part.value_size % self._word_size != 0:
                 raise ValueError(
                     f'Operand label "{binding.label}" is invalid because '

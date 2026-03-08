@@ -33,6 +33,13 @@ operand_sets:
         argument:
           size: 16
           word_align: false
+  imm_zero_word:
+    operand_values:
+      imm_zero_word:
+        type: numeric
+        argument:
+          size: 0
+          word_align: true
   ind_word:
     operand_values:
       ind_word:
@@ -171,3 +178,12 @@ instructions:
       operand_sets:
         list:
           - imm_unaligned_word
+  badzero:
+    bytecode:
+      value: 11
+      size: 16
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - imm_zero_word
