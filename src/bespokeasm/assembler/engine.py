@@ -215,7 +215,13 @@ class Assembler:
 
         for lobj in compilable_line_obs:
             if isinstance(lobj, LineWithWords):
-                lobj.generate_words()
+                try:
+                    lobj.generate_words()
+                except ValueError as e:
+                    diagnostic_reporter.error(
+                        lobj.line_id,
+                        str(e),
+                    )
             if self._verbose > 2:
                 diagnostic_reporter.info(
                     None,
