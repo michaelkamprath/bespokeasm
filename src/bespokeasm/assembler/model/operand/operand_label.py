@@ -8,7 +8,7 @@ from bespokeasm.assembler.model.operand import OperandType
 from bespokeasm.utilities import is_valid_label
 
 
-_OPERAND_LABEL_PATTERN = re.compile(r'@([._a-zA-Z][a-zA-Z0-9_]*)\s*:')
+_OPERAND_LABEL_PATTERN = re.compile(r'@([._a-zA-Z][a-zA-Z0-9_]*):')
 
 _SUPPORTED_OPERAND_LABEL_TYPES = {
     OperandType.NUMERIC,
@@ -67,7 +67,13 @@ def parse_operand_label_annotation(
     matches = list(_OPERAND_LABEL_PATTERN.finditer(stripped))
     if len(matches) == 0:
         # If it looks like operand-label syntax but did not parse, emit targeted syntax guidance.
-        if stripped.startswith('@') and ':' in stripped:
+        if stripped.startswith('@'):
+            if ':' not in stripped:
+                raise OperandLabelError(
+                    line_id,
+                    f'Malformed operand-label syntax in "{operand_expression}". '
+                    'Expected "@name: expression" (missing ":" after operand-label name).',
+                )
             raise OperandLabelError(
                 line_id,
                 f'Malformed operand-label syntax in "{operand_expression}". Expected "@name: expression".',

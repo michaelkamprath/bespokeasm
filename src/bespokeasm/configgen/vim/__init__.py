@@ -133,6 +133,9 @@ class VimConfigGenerator(LanguageConfigGenerator):
             (f'{lang_group}CharNumber', SyntaxElement.CHARACTER_NUMBER),
             (f'{lang_group}LabelName', SyntaxElement.LABEL_NAME),
             (f'{lang_group}LabelColon', SyntaxElement.PUNCTUATION_LABEL_COLON),
+            (f'{lang_group}OperandLabelAt', SyntaxElement.OPERAND_LABEL_AT),
+            (f'{lang_group}OperandLabelName', SyntaxElement.OPERAND_LABEL_NAME),
+            (f'{lang_group}OperandLabelColon', SyntaxElement.OPERAND_LABEL_COLON),
             (f'{lang_group}String', SyntaxElement.STRING),
             (f'{lang_group}StringPunc', SyntaxElement.PUNCTUATION_STRING),
             (f'{lang_group}Escape', SyntaxElement.STRING_ESCAPE),
@@ -288,6 +291,15 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
             + '\\.'
             + f'\\w\\+\\|_\\w\\+\\|\\w\\+\\)\\s*:/ contains={lang_group}LabelName,{lang_group}LabelColon'
         )
+        lines.append(
+            fr'syn match {lang_group}OperandLabelAt /@\ze\%(\.\|_\|[A-Za-z]\)\w*\s*:/'
+        )
+        lines.append(
+            fr'syn match {lang_group}OperandLabelName /\%(@\)\@<=\%(\.\w\+\|_\w\+\|[A-Za-z]\w*\)\ze\s*:/'
+        )
+        lines.append(
+            fr'syn match {lang_group}OperandLabelColon /\%(@\%(\.\|_\|[A-Za-z]\)\w*\s*\)\@<=:/'
+        )
 
         # Constant assignments (name before '=' or EQU at start-of-line)
         lines.append(fr'syn match {lang_group}ConstName /^\s*\zs\w\+\ze\s*\%(=\|EQU\)/')
@@ -336,6 +348,9 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         lines.append(f'hi def link {lang_group}CharNumber Number')
         lines.append(f'hi def link {lang_group}LabelName Label')
         lines.append(f'hi def link {lang_group}LabelColon Delimiter')
+        lines.append(f'hi def link {lang_group}OperandLabelAt Delimiter')
+        lines.append(f'hi def link {lang_group}OperandLabelName Label')
+        lines.append(f'hi def link {lang_group}OperandLabelColon Delimiter')
         lines.append(f'hi def link {lang_group}Directive Statement')
         lines.append(f'hi def link {lang_group}DataType Type')
         lines.append(f'hi def link {lang_group}PreProc PreProc')

@@ -48,6 +48,21 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.DECIMAL_NUMBER, 'constant.numeric.integer.decimal', 'Numbers - Decimal'),
             (SyntaxElement.CHARACTER_NUMBER, 'constant.numeric.character', 'Numbers - Character'),
             (SyntaxElement.LABEL_DEFINITION, 'variable.other.label.definition', 'Labels - Definitions'),
+            (
+                SyntaxElement.OPERAND_LABEL_AT,
+                'punctuation.definition.variable.at.operand-label',
+                'Operand Labels - @',
+            ),
+            (
+                SyntaxElement.OPERAND_LABEL_NAME,
+                'variable.other.label.definition.operand-label',
+                'Operand Labels - Name',
+            ),
+            (
+                SyntaxElement.OPERAND_LABEL_COLON,
+                'punctuation.definition.variable.colon.operand-label',
+                'Operand Labels - Colon',
+            ),
             # (SyntaxElement.LABEL_USAGE, 'variable.other.label.usage', 'Labels - Usages'),
             (SyntaxElement.LABEL_NAME, 'variable.other.label', 'Labels'),
             (SyntaxElement.PUNCTUATION_STRING, 'punctuation.definition.string', 'String Punctuation'),
@@ -214,6 +229,13 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         else:
             # remove the registers syntax
             del syntax_dict['contexts']['registers']
+
+        if 'operand_label_definitions' in syntax_dict['contexts']:
+            syntax_dict['contexts']['operand_label_definitions'][0]['match'] = \
+                syntax_dict['contexts']['operand_label_definitions'][0]['match'].replace(
+                    '##LABEL_PATTERN##',
+                    self._label_pattern(),
+                )
 
         # handle compiler predefined labels and built-in constants
         from bespokeasm.assembler.keywords import BUILTIN_CONSTANTS_SET

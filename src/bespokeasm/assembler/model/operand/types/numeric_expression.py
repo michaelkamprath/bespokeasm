@@ -45,7 +45,7 @@ class NumericExpressionOperand(OperandWithArgument):
     @property
     def match_pattern(self) -> str:
         base_pattern = r'(?:[\$\%\w\(\)\+\-\s]*[\w\)])'
-        return fr'(?:@(?:[._a-zA-Z][a-zA-Z0-9_]*)\s*:\s*)?{base_pattern}'
+        return fr'(?:@(?:[._a-zA-Z][a-zA-Z0-9_]*):\s*)?{base_pattern}'
 
     @property
     def enforce_argument_valid_address(self) -> bool:

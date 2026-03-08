@@ -108,7 +108,7 @@ class RelativeAddressOperand(OperandWithArgument):
     def match_pattern(self) -> str:
         base_match_str = (
             r'(?P<operand_expression>'
-            r'(?:@(?:[._a-zA-Z][a-zA-Z0-9_]*)\s*:\s*)?'
+            r'(?:@(?:[._a-zA-Z][a-zA-Z0-9_]*):\s*)?'
             fr'(?:{EXPRESSION_PARTS_PATTERN}|\s)+'
             r')'
         )

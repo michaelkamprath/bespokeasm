@@ -1411,7 +1411,7 @@ class TestInstructionParsing(unittest.TestCase):
 
         numeric = InstructionLine.factory(
             LineIdentifier(1, 'test_operand_label_supported_syntax_and_wrappers'),
-            'nword @num_lbl:$1234',
+            'aword @num_lbl:$1234',
             '',
             isa_model,
             memzone_mngr.global_zone,
@@ -1423,7 +1423,7 @@ class TestInstructionParsing(unittest.TestCase):
 
         numeric_space = InstructionLine.factory(
             LineIdentifier(2, 'test_operand_label_supported_syntax_and_wrappers'),
-            'nword @num_lbl2: $1234',
+            'aword @num_lbl2: $1234',
             '',
             isa_model,
             memzone_mngr.global_zone,
@@ -1530,7 +1530,7 @@ class TestInstructionParsing(unittest.TestCase):
         with self.assertRaises(SystemExit) as one_label_per_operand:
             InstructionLine.factory(
                 LineIdentifier(20, 'test_operand_label_invalid_parse_cases'),
-                'nword @a:@b:$1234',
+                'aword @a:@b:$1234',
                 '',
                 isa_model,
                 memzone_mngr.global_zone,
@@ -1552,7 +1552,7 @@ class TestInstructionParsing(unittest.TestCase):
         with self.assertRaises(SystemExit) as bad_syntax:
             InstructionLine.factory(
                 LineIdentifier(22, 'test_operand_label_invalid_parse_cases'),
-                'nword @1bad: $1234',
+                'aword @1bad: $1234',
                 '',
                 isa_model,
                 memzone_mngr.global_zone,
@@ -1560,10 +1560,33 @@ class TestInstructionParsing(unittest.TestCase):
             )
         self.assertIn('Malformed operand-label syntax', str(bad_syntax.exception))
 
+        with self.assertRaises(SystemExit) as bad_spacing:
+            InstructionLine.factory(
+                LineIdentifier(22, 'test_operand_label_invalid_parse_cases'),
+                'aword @lbl : $1234',
+                '',
+                isa_model,
+                memzone_mngr.global_zone,
+                memzone_mngr,
+            )
+        self.assertIn('Malformed operand-label syntax', str(bad_spacing.exception))
+
+        with self.assertRaises(SystemExit) as missing_colon:
+            InstructionLine.factory(
+                LineIdentifier(22, 'test_operand_label_invalid_parse_cases'),
+                'aword @lbl $1234',
+                '',
+                isa_model,
+                memzone_mngr.global_zone,
+                memzone_mngr,
+            )
+        self.assertIn('Malformed operand-label syntax', str(missing_colon.exception))
+        self.assertIn('missing ":"', str(missing_colon.exception))
+
         with self.assertRaises(SystemExit) as same_line:
             InstructionLine.factory(
                 LineIdentifier(23, 'test_operand_label_invalid_parse_cases'),
-                'nword @lbl:',
+                'aword @lbl:',
                 '',
                 isa_model,
                 memzone_mngr.global_zone,

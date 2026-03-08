@@ -44,6 +44,21 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.CHARACTER_NUMBER, 'constant.numeric.character', 'Numbers - Character'),
             (SyntaxElement.LABEL_DEFINITION, 'variable.other.label.definition', 'Label Definitions'),
             (SyntaxElement.LABEL_USAGE, 'variable.other.label.usage', 'Label Usages'),
+            (
+                SyntaxElement.OPERAND_LABEL_AT,
+                'punctuation.definition.variable.at.operand-label',
+                'Operand Label - @',
+            ),
+            (
+                SyntaxElement.OPERAND_LABEL_NAME,
+                'variable.other.label.definition.operand-label',
+                'Operand Label - Name',
+            ),
+            (
+                SyntaxElement.OPERAND_LABEL_COLON,
+                'punctuation.definition.variable.colon.operand-label',
+                'Operand Label - Colon',
+            ),
             (SyntaxElement.PUNCTUATION_STRING, 'punctuation.definition.string', 'String Punctuation'),
             (SyntaxElement.STRING, 'string.quoted', 'Strings'),
             (SyntaxElement.STRING_ESCAPE, 'constant.character.escape', 'Strings - Escaped Characters'),
@@ -273,6 +288,12 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
                 func_regex = '|'.join([d for d in EXPRESSION_FUNCTIONS_SET])
                 func_str = item['match']
                 item['match'] = func_str.replace('##EXPRESSION_FUNCTIONS##', func_regex)
+
+        operand_label_defs = grammar_json['repository'].get('operand_label_definitions')
+        if operand_label_defs:
+            for pattern in operand_label_defs.get('patterns', []):
+                if isinstance(pattern, dict) and 'match' in pattern:
+                    pattern['match'] = pattern['match'].replace('##LABEL_PATTERN##', self._label_pattern())
 
         tmGrammar_fp = os.path.join(extension_dir_path, 'syntaxes', 'tmGrammar.json')
         with open(tmGrammar_fp, 'w', encoding='utf-8') as f:

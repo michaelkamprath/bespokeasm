@@ -191,15 +191,17 @@ function buildSemanticTokens(document) {
 
   for (let line = 0; line < lines.length; line += 1) {
     const text = lines[line];
-    const def = labelHover.findLabelDefinition(text);
-    if (def) {
-      const start = text.indexOf(def);
-      builder.push(line, start, def.length, labelType, definitionModifier);
+    const labelDefinitions = labelHover.findLabelDefinitions(text);
+    const labelDefinitionOffsets = new Set();
+    for (const def of labelDefinitions) {
+      builder.push(line, def.character, def.name.length, labelType, definitionModifier);
+      labelDefinitionOffsets.add(`${def.name}@${def.character}`);
     }
     const constDef = constantsHover.findConstantDefinition(text);
+    let constDefStart = -1;
     if (constDef) {
-      const start = text.indexOf(constDef);
-      builder.push(line, start, constDef.length, constantType, definitionModifier);
+      constDefStart = text.indexOf(constDef);
+      builder.push(line, constDefStart, constDef.length, constantType, definitionModifier);
     }
 
     const searchRanges = getSemanticSearchRanges(text);
@@ -211,13 +213,13 @@ function buildSemanticTokens(document) {
         const word = match[1];
         const offset = range.start + match.index;
         if (constants.has(word)) {
-          if (!(constDef && word === constDef && offset === text.indexOf(constDef))) {
+          if (!(constDef && word === constDef && offset === constDefStart)) {
             builder.push(line, offset, word.length, constantType, 0);
             continue;
           }
         }
         if (labels.has(word)) {
-          if (def && word === def && offset === text.indexOf(def)) {
+          if (labelDefinitionOffsets.has(`${word}@${offset}`)) {
             continue;
           }
           builder.push(line, offset, word.length, labelType, 0);

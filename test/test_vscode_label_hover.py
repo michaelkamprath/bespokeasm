@@ -72,6 +72,17 @@ const includeLabels = helper.buildLabelDefinitionMapFromFiles([
   {{uri: 'file:///inc.asm', lines: ['ext:', '  nop']}}
 ]);
 const includeLabelLoc = helper.getLabelLocation(includeLabels, 'ext');
+const opLines = [
+  'mix @first:$1111, [@second: $2222]',
+  '  mov first, second',
+  'text ".not_a_label: nope" ; @ignored: nope'
+];
+const opMap = helper.buildLabelDefinitionMap(opLines);
+const firstLoc = helper.getLabelLocation(opMap, 'first');
+const secondLoc = helper.getLabelLocation(opMap, 'second');
+const firstIsDef = helper.isDefinitionAtLocation(opMap, 'first', 0, firstLoc.character);
+const secondIsDef = helper.isDefinitionAtLocation(opMap, 'second', 0, secondLoc.character);
+const opDefs = helper.findLabelDefinitions(opLines[0]);
 console.log(JSON.stringify({{
   start,
   usage,
@@ -85,7 +96,12 @@ console.log(JSON.stringify({{
   constLoc2,
   constUsage,
   constUsage2,
-  includeLabelLoc
+  includeLabelLoc,
+  firstLoc,
+  secondLoc,
+  firstIsDef,
+  secondIsDef,
+  opDefs
 }}));
 """
         result = subprocess.run(
@@ -109,6 +125,13 @@ console.log(JSON.stringify({{
         self.assertTrue(payload['constUsage'])
         self.assertFalse(payload['constUsage2'])
         self.assertEqual(payload['includeLabelLoc']['line'], 0)
+        self.assertEqual(payload['firstLoc']['line'], 0)
+        self.assertEqual(payload['secondLoc']['line'], 0)
+        self.assertTrue(payload['firstIsDef'])
+        self.assertTrue(payload['secondIsDef'])
+        self.assertEqual([item['name'] for item in payload['opDefs']], ['first', 'second'])
+        self.assertEqual(payload['opDefs'][0]['character'], payload['firstLoc']['character'])
+        self.assertEqual(payload['opDefs'][1]['character'], payload['secondLoc']['character'])
         shutil.rmtree(temp_dir)
 
     def test_vscode_collect_includes_transitive(self):

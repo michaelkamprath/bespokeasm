@@ -45,6 +45,9 @@
           "include": "#registers"
         },
         {
+          "include": "#operand_label_definitions"
+        },
+        {
           "include": "#compiler_labels"
         },
         {
@@ -86,6 +89,9 @@
               "include": "#numeric-values"
             },
             {
+              "include": "#operand_label_definitions"
+            },
+            {
               "include": "#compiler_labels"
             },
             {
@@ -121,6 +127,9 @@
               "include": "#numeric-values"
             },
             {
+              "include": "#operand_label_definitions"
+            },
+            {
               "include": "#compiler_labels"
             },
             {
@@ -151,6 +160,9 @@
       "patterns": [
         {
           "include": "#numeric-values"
+        },
+        {
+          "include": "#operand_label_definitions"
         },
         {
           "include": "#compiler_labels"
@@ -184,6 +196,9 @@
       "patterns": [
         {
           "include": "#registers"
+        },
+        {
+          "include": "#operand_label_definitions"
         },
         {
           "include": "#compiler_labels"
@@ -226,6 +241,9 @@
         },
         {
           "include": "#registers"
+        },
+        {
+          "include": "#operand_label_definitions"
         },
         {
           "include": "#compiler_labels"
@@ -304,6 +322,24 @@
         }
       ]
     },
+    "operand_label_definitions": {
+      "patterns": [
+        {
+          "captures": {
+            "1": {
+              "name": "punctuation.definition.variable.at.operand-label"
+            },
+            "2": {
+              "name": "variable.other.label.definition variable.other.label.definition.operand-label"
+            },
+            "3": {
+              "name": "punctuation.definition.variable.colon.operand-label"
+            }
+          },
+          "match": "(@)(##LABEL_PATTERN##)(:)(\\s*)"
+        }
+      ]
+    },
     "macros": {
       "begin": "(?i)(##MACROS##)",
       "beginCaptures": {
@@ -319,6 +355,9 @@
         },
         {
           "include": "#registers"
+        },
+        {
+          "include": "#operand_label_definitions"
         },
         {
           "include": "#compiler_labels"
@@ -354,6 +393,9 @@
         },
         {
           "include": "#registers"
+        },
+        {
+          "include": "#operand_label_definitions"
         },
         {
           "include": "#compiler_labels"

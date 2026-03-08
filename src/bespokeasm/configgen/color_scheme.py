@@ -33,6 +33,9 @@ class SyntaxElement(Enum):
     LABEL_DEFINITION = 'label_definition'
     LABEL_USAGE = 'label_usage'
     PUNCTUATION_LABEL_COLON = 'label_colon'
+    OPERAND_LABEL_AT = 'operand_label_at'
+    OPERAND_LABEL_NAME = 'operand_label_name'
+    OPERAND_LABEL_COLON = 'operand_label_colon'
 
     # Strings and escapes
     STRING = 'string'
@@ -109,6 +112,9 @@ DEFAULT_COLOR_SCHEME = ColorScheme(
         SyntaxElement.LABEL_DEFINITION: '#278ed8',
         SyntaxElement.LABEL_USAGE: '#7fcaff',
         SyntaxElement.PUNCTUATION_LABEL_COLON: '#ed80a2',
+        SyntaxElement.OPERAND_LABEL_AT: '#ed80a2',
+        SyntaxElement.OPERAND_LABEL_NAME: '#5aa9e6',
+        SyntaxElement.OPERAND_LABEL_COLON: '#ed80a2',
 
         # Strings and escapes
         SyntaxElement.STRING: '#17d75a',

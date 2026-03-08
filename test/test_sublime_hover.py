@@ -1,8 +1,11 @@
 import importlib.util
 import pathlib as pl
+import re
 import sys
 import tempfile
 import types
+
+from bespokeasm.utilities import PATTERN_ALLOWED_LABELS
 
 
 def _load_sublime_hover_module():
@@ -15,6 +18,18 @@ def _load_sublime_hover_module():
     assert spec.loader is not None
     spec.loader.exec_module(module)
     return module
+
+
+def _install_label_patterns(hover):
+    pattern = PATTERN_ALLOWED_LABELS.pattern
+    if pattern.startswith('^'):
+        pattern = pattern[1:]
+    if pattern.endswith('$'):
+        pattern = pattern[:-1]
+    hover.LABEL_DEFINITION_PATTERN = re.compile(rf'^\s*(?P<name>{pattern})\s*:')
+    hover.OPERAND_LABEL_DEFINITION_PATTERN = re.compile(rf'@(?P<name>{pattern}):\s*')
+    hover.CONSTANT_DEFINITION_PATTERN = re.compile(rf'^\s*(?P<name>{pattern})\s*(?:=|\bEQU\b)')
+    hover.WORD_PATTERN = re.compile(rf'(?:{pattern})', re.IGNORECASE)
 
 
 def test_sublime_mnemonic_hover_table_renders_div_table():
@@ -95,3 +110,53 @@ def test_sublime_hover_adds_bottom_padding_wrapper():
     wrapped = hover._with_hover_padding('<p>content</p>')
     assert 'padding:0 0 8px 0' in wrapped
     assert '<p>content</p>' in wrapped
+
+
+def test_sublime_label_definition_map_detects_operand_labels():
+    hover = _load_sublime_hover_module()
+    _install_label_patterns(hover)
+    entries = [{
+        'path': '/tmp/main.asm',
+        'lines': [
+            'entry:',
+            'mix @first:$1111, [@second: $2222]',
+            'text ".skip: here" ; @ignore: nope',
+        ],
+    }]
+    defs = hover._build_definition_map(entries, 'label')
+    assert defs['entry']['line'] == 0
+    assert defs['first']['line'] == 1
+    assert defs['second']['line'] == 1
+    assert 'skip' not in defs
+    assert 'ignore' not in defs
+
+
+def test_sublime_is_definition_at_point_handles_operand_labels():
+    hover = _load_sublime_hover_module()
+    _install_label_patterns(hover)
+    line_text = 'mix @first:$1111, [@second: $2222]'
+
+    class _Region:
+        def __init__(self, begin, end):
+            self._begin = begin
+            self._end = end
+
+        def begin(self):
+            return self._begin
+
+        def end(self):
+            return self._end
+
+    class _View:
+        def line(self, _point):
+            return _Region(0, len(line_text))
+
+        def substr(self, _region):
+            return line_text
+
+    view = _View()
+    first_point = line_text.index('first')
+    second_point = line_text.index('second')
+    assert hover._is_definition_at_point(view, first_point, 'first', hover.LABEL_DEFINITION_PATTERN)
+    assert hover._is_definition_at_point(view, second_point, 'second', hover.LABEL_DEFINITION_PATTERN)
+    assert not hover._is_definition_at_point(view, second_point, 'first', hover.LABEL_DEFINITION_PATTERN)
