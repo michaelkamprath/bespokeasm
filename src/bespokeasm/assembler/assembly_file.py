@@ -29,6 +29,7 @@ from bespokeasm.assembler.line_object.preprocessor_line.use_scope import UseScop
 from bespokeasm.assembler.memory_zone.manager import GLOBAL_ZONE_NAME
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.assembler.parsing import split_line_comment
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
 
@@ -113,14 +114,9 @@ class AssemblyFile:
                         lobj_list: list[LineObject] = []
                         is_conditional_directive = line_str.startswith(tuple(CONDITIONAL_LINE_PREFIX_LIST))
                         if not condition_stack.currently_active(preprocessor) and not is_conditional_directive:
-                            comment_str = ''
-                            comment_match = re.search(LineOjectFactory.PATTERN_COMMENTS, line_str)
-                            if comment_match is not None:
-                                comment_str = comment_match.group(1).strip()
-                            instruction_str = ''
-                            instruction_match = re.search(LineOjectFactory.PATTERN_INSTRUCTION_CONTENT, line_str)
-                            if instruction_match is not None:
-                                instruction_str = instruction_match.group(1).strip()
+                            instruction_portion, comment_portion = split_line_comment(line_str)
+                            instruction_str = instruction_portion.strip()
+                            comment_str = comment_portion.strip()
                             line_obj = LineObject(line_id, instruction_str, comment_str, current_memzone)
                             line_obj.compilable = False
                             line_obj.is_muted = condition_stack.is_muted

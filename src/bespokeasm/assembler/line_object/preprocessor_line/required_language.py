@@ -124,13 +124,14 @@ class RequiredLanguageLine(PreprocessorLine):
         # Extract the expression part (everything after "#require ")
         expression = instruction.replace('#require', '', 1).strip()
 
-        # Check if this expression contains language version symbols
+        # Check if this expression contains built-in version symbols
         if not LanguageVersionEvaluator.contains_language_version_symbols(expression):
             isa_model.diagnostic_reporter.error(
                 line_id,
-                '#require directive with non-quoted expression must use language version symbols. '
+                '#require directive with non-quoted expression must use built-in version symbols. '
                 'Use legacy format: #require "language-name >= version" or '
-                'use language version symbols: #require __LANGUAGE_VERSION_MAJOR__ >= 1',
+                'use built-in version symbols: #require __LANGUAGE_VERSION_MAJOR__ >= 1 or '
+                '#require __BESPOKEASM_VERSION__ >= 0.7.2',
             )
 
         # Evaluate the language version expression

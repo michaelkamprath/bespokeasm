@@ -205,6 +205,7 @@ class ParsedOperand:
         operand_str: str,
         word_size: int,
         word_segment_size: int,
+        operand_label: str | None = None,
     ):
         self._operand = operand
         self._bytecode = bytecode
@@ -212,6 +213,7 @@ class ParsedOperand:
         self._operand_str = operand_str
         self._word_size = word_size
         self._word_segment_size = word_segment_size
+        self._operand_label = operand_label
 
     def __repr__(self):
         return str(self)
@@ -238,6 +240,10 @@ class ParsedOperand:
     @property
     def operand_string(self) -> str:
         return self._operand_str
+
+    @property
+    def operand_label(self) -> str | None:
+        return self._operand_label
 
     @property
     def operand_argument_string(self) -> str:

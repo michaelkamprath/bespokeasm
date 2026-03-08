@@ -5,6 +5,9 @@ from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model.operand import Operand
 from bespokeasm.assembler.model.operand import ParsedOperand
 from bespokeasm.assembler.model.operand.factory import OperandFactory
+from bespokeasm.assembler.model.operand.operand_label import contains_operand_label_annotation
+from bespokeasm.assembler.model.operand.operand_label import OperandLabelError
+from bespokeasm.assembler.model.operand.operand_label import supports_operand_labels
 
 
 class OperandSet:
@@ -66,12 +69,28 @@ class OperandSet:
         register_labels: set[str],
         memzone_manager: MemoryZoneManager,
     ) -> ParsedOperand | None:
+        operand_label_error: OperandLabelError | None = None
         for operand in self._ordered_operand_list:
-            op: ParsedOperand = operand.parse_operand(line_id, operand_str, register_labels, memzone_manager)
+            try:
+                op: ParsedOperand = operand.parse_operand(line_id, operand_str, register_labels, memzone_manager)
+            except OperandLabelError as e:
+                if operand_label_error is None:
+                    operand_label_error = e
+                continue
             if op is not None:
                 # if some part was returned, then this is a valid match. Matching
                 # precedence order is important here!
                 return op
+        if operand_label_error is not None:
+            raise operand_label_error
+        if contains_operand_label_annotation(operand_str) and not any(
+            supports_operand_labels(operand.type) for operand in self._ordered_operand_list
+        ):
+            raise OperandLabelError(
+                line_id,
+                'Operand labels are only supported for operand types: '
+                'numeric, indirect_numeric, deferred_numeric, address, relative_address.',
+            )
         return None
 
     def match_operand(

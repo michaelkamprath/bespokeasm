@@ -9,7 +9,10 @@ from bespokeasm.assembler.model.instruction_macro import InstructionMacro
 from bespokeasm.assembler.model.instruction_macro import InstructionMacroVariant
 from bespokeasm.assembler.model.instruction_macro import MacroLineIdentifier
 from bespokeasm.assembler.model.instruction_parser_base import InstructioParserBase
+from bespokeasm.assembler.model.operand.operand_label import contains_operand_label_annotation
+from bespokeasm.assembler.model.operand.operand_label import OperandLabelError
 from bespokeasm.assembler.model.operand_parser import MatchedOperandSet
+from bespokeasm.assembler.parsing import split_operands
 
 
 class MacroBytecodeGenerator:
@@ -29,20 +32,35 @@ class MacroBytecodeGenerator:
             # this shouldn't happen
             sys.exit(f'ERROR: {line_id} - INTERNAL - Asked macro {macro} to parse mnemonic "{mnemonic}"')
 
+        operand_label_error: OperandLabelError | None = None
         for variant in macro.variants:
-            assembled_instruction = MacroBytecodeGenerator.generate_variant_bytecode_parts(
-                variant,
-                line_id,
-                mnemonic,
-                operands,
-                isa_model,
-                memzone_manager,
-                parser_class,
-            )
+            try:
+                assembled_instruction = MacroBytecodeGenerator.generate_variant_bytecode_parts(
+                    variant,
+                    line_id,
+                    mnemonic,
+                    operands,
+                    isa_model,
+                    memzone_manager,
+                    parser_class,
+                )
+            except OperandLabelError as e:
+                if operand_label_error is None:
+                    operand_label_error = e
+                continue
             if assembled_instruction is not None:
                 return assembled_instruction
 
-        sys.exit(f'ERROR: {line_id} - Macro "{mnemonic}" has no valid operands configured.')
+        if operand_label_error is not None:
+            isa_model.diagnostic_reporter.error(
+                operand_label_error.line_id,
+                operand_label_error.message,
+                category=operand_label_error.category,
+            )
+        isa_model.diagnostic_reporter.error(
+            line_id,
+            f'Macro "{mnemonic}" has no valid operands configured.',
+        )
 
     @classmethod
     def generate_variant_bytecode_parts(
@@ -58,10 +76,14 @@ class MacroBytecodeGenerator:
         if mnemonic != variant.mnemonic:
             # this shouldn't happen
             sys.exit(f'ERROR: {line_id} - INTERNAL - Asked instruction {variant} to parse mnemonic "{mnemonic}"')
-        if operands is not None and operands != '':
-            operand_list = operands.strip().split(',')
-        else:
-            operand_list = []
+        operand_list = split_operands(operands)
+
+        for operand_str in operand_list:
+            if contains_operand_label_annotation(operand_str):
+                isa_model.diagnostic_reporter.error(
+                    line_id,
+                    f'Macro "{mnemonic}" does not support operand labels in macro usage.',
+                )
 
         # first step is to parse the macro instruction, return None if operands don't match
         matched_operands: MatchedOperandSet = None
@@ -120,6 +142,12 @@ class MacroBytecodeGenerator:
             if '@OP' in instruction_str:
                 # ensure all @OPs are handled
                 sys.exit(f'ERROR: {line_id} - Macro "{variant.mnemonic}" has unrecognized @OP on step {step_num}')
+            if contains_operand_label_annotation(instruction_str):
+                isa_model.diagnostic_reporter.error(
+                    line_id,
+                    f'Macro "{variant.mnemonic}" step {step_num} expands to operand-label syntax, '
+                    'which is not supported for macros.',
+                )
 
             instruction_lines.append(instruction_str)
 

@@ -11,6 +11,7 @@ import tempfile
 import textwrap
 import unittest
 
+from bespokeasm import BESPOKEASM_VERSION_STR
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.model import AssemblerModel
@@ -43,6 +44,7 @@ class TestLanguageVersionEvaluator(unittest.TestCase):
         self.assertTrue(LanguageVersionEvaluator.contains_language_version_symbols('__LANGUAGE_VERSION_MAJOR__ >= 1'))
         self.assertTrue(LanguageVersionEvaluator.contains_language_version_symbols('__LANGUAGE_VERSION_MINOR__ < 5'))
         self.assertTrue(LanguageVersionEvaluator.contains_language_version_symbols('__LANGUAGE_VERSION_PATCH__ != 0'))
+        self.assertTrue(LanguageVersionEvaluator.contains_language_version_symbols('__BESPOKEASM_VERSION__ >= 0.7.2'))
 
         # Test expressions that don't contain language version symbols
         self.assertFalse(LanguageVersionEvaluator.contains_language_version_symbols('OTHER_SYMBOL >= 1'))
@@ -104,6 +106,8 @@ class TestLanguageVersionEvaluator(unittest.TestCase):
             '__LANGUAGE_VERSION__ == 0.0.1', self.preprocessor, self.line_id))
         self.assertFalse(LanguageVersionEvaluator.evaluate_expression(
             '__LANGUAGE_VERSION__ == 1.0.0', self.preprocessor, self.line_id))
+        self.assertTrue(LanguageVersionEvaluator.evaluate_expression(
+            f'__BESPOKEASM_VERSION__ == {BESPOKEASM_VERSION_STR}', self.preprocessor, self.line_id))
 
     def test_evaluate_implied_format(self):
         """Test evaluation of implied format (symbol only, implies != 0)."""
@@ -217,6 +221,13 @@ class TestLanguageVersionEvaluator(unittest.TestCase):
         # Create a preprocessor without ISA model
         preprocessor_no_isa = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
 
+        # BespokeASM version symbol should still be available without an ISA model
+        self.assertTrue(
+            LanguageVersionEvaluator.evaluate_expression(
+                '__BESPOKEASM_VERSION__', preprocessor_no_isa, self.line_id
+            )
+        )
+
         # Test that language version symbols don't exist
         with self.assertRaises(SystemExit):
             LanguageVersionEvaluator.evaluate_expression(
@@ -252,6 +263,8 @@ class TestLanguageVersionEvaluator(unittest.TestCase):
             '__LANGUAGE_VERSION_PATCH__'))
         self.assertTrue(LanguageVersionEvaluator.is_pure_language_version_expression(
             '__LANGUAGE_VERSION__ != 1.0.0'))
+        self.assertTrue(LanguageVersionEvaluator.is_pure_language_version_expression(
+            '__BESPOKEASM_VERSION__ >= 0.7.2'))
 
         # Test mixed expressions (should NOT be handled by language version evaluator)
         self.assertFalse(LanguageVersionEvaluator.is_pure_language_version_expression(

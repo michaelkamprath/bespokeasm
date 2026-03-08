@@ -1,0 +1,189 @@
+description: Test operand label parsing and pass-1 address registration
+general:
+  address_size: 16
+  word_size: 16
+  multi_word_endian: big
+  intra_word_endian: big
+  identifier:
+    name: bespokeasm-test
+    version: "0.2.0"
+  registers:
+    - ra
+    - rb
+  min_version: "0.7.0"
+operand_sets:
+  imm_word:
+    operand_values:
+      imm_word:
+        type: numeric
+        argument:
+          size: 16
+          word_align: true
+  imm_byte:
+    operand_values:
+      imm_byte:
+        type: numeric
+        argument:
+          size: 8
+          word_align: true
+  imm_unaligned_word:
+    operand_values:
+      imm_unaligned_word:
+        type: numeric
+        argument:
+          size: 16
+          word_align: false
+  imm_zero_word:
+    operand_values:
+      imm_zero_word:
+        type: numeric
+        argument:
+          size: 0
+          word_align: true
+  ind_word:
+    operand_values:
+      ind_word:
+        type: indirect_numeric
+        argument:
+          size: 16
+          word_align: true
+  def_word:
+    operand_values:
+      def_word:
+        type: deferred_numeric
+        argument:
+          size: 16
+          word_align: true
+  addr_word:
+    operand_values:
+      addr_word:
+        type: address
+        argument:
+          size: 16
+          word_align: true
+  rel_word:
+    operand_values:
+      rel_word:
+        type: relative_address
+        argument:
+          size: 16
+          word_align: true
+          max: 32767
+          min: -32768
+  rel_curly_word:
+    operand_values:
+      rel_curly_word:
+        type: relative_address
+        use_curly_braces: true
+        argument:
+          size: 16
+          word_align: true
+          max: 32767
+          min: -32768
+  reg_only:
+    operand_values:
+      reg_only:
+        type: register
+        register: ra
+instructions:
+  nword:
+    bytecode:
+      value: 1
+      size: 16
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - imm_word
+  aword:
+    bytecode:
+      value: 2
+      size: 16
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - addr_word
+  iword:
+    bytecode:
+      value: 3
+      size: 16
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - ind_word
+  dword:
+    bytecode:
+      value: 4
+      size: 16
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - def_word
+  rword:
+    bytecode:
+      value: 5
+      size: 16
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - rel_word
+  rcword:
+    bytecode:
+      value: 6
+      size: 16
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - rel_curly_word
+  mix:
+    bytecode:
+      value: 7
+      size: 16
+    operands:
+      count: 2
+      operand_sets:
+        reverse_argument_order: true
+        list:
+          - imm_word
+          - imm_word
+  regop:
+    bytecode:
+      value: 8
+      size: 16
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - reg_only
+  badfull:
+    bytecode:
+      value: 9
+      size: 16
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - imm_byte
+  badalign:
+    bytecode:
+      value: 10
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - imm_unaligned_word
+  badzero:
+    bytecode:
+      value: 11
+      size: 16
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - imm_zero_word

@@ -1,4 +1,3 @@
-import re
 import sys
 
 from bespokeasm.assembler.label_scope import LabelScope
@@ -13,20 +12,12 @@ from bespokeasm.assembler.line_object.preprocessor_line.factory import Preproces
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.assembler.parsing import split_line_comment
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
 
 
 class LineOjectFactory:
-    PATTERN_COMMENTS = re.compile(
-        r'((?<=\;).*)$',
-        flags=re.IGNORECASE | re.MULTILINE
-    )
-    PATTERN_INSTRUCTION_CONTENT = re.compile(
-        r'^([^;\v]*)(?:;.*)?$',
-        flags=re.IGNORECASE | re.MULTILINE
-    )
-
     @classmethod
     def parse_line(
                 cls,
@@ -42,17 +33,9 @@ class LineOjectFactory:
                 log_verbosity: int,
                 filename: str = None,
             ) -> list[LineObject]:
-        # find comments
-        comment_str = ''
-        comment_match = re.search(LineOjectFactory.PATTERN_COMMENTS, line_str)
-        if comment_match is not None:
-            comment_str = comment_match.group(1).strip()
-
-        # find instruction
-        instruction_str = ''
-        instruction_match = re.search(LineOjectFactory.PATTERN_INSTRUCTION_CONTENT, line_str)
-        if instruction_match is not None:
-            instruction_str = instruction_match.group(1).strip()
+        instruction_portion, comment_portion = split_line_comment(line_str)
+        comment_str = comment_portion.strip()
+        instruction_str = instruction_portion.strip()
 
         line_obj_list: list[LineObject] = []
         label_seen = False

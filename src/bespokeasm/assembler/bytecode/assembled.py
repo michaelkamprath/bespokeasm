@@ -1,4 +1,5 @@
 import math
+from dataclasses import dataclass
 from typing import Literal
 
 from bespokeasm.assembler.bytecode.parts import ByteCodePart
@@ -9,6 +10,11 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 
 
 class AssembledInstruction:
+    @dataclass(frozen=True)
+    class OperandLabelBinding:
+        label: str
+        bytecode_part: ByteCodePart
+
     def __init__(
         self,
         line_id: LineIdentifier,
@@ -17,6 +23,7 @@ class AssembledInstruction:
         segment_size: int,
         multi_word_endian: Literal['little', 'big'],
         intra_word_endian: Literal['little', 'big'],
+        operand_label_bindings: list[tuple[str, ByteCodePart]] | None = None,
     ):
         self._parts = parts
         self._line_id = line_id
@@ -24,6 +31,10 @@ class AssembledInstruction:
         self._segment_size = segment_size
         self._multi_word_endian = multi_word_endian
         self._intra_word_endian = intra_word_endian
+        self._operand_label_bindings = [
+            AssembledInstruction.OperandLabelBinding(label, part)
+            for label, part in (operand_label_bindings or [])
+        ]
         # calculate word count
         total_bits = 0
         for bcp in self._parts:
@@ -51,6 +62,49 @@ class AssembledInstruction:
     @property
     def parts(self):
         return self._parts
+
+    @property
+    def has_operand_labels(self) -> bool:
+        return len(self._operand_label_bindings) > 0
+
+    def _get_part_start_bit_offset(self, target_part: ByteCodePart) -> int:
+        bit_offset = 0
+        for part in self._parts:
+            if part.word_align and bit_offset % self._word_size != 0:
+                bit_offset += self._word_size - (bit_offset % self._word_size)
+            if part is target_part:
+                return bit_offset
+            bit_offset += part.value_size
+        raise ValueError(
+            'INTERNAL - Unable to locate operand-label target in emitted instruction parts.'
+        )
+
+    def get_operand_label_addresses(self, instruction_address: int) -> list[tuple[str, int]]:
+        if instruction_address is None:
+            raise ValueError(
+                'INTERNAL - Instruction address is required to resolve operand labels.'
+            )
+        label_addresses: list[tuple[str, int]] = []
+        for binding in self._operand_label_bindings:
+            start_bit_offset = self._get_part_start_bit_offset(binding.bytecode_part)
+            if start_bit_offset % self._word_size != 0:
+                raise ValueError(
+                    f'Operand label "{binding.label}" is invalid because '
+                    f'its operand argument starts at non-word-aligned bit offset {start_bit_offset}.'
+                )
+            if binding.bytecode_part.value_size == 0:
+                raise ValueError(
+                    f'Operand label "{binding.label}" is invalid because '
+                    'the annotated operand argument emits zero bits.'
+                )
+            if binding.bytecode_part.value_size % self._word_size != 0:
+                raise ValueError(
+                    f'Operand label "{binding.label}" is invalid because '
+                    f'the annotated operand argument is not word-full '
+                    f'({binding.bytecode_part.value_size} bits for word size {self._word_size}).'
+                )
+            label_addresses.append((binding.label, instruction_address + (start_bit_offset // self._word_size)))
+        return label_addresses
 
     def get_words(
             self,

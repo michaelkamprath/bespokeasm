@@ -8,6 +8,7 @@ from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model.operand import OperandType
 from bespokeasm.assembler.model.operand import OperandWithArgument
 from bespokeasm.assembler.model.operand import ParsedOperand
+from bespokeasm.assembler.model.operand.operand_label import parse_operand_label_annotation
 from bespokeasm.utilities import PATTERN_CHARACTER_ORDINAL
 
 
@@ -43,7 +44,8 @@ class NumericExpressionOperand(OperandWithArgument):
 
     @property
     def match_pattern(self) -> str:
-        return r'(?:[\$\%\w\(\)\+\-\s]*[\w\)])'
+        base_pattern = r'(?:[\$\%\w\(\)\+\-\s]*[\w\)])'
+        return fr'(?:@(?:[._a-zA-Z][a-zA-Z0-9_]*):\s*)?{base_pattern}'
 
     @property
     def enforce_argument_valid_address(self) -> bool:
@@ -55,6 +57,7 @@ class NumericExpressionOperand(OperandWithArgument):
         operand: str,
         register_labels: set[str],
         memzone_manager: MemoryZoneManager,
+        operand_label: str | None = None,
     ) -> ParsedOperand:
         bytecode_part = NumericByteCodePart(
             self.bytecode_value,
@@ -91,7 +94,15 @@ class NumericExpressionOperand(OperandWithArgument):
             )
         if arg_part.contains_register_labels(register_labels):
             return None
-        return ParsedOperand(self, bytecode_part, arg_part, operand, self._word_size, self._word_segment_size)
+        return ParsedOperand(
+            self,
+            bytecode_part,
+            arg_part,
+            operand,
+            self._word_size,
+            self._word_segment_size,
+            operand_label=operand_label,
+        )
 
     def parse_operand(
         self,
@@ -100,13 +111,21 @@ class NumericExpressionOperand(OperandWithArgument):
         register_labels: set[str],
         memzone_manager: MemoryZoneManager,
     ) -> ParsedOperand:
+        parsed_operand_label = parse_operand_label_annotation(line_id, operand, register_labels, self.type)
+        operand = parsed_operand_label.operand_expression
         operand_without_char_literals = re.sub(PATTERN_CHARACTER_ORDINAL, '', operand)
         # do not match if expression contains square brack or curly braces
         punctuation_match = re.search(r'[\[\]\{\}]+', operand_without_char_literals)
         if punctuation_match is not None:
             return None
         try:
-            op = self._parse_bytecode_parts(line_id, operand, register_labels, memzone_manager)
+            op = self._parse_bytecode_parts(
+                line_id,
+                operand,
+                register_labels,
+                memzone_manager,
+                operand_label=parsed_operand_label.label_name,
+            )
         except SyntaxError:
             return None
         return op

@@ -12,8 +12,9 @@ import sublime_plugin
 
 
 WORD_PATTERN = re.compile(r'(?:##MNEMONIC_PATTERN##|##LABEL_PATTERN##)', re.IGNORECASE)
-LABEL_DEFINITION_PATTERN = re.compile(r'^\s*(##LABEL_PATTERN##)\s*:')
-CONSTANT_DEFINITION_PATTERN = re.compile(r'^\s*(##LABEL_PATTERN##)\s*(?:=|\bEQU\b)')
+LABEL_DEFINITION_PATTERN = re.compile(r'^\s*(?P<name>##LABEL_PATTERN##)\s*:')
+OPERAND_LABEL_DEFINITION_PATTERN = re.compile(r'@(?P<name>##LABEL_PATTERN##):\s*')
+CONSTANT_DEFINITION_PATTERN = re.compile(r'^\s*(?P<name>##LABEL_PATTERN##)\s*(?:=|\bEQU\b)')
 INCLUDE_PATTERN = re.compile(r'^\s*#include\s+(?:"([^"]+)"|<([^>]+)>|(\S+))', re.IGNORECASE)
 PACKAGE_NAME = '##PACKAGE_NAME##'
 
@@ -214,22 +215,95 @@ def _collect_included_files(lines, base_dir, visited=None):
     return entries
 
 
-def _build_definition_map(entries, pattern):
+def _get_code_regions(text):
+    ranges = []
+    segment_start = 0
+    in_quote = None
+    escaped = False
+
+    for idx, ch in enumerate(text):
+        if in_quote is not None:
+            if escaped:
+                escaped = False
+            elif ch == '\\':
+                escaped = True
+            elif ch == in_quote:
+                in_quote = None
+                segment_start = idx + 1
+            continue
+
+        if ch in ('"', "'"):
+            if segment_start < idx:
+                ranges.append((segment_start, idx))
+            in_quote = ch
+            continue
+
+        if ch == ';':
+            if segment_start < idx:
+                ranges.append((segment_start, idx))
+            return ranges
+
+    if in_quote is None and segment_start < len(text):
+        ranges.append((segment_start, len(text)))
+    return ranges
+
+
+def _is_offset_in_code_region(text, offset):
+    for start, end in _get_code_regions(text):
+        if start <= offset < end:
+            return True
+    return False
+
+
+def _iter_label_definitions(text):
+    definitions = []
+
+    line_label_match = LABEL_DEFINITION_PATTERN.match(text)
+    if line_label_match:
+        name = line_label_match.group('name')
+        col = line_label_match.start('name')
+        if _is_offset_in_code_region(text, col):
+            definitions.append((name, col))
+
+    for start, end in _get_code_regions(text):
+        segment = text[start:end]
+        for match in OPERAND_LABEL_DEFINITION_PATTERN.finditer(segment):
+            name = match.group('name')
+            col = start + match.start('name')
+            definitions.append((name, col))
+
+    definitions.sort(key=lambda item: item[1])
+    return definitions
+
+
+def _iter_constant_definitions(text):
+    match = CONSTANT_DEFINITION_PATTERN.match(text)
+    if not match:
+        return []
+    name = match.group('name')
+    col = match.start('name')
+    if not _is_offset_in_code_region(text, col):
+        return []
+    return [(name, col)]
+
+
+def _build_definition_map(entries, definition_kind):
     definitions = {}
     for entry in entries:
         path = entry.get('path')
         for line_index, text in enumerate(entry.get('lines', [])):
-            match = pattern.match(text)
-            if not match:
-                continue
-            name = match.group(1)
-            if name in definitions:
-                continue
-            definitions[name] = {
-                'line': line_index,
-                'col': text.find(name),
-                'path': path
-            }
+            if definition_kind == 'label':
+                line_definitions = _iter_label_definitions(text)
+            else:
+                line_definitions = _iter_constant_definitions(text)
+            for name, col in line_definitions:
+                if name in definitions:
+                    continue
+                definitions[name] = {
+                    'line': line_index,
+                    'col': col,
+                    'path': path
+                }
     return definitions
 
 
@@ -246,8 +320,8 @@ def _get_view_state(view):
     if base_dir:
         entries.extend(_collect_included_files(lines, base_dir))
 
-    label_map = _build_definition_map(entries, LABEL_DEFINITION_PATTERN)
-    constant_map = _build_definition_map(entries, CONSTANT_DEFINITION_PATTERN)
+    label_map = _build_definition_map(entries, 'label')
+    constant_map = _build_definition_map(entries, 'constant')
     state = {
         'change_count': change_count,
         'lines': lines,
@@ -271,13 +345,18 @@ def _get_token_at_point(view, point):
 def _is_definition_at_point(view, point, token, pattern):
     line_region = view.line(point)
     line_text = view.substr(line_region)
-    match = pattern.match(line_text)
-    if not match or match.group(1) != token:
-        return False
     column = point - line_region.begin()
-    start = match.start(1)
-    end = match.end(1)
-    return start <= column < end
+    if pattern is CONSTANT_DEFINITION_PATTERN:
+        definitions = _iter_constant_definitions(line_text)
+    else:
+        definitions = _iter_label_definitions(line_text)
+    for name, start in definitions:
+        if name != token:
+            continue
+        end = start + len(name)
+        if start <= column < end:
+            return True
+    return False
 
 
 def _build_definition_hover(name, location, current_path, token_color=None):
@@ -745,12 +824,8 @@ def _update_semantic_regions(view):
     label_regions = []
     constant_regions = []
     for line_index, text in enumerate(state['lines']):
-        label_def = LABEL_DEFINITION_PATTERN.match(text)
-        label_def_name = label_def.group(1) if label_def else None
-        label_def_start = label_def.start(1) if label_def else None
-        const_def = CONSTANT_DEFINITION_PATTERN.match(text)
-        const_def_name = const_def.group(1) if const_def else None
-        const_def_start = const_def.start(1) if const_def else None
+        label_definition_starts = set(_iter_label_definitions(text))
+        constant_definition_starts = set(_iter_constant_definitions(text))
 
         for match in WORD_PATTERN.finditer(text):
             word = match.group(0)
@@ -759,12 +834,12 @@ def _update_semantic_regions(view):
             if _is_in_comment(view, start, end):
                 continue
             if word in constants:
-                if const_def_name == word and match.start() == const_def_start:
+                if (word, match.start()) in constant_definition_starts:
                     continue
                 constant_regions.append(sublime.Region(start, end))
                 continue
             if word in labels:
-                if label_def_name == word and match.start() == label_def_start:
+                if (word, match.start()) in label_definition_starts:
                     continue
                 label_regions.append(sublime.Region(start, end))
 
@@ -783,9 +858,9 @@ def _update_semantic_regions(view):
 
 
 def _is_in_comment(view, start, end):
-    if view.match_selector(start, 'comment'):
+    if view.match_selector(start, 'comment') or view.match_selector(start, 'string'):
         return True
-    if end > start and view.match_selector(end - 1, 'comment'):
+    if end > start and (view.match_selector(end - 1, 'comment') or view.match_selector(end - 1, 'string')):
         return True
     return False
 

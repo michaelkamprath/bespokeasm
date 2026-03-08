@@ -49,6 +49,114 @@ class TestConfigurationGeneration(unittest.TestCase):
         match_list = set(match.group(1).split('|'))
         self.assertSetEqual(match_list, set(target_list), f'all items from "{test_name}" should be found')
 
+    def test_operand_label_configgen_scopes_and_colors(self):
+        self.assertIn(SyntaxElement.OPERAND_LABEL_AT, DEFAULT_COLOR_SCHEME.colors)
+        self.assertIn(SyntaxElement.OPERAND_LABEL_NAME, DEFAULT_COLOR_SCHEME.colors)
+        self.assertIn(SyntaxElement.OPERAND_LABEL_COLON, DEFAULT_COLOR_SCHEME.colors)
+
+        test_dir = tempfile.mkdtemp()
+        config_file = pkg_resources.files(config_files).joinpath('test_operand_labels.yaml')
+
+        vscode = VSCodeConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            None,
+            None,
+            'asmtest',
+        )
+        vscode.generate()
+        vscode_ext_dir = os.path.join(test_dir, 'extensions', vscode.language_name)
+        grammar_fp = os.path.join(vscode_ext_dir, 'syntaxes', 'tmGrammar.json')
+        self.assertIsFile(grammar_fp)
+        with open(grammar_fp) as json_file:
+            grammar_json = json.load(json_file)
+        operand_label_patterns = grammar_json['repository']['operand_label_definitions']['patterns']
+        self.assertTrue(operand_label_patterns)
+        self.assertNotIn('##LABEL_PATTERN##', operand_label_patterns[0]['match'])
+        self.assertIn('(@)', operand_label_patterns[0]['match'])
+        self.assertIn('(\\s*)', operand_label_patterns[0]['match'])
+        self.assertNotIn(')\\s*(:)', operand_label_patterns[0]['match'])
+        self.assertIn(
+            '#operand_label_definitions',
+            [entry['include'] for entry in grammar_json['repository']['instructions']['patterns'] if 'include' in entry],
+        )
+
+        package_fp = os.path.join(vscode_ext_dir, 'package.json')
+        with open(package_fp) as json_file:
+            package_json = json.load(json_file)
+        theme_relpath = package_json['contributes']['themes'][0]['path'].lstrip('./')
+        theme_fp = os.path.join(vscode_ext_dir, theme_relpath)
+        self.assertIsFile(theme_fp)
+        with open(theme_fp) as json_file:
+            theme_json = json.load(json_file)
+        theme_scopes = {entry['scope'] for entry in theme_json['tokenColors']}
+        self.assertIn('punctuation.definition.variable.at.operand-label', theme_scopes)
+        self.assertIn('variable.other.label.definition.operand-label', theme_scopes)
+        self.assertIn('punctuation.definition.variable.colon.operand-label', theme_scopes)
+
+        sublime_tmp_dir = tempfile.mkdtemp()
+        sublime = SublimeConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            None,
+            None,
+            'asmtest',
+        )
+        sublime._generate_files_in_dir(sublime_tmp_dir)
+        syntax_fp = os.path.join(sublime_tmp_dir, f'{sublime.language_name}.sublime-syntax')
+        self.assertIsFile(syntax_fp)
+        with open(syntax_fp) as yaml_file:
+            syntax_dict = YAML().load(yaml_file)
+        operand_ctx = syntax_dict['contexts']['operand_label_definitions'][0]
+        self.assertNotIn('##LABEL_PATTERN##', operand_ctx['match'])
+        self.assertIn('(@)', operand_ctx['match'])
+        self.assertIn(r'(\s*)', operand_ctx['match'])
+        self.assertNotIn(r')\s*(:)', operand_ctx['match'])
+        self.assertEqual(
+            operand_ctx['captures'][1],
+            'punctuation.definition.variable.at.operand-label',
+        )
+        self.assertEqual(
+            operand_ctx['captures'][2],
+            'variable.other.label.definition variable.other.label.definition.operand-label',
+        )
+        self.assertEqual(
+            operand_ctx['captures'][3],
+            'punctuation.definition.variable.colon.operand-label',
+        )
+        color_fp = os.path.join(sublime_tmp_dir, f'{sublime.language_name}.sublime-color-scheme')
+        with open(color_fp) as json_file:
+            color_json = json.load(json_file)
+        sublime_scopes = {entry['scope'] for entry in color_json['rules']}
+        self.assertIn('punctuation.definition.variable.at.operand-label', sublime_scopes)
+        self.assertIn('variable.other.label.definition.operand-label', sublime_scopes)
+        self.assertIn('punctuation.definition.variable.colon.operand-label', sublime_scopes)
+
+        vim = VimConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            None,
+            None,
+            'asmtest',
+        )
+        vim.generate()
+        vim_ft = vim.language_id.replace('-', '').lower()
+        vim_syntax_fp = os.path.join(test_dir, 'syntax', f'{vim_ft}.vim')
+        with open(vim_syntax_fp) as file:
+            vim_text = file.read()
+        self.assertIn(f'syn match {vim_ft}OperandLabelAt', vim_text)
+        self.assertIn(f'syn match {vim_ft}OperandLabelName', vim_text)
+        self.assertIn(f'syn match {vim_ft}OperandLabelColon', vim_text)
+        self.assertRegex(vim_text, rf'hi\s+{re.escape(vim_ft)}OperandLabelAt\s+')
+        self.assertRegex(vim_text, rf'hi\s+{re.escape(vim_ft)}OperandLabelName\s+')
+        self.assertRegex(vim_text, rf'hi\s+{re.escape(vim_ft)}OperandLabelColon\s+')
+
+        shutil.rmtree(sublime_tmp_dir)
+        shutil.rmtree(test_dir)
+
     def test_vscode_configgen_no_registers(self):
         test_dir = tempfile.mkdtemp()
         config_file = pkg_resources.files(config_files).joinpath('test_instruction_line_creation_little_endian.yaml')

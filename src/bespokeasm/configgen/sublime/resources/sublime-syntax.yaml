@@ -11,6 +11,7 @@ contexts:
     - include: instructions
     - include: numbers
     - include: strings
+    - include: operand_label_definitions
     - include: compiler_labels
     - match: ^\s*(\w*)(?:\s*)?(\=|EQU)
       captures:
@@ -41,6 +42,7 @@ contexts:
         - include: pop_instruction_end
         - include: strings
         - include: registers
+        - include: operand_label_definitions
         - include: compiler_labels
         - include: indirect_addressing
         - include: deferred_addressing
@@ -55,6 +57,7 @@ contexts:
         - include: pop_instruction_end
         - include: strings
         - include: registers
+        - include: operand_label_definitions
         - include: compiler_labels
         - include: indirect_addressing
         - include: deferred_addressing
@@ -74,6 +77,13 @@ contexts:
   compiler_labels:
     - match: (?<!\w)(?:##COMPILERCONSTANTS##)\b
       scope: constant.language
+
+  operand_label_definitions:
+    - match: (@)(##LABEL_PATTERN##)(:)(\s*)
+      captures:
+        1: punctuation.definition.variable.at.operand-label
+        2: variable.other.label.definition variable.other.label.definition.operand-label
+        3: punctuation.definition.variable.colon.operand-label
 
   strings:
     - match: "(\"|')"
@@ -103,6 +113,7 @@ contexts:
   numerical_expressions:
     - include: numbers
     - include: registers
+    - include: operand_label_definitions
     - include: compiler_labels
     - match: "[\\+\\-\\*\\/]{1}"
       scope: keyword.operator.arithmetic
@@ -131,6 +142,7 @@ contexts:
         - include: indirect_addressing
         - include: deferred_addressing
         - include: registers
+        - include: operand_label_definitions
         - include: compiler_labels
         - include: numerical_expressions
         - include: operands_variables
@@ -146,6 +158,7 @@ contexts:
         - include: indirect_addressing
         - include: deferred_addressing
         - include: registers
+        - include: operand_label_definitions
         - include: compiler_labels
         - include: numerical_expressions
         - include: operands_variables
@@ -202,6 +215,6 @@ contexts:
     - match: (?i)(?=(?:\s*\;|\s*$|##INSTRUCTIONS##))
       pop: true
       name: instructions
-    - match: (?=(?:\.|_|\w){1}[\w\d_]*:)
+    - match: (?=^\s*(?:\.|_|\w){1}[\w\d_]*:)
       pop: true
       name: label

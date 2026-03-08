@@ -10,6 +10,7 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.assembler.line_object.directive_line.fill_data import FillUntilDataLine
+from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.line_object.predefined_data import PredefinedDataLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
@@ -160,6 +161,8 @@ class Assembler:
 
             try:
                 word_count = lobj.word_count
+                if isinstance(lobj, InstructionLine) and lobj.has_operand_labels:
+                    lobj.register_operand_labels(named_scope_manager)
                 if isinstance(lobj, FillUntilDataLine) and word_count == 0:
                     diagnostic_reporter.warn(
                         lobj.line_id,
@@ -212,7 +215,13 @@ class Assembler:
 
         for lobj in compilable_line_obs:
             if isinstance(lobj, LineWithWords):
-                lobj.generate_words()
+                try:
+                    lobj.generate_words()
+                except ValueError as e:
+                    diagnostic_reporter.error(
+                        lobj.line_id,
+                        str(e),
+                    )
             if self._verbose > 2:
                 diagnostic_reporter.info(
                     None,

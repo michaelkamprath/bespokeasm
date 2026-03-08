@@ -2,6 +2,7 @@ import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.model.instruction_base import InstructionBase
+from bespokeasm.assembler.model.operand.operand_label import contains_operand_label_annotation
 from bespokeasm.assembler.model.operand_parser import OperandParser
 from bespokeasm.assembler.model.operand_set import OperandSetCollection
 
@@ -49,6 +50,13 @@ class InstructionMacroVariant(InstructionBase):
             self._operand_parser.validate(mnemonic)
         else:
             self._operand_parser = None
+        for step_num, instruction in enumerate(self._variant_config.get('instructions', [])):
+            if contains_operand_label_annotation(instruction):
+                diagnostic_reporter.error(
+                    None,
+                    f'Macro "{mnemonic}" variant {variant_num} step {step_num} uses operand-label syntax, '
+                    'which is not supported in macro definitions.',
+                )
 
     @property
     def operand_count(self) -> int:
