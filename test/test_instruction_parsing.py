@@ -1320,6 +1320,9 @@ class TestInstructionParsing(unittest.TestCase):
         )
 
         test_cases = [
+            ("adi ','", 44),
+            ("adi ';'", 59),
+            ("adi ':'", 58),
             ("adi '\"'", 34),
             ("adi '['", 91),
             ("adi ']'", 93),
@@ -1345,6 +1348,46 @@ class TestInstructionParsing(unittest.TestCase):
                 ],
                 f'{instruction} should assemble with immediate value {expected_ordinal}',
             )
+
+    def test_line_parsing_accepts_semicolon_character_ordinal_with_comment(self):
+        fp = pkg_resources.files(config_files).joinpath('test_instruction_operands.yaml')
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
+        preprocessor = Preprocessor([], diagnostic_reporter=self.diagnostic_reporter)
+        condition_stack = ConditionStack(diagnostic_reporter=self.diagnostic_reporter)
+        line_id = LineIdentifier(150, 'test_line_parsing_accepts_semicolon_character_ordinal_with_comment')
+
+        line_objects = LineOjectFactory.parse_line(
+            line_id,
+            "adi ';' ; trailing comment",
+            isa_model,
+            TestInstructionParsing.label_values,
+            self.active_named_scopes,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+            preprocessor,
+            condition_stack,
+            0,
+        )
+        self.assertEqual(len(line_objects), 1)
+        instruction = line_objects[0]
+        self.assertIsInstance(instruction, InstructionLine)
+        instruction.set_start_address(0)
+        instruction.label_scope = TestInstructionParsing.label_values
+        instruction.active_named_scopes = self.active_named_scopes
+        instruction.generate_words()
+        self.assertEqual(instruction.comment, 'trailing comment')
+        self.assertEqual(
+            instruction.get_words(),
+            [
+                Word(0xA2, 8, 8, isa_model.intra_word_endianness),
+                Word(59, 8, 8, isa_model.intra_word_endianness),
+            ],
+        )
 
     def test_instruction_aliases(self):
         fp = pkg_resources.files(config_files).joinpath('test_instruction_aliases.yaml')

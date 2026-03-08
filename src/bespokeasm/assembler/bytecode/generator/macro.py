@@ -12,6 +12,7 @@ from bespokeasm.assembler.model.instruction_parser_base import InstructioParserB
 from bespokeasm.assembler.model.operand.operand_label import contains_operand_label_annotation
 from bespokeasm.assembler.model.operand.operand_label import OperandLabelError
 from bespokeasm.assembler.model.operand_parser import MatchedOperandSet
+from bespokeasm.assembler.parsing import split_operands
 
 
 class MacroBytecodeGenerator:
@@ -75,10 +76,7 @@ class MacroBytecodeGenerator:
         if mnemonic != variant.mnemonic:
             # this shouldn't happen
             sys.exit(f'ERROR: {line_id} - INTERNAL - Asked instruction {variant} to parse mnemonic "{mnemonic}"')
-        if operands is not None and operands != '':
-            operand_list = operands.strip().split(',')
-        else:
-            operand_list = []
+        operand_list = split_operands(operands)
 
         for operand_str in operand_list:
             if contains_operand_label_annotation(operand_str):

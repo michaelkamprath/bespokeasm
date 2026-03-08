@@ -9,6 +9,7 @@ from bespokeasm.assembler.model.instruction import Instruction
 from bespokeasm.assembler.model.instruction import InstructionVariant
 from bespokeasm.assembler.model.operand.operand_label import OperandLabelError
 from bespokeasm.assembler.model.operand_parser import MatchedOperandSet
+from bespokeasm.assembler.parsing import split_operands
 
 
 class InstructionBytecodeGenerator:
@@ -69,10 +70,7 @@ class InstructionBytecodeGenerator:
         if mnemonic != variant.mnemonic:
             # this shouldn't happen
             sys.exit(f'ERROR: {line_id} - INTERNAL - Asked instruction {variant} to parse mnemonic "{mnemonic}"')
-        if operands is not None and operands != '':
-            operand_list = operands.strip().split(',')
-        else:
-            operand_list = []
+        operand_list = split_operands(operands)
 
         # generate the machine code parts
         multi_word_endian = variant._variant_config['bytecode'].get('multi_word_endian', isa_model.multi_word_endianness)

@@ -9,6 +9,7 @@ from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.model.instruction_parser import InstructioParser
+from bespokeasm.assembler.parsing import split_line_comment
 
 
 class InstructionLine(LineWithWords):
@@ -39,10 +40,11 @@ class InstructionLine(LineWithWords):
             instructions_regex = instructions_regex.replace('.', '\\.')
             cls._INSTRUCTUION_EXTRACTION_PATTERN = re.compile(
                 fr'(?i)^((?:{instructions_regex}).*?(?=(?:{instructions_regex})'
-                fr'|\s*\;|\s*$|\s*{EMBEDDED_STRING_PATTERN}))',
+                fr'|\s*$|\s*{EMBEDDED_STRING_PATTERN}))',
                 flags=re.IGNORECASE | re.MULTILINE,
             )
-        instruction_match = re.search(cls._INSTRUCTUION_EXTRACTION_PATTERN, line_str.strip())
+        instruction_content, _ = split_line_comment(line_str)
+        instruction_match = re.search(cls._INSTRUCTUION_EXTRACTION_PATTERN, instruction_content.strip())
         if instruction_match is not None:
             instruction_str = instruction_match.group(0)
 
