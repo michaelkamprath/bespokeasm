@@ -1,0 +1,19 @@
+description: Test macro operand-label rejection
+general:
+  address_size: 16
+  multi_word_endian: little
+  identifier:
+    name: bespokeasm-macro-oplabel-test
+    version: "0.1.0"
+  min_version: "0.7.0"
+instructions:
+  nop:
+    bytecode:
+      value: 0
+      size: 8
+operand_sets: {}
+macros:
+  badmacro:
+    variants:
+      - instructions:
+          - "nop @bad_label: $10"

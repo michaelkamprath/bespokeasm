@@ -12,6 +12,7 @@ from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model.operand import OperandType
 from bespokeasm.assembler.model.operand import OperandWithArgument
 from bespokeasm.assembler.model.operand import ParsedOperand
+from bespokeasm.assembler.model.operand.operand_label import parse_operand_label_annotation
 from bespokeasm.expression import EXPRESSION_PARTS_PATTERN
 
 
@@ -105,7 +106,12 @@ class RelativeAddressOperand(OperandWithArgument):
 
     @cached_property
     def match_pattern(self) -> str:
-        base_match_str = fr'((?:{EXPRESSION_PARTS_PATTERN}|\s)+)'
+        base_match_str = (
+            r'(?P<operand_expression>'
+            r'(?:@(?:[._a-zA-Z][a-zA-Z0-9_]*)\s*:\s*)?'
+            fr'(?:{EXPRESSION_PARTS_PATTERN}|\s)+'
+            r')'
+        )
         if self.uses_curly_braces:
             return fr'\{{\s*{base_match_str}\s*\}}'
         else:
@@ -134,12 +140,21 @@ class RelativeAddressOperand(OperandWithArgument):
         register_labels: set[str],
         memzone_manager: MemoryZoneManager,
     ) -> ParsedOperand:
-        # find argument per the required pattern
-        match = re.match(self.match_pattern, operand.strip())
-        if match is None or len(match.groups()) != 1:
+        match = re.match(fr'^{self.match_pattern}$', operand.strip())
+        if match is None:
             return None
-        # do not match if expression contains square bracks
-        if '[' in operand or ']' in operand:
+        operand_expression = match.group('operand_expression').strip()
+
+        # do not match if expression contains square brackets
+        if '[' in operand_expression or ']' in operand_expression:
+            return None
+        parsed_operand_label = parse_operand_label_annotation(
+            line_id,
+            operand_expression,
+            register_labels,
+            self.type,
+        )
+        if re.match(fr'^(?:{EXPRESSION_PARTS_PATTERN}|\s)+$', parsed_operand_label.operand_expression) is None:
             return None
         bytecode_part = NumericByteCodePart(
             self.bytecode_value,
@@ -151,20 +166,31 @@ class RelativeAddressOperand(OperandWithArgument):
             self._word_size,
             self._word_segment_size,
         ) if self.bytecode_value is not None else None
-        arg_part = RelativeAddressByteCodePart(
-            match.group(1).strip(),
-            self.argument_size,
-            self.argument_word_align,
-            self.argument_multi_word_endian,
-            self.argument_intra_word_endian,
-            line_id,
-            self.min_offset,
-            self.max_offset,
-            memzone_manager.global_zone,
-            self.offset_from_instruction_end,
-            self._word_size,
-            self._word_segment_size,
-        )
+        try:
+            arg_part = RelativeAddressByteCodePart(
+                parsed_operand_label.operand_expression,
+                self.argument_size,
+                self.argument_word_align,
+                self.argument_multi_word_endian,
+                self.argument_intra_word_endian,
+                line_id,
+                self.min_offset,
+                self.max_offset,
+                memzone_manager.global_zone,
+                self.offset_from_instruction_end,
+                self._word_size,
+                self._word_segment_size,
+            )
+        except SyntaxError:
+            return None
         if arg_part.contains_register_labels(register_labels):
             return None
-        return ParsedOperand(self, bytecode_part, arg_part, operand, self._word_size, self._word_segment_size)
+        return ParsedOperand(
+            self,
+            bytecode_part,
+            arg_part,
+            operand,
+            self._word_size,
+            self._word_segment_size,
+            operand_label=parsed_operand_label.label_name,
+        )

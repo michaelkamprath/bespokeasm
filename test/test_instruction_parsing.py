@@ -1400,6 +1400,214 @@ class TestInstructionParsing(unittest.TestCase):
         nop_words = ins_nop.get_words()
         self.assertEqual(nop_words, [Word(0, 8, 8, 'little')], 'nop should assemble to correct word')
 
+    def test_operand_label_supported_syntax_and_wrappers(self):
+        fp = pkg_resources.files(config_files).joinpath('test_operand_labels.yaml')
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
+
+        numeric = InstructionLine.factory(
+            LineIdentifier(1, 'test_operand_label_supported_syntax_and_wrappers'),
+            'nword @num_lbl:$1234',
+            '',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+        self.assertIsInstance(numeric, InstructionLine)
+        numeric.set_start_address(0x40)
+        self.assertEqual(numeric.get_operand_label_addresses(), [('num_lbl', 0x41)])
+
+        numeric_space = InstructionLine.factory(
+            LineIdentifier(2, 'test_operand_label_supported_syntax_and_wrappers'),
+            'nword @num_lbl2: $1234',
+            '',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+        self.assertIsInstance(numeric_space, InstructionLine)
+        numeric_space.set_start_address(0x40)
+        self.assertEqual(numeric_space.get_operand_label_addresses(), [('num_lbl2', 0x41)])
+
+        indirect = InstructionLine.factory(
+            LineIdentifier(3, 'test_operand_label_supported_syntax_and_wrappers'),
+            'iword [@ind_lbl:$2233]',
+            '',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+        self.assertIsInstance(indirect, InstructionLine)
+        indirect.set_start_address(0x50)
+        self.assertEqual(indirect.get_operand_label_addresses(), [('ind_lbl', 0x51)])
+
+        deferred = InstructionLine.factory(
+            LineIdentifier(4, 'test_operand_label_supported_syntax_and_wrappers'),
+            'dword [[@def_lbl:$3344]]',
+            '',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+        self.assertIsInstance(deferred, InstructionLine)
+        deferred.set_start_address(0x50)
+        self.assertEqual(deferred.get_operand_label_addresses(), [('def_lbl', 0x51)])
+
+        address = InstructionLine.factory(
+            LineIdentifier(5, 'test_operand_label_supported_syntax_and_wrappers'),
+            'aword @addr_lbl:$1122',
+            '',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+        self.assertIsInstance(address, InstructionLine)
+        address.set_start_address(0x60)
+        self.assertEqual(address.get_operand_label_addresses(), [('addr_lbl', 0x61)])
+
+        relative = InstructionLine.factory(
+            LineIdentifier(6, 'test_operand_label_supported_syntax_and_wrappers'),
+            'rword @rel_lbl: target',
+            '',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+        self.assertIsInstance(relative, InstructionLine)
+        relative.set_start_address(0x70)
+        self.assertEqual(relative.get_operand_label_addresses(), [('rel_lbl', 0x71)])
+
+        relative_curly = InstructionLine.factory(
+            LineIdentifier(7, 'test_operand_label_supported_syntax_and_wrappers'),
+            'rcword {@relc_lbl: target}',
+            '',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+        self.assertIsInstance(relative_curly, InstructionLine)
+        relative_curly.set_start_address(0x70)
+        self.assertEqual(relative_curly.get_operand_label_addresses(), [('relc_lbl', 0x71)])
+
+    def test_operand_label_reverse_argument_order_mapping(self):
+        fp = pkg_resources.files(config_files).joinpath('test_operand_labels.yaml')
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
+
+        instr = InstructionLine.factory(
+            LineIdentifier(10, 'test_operand_label_reverse_argument_order_mapping'),
+            'mix @first:$1111, @second:$2222',
+            '',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+        self.assertIsInstance(instr, InstructionLine)
+        instr.set_start_address(0x20)
+        self.assertEqual(
+            instr.get_operand_label_addresses(),
+            [('first', 0x22), ('second', 0x21)],
+            'operand label address mapping should follow final emitted argument order',
+        )
+
+    def test_operand_label_invalid_parse_cases(self):
+        fp = pkg_resources.files(config_files).joinpath('test_operand_labels.yaml')
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
+
+        with self.assertRaises(SystemExit) as one_label_per_operand:
+            InstructionLine.factory(
+                LineIdentifier(20, 'test_operand_label_invalid_parse_cases'),
+                'nword @a:@b:$1234',
+                '',
+                isa_model,
+                memzone_mngr.global_zone,
+                memzone_mngr,
+            )
+        self.assertIn('Multiple operand-label annotations on the same operand', str(one_label_per_operand.exception))
+
+        with self.assertRaises(SystemExit) as unsupported_type:
+            InstructionLine.factory(
+                LineIdentifier(21, 'test_operand_label_invalid_parse_cases'),
+                'regop @r: ra',
+                '',
+                isa_model,
+                memzone_mngr.global_zone,
+                memzone_mngr,
+            )
+        self.assertIn('Operand labels are only supported for operand types', str(unsupported_type.exception))
+
+        with self.assertRaises(SystemExit) as bad_syntax:
+            InstructionLine.factory(
+                LineIdentifier(22, 'test_operand_label_invalid_parse_cases'),
+                'nword @1bad: $1234',
+                '',
+                isa_model,
+                memzone_mngr.global_zone,
+                memzone_mngr,
+            )
+        self.assertIn('Malformed operand-label syntax', str(bad_syntax.exception))
+
+        with self.assertRaises(SystemExit) as same_line:
+            InstructionLine.factory(
+                LineIdentifier(23, 'test_operand_label_invalid_parse_cases'),
+                'nword @lbl:',
+                '',
+                isa_model,
+                memzone_mngr.global_zone,
+                memzone_mngr,
+            )
+        self.assertIn('must appear on the same physical line', str(same_line.exception))
+
+    def test_operand_label_non_word_alignment_and_word_full_validation(self):
+        fp = pkg_resources.files(config_files).joinpath('test_operand_labels.yaml')
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
+
+        non_word_full = InstructionLine.factory(
+            LineIdentifier(30, 'test_operand_label_non_word_alignment_and_word_full_validation'),
+            'badfull @full_err:$12',
+            '',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+        self.assertIsInstance(non_word_full, InstructionLine)
+        non_word_full.set_start_address(0x10)
+        with self.assertRaises(ValueError) as non_word_full_error:
+            non_word_full.get_operand_label_addresses()
+        self.assertIn('not word-full', str(non_word_full_error.exception))
+
+        non_word_aligned = InstructionLine.factory(
+            LineIdentifier(31, 'test_operand_label_non_word_alignment_and_word_full_validation'),
+            'badalign @align_err:$1234',
+            '',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+        self.assertIsInstance(non_word_aligned, InstructionLine)
+        non_word_aligned.set_start_address(0x10)
+        with self.assertRaises(ValueError) as non_word_aligned_error:
+            non_word_aligned.get_operand_label_addresses()
+        self.assertIn('non-word-aligned', str(non_word_aligned_error.exception))
+
     def test_instruction_multiple_aliases(self):
         fp = pkg_resources.files(config_files).joinpath('test_instruction_aliases.yaml')
         isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)

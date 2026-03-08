@@ -7,6 +7,8 @@ from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.engine import Assembler
 from bespokeasm.assembler.label_scope import GlobalLabelScope
+from bespokeasm.assembler.label_scope import LabelScope
+from bespokeasm.assembler.label_scope import LabelScopeType
 from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
@@ -348,3 +350,146 @@ class TestAssemblerEngine(unittest.TestCase):
             2,
         )
         self.assertEqual(bytecode, bytearray([0xAF, 0xB0]), 'fill_word should be packed with real words correctly')
+
+    def test_operand_label_scope_prefix_behavior(self):
+        fp = pkg_resources.files(config_files).joinpath('test_operand_labels.yaml')
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
+
+        global_scope = GlobalLabelScope(isa_model.registers)
+        file_scope = LabelScope(LabelScopeType.FILE, global_scope, 'scope_test.asm')
+        local_scope = LabelScope(LabelScopeType.LOCAL, file_scope, 'anchor')
+
+        named_scope_manager = NamedScopeManager(self.diagnostic_reporter)
+        named_scope_manager.create_scope('lib', 'lib_', LineIdentifier(1, 'scope_test.asm'))
+        active_named_scopes = ActiveNamedScopeList(named_scope_manager)
+        active_named_scopes.activate_named_scope('lib')
+
+        local_instr = InstructionLine.factory(
+            LineIdentifier(2, 'scope_test.asm'),
+            'nword @.local_op:$1001',
+            '',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+        self.assertIsInstance(local_instr, InstructionLine)
+        local_instr.set_start_address(0)
+        local_instr.label_scope = local_scope
+        local_instr.active_named_scopes = active_named_scopes
+        local_instr.register_operand_labels(named_scope_manager)
+        self.assertEqual(
+            local_scope.get_label_value('.local_op', LineIdentifier(2, 'scope_test.asm')),
+            1,
+            'local operand label should resolve in local scope',
+        )
+
+        file_instr = InstructionLine.factory(
+            LineIdentifier(3, 'scope_test.asm'),
+            'nword @_file_op:$1002',
+            '',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+        self.assertIsInstance(file_instr, InstructionLine)
+        file_instr.set_start_address(2)
+        file_instr.label_scope = local_scope
+        file_instr.active_named_scopes = active_named_scopes
+        file_instr.register_operand_labels(named_scope_manager)
+        self.assertEqual(
+            file_scope.get_label_value('_file_op', LineIdentifier(3, 'scope_test.asm')),
+            3,
+            'file-scope operand label should resolve in file scope',
+        )
+
+        global_instr = InstructionLine.factory(
+            LineIdentifier(4, 'scope_test.asm'),
+            'nword @global_op:$1003',
+            '',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+        self.assertIsInstance(global_instr, InstructionLine)
+        global_instr.set_start_address(4)
+        global_instr.label_scope = local_scope
+        global_instr.active_named_scopes = active_named_scopes
+        global_instr.register_operand_labels(named_scope_manager)
+        self.assertEqual(
+            global_scope.get_label_value('global_op', LineIdentifier(4, 'scope_test.asm')),
+            5,
+            'global operand label should resolve in global scope',
+        )
+
+        named_instr = InstructionLine.factory(
+            LineIdentifier(5, 'scope_test.asm'),
+            'nword @lib_op:$1004',
+            '',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+        self.assertIsInstance(named_instr, InstructionLine)
+        named_instr.set_start_address(6)
+        named_instr.label_scope = local_scope
+        named_instr.active_named_scopes = active_named_scopes
+        named_instr.register_operand_labels(named_scope_manager)
+
+        named_scope = named_scope_manager.get_scope_definition('lib')
+        self.assertIsNotNone(named_scope)
+        self.assertEqual(
+            named_scope.get_label_value('lib_op', LineIdentifier(5, 'scope_test.asm')),
+            7,
+            'named-scope operand label should resolve in named scope when prefix matches',
+        )
+
+    def test_operand_label_duplicate_definition_uses_existing_duplicate_error(self):
+        fp = pkg_resources.files(config_files).joinpath('test_operand_labels.yaml')
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
+
+        named_scope_manager = NamedScopeManager(self.diagnostic_reporter)
+        active_named_scopes = ActiveNamedScopeList(named_scope_manager)
+        global_scope = GlobalLabelScope(isa_model.registers)
+        file_scope = LabelScope(LabelScopeType.FILE, global_scope, 'dupe.asm')
+        local_scope = LabelScope(LabelScopeType.LOCAL, file_scope, 'anchor')
+
+        first = InstructionLine.factory(
+            LineIdentifier(1, 'dupe.asm'),
+            'nword @dupe:$1234',
+            '',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+        self.assertIsInstance(first, InstructionLine)
+        first.set_start_address(0)
+        first.label_scope = local_scope
+        first.active_named_scopes = active_named_scopes
+        first.register_operand_labels(named_scope_manager)
+
+        second = InstructionLine.factory(
+            LineIdentifier(2, 'dupe.asm'),
+            'nword @dupe:$5678',
+            '',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+        self.assertIsInstance(second, InstructionLine)
+        second.set_start_address(2)
+        second.label_scope = local_scope
+        second.active_named_scopes = active_named_scopes
+
+        with self.assertRaises(SystemExit) as duplicate_error:
+            second.register_operand_labels(named_scope_manager)
+        self.assertIn('defined multiple times', str(duplicate_error.exception))

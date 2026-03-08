@@ -186,6 +186,29 @@ class TestInstructionMacros(unittest.TestCase):
             'instruction words should match'
         )
 
+    def test_macro_usage_rejects_operand_labels(self):
+        isa_model = self.isa_model
+        memzone = self.memzone
+        memzone_mngr = self.memory_zone_manager
+        line_id = LineIdentifier(1, 'test_macro_usage_rejects_operand_labels')
+
+        with self.assertRaises(SystemExit) as usage_error:
+            InstructionLine.factory(
+                line_id,
+                'mov2 [@src_arg:$2000],[$1234]',
+                'some comment!',
+                isa_model,
+                memzone,
+                memzone_mngr,
+            )
+        self.assertIn('does not support operand labels in macro usage', str(usage_error.exception))
+
+    def test_macro_definition_rejects_operand_labels(self):
+        fp = pkg_resources.files(config_files).joinpath('test_instruction_macros_operand_labels.yaml')
+        with self.assertRaises(SystemExit) as definition_error:
+            AssemblerModel(str(fp), 0, self.diagnostic_reporter)
+        self.assertIn('which is not supported in macro definitions', str(definition_error.exception))
+
     def test_macro_parsing_registers(self):
         isa_model = self.isa_model
         memzone = self.memzone

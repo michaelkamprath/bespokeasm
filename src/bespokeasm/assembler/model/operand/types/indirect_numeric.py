@@ -5,6 +5,7 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model.operand import OperandType
 from bespokeasm.assembler.model.operand import ParsedOperand
+from bespokeasm.assembler.model.operand.operand_label import parse_operand_label_annotation
 
 from .numeric_expression import NumericExpressionOperand
 
@@ -49,14 +50,24 @@ class IndirectNumericOperand(NumericExpressionOperand):
         register_labels: set[str],
         memzone_manager: MemoryZoneManager,
     ) -> ParsedOperand:
-        # first check that operand is what we expect
-        match = re.match(f'^{self.match_pattern}$', operand.strip())
+        # First use the configured match_pattern, then parse optional operand-label annotation.
+        match = re.match(fr'^{self.match_pattern}$', operand.strip())
         if match is not None and len(match.groups()) > 0:
-            return self._parse_bytecode_parts(
+            parsed_operand_label = parse_operand_label_annotation(
                 line_id,
                 match.group(1).strip(),
                 register_labels,
-                memzone_manager,
+                self.type,
             )
+            try:
+                return self._parse_bytecode_parts(
+                    line_id,
+                    parsed_operand_label.operand_expression,
+                    register_labels,
+                    memzone_manager,
+                    operand_label=parsed_operand_label.label_name,
+                )
+            except SyntaxError:
+                return None
         else:
             return None

@@ -155,6 +155,7 @@ class AddressOperand(NumericExpressionOperand):
         operand: str,
         register_labels: set[str],
         memzone_manager: MemoryZoneManager,
+        operand_label: str | None = None,
     ) -> ParsedOperand:
         """Overrides `NumericExpressionOperand._parse_bytecode_parts` to add support for slicing ]
            the least significant bytes of the argument value."""
@@ -183,4 +184,12 @@ class AddressOperand(NumericExpressionOperand):
         )
         if arg_part.contains_register_labels(register_labels):
             return None
-        return ParsedOperand(self, bytecode_part, arg_part, operand, self._word_size, self._word_segment_size)
+        return ParsedOperand(
+            self,
+            bytecode_part,
+            arg_part,
+            operand,
+            self._word_size,
+            self._word_segment_size,
+            operand_label=operand_label,
+        )

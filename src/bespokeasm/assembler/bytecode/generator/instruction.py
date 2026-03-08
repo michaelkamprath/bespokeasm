@@ -7,6 +7,7 @@ from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.model.instruction import Instruction
 from bespokeasm.assembler.model.instruction import InstructionVariant
+from bespokeasm.assembler.model.operand.operand_label import OperandLabelError
 from bespokeasm.assembler.model.operand_parser import MatchedOperandSet
 
 
@@ -26,19 +27,34 @@ class InstructionBytecodeGenerator:
             # this shouldn't happen
             sys.exit(f'ERROR: {line_id} - INTERNAL - Asked instruction {instruction} to parse mnemonic "{mnemonic}"')
 
+        operand_label_error: OperandLabelError | None = None
         for variant in instruction.variants:
-            assembled_instruction = InstructionBytecodeGenerator.generate_variant_bytecode_parts(
-                variant,
-                line_id,
-                mnemonic,
-                operands,
-                isa_model,
-                memzone_manager,
-            )
+            try:
+                assembled_instruction = InstructionBytecodeGenerator.generate_variant_bytecode_parts(
+                    variant,
+                    line_id,
+                    mnemonic,
+                    operands,
+                    isa_model,
+                    memzone_manager,
+                )
+            except OperandLabelError as e:
+                if operand_label_error is None:
+                    operand_label_error = e
+                continue
             if assembled_instruction is not None:
                 return assembled_instruction
 
-        sys.exit(f'ERROR: {line_id} - Instruction "{mnemonic}" has no valid operands configured.')
+        if operand_label_error is not None:
+            isa_model.diagnostic_reporter.error(
+                operand_label_error.line_id,
+                operand_label_error.message,
+                category=operand_label_error.category,
+            )
+        isa_model.diagnostic_reporter.error(
+            line_id,
+            f'Instruction "{mnemonic}" has no valid operands configured.',
+        )
 
     @classmethod
     def generate_variant_bytecode_parts(
@@ -92,11 +108,23 @@ class InstructionBytecodeGenerator:
             if matched_operands is None:
                 return None
             machine_code = matched_operands.generate_bytecode(base_bytecode, base_bytecode_suffix)
+            operand_label_bindings = []
+            for parsed_operand in matched_operands.operands:
+                if parsed_operand.operand_label is None:
+                    continue
+                if parsed_operand.argument is None:
+                    raise OperandLabelError(
+                        line_id,
+                        f'Operand label "{parsed_operand.operand_label}" is invalid because '
+                        'the annotated operand does not emit argument bytes.',
+                    )
+                operand_label_bindings.append((parsed_operand.operand_label, parsed_operand.argument))
         elif len(operand_list) > 0:
             # This variant was expecting no operands but some were found. No match.
             return None
         else:
             machine_code = [base_bytecode]
+            operand_label_bindings = []
 
         return AssembledInstruction(
             line_id,
@@ -105,4 +133,5 @@ class InstructionBytecodeGenerator:
             isa_model.word_segment_size,
             multi_word_endian,
             intra_word_endian,
+            operand_label_bindings=operand_label_bindings,
         )

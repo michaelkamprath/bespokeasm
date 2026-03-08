@@ -1,6 +1,7 @@
 import re
 import sys
 
+from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.assembler.line_object.emdedded_string import EMBEDDED_STRING_PATTERN
@@ -100,6 +101,23 @@ class InstructionLine(LineWithWords):
     def word_count(self) -> int:
         """Returns the number of words this instruction will generate"""
         return self._assembled_instruction.word_count
+
+    @property
+    def has_operand_labels(self) -> bool:
+        return self._assembled_instruction.has_operand_labels
+
+    def get_operand_label_addresses(self) -> list[tuple[str, int]]:
+        return self._assembled_instruction.get_operand_label_addresses(self.address)
+
+    def register_operand_labels(self, named_scope_manager: NamedScopeManager) -> None:
+        for label, value in self.get_operand_label_addresses():
+            if not named_scope_manager.set_label_value(
+                label,
+                value,
+                self.line_id,
+                self.active_named_scopes,
+            ):
+                self.label_scope.set_label_value(label, value, self.line_id)
 
     def generate_words(self) -> bytearray:
         """Finalize the bytes for this line with the label assignemnts"""

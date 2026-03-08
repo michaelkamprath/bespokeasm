@@ -10,6 +10,9 @@ from bespokeasm.assembler.model.operand import Operand
 from bespokeasm.assembler.model.operand import OperandBytecodePositionType
 from bespokeasm.assembler.model.operand import ParsedOperand
 from bespokeasm.assembler.model.operand.factory import OperandFactory
+from bespokeasm.assembler.model.operand.operand_label import contains_operand_label_annotation
+from bespokeasm.assembler.model.operand.operand_label import OperandLabelError
+from bespokeasm.assembler.model.operand.operand_label import supports_operand_labels
 from bespokeasm.assembler.model.operand_set import OperandSet
 from bespokeasm.assembler.model.operand_set import OperandSetCollection
 
@@ -229,6 +232,7 @@ class SpecificOperandsModel:
         '''attempts to find a operand match based on any specific operand configuration.
            Returns None if no match is found, or a MatchedOperandSet if a valid match is found.
         '''
+        operand_label_error: OperandLabelError | None = None
         for configured_operands in self._specific_operands:
             if configured_operands.operand_count != target_operand_count:
                 # wrong operand count
@@ -249,12 +253,22 @@ class SpecificOperandsModel:
                     if operand_index >= len(operands):
                         # instruction had too few operand present
                         return None
+                    raw_operand = operands[operand_index]
                     operand = configured_operands[i].parse_operand(
                         line_id,
-                        operands[operand_index],
+                        raw_operand,
                         register_labels,
                         memzone_manager,
                     )
+                    if operand is None \
+                            and contains_operand_label_annotation(raw_operand) \
+                            and not supports_operand_labels(configured_operands[i].type):
+                        if operand_label_error is None:
+                            operand_label_error = OperandLabelError(
+                                line_id,
+                                'Operand labels are only supported for operand types: '
+                                'numeric, indirect_numeric, deferred_numeric, address, relative_address.',
+                            )
                 operand_index += 1
 
                 if operand is None:
@@ -273,6 +287,8 @@ class SpecificOperandsModel:
                                 configured_operands.reverse_bytecode_order
                             )
             return matched_set
+        if operand_label_error is not None:
+            raise operand_label_error
         return None
 
 
