@@ -5,7 +5,6 @@ from typing import Literal
 
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.assembler.line_object import INSTRUCTION_EXPRESSION_PATTERN
 from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.expression import ExpressionNode
@@ -14,9 +13,8 @@ from bespokeasm.expression import parse_expression
 
 class DataLine(LineWithWords):
     PATTERN_DATA_DIRECTIVE = re.compile(
-        r'^(\.byte|\.2byte|\.4byte|\.8byte|\.16byte|\.cstr|\.asciiz)\b\s*(?:(?P<quote>[\"\'])((?:\\(?P=quote)|.)*)(?P=quote)'
-        r'|({}(?:\s*\,{})*))'.format(INSTRUCTION_EXPRESSION_PATTERN, INSTRUCTION_EXPRESSION_PATTERN),
-        flags=re.IGNORECASE | re.MULTILINE
+        r'^(\.byte|\.2byte|\.4byte|\.8byte|\.16byte|\.cstr|\.asciiz)\b\s*(.*)$',
+        flags=re.IGNORECASE
     )
 
     DIRECTIVE_VALUE_BYTE_SIZE = {
@@ -59,44 +57,102 @@ class DataLine(LineWithWords):
         returned.
         """
         data_match = re.search(DataLine.PATTERN_DATA_DIRECTIVE, line_str.strip())
-        # deterine if this is a string or numeric list
-        if data_match is not None and len(data_match.groups()) == 4:
-            directive_str = data_match.group(1).strip()
-            if data_match.group(3) is None and data_match.group(4) is not None:
-                # check to ensure this isn't a cstr
-                if directive_str == '.cstr' or directive_str == '.asciiz':
-                    sys.exit(f'ERROR: {line_id} - {directive_str} data directive used with non-string value')
-                # it's numeric
-                values_list = [x.strip() for x in data_match.group(4).strip().split(',') if x.strip() != '']
-            elif data_match.group(3) is not None:
-                # its a string.
-                # first, convert escapes
-                converted_str = bytes(data_match.group(3), 'utf-8').decode('unicode_escape')
-                values_list = [ord(x) for x in list(converted_str)]
-                if directive_str == '.cstr' or directive_str == '.asciiz':
-                    # Add a 0-value at the end of the string values.
-                    values_list.extend([cstr_terminator])
-            else:
-                # don't know what this is
-                return None
-
-            return DataLine(
-                line_id,
-                directive_str,
-                values_list,
-                line_str,
-                comment,
-                current_memzone,
-                word_size,
-                word_segment_size,
-                intra_word_endianness,
-                multi_word_endianness,
-                string_byte_packing,
-                string_byte_packing_fill,
-                diagnostic_reporter=diagnostic_reporter,
-            )
-        else:
+        if data_match is None:
             return None
+
+        directive_str = data_match.group(1).strip()
+        args_str = data_match.group(2).strip()
+        if args_str == '':
+            return None
+
+        value_items = DataLine._split_data_items(args_str, line_id)
+        if len(value_items) == 0:
+            return None
+
+        values_list = []
+        if directive_str in ('.cstr', '.asciiz'):
+            if len(value_items) != 1:
+                sys.exit(f'ERROR: {line_id} - {directive_str} data directive used with non-string value')
+            string_values = DataLine._extract_string_item(value_items[0], line_id, directive_str)
+            values_list.extend(string_values)
+            values_list.extend([cstr_terminator])
+        else:
+            for item in value_items:
+                if DataLine._is_quoted_item(item):
+                    string_values = DataLine._extract_string_item(item, line_id, directive_str)
+                    if directive_str != '.byte':
+                        sys.exit(f'ERROR: {line_id} - {directive_str} data directive used with string value')
+                    values_list.extend(string_values)
+                else:
+                    values_list.append(item)
+
+        return DataLine(
+            line_id,
+            directive_str,
+            values_list,
+            line_str,
+            comment,
+            current_memzone,
+            word_size,
+            word_segment_size,
+            intra_word_endianness,
+            multi_word_endianness,
+            string_byte_packing,
+            string_byte_packing_fill,
+            diagnostic_reporter=diagnostic_reporter,
+        )
+
+    @staticmethod
+    def _split_data_items(args_str: str, line_id: LineIdentifier) -> list[str]:
+        """Split comma-separated data items while respecting quoted strings."""
+        items = []
+        token_chars = []
+        quote_char = None
+        escape_next = False
+
+        for ch in args_str:
+            if quote_char is not None:
+                token_chars.append(ch)
+                if escape_next:
+                    escape_next = False
+                elif ch == '\\':
+                    escape_next = True
+                elif ch == quote_char:
+                    quote_char = None
+                continue
+
+            if ch in ('"', '\''):
+                quote_char = ch
+                token_chars.append(ch)
+            elif ch == ',':
+                item = ''.join(token_chars).strip()
+                if item != '':
+                    items.append(item)
+                token_chars = []
+            else:
+                token_chars.append(ch)
+
+        if quote_char is not None:
+            sys.exit(f'ERROR: {line_id} - unterminated string in data directive')
+
+        item = ''.join(token_chars).strip()
+        if item != '':
+            items.append(item)
+        return items
+
+    @staticmethod
+    def _is_quoted_item(item_str: str) -> bool:
+        if len(item_str) < 2:
+            return False
+        quote = item_str[0]
+        return quote in ('"', '\'') and item_str[-1] == quote
+
+    @staticmethod
+    def _extract_string_item(item_str: str, line_id: LineIdentifier, directive_str: str) -> list[int]:
+        if not DataLine._is_quoted_item(item_str):
+            sys.exit(f'ERROR: {line_id} - {directive_str} data directive used with non-string value')
+        converted_str = bytes(item_str[1:-1], 'utf-8').decode('unicode_escape')
+        return [ord(x) for x in converted_str]
 
     def __init__(
             self,

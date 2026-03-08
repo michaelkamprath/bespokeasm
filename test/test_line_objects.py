@@ -449,11 +449,48 @@ class TestLineObject(unittest.TestCase):
             'byte array matches',
         )
 
+        d12a = DataLine.factory(
+            38,
+            ".byte 'if',0,'...........', 'I',  0xff",
+            'mixed byte list',
+            memzone,
+            8,
+            8,
+            'big',
+            'big',
+            0,
+            diagnostic_reporter=self.diagnostic_reporter,
+        )
+        d12a.label_scope = label_values
+        d12a.generate_words()
+        self.assertIsInstance(d12a, DataLine)
+        self.assertEqual(d12a.byte_size, 16, 'mixed byte list has 16 bytes')
+        self.assertEqual(d12a.word_count, 16, 'mixed byte list has 16 words for 8-bit words')
+        self.assertEqual(
+            d12a.get_words(),
+            [Word(v, 8, 8, 'big') for v in [0x69, 0x66, 0x00, *([0x2E] * 11), 0x49, 0xFF]],
+            'mixed string/numeric byte list matches',
+        )
+
         with self.assertRaises(SystemExit, msg='this instruction should fail'):
             DataLine.factory(
                 42,
                 ' .cstr 0x42',
                 'bad cstr usage',
+                memzone,
+                8,
+                8,
+                'big',
+                'big',
+                0,
+                diagnostic_reporter=self.diagnostic_reporter,
+            )
+
+        with self.assertRaises(SystemExit, msg='strings are invalid in multi-byte directives'):
+            DataLine.factory(
+                42,
+                '.2byte "AB", 0x1234',
+                'bad 2byte string usage',
                 memzone,
                 8,
                 8,
