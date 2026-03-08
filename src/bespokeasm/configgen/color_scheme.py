@@ -113,7 +113,7 @@ DEFAULT_COLOR_SCHEME = ColorScheme(
         SyntaxElement.LABEL_USAGE: '#7fcaff',
         SyntaxElement.PUNCTUATION_LABEL_COLON: '#ed80a2',
         SyntaxElement.OPERAND_LABEL_AT: '#ed80a2',
-        SyntaxElement.OPERAND_LABEL_NAME: '#5aa9e6',
+        SyntaxElement.OPERAND_LABEL_NAME: '#278ed8',
         SyntaxElement.OPERAND_LABEL_COLON: '#ed80a2',
 
         # Strings and escapes
