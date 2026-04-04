@@ -14,12 +14,12 @@ jobs:
     name: Build wheel for pipx
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Read project metadata
         id: meta
         run: python scripts/read_project_metadata.py
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ steps.meta.outputs.version }}
       - name: Install build dependencies
@@ -30,23 +30,28 @@ jobs:
         run: python -m build --wheel
       - name: Upload wheel to release
         if: github.event_name == 'release' && github.event.action == 'published' && github.actor != 'nektos/act' && env.SKIP_RELEASE_UPLOAD != 'true'
-        uses: softprops/action-gh-release@v1
-        with:
-          files: dist/*.whl
-          fail_on_unmatched_files: true
+        shell: bash
+        run: |
+          shopt -s nullglob
+          files=(dist/*.whl)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No wheel files matched dist/*.whl" >&2
+            exit 1
+          fi
+          gh release upload "${{ github.event.release.tag_name }}" "${files[@]}" --clobber
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   pyinstaller-linux:
     name: PyInstaller linux
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Read project metadata
         id: meta
         run: python scripts/read_project_metadata.py
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ steps.meta.outputs.version }}
       - name: Install dependencies
@@ -80,24 +85,22 @@ jobs:
           echo "ASSET_PATH=$DEST" >> "$GITHUB_ENV"
       - name: Upload binary to release
         if: github.event_name == 'release' && github.event.action == 'published' && github.actor != 'nektos/act' && env.SKIP_RELEASE_UPLOAD != 'true'
-        uses: softprops/action-gh-release@v1
-        with:
-          files: ${{ env.ASSET_PATH }}
-          fail_on_unmatched_files: true
+        shell: bash
+        run: gh release upload "${{ github.event.release.tag_name }}" "${ASSET_PATH}" --clobber
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   pyinstaller-linux-arm:
     name: PyInstaller linux-arm64
     if: github.actor != 'nektos/act'
     runs-on: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Read project metadata
         id: meta
         run: python scripts/read_project_metadata.py
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ steps.meta.outputs.version }}
       - name: Install dependencies
@@ -131,12 +134,10 @@ jobs:
           echo "ASSET_PATH=$DEST" >> "$GITHUB_ENV"
       - name: Upload binary to release
         if: github.event_name == 'release' && github.event.action == 'published' && github.actor != 'nektos/act' && env.SKIP_RELEASE_UPLOAD != 'true'
-        uses: softprops/action-gh-release@v1
-        with:
-          files: ${{ env.ASSET_PATH }}
-          fail_on_unmatched_files: true
+        shell: bash
+        run: gh release upload "${{ github.event.release.tag_name }}" "${ASSET_PATH}" --clobber
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   pyinstaller-other:
     name: PyInstaller ${{ matrix.os }}
@@ -149,12 +150,12 @@ jobs:
       matrix:
         os: [macos-latest, macos-15-intel, windows-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Read project metadata
         id: meta
         run: python scripts/read_project_metadata.py
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ steps.meta.outputs.version }}
       - name: Install dependencies
@@ -188,9 +189,7 @@ jobs:
           echo "ASSET_PATH=$DEST" >> "$GITHUB_ENV"
       - name: Upload binary to release
         if: github.event_name == 'release' && github.event.action == 'published' && github.actor != 'nektos/act' && env.SKIP_RELEASE_UPLOAD != 'true'
-        uses: softprops/action-gh-release@v1
-        with:
-          files: ${{ env.ASSET_PATH }}
-          fail_on_unmatched_files: true
+        shell: bash
+        run: gh release upload "${{ github.event.release.tag_name }}" "${ASSET_PATH}" --clobber
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
