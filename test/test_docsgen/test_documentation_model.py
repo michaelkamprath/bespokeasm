@@ -199,6 +199,22 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertEqual(len(mov2_doc['versions']), 1)
         self.assertEqual(len(mov2_doc['versions'][0]['signatures'][0]['operands']), 2)
 
+    def test_address_operand_auto_details_describe_operand_fetch_page(self):
+        notes = DocumentationModel._derive_operand_auto_details(
+            'address',
+            {
+                'argument': {
+                    'slice_lsb': True,
+                    'match_address_msb': True,
+                    'match_on_argument_bytcode': True,
+                }
+            },
+            has_manual_description=False,
+        )
+
+        self.assertIn('Uses only the least significant bits of the address value.', notes)
+        self.assertIn('High address bits are taken from the operand fetch page.', notes)
+
     def test_macro_category_defaults_when_none(self):
         """A None category is treated as Uncategorized instead of breaking sorting."""
         self.mock_isa_model._config = {

@@ -122,14 +122,15 @@ class AssembledInstruction:
         :returns: A list of words that represent the assembled instruction.
         '''
         words: list[Word] = ByteCodePart.compact_parts_to_words(
-            self._parts,
-            self._word_size,
-            self._segment_size,
-            self._multi_word_endian,
-            label_scope,
-            active_named_scopes,
-            instruction_address,
-            instruction_size,
+            parts=self._parts,
+            word_size=self._word_size,
+            segment_size=self._segment_size,
+            multi_word_endianness=self._multi_word_endian,
+            label_scope=label_scope,
+            active_named_scopes=active_named_scopes,
+            instruction_address=instruction_address,
+            instruction_size=instruction_size,
+            bytecode_start_address=instruction_address,
         )
         return words
 

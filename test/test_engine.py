@@ -344,10 +344,11 @@ class TestAssemblerEngine(unittest.TestCase):
             with self.assertRaises(SystemExit) as ctx:
                 assembler.assemble_bytecode()
 
-        self.assertIn(
-            'Operand address value 0x29fa does not have the same MSBs as the instruction address 0x2a10',
-            str(ctx.exception),
-        )
+        error_text = str(ctx.exception).lower()
+        self.assertIn('instruction address 0x2a10', error_text)
+        self.assertIn('operand byte address 0x2a11', error_text)
+        self.assertIn('page comparison address 0x2a10', error_text)
+        self.assertIn('target address 0x29fa', error_text)
         self.assertIn('line 2', str(ctx.exception))
 
     def test_generate_bytes_from_line_objects_4bit_words_with_fill(self):

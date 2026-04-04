@@ -103,6 +103,7 @@ class ByteCodePart:
         _active_named_scopes: ActiveNamedScopeList,
         _instruction_address: int,
         _instruction_size: int,
+        _bytecode_address: int | None = None,
     ) -> int:
         # this should be overridden
         raise NotImplementedError
@@ -113,6 +114,7 @@ class ByteCodePart:
         active_named_scopes: ActiveNamedScopeList,
         instruction_address: int,
         instruction_size: int,
+        bytecode_address: int | None = None,
     ) -> WordSlice | Value:
         return WordSlice(
             self.get_value(
@@ -120,6 +122,7 @@ class ByteCodePart:
                 active_named_scopes,
                 instruction_address,
                 instruction_size,
+                bytecode_address,
             ),
             self._value_size,
         )
@@ -130,12 +133,14 @@ class ByteCodePart:
             active_named_scopes: ActiveNamedScopeList,
             instruction_address: int,
             instruction_size: int,
+            bytecode_address: int | None = None,
     ) -> list[Word]:
         value_representation = self.get_value_representation(
             label_scope,
             active_named_scopes,
             instruction_address,
             instruction_size,
+            bytecode_address,
         )
         if isinstance(value_representation, WordSlice):
             return [
@@ -157,6 +162,23 @@ class ByteCodePart:
         return False
 
     @classmethod
+    def _iter_parts_with_bytecode_addresses(
+        cls,
+        parts: list[ByteCodePart],
+        word_size: int,
+        bytecode_start_address: int | None,
+    ):
+        bit_offset = 0
+        for part in parts:
+            if part.word_align and bit_offset % word_size != 0:
+                bit_offset += word_size - (bit_offset % word_size)
+            part_bytecode_address = None
+            if bytecode_start_address is not None:
+                part_bytecode_address = bytecode_start_address + (bit_offset // word_size)
+            yield part, part_bytecode_address
+            bit_offset += part.value_size
+
+    @classmethod
     def compact_parts_to_words(
         cls,
         parts: list[ByteCodePart],
@@ -167,6 +189,7 @@ class ByteCodePart:
         active_named_scopes: ActiveNamedScopeList,
         instruction_address: int,
         instruction_size: int,
+        bytecode_start_address: int | None = None,
     ) -> list[Word]:
         """
         Compact a list of ByteCodePart objects into a list of Word objects.
@@ -208,7 +231,11 @@ class ByteCodePart:
                 current_word_slices = []
             return result
 
-        for part in parts:
+        for part, part_bytecode_address in cls._iter_parts_with_bytecode_addresses(
+            parts,
+            word_size,
+            bytecode_start_address,
+        ):
             if isinstance(part, CompositeByteCodePart):
                 # if the CompositeByteCodePart is word-aligned, then we flush the word slices and
                 # add the part's words. Otherwise, we get the WordSlice from the part.
@@ -220,6 +247,7 @@ class ByteCodePart:
                         active_named_scopes,
                         instruction_address,
                         instruction_size,
+                        part_bytecode_address,
                     ))
                 else:
                     value_representation = part.get_value_representation(
@@ -227,6 +255,7 @@ class ByteCodePart:
                         active_named_scopes,
                         instruction_address,
                         instruction_size,
+                        part_bytecode_address,
                     )
                     if isinstance(value_representation, WordSlice):
                         current_word_slices.append((value_representation, part.intra_word_endian))
@@ -241,6 +270,7 @@ class ByteCodePart:
                     active_named_scopes,
                     instruction_address,
                     instruction_size,
+                    part_bytecode_address,
                 )
                 if isinstance(value_representation, WordSlice):
                     if part.word_align:
@@ -307,6 +337,7 @@ class NumericByteCodePart(ByteCodePart):
         active_named_scopes: ActiveNamedScopeList,
         instruction_address: int,
         instruction_size: int,
+        bytecode_address: int | None = None,
     ) -> int:
         return self._value
 
@@ -348,6 +379,7 @@ class ExpressionByteCodePart(ByteCodePart):
         active_named_scopes: ActiveNamedScopeList,
         instruction_address: int,
         instruction_size: int,
+        bytecode_address: int | None = None,
     ) -> int:
         value = self._parsed_expression.get_value(
             label_scope,
@@ -398,8 +430,15 @@ class ExpressionByteCodePartWithValidation(ExpressionByteCodePart):
         active_named_scopes: ActiveNamedScopeList,
         instruction_address: int,
         instruction_size: int,
+        bytecode_address: int | None = None,
     ) -> int:
-        value = super().get_value(label_scope, active_named_scopes, instruction_address, instruction_size)
+        value = super().get_value(
+            label_scope,
+            active_named_scopes,
+            instruction_address,
+            instruction_size,
+            bytecode_address,
+        )
         if self._max is not None and value > self._max:
             sys.exit(f'ERROR: {self.line_id} - operand value of {value} exceeds maximun allowed of {self._max}')
         if self._min is not None and value < self._min:
@@ -441,8 +480,15 @@ class ExpressionByteCodePartInMemoryZone(ExpressionByteCodePart):
         active_named_scopes: ActiveNamedScopeList,
         instruction_address: int,
         instruction_size: int,
+        bytecode_address: int | None = None,
     ) -> int:
-        value = super().get_value(label_scope, active_named_scopes, instruction_address, instruction_size)
+        value = super().get_value(
+            label_scope,
+            active_named_scopes,
+            instruction_address,
+            instruction_size,
+            bytecode_address,
+        )
         if self._memzone is not None:
             if value > self._memzone.end:
                 sys.exit(
@@ -494,8 +540,15 @@ class ExpressionEnumerationByteCodePart(ExpressionByteCodePart):
         active_named_scopes: ActiveNamedScopeList,
         instruction_address: int,
         instruction_size: int,
+        bytecode_address: int | None = None,
     ) -> int:
-        value = super().get_value(label_scope, active_named_scopes, instruction_address, instruction_size)
+        value = super().get_value(
+            label_scope,
+            active_named_scopes,
+            instruction_address,
+            instruction_size,
+            bytecode_address,
+        )
         if value not in self._value_dict:
             sys.exit(
                 f'ERROR: {self.line_id} - numeric expression value of {value} is '
@@ -547,17 +600,23 @@ class CompositeByteCodePart(ByteCodePart):
         active_named_scopes: ActiveNamedScopeList,
         instruction_address: int,
         instruction_size: int,
+        bytecode_address: int | None = None,
     ) -> int:
         bits = PackedBits()
-        for p in self._parts_list:
+        for part, part_bytecode_address in self._iter_parts_with_bytecode_addresses(
+            self._parts_list,
+            self.word_size,
+            bytecode_address,
+        ):
             bits.append_bits(
-                p.get_value(
+                part.get_value(
                     label_scope,
                     active_named_scopes,
                     instruction_address,
                     instruction_size,
+                    part_bytecode_address,
                 ),
-                p.value_size,
+                part.value_size,
                 False,
             )
         value = int.from_bytes(bits.get_bytes(), 'big')
@@ -572,12 +631,19 @@ class CompositeByteCodePart(ByteCodePart):
         active_named_scopes: ActiveNamedScopeList,
         instruction_address: int,
         instruction_size: int,
+        bytecode_address: int | None = None,
     ) -> WordSlice | Value:
         '''
         For a CompositeByteCodePart, we will return a compacted WordSlice based on the compacted value
         '''
         return WordSlice(
-            self.get_value(label_scope, active_named_scopes, instruction_address, instruction_size),
+            self.get_value(
+                label_scope,
+                active_named_scopes,
+                instruction_address,
+                instruction_size,
+                bytecode_address,
+            ),
             self.value_size,
         )
 
@@ -587,6 +653,7 @@ class CompositeByteCodePart(ByteCodePart):
         active_named_scopes: ActiveNamedScopeList,
         instruction_address: int,
         instruction_size: int,
+        bytecode_address: int | None = None,
     ) -> list[Word]:
         """
         Returns a list of Word objects representing the composite bytecode part.
@@ -601,4 +668,5 @@ class CompositeByteCodePart(ByteCodePart):
             active_named_scopes,
             instruction_address,
             instruction_size,
+            bytecode_address,
         )

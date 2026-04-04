@@ -1,5 +1,6 @@
 import importlib.resources as pkg_resources
 import unittest
+from pathlib import Path
 
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
@@ -1140,6 +1141,7 @@ class TestInstructionParsing(unittest.TestCase):
             memzone_mngr.global_zone,
             False,
             False,
+            False,
             isa_model.word_size,
             isa_model.word_segment_size,
         )
@@ -1157,6 +1159,7 @@ class TestInstructionParsing(unittest.TestCase):
             memzone_mngr.global_zone,
             True,
             True,
+            False,
             isa_model.word_size,
             isa_model.word_segment_size,
         )
@@ -1177,6 +1180,7 @@ class TestInstructionParsing(unittest.TestCase):
             memzone_32bit_mngr.global_zone,
             True,
             True,
+            False,
             isa_model.word_size,
             isa_model.word_segment_size,
         )
@@ -1198,9 +1202,79 @@ class TestInstructionParsing(unittest.TestCase):
                 memzone_mngr.global_zone,
                 True,
                 False,
+                False,
                 isa_model.word_size,
                 isa_model.word_segment_size,
             )
+
+        # boundary behavior defaults to comparing against the instruction address page
+        bc4 = AddressByteCodePart(
+            '$27AA',
+            8,
+            True,
+            isa_model.multi_word_endianness,
+            isa_model.intra_word_endianness,
+            lineid,
+            memzone_mngr.global_zone,
+            True,
+            True,
+            False,
+            isa_model.word_size,
+            isa_model.word_segment_size,
+        )
+        with self.assertRaisesRegex(
+            ValueError,
+            'instruction address 0x26ff',
+        ):
+            bc4.get_value(TestInstructionParsing.label_values, self.active_named_scopes, 0x26FF, 2)
+
+        # operand-page matching uses the emitted operand byte address, which crosses to 0x2700 at 0x26FF
+        bc5 = AddressByteCodePart(
+            '$27AA',
+            8,
+            True,
+            isa_model.multi_word_endianness,
+            isa_model.intra_word_endianness,
+            lineid,
+            memzone_mngr.global_zone,
+            True,
+            True,
+            True,
+            isa_model.word_size,
+            isa_model.word_segment_size,
+        )
+        value5 = bc5.get_value(
+            TestInstructionParsing.label_values,
+            self.active_named_scopes,
+            0x26FF,
+            2,
+            0x2700,
+        )
+        self.assertEqual(value5, 0xAA, 'operand-page matching should accept next-page target at xxFF')
+        with self.assertRaises(ValueError) as ctx:
+            AddressByteCodePart(
+                '$26AA',
+                8,
+                True,
+                isa_model.multi_word_endianness,
+                isa_model.intra_word_endianness,
+                lineid,
+                memzone_mngr.global_zone,
+                True,
+                True,
+                True,
+                isa_model.word_size,
+                isa_model.word_segment_size,
+            ).get_value(
+                TestInstructionParsing.label_values,
+                self.active_named_scopes,
+                0x26FF,
+                2,
+                0x2700,
+            )
+        self.assertIn('instruction address 0x26ff', str(ctx.exception))
+        self.assertIn('operand byte address 0x2700', str(ctx.exception))
+        self.assertIn('target address 0x26aa', str(ctx.exception).lower())
 
         # Test byte code generation for sliced addresses
         t1 = InstructionLine.factory(
@@ -1226,6 +1300,25 @@ class TestInstructionParsing(unittest.TestCase):
         t1.set_start_address(0x3350)
         with self.assertRaises(ValueError, msg="address MSBs don't match"):
             t1.generate_words()
+
+        # the operand-page variant should validate against the operand byte address at xxFF
+        t1_operand_page = InstructionLine.factory(
+            lineid, 'jmp_local_operand_page $27AA', 'comment',
+            isa_model, memzone_mngr.global_zone, memzone_mngr,
+        )
+        t1_operand_page.set_start_address(0x26FF)
+        t1_operand_page.label_scope = TestInstructionParsing.label_values
+        t1_operand_page.active_named_scopes = self.active_named_scopes
+        self.assertIsInstance(t1_operand_page, InstructionLine)
+        t1_operand_page.generate_words()
+        self.assertEqual(
+            list(t1_operand_page.get_words()),
+            [
+                Word(0xE3, 8, 8, isa_model.intra_word_endianness),
+                Word(0xAA, 8, 8, isa_model.intra_word_endianness),
+            ],
+            'operand-page variant should emit the low byte for the next page target',
+        )
 
         # Test bye code generation for unsliced addresses
         t2 = InstructionLine.factory(
@@ -1281,6 +1374,78 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertEqual(t4.word_count, 3, 'has 3 words')
         with self.assertRaises(SystemExit, msg='address not in target memory zone'):
             t4.generate_words()
+
+    def test_minimal_fast_ops_validate_against_operand_fetch_page(self):
+        minimal_fp = (
+            Path(__file__).resolve().parents[1]
+            / 'examples'
+            / 'slu4-minimal-64x4'
+            / 'slu4-minimal-64x4.yaml'
+        )
+        isa_model = AssemblerModel(str(minimal_fp), 0, self.diagnostic_reporter)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
+        lineid = LineIdentifier(43, 'test_minimal_fast_ops_validate_against_operand_fetch_page')
+        opcode_map = {
+            'feq': 0x54,
+            'fpa': 0x5B,
+        }
+        cases = [
+            (0x26FE, 0x26AA, True),
+            (0x26FE, 0x27AA, False),
+            (0x26FF, 0x26AA, False),
+            (0x26FF, 0x27AA, True),
+        ]
+
+        for mnemonic, opcode in opcode_map.items():
+            for instruction_address, target_address, should_pass in cases:
+                with self.subTest(
+                    mnemonic=mnemonic,
+                    instruction_address=hex(instruction_address),
+                    target_address=hex(target_address),
+                ):
+                    line = InstructionLine.factory(
+                        lineid,
+                        f'{mnemonic} ${target_address:04X}',
+                        'comment',
+                        isa_model,
+                        memzone_mngr.global_zone,
+                        memzone_mngr,
+                    )
+                    line.set_start_address(instruction_address)
+                    line.label_scope = isa_model.global_label_scope
+                    line.active_named_scopes = self.active_named_scopes
+                    self.assertIsInstance(line, InstructionLine)
+                    self.assertEqual(line.word_count, 2, 'fast ops should emit opcode plus one-byte operand')
+
+                    if should_pass:
+                        line.generate_words()
+                        self.assertEqual(
+                            list(line.get_words()),
+                            [
+                                Word(opcode, 8, 8, isa_model.intra_word_endianness),
+                                Word(target_address & 0xFF, 8, 8, isa_model.intra_word_endianness),
+                            ],
+                            'fast op should emit opcode plus target low byte',
+                        )
+                    else:
+                        with self.assertRaises(ValueError) as ctx:
+                            line.generate_words()
+                        self.assertIn(
+                            f'instruction address 0x{instruction_address:x}',
+                            str(ctx.exception).lower(),
+                        )
+                        self.assertIn(
+                            f'operand byte address 0x{instruction_address + 1:x}',
+                            str(ctx.exception).lower(),
+                        )
+                        self.assertIn(
+                            f'target address 0x{target_address:x}',
+                            str(ctx.exception).lower(),
+                        )
 
     def test_instruction_parsing_16bit_word(self):
         fp = pkg_resources.files(config_files).joinpath('test_16bit_data_words.yaml')

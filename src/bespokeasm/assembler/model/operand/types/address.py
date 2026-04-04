@@ -4,8 +4,8 @@
 # - The bytecode of the argument value (the address) can be sliced into the least significant byte(s),
 #   to enable "fast jumps" in the assembler.
 #   * The expected significant bytes can either be configured to a specific value (e.g., "zero page")
-#     or to the same as the current instruction's address. If the operand's value has a signficant byte(s)
-#     that is not what is expected, the assembler will raise an error.
+#     or to match either the current instruction address or the emitted operand fetch page. If the
+#     operand's value has significant byte(s) that are not what is expected, the assembler raises an error.
 from bespokeasm.assembler.bytecode.parts import ExpressionByteCodePartInMemoryZone
 from bespokeasm.assembler.bytecode.parts import NumericByteCodePart
 from bespokeasm.assembler.label_scope import LabelScope
@@ -31,12 +31,13 @@ class AddressByteCodePart(ExpressionByteCodePartInMemoryZone):
         memzone: MemoryZone,
         is_lsb_bytes: bool,
         match_address_msb: bool,
+        match_on_argument_bytcode: bool,
         word_size: int,
         word_segment_size: int,
     ) -> None:
         """Creates a new address bytecode part that is bound to a memory zone.
            The address value is sliced into the least significant bit(s) if `is_lsb_bytes` is true,
-           ensuring that the MSBs match the current instruction's address MSBs."""
+           ensuring that the MSBs match the configured comparison page."""
         super().__init__(
             memzone,
             value_expression,
@@ -50,10 +51,12 @@ class AddressByteCodePart(ExpressionByteCodePartInMemoryZone):
         )
         self._is_lsb_bytes = is_lsb_bytes
         self._match_address_msb = match_address_msb
+        self._match_on_argument_bytcode = match_on_argument_bytcode
 
     def __str__(self) -> str:
         return f'AddressByteCodePart<expression="{self._expression}",zone={self._memzone},' \
-               f'slice_lab={self._is_lsb_bytes},match_msb={self._match_address_msb}>'
+               f'slice_lab={self._is_lsb_bytes},match_msb={self._match_address_msb},' \
+               f'match_on_arg_bytecode={self._match_on_argument_bytcode}>'
 
     def get_value(
         self,
@@ -61,6 +64,7 @@ class AddressByteCodePart(ExpressionByteCodePartInMemoryZone):
         active_named_scopes: ActiveNamedScopeList,
         instruction_address: int,
         instruction_size: int,
+        bytecode_address: int | None = None,
     ) -> int:
         if instruction_address is None:
             raise ValueError('AddressByteCodePart.get_value had no instruction_address passed')
@@ -69,19 +73,26 @@ class AddressByteCodePart(ExpressionByteCodePartInMemoryZone):
             active_named_scopes,
             instruction_address,
             instruction_size,
+            bytecode_address,
         )
 
         if self._is_lsb_bytes and self._match_address_msb:
             # mask out the MSBs of the address value. The`value_size` is interpreted as the number of LSB bytes
             mask = (1 << self.value_size) - 1
             final_value = value & mask
-            # check if the MSBs of the value match the MSBs of the instruction address
-            shifted_address = instruction_address >> self.value_size
+            if self._match_on_argument_bytcode and bytecode_address is None:
+                raise ValueError('AddressByteCodePart.get_value had no bytecode_address passed')
+            operand_byte_address = instruction_address if bytecode_address is None else bytecode_address
+            comparison_address = operand_byte_address if self._match_on_argument_bytcode else instruction_address
+            # check if the MSBs of the value match the configured comparison address
+            shifted_address = comparison_address >> self.value_size
             shifted_value = value >> self.value_size
             if shifted_address != shifted_value:
                 raise ValueError(
-                    f'Operand address value 0x{value:x} does not have the same MSBs '
-                    f'as the instruction address 0x{instruction_address:x}'
+                    f'Target address 0x{value:x} does not have the same MSBs '
+                    f'as page comparison address 0x{comparison_address:x} '
+                    f'(instruction address 0x{instruction_address:x}, '
+                    f'operand byte address 0x{operand_byte_address:x})'
                 )
         else:
             final_value = value
@@ -143,10 +154,17 @@ class AddressOperand(NumericExpressionOperand):
 
     @property
     def match_address_msb(self) -> bool:
-        """Returns true if the argument value's MSBs should match the MSBs of the current instruction's
-           address. Can only be true if `does_lsb_slice` is also true. Defaults to false."""
+        """Returns true if the argument value's MSBs should match the configured comparison page.
+           Can only be true if `does_lsb_slice` is also true. Defaults to false."""
         if self.does_lsb_slice:
             return self.config['argument'].get('match_address_msb', False)
+        return False
+
+    @property
+    def match_on_argument_bytcode(self) -> bool:
+        """Returns true if MSB matching should use the emitted address of the operand bytes."""
+        if self.does_lsb_slice and self.match_address_msb:
+            return self.config['argument'].get('match_on_argument_bytcode', False)
         return False
 
     def _parse_bytecode_parts(
@@ -179,6 +197,7 @@ class AddressOperand(NumericExpressionOperand):
             self.valid_memory_zone(memzone_manager),
             self.does_lsb_slice,
             self.match_address_msb,
+            self.match_on_argument_bytcode,
             self._word_size,
             self._word_segment_size,
         )

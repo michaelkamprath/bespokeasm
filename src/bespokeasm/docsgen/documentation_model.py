@@ -862,7 +862,10 @@ class DocumentationModel:
                     notes.append('Uses only the least significant bits of the address value.')
 
                 if argument_config.get('match_address_msb'):
-                    notes.append('High address bits are taken from the current instruction address.')
+                    if argument_config.get('match_on_argument_bytcode'):
+                        notes.append('High address bits are taken from the operand fetch page.')
+                    else:
+                        notes.append('High address bits are taken from the current instruction address.')
 
         if operand_type == 'relative_address':
             if operand_config.get('use_curly_braces'):
