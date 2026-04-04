@@ -53,10 +53,17 @@ class RelativeAddressByteCodePart(ExpressionByteCodePartInMemoryZone):
         active_named_scopes: ActiveNamedScopeList,
         instruction_address: int,
         instruction_size: int,
+        bytecode_address: int | None = None,
     ) -> int:
         if instruction_address is None:
             raise ValueError('RelativeAddressByteCodePart.get_value had no instruction_address passed')
-        expression_value = super().get_value(label_scope, active_named_scopes, instruction_address, instruction_size)
+        expression_value = super().get_value(
+            label_scope,
+            active_named_scopes,
+            instruction_address,
+            instruction_size,
+            bytecode_address,
+        )
         relative_value = expression_value - instruction_address
         if self._offset_from_instruction_end:
             # minus one to account for the current address being 1 byte of instruction size

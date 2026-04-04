@@ -167,6 +167,23 @@ instructions:
                 word_align: true
                 slice_lsb: true
                 match_address_msb: true
+  jmp_local_operand_page:
+    bytecode:
+      value: 0xE3
+      size: 8
+    operands:
+      count: 1
+      specific_operands:
+        local_addr:
+          list:
+            local_addr:
+              type: address
+              argument:
+                size: 8
+                word_align: true
+                slice_lsb: true
+                match_address_msb: true
+                match_on_argument_bytcode: true
   jmpa:
     bytecode:
       value: 0xE1

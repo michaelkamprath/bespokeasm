@@ -19,6 +19,8 @@ Changes that are planned but not implemented yet:
 
 
 ## [Unreleased]
+
+## [0.7.2]
 * Added `.16byte` data directive to emit 16-byte values with configured multi-word endianness.
 * Added `#error` preprocessor directive for compile-time errors with optional message.
 * Added an enhanced instruction set for the Ben Eater SAP-1 example
@@ -28,6 +30,7 @@ Changes that are planned but not implemented yet:
 * Fixed a bug where single character ordinals with the double quote character (`'"'`) did not parse correctly.
 * Added operand labels in instruction operands using `@name: expression` for `numeric`, `indirect_numeric`, `deferred_numeric`, `address`, and `relative_address` operand types; includes scope behavior aligned with normal labels, targeted diagnostics for malformed syntax/invalid emission targets, and VS Code/Sublime/Vim highlighting + hover definition support for operand-label definitions. Operand labels are not supported in macro definitions or macro invocations.
 * Fixed bug in how the `.byte` data directive handles lists of mixed value types (styrings and numeric).
+* Updated sliced `address` operands so `match_on_argument_bytcode` is honored when `match_address_msb` is enabled, allowing page matching against the emitted operand fetch address instead of only the instruction start address.
 
 ## [0.7.1]
 * Added support to the VSCode and Sublime Text language extensions for editor hovers for mnemonics, labels, and constants; plus improved semantic syntax highlighting that differentiations label and constant defintion from label and constant usage.
@@ -213,7 +216,8 @@ First tracked released
 * Enabled the `reverse_argument_order` instruction option be applied to a specific operand configuration. This slightly changed the configuration file format.
 * Added ability for instructions with operands to have a single "empty operand" variant, e.g., `pop`
 
-[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.7.2...HEAD
+[0.7.2]: https://github.com/michaelkamprath/bespokeasm/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/michaelkamprath/bespokeasm/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.5.1...v0.6.0

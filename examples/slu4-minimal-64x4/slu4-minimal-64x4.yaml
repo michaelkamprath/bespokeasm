@@ -99,7 +99,7 @@ operand_sets:
           description: Two byte address pointing two two bytes in memory that contain another address to use.
   address_lsb:
     # one byte is interpreted as an address's LSB and the address MSB
-    # is taken from the current instruction address
+    # is taken from the operand fetch page, i.e. the page containing the emitted operand byte
     operand_values:
       address_lsb:
         type: address
@@ -109,10 +109,11 @@ operand_sets:
           endian: little
           slice_lsb: true
           match_address_msb: true
+          match_on_argument_bytcode: true
         documentation:
           title: Page Offset Address
           category: addressing
-          description: One byte used as the LSB for the address. The MSB is the current instruct's address MSB.
+          description: One byte used as the LSB for the address. The MSB of the address comes from the operand's own bytecode address.
   offset:
     # one byte is interpreted as an offset
     operand_values:
