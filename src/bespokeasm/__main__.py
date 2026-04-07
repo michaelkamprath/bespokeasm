@@ -1,7 +1,6 @@
 import sys
 
 from bespokeasm.cli import _is_completion_invocation
-from bespokeasm.cli import build_cli
 from bespokeasm.cli import CommandHandlers
 
 
@@ -107,23 +106,27 @@ def _vim_handler(config_file, verbose, editor_config_dir, language_name, languag
     generator.generate()
 
 
-main = build_cli(
-    CommandHandlers(
-        compile=_compile_handler,
-        docs=_docs_handler,
-        vscode=_vscode_handler,
-        sublime=_sublime_handler,
-        vim=_vim_handler,
-    )
+_HANDLERS = CommandHandlers(
+    compile=_compile_handler,
+    docs=_docs_handler,
+    vscode=_vscode_handler,
+    sublime=_sublime_handler,
+    vim=_vim_handler,
 )
+
+
+def _build_main():
+    from bespokeasm.cli import build_cli
+    return build_cli(_HANDLERS)
 
 
 def entry_point():
     # Preserve completion calls without modifying argv
     if _is_completion_invocation():
-        from bespokeasm import completion_cli
+        from bespokeasm.completion_cli import completion_entry_point
+        return completion_entry_point(_HANDLERS)
 
-        return completion_cli.entry_point()
+    main = _build_main()
 
     args = sys.argv[1:]
     # Friendly banner for bare --help or no args

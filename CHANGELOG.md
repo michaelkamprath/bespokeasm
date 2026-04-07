@@ -19,6 +19,10 @@ Changes that are planned but not implemented yet:
 
 
 ## [Unreleased]
+* Improved CLI startup performance by deferring heavy imports (`click`, `dataclasses`, `pathlib`) until needed and eliminating redundant CLI construction on the completion path.
+* Reduced standalone binary size (~20%) by excluding unused modules (email, http, ssl, xml, etc.) from PyInstaller builds.
+* Added Nuitka as an alternative build target (`make nuitka`) for standalone binaries with faster startup than PyInstaller.
+* Updated installation documentation to recommend `pipx install` as the primary installation method for the best startup and tab completion performance.
 
 ## [0.7.2]
 * Added `.16byte` data directive to emit 16-byte values with configured multi-word endianness.

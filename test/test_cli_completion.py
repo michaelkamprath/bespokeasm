@@ -4,11 +4,12 @@ from textwrap import dedent
 
 import click.shell_completion as sc
 import pytest
-from bespokeasm import completion_cli
+from bespokeasm.__main__ import _build_main
 from bespokeasm.__main__ import entry_point
-from bespokeasm.__main__ import main
 from bespokeasm.cli import _inject_zsh_nosort
 from click.shell_completion import get_completion_class
+
+main = _build_main()
 
 
 def _zsh_completions_for(cli, args, incomplete):
@@ -73,15 +74,24 @@ def test_generate_extension_vscode_and_sublime_have_required_config_option():
 
 
 def test_completion_cli_matches_main_compile_completions():
+    from bespokeasm.cli import build_cli
+    from bespokeasm.cli import CommandHandlers
+
+    def _noop(*a, **k):
+        return None
+
+    completion_main = build_cli(CommandHandlers(_noop, _noop, _noop, _noop, _noop))
     main_items = _zsh_completions_for(main, ['compile'], '-')
-    completion_items = _zsh_completions_for(completion_cli.main, ['compile'], '-')
+    completion_items = _zsh_completions_for(completion_main, ['compile'], '-')
     assert {(item.value, item.help) for item in main_items} == {(item.value, item.help) for item in completion_items}
 
 
 def test_entry_point_routes_completion_invocations(monkeypatch):
+    from bespokeasm import completion_cli
+
     sentinel = object()
     monkeypatch.setenv('_BESPOKEASM_COMPLETE', 'zsh_complete')
-    monkeypatch.setattr(completion_cli, 'entry_point', lambda: sentinel)
+    monkeypatch.setattr(completion_cli, 'completion_entry_point', lambda handlers=None: sentinel)
     assert entry_point() is sentinel
 
 

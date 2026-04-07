@@ -2,7 +2,7 @@ PYTHON := $(shell if [ -x ".venv/bin/python" ]; then echo ".venv/bin/python"; el
 PYINSTALLER_DIST := dist
 PYINSTALLER_NAME := bespokeasm
 
-.PHONY: tests clean flake8 pyinstaller pipx-wheel
+.PHONY: tests clean flake8 pyinstaller nuitka pipx-wheel
 
 tests:
 	PYTHONPATH=./src:${PYTHONPATH} $(PYTHON) -m unittest discover . -v
@@ -26,6 +26,13 @@ pyinstaller:
 		--distpath $(PYINSTALLER_DIST) --paths src --collect-all bespokeasm \
 		--add-data "src/bespokeasm/configgen/sublime/resources:bespokeasm/configgen/sublime/resources" \
 		--add-data "src/bespokeasm/configgen/vscode/resources:bespokeasm/configgen/vscode/resources" \
+		--exclude-module email --exclude-module http --exclude-module urllib \
+		--exclude-module ssl --exclude-module xml --exclude-module ctypes \
+		--exclude-module ftplib --exclude-module socket --exclude-module netrc \
+		--exclude-module webbrowser --exclude-module plistlib --exclude-module calendar \
+		--exclude-module csv --exclude-module fractions \
+		--exclude-module statistics --exclude-module argparse --exclude-module uuid \
+		--exclude-module pre_commit \
 		src/bespokeasm/__main__.py
 	VERSION=$$($(PYTHON) -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])"); \
 	OS_NAME=$$(uname -s); \
@@ -41,6 +48,46 @@ pyinstaller:
 	printf "L\nQ\n" | $(PYTHON) -m PyInstaller.utils.cliutils.archive_viewer "$(PYINSTALLER_DIST)/$(PYINSTALLER_NAME)$${EXT}" 2>/dev/null | rg -q "bespokeasm/configgen/sublime/resources/sublime-syntax\\.yaml" || { echo "ERROR: Missing Sublime resource files in PyInstaller bundle."; exit 1; }; \
 	printf "L\nQ\n" | $(PYTHON) -m PyInstaller.utils.cliutils.archive_viewer "$(PYINSTALLER_DIST)/$(PYINSTALLER_NAME)$${EXT}" 2>/dev/null | rg -q "bespokeasm/configgen/vscode/resources/package\\.json" || { echo "ERROR: Missing VS Code resource files in PyInstaller bundle."; exit 1; }; \
 	SRC="$(PYINSTALLER_DIST)/$(PYINSTALLER_NAME)$${EXT}"; \
+	DEST="$(PYINSTALLER_DIST)/$(PYINSTALLER_NAME)-$${VERSION}-$${PLATFORM}-$${ARCH}$${EXT}"; \
+	mv "$$SRC" "$$DEST"
+
+NUITKA_NOFOLLOW := \
+	--nofollow-import-to='*.tests' --nofollow-import-to='*.distutils' \
+	--nofollow-import-to=setuptools --nofollow-import-to=pip \
+	--nofollow-import-to=pre_commit --nofollow-import-to=email \
+	--nofollow-import-to=http --nofollow-import-to=urllib \
+	--nofollow-import-to=ssl --nofollow-import-to=xml \
+	--nofollow-import-to=ftplib --nofollow-import-to=unittest
+
+nuitka:
+	# Requires `nuitka[onefile]` in the current python environment. `pip install nuitka[onefile]`
+	# Also requires a C compiler (gcc/clang).
+	@$(PYTHON) -m nuitka --version >/dev/null 2>&1 || { echo "ERROR: nuitka is not installed. Install with: pip install 'nuitka[onefile]'"; exit 1; }
+	PYTHONPATH=./src $(PYTHON) -m nuitka \
+		--onefile \
+		-o bespokeasm \
+		--no-deployment-flag=self-execution \
+		--include-package-data=bespokeasm \
+		--include-data-dir=src/bespokeasm/configgen/sublime/resources=bespokeasm/configgen/sublime/resources \
+		--include-data-dir=src/bespokeasm/configgen/vscode/resources=bespokeasm/configgen/vscode/resources \
+		$(NUITKA_NOFOLLOW) \
+		--output-dir=$(PYINSTALLER_DIST) \
+		src/bespokeasm/__main__.py
+	@# Verify required resource files are present in the dist directory
+	@test -d "$(PYINSTALLER_DIST)/__main__.dist/bespokeasm/configgen/sublime/resources" || { echo "ERROR: Missing Sublime resource files in Nuitka bundle."; exit 1; }
+	@test -f "$(PYINSTALLER_DIST)/__main__.dist/bespokeasm/configgen/vscode/resources/package.json" || { echo "ERROR: Missing VS Code resource files in Nuitka bundle."; exit 1; }
+	VERSION=$$($(PYTHON) -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])"); \
+	OS_NAME=$$(uname -s); \
+	case "$$OS_NAME" in \
+		Linux*) PLATFORM=linux ;; \
+		Darwin*) PLATFORM=macos ;; \
+		MINGW*|MSYS*|CYGWIN*) PLATFORM=windows ;; \
+		*) PLATFORM=unknown ;; \
+	esac; \
+	ARCH=$$(uname -m); \
+	EXT=""; \
+	if [ "$$PLATFORM" = "windows" ]; then EXT=".exe"; fi; \
+	SRC="$(PYINSTALLER_DIST)/bespokeasm$${EXT}"; \
 	DEST="$(PYINSTALLER_DIST)/$(PYINSTALLER_NAME)-$${VERSION}-$${PLATFORM}-$${ARCH}$${EXT}"; \
 	mv "$$SRC" "$$DEST"
 

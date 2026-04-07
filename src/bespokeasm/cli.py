@@ -1,23 +1,15 @@
 import os
 import sys
 from collections.abc import Callable
-from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
-
-import click
-from bespokeasm import BESPOKEASM_VERSION_STR
-from bespokeasm.cli_completion import AutoOptionGroup
-from bespokeasm.cli_completion import OptionForwardingCommand
-from click.shell_completion import get_completion_class
+from typing import NamedTuple
 
 
 SUPPORTED_COMPLETION_SHELLS = ('bash', 'zsh', 'fish')
 VERBOSE_HELP = 'Verbosity of logging (counting flag: -v, -vv, -vvv or --verbose <n>).'
 
 
-@dataclass(frozen=True)
-class CommandHandlers:
+class CommandHandlers(NamedTuple):
     compile: Callable[..., Any]
     docs: Callable[..., Any]
     vscode: Callable[..., Any]
@@ -37,8 +29,10 @@ def _detect_shell():
     return None
 
 
-def _default_completion_path(shell: str, prog_name: str) -> Path:
+def _default_completion_path(shell: str, prog_name: str):
     """Return the default completion file path for the program name and shell."""
+    from pathlib import Path
+
     if shell == 'bash':
         return Path(os.path.expanduser('~/.local/share/bash-completion/completions')) / prog_name
     if shell == 'zsh':
@@ -126,7 +120,12 @@ def _inject_zsh_nosort(script: str) -> str:
     return '\n'.join(lines)
 
 
-def build_cli(handlers: CommandHandlers) -> click.Group:
+def build_cli(handlers: CommandHandlers):
+    import click
+    from bespokeasm import BESPOKEASM_VERSION_STR
+    from bespokeasm.cli_completion import AutoOptionGroup
+    from bespokeasm.cli_completion import OptionForwardingCommand
+
     @click.group(cls=AutoOptionGroup)
     @click.version_option(BESPOKEASM_VERSION_STR)
     def main():
@@ -355,6 +354,9 @@ def build_cli(handlers: CommandHandlers) -> click.Group:
     )
     def install_completion(target_shell, destination, prog_name):
         """Write a shell completion script to a standard location for the chosen shell."""
+        from pathlib import Path
+        from click.shell_completion import get_completion_class
+
         resolved_shell = target_shell.lower() if target_shell else _detect_shell()
         if not resolved_shell:
             click.echo('ERROR: Could not detect shell. Please specify --shell.', err=True)

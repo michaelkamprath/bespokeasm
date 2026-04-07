@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bespokeasm"
-version = "0.7.2"
+version = "0.7.3a"
 authors = [
   { name="Michael Kamprath", email="michael@kamprath.net" },
 ]
@@ -32,6 +32,7 @@ dev = [
     "build",
     "pipx",
     "pyinstaller",
+    "nuitka[onefile]",
 ]
 
 [project.urls]

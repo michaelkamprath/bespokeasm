@@ -16,45 +16,54 @@ Note that supplying an instruction set configuration file is required via the `-
 
 ### Installation Options
 
-#### Standalone binary (PyInstaller build)
+#### Recommended: pipx install
 
-- Download the platform file from the GitHub Releases page (e.g., `bespokeasm-<version>-linux-x86_64`, `bespokeasm-<version>-macos-arm64`, `bespokeasm-<version>-macos-x86_64`, or `bespokeasm-<version>-windows-x86_64.exe`).
-- On Linux/macOS, ensure it’s executable: chmod +x bespokeasm.
-- Run directly from a terminal, no Python needed: ./bespokeasm -c <config.yaml> <source.asm> -n -p.
-- To place it on your PATH:
-  - Linux/macOS: rename or symlink to `bespokeasm` in a PATH dir (e.g., `sudo ln -sf /path/to/bespokeasm-macos-x86_64 /usr/local/bin/bespokeasm` or `mv bespokeasm-linux-x86_64 ~/bin/bespokeasm`).
-  - Windows: rename to `bespokeasm.exe` or create a shortcut in a PATH folder (e.g., `C:\\Users\\<you>\\AppData\\Local\\Microsoft\\WindowsApps`) or add the download folder to PATH.
-- Upgrading: download the new platform binary, replace the target of your symlink or overwrite the file in your PATH, and re-run `chmod +x` on Linux/macOS if needed.
+[`pipx`](https://pipx.pypa.io/) installs BespokeASM into its own isolated environment and makes the `bespokeasm` command available globally -- no virtual environment management needed. This is the fastest and most convenient way to install.
 
-#### pipx (isolated install using a wheel)
-- Prerequisite: Python 3.11+ with pipx installed. If needed: python3 -m pip install --user pipx then python3 -m pipx ensurepath (restart shell).
-- Download the wheel from the GitHub Releases page (e.g., `bespokeasm-<version>-py3-none-any.whl`).
-- Install: pipx install ./bespokeasm-<version>-py3-none-any.whl.
-- Use the CLI from anywhere: bespokeasm -c <config.yaml> <source.asm> -n -p.
-- To update, reinstall with the newer wheel; to remove, pipx uninstall bespokeasm.
+**Prerequisite:** Python 3.11+ and `pipx`. If you don’t have `pipx`: `python3 -m pip install --user pipx && python3 -m pipx ensurepath` (restart your shell).
 
-#### Install From Source
-To install, clone this repository and install using `pip`.
+Install directly from the GitHub repository:
 
 ```sh
-git clone git@github.com:michaelkamprath/bespokeasm.git
-pip install ./bespokeasm/
+pipx install git+https://github.com/michaelkamprath/bespokeasm.git
 ```
 
-Preferably, you use a `python` virtual environment to install BespokeASM into. For example:
+Or install from a wheel attached to a [GitHub Release](https://github.com/michaelkamprath/bespokeasm/releases):
+
+```sh
+pipx install ./bespokeasm-<version>-py3-none-any.whl
+```
+
+After installing, enable shell tab completions for the best experience:
+
+```sh
+bespokeasm install-completion
+```
+
+To upgrade: `pipx upgrade bespokeasm` (or `pipx install --force` with a new wheel). To remove: `pipx uninstall bespokeasm`.
+
+#### Standalone binary (no Python required)
+
+If you don’t have Python installed, download a standalone binary from the [GitHub Releases](https://github.com/michaelkamprath/bespokeasm/releases) page (e.g., `bespokeasm-<version>-linux-x86_64`, `bespokeasm-<version>-macos-arm64`, `bespokeasm-<version>-macos-x86_64`, or `bespokeasm-<version>-windows-x86_64.exe`).
+
+- On Linux/macOS, make it executable: `chmod +x bespokeasm-*`.
+- To place it on your PATH, rename or symlink to `bespokeasm` in a PATH directory (e.g., `ln -sf /path/to/bespokeasm-macos-x86_64 /usr/local/bin/bespokeasm`).
+- On Windows, rename to `bespokeasm.exe` and place in a folder on your PATH.
+- To upgrade, download the new binary and replace the old one.
+
+Note: the standalone binary has a slightly slower startup than a `pipx` install due to its self-contained packaging.
+
+#### Install from source
+
+For development or if you prefer `pip`:
 
 ```sh
 git clone git@github.com:michaelkamprath/bespokeasm.git
 cd bespokeasm
-python3 -m venv .venv/bespokeasm
-source .venv/bespokeasm/bin/activate
 pip install .
-bespokeasm --version
 ```
 
-Be sure to activate the virtual environment whenever you want to use BespokeASM.
-
-For development (building wheels/binaries), install dev tools in your venv:
+For development (building wheels/binaries), install dev extras:
 
 ```sh
 pip install ".[dev]"
