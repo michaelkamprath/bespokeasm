@@ -13,6 +13,7 @@ from bespokeasm.configgen import LanguageConfigGenerator
 from bespokeasm.configgen.color_scheme import DEFAULT_COLOR_SCHEME
 from bespokeasm.configgen.color_scheme import SyntaxElement
 from bespokeasm.docsgen import build_documentation_model
+from bespokeasm.docsgen import directive_docs
 from bespokeasm.docsgen.markdown_generator import MarkdownGenerator
 
 
@@ -337,8 +338,15 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
 
         label_pattern = self._label_pattern()
         mnemonic_pattern = self._mnemonic_pattern()
+        if self.model.registers:
+            register_pattern = self._replace_token_with_regex_list(
+                '##REGISTERS##', '##REGISTERS##', self.model.registers
+            )
+        else:
+            register_pattern = '(?!)'
         self._replace_token_in_file(extension_fp, '##LABEL_PATTERN##', label_pattern)
         self._replace_token_in_file(extension_fp, '##MNEMONIC_PATTERN##', mnemonic_pattern)
+        self._replace_token_in_file(extension_fp, '##REGISTERS##', register_pattern)
         self._replace_token_in_file(label_hover_fp, '##LABEL_PATTERN##', label_pattern)
         self._replace_token_in_file(constants_hover_fp, '##LABEL_PATTERN##', label_pattern)
 
@@ -372,6 +380,13 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             'instructions': instruction_docs,
             'macros': macro_docs,
             'predefined': markdown_generator.generate_predefined_hover_docs(),
+            'directives': {
+                'compiler': directive_docs.COMPILER_DIRECTIVE_DOCS,
+                'data_type': directive_docs.BYTECODE_DIRECTIVE_DOCS,
+                'preprocessor': directive_docs.PREPROCESSOR_DIRECTIVE_DOCS,
+            },
+            'registers': markdown_generator.generate_register_hover_docs(),
+            'expression_functions': directive_docs.EXPRESSION_FUNCTION_DOCS,
         }
         docs_fp = os.path.join(extension_dir_path, 'instruction-docs.json')
         with open(docs_fp, 'w', encoding='utf-8') as docs_file:

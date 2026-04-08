@@ -534,6 +534,49 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.assertIn('| **Size** | 1 byte |', docs['constants']['BUFFER_PTR'])
         self.assertIn('| **Size** | 8 bytes |', docs['data']['BUFFER'])
 
+    def test_generate_register_hover_docs_with_documentation(self):
+        """Registers with title/description generate hover docs."""
+        self.mock_doc_model.general_docs = {
+            'hardware': {'word_size': 8},
+            'registers': [
+                {'name': 'a', 'title': 'Accumulator', 'description': 'Main register.', 'size': 8},
+                {'name': 'sp', 'title': 'Stack Pointer', 'description': None, 'size': 16},
+            ],
+        }
+        generator = MarkdownGenerator(self.mock_doc_model, verbose=0)
+        docs = generator.generate_register_hover_docs()
+        self.assertIn('a', docs)
+        self.assertIn('### `a` : Accumulator', docs['a'])
+        self.assertIn('Main register.', docs['a'])
+        self.assertIn('8 bits', docs['a'])
+        self.assertIn('sp', docs)
+        self.assertIn('Stack Pointer', docs['sp'])
+        self.assertIn('16 bits', docs['sp'])
+
+    def test_generate_register_hover_docs_skips_undocumented(self):
+        """Registers without title or description are excluded."""
+        self.mock_doc_model.general_docs = {
+            'hardware': {'word_size': 8},
+            'registers': [
+                {'name': 'a', 'title': None, 'description': None, 'size': 8},
+                {'name': 'b', 'title': 'B register', 'description': None, 'size': 8},
+            ],
+        }
+        generator = MarkdownGenerator(self.mock_doc_model, verbose=0)
+        docs = generator.generate_register_hover_docs()
+        self.assertNotIn('a', docs)
+        self.assertIn('b', docs)
+
+    def test_generate_register_hover_docs_empty_list(self):
+        """No registers produces empty dict."""
+        self.mock_doc_model.general_docs = {
+            'hardware': {'word_size': 8},
+            'registers': [],
+        }
+        generator = MarkdownGenerator(self.mock_doc_model, verbose=0)
+        docs = generator.generate_register_hover_docs()
+        self.assertEqual(docs, {})
+
     def test_macros_calling_syntax_from_operands(self):
         """Macros render calling syntax using their configured operands."""
         isa_model = Mock()

@@ -15,6 +15,10 @@ WORD_PATTERN = re.compile(r'(?:##MNEMONIC_PATTERN##|##LABEL_PATTERN##)', re.IGNO
 LABEL_DEFINITION_PATTERN = re.compile(r'^\s*(?P<name>##LABEL_PATTERN##)\s*:')
 OPERAND_LABEL_DEFINITION_PATTERN = re.compile(r'@(?P<name>##LABEL_PATTERN##):\s*')
 CONSTANT_DEFINITION_PATTERN = re.compile(r'^\s*(?P<name>##LABEL_PATTERN##)\s*(?:=|\bEQU\b)')
+CONSTANT_VALUE_PATTERN = re.compile(r'^\s*##LABEL_PATTERN##\s*(?:=|\bEQU\b)\s*(?P<value>.+?)(?:\s*;.*)?$')
+COMPILER_DIRECTIVE_PATTERN = re.compile(r'\.(\w+)\b', re.IGNORECASE)
+PREPROCESSOR_DIRECTIVE_PATTERN = re.compile(r'#(\S+)\b', re.IGNORECASE)
+REGISTER_PATTERN = re.compile(r'(?i)(?:##REGISTERS##)')
 INCLUDE_PATTERN = re.compile(r'^\s*#include\s+(?:"([^"]+)"|<([^>]+)>|(\S+))', re.IGNORECASE)
 PACKAGE_NAME = '##PACKAGE_NAME##'
 
@@ -40,6 +44,12 @@ DEFAULT_HOVER_COLORS = {
     'inline_code': '##HOVER_COLOR_INLINE_CODE##',
     'table_header': '##HOVER_COLOR_TABLE_HEADER##',
     'table_boundary': '##HOVER_COLOR_TABLE_BOUNDARY##',
+    'preprocessor': '##HOVER_COLOR_PREPROCESSOR##',
+    'directive': '##HOVER_COLOR_DIRECTIVE##',
+    'data_type': '##HOVER_COLOR_DATA_TYPE##',
+    'register': '##HOVER_COLOR_REGISTER##',
+    'punctuation_preprocessor': '##HOVER_COLOR_PUNCTUATION_PREPROCESSOR##',
+    'operator': '##HOVER_COLOR_OPERATOR##',
 }
 INLINE_CODE_COLOR = DEFAULT_HOVER_COLORS['inline_code']
 TABLE_HEADER_COLOR = DEFAULT_HOVER_COLORS['table_header']
@@ -57,7 +67,8 @@ DEFAULT_SEMANTIC_HIGHLIGHTING = True
 _DOCS_CACHE = {}
 _COLOR_CACHE = {}
 _VIEW_CACHE = {}
-_PENDING_SEMANTIC = set()
+_PENDING_SEMANTIC = {}
+SEMANTIC_DEBOUNCE_MS = 350
 
 
 def _is_bespokeasm_view(view):
@@ -184,10 +195,7 @@ def _parse_include_path(line):
 
 
 def _collect_lines(view):
-    lines = []
-    for line_region in view.lines(sublime.Region(0, view.size())):
-        lines.append(view.substr(line_region))
-    return lines
+    return view.substr(sublime.Region(0, view.size())).splitlines()
 
 
 def _collect_included_files(lines, base_dir, visited=None):
@@ -326,7 +334,9 @@ def _get_view_state(view):
         'change_count': change_count,
         'lines': lines,
         'label_map': label_map,
-        'constant_map': constant_map
+        'constant_map': constant_map,
+        'current_path': view.file_name(),
+        'included_entries': entries[1:] if len(entries) > 1 else [],
     }
     _VIEW_CACHE[view_id] = state
     return state
@@ -382,6 +392,151 @@ def _build_definition_hover(name, location, current_path, token_color=None):
     return '<p>{}: {}</p>'.format(code_html, location_text)
 
 
+def _find_references(token, state):
+    """Find all usage locations of a token (excluding its definition).
+
+    Returns a list of dicts with 'line' (0-based), 'col' (0-based), and 'path'.
+    """
+    refs = []
+    current_path = state.get('current_path')
+
+    def _scan_lines(lines, path):
+        for line_index, text in enumerate(lines):
+            label_defs = None
+            const_defs = None
+            for start, end in _get_code_regions(text):
+                segment = text[start:end]
+                for match in WORD_PATTERN.finditer(segment):
+                    if match.group(0) != token:
+                        continue
+                    col = start + match.start()
+                    if label_defs is None:
+                        label_defs = _iter_label_definitions(text)
+                    if const_defs is None:
+                        const_defs = _iter_constant_definitions(text)
+                    is_def = any(n == token and c == col for n, c in label_defs)
+                    is_def = is_def or any(n == token and c == col for n, c in const_defs)
+                    if not is_def:
+                        refs.append({'line': line_index, 'col': col, 'path': path})
+
+    _scan_lines(state.get('lines', []), current_path)
+    for entry in state.get('included_entries', []):
+        _scan_lines(entry.get('lines', []), entry.get('path'))
+    return refs
+
+
+def _build_label_definition_self_hover(name, references, current_path, token_color=None):
+    escaped_name = html.escape(name)
+    if token_color:
+        code_html = '<code style="color:{};">{}</code>'.format(html.escape(token_color), escaped_name)
+    else:
+        code_html = '<code>{}</code>'.format(escaped_name)
+    if not references:
+        return '<p>{}: No references found.</p>'.format(code_html)
+    count = len(references)
+    if count == 1:
+        header = '{}: 1 reference'.format(code_html)
+    else:
+        header = '{}: {} references'.format(code_html, count)
+    items = []
+    for ref in references:
+        line_num = ref['line'] + 1
+        path = ref.get('path') or current_path
+        filename = os.path.basename(path) if path else 'file'
+        if path and current_path and os.path.normcase(path) == os.path.normcase(current_path):
+            label = 'line {}'.format(line_num)
+        else:
+            label = 'line {} in {}'.format(line_num, html.escape(filename))
+        if path:
+            link = _build_hover_link(path, line_num, ref.get('col', 0) + 1)
+            items.append('<a href="{}">{}</a>'.format(link, label))
+        else:
+            items.append(label)
+    return '<p>{}</p><p>{}</p>'.format(header, ', '.join(items))
+
+
+def _extract_constant_value(state, token):
+    """Extract the raw value text of a constant from its definition line."""
+    location = state.get('constant_map', {}).get(token)
+    if not location:
+        return None
+    line_index = location.get('line', 0)
+    lines = state.get('lines', [])
+    path = location.get('path')
+    if path and path != state.get('current_path'):
+        for entry in state.get('included_entries', []):
+            if entry.get('path') == path:
+                lines = entry.get('lines', [])
+                break
+        else:
+            return None
+    if line_index < 0 or line_index >= len(lines):
+        return None
+    match = CONSTANT_VALUE_PATTERN.match(lines[line_index])
+    if match:
+        return match.group('value').strip()
+    return None
+
+
+def _build_constant_hover(name, location, current_path, value_text=None, token_color=None, number_color=None):
+    line_num = location.get('line', 0) + 1
+    path = location.get('path') or current_path
+    filename = os.path.basename(path) if path else 'file'
+    escaped_name = html.escape(name)
+    if token_color:
+        code_html = '<code style="color:{};">{}</code>'.format(html.escape(token_color), escaped_name)
+    else:
+        code_html = '<code>{}</code>'.format(escaped_name)
+    if path and current_path and os.path.normcase(path) == os.path.normcase(current_path):
+        location_text = 'Defined at line {}.'.format(line_num)
+    else:
+        location_text = 'Defined at line {} in {}.'.format(line_num, filename)
+    parts = [code_html]
+    if value_text:
+        escaped_value = html.escape(value_text)
+        if number_color:
+            parts.append(' = <code style="color:{};">{}</code>'.format(html.escape(number_color), escaped_value))
+        else:
+            parts.append(' = <code>{}</code>'.format(escaped_value))
+    parts.append('<br>{}'.format(location_text))
+    if path:
+        cmd = _build_hover_link(path, line_num, location.get('col', 0) + 1)
+        parts.append(' <a href="{}">Go to definition</a>'.format(cmd))
+    return '<p>{}</p>'.format(''.join(parts))
+
+
+def _get_directive_at_point(view, point):
+    """Check if the point is on a directive and return its name (without prefix)."""
+    line_region = view.line(point)
+    line_text = view.substr(line_region)
+    column = point - line_region.begin()
+    for match in COMPILER_DIRECTIVE_PATTERN.finditer(line_text):
+        dir_start = match.start(1) - 1  # include the dot
+        dir_end = match.end(1)
+        if dir_start <= column < dir_end:
+            if _is_offset_in_code_region(line_text, match.start()):
+                return match.group(1).lower()
+    for match in PREPROCESSOR_DIRECTIVE_PATTERN.finditer(line_text):
+        dir_start = match.start(1) - 1  # include the hash
+        dir_end = match.end(1)
+        if dir_start <= column < dir_end:
+            if _is_offset_in_code_region(line_text, match.start()):
+                return match.group(1).lower()
+    return None
+
+
+def _get_register_at_point(view, point):
+    """Check if the point is on a register token and return its name."""
+    line_region = view.line(point)
+    line_text = view.substr(line_region)
+    column = point - line_region.begin()
+    for match in REGISTER_PATTERN.finditer(line_text):
+        if match.start() <= column < match.end():
+            if _is_offset_in_code_region(line_text, match.start()):
+                return match.group(0).lower()
+    return None
+
+
 def _build_hover_link(path, line_num, column):
     return 'bespokeasm://open?path={}&line={}&col={}'.format(
         quote(path),
@@ -424,11 +579,14 @@ def _with_hover_padding(html):
     return '<div style="padding:0 0 {}px 0;">{}</div>'.format(HOVER_EXTRA_BOTTOM_PADDING_PIXELS, html)
 
 
-def _render_markdown(markdown_text, hover_colors):
-    return _markdown_to_minihtml(markdown_text, hover_colors)
+def _render_markdown(markdown_text, hover_colors, heading_color=None, heading_prefix_color=None):
+    return _markdown_to_minihtml(
+        markdown_text, hover_colors,
+        heading_color=heading_color, heading_prefix_color=heading_prefix_color
+    )
 
 
-def _markdown_to_minihtml(markdown_text, hover_colors):
+def _markdown_to_minihtml(markdown_text, hover_colors, heading_color=None, heading_prefix_color=None):
     lines = markdown_text.splitlines()
     html_parts = []
     paragraph_lines = []
@@ -502,7 +660,8 @@ def _markdown_to_minihtml(markdown_text, hover_colors):
             heading_text = heading_match.group(2)
             content = _render_inline(
                 heading_text,
-                code_color=_heading_code_color(heading_text, hover_colors)
+                code_color=_heading_code_color(heading_text, hover_colors, color_override=heading_color),
+                prefix_color=heading_prefix_color
             )
             html_parts.append('<h{0}>{1}</h{0}>'.format(level, content))
             continue
@@ -540,21 +699,36 @@ def _markdown_to_minihtml(markdown_text, hover_colors):
     return ''.join(html_parts)
 
 
-def _render_inline(text, code_color=INLINE_CODE_COLOR):
+def _render_inline(text, code_color=INLINE_CODE_COLOR, prefix_color=None):
     escaped = html.escape(text)
-    escaped = re.sub(
-        r'`([^`]+)`',
-        r'<code style="color:{};">\1</code>'.format(code_color),
-        escaped
-    )
+
+    def _replace_code(match):
+        content = match.group(1)
+        if prefix_color:
+            # Split directive prefix (#/.) from name for separate coloring
+            prefix_match = re.match(r'^([#.])(\S+)$', content)
+            if prefix_match:
+                return (
+                    '<code>'
+                    '<span style="color:{};">{}</span>'
+                    '<span style="color:{};">{}</span>'
+                    '</code>'
+                ).format(prefix_color, prefix_match.group(1), code_color, prefix_match.group(2))
+        return '<code style="color:{};">{}</code>'.format(code_color, content)
+
+    escaped = re.sub(r'`([^`]+)`', _replace_code, escaped)
     escaped = re.sub(r'\*\*([^*]+)\*\*', r'<strong>\1</strong>', escaped)
     escaped = re.sub(r'(?<!\*)\*([^*]+)\*(?!\*)', r'<em>\1</em>', escaped)
     return escaped
 
 
-def _heading_code_color(heading_text, hover_colors):
+def _heading_code_color(heading_text, hover_colors, color_override=None):
+    if color_override:
+        return color_override
     if re.search(r':\s*Predefined Constant\s*$', heading_text):
         return hover_colors.get('compiler_label', DEFAULT_HOVER_COLORS['compiler_label'])
+    if re.search(r':\s*Register\s*$', heading_text):
+        return hover_colors.get('register', DEFAULT_HOVER_COLORS['register'])
     return hover_colors.get('instruction', DEFAULT_HOVER_COLORS['instruction'])
 
 
@@ -563,24 +737,76 @@ def _render_code_block(lines, hover_colors):
     parameter_color = hover_colors.get('parameter', DEFAULT_HOVER_COLORS['parameter'])
     number_color = hover_colors.get('number', DEFAULT_HOVER_COLORS['number'])
     punctuation_color = hover_colors.get('punctuation', DEFAULT_HOVER_COLORS['punctuation'])
+    preprocessor_color = hover_colors.get('preprocessor', DEFAULT_HOVER_COLORS.get('preprocessor', instruction_color))
+    directive_color = hover_colors.get('directive', DEFAULT_HOVER_COLORS.get('directive', instruction_color))
+    data_type_color = hover_colors.get('data_type', DEFAULT_HOVER_COLORS.get('data_type', instruction_color))
+    punctuation_preproc_color = hover_colors.get(
+        'punctuation_preprocessor', DEFAULT_HOVER_COLORS.get('punctuation_preprocessor', punctuation_color)
+    )
 
+    # Tokenizer: directive forms (.2byte, #include) must precede generic
+    # number/word patterns so they are captured as single tokens.
     token_re = re.compile(
         r'\s+|'
+        r'#\S+|'
+        r'\.\d*[A-Za-z]\w*|'
         r'0x[0-9a-fA-F]+|\$[0-9a-fA-F]+|\d+|'
         r'[A-Za-z_][\w\d_]*|'
         r'.'
     )
 
+    # Known directive names for code block coloring
+    preprocessor_names = {
+        'include', 'require', 'error', 'create_memzone', 'print',
+        'define', 'if', 'elif', 'else', 'endif', 'ifdef', 'ifndef',
+        'mute', 'unmute', 'emit', 'create-scope', 'use-scope', 'deactivate-scope',
+    }
+    compiler_directive_names = {'org', 'memzone', 'align'}
+    data_type_names = {
+        'fill', 'zero', 'zerountil',
+        'byte', '2byte', '4byte', '8byte', '16byte', 'cstr', 'asciiz',
+    }
+
+    def _classify_directive_token(token_text):
+        """Return (prefix_color, name_color) for a directive token, or None."""
+        if token_text.startswith('#'):
+            name = token_text[1:].lower()
+            if name in preprocessor_names:
+                return punctuation_preproc_color, preprocessor_color
+        elif token_text.startswith('.'):
+            name = token_text[1:].lower()
+            if name in data_type_names:
+                return data_type_color, data_type_color
+            if name in compiler_directive_names:
+                return directive_color, directive_color
+        return None
+
     rendered_lines = []
     for line in lines:
         parts = []
         seen_mnemonic = False
+
         for match in token_re.finditer(line):
             token = match.group(0)
             if token.isspace():
                 token = token.replace('\t', '    ')
                 parts.append(token.replace(' ', '&nbsp;'))
                 continue
+            # Check for directive tokens (.byte, .2byte, #include, etc.)
+            if not seen_mnemonic and (token.startswith('.') or token.startswith('#')):
+                dir_colors = _classify_directive_token(token)
+                if dir_colors:
+                    prefix_color, name_color = dir_colors
+                    prefix = token[0]
+                    name = token[1:]
+                    parts.append('<span style="color:{};">{}</span>'.format(
+                        prefix_color, html.escape(prefix)
+                    ))
+                    parts.append('<span style="color:{};">{}</span>'.format(
+                        name_color, html.escape(name)
+                    ))
+                    seen_mnemonic = True
+                    continue
             if re.match(r'^(0x[0-9a-fA-F]+|\$[0-9a-fA-F]+|\d+)$', token):
                 color = number_color
             elif re.match(r'^[A-Za-z_][\w\d_]*$', token):
@@ -800,15 +1026,18 @@ def _schedule_semantic_update(view):
     if not _is_bespokeasm_view(view):
         return
     view_id = view.id()
-    if view_id in _PENDING_SEMANTIC:
-        return
-    _PENDING_SEMANTIC.add(view_id)
+    # Bump generation counter so any previously scheduled run is cancelled.
+    generation = _PENDING_SEMANTIC.get(view_id, 0) + 1
+    _PENDING_SEMANTIC[view_id] = generation
 
     def _run():
-        _PENDING_SEMANTIC.discard(view_id)
+        # Only execute if no newer edit has superseded this one.
+        if _PENDING_SEMANTIC.get(view_id) != generation:
+            return
+        _PENDING_SEMANTIC.pop(view_id, None)
         _update_semantic_regions(view)
 
-    sublime.set_timeout_async(_run, 120)
+    sublime.set_timeout_async(_run, SEMANTIC_DEBOUNCE_MS)
 
 
 def _update_semantic_regions(view):
@@ -823,25 +1052,42 @@ def _update_semantic_regions(view):
     constants = set(state['constant_map'].keys())
     label_regions = []
     constant_regions = []
+
+    # Compute line start offsets once instead of
+    # calling view.text_point() per match.
+    line_offsets = []
+    offset = 0
+    for text in state['lines']:
+        line_offsets.append(offset)
+        offset += len(text) + 1  # +1 for newline
+
     for line_index, text in enumerate(state['lines']):
+        # Use pure-text code region detection instead of
+        # view.match_selector() per match (avoids API round-trips).
+        code_regions = _get_code_regions(text)
+        if not code_regions:
+            continue
+
         label_definition_starts = set(_iter_label_definitions(text))
         constant_definition_starts = set(_iter_constant_definitions(text))
+        base_offset = line_offsets[line_index]
 
-        for match in WORD_PATTERN.finditer(text):
-            word = match.group(0)
-            start = view.text_point(line_index, match.start())
-            end = view.text_point(line_index, match.end())
-            if _is_in_comment(view, start, end):
-                continue
-            if word in constants:
-                if (word, match.start()) in constant_definition_starts:
+        for region_start, region_end in code_regions:
+            segment = text[region_start:region_end]
+            for match in WORD_PATTERN.finditer(segment):
+                word = match.group(0)
+                col = region_start + match.start()
+                if word in constants:
+                    if (word, col) in constant_definition_starts:
+                        continue
+                    start = base_offset + col
+                    constant_regions.append(sublime.Region(start, start + len(word)))
                     continue
-                constant_regions.append(sublime.Region(start, end))
-                continue
-            if word in labels:
-                if (word, match.start()) in label_definition_starts:
-                    continue
-                label_regions.append(sublime.Region(start, end))
+                if word in labels:
+                    if (word, col) in label_definition_starts:
+                        continue
+                    start = base_offset + col
+                    label_regions.append(sublime.Region(start, start + len(word)))
 
     view.add_regions(
         'bespokeasm_label_usages',
@@ -857,76 +1103,136 @@ def _update_semantic_regions(view):
     )
 
 
-def _is_in_comment(view, start, end):
-    if view.match_selector(start, 'comment') or view.match_selector(start, 'string'):
-        return True
-    if end > start and (view.match_selector(end - 1, 'comment') or view.match_selector(end - 1, 'string')):
-        return True
-    return False
-
-
 class BespokeAsmHoverListener(sublime_plugin.EventListener):
     def on_hover(self, view, point, hover_zone):
         if hover_zone != sublime.HOVER_TEXT or not _is_bespokeasm_view(view):
             return
-        token = _get_token_at_point(view, point)
-        if not token:
-            return
+
         hover_mnemonics = _get_hover_setting(view, 'mnemonics', DEFAULT_HOVER_SETTINGS['mnemonics'])
         hover_labels = _get_hover_setting(view, 'labels', DEFAULT_HOVER_SETTINGS['labels'])
         hover_constants = _get_hover_setting(view, 'constants', DEFAULT_HOVER_SETTINGS['constants'])
         docs = _load_instruction_docs(view)
+        hover_colors = _load_hover_colors(view)
+        max_width = _get_hover_max_width(view, DEFAULT_HOVER_MAX_WIDTH)
+
+        # Check directives first (these have their own token patterns)
+        if docs and hover_mnemonics:
+            all_directives = docs.get('directives', {})
+            directive_name = _get_directive_at_point(view, point)
+            if directive_name:
+                directive_categories = [
+                    ('preprocessor', 'preprocessor', 'punctuation_preprocessor'),
+                    ('data_type', 'data_type', None),
+                    ('compiler', 'directive', None),
+                ]
+                for category_key, color_key, prefix_color_key in directive_categories:
+                    category_docs = all_directives.get(category_key, {})
+                    if directive_name in category_docs:
+                        heading_color = hover_colors.get(color_key, DEFAULT_HOVER_COLORS.get(color_key))
+                        prefix_color = hover_colors.get(
+                            prefix_color_key, DEFAULT_HOVER_COLORS.get(prefix_color_key)
+                        ) if prefix_color_key else None
+                        popup_html = _render_markdown(
+                            category_docs[directive_name], hover_colors,
+                            heading_color=heading_color, heading_prefix_color=prefix_color
+                        )
+                        _show_popup(view, popup_html, point, max_width)
+                        return
+
+        # Check registers
+        if docs and hover_mnemonics:
+            register_docs = docs.get('registers', {})
+            register_name = _get_register_at_point(view, point)
+            if register_name and register_name in register_docs:
+                register_color = hover_colors.get('register', DEFAULT_HOVER_COLORS['register'])
+                popup_html = _render_markdown(
+                    register_docs[register_name], hover_colors, heading_color=register_color
+                )
+                _show_popup(view, popup_html, point, max_width)
+                return
+
+        token = _get_token_at_point(view, point)
+        if not token:
+            return
+
         predefined_docs = docs.get('predefined', {}) if docs else {}
         predefined_constant_docs = predefined_docs.get('constants', {})
         predefined_data_docs = predefined_docs.get('data', {})
         predefined_memory_zone_docs = predefined_docs.get('memory_zones', {})
+
+        # Check instruction/macro mnemonics
         if docs and hover_mnemonics:
             instruction_docs = docs.get('instructions', {})
             macro_docs = docs.get('macros', {})
             doc = instruction_docs.get(token.upper()) or macro_docs.get(token.upper())
             if doc:
-                hover_colors = _load_hover_colors(view)
-                html = _render_markdown(doc, hover_colors)
-                max_width = _get_hover_max_width(view, DEFAULT_HOVER_MAX_WIDTH)
-                _show_popup(view, html, point, max_width)
+                popup_html = _render_markdown(doc, hover_colors)
+                _show_popup(view, popup_html, point, max_width)
+                return
+
+        # Check expression functions (BYTE0, LSB, etc.)
+        if docs and hover_mnemonics:
+            expr_func_docs = docs.get('expression_functions', {})
+            doc = expr_func_docs.get(token.upper())
+            if doc:
+                operator_color = hover_colors.get('operator', DEFAULT_HOVER_COLORS.get('operator'))
+                popup_html = _render_markdown(doc, hover_colors, heading_color=operator_color)
+                _show_popup(view, popup_html, point, max_width)
                 return
 
         state = _get_view_state(view)
+
+        # Check user-defined constants (usage hover with value preview)
         if hover_constants and token in state['constant_map'] and not _is_definition_at_point(
             view, point, token, CONSTANT_DEFINITION_PATTERN
         ):
             location = state['constant_map'][token]
-            hover_colors = _load_hover_colors(view)
             constant_color = hover_colors.get('constant_usage', DEFAULT_HOVER_COLORS['constant_usage'])
-            html = _build_definition_hover(token, location, view.file_name(), token_color=constant_color)
-            max_width = _get_hover_max_width(view, DEFAULT_HOVER_MAX_WIDTH)
-            _show_popup(view, html, point, max_width)
+            number_color = hover_colors.get('number', DEFAULT_HOVER_COLORS['number'])
+            value_text = _extract_constant_value(state, token)
+            popup_html = _build_constant_hover(
+                token, location, view.file_name(),
+                value_text=value_text, token_color=constant_color, number_color=number_color
+            )
+            _show_popup(view, popup_html, point, max_width)
             return
+
+        # Check predefined constants
         if hover_constants and token not in state['constant_map']:
             doc = predefined_constant_docs.get(token)
             if doc:
-                hover_colors = _load_hover_colors(view)
-                html = _render_markdown(doc, hover_colors)
-                max_width = _get_hover_max_width(view, DEFAULT_HOVER_MAX_WIDTH)
-                _show_popup(view, html, point, max_width)
+                popup_html = _render_markdown(doc, hover_colors)
+                _show_popup(view, popup_html, point, max_width)
                 return
+
+        # Check user-defined labels (usage hover)
         if hover_labels and token in state['label_map'] and not _is_definition_at_point(
             view, point, token, LABEL_DEFINITION_PATTERN
         ):
             location = state['label_map'][token]
-            hover_colors = _load_hover_colors(view)
             label_color = hover_colors.get('label_usage', DEFAULT_HOVER_COLORS['label_usage'])
-            html = _build_definition_hover(token, location, view.file_name(), token_color=label_color)
-            max_width = _get_hover_max_width(view, DEFAULT_HOVER_MAX_WIDTH)
-            _show_popup(view, html, point, max_width)
+            popup_html = _build_definition_hover(token, location, view.file_name(), token_color=label_color)
+            _show_popup(view, popup_html, point, max_width)
             return
+
+        # Check label definition self-hover (show reference list)
+        if hover_labels and token in state['label_map'] and _is_definition_at_point(
+            view, point, token, LABEL_DEFINITION_PATTERN
+        ):
+            label_color = hover_colors.get('label_usage', DEFAULT_HOVER_COLORS['label_usage'])
+            references = _find_references(token, state)
+            popup_html = _build_label_definition_self_hover(
+                token, references, view.file_name(), token_color=label_color
+            )
+            _show_popup(view, popup_html, point, max_width)
+            return
+
+        # Check predefined data/memory zones
         if hover_labels and token not in state['label_map']:
             doc = predefined_data_docs.get(token) or predefined_memory_zone_docs.get(token)
             if doc:
-                hover_colors = _load_hover_colors(view)
-                html = _render_markdown(doc, hover_colors)
-                max_width = _get_hover_max_width(view, DEFAULT_HOVER_MAX_WIDTH)
-                _show_popup(view, html, point, max_width)
+                popup_html = _render_markdown(doc, hover_colors)
+                _show_popup(view, popup_html, point, max_width)
 
 
 class BespokeAsmSemanticListener(sublime_plugin.EventListener):

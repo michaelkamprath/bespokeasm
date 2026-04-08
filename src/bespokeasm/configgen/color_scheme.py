@@ -167,6 +167,12 @@ HOVER_COLOR_ELEMENT_MAP: dict[str, SyntaxElement] = {
     'parameter': SyntaxElement.PARAMETER,
     'number': SyntaxElement.DECIMAL_NUMBER,
     'punctuation': SyntaxElement.PUNCTUATION_SEPARATOR,
+    'preprocessor': SyntaxElement.PREPROCESSOR,
+    'directive': SyntaxElement.DIRECTIVE,
+    'data_type': SyntaxElement.DATA_TYPE,
+    'register': SyntaxElement.REGISTER,
+    'punctuation_preprocessor': SyntaxElement.PUNCTUATION_PREPROCESSOR,
+    'operator': SyntaxElement.OPERATOR,
 }
 
 

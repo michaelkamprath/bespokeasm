@@ -118,6 +118,43 @@ class MarkdownGenerator:
             'memory_zones': self._generate_predefined_memory_zone_hover_docs(),
         }
 
+    def generate_register_hover_docs(self) -> dict[str, str]:
+        """
+        Generate hover markdown for documented registers.
+
+        Returns:
+            Dictionary mapping register name to hover markdown.
+            Only registers with documentation are included.
+        """
+        registers = getattr(self.doc_model, 'general_docs', {}).get('registers', [])
+        singular_unit, plural_unit = self._hover_size_units()
+
+        docs: dict[str, str] = {}
+        for register in registers:
+            title = register.get('title')
+            description = register.get('description')
+            if not title and not description:
+                continue
+
+            name = register.get('name')
+            if not name:
+                continue
+
+            rows: list[tuple[str, str]] = []
+            size = register.get('size')
+            if size is not None:
+                rows.append(('Size', f'{size} bits'))
+
+            display_title = title or 'Register'
+            docs[name] = self._generate_predefined_hover_markdown(
+                name,
+                display_title,
+                description,
+                rows
+            )
+
+        return docs
+
     def _generate_predefined_constant_hover_docs(self) -> dict[str, str]:
         constants = getattr(self.doc_model, 'predefined_constants', None) or []
         address_size = (

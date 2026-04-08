@@ -17,6 +17,7 @@ from bespokeasm.configgen.color_scheme import build_hover_color_map
 from bespokeasm.configgen.color_scheme import DEFAULT_COLOR_SCHEME
 from bespokeasm.configgen.color_scheme import SyntaxElement
 from bespokeasm.docsgen import build_documentation_model
+from bespokeasm.docsgen import directive_docs
 from bespokeasm.docsgen.markdown_generator import MarkdownGenerator
 from ruamel.yaml import YAML
 
@@ -347,6 +348,13 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             'instructions': instruction_docs,
             'macros': macro_docs,
             'predefined': markdown_generator.generate_predefined_hover_docs(),
+            'directives': {
+                'compiler': directive_docs.COMPILER_DIRECTIVE_DOCS,
+                'data_type': directive_docs.BYTECODE_DIRECTIVE_DOCS,
+                'preprocessor': directive_docs.PREPROCESSOR_DIRECTIVE_DOCS,
+            },
+            'registers': markdown_generator.generate_register_hover_docs(),
+            'expression_functions': directive_docs.EXPRESSION_FUNCTION_DOCS,
         }
         docs_fp = os.path.join(destination_dir, 'instruction-docs.json')
         with open(docs_fp, 'w', encoding='utf-8') as docs_file:
@@ -377,6 +385,13 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         self._replace_token_in_file(hover_plugin_fp, '##PACKAGE_NAME##', self.language_name)
         self._replace_token_in_file(hover_plugin_fp, '##LABEL_PATTERN##', self._label_pattern())
         self._replace_token_in_file(hover_plugin_fp, '##MNEMONIC_PATTERN##', self._mnemonic_pattern())
+        if self.model.registers:
+            register_regex = self._replace_token_with_regex_list(
+                '##REGISTERS##', '##REGISTERS##', self.model.registers
+            )
+            self._replace_token_in_file(hover_plugin_fp, '##REGISTERS##', register_regex)
+        else:
+            self._replace_token_in_file(hover_plugin_fp, '##REGISTERS##', '(?!)')
         hover_color_tokens = {
             '##HOVER_COLOR_INSTRUCTION##': hover_colors['instruction'],
             '##HOVER_COLOR_COMPILER_LABEL##': hover_colors['compiler_label'],
@@ -388,6 +403,12 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             '##HOVER_COLOR_INLINE_CODE##': hover_colors['inline_code'],
             '##HOVER_COLOR_TABLE_HEADER##': hover_colors['table_header'],
             '##HOVER_COLOR_TABLE_BOUNDARY##': hover_colors['table_boundary'],
+            '##HOVER_COLOR_PREPROCESSOR##': hover_colors['preprocessor'],
+            '##HOVER_COLOR_DIRECTIVE##': hover_colors['directive'],
+            '##HOVER_COLOR_DATA_TYPE##': hover_colors['data_type'],
+            '##HOVER_COLOR_REGISTER##': hover_colors['register'],
+            '##HOVER_COLOR_PUNCTUATION_PREPROCESSOR##': hover_colors['punctuation_preprocessor'],
+            '##HOVER_COLOR_OPERATOR##': hover_colors['operator'],
         }
         for token, color in hover_color_tokens.items():
             self._replace_token_in_file(hover_plugin_fp, token, color)

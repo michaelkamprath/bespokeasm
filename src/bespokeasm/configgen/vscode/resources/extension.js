@@ -246,6 +246,197 @@ function buildMarkdownHover(doc) {
   return markdown;
 }
 
+const COMPILER_DIRECTIVE_RE = /\.(\w+)\b/gi;
+const PREPROCESSOR_DIRECTIVE_RE = /#(\S+)\b/gi;
+const REGISTER_RE = /(?:##REGISTERS##)/gi;
+const CONSTANT_VALUE_RE = /^\s*##LABEL_PATTERN##\s*(?:=|\bEQU\b)\s*(.+?)(?:\s*;.*)?$/;
+
+function getDirectiveAtPosition(lineText, character) {
+  if (!isOffsetInCodeRegion(lineText, character)) {
+    return null;
+  }
+  COMPILER_DIRECTIVE_RE.lastIndex = 0;
+  let match;
+  while ((match = COMPILER_DIRECTIVE_RE.exec(lineText)) !== null) {
+    const dirStart = match.index;  // include the dot
+    const dirEnd = match.index + match[0].length;
+    if (character >= dirStart && character < dirEnd) {
+      return match[1].toLowerCase();
+    }
+  }
+  PREPROCESSOR_DIRECTIVE_RE.lastIndex = 0;
+  while ((match = PREPROCESSOR_DIRECTIVE_RE.exec(lineText)) !== null) {
+    const dirStart = match.index;  // include the hash
+    const dirEnd = match.index + match[0].length;
+    if (character >= dirStart && character < dirEnd) {
+      return match[1].toLowerCase();
+    }
+  }
+  return null;
+}
+
+function getRegisterAtPosition(lineText, character) {
+  let match;
+  REGISTER_RE.lastIndex = 0;
+  while ((match = REGISTER_RE.exec(lineText)) !== null) {
+    if (character >= match.index && character < match.index + match[0].length) {
+      return match[0].toLowerCase();
+    }
+  }
+  return null;
+}
+
+function extractConstantValue(document, token, constantMap) {
+  const location = constantsHover.getConstantLocation(constantMap, token);
+  if (!location) {
+    return null;
+  }
+  const targetUri = location.uri || document.uri;
+  try {
+    let lineText;
+    if (targetUri.toString() === document.uri.toString()) {
+      lineText = document.lineAt(location.line).text;
+    } else {
+      const content = fs.readFileSync(targetUri.fsPath, 'utf8');
+      const lines = content.split(/\r?\n/);
+      if (location.line < lines.length) {
+        lineText = lines[location.line];
+      }
+    }
+    if (lineText) {
+      const match = CONSTANT_VALUE_RE.exec(lineText);
+      if (match) {
+        return match[1].trim();
+      }
+    }
+  } catch (_) {
+    // ignore read errors
+  }
+  return null;
+}
+
+function findReferences(document, token) {
+  const refs = [];
+  const wordPattern = /(?:##MNEMONIC_PATTERN##|##LABEL_PATTERN##)/gi;
+
+  function scanLines(lines, uri) {
+    for (let lineIdx = 0; lineIdx < lines.length; lineIdx += 1) {
+      const text = lines[lineIdx];
+      const searchRanges = getSemanticSearchRanges(text);
+      let labelDefs = null;
+      let constDef = null;
+      let constDefChecked = false;
+      for (const range of searchRanges) {
+        const segment = text.slice(range.start, range.end);
+        wordPattern.lastIndex = 0;
+        let match;
+        while ((match = wordPattern.exec(segment)) !== null) {
+          if (match[0] !== token) {
+            continue;
+          }
+          const offset = range.start + match.index;
+          if (labelDefs === null) {
+            labelDefs = labelHover.findLabelDefinitions(text);
+          }
+          if (!constDefChecked) {
+            constDef = constantsHover.findConstantDefinition(text);
+            constDefChecked = true;
+          }
+          let isDef = false;
+          for (const def of labelDefs) {
+            if (def.name === token && def.character === offset) {
+              isDef = true;
+              break;
+            }
+          }
+          if (!isDef && constDef === token) {
+            const constStart = text.indexOf(constDef);
+            if (constStart === offset) {
+              isDef = true;
+            }
+          }
+          if (!isDef) {
+            refs.push({ line: lineIdx, character: offset, uri });
+          }
+        }
+      }
+    }
+  }
+
+  const lines = [];
+  for (let i = 0; i < document.lineCount; i += 1) {
+    lines.push(document.lineAt(i).text);
+  }
+  scanLines(lines, document.uri);
+
+  const baseDir = document.uri.fsPath ? path.dirname(document.uri.fsPath) : null;
+  if (baseDir) {
+    const includes = includeFiles.collectIncludedFiles(lines, baseDir);
+    for (const entry of includes) {
+      scanLines(entry.lines, vscode.Uri.file(entry.path));
+    }
+  }
+  return refs;
+}
+
+function buildConstantHoverWithValue(constant, location, uri, valueText) {
+  const targetUri = location.uri || uri;
+  const commandArgs = {
+    uri: targetUri.toString(),
+    line: location.line,
+    character: location.character
+  };
+  const commandUri = vscode.Uri.parse(
+    `command:${OPEN_CONSTANT_COMMAND}?${encodeURIComponent(JSON.stringify(commandArgs))}`
+  );
+  const filename = targetUri?.fsPath ? path.basename(targetUri.fsPath) : 'file';
+  const locationText = targetUri === uri
+    ? `Defined at line ${location.line + 1}.`
+    : `Defined at line ${location.line + 1} in ${filename}.`;
+  let text = `\`${constant}\``;
+  if (valueText) {
+    text += ` = \`${valueText}\``;
+  }
+  text += `\n\n${locationText} [Go to definition](${commandUri})`;
+  const markdown = new vscode.MarkdownString(text);
+  markdown.isTrusted = { enabledCommands: [OPEN_CONSTANT_COMMAND] };
+  return markdown;
+}
+
+function buildLabelDefinitionSelfHover(label, references, documentUri) {
+  if (!references || references.length === 0) {
+    const markdown = new vscode.MarkdownString(`\`${label}\`: No references found.`);
+    markdown.isTrusted = false;
+    return markdown;
+  }
+  const count = references.length;
+  const header = count === 1
+    ? `\`${label}\`: 1 reference`
+    : `\`${label}\`: ${count} references`;
+  const lines = [header, ''];
+  for (const ref of references) {
+    const lineNum = ref.line + 1;
+    const targetUri = ref.uri || documentUri;
+    const commandArgs = {
+      uri: targetUri.toString(),
+      line: ref.line,
+      character: ref.character || 0
+    };
+    const commandUri = vscode.Uri.parse(
+      `command:${OPEN_LABEL_COMMAND}?${encodeURIComponent(JSON.stringify(commandArgs))}`
+    );
+    const filename = targetUri?.fsPath ? path.basename(targetUri.fsPath) : 'file';
+    const isSameFile = targetUri.toString() === documentUri.toString();
+    const locationLabel = isSameFile
+      ? `line ${lineNum}`
+      : `line ${lineNum} in ${filename}`;
+    lines.push(`- [${locationLabel}](${commandUri})`);
+  }
+  const markdown = new vscode.MarkdownString(lines.join('\n'));
+  markdown.isTrusted = { enabledCommands: [OPEN_LABEL_COMMAND] };
+  return markdown;
+}
+
 function activate(context) {
   const languageId = getLanguageId(context);
   if (!languageId) {
@@ -263,16 +454,47 @@ function activate(context) {
   const predefinedConstantDocs = predefinedDocs.constants || {};
   const predefinedDataDocs = predefinedDocs.data || {};
   const predefinedMemoryZoneDocs = predefinedDocs.memory_zones || {};
+  const directiveDocsAll = hoverDocs.directives || {};
+  const directiveCategories = [
+    directiveDocsAll.preprocessor || {},
+    directiveDocsAll.data_type || {},
+    directiveDocsAll.compiler || {}
+  ];
+  const registerDocs = hoverDocs.registers || {};
+  const exprFuncDocs = hoverDocs.expression_functions || {};
   const wordPattern = /(?:##MNEMONIC_PATTERN##|##LABEL_PATTERN##)/i;
   const provider = {
     provideHover(document, position) {
       const hoverSettings = getHoverSettings(document, languageId);
+      const lineText = document.lineAt(position.line).text;
+
+      // Check directives first
+      if (hoverSettings.mnemonics) {
+        const directiveName = getDirectiveAtPosition(lineText, position.character);
+        if (directiveName) {
+          for (const category of directiveCategories) {
+            if (directiveName in category) {
+              return new vscode.Hover(buildMarkdownHover(category[directiveName]));
+            }
+          }
+        }
+      }
+
+      // Check registers
+      if (hoverSettings.mnemonics) {
+        if (isOffsetInCodeRegion(lineText, position.character)) {
+          const registerName = getRegisterAtPosition(lineText, position.character);
+          if (registerName && registerDocs[registerName]) {
+            return new vscode.Hover(buildMarkdownHover(registerDocs[registerName]));
+          }
+        }
+      }
+
       const range = document.getWordRangeAtPosition(position, wordPattern);
       if (!range) {
         return null;
       }
 
-      const lineText = document.lineAt(position.line).text;
       if (!isOffsetInCodeRegion(lineText, range.start.character)) {
         return null;
       }
@@ -288,6 +510,10 @@ function activate(context) {
         if (doc) {
           return new vscode.Hover(buildMarkdownHover(doc), range);
         }
+        const exprDoc = exprFuncDocs[key];
+        if (exprDoc) {
+          return new vscode.Hover(buildMarkdownHover(exprDoc), range);
+        }
       }
 
       if (hoverSettings.constants) {
@@ -301,7 +527,10 @@ function activate(context) {
             range.start.character,
             document.uri
           )) {
-            const markdown = buildConstantHover(token, constantLocation, document.uri);
+            const valueText = extractConstantValue(document, token, constantMap);
+            const markdown = buildConstantHoverWithValue(
+              token, constantLocation, document.uri, valueText
+            );
             return new vscode.Hover(markdown, range);
           }
         } else {
@@ -323,7 +552,9 @@ function activate(context) {
             range.start.character,
             document.uri
           )) {
-            return null;
+            const references = findReferences(document, token);
+            const markdown = buildLabelDefinitionSelfHover(token, references, document.uri);
+            return new vscode.Hover(markdown, range);
           }
           const markdown = buildDefinitionHover(token, labelLocation, document.uri);
           return new vscode.Hover(markdown, range);
