@@ -27,6 +27,7 @@ class ListingPrettyPrinter(PrettyPrinterBase):
             self.max_byte_count,
         )
         self._word_size = model.word_size
+        self._word_segment_size = model.word_segment_size
 
     def pretty_print(self) -> str:
         if len(self.line_objects) < 1:
@@ -44,7 +45,7 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         )
 
         cur_filename = None
-        hex_width = Word(0, self._word_size).ideal_hex_width
+        hex_width = Word(0, self._word_size, self._word_segment_size).ideal_hex_width
         for lo in lobjs:
             # detect a new file and print the file header
             if lo.line_id.filename != cur_filename:
@@ -132,6 +133,7 @@ class ListingPrettyPrinter(PrettyPrinterBase):
                             lobj.get_words(),
                             self._bytes_per_line,
                             self._word_size,
+                            self._word_segment_size,
                         )
 
         # write the line number
@@ -181,6 +183,7 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         line_words: list[Word],
         words_per_str: int,
         word_size: int,
+        word_segment_size: int,
     ) -> list[str]:
         # convert the line_bytes to a list of strings, each string being a hex representation of a byte.
         # Each line should contain at most 6 bytes. There should be as many strings in the return list
@@ -201,7 +204,7 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         #
         results: list[str] = []
         cur_str = None
-        hex_width = Word(0, word_size).ideal_hex_width
+        hex_width = Word(0, word_size, word_segment_size).ideal_hex_width
         for w in line_words:
             if cur_str is None:
                 cur_str = ''

@@ -94,6 +94,58 @@ class TestListingPrettyPrinter(unittest.TestCase):
         ]
         self.assertTrue(any('06 07' in line for line in cont_line))
 
+    def test_pretty_print_machine_code_4bit_words(self):
+        config = {
+            'description': '4-bit listing test',
+            'general': {
+                'address_size': 8,
+                'endian': 'big',
+                'registers': [],
+                'min_version': '0.7.0',
+                'string_byte_packing': False,
+                'string_byte_packing_fill': 0,
+                'word_size': 4,
+            },
+            'instructions': {'nop': {'bytecode': {'size': 4, 'value': 0}}},
+            'operand_sets': {},
+            'registers': [],
+        }
+        with tempfile.NamedTemporaryFile('w+', suffix='.json', delete=False) as tf:
+            json.dump(config, tf)
+            tf.flush()
+            try:
+                model = AssemblerModel(tf.name, 0, self.diagnostic_reporter)
+                self.assertEqual(model.word_segment_size, 4)
+                memzone = MemoryZone(model.address_size, 0, 2 ** model.address_size - 1, 'GLOBAL')
+                words = [
+                    Word(value, model.word_size, model.word_segment_size, model.intra_word_endianness)
+                    for value in [0x8, 0x0, 0x1, 0xE, 0xC, 0x9, 0x1]
+                ]
+                line = DummyLineWithWords(
+                    LineIdentifier(1, 'main.asm'),
+                    'nibbles',
+                    '4-bit words',
+                    memzone,
+                    model.word_size,
+                    model.word_segment_size,
+                    model.intra_word_endianness,
+                    model.multi_word_endianness,
+                    words,
+                )
+                line.set_start_address(0x0)
+                output = ListingPrettyPrinter([line], model, 'main.asm').pretty_print()
+            finally:
+                os.unlink(tf.name)
+
+        lines = [line for line in output.splitlines() if line.strip()]
+        data_line = [line for line in lines if 'nibbles' in line][0]
+        self.assertIn('| 8 0 1 e c 9 |', data_line)
+        continuation_lines = [
+            line for line in lines
+            if line.strip().startswith('|') and 'nibbles' not in line and '4-bit words' not in line
+        ]
+        self.assertTrue(any('| 1           |' in line for line in continuation_lines))
+
     def test_pretty_print_header_variations(self):
         def make_config(address_size, word_size):
             config = {
@@ -146,16 +198,16 @@ class TestListingPrettyPrinter(unittest.TestCase):
 
     def test_generate_bytecode_line_string(self):
         words = [Word(i, 8) for i in range(7)]
-        result = ListingPrettyPrinter._generate_bytecode_line_string(words, 6, 8)
+        result = ListingPrettyPrinter._generate_bytecode_line_string(words, 6, 8, 8)
         self.assertEqual(len(result), 2)
         self.assertTrue(result[0].startswith('00 01 02 03 04 05'))
         self.assertTrue(result[1].strip().startswith('06'))
         words = [Word(i, 8) for i in range(12)]
-        result = ListingPrettyPrinter._generate_bytecode_line_string(words, 6, 8)
+        result = ListingPrettyPrinter._generate_bytecode_line_string(words, 6, 8, 8)
         self.assertEqual(len(result), 2)
         self.assertTrue(result[0].startswith('00 01 02 03 04 05'))
         self.assertTrue(result[1].startswith('06 07 08 09 0a 0b'))
-        result = ListingPrettyPrinter._generate_bytecode_line_string([], 6, 8)
+        result = ListingPrettyPrinter._generate_bytecode_line_string([], 6, 8, 8)
         self.assertEqual(result, [])
 
 

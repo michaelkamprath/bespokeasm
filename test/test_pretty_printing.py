@@ -1,9 +1,16 @@
+import contextlib
 import importlib.resources as pkg_resources
+import io
+import json
+import os
+import tempfile
 import unittest
 
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
+from bespokeasm.assembler.engine import Assembler
 from bespokeasm.assembler.label_scope import GlobalLabelScope
+from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
@@ -50,7 +57,8 @@ class TestPrettyPrinting(unittest.TestCase):
             ListingPrettyPrinter._generate_bytecode_line_string(
                 word_list,
                 6,
-                8
+                8,
+                8,
             ),
             ['00 01 02 03 04 05 ', '06 07 08 09 0a 0b ', '0c 0d 0e 0f       '],
         )
@@ -60,6 +68,7 @@ class TestPrettyPrinting(unittest.TestCase):
                 word_list,
                 3,
                 8,
+                8,
             ),
             ['00 01 02 ', '03 04 05 ', '06 07 08 ', '09 0a 0b ', '0c 0d 0e ', '0f       '],
         )
@@ -68,6 +77,7 @@ class TestPrettyPrinting(unittest.TestCase):
             ListingPrettyPrinter._generate_bytecode_line_string(
                 word_list,
                 16,
+                8,
                 8,
             ),
             ['00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f '],
@@ -83,7 +93,8 @@ class TestPrettyPrinting(unittest.TestCase):
             ListingPrettyPrinter._generate_bytecode_line_string(
                 word_list,
                 4,
-                16
+                16,
+                8,
             ),
             ['0000 0001 00a2 0b03 ', '1234 abcd ffff 8000 '],
         )
@@ -92,7 +103,8 @@ class TestPrettyPrinting(unittest.TestCase):
             ListingPrettyPrinter._generate_bytecode_line_string(
                 word_list,
                 2,
-                16
+                16,
+                8,
             ),
             ['0000 0001 ', '00a2 0b03 ', '1234 abcd ', 'ffff 8000 '],
         )
@@ -101,7 +113,8 @@ class TestPrettyPrinting(unittest.TestCase):
             ListingPrettyPrinter._generate_bytecode_line_string(
                 word_list,
                 1,
-                16
+                16,
+                8,
             ),
             ['0000 ', '0001 ', '00a2 ', '0b03 ', '1234 ', 'abcd ', 'ffff ', '8000 '],
         )
@@ -110,7 +123,8 @@ class TestPrettyPrinting(unittest.TestCase):
             ListingPrettyPrinter._generate_bytecode_line_string(
                 word_list,
                 8,
-                16
+                16,
+                8,
             ),
             ['0000 0001 00a2 0b03 1234 abcd ffff 8000 '],
         )
@@ -119,7 +133,8 @@ class TestPrettyPrinting(unittest.TestCase):
             ListingPrettyPrinter._generate_bytecode_line_string(
                 word_list,
                 3,
-                16
+                16,
+                8,
             ),
             ['0000 0001 00a2 ', '0b03 1234 abcd ', 'ffff 8000      '],
         )
@@ -166,3 +181,68 @@ class TestPrettyPrinting(unittest.TestCase):
         # Check that each original mnemonic appears in the output
         for mnemonic in lines:
             self.assertIn(mnemonic, output, f'Listing should show original mnemonic: {mnemonic}')
+
+    def test_listing_handles_4bit_words_in_assembler_flow(self):
+        LabelScope._global_scope = None
+        try:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                config_file = os.path.join(temp_dir, 'test_4bit_isa.json')
+                source_file = os.path.join(temp_dir, 'test_4bit.asm')
+                output_file = os.path.join(temp_dir, 'test_4bit.bin')
+
+                with open(config_file, 'w') as handle:
+                    json.dump(
+                        {
+                            'description': '4-bit listing regression test',
+                            'general': {
+                                'address_size': 8,
+                                'endian': 'big',
+                                'word_size': 4,
+                                'registers': [],
+                                'min_version': '0.7.0',
+                                'string_byte_packing': False,
+                                'string_byte_packing_fill': 0,
+                            },
+                            'instructions': {
+                                'nop': {'bytecode': {'size': 4, 'value': 0x0}},
+                                'hlt': {'bytecode': {'size': 4, 'value': 0xF}},
+                            },
+                            'operand_sets': {},
+                            'registers': [],
+                        },
+                        handle,
+                    )
+
+                with open(source_file, 'w') as handle:
+                    handle.write('.org 0x00\nnop\nhlt\n')
+
+                assembler = Assembler(
+                    source_file=source_file,
+                    config_file=config_file,
+                    generate_binary=True,
+                    output_file=output_file,
+                    binary_start=0,
+                    binary_end=None,
+                    binary_fill_value=0,
+                    enable_pretty_print=True,
+                    pretty_print_format='listing',
+                    pretty_print_output='stdout',
+                    is_verbose=0,
+                    include_paths=[],
+                    predefined=[],
+                )
+
+                stdout = io.StringIO()
+                with contextlib.redirect_stdout(stdout):
+                    assembler.assemble_bytecode()
+
+                with open(output_file, 'rb') as handle:
+                    self.assertEqual(handle.read(), bytes.fromhex('0F'))
+        finally:
+            LabelScope._global_scope = None
+
+        output = stdout.getvalue()
+        self.assertIn(f'File: {source_file}', output)
+        self.assertIn('line | a  | w |', output)
+        self.assertIn('| 0 |     nop', output)
+        self.assertIn('| f |     hlt', output)

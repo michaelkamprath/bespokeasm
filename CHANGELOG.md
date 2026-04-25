@@ -27,6 +27,7 @@ Changes that are planned but not implemented yet:
 * Added constant value preview and label reference list hovers in VS Code and Sublime Text extensions.
 * Improved hover coloring in Sublime Text to match syntax highlighting for directives, registers, and expression functions.
 * Improved Sublime Text semantic highlighting performance for large files.
+* Fixed a bug in the listing pretty-printer where ISA configurations with `word_size < 8` could crash while formatting output because word-segment sizing was not preserved when calculating hex widths.
 
 ## [0.7.2]
 * Added `.16byte` data directive to emit 16-byte values with configured multi-word endianness.
