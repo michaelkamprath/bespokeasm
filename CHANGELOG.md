@@ -19,6 +19,8 @@ Changes that are planned but not implemented yet:
 
 
 ## [Unreleased]
+
+## [0.7.3]
 * Added configurable mnemonic decorators (`+`, `-`, `++`, `--`, `!`, `@`) so instruction variants can use prefixed or suffixed decorated mnemonics such as `m+`, `m-`, and `++inc`.
 * Added `general.default_numeric_base` so ISA configurations can opt into decimal, hex, octal, or binary interpretation for bare numeric literals without changing prefixed forms.
 * Improved CLI startup performance by deferring heavy imports (`click`, `dataclasses`, `pathlib`) until needed and eliminating redundant CLI construction on the completion path.
@@ -228,7 +230,8 @@ First tracked released
 * Enabled the `reverse_argument_order` instruction option be applied to a specific operand configuration. This slightly changed the configuration file format.
 * Added ability for instructions with operands to have a single "empty operand" variant, e.g., `pop`
 
-[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.7.2...HEAD
+[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.7.3...HEAD
+[0.7.3]: https://github.com/michaelkamprath/bespokeasm/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/michaelkamprath/bespokeasm/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/michaelkamprath/bespokeasm/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.6.0...v0.7.0
