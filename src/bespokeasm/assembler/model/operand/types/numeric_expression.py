@@ -80,6 +80,7 @@ class NumericExpressionOperand(OperandWithArgument):
                 line_id,
                 self._word_size,
                 self._word_segment_size,
+                self.default_numeric_base,
             )
         else:
             arg_part = ExpressionByteCodePart(
@@ -91,6 +92,7 @@ class NumericExpressionOperand(OperandWithArgument):
                 line_id,
                 self._word_size,
                 self._word_segment_size,
+                self.default_numeric_base,
             )
         if arg_part.contains_register_labels(register_labels):
             return None

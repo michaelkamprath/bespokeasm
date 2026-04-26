@@ -52,6 +52,7 @@ class IndexedRegisterOperand(RegisterOperand):
                 word_size,
                 word_segment_size,
                 diagnostic_reporter,
+                default_numeric_base=self.default_numeric_base,
             )
             if op.null_operand:
                 sys.exit(f'ERROR: indirect indexed register operand "{operand_id}" configured with a empty index "{op_id}".')
@@ -80,6 +81,12 @@ class IndexedRegisterOperand(RegisterOperand):
     @property
     def type(self) -> OperandType:
         return OperandType.INDEXED_REGISTER
+
+    @Operand.default_numeric_base.setter
+    def default_numeric_base(self, value: str):
+        self._default_numeric_base = value
+        for operand in self._index_operand_list:
+            operand.default_numeric_base = value
 
     @cached_property
     def match_pattern(self) -> str:

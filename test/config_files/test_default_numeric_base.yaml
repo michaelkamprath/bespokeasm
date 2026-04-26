@@ -1,0 +1,22 @@
+general:
+  min_version: 0.7.0
+  address_size: 16
+  default_numeric_base: hex
+operand_sets:
+  integer:
+    operand_values:
+      imm8:
+        type: numeric
+        argument:
+          size: 8
+          word_align: false
+instructions:
+  ldi:
+    bytecode:
+      value: 0x40
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - integer

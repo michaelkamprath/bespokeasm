@@ -135,6 +135,7 @@ class IndirectRegisterOperand(RegisterOperand):
                         line_id,
                         self._word_size,
                         self._word_segment_size,
+                        self.default_numeric_base,
                     )
                     # now test that is is a numeric expression. If not, return nothing
                     if arg_part.contains_register_labels(register_labels):

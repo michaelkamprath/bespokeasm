@@ -1,0 +1,15 @@
+; Echo the most recently pressed key onto the 7-segment display, forever.
+;
+; KA loads A with the keypad value and sets FLAG = 1 when no key is pressed.
+; We poll until a key is detected, display it, then loop back.
+
+#require __LANGUAGE_NAME__ == gmc4
+
+.org 0x00
+
+poll:
+    ka              ; A = key; FLAG = 1 if no key pressed
+    jump poll       ; FLAG=1 -> nothing pressed, keep polling
+    ao              ; key was pressed (FLAG=0); show it on the 7-seg
+    jump poll       ; FLAG=0 here, so this JUMP falls through (and sets FLAG=1)
+    jump poll       ; FLAG=1 now -> unconditionally restart the loop

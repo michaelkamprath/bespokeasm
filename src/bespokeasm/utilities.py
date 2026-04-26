@@ -5,53 +5,126 @@ from ruamel.yaml.comments import CommentedMap
 from ruamel.yaml.comments import CommentedSeq
 
 
+DEFAULT_NUMERIC_BASE_ALIASES = {
+    'decimal': 'decimal',
+    'hex': 'hex',
+    'hexadecimal': 'hex',
+    'base16': 'hex',
+    'octal': 'octal',
+    'base8': 'octal',
+    'binary': 'binary',
+    'base2': 'binary',
+}
+DEFAULT_NUMERIC_BASE_PATTERNS = {
+    'decimal': r'\d+',
+    'hex': r'[0-9a-fA-F]+',
+    'octal': r'[0-7]+',
+    'binary': r'[01]+',
+}
+DEFAULT_NUMERIC_BASE_RADIX = {
+    'decimal': 10,
+    'hex': 16,
+    'octal': 8,
+    'binary': 2,
+}
 PATTERN_HEX = r'(?:\$|0x)[0-9a-fA-F]+|[0-9a-fA-F]+H\b'
 PATTERN_CHARACTER_ORDINAL = r"'(?:[^'\\]|\\.)'"
 PATTERN_NUMERIC = fr'(?:{PATTERN_HEX}|(?:b|%)[01]+|\d+|{PATTERN_CHARACTER_ORDINAL})'
 PATTERN_NUMERIC_COMPILED = re.compile(f'^({PATTERN_NUMERIC})$', flags=re.IGNORECASE | re.MULTILINE)
+PATTERN_EXPLICIT_NUMERIC = fr'(?:{PATTERN_HEX}|(?:b|%)[01]+|{PATTERN_CHARACTER_ORDINAL})'
+PATTERN_EXPLICIT_NUMERIC_COMPILED = re.compile(
+    f'^({PATTERN_EXPLICIT_NUMERIC})$',
+    flags=re.IGNORECASE | re.MULTILINE,
+)
 PATTERN_CHARACTER_ORDINAL_COMPILED = re.compile(
     f'^{PATTERN_CHARACTER_ORDINAL}$',
     flags=re.IGNORECASE | re.MULTILINE,
 )
 
 
-def parse_numeric_string(numeric_str: str) -> int:
+def normalize_default_numeric_base(default_numeric_base: str | None) -> str:
+    if default_numeric_base is None:
+        return 'decimal'
+    normalized_base = str(default_numeric_base).strip().lower()
+    if normalized_base not in DEFAULT_NUMERIC_BASE_ALIASES:
+        raise ValueError(f'Unknown default numeric base: {default_numeric_base}')
+    return DEFAULT_NUMERIC_BASE_ALIASES[normalized_base]
+
+
+def is_explicit_numeric_string(value_str: str) -> bool:
+    if value_str.isspace():
+        return False
+    match = re.match(PATTERN_EXPLICIT_NUMERIC_COMPILED, value_str.strip())
+    return match is not None and len(match.groups()) > 0
+
+
+def is_unprefixed_numeric_string(value_str: str, default_numeric_base: str = 'decimal') -> bool:
+    if value_str.isspace():
+        return False
+    normalized_base = normalize_default_numeric_base(default_numeric_base)
+    pattern = DEFAULT_NUMERIC_BASE_PATTERNS[normalized_base]
+    return re.fullmatch(pattern, value_str.strip(), flags=re.IGNORECASE) is not None
+
+
+def parse_numeric_string(numeric_str: str, default_numeric_base: str = 'decimal') -> int:
     """returns an integer value for the passed numeric string. Supports decimal,
     hexadecimal, and binary numbers. Throws `ValueError` for strings that are not
     parsable.
     """
-    if numeric_str.startswith('$'):
-        return int(numeric_str[1:], 16)
-    elif numeric_str.startswith('0x'):
-        return int(numeric_str[2:], 16)
-    elif numeric_str.endswith('H'):
-        return int(numeric_str[:-1], 16)
-    elif numeric_str.startswith('0b'):
-        return int(numeric_str[2:], 2)
-    elif numeric_str.startswith('b') or numeric_str.startswith('%'):
-        return int(numeric_str[1:], 2)
-    elif numeric_str.startswith('\'') or numeric_str.startswith('"'):
-        match = re.match(PATTERN_CHARACTER_ORDINAL_COMPILED, numeric_str)
+    stripped_numeric = numeric_str.strip()
+    if stripped_numeric == '':
+        raise ValueError('Invalid numeric literal: empty string')
+
+    sign = 1
+    unsigned_numeric = stripped_numeric
+    if stripped_numeric[0] in ('+', '-'):
+        sign = -1 if stripped_numeric[0] == '-' else 1
+        unsigned_numeric = stripped_numeric[1:]
+        if unsigned_numeric == '':
+            raise ValueError(f'Invalid numeric literal: {numeric_str}')
+
+    normalized_base = normalize_default_numeric_base(default_numeric_base)
+    lowered_numeric = unsigned_numeric.lower()
+    uppered_numeric = unsigned_numeric.upper()
+    if unsigned_numeric.startswith('$'):
+        return sign * int(unsigned_numeric[1:], 16)
+    elif lowered_numeric.startswith('0x'):
+        return sign * int(unsigned_numeric[2:], 16)
+    elif uppered_numeric.endswith('H'):
+        return sign * int(unsigned_numeric[:-1], 16)
+    elif lowered_numeric.startswith('0b') and len(unsigned_numeric) > 2:
+        return sign * int(unsigned_numeric[2:], 2)
+    elif (lowered_numeric.startswith('b') or unsigned_numeric.startswith('%')) and len(unsigned_numeric) > 1:
+        return sign * int(unsigned_numeric[1:], 2)
+    elif unsigned_numeric.startswith('\'') or unsigned_numeric.startswith('"'):
+        match = re.match(PATTERN_CHARACTER_ORDINAL_COMPILED, unsigned_numeric)
         if match is None:
             raise ValueError(f'Invalid character literal: {numeric_str}')
         try:
-            decoded_literal = bytes(numeric_str[1:-1], 'utf-8').decode('unicode_escape')
+            decoded_literal = bytes(unsigned_numeric[1:-1], 'utf-8').decode('unicode_escape')
         except UnicodeDecodeError as decode_error:
             raise ValueError(f'Invalid character literal: {numeric_str}') from decode_error
         if len(decoded_literal) != 1:
             raise ValueError(f'Invalid character literal: {numeric_str}')
-        return ord(decoded_literal)
+        return sign * ord(decoded_literal)
     else:
-        return int(numeric_str)
+        if not is_unprefixed_numeric_string(unsigned_numeric, normalized_base):
+            raise ValueError(
+                f'Invalid {normalized_base} numeric literal: {numeric_str}'
+            )
+        return sign * int(unsigned_numeric, DEFAULT_NUMERIC_BASE_RADIX[normalized_base])
 
 
-def is_string_numeric(value_str: str) -> bool:
+def is_string_numeric(value_str: str, default_numeric_base: str = 'decimal') -> bool:
     """Tests whether the passed string is numeric"""
     if value_str.isspace():
         # strings of only whitespace don't play well with the regex
         return False
-    match = re.match(PATTERN_NUMERIC_COMPILED, value_str.strip())
-    return match is not None and len(match.groups()) > 0
+    stripped_value = value_str.strip()
+    return is_explicit_numeric_string(stripped_value) or is_unprefixed_numeric_string(
+        stripped_value,
+        default_numeric_base,
+    )
 
 
 PATTERN_ALLOWED_LABELS = re.compile(

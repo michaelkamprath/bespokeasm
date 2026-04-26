@@ -70,6 +70,7 @@ class LineOjectFactory:
                     label_scope,
                     active_named_scopes,
                     current_memzone,
+                    default_numeric_base=model.default_numeric_base,
                 )
                 if line_obj is not None:
                     if label_seen:

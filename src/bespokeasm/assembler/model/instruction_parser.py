@@ -19,15 +19,15 @@ class InstructioParser(InstructioParserBase):
         memzone_manager: MemoryZoneManager,
     ) -> AssembledInstruction:
         instr_parts = instruction.strip().split(' ', 1)
-        mnemonic = instr_parts[0].lower()
+        source_mnemonic = instr_parts[0].lower()
         if len(instr_parts) > 1:
             operands = instr_parts[1]
         else:
             operands = ''
 
-        instr_obj: InstructionBase = isa_model.instructions.get(mnemonic)
+        instr_obj: InstructionBase = isa_model.instructions.get(source_mnemonic)
         if instr_obj is None:
-            sys.exit(f'ERROR: {line_id} - Unrecognized mnemonic "{mnemonic}"')
+            sys.exit(f'ERROR: {line_id} - Unrecognized mnemonic "{source_mnemonic}"')
 
         # Always use the canonical mnemonic for bytecode generation
         canonical_mnemonic = instr_obj.mnemonic
@@ -39,5 +39,6 @@ class InstructioParser(InstructioParserBase):
             operands,
             isa_model,
             memzone_manager,
-            InstructioParser
+            InstructioParser,
+            source_mnemonic=source_mnemonic,
         )

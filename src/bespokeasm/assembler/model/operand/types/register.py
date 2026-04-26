@@ -4,21 +4,13 @@ import sys
 from bespokeasm.assembler.bytecode.parts import NumericByteCodePart
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.model.decorators import get_decorator_regex_pattern
 from bespokeasm.assembler.model.operand import Operand
 from bespokeasm.assembler.model.operand import OperandType
 from bespokeasm.assembler.model.operand import ParsedOperand
 
 
 class RegisterOperand(Operand):
-    _DECORATOR_REGEX_PATTERNS = {
-        'plus': r'\+',
-        'plus_plus': r'\+\+',
-        'minus': r'\-',
-        'minus_minus': r'\-\-',
-        'exclamation': r'\!',
-        'at': r'\@',
-    }
-
     _OPERAND_PATTERN_TEMPLATE = r'{0}{1}'
 
     def __init__(
@@ -67,18 +59,13 @@ class RegisterOperand(Operand):
     @property
     def decorator_pattern(self) -> str:
         if self.has_decorator:
-            if 'type' not in self._config['decorator']:
-                sys.exit(
-                    f'ERROR - ISA configation declares register based operand {self} with a decorator '
-                    f'but the decorator type is not configured.'
-                )
-            decorator_type = self._config['decorator']['type']
-            if decorator_type not in RegisterOperand._DECORATOR_REGEX_PATTERNS:
-                sys.exit(
-                    f'ERROR - ISA configation declares register based operand {self} with unknow decorator '
-                    f'type = {decorator_type}'
-                )
-            return RegisterOperand._DECORATOR_REGEX_PATTERNS[decorator_type]
+            return get_decorator_regex_pattern(
+                self._config['decorator'],
+                context=(
+                    f'ISA configation declares register based operand "{self.id}" '
+                    f'for register "{self.register}"'
+                ),
+            )
         return ''
 
     @property

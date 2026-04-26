@@ -48,6 +48,7 @@ class Operand:
         self._config = arg_config_dict
         self._default_multi_word_endian = default_multi_word_endian
         self._default_intra_word_endian = default_intra_word_endian
+        self._default_numeric_base = 'decimal'
         self._word_size = word_size
         self._word_segment_size = word_segment_size
         self._diagnostic_reporter = diagnostic_reporter
@@ -69,6 +70,14 @@ class Operand:
     @property
     def type(self) -> OperandType:
         return OperandType.UNKNOWN
+
+    @property
+    def default_numeric_base(self) -> str:
+        return self._default_numeric_base
+
+    @default_numeric_base.setter
+    def default_numeric_base(self, value: str):
+        self._default_numeric_base = value
 
     @property
     def null_operand(self) -> bool:

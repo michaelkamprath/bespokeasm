@@ -135,6 +135,7 @@ class SpecificOperandsModel:
             word_size: int,
             word_segment_size: int,
             diagnostic_reporter,
+            default_numeric_base: str = 'decimal',
         ):
             self._config = config
             self._operands = [
@@ -147,6 +148,7 @@ class SpecificOperandsModel:
                     word_size,
                     word_segment_size,
                     diagnostic_reporter,
+                    default_numeric_base=default_numeric_base,
                 )
                 for arg_type_id, arg_type_conf in self._config.get('list', {}).items()
             ]
@@ -195,6 +197,7 @@ class SpecificOperandsModel:
         word_size: int,
         word_segment_size: int,
         diagnostic_reporter,
+        default_numeric_base: str = 'decimal',
     ):
         self._specific_operands = [
             SpecificOperandsModel.SpecificOperandConfig(
@@ -205,6 +208,7 @@ class SpecificOperandsModel:
                 word_size,
                 word_segment_size,
                 diagnostic_reporter,
+                default_numeric_base=default_numeric_base,
             )
             for arg_confing_dict in config.values()
         ]
@@ -304,6 +308,7 @@ class OperandParser:
                 word_size: int,
                 word_segment_size: int,
                 diagnostic_reporter,
+                default_numeric_base: str = 'decimal',
             ):
         if instruction_operands_config is not None:
             self._config = instruction_operands_config
@@ -321,6 +326,7 @@ class OperandParser:
                 word_size,
                 word_segment_size,
                 diagnostic_reporter,
+                default_numeric_base=default_numeric_base,
             )
         else:
             self._specific_operands_model = None

@@ -24,6 +24,7 @@ class FillDataLine(LineWithWords):
             word_segment_size: int,
             intra_word_endianness: Literal['little', 'big'],
             multi_word_endianness: Literal['little', 'big'],
+            default_numeric_base: str = 'decimal',
     ) -> None:
         super().__init__(
             line_id,
@@ -35,8 +36,8 @@ class FillDataLine(LineWithWords):
             intra_word_endianness,
             multi_word_endianness,
         )
-        self._count_expr = parse_expression(line_id, fill_count_expression)
-        self._value_expr = parse_expression(line_id, fill_value_expression)
+        self._count_expr = parse_expression(line_id, fill_count_expression, default_numeric_base)
+        self._value_expr = parse_expression(line_id, fill_value_expression, default_numeric_base)
         self._count = None
         self._value = None
 
@@ -76,6 +77,7 @@ class FillUntilDataLine(LineWithWords):
             word_segment_size: int,
             intra_word_endianness: Literal['little', 'big'],
             multi_word_endianness: Literal['little', 'big'],
+            default_numeric_base: str = 'decimal',
     ) -> None:
         super().__init__(
             line_id,
@@ -87,8 +89,12 @@ class FillUntilDataLine(LineWithWords):
             intra_word_endianness,
             multi_word_endianness,
         )
-        self._fill_until_addr_expr = parse_expression(line_id, fill_until_address_expresion)
-        self._fill_value_expr = parse_expression(line_id, fill_value_expression)
+        self._fill_until_addr_expr = parse_expression(
+            line_id,
+            fill_until_address_expresion,
+            default_numeric_base,
+        )
+        self._fill_value_expr = parse_expression(line_id, fill_value_expression, default_numeric_base)
         self._fill_until_addr = None
         self._fill_value = None
 

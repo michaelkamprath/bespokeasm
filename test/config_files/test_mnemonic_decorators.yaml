@@ -1,0 +1,67 @@
+description: Test Mnemonic Decorator Parsing
+general:
+  min_version: "0.7.0"
+  address_size: 16
+  multi_word_endian: big
+  identifier:
+    name: mnemonic-decorator-test
+    version: "0.1.0"
+operand_sets:
+  imm8:
+    operand_values:
+      value:
+        type: numeric
+        argument:
+          size: 8
+          word_align: true
+instructions:
+  nop:
+    bytecode:
+      value: 0x00
+      size: 8
+    operands:
+      count: 0
+  m:
+    bytecode:
+      value: 0x05
+      size: 8
+    operands:
+      count: 0
+    variants:
+      - bytecode:
+          value: 0x06
+          size: 8
+        mnemonic_decorator:
+          type: plus
+          is_prefix: false
+        operands:
+          count: 0
+      - bytecode:
+          value: 0x16
+          size: 8
+        mnemonic_decorator:
+          type: plus
+          is_prefix: false
+        operands:
+          count: 1
+          operand_sets:
+            list:
+              - imm8
+      - bytecode:
+          value: 0x07
+          size: 8
+        mnemonic_decorator:
+          type: minus
+          is_prefix: false
+        operands:
+          count: 0
+  inc:
+    variants:
+      - bytecode:
+          value: 0x20
+          size: 8
+        mnemonic_decorator:
+          type: plus_plus
+          is_prefix: true
+        operands:
+          count: 0

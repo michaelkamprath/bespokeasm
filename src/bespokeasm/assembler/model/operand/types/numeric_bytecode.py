@@ -84,6 +84,7 @@ class NumericBytecode(Operand):
             line_id,
             self._word_size,
             self._word_segment_size,
+            self.default_numeric_base,
         )
         if bytecode_part.contains_register_labels(register_labels):
             return None

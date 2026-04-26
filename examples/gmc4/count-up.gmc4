@@ -1,0 +1,22 @@
+; Count 0..F on the 7-segment display, looping forever.
+;
+; A is the visible digit. After F it overflows back to 0 and the cycle repeats.
+; TIMR delays for (A + 1) * 0.1s, so the speed varies across the cycle.
+;
+; This program also demonstrates the canonical GMC-4 idiom for an unconditional
+; branch: two JUMPs back to back. The first JUMP is conditional on FLAG; the
+; second is always taken because every JUMP - including a non-taken one -
+; forces FLAG = 1 before the next instruction.
+
+#require __LANGUAGE_NAME__ == gmc4
+
+.org 0x00
+
+start:
+    tia  0          ; A = 0
+loop:
+    ao              ; show A on the 7-segment display
+    cal  TIMR       ; delay (A + 1) * 0.1s
+    aia  1          ; A = A + 1 mod 16; FLAG = 1 on overflow F -> 0
+    jump loop       ; taken on overflow; otherwise falls through (and forces FLAG=1)
+    jump loop       ; FLAG = 1 from the prior JUMP -> unconditionally taken

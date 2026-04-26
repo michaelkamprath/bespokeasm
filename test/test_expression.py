@@ -278,6 +278,94 @@ class TestExpression(unittest.TestCase):
         scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         with self.assertRaisesRegex(SyntaxError, 'only single-character ordinals'):
             parse_expression(1212, "'AB'").get_value(labels, scopes, 1)
+
+    def test_default_numeric_base_modes(self):
+        line_id = LineIdentifier(999, 'test_default_numeric_base_modes')
+        labels = GlobalLabelScope(set())
+        labels.set_label_value('face', 9, line_id)
+        numeric_only_labels = GlobalLabelScope(set())
+        scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
+
+        self.assertEqual(
+            parse_expression(line_id, '123').get_value(labels, scopes, line_id),
+            123,
+            'default decimal mode remains unchanged',
+        )
+        self.assertEqual(
+            parse_expression(line_id, 'f', 'hex').get_value(labels, scopes, line_id),
+            15,
+            'hex mode parses bare hex digits',
+        )
+        self.assertEqual(
+            parse_expression(line_id, '1F', 'hex').get_value(labels, scopes, line_id),
+            31,
+            'hex mode parses multi-digit bare hex values',
+        )
+        self.assertEqual(
+            parse_expression(line_id, 'face', 'hex').get_value(numeric_only_labels, scopes, line_id),
+            0xFACE,
+            'hex mode parses bare hex words when no label overrides them',
+        )
+        self.assertEqual(
+            parse_expression(line_id, '0x1F', 'hex').get_value(labels, scopes, line_id),
+            31,
+            '0x-prefixed hex keeps its meaning in hex mode',
+        )
+        self.assertEqual(
+            parse_expression(line_id, '$1F', 'hex').get_value(labels, scopes, line_id),
+            31,
+            '$-prefixed hex keeps its meaning in hex mode',
+        )
+        self.assertEqual(
+            parse_expression(line_id, '1Fh', 'hex').get_value(labels, scopes, line_id),
+            31,
+            'h-suffixed hex keeps its meaning in hex mode',
+        )
+        self.assertEqual(
+            parse_expression(line_id, 'b1010', 'hex').get_value(labels, scopes, line_id),
+            10,
+            'binary prefix keeps its meaning in hex mode',
+        )
+        self.assertEqual(
+            parse_expression(line_id, '123', 'hex').get_value(labels, scopes, line_id),
+            0x123,
+            'decimal-looking tokens are reinterpreted in hex mode',
+        )
+        self.assertEqual(
+            parse_expression(line_id, '-f', 'hex').get_value(labels, scopes, line_id),
+            -15,
+            'unary minus applies after hex interpretation',
+        )
+        self.assertEqual(
+            parse_expression(line_id, 'face', 'hex').get_value(labels, scopes, line_id),
+            9,
+            'defined labels win over hex reinterpretation',
+        )
+        self.assertEqual(
+            parse_expression(line_id, 'f + 1', 'hex').get_value(labels, scopes, line_id),
+            16,
+            'expression arithmetic uses the configured base for bare tokens',
+        )
+        self.assertEqual(
+            parse_expression(line_id, '17', 'octal').get_value(labels, scopes, line_id),
+            15,
+            'octal mode parses bare octal values',
+        )
+        self.assertEqual(
+            parse_expression(line_id, '1010', 'binary').get_value(labels, scopes, line_id),
+            10,
+            'binary mode parses bare binary values',
+        )
+
+    def test_invalid_default_numeric_base_tokens(self):
+        line_id = LineIdentifier(1000, 'test_invalid_default_numeric_base_tokens')
+        labels = TestExpression.label_values
+        scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
+
+        with self.assertRaisesRegex(SyntaxError, 'invalid octal numeric literal: 8'):
+            parse_expression(line_id, '8', 'octal').get_value(labels, scopes, line_id)
+        with self.assertRaisesRegex(SyntaxError, 'invalid binary numeric literal: 2'):
+            parse_expression(line_id, '2', 'binary').get_value(labels, scopes, line_id)
         with self.assertRaisesRegex(SyntaxError, 'double-quoted strings are not valid'):
             parse_expression(1212, '"A"').get_value(labels, scopes, 1)
 

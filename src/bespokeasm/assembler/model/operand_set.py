@@ -23,6 +23,7 @@ class OperandSet:
         word_size: int,
         word_segment_size: int,
         diagnostic_reporter,
+        default_numeric_base: str = 'decimal',
     ) -> None:
         self._name = name
         self._config = config_dict
@@ -37,6 +38,7 @@ class OperandSet:
                 word_size,
                 word_segment_size,
                 diagnostic_reporter,
+                default_numeric_base=default_numeric_base,
             )
             if operand.null_operand:
                 # null operands not supported in operand sets. must use specific operand configuration.
@@ -115,6 +117,7 @@ class OperandSetCollection(dict):
         word_size: int,
         word_segment_size: int,
         diagnostic_reporter,
+        default_numeric_base: str = 'decimal',
     ) -> None:
         super().__init__(self)
         for set_name, set_config in config_dict.items():
@@ -127,6 +130,7 @@ class OperandSetCollection(dict):
                 word_size,
                 word_segment_size,
                 diagnostic_reporter,
+                default_numeric_base=default_numeric_base,
             )
 
     def __repr__(self) -> str:

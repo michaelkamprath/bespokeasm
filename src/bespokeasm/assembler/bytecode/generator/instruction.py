@@ -23,18 +23,21 @@ class InstructionBytecodeGenerator:
         operands: str,
         isa_model: AssemblerModel,
         memzone_manager: MemoryZoneManager,
+        source_mnemonic: str | None = None,
     ) -> AssembledInstruction:
         if mnemonic != instruction.mnemonic:
             # this shouldn't happen
             sys.exit(f'ERROR: {line_id} - INTERNAL - Asked instruction {instruction} to parse mnemonic "{mnemonic}"')
+        source_mnemonic = mnemonic if source_mnemonic is None else source_mnemonic.lower()
 
         operand_label_error: OperandLabelError | None = None
-        for variant in instruction.variants:
+        for variant in instruction.matching_variants(source_mnemonic):
             try:
                 assembled_instruction = InstructionBytecodeGenerator.generate_variant_bytecode_parts(
                     variant,
                     line_id,
                     mnemonic,
+                    source_mnemonic,
                     operands,
                     isa_model,
                     memzone_manager,
@@ -54,7 +57,7 @@ class InstructionBytecodeGenerator:
             )
         isa_model.diagnostic_reporter.error(
             line_id,
-            f'Instruction "{mnemonic}" has no valid operands configured.',
+            f'Instruction "{source_mnemonic}" has no valid operands configured.',
         )
 
     @classmethod
@@ -63,6 +66,7 @@ class InstructionBytecodeGenerator:
         variant: InstructionVariant,
         line_id: LineIdentifier,
         mnemonic: str,
+        source_mnemonic: str,
         operands: str,
         isa_model: AssemblerModel,
         memzone_manager: MemoryZoneManager,

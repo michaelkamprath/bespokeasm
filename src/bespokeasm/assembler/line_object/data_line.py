@@ -49,6 +49,7 @@ class DataLine(LineWithWords):
             cstr_terminator: int = 0,
             string_byte_packing: bool = False,
             string_byte_packing_fill: int = 0,
+            default_numeric_base: str = 'decimal',
             *,
             diagnostic_reporter,
     ) -> LineWithWords:
@@ -99,6 +100,7 @@ class DataLine(LineWithWords):
             multi_word_endianness,
             string_byte_packing,
             string_byte_packing_fill,
+            default_numeric_base,
             diagnostic_reporter=diagnostic_reporter,
         )
 
@@ -168,6 +170,7 @@ class DataLine(LineWithWords):
             multi_word_endianness: Literal['little', 'big'],
             string_byte_packing: bool = False,
             string_byte_packing_fill: int = 0,
+            default_numeric_base: str = 'decimal',
             *,
             diagnostic_reporter,
     ) -> None:
@@ -186,6 +189,7 @@ class DataLine(LineWithWords):
         self.diagnostic_reporter = diagnostic_reporter
         self._arg_value_list = value_list
         self._directive = directive_str
+        self._default_numeric_base = default_numeric_base
         self._string_byte_packing = string_byte_packing
         self._string_byte_packing_fill = string_byte_packing_fill
 
@@ -244,7 +248,11 @@ class DataLine(LineWithWords):
             if isinstance(arg_item, int):
                 arg_val = arg_item
             elif isinstance(arg_item, str):
-                e: ExpressionNode = parse_expression(self.line_id, arg_item)
+                e: ExpressionNode = parse_expression(
+                    self.line_id,
+                    arg_item,
+                    self._default_numeric_base,
+                )
                 arg_val = e.get_value(self.label_scope, self.active_named_scopes, self.line_id)
             else:
                 sys.exit(f'ERROR: line {self.line_id} - unknown data item "{arg_item}"')

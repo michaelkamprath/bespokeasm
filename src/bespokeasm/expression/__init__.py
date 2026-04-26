@@ -14,14 +14,16 @@ import sys
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.line_identifier import LineIdentifier
-from bespokeasm.utilities import is_string_numeric
+from bespokeasm.utilities import is_explicit_numeric_string
+from bespokeasm.utilities import is_unprefixed_numeric_string
 from bespokeasm.utilities import is_valid_label
+from bespokeasm.utilities import normalize_default_numeric_base
 from bespokeasm.utilities import parse_numeric_string
 from bespokeasm.utilities import PATTERN_CHARACTER_ORDINAL
 from bespokeasm.utilities import PATTERN_HEX
 
 EXPRESSION_PARTS_PATTERN = \
-    r'(?:(?:\%|b)[01]+|{}|\d+|[\+\-\*\/\&\|\^\(\)]|>>|<<|%|LSB\(|BYTE\d\(|(?:\.|_)?\w+|{}|[><])'.format(
+    r'(?:(?:\%|b)[01]+|{}|[\+\-\*\/\&\|\^\(\)]|>>|<<|%|LSB\(|BYTE\d\(|(?:\.|_)?\w+|{}|[><])'.format(
         PATTERN_HEX,
         PATTERN_CHARACTER_ORDINAL,
     )
@@ -30,22 +32,23 @@ EXPRESSION_PARTS_PATTERN = \
 class TokenType(enum.Enum):
     T_NUM = 0
     T_LABEL = 1
-    T_NEGATION = 2
-    T_RIGHT_SHIFT = 3
-    T_LEFT_SHIFT = 4
-    T_PLUS = 5
-    T_MINUS = 6
-    T_MULT = 7
-    T_DIV = 8
-    T_MOD = 9
-    T_AND = 10
-    T_OR = 11
-    T_XOR = 12
-    T_LSB = 13
-    T_BYTE = 14
-    T_LPAR = 15
-    T_RPAR = 16
-    T_END = 17
+    T_LABEL_OR_NUM = 2
+    T_NEGATION = 3
+    T_RIGHT_SHIFT = 4
+    T_LEFT_SHIFT = 5
+    T_PLUS = 6
+    T_MINUS = 7
+    T_MULT = 8
+    T_DIV = 9
+    T_MOD = 10
+    T_AND = 11
+    T_OR = 12
+    T_XOR = 13
+    T_LSB = 14
+    T_BYTE = 15
+    T_LPAR = 16
+    T_RPAR = 17
+    T_END = 18
 
 
 class ExpressionNode:
@@ -63,9 +66,10 @@ class ExpressionNode:
         TokenType.T_NEGATION: operator.neg,
     }
 
-    def __init__(self, token_type: TokenType, value=None):
+    def __init__(self, token_type: TokenType, value=None, default_numeric_base: str = 'decimal'):
         self.token_type = token_type
         self.value = value
+        self.default_numeric_base = normalize_default_numeric_base(default_numeric_base)
         self.left_child: ExpressionNode = None
         self.right_child: ExpressionNode = None
         self._is_unary = token_type in [TokenType.T_BYTE, TokenType.T_LSB]
@@ -92,8 +96,10 @@ class ExpressionNode:
     ) -> int:
         if self.token_type == TokenType.T_NUM:
             return self.value
-        elif self.token_type == TokenType.T_LABEL:
+        elif self.token_type in [TokenType.T_LABEL, TokenType.T_LABEL_OR_NUM]:
             if label_scope is None:
+                if self.token_type == TokenType.T_LABEL_OR_NUM:
+                    return parse_numeric_string(self.value, self.default_numeric_base)
                 sys.exit(f'ERROR - INTERNAL: {line_id} - Label {self.value} has no label scope = {self}')
             # in ths case value is a label
             if active_named_scopes is not None:
@@ -102,6 +108,8 @@ class ExpressionNode:
                 )
             else:
                 val = label_scope.get_label_value(self.value, line_id)
+            if val is None and self.token_type == TokenType.T_LABEL_OR_NUM:
+                return parse_numeric_string(self.value, self.default_numeric_base)
             if val is None:
                 sys.exit(f'ERROR: {line_id} - Label {self.value} resolves to NONE = {self}')
             return val
@@ -115,7 +123,7 @@ class ExpressionNode:
         active_named_scopes: ActiveNamedScopeList,
         line_id: LineIdentifier
     ) -> int:
-        if self.token_type in [TokenType.T_NUM, TokenType.T_LABEL]:
+        if self.token_type in [TokenType.T_NUM, TokenType.T_LABEL, TokenType.T_LABEL_OR_NUM]:
             return self._numeric_value(label_scope, active_named_scopes, line_id)
         if self.token_type in [TokenType.T_LSB, TokenType.T_BYTE]:
             byte_idx = 0
@@ -163,13 +171,20 @@ class ExpressionNode:
         return int(calculated_value)
 
     def contains_register_labels(self, register_labels: set[str]) -> bool:
-        contained_registers = self.contained_labels().intersection(register_labels)
-        return len(contained_registers) > 0
+        if self.token_type in [TokenType.T_LABEL, TokenType.T_LABEL_OR_NUM]:
+            return self.value in register_labels
+        if self.token_type == TokenType.T_NUM:
+            return False
+        if self.left_child is not None and self.left_child.contains_register_labels(register_labels):
+            return True
+        if not self.is_unary and self.right_child is not None:
+            return self.right_child.contains_register_labels(register_labels)
+        return False
 
     def contained_labels(self) -> set[str]:
         if self.token_type == TokenType.T_LABEL:
             return {self.value}
-        elif self.token_type in [TokenType.T_NUM]:
+        elif self.token_type in [TokenType.T_NUM, TokenType.T_LABEL_OR_NUM]:
             return set()
         left_result: set[str] = self.left_child.contained_labels()
         right_result: set[str] = set()
@@ -178,8 +193,12 @@ class ExpressionNode:
         return left_result.union(right_result)
 
 
-def parse_expression(line_id: LineIdentifier, expression: str) -> ExpressionNode:
-    tokens = _lexical_analysis(line_id, expression)
+def parse_expression(
+    line_id: LineIdentifier,
+    expression: str,
+    default_numeric_base: str = 'decimal',
+) -> ExpressionNode:
+    tokens = _lexical_analysis(line_id, expression, default_numeric_base)
     ast = _parse_e(line_id, tokens)
     _match(line_id, tokens, TokenType.T_END)
     return ast
@@ -202,8 +221,13 @@ TOKEN_MAPPINGS = {
 }
 
 
-def _lexical_analysis(line_id: LineIdentifier, s: str) -> list[ExpressionNode]:
+def _lexical_analysis(
+    line_id: LineIdentifier,
+    s: str,
+    default_numeric_base: str = 'decimal',
+) -> list[ExpressionNode]:
     expression_without_char_literals = _strip_character_ordinals_for_validation(line_id, s)
+    normalized_base = normalize_default_numeric_base(default_numeric_base)
     tokens = []
     if '&&' in expression_without_char_literals or '||' in expression_without_char_literals:
         raise SyntaxError(
@@ -235,10 +259,27 @@ def _lexical_analysis(line_id: LineIdentifier, s: str) -> list[ExpressionNode]:
             token = ExpressionNode(token_type, value=part)
         elif re.match(r'^BYTE\d\(', part):
             token = ExpressionNode(TokenType.T_BYTE, value=part)
-        elif is_string_numeric(part):
+        elif is_explicit_numeric_string(part):
             token = ExpressionNode(TokenType.T_NUM, value=parse_numeric_string(part))
+        elif is_unprefixed_numeric_string(part, normalized_base):
+            if is_valid_label(part):
+                token = ExpressionNode(
+                    TokenType.T_LABEL_OR_NUM,
+                    value=part,
+                    default_numeric_base=normalized_base,
+                )
+            else:
+                token = ExpressionNode(
+                    TokenType.T_NUM,
+                    value=parse_numeric_string(part, normalized_base),
+                    default_numeric_base=normalized_base,
+                )
         elif is_valid_label(part):
             token = ExpressionNode(TokenType.T_LABEL, value=part)
+        elif re.fullmatch(r'[\da-zA-Z]+', part) is not None:
+            raise SyntaxError(
+                f'ERROR: {line_id} - invalid {normalized_base} numeric literal: {part}'
+            )
         else:
             sys.exit(f'ERROR: {line_id} - invalid token: {part}')
         tokens.append(token)
@@ -336,7 +377,7 @@ def _parse_e3(line_id: LineIdentifier, tokens: list[ExpressionNode]) -> Expressi
 
 
 def _parse_e4(line_id: LineIdentifier, tokens: list[ExpressionNode]) -> ExpressionNode:
-    if tokens[0].token_type in [TokenType.T_NUM, TokenType.T_LABEL]:
+    if tokens[0].token_type in [TokenType.T_NUM, TokenType.T_LABEL, TokenType.T_LABEL_OR_NUM]:
         return tokens.pop(0)
 
     if tokens[0].token_type in [TokenType.T_LSB, TokenType.T_BYTE]:

@@ -353,6 +353,7 @@ class ExpressionByteCodePart(ByteCodePart):
         line_id: LineIdentifier,
         word_size: int,
         segment_size: int,
+        default_numeric_base: str = 'decimal',
     ) -> None:
         super().__init__(
             value_size,
@@ -364,7 +365,11 @@ class ExpressionByteCodePart(ByteCodePart):
             segment_size,
         )
         self._expression = value_expression
-        self._parsed_expression = parse_expression(self.line_id, self._expression)
+        self._parsed_expression = parse_expression(
+            self.line_id,
+            self._expression,
+            default_numeric_base,
+        )
 
     @property
     def instruction_string(self) -> str:
@@ -407,6 +412,7 @@ class ExpressionByteCodePartWithValidation(ExpressionByteCodePart):
                 line_id: LineIdentifier,
                 word_size: int,
                 segment_size: int,
+                default_numeric_base: str = 'decimal',
             ) -> None:
         super().__init__(
             value_expression,
@@ -417,6 +423,7 @@ class ExpressionByteCodePartWithValidation(ExpressionByteCodePart):
             line_id,
             word_size,
             segment_size,
+            default_numeric_base,
         )
         self._max = max_value
         self._min = min_value
@@ -458,6 +465,7 @@ class ExpressionByteCodePartInMemoryZone(ExpressionByteCodePart):
         line_id: LineIdentifier,
         word_size: int,
         segment_size: int,
+        default_numeric_base: str = 'decimal',
     ) -> None:
         super().__init__(
             value_expression,
@@ -468,6 +476,7 @@ class ExpressionByteCodePartInMemoryZone(ExpressionByteCodePart):
             line_id,
             word_size,
             segment_size,
+            default_numeric_base,
         )
         self._memzone = memzone
 

@@ -29,10 +29,12 @@ class OperandFactory:
         word_size: int,
         word_segment_size: int,
         diagnostic_reporter,
+        default_numeric_base: str = 'decimal',
     ) -> Operand:
         type_str = arg_config_dict['type']
+        operand: Operand
         if type_str == 'numeric':
-            return numeric_expression.NumericExpressionOperand(
+            operand = numeric_expression.NumericExpressionOperand(
                 operand_id,
                 arg_config_dict,
                 default_multi_word_endian,
@@ -42,7 +44,7 @@ class OperandFactory:
                 diagnostic_reporter,
             )
         elif type_str == 'register':
-            return register.RegisterOperand(
+            operand = register.RegisterOperand(
                 operand_id,
                 arg_config_dict,
                 default_multi_word_endian,
@@ -53,7 +55,7 @@ class OperandFactory:
                 diagnostic_reporter,
             )
         elif type_str == 'indexed_register':
-            return indexed_register.IndexedRegisterOperand(
+            operand = indexed_register.IndexedRegisterOperand(
                 operand_id,
                 arg_config_dict,
                 default_multi_word_endian,
@@ -64,7 +66,7 @@ class OperandFactory:
                 diagnostic_reporter,
             )
         elif type_str == 'indirect_register':
-            return indirect_register.IndirectRegisterOperand(
+            operand = indirect_register.IndirectRegisterOperand(
                 operand_id,
                 arg_config_dict,
                 default_multi_word_endian,
@@ -75,7 +77,7 @@ class OperandFactory:
                 diagnostic_reporter,
             )
         elif type_str == 'indirect_indexed_register':
-            return indirect_indexed_register.IndirectIndexedRegisterOperand(
+            operand = indirect_indexed_register.IndirectIndexedRegisterOperand(
                 operand_id,
                 arg_config_dict,
                 default_multi_word_endian,
@@ -86,7 +88,7 @@ class OperandFactory:
                 diagnostic_reporter,
             )
         elif type_str == 'indirect_numeric':
-            return indirect_numeric.IndirectNumericOperand(
+            operand = indirect_numeric.IndirectNumericOperand(
                 operand_id,
                 arg_config_dict,
                 default_multi_word_endian,
@@ -96,7 +98,7 @@ class OperandFactory:
                 diagnostic_reporter,
             )
         elif type_str == 'deferred_numeric':
-            return deferred_numeric.DeferredNumericOperand(
+            operand = deferred_numeric.DeferredNumericOperand(
                 operand_id,
                 arg_config_dict,
                 default_multi_word_endian,
@@ -106,7 +108,7 @@ class OperandFactory:
                 diagnostic_reporter,
             )
         elif type_str == 'enumeration':
-            return enumeration_operand.EnumerationOperand(
+            operand = enumeration_operand.EnumerationOperand(
                 operand_id,
                 arg_config_dict,
                 default_multi_word_endian,
@@ -117,7 +119,7 @@ class OperandFactory:
                 diagnostic_reporter,
             )
         elif type_str == 'numeric_enumeration':
-            return numeric_enumeration.NumericEnumerationOperand(
+            operand = numeric_enumeration.NumericEnumerationOperand(
                 operand_id,
                 arg_config_dict,
                 default_multi_word_endian,
@@ -128,7 +130,7 @@ class OperandFactory:
                 diagnostic_reporter,
             )
         elif type_str == 'numeric_bytecode':
-            return numeric_bytecode.NumericBytecode(
+            operand = numeric_bytecode.NumericBytecode(
                 operand_id,
                 arg_config_dict,
                 default_multi_word_endian,
@@ -138,7 +140,7 @@ class OperandFactory:
                 diagnostic_reporter,
             )
         elif type_str == 'address':
-            return address.AddressOperand(
+            operand = address.AddressOperand(
                 operand_id,
                 arg_config_dict,
                 default_multi_word_endian,
@@ -148,7 +150,7 @@ class OperandFactory:
                 diagnostic_reporter,
             )
         elif type_str == 'relative_address':
-            return relative_address.RelativeAddressOperand(
+            operand = relative_address.RelativeAddressOperand(
                 operand_id,
                 arg_config_dict,
                 default_multi_word_endian,
@@ -158,7 +160,7 @@ class OperandFactory:
                 diagnostic_reporter,
             )
         elif type_str == 'empty':
-            return empty.EmptyOperand(
+            operand = empty.EmptyOperand(
                 operand_id,
                 arg_config_dict,
                 default_multi_word_endian,
@@ -169,3 +171,5 @@ class OperandFactory:
             )
         else:
             sys.exit(f'ERROR - Operand {operand_id} was configured with unknown type "{type_str}"')
+        operand.default_numeric_base = default_numeric_base
+        return operand

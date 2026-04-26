@@ -18,10 +18,15 @@ class AddressOrgLine(SetMemoryZoneLine):
             address_expression: str,
             memzone_name: str,
             memzone_manager: MemoryZoneManager,
+            default_numeric_base: str = 'decimal',
     ) -> None:
         super().__init__(line_id, instruction, comment, memzone_name, memzone_manager)
         self._parsed_memzone_name = memzone_name
-        self._address_expr: ExpressionNode = parse_expression(line_id, address_expression)
+        self._address_expr: ExpressionNode = parse_expression(
+            line_id,
+            address_expression,
+            default_numeric_base,
+        )
 
     @property
     def has_explicit_memzone_name(self) -> bool:

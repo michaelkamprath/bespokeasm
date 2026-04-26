@@ -164,7 +164,7 @@ class LanguageVersionEvaluator:
                     sys.exit(f'ERROR: {line_id} - Version symbol {symbol} is not defined')
 
             try:
-                expr_node = parse_expression(line_id, resolved)
+                expr_node = parse_expression(line_id, resolved, preprocessor.default_numeric_base)
                 if len(expr_node.contained_labels()) == 0:
                     active_scopes = ActiveNamedScopeList.empty(preprocessor.diagnostic_reporter)
                     result = expr_node.get_value(
@@ -197,8 +197,8 @@ class LanguageVersionEvaluator:
 
         # Try to parse both sides as expressions
         try:
-            lhs_expression = parse_expression(line_id, lhs_resolved)
-            rhs_expression = parse_expression(line_id, rhs_resolved)
+            lhs_expression = parse_expression(line_id, lhs_resolved, preprocessor.default_numeric_base)
+            rhs_expression = parse_expression(line_id, rhs_resolved, preprocessor.default_numeric_base)
 
             # Determine if we should do string or numeric comparison
             if len(lhs_expression.contained_labels()) > 0 or len(rhs_expression.contained_labels()) > 0:

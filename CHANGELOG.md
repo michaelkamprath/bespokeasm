@@ -19,6 +19,8 @@ Changes that are planned but not implemented yet:
 
 
 ## [Unreleased]
+* Added configurable mnemonic decorators (`+`, `-`, `++`, `--`, `!`, `@`) so instruction variants can use prefixed or suffixed decorated mnemonics such as `m+`, `m-`, and `++inc`.
+* Added `general.default_numeric_base` so ISA configurations can opt into decimal, hex, octal, or binary interpretation for bare numeric literals without changing prefixed forms.
 * Improved CLI startup performance by deferring heavy imports (`click`, `dataclasses`, `pathlib`) until needed and eliminating redundant CLI construction on the completion path.
 * Reduced standalone binary size (~20%) by excluding unused modules (email, http, ssl, xml, etc.) from PyInstaller builds.
 * Added Nuitka as an alternative build target (`make nuitka`) for standalone binaries with faster startup than PyInstaller.
@@ -28,6 +30,7 @@ Changes that are planned but not implemented yet:
 * Improved hover coloring in Sublime Text to match syntax highlighting for directives, registers, and expression functions.
 * Improved Sublime Text semantic highlighting performance for large files.
 * Fixed a bug in the listing pretty-printer where ISA configurations with `word_size < 8` could crash while formatting output because word-segment sizing was not preserved when calculating hex widths.
+* Added an example instruction set for the Gakken GMC-4 (and the equivalent Radio Shack Science Fair Microcomputer Trainer): a 4-bit Harvard-architecture ISA with 80 nibbles of program memory and 16 nibbles of data memory. The 15 built-in CAL subroutines are exposed as predefined constants (`RSTO`, `SETR`, ..., `DSPR`, `DEM_PLUS`) so legacy-style `cal DSPR` source compiles natively. Includes two sample programs and a README.
 
 ## [0.7.2]
 * Added `.16byte` data directive to emit 16-byte values with configured multi-word endianness.

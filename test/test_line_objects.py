@@ -1445,6 +1445,35 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(len(line_objs), 2, 'two instructions should be parsed on one line')
         self.assertTrue(all(isinstance(lo, InstructionLine) for lo in line_objs), 'both should be instructions')
 
+    def test_multiple_instructions_per_line_with_decorated_mnemonic(self):
+        fp = pkg_resources.files(config_files).joinpath('test_mnemonic_decorators.yaml')
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
+        lineid = LineIdentifier(78, 'test_multiple_instructions_per_line_with_decorated_mnemonic')
+        preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
+
+        line_objs = LineOjectFactory.parse_line(
+            lineid,
+            'm+ 3 nop',
+            isa_model,
+            TestLineObject.label_values,
+            self.active_named_scopes,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+            preprocessor,
+            ConditionStack(self.diagnostic_reporter),
+            0,
+        )
+
+        self.assertEqual(len(line_objs), 2, 'decorated mnemonic should coexist with later same-line instruction')
+        self.assertTrue(all(isinstance(lo, InstructionLine) for lo in line_objs), 'both should be instructions')
+        self.assertEqual(line_objs[0].instruction.strip(), 'm+ 3')
+        self.assertEqual(line_objs[1].instruction.strip(), 'nop')
+
     def test_embedded_string_bugs(self):
         fp = pkg_resources.files(config_files).joinpath('test_operand_features.yaml')
         isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)

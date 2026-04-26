@@ -77,7 +77,15 @@ class DirectiveLine:
         if line_match is not None and len(line_match.groups()) >= 1:
             value_str = line_match.group(1)
             memzone_name = line_match.group(2)
-            return AddressOrgLine(line_id, line_match.group(0), comment, value_str, memzone_name, memzone_manager)
+            return AddressOrgLine(
+                line_id,
+                line_match.group(0),
+                comment,
+                value_str,
+                memzone_name,
+                memzone_manager,
+                isa_model.default_numeric_base,
+            )
 
         # .memzone
         line_match = re.search(DirectiveLine.PATTERN_SET_MEMZONE_DIRECTIVE, cleaned_line_str)
@@ -101,6 +109,7 @@ class DirectiveLine:
                 isa_model.word_segment_size,
                 isa_model.intra_word_endianness,
                 isa_model.multi_word_endianness,
+                isa_model.default_numeric_base,
             )
 
         # .zero
@@ -120,6 +129,7 @@ class DirectiveLine:
                 isa_model.word_segment_size,
                 isa_model.intra_word_endianness,
                 isa_model.multi_word_endianness,
+                isa_model.default_numeric_base,
             )
 
         # .zerountil
@@ -137,12 +147,20 @@ class DirectiveLine:
                 isa_model.word_segment_size,
                 isa_model.intra_word_endianness,
                 isa_model.multi_word_endianness,
+                isa_model.default_numeric_base,
             )
 
         # .page
         line_match = PageAlignLine.PATTERN_PAGE_ALIGN.match(cleaned_line_str)
         if line_match is not None:
-            return PageAlignLine(line_id, cleaned_line_str, comment, current_memzone, isa_model.page_size)
+            return PageAlignLine(
+                line_id,
+                cleaned_line_str,
+                comment,
+                current_memzone,
+                isa_model.page_size,
+                isa_model.default_numeric_base,
+            )
 
         # nothing was matched here. pass to data directive
         return DataLine.factory(
@@ -157,4 +175,5 @@ class DirectiveLine:
             isa_model.cstr_terminator,
             isa_model.string_byte_packing,
             isa_model.string_byte_packing_fill,
+            isa_model.default_numeric_base,
             diagnostic_reporter=isa_model.diagnostic_reporter)

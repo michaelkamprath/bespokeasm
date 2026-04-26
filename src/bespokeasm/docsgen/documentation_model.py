@@ -2,6 +2,8 @@ from typing import Any
 
 import click
 from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.assembler.model.decorators import apply_decorator_symbol
+from bespokeasm.assembler.model.decorators import get_decorator_symbol
 
 
 class DocumentationModel:
@@ -524,26 +526,7 @@ class DocumentationModel:
         """Convert a decorator configuration into a symbol and prefix flag."""
         if not decorator_config or not isinstance(decorator_config, dict):
             return None
-
-        decorator_type = decorator_config.get('type')
-        if decorator_type is None:
-            return None
-
-        symbol_map = {
-            'plus': '+',
-            'plus_plus': '++',
-            'minus': '-',
-            'minus_minus': '--',
-            'exclamation': '!',
-            'at': '@'
-        }
-
-        symbol = symbol_map.get(decorator_type)
-        if symbol is None:
-            return None
-
-        is_prefix = bool(decorator_config.get('is_prefix', False))
-        return symbol, is_prefix
+        return get_decorator_symbol(decorator_config, context='documentation')
 
     def _derive_operand_syntax(
         self,
@@ -999,6 +982,7 @@ class DocumentationModel:
 
         if 'operands' in instruction_config or 'bytecode' in instruction_config:
             version_sources.append({
+                'mnemonic': mnemonic,
                 'operands': instruction_config.get('operands'),
                 'documentation': None
             })
@@ -1008,6 +992,11 @@ class DocumentationModel:
             for variant in variants:
                 if isinstance(variant, dict):
                     version_sources.append({
+                        'mnemonic': apply_decorator_symbol(
+                            mnemonic,
+                            variant.get('mnemonic_decorator'),
+                            context=f'instruction "{mnemonic}"',
+                        ),
                         'operands': variant.get('operands'),
                         'documentation': variant.get('documentation')
                     })
@@ -1019,6 +1008,7 @@ class DocumentationModel:
         if not version_sources:
             # Ensure at least one version so the syntax block can be emitted even without operands.
             version_sources.append({
+                'mnemonic': mnemonic,
                 'operands': None,
                 'documentation': None
             })
@@ -1036,6 +1026,7 @@ class DocumentationModel:
             )
             versions.append({
                 'index': index,
+                'mnemonic': version_source.get('mnemonic', mnemonic),
                 'signatures': signatures,
                 'title': doc_config.get('title') if documented else None,
                 'description': doc_config.get('description') if documented else None,

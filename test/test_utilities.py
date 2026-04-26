@@ -40,6 +40,17 @@ class TestUtilities(unittest.TestCase):
         self.assertFalse(is_string_numeric("'12'"), 'character ordinal can only be one character long')
         self.assertFalse(is_string_numeric('0b10011001'), 'binary numbers do not strt with "0b"')
 
+    def test_default_numeric_base_helpers(self):
+        self.assertEqual(parse_numeric_string('f', 'hex'), 15, 'bare hex digit uses configured base')
+        self.assertEqual(parse_numeric_string('1F', 'hex'), 31, 'multi-digit bare hex uses configured base')
+        self.assertEqual(parse_numeric_string('face', 'hex'), 0xFACE, 'bare hex words use configured base')
+        self.assertEqual(parse_numeric_string('17', 'octal'), 15, 'bare octal uses configured base')
+        self.assertEqual(parse_numeric_string('1010', 'binary'), 10, 'bare binary uses configured base')
+        self.assertEqual(parse_numeric_string('-f', 'hex'), -15, 'signed bare hex uses configured base')
+        self.assertTrue(is_string_numeric('face', 'hex'), 'hex mode accepts bare hex words')
+        self.assertFalse(is_string_numeric('8', 'octal'), 'octal mode rejects invalid octal digits')
+        self.assertFalse(is_string_numeric('2', 'binary'), 'binary mode rejects invalid binary digits')
+
     def test_PackedBits(self):
         ib1 = PackedBits()
         ib1.append_bits(0xd, 4, False, 'big')

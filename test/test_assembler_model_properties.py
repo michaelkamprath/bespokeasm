@@ -42,6 +42,7 @@ class TestAssemblerModelDefaults(unittest.TestCase):
         self.assertEqual(model.intra_word_endianness, 'big', 'intra_word_endianness should default to big')
         self.assertEqual(model.page_size, 1, 'page_size should default to 1')
         self.assertFalse(model.allow_embedded_strings, 'allow_embedded_strings should default to False')
+        self.assertEqual(model.default_numeric_base, 'decimal', 'default_numeric_base should default to decimal')
         # min_version should exist in config
         self.assertIn('min_version', model._config['general'], 'min_version should be set in config')
 
@@ -68,6 +69,102 @@ class TestAssemblerModelDefaults(unittest.TestCase):
         self.assertEqual(model.cstr_terminator, 0x55, 'cstr_terminator should match config')
         temp.close()
         os.unlink(temp.name)
+
+    def test_default_numeric_base_aliases(self):
+        config = {
+            'general': {
+                'address_size': 16,
+                'min_version': '0.7.0',
+                'default_numeric_base': 'base16',
+            },
+            'instructions': {},
+            'operand_sets': {},
+        }
+        temp = tempfile.NamedTemporaryFile('w+', delete=False, suffix='.yaml')
+        self.yaml.dump(config, temp)
+        temp.flush()
+        model = AssemblerModel(temp.name, 0, self.diagnostic_reporter)
+        self.assertEqual(model.default_numeric_base, 'hex', 'default_numeric_base aliases normalize to canonical values')
+        temp.close()
+        os.unlink(temp.name)
+
+    def test_default_numeric_base_rejects_ambiguous_register_names(self):
+        config = {
+            'general': {
+                'address_size': 16,
+                'min_version': '0.7.0',
+                'default_numeric_base': 'hex',
+                'registers': ['b'],
+            },
+            'instructions': {},
+            'operand_sets': {},
+        }
+        temp = tempfile.NamedTemporaryFile('w+', delete=False, suffix='.yaml')
+        self.yaml.dump(config, temp)
+        temp.flush()
+        with self.assertRaisesRegex(SystemExit, 'ambiguous with a bare hex numeric literal'):
+            AssemblerModel(temp.name, 0, self.diagnostic_reporter)
+        temp.close()
+        os.unlink(temp.name)
+
+    def test_default_numeric_base_rejects_ambiguous_predefined_names(self):
+        test_cases = [
+            (
+                {
+                    'general': {
+                        'address_size': 16,
+                        'min_version': '0.7.0',
+                        'default_numeric_base': 'hex',
+                    },
+                    'predefined': {
+                        'constants': [{'name': 'face', 'value': 1}],
+                    },
+                    'instructions': {},
+                    'operand_sets': {},
+                },
+                'predefined constant name "face"',
+            ),
+            (
+                {
+                    'general': {
+                        'address_size': 16,
+                        'min_version': '0.7.0',
+                        'default_numeric_base': 'binary',
+                    },
+                    'predefined': {
+                        'data': [{'name': '1010', 'address': 0, 'size': 1}],
+                    },
+                    'instructions': {},
+                    'operand_sets': {},
+                },
+                'predefined data label "1010"',
+            ),
+            (
+                {
+                    'general': {
+                        'address_size': 16,
+                        'min_version': '0.7.0',
+                        'default_numeric_base': 'octal',
+                    },
+                    'predefined': {
+                        'symbols': [{'name': '17', 'value': 'ENABLED'}],
+                    },
+                    'instructions': {},
+                    'operand_sets': {},
+                },
+                'predefined preprocessor symbol name "17"',
+            ),
+        ]
+
+        for config, expected_error in test_cases:
+            with self.subTest(expected_error=expected_error):
+                temp = tempfile.NamedTemporaryFile('w+', delete=False, suffix='.yaml')
+                self.yaml.dump(config, temp)
+                temp.flush()
+                with self.assertRaisesRegex(SystemExit, expected_error):
+                    AssemblerModel(temp.name, 0, self.diagnostic_reporter)
+                temp.close()
+                os.unlink(temp.name)
 
 
 if __name__ == '__main__':

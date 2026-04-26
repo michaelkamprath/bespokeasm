@@ -36,12 +36,17 @@ class PageAlignLine(LineObject):
         comment: str,
         memzone: MemoryZone,
         default_page_size: int,
+        default_numeric_base: str = 'decimal',
     ):
         super().__init__(line_id, instruction, comment, memzone)
         define_symbol_match = re.search(PageAlignLine.PATTERN_PAGE_ALIGN, instruction)
         if define_symbol_match is not None:
             if define_symbol_match.group(1) is not None:
-                self._page_size = parse_expression(line_id, define_symbol_match.group(1))
+                self._page_size = parse_expression(
+                    line_id,
+                    define_symbol_match.group(1),
+                    default_numeric_base,
+                )
             else:
                 self._page_size = default_page_size
         else:

@@ -269,6 +269,62 @@ class TestInstructionParsing(unittest.TestCase):
             'instruction byte should match',
         )
 
+    def test_mnemonic_decorators(self):
+        fp = pkg_resources.files(config_files).joinpath('test_mnemonic_decorators.yaml')
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
+
+        self.assertSetEqual(
+            isa_model.instruction_mnemonics,
+            {'nop', 'm', 'm+', 'm-', '++inc'},
+            'instruction mnemonics should include configured decorated forms only',
+        )
+        self.assertNotIn('inc', isa_model.instruction_mnemonics)
+
+        cases = [
+            ('m', [Word(0x05, 8, 8, 'big')]),
+            ('m+', [Word(0x06, 8, 8, 'big')]),
+            ('m-', [Word(0x07, 8, 8, 'big')]),
+            ('M+', [Word(0x06, 8, 8, 'big')]),
+            ('++inc', [Word(0x20, 8, 8, 'big')]),
+            ('m+ 3', [Word(0x16, 8, 8, 'big'), Word(0x03, 8, 8, 'big')]),
+        ]
+
+        for instruction_str, expected_words in cases:
+            instruction = InstructionLine.factory(
+                LineIdentifier(200, 'test_mnemonic_decorators'),
+                instruction_str,
+                '',
+                isa_model,
+                memzone_mngr.global_zone,
+                memzone_mngr,
+            )
+            instruction.set_start_address(0x20)
+            self.assertIsInstance(instruction, InstructionLine, f'{instruction_str} should parse as instruction')
+            instruction.label_scope = TestInstructionParsing.label_values
+            instruction.generate_words()
+            self.assertEqual(
+                instruction.get_words(),
+                expected_words,
+                f'{instruction_str} should encode expected bytecode',
+            )
+
+        with self.assertRaises(SystemExit) as undeclared:
+            InstructionLine.factory(
+                LineIdentifier(201, 'test_mnemonic_decorators'),
+                'm!',
+                '',
+                isa_model,
+                memzone_mngr.global_zone,
+                memzone_mngr,
+            )
+        self.assertIn('undeclared postfix decorator "!"', str(undeclared.exception))
+        self.assertIn('Configured forms: "m", "m+", "m-"', str(undeclared.exception))
+
     def test_indexed_register_operands(self):
         fp = pkg_resources.files(config_files).joinpath('test_indirect_indexed_register_operands.yaml')
         isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
@@ -1925,3 +1981,48 @@ class TestInstructionParsing(unittest.TestCase):
         ins_nop.generate_words()
         nop_words = ins_nop.get_words()
         self.assertEqual(nop_words, [Word(0, 8, 8, 'little')], 'nop should assemble to correct word')
+
+    def test_instruction_default_numeric_base_from_model(self):
+        fp = pkg_resources.files(config_files).joinpath('test_default_numeric_base.yaml')
+        isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
+        memzone_mngr = MemoryZoneManager(
+            isa_model.address_size,
+            isa_model.default_origin,
+            isa_model.predefined_memory_zones,
+        )
+        labels = GlobalLabelScope(set())
+        labels.set_label_value('face', 9, LineIdentifier(0, 'test_instruction_default_numeric_base_from_model'))
+
+        ins1 = InstructionLine.factory(
+            22,
+            'ldi f+1',
+            'hex expression immediate',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+        ins1.set_start_address(0)
+        ins1.label_scope = labels
+        ins1.generate_words()
+        self.assertEqual(
+            ins1.get_words(),
+            [Word(0x40, 8, 8, 'big'), Word(0x10, 8, 8, 'big')],
+            'configured default base applies to instruction operands',
+        )
+
+        ins2 = InstructionLine.factory(
+            22,
+            'ldi face',
+            'label should win over bare-hex reinterpretation',
+            isa_model,
+            memzone_mngr.global_zone,
+            memzone_mngr,
+        )
+        ins2.set_start_address(0)
+        ins2.label_scope = labels
+        ins2.generate_words()
+        self.assertEqual(
+            ins2.get_words(),
+            [Word(0x40, 8, 8, 'big'), Word(0x09, 8, 8, 'big')],
+            'labels take precedence over bare literals in configured base mode',
+        )

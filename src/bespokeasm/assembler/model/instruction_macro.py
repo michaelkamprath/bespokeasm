@@ -30,6 +30,7 @@ class InstructionMacroVariant(InstructionBase):
                 word_size: int,
                 word_segment_size: int,
                 diagnostic_reporter,
+                default_numeric_base: str = 'decimal',
             ) -> None:
         super().__init__(mnemonic, default_multi_word_endian, default_intra_word_endian, registers)
         self._variant_config = macro_variant_config
@@ -46,6 +47,7 @@ class InstructionMacroVariant(InstructionBase):
                 word_size,
                 word_segment_size,
                 diagnostic_reporter,
+                default_numeric_base=default_numeric_base,
             )
             self._operand_parser.validate(mnemonic)
         else:
@@ -91,6 +93,7 @@ class InstructionMacro(InstructionBase):
                 word_segment_size: int,
                 diagnostic_reporter,
                 documentation: str | None = None,
+                default_numeric_base: str = 'decimal',
             ) -> None:
         super().__init__(mnemonic, default_multi_word_endian, default_intra_word_endian, registers)
         self._config = macro_config
@@ -112,6 +115,7 @@ class InstructionMacro(InstructionBase):
                     word_size,
                     word_segment_size,
                     diagnostic_reporter,
+                    default_numeric_base=default_numeric_base,
                 )
             )
 

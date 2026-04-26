@@ -1271,7 +1271,7 @@ class MarkdownGenerator:
                 if display_name:
                     operand_tokens.append(display_name)
 
-            syntax_line = mnemonic
+            syntax_line = version_data.get('mnemonic', mnemonic)
             if operand_tokens:
                 syntax_line = f"{syntax_line} {', '.join(operand_tokens)}"
 

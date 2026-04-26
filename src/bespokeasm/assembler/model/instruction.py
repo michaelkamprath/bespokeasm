@@ -1,6 +1,7 @@
 import sys
 from typing import Literal
 
+from bespokeasm.assembler.model.decorators import apply_decorator_symbol
 from bespokeasm.assembler.model.instruction_base import InstructionBase
 from bespokeasm.assembler.model.operand_parser import OperandParser
 from bespokeasm.assembler.model.operand_set import OperandSetCollection
@@ -32,6 +33,7 @@ class InstructionVariant(InstructionBase):
                 word_size: int,
                 word_segment_size: int,
                 diagnostic_reporter,
+                default_numeric_base: str = 'decimal',
             ) -> None:
         super().__init__(mnemonic, default_multi_word_endian, default_intra_word_endian, registers)
         self._variant_config = instruction_variant_config
@@ -56,6 +58,7 @@ class InstructionVariant(InstructionBase):
                     word_size,
                     word_segment_size,
                     diagnostic_reporter,
+                    default_numeric_base=default_numeric_base,
                 )
             except TypeError as e:
                 sys.exit(f'ERROR: Operand configuration for instruction "{mnemonic}" is invalid: {e}')
@@ -84,6 +87,14 @@ class InstructionVariant(InstructionBase):
         return 'suffix' in self._variant_config['bytecode']
 
     @property
+    def has_mnemonic_decorator(self) -> bool:
+        return 'mnemonic_decorator' in self._variant_config
+
+    @property
+    def mnemonic_decorator(self) -> dict | None:
+        return self._variant_config.get('mnemonic_decorator')
+
+    @property
     def suffix_bytecode_size(self) -> int:
         if self.has_bytecode_suffix:
             return self._variant_config['bytecode']['suffix']['size']
@@ -96,6 +107,13 @@ class InstructionVariant(InstructionBase):
             return self._variant_config['bytecode']['suffix']['value']
         else:
             return 0
+
+    def source_mnemonic_for_stem(self, mnemonic_stem: str) -> str:
+        return apply_decorator_symbol(
+            mnemonic_stem,
+            self.mnemonic_decorator,
+            context=f'instruction "{self.mnemonic}"',
+        ).lower()
 
     def __str__(self) -> str:
         operand_str = str(self._operand_parser) if self._operand_parser is not None else 'NO_OPERANDS'
@@ -114,9 +132,14 @@ class Instruction(InstructionBase):
                 word_size: int,
                 word_segment_size: int,
                 diagnostic_reporter,
+                aliases: list[str] | None = None,
+                default_numeric_base: str = 'decimal',
             ) -> None:
         super().__init__(mnemonic, default_multi_word_endian, default_intra_word_endian, registers)
         self._config = instruction_config
+        self._source_mnemonic_stems = [mnemonic]
+        if aliases is not None:
+            self._source_mnemonic_stems.extend(alias.lower() for alias in aliases)
 
         variant_num = 0
         self._variants: list[InstructionVariant] = []
@@ -133,6 +156,7 @@ class Instruction(InstructionBase):
                     word_size,
                     word_segment_size,
                     diagnostic_reporter,
+                    default_numeric_base=default_numeric_base,
                 )
             )
 
@@ -151,6 +175,7 @@ class Instruction(InstructionBase):
                         word_size,
                         word_segment_size,
                         diagnostic_reporter,
+                        default_numeric_base=default_numeric_base,
                     )
                 )
         if len(self._variants) == 0:
@@ -159,6 +184,38 @@ class Instruction(InstructionBase):
     @property
     def variants(self) -> list[InstructionVariant]:
         return self._variants
+
+    @property
+    def source_mnemonic_stems(self) -> list[str]:
+        return self._source_mnemonic_stems
+
+    @property
+    def valid_source_mnemonics(self) -> list[str]:
+        result: list[str] = []
+        for mnemonic_stem in self._source_mnemonic_stems:
+            for variant in self._variants:
+                source_mnemonic = variant.source_mnemonic_for_stem(mnemonic_stem)
+                if source_mnemonic not in result:
+                    result.append(source_mnemonic)
+        return result
+
+    def matching_variants(self, source_mnemonic: str) -> list[InstructionVariant]:
+        source_mnemonic = source_mnemonic.lower()
+        return [
+            variant for variant in self._variants
+            if source_mnemonic in {
+                variant.source_mnemonic_for_stem(mnemonic_stem)
+                for mnemonic_stem in self._source_mnemonic_stems
+            }
+        ]
+
+    def configured_mnemonics_for_stem(self, mnemonic_stem: str) -> list[str]:
+        result: list[str] = []
+        for variant in self._variants:
+            source_mnemonic = variant.source_mnemonic_for_stem(mnemonic_stem.lower())
+            if source_mnemonic not in result:
+                result.append(source_mnemonic)
+        return result
 
     def __str__(self) -> str:
         return f'Instruction<{self._mnemonic}>'

@@ -31,6 +31,7 @@ class LabelLine(LineObject):
                 label_scope: LabelScope,
                 active_named_scopes: ActiveNamedScopeList,
                 current_memzone: MemoryZone,
+                default_numeric_base: str = 'decimal',
             ) -> LineObject | None:
         """Tries to match the passed line string to the Label or Constant directive patterns.
         If succcessful, returns a constructed LabelLine object. If not, None is
@@ -49,7 +50,11 @@ class LabelLine(LineObject):
         # Now determine is the line is a constant
         constant_match = re.search(LabelLine.PATTERN_CONSTANT, line_str)
         if constant_match is not None and len(constant_match.groups()) == 2:
-            value_expr = parse_expression(line_id, constant_match.group(2).strip())
+            value_expr = parse_expression(
+                line_id,
+                constant_match.group(2).strip(),
+                default_numeric_base,
+            )
             if value_expr.contains_register_labels(registers):
                 sys.exit(f'ERROR: {line_id} - Expression contains register label')
             constant_label = constant_match.group(1).strip()

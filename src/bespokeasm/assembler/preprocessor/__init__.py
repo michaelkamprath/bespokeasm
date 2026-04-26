@@ -21,12 +21,14 @@ class Preprocessor:
             raise ValueError('DiagnosticReporter is required for Preprocessor')
         self._diagnostic_reporter = diagnostic_reporter
         self._symbols: dict[str, PreprocessorSymbol] = {}
+        self._default_numeric_base = 'decimal'
 
         # Add built-in BespokeASM version symbol
         self._add_bespokeasm_version_symbol()
 
         # Add built-in language version symbols if ISA model is provided
         if isa_model is not None:
+            self._default_numeric_base = getattr(isa_model, 'default_numeric_base', 'decimal')
             self._add_language_version_symbols(isa_model)
 
         for symbol_def in predefined_symbols:
@@ -46,6 +48,10 @@ class Preprocessor:
     @property
     def diagnostic_reporter(self):
         return self._diagnostic_reporter
+
+    @property
+    def default_numeric_base(self) -> str:
+        return self._default_numeric_base
 
     def add_cli_symbols(self, cli_symbols: list[str]) -> None:
         for symbol_str in cli_symbols:

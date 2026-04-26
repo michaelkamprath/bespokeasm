@@ -24,10 +24,11 @@ class BytecodeGenerator:
         isa_model: AssemblerModel,
         memzone_manager: MemoryZoneManager,
         parser_class: type[InstructioParserBase],
+        source_mnemonic: str | None = None,
     ) -> AssembledInstruction:
         if isinstance(instruction, Instruction):
             return InstructionBytecodeGenerator.generate_bytecode_parts(
-                        instruction, line_id, mnemonic, operands, isa_model, memzone_manager
+                        instruction, line_id, mnemonic, operands, isa_model, memzone_manager, source_mnemonic
                     )
         elif isinstance(instruction, InstructionMacro):
             return MacroBytecodeGenerator.generate_bytecode_parts(

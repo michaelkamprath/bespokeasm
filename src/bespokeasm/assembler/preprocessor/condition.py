@@ -147,8 +147,16 @@ class IfPreprocessorCondition(PreprocessorCondition):
         lhs_resolved = preprocessor.resolve_symbols(self._line, self._lhs_expression)
         rhs_resolved = preprocessor.resolve_symbols(self._line, self._rhs_expression)
 
-        lhs_expression: ExpressionNode = parse_expression(self._line, lhs_resolved)
-        rhs_expression: ExpressionNode = parse_expression(self._line, rhs_resolved)
+        lhs_expression: ExpressionNode = parse_expression(
+            self._line,
+            lhs_resolved,
+            preprocessor.default_numeric_base,
+        )
+        rhs_expression: ExpressionNode = parse_expression(
+            self._line,
+            rhs_resolved,
+            preprocessor.default_numeric_base,
+        )
 
         if len(lhs_expression.contained_labels()) > 0 or len(rhs_expression.contained_labels()) > 0:
             # must do a string comparison

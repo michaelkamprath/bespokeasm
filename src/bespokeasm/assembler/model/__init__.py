@@ -16,6 +16,8 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.model.instruction_set import InstructionSet
 from bespokeasm.assembler.model.operand_set import OperandSet
 from bespokeasm.assembler.model.operand_set import OperandSetCollection
+from bespokeasm.utilities import is_unprefixed_numeric_string
+from bespokeasm.utilities import normalize_default_numeric_base
 from packaging import version
 from ruamel.yaml import YAML
 
@@ -77,13 +79,7 @@ class AssemblerModel:
         self._isa_name = self._isa_name.strip().replace(' ', '_')
         self._isa_version = self._isa_version.strip()
         # set up registers
-        registers_config = self._config['general'].get('registers')
-        if isinstance(registers_config, dict):
-            register_names = list(registers_config.keys())
-        elif registers_config is None:
-            register_names = []
-        else:
-            register_names = list(registers_config)
+        register_names = self._configured_register_names()
         self._registers = set(register_names)
         # check to see if any registers named with a keyword
         for reg in self._registers:
@@ -97,6 +93,7 @@ class AssemblerModel:
             self.word_size,
             self.word_segment_size,
             self._diagnostic_reporter,
+            default_numeric_base=self.default_numeric_base,
         )
         self._instructions = InstructionSet(
                 self._config['instructions'],
@@ -104,6 +101,7 @@ class AssemblerModel:
                 self._operand_sets,
                 self.multi_word_endianness,
                 self.intra_word_endianness,
+                self.default_numeric_base,
                 self.registers,
                 self.word_size,
                 self.word_segment_size,
@@ -143,6 +141,16 @@ class AssemblerModel:
         fill = general.get('string_byte_packing_fill', 0)
         if not isinstance(fill, int) or not (0 <= fill <= 255):
             sys.exit('ERROR - "string_byte_packing_fill" must be an integer between 0 and 255.')
+        try:
+            general['default_numeric_base'] = normalize_default_numeric_base(
+                general.get('default_numeric_base')
+            )
+        except ValueError:
+            sys.exit(
+                'ERROR - "default_numeric_base" must be one of: decimal, hex/hexadecimal/base16, '
+                'octal/base8, binary/base2.'
+            )
+        self._validate_ambiguous_source_identifiers()
 
         # check for min required BespokeASM version
         if 'min_version' in self._config['general']:
@@ -172,6 +180,59 @@ class AssemblerModel:
                         f'default origin value of {self.default_origin} is less than the GLOBAL memory '
                         f'zone start value of {zone["start"]}.'
                     )
+
+    def _configured_register_names(self) -> list[str]:
+        registers_config = self._config['general'].get('registers')
+        if isinstance(registers_config, dict):
+            return list(registers_config.keys())
+        elif registers_config is None:
+            return []
+        else:
+            return list(registers_config)
+
+    def _validate_register_names(self, register_names: list[str]) -> None:
+        if self.default_numeric_base == 'decimal':
+            return
+        for register_name in register_names:
+            if is_unprefixed_numeric_string(register_name, self.default_numeric_base):
+                sys.exit(
+                    'ERROR: the instruction set configuration file specified register name '
+                    f'"{register_name}" which is ambiguous with a bare {self.default_numeric_base} '
+                    'numeric literal under general.default_numeric_base. Rename the register or '
+                    'use a different default_numeric_base.'
+                )
+
+    def _validate_ambiguous_named_entities(
+        self,
+        names: list[str],
+        entity_description: str,
+    ) -> None:
+        if self.default_numeric_base == 'decimal':
+            return
+        for name in names:
+            if is_unprefixed_numeric_string(name, self.default_numeric_base):
+                sys.exit(
+                    'ERROR: the instruction set configuration file specified '
+                    f'{entity_description} "{name}" which is ambiguous with a bare '
+                    f'{self.default_numeric_base} numeric literal under '
+                    'general.default_numeric_base. Rename it or use a different '
+                    'default_numeric_base.'
+                )
+
+    def _validate_ambiguous_source_identifiers(self) -> None:
+        self._validate_register_names(self._configured_register_names())
+        self._validate_ambiguous_named_entities(
+            [item['name'] for item in self.predefined_constants],
+            'predefined constant name',
+        )
+        self._validate_ambiguous_named_entities(
+            [item['name'] for item in self.predefined_data_blocks],
+            'predefined data label',
+        )
+        self._validate_ambiguous_named_entities(
+            [item['name'] for item in self.predefined_symbols],
+            'predefined preprocessor symbol name',
+        )
 
     def __repr__(self) -> str:
         return str(self)
@@ -287,6 +348,10 @@ class AssemblerModel:
         return self._config['general'].get('word_segment_size', self.word_size)
 
     @property
+    def default_numeric_base(self) -> Literal['decimal', 'hex', 'octal', 'binary']:
+        return self._config['general'].get('default_numeric_base', 'decimal')
+
+    @property
     def registers(self) -> set[str]:
         return self._registers
 
@@ -318,14 +383,18 @@ class AssemblerModel:
 
     @cached_property
     def predefined_constants(self) -> list[dict[str, int]]:
-        if 'predefined' in self._config and 'constants' in self._config['predefined']:
+        if 'predefined' in self._config \
+                and self._config['predefined'] is not None \
+                and 'constants' in self._config['predefined']:
             return self._config['predefined']['constants']
         else:
             return []
 
     @cached_property
     def predefined_data_blocks(self) -> list[dict]:
-        if 'predefined' in self._config and 'data' in self._config['predefined']:
+        if 'predefined' in self._config \
+                and self._config['predefined'] is not None \
+                and 'data' in self._config['predefined']:
             return self._config['predefined']['data']
         else:
             return []
@@ -372,7 +441,9 @@ class AssemblerModel:
 
     @property
     def predefined_symbols(self) -> list[dict]:
-        if 'predefined' in self._config and 'symbols' in self._config['predefined']:
+        if 'predefined' in self._config \
+                and self._config['predefined'] is not None \
+                and 'symbols' in self._config['predefined']:
             return self._config['predefined']['symbols']
         else:
             return []

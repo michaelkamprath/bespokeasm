@@ -1,0 +1,497 @@
+description: Gakken GMC-4 / Radio Shack SFMT ISA
+general:
+  min_version: 0.7.3
+  address_size: 8
+  word_size: 4
+  multi_word_endian: big
+  default_numeric_base: hex
+  identifier:
+    name: gmc4
+    version: "1.0.0"
+    extension: gmc4
+  registers:
+    DEM:
+      title: DEM compatibility token
+      description: |-
+        Not a hardware register. Kept only so historical `cal dem+` and
+        `cal dem-` listings continue to assemble. Prefer the standalone
+        `dem+` and `dem-` mnemonics for new source.
+      size: 4
+  flags:
+    flag:
+      name: flag
+      description: |-
+        Single-bit status flag. Convention is `1` = exceptional condition (no key, overflow, not equal, was-even),
+        `0` = normal/equality. The conditional `JUMP` is taken when FLAG=1 and forces FLAG=1 after executing.
+  documentation:
+    description: |-
+      The Gakken GMC-4 (an Otona-no-Kagaku kit, 2009) and the older Radio Shack Science Fair
+      Microcomputer Trainer (SFMT) share a 4-bit Harvard-architecture instruction set with
+      80 nibbles of program memory (`0x00`-`0x4F`) and 16 nibbles of data memory
+      (`0x50`-`0x5F`). The 16 primary opcodes occupy the high nibble of an instruction;
+      most instructions fit in one or two nibbles, with `JUMP` being the sole three-nibble
+      instruction. The `cal` opcode (`E_`) selects one of fifteen built-in subroutines via
+      its low nibble; predefined constants (`RSTO`, `SETR`, ..., `DSPR`) make the
+      legacy-style `cal DSPR` syntax available, while the source-language mnemonics
+      `m+`, `m-`, `dem+`, and `dem-` preserve the original decimal-arithmetic spellings.
+    examples:
+      - title: Count 0..F on the 7-segment display
+        description: Loops forever, incrementing A and displaying it after a short delay.
+        code: |-
+          .org 0x00
+          start:
+              tia  0          ; A = 0
+          loop:
+              ao              ; show A on 7-segment
+              cal  TIMR       ; delay (A+1) * 0.1s
+              aia  1          ; A = A + 1; FLAG=1 on overflow
+              jump loop       ; if FLAG=1 (overflow this time, taken every other pass) - see notes
+              jump loop       ; second JUMP: FLAG=1 was forced by the prior JUMP, so this is unconditional
+predefined:
+  memory_zones:
+    - name: GLOBAL
+      start: 0x00
+      end: 0x4F
+      documentation:
+        title: Program memory
+        description: 80-nibble program ROM/RAM. All assembled code lands here.
+    - name: data_memory
+      start: 0x50
+      end: 0x5F
+      documentation:
+        title: Data memory
+        description: 16-nibble data RAM, accessed via the `Y` register as `mem[0x50 + Y]`.
+  constants:
+    - name: data_base
+      value: 0x50
+      documentation:
+        type: address
+        description: Base address of data memory; `mem[0x50 + Y]` is the cell selected by Y.
+    - name: data_5e
+      value: 0x5E
+      documentation:
+        type: address
+        description: Low nibble of the 7-bit pattern shown by `DSPR` on the binary LEDs.
+    - name: data_5f
+      value: 0x5F
+      documentation:
+        type: address
+        description: High 3 bits of the 7-bit pattern shown by `DSPR` on the binary LEDs.
+    # Legacy CAL subroutine indices. Use as `cal RSTO`, `cal DSPR`, etc. to
+    # generate the corresponding `E_` byte. Names mirror the original
+    # GMC-4 / SFMT mnemonics. Lowercase aliases are also defined because
+    # bespokeasm constants are case-sensitive and historical listings
+    # mix both cases freely.
+    - name: RSTO
+      value: 0x0
+      documentation:
+        type: subroutine
+        description: Clear the 7-segment display. Emits `E0` when used as `cal RSTO`.
+    - name: SETR
+      value: 0x1
+      documentation:
+        type: subroutine
+        description: Turn on the binary LED indexed by `Y` (0..6). Emits `E1` when used as `cal SETR`.
+    - name: RSTR
+      value: 0x2
+      documentation:
+        type: subroutine
+        description: Turn off the binary LED indexed by `Y` (0..6). Emits `E2` when used as `cal RSTR`.
+    - name: CMPL
+      value: 0x4
+      documentation:
+        type: subroutine
+        description: One's complement of `A`. Emits `E4` when used as `cal CMPL`.
+    - name: CHNG
+      value: 0x5
+      documentation:
+        type: subroutine
+        description: Exchange `{A,B,Y,Z}` with `{A',B',Y',Z'}`. Emits `E5` when used as `cal CHNG`.
+    - name: SIFT
+      value: 0x6
+      documentation:
+        type: subroutine
+        description: Right-shift `A` by 1; FLAG=1 if `A` was even. Emits `E6` when used as `cal SIFT`.
+    - name: ENDS
+      value: 0x7
+      documentation:
+        type: subroutine
+        description: Play end-of-program tone. Emits `E7` when used as `cal ENDS`.
+    - name: ERRS
+      value: 0x8
+      documentation:
+        type: subroutine
+        description: Play error tone. Emits `E8` when used as `cal ERRS`.
+    - name: SHTS
+      value: 0x9
+      documentation:
+        type: subroutine
+        description: Play short beep. Emits `E9` when used as `cal SHTS`.
+    - name: LONS
+      value: 0xA
+      documentation:
+        type: subroutine
+        description: Play long beep. Emits `EA` when used as `cal LONS`.
+    - name: SUND
+      value: 0xB
+      documentation:
+        type: subroutine
+        description: Play tone whose pitch is in `A` (1..0xE). Emits `EB` when used as `cal SUND`.
+    - name: TIMR
+      value: 0xC
+      documentation:
+        type: subroutine
+        description: Delay `(A + 1) * 0.1` seconds. Emits `EC` when used as `cal TIMR`.
+    - name: DSPR
+      value: 0xD
+      documentation:
+        type: subroutine
+        description: Drive binary LEDs from `mem[0x5E]` and `mem[0x5F]`. Emits `ED` when used as `cal DSPR`.
+    # Lowercase aliases for the CAL routine indices.
+    - name: rsto
+      value: 0x0
+    - name: setr
+      value: 0x1
+    - name: rstr
+      value: 0x2
+    - name: cmpl
+      value: 0x4
+    - name: chng
+      value: 0x5
+    - name: sift
+      value: 0x6
+    - name: ends
+      value: 0x7
+    - name: errs
+      value: 0x8
+    - name: shts
+      value: 0x9
+    - name: lons
+      value: 0xA
+    - name: sund
+      value: 0xB
+    - name: timr
+      value: 0xC
+    - name: dspr
+      value: 0xD
+operand_sets:
+  nibble_imm:
+    operand_values:
+      imm4:
+        type: numeric
+        argument:
+          size: 4
+          word_align: false
+    documentation:
+      title: 4-bit immediate
+      category: Literals
+      description: A 4-bit immediate value (0x0..0xF) packed in the low nibble of a two-nibble instruction.
+  program_address:
+    operand_values:
+      addr8:
+        type: address
+        argument:
+          size: 8
+          word_align: false
+          memory_zone: GLOBAL
+    documentation:
+      title: Program address
+      category: Addressing
+      description: An 8-bit program memory address. Validated against the program memory zone (`0x00`-`0x4F`).
+instructions:
+  ka:
+    bytecode:
+      value: 0x0
+      size: 4
+    documentation:
+      category: input/output
+      title: Key to A
+      description: Read the keypad value into `A`. If no key is pressed, `A` is unchanged and `FLAG` is set to `1`; otherwise `FLAG` is cleared.
+      modifies:
+        - register: a
+          description: Loaded with the pressed key code (0x0..0xF) when a key is down.
+        - flag: flag
+          description: Set to `1` when no key is pressed, `0` otherwise.
+  ao:
+    bytecode:
+      value: 0x1
+      size: 4
+    documentation:
+      category: input/output
+      title: A to output
+      description: Display the value of `A` on the 7-segment LED.
+  ch:
+    bytecode:
+      value: 0x2
+      size: 4
+    documentation:
+      category: data movement
+      title: Exchange A<->B and Y<->Z
+      description: Swap A with its shadow B, and Y with its shadow Z.
+      modifies:
+        - register: a
+        - register: b
+        - register: y
+        - register: z
+  cy:
+    bytecode:
+      value: 0x3
+      size: 4
+    documentation:
+      category: data movement
+      title: Exchange A<->Y
+      description: Swap the contents of A and Y.
+      modifies:
+        - register: a
+        - register: y
+  am:
+    bytecode:
+      value: 0x4
+      size: 4
+    documentation:
+      category: data movement
+      title: A to memory
+      description: Store `A` into data memory at address `0x50 + Y`.
+      modifies:
+        - memory: 0x50 + Y
+          description: Receives the value of A.
+  ma:
+    bytecode:
+      value: 0x5
+      size: 4
+    documentation:
+      category: data movement
+      title: Memory to A
+      description: Load `A` from data memory at address `0x50 + Y`.
+      modifies:
+        - register: a
+  m:
+    variants:
+      - bytecode:
+          value: 0x6
+          size: 4
+        mnemonic_decorator:
+          type: plus
+          is_prefix: false
+        documentation:
+          category: arithmetic
+          title: A = A + mem[0x50+Y]
+          description: Add the value at `mem[0x50 + Y]` to `A`. `FLAG` is set to `1` on 4-bit overflow, else `0`.
+          modifies:
+            - register: a
+            - flag: flag
+              description: Set to `1` if the addition carries out of the 4-bit result.
+      - bytecode:
+          value: 0x7
+          size: 4
+        mnemonic_decorator:
+          type: minus
+          is_prefix: false
+        documentation:
+          category: arithmetic
+          title: A = mem[0x50+Y] - A
+          description: Subtract `A` from `mem[0x50 + Y]` and store the 4-bit result in `A`. `FLAG` is set to `1` if the result was negative (borrow), else `0`.
+          modifies:
+            - register: a
+            - flag: flag
+              description: Set to `1` on borrow (negative result).
+  tia:
+    bytecode:
+      value: 0x8
+      size: 4
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - nibble_imm
+    documentation:
+      category: data movement
+      title: Transfer immediate to A
+      description: Load the 4-bit immediate into `A`.
+      modifies:
+        - register: a
+  aia:
+    bytecode:
+      value: 0x9
+      size: 4
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - nibble_imm
+    documentation:
+      category: arithmetic
+      title: Add immediate to A
+      description: Add the 4-bit immediate to `A`. `FLAG` is set to `1` on 4-bit overflow.
+      modifies:
+        - register: a
+        - flag: flag
+          description: Set to `1` on carry out of the 4-bit result.
+  tiy:
+    bytecode:
+      value: 0xA
+      size: 4
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - nibble_imm
+    documentation:
+      category: data movement
+      title: Transfer immediate to Y
+      description: Load the 4-bit immediate into `Y`.
+      modifies:
+        - register: y
+  aiy:
+    bytecode:
+      value: 0xB
+      size: 4
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - nibble_imm
+    documentation:
+      category: arithmetic
+      title: Add immediate to Y
+      description: Add the 4-bit immediate to `Y`. `FLAG` is set to `1` on 4-bit overflow.
+      modifies:
+        - register: y
+        - flag: flag
+          description: Set to `1` on carry out of the 4-bit result.
+  cia:
+    bytecode:
+      value: 0xC
+      size: 4
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - nibble_imm
+    documentation:
+      category: arithmetic
+      title: Compare A to immediate
+      description: Compare `A` with the 4-bit immediate. `FLAG` is set to `0` if equal, `1` otherwise. A subsequent `JUMP` therefore branches on inequality.
+      modifies:
+        - flag: flag
+          description: Cleared on equality, set on inequality.
+  ciy:
+    bytecode:
+      value: 0xD
+      size: 4
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - nibble_imm
+    documentation:
+      category: arithmetic
+      title: Compare Y to immediate
+      description: Compare `Y` with the 4-bit immediate. `FLAG` is set to `0` if equal, `1` otherwise.
+      modifies:
+        - flag: flag
+          description: Cleared on equality, set on inequality.
+  cal:
+    bytecode:
+      value: 0xE
+      size: 4
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - nibble_imm
+    variants:
+      - bytecode:
+          value: 0xEE
+          size: 8
+        operands:
+          count: 1
+          specific_operands:
+            dem_minus:
+              list:
+                target:
+                  type: register
+                  register: DEM
+                  decorator:
+                    type: minus
+                    is_prefix: false
+        documentation:
+          category: control
+          title: Call DEM- (compatibility)
+          description: |-
+            Compatibility form for historical listings. `cal dem-` emits
+            `EE`; prefer standalone `dem-` in new source.
+      - bytecode:
+          value: 0xEF
+          size: 8
+        operands:
+          count: 1
+          specific_operands:
+            dem_plus:
+              list:
+                target:
+                  type: register
+                  register: DEM
+                  decorator:
+                    type: plus
+                    is_prefix: false
+        documentation:
+          category: control
+          title: Call DEM+ (compatibility)
+          description: |-
+            Compatibility form for historical listings. `cal dem+` emits
+            `EF`; prefer standalone `dem+` in new source.
+    documentation:
+      category: control
+      title: Call built-in subroutine
+      description: |-
+        Calls the built-in subroutine selected by the 4-bit immediate.
+        Use the predefined constants (`RSTO`, `SETR`, `RSTR`, `CMPL`, `CHNG`,
+        `SIFT`, `ENDS`, `ERRS`, `SHTS`, `LONS`, `SUND`, `TIMR`, `DSPR`)
+        for legacy-style source: `cal DSPR` emits `ED`. A bare numeric
+        immediate also works (e.g. `cal 0xD`).
+  dem:
+    variants:
+      - bytecode:
+          value: 0xEE
+          size: 8
+        mnemonic_decorator:
+          type: minus
+          is_prefix: false
+        documentation:
+          category: control
+          title: Decimal subtract
+          description: |-
+            Legacy `DEM-`. Decimal-adjusted subtract of `A` from
+            `mem[0x50 + Y]`; `Y` is decremented. Emits `EE`.
+      - bytecode:
+          value: 0xEF
+          size: 8
+        mnemonic_decorator:
+          type: plus
+          is_prefix: false
+        documentation:
+          category: control
+          title: Decimal add
+          description: |-
+            Legacy `DEM+`. Decimal-adjusted add of `A` to `mem[0x50 + Y]`;
+            `Y` is decremented; auto-adjust on overflow. Emits `EF`.
+  jump:
+    bytecode:
+      value: 0xF
+      size: 4
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - program_address
+    documentation:
+      category: control
+      title: Conditional jump
+      description: |-
+        If `FLAG == 1`, set the program counter to the 8-bit address operand.
+        After execution `FLAG` is forced to `1`, so a second `JUMP` immediately following
+        the first acts as an unconditional branch.
+      modifies:
+        - flag: flag
+          description: Forced to `1` after execution.
