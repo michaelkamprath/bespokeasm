@@ -67,6 +67,17 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIn(f'syn region {vim_ft}BracketExpr matchgroup={vim_ft}Bracket', syn)
         self.assertIn(f'syn region {vim_ft}DoubleBracketExpr matchgroup={vim_ft}DoubleBracket', syn)
         self.assertIn(f'syn region {vim_ft}ParenExpr matchgroup={vim_ft}Paren', syn)
+        instr_line = next(
+            line for line in syn.splitlines()
+            if line.startswith(f'syn region {vim_ft}InstrLine ')
+        )
+        bracket_line = next(
+            line for line in syn.splitlines()
+            if line.startswith(f'syn region {vim_ft}BracketExpr ')
+        )
+        self.assertIn(f'{vim_ft}LabelUsage', instr_line)
+        self.assertIn(f'{vim_ft}LabelUsage', bracket_line)
+        self.assertNotRegex(syn, rf'(?m)^syn\s+match\s+{re.escape(vim_ft)}LabelUsage\b')
         self.assertIn(r'start=/\[\(\[\)\@!/', syn)
         self.assertIn(r'end=/\s*\ze;\|$/ oneline', syn)
         for region_name in ('InstrLine', 'MacroLine'):
@@ -78,8 +89,10 @@ class TestConfigurationGeneration(unittest.TestCase):
                 self.assertIn(r'end=/\s*\ze\<', region_line)
                 self.assertIn(r'\|\s*\ze;\|$/ oneline', region_line)
         self.assertIn(f'hi def link {vim_ft}CompilerLabel Constant', syn)
+        self.assertIn(f'hi def link {vim_ft}LabelUsage Identifier', syn)
         self.assertIn(f'hi def link {vim_ft}Param Identifier', syn)
         self.assertIn(f'hi def link {vim_ft}Separator Delimiter', syn)
+        self.assertIn(f'hi {vim_ft}LabelUsage ', syn)
         self.assertIn(f'hi {vim_ft}AssignOp ', syn)
 
         param_index = syn.find(f'syn match {vim_ft}Param')
@@ -1122,6 +1135,168 @@ class TestConfigurationGeneration(unittest.TestCase):
         start_index = region_line.index('start=/')
         end_index = region_line.index(' end=/')
         self.assertLess(start_index, end_index)
+        shutil.rmtree(test_dir)
+
+    def test_vim_ftplugin_generated(self):
+        test_dir = tempfile.mkdtemp()
+        config_file = pkg_resources.files(config_files).joinpath('test_instruction_line_creation_little_endian.yaml')
+        configgen = VimConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            None,
+            None,
+            'asmtest',
+        )
+        configgen.generate()
+        vim_ft = (configgen.language_id.replace('-', '').lower())
+        ftplugin_fp = os.path.join(str(test_dir), 'ftplugin', f'{vim_ft}.vim')
+        self.assertIsFile(ftplugin_fp)
+        with open(ftplugin_fp) as f:
+            ftplugin = f.read()
+
+        self.assertIn(f'if exists("b:did_{vim_ft}_ftplugin") | finish | endif', ftplugin)
+        self.assertIn(f'augroup bespokeasm_{vim_ft}', ftplugin)
+        self.assertIn('autocmd! * <buffer>', ftplugin)
+        self.assertIn(f'autocmd bespokeasm_{vim_ft} BufReadPost <buffer>', ftplugin)
+        self.assertIn(f'autocmd bespokeasm_{vim_ft} BufWritePost <buffer>', ftplugin)
+        self.assertIn(f'autocmd bespokeasm_{vim_ft} CursorHold <buffer>', ftplugin)
+        self.assertIn(f'setlocal keywordprg=:call\\ {vim_ft}_docs#Show', ftplugin)
+        self.assertIn(f'g:bespokeasm_{vim_ft}_max_scan_lines = 10000', ftplugin)
+        self.assertIn(f'call s:RefreshLabelsGuarded_{vim_ft}()', ftplugin)
+        self.assertIn(f'silent! syntax clear {vim_ft}LabelUsage', ftplugin)
+        self.assertIn(r'\%(@\)\@<=\<\%(', ftplugin)
+        self.assertNotIn(' \\\n', ftplugin)
+        self.assertIn(
+            f"autocmd bespokeasm_{vim_ft} CursorHold <buffer> call {vim_ft}_docs#PopupAtCursor(expand('<cword>'))",
+            ftplugin,
+        )
+        self.assertIn('Cross-file label resolution is not supported.', ftplugin)
+        shutil.rmtree(test_dir)
+
+    def test_vim_autoload_docs_generated(self):
+        test_dir = tempfile.mkdtemp()
+        config_file = pkg_resources.files(config_files).joinpath('test_compiler_features.yaml')
+        configgen = VimConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            None,
+            None,
+            'asmtest',
+        )
+        configgen.generate()
+        vim_ft = (configgen.language_id.replace('-', '').lower())
+        docs_fp = os.path.join(str(test_dir), 'autoload', f'{vim_ft}_docs.vim')
+        self.assertIsFile(docs_fp)
+        with open(docs_fp) as f:
+            docs = f.read()
+
+        self.assertIn('let s:docs = {', docs)
+        self.assertIn(f'function! {vim_ft}_docs#Show(word) abort', docs)
+        self.assertIn(f'function! {vim_ft}_docs#PopupAtCursor(word) abort', docs)
+        self.assertIn('"ld": "', docs)
+        self.assertIn('"a": "', docs)
+        self.assertIn('".org": "', docs)
+        for line in docs.splitlines():
+            if not line.startswith('\\   "'):
+                continue
+            self.assertRegex(line, r'^\\   "(?:[^"\\]|\\.)+": "(?:[^"\\]|\\.)*",$')
+            self.assertNotRegex(line, r'(?<!\\)\\",$')
+        shutil.rmtree(test_dir)
+
+    def test_vim_digit_leading_filetype_is_sanitized(self):
+        test_dir = tempfile.mkdtemp()
+        config_file = pkg_resources.files(config_files).joinpath('test_instruction_line_creation_little_endian.yaml')
+        configgen = VimConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            '6502-asm',
+            None,
+            'asmtest',
+        )
+        configgen.generate()
+        vim_ft = '_6502asmassembly'
+
+        for subdir, filename in [
+            ('syntax', f'{vim_ft}.vim'),
+            ('ftdetect', f'{vim_ft}.vim'),
+            ('ftplugin', f'{vim_ft}.vim'),
+            ('autoload', f'{vim_ft}_docs.vim'),
+        ]:
+            self.assertIsFile(os.path.join(str(test_dir), subdir, filename))
+
+        docs_fp = os.path.join(str(test_dir), 'autoload', f'{vim_ft}_docs.vim')
+        with open(docs_fp) as f:
+            docs = f.read()
+        self.assertFalse(vim_ft[0].isdigit())
+        self.assertIn(f'function! {vim_ft}_docs#Show(word) abort', docs)
+        self.assertIn(f'function! {vim_ft}_docs#PopupAtCursor(word) abort', docs)
+        shutil.rmtree(test_dir)
+
+    def test_vim_syntax_includes_label_usage(self):
+        test_dir = tempfile.mkdtemp()
+        config_file = pkg_resources.files(config_files).joinpath('test_instruction_line_creation_little_endian.yaml')
+        configgen = VimConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            None,
+            None,
+            'asmtest',
+        )
+        configgen.generate()
+        vim_ft = (configgen.language_id.replace('-', '').lower())
+        syntax_fp = os.path.join(str(test_dir), 'syntax', f'{vim_ft}.vim')
+        self.assertIsFile(syntax_fp)
+        with open(syntax_fp) as f:
+            syn = f.read()
+
+        self._assert_vim_contextual_syntax(syn, vim_ft)
+        self.assertNotRegex(syn, rf'(?m)^syn\s+match\s+{re.escape(vim_ft)}LabelUsage\b')
+        self.assertIn(f'hi def link {vim_ft}LabelUsage Identifier', syn)
+        self.assertRegex(syn, rf'(?m)^hi\s+{re.escape(vim_ft)}LabelUsage\s+guifg=')
+        shutil.rmtree(test_dir)
+
+    def test_vim_string_escape_round_trips_docs(self):
+        test_dir = tempfile.mkdtemp()
+        config_file = pkg_resources.files(config_files).joinpath('test_instruction_line_creation_little_endian.yaml')
+        configgen = VimConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            None,
+            None,
+            'asmtest',
+        )
+        value = 'quote " backslash \\ newline\ncarriage\rend'
+        escaped = configgen._vim_string_escape(value)
+
+        def decode_vim_double_quoted_string(text):
+            result = []
+            index = 0
+            while index < len(text):
+                char = text[index]
+                if char == '\\' and index + 1 < len(text):
+                    next_char = text[index + 1]
+                    if next_char == 'n':
+                        result.append('\n')
+                    elif next_char == 'r':
+                        result.append('\r')
+                    else:
+                        result.append(next_char)
+                    index += 2
+                    continue
+                result.append(char)
+                index += 1
+            return ''.join(result)
+
+        self.assertEqual(decode_vim_double_quoted_string(escaped), value)
+        self.assertIn(r'\"', escaped)
+        self.assertIn(r'\\', escaped)
+        self.assertIn(r'\n', escaped)
+        self.assertIn(r'\r', escaped)
         shutil.rmtree(test_dir)
 
     def test_vim_configgen_with_macros(self):

@@ -4,7 +4,7 @@
 
 BespokeASM generates editor syntax highlighting for three targets: VSCode, Sublime Text, and vim. The VSCode and Sublime generators produce rich, context-aware highlighting using scoped region models (TextMate grammar and Sublime syntax push/pop contexts respectively). The vim generator currently uses only flat `syn match` and `syn keyword` patterns with no scoped regions, leaving several gaps.
 
-This plan brings the vim syntax file to parity with the other editors **at the grammar layer** — no vim plugin required. The one feature not addressed here is semantic label-usage highlighting (underlining identifiers that match known label definitions), which requires a separate generated vim plugin and is out of scope.
+This plan brings the vim syntax file to parity with the other editors **at the grammar layer** — no vim plugin required. Semantic label-usage highlighting and hover-equivalent documentation are covered separately by `vim-semantic-and-hover-plan.md`.
 
 ## File to Modify
 

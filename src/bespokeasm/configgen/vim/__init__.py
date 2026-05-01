@@ -8,6 +8,7 @@ from bespokeasm.assembler.keywords import PREPROCESSOR_DIRECTIVES_SET
 from bespokeasm.configgen import LanguageConfigGenerator
 from bespokeasm.configgen.color_scheme import DEFAULT_COLOR_SCHEME
 from bespokeasm.configgen.color_scheme import SyntaxElement
+from bespokeasm.configgen.hover_docs import build_hover_docs
 
 
 class VimConfigGenerator(LanguageConfigGenerator):
@@ -115,6 +116,7 @@ class VimConfigGenerator(LanguageConfigGenerator):
             (f'{lang_group}DecNumber', SyntaxElement.DECIMAL_NUMBER),
             (f'{lang_group}CharNumber', SyntaxElement.CHARACTER_NUMBER),
             (f'{lang_group}LabelName', SyntaxElement.LABEL_NAME),
+            (f'{lang_group}LabelUsage', SyntaxElement.LABEL_USAGE),
             (f'{lang_group}LabelColon', SyntaxElement.PUNCTUATION_LABEL_COLON),
             (f'{lang_group}OperandLabelAt', SyntaxElement.OPERAND_LABEL_AT),
             (f'{lang_group}OperandLabelName', SyntaxElement.OPERAND_LABEL_NAME),
@@ -165,15 +167,21 @@ ctermbg=NONE gui=bold cterm=bold')
     def generate(self) -> None:
         syntax_dir_path = os.path.join(self.export_dir, 'syntax')
         ftdetect_dir_path = os.path.join(self.export_dir, 'ftdetect')
+        ftplugin_dir_path = os.path.join(self.export_dir, 'ftplugin')
+        autoload_dir_path = os.path.join(self.export_dir, 'autoload')
 
         Path(syntax_dir_path).mkdir(parents=True, exist_ok=True)
         Path(ftdetect_dir_path).mkdir(parents=True, exist_ok=True)
+        Path(ftplugin_dir_path).mkdir(parents=True, exist_ok=True)
+        Path(autoload_dir_path).mkdir(parents=True, exist_ok=True)
 
         if self.verbose >= 1:
             print(f'Generating Vim syntax files for language "{self.language_id}" into: {self.export_dir}')
 
         # Sanitize Vim filetype: lowercase, no dashes
         vim_filetype = self.language_id.replace('-', '').lower()
+        if vim_filetype and vim_filetype[0].isdigit():
+            vim_filetype = '_' + vim_filetype
 
         syntax_fp = os.path.join(syntax_dir_path, f'{vim_filetype}.vim')
         ftdetect_fp = os.path.join(ftdetect_dir_path, f'{vim_filetype}.vim')
@@ -189,6 +197,20 @@ ctermbg=NONE gui=bold cterm=bold')
             f.write(ftdetect_text)
             if self.verbose > 1:
                 print(f'  generated {os.path.basename(ftdetect_fp)}')
+
+        ftplugin_fp = os.path.join(ftplugin_dir_path, f'{vim_filetype}.vim')
+        ftplugin_text = self._build_ftplugin_vim(vim_filetype)
+        with open(ftplugin_fp, 'w', encoding='utf-8') as f:
+            f.write(ftplugin_text)
+            if self.verbose > 1:
+                print(f'  generated {os.path.basename(ftplugin_fp)}')
+
+        docs_fp = os.path.join(autoload_dir_path, f'{vim_filetype}_docs.vim')
+        docs_text = self._build_docs_autoload_vim(vim_filetype)
+        with open(docs_fp, 'w', encoding='utf-8') as f:
+            f.write(docs_text)
+            if self.verbose > 1:
+                print(f'  generated {os.path.basename(docs_fp)}')
 
     def _vim_escape(self, token: str) -> str:
         # Escape Vim regex special chars
@@ -255,6 +277,7 @@ ctermbg=NONE gui=bold cterm=bold')
             f'{lang_group}BracketExpr',
             f'{lang_group}ParenExpr',
             f'{lang_group}Param',
+            f'{lang_group}LabelUsage',
         ])
         operand_contains = ','.join([
             f'{lang_group}String',
@@ -272,6 +295,7 @@ ctermbg=NONE gui=bold cterm=bold')
             f'{lang_group}BracketExpr',
             f'{lang_group}ParenExpr',
             f'{lang_group}Param',
+            f'{lang_group}LabelUsage',
         ])
         directive_contains = ','.join([
             f'{lang_group}String',
@@ -422,6 +446,7 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         lines.append(f'hi def link {lang_group}DecNumber Number')
         lines.append(f'hi def link {lang_group}CharNumber Number')
         lines.append(f'hi def link {lang_group}LabelName Label')
+        lines.append(f'hi def link {lang_group}LabelUsage Identifier')
         lines.append(f'hi def link {lang_group}LabelColon Delimiter')
         lines.append(f'hi def link {lang_group}OperandLabelAt Delimiter')
         lines.append(f'hi def link {lang_group}OperandLabelName Label')
@@ -459,4 +484,177 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
             f'autocmd BufRead,BufNewFile *.{ext} setfiletype {vim_filetype}',
             '',
         ]
+        return '\n'.join(lines)
+
+    def _build_ftplugin_vim(self, vim_filetype: str) -> str:
+        lines = [
+            '" BespokeASM generated ftplugin.',
+            '" Known limitations:',
+            '" - Cross-file label resolution is not supported.',
+            f'" - Buffers larger than g:bespokeasm_{vim_filetype}_max_scan_lines are not scanned.',
+            '" - Operand-label scoping is approximated across the whole buffer.',
+            '" - Hover popups require vim 8.2+ or Neovim; K uses a preview window everywhere else.',
+            f'if exists("b:did_{vim_filetype}_ftplugin") | finish | endif',
+            f'let b:did_{vim_filetype}_ftplugin = 1',
+            '',
+            f'augroup bespokeasm_{vim_filetype}',
+            '  autocmd! * <buffer>',
+            'augroup END',
+            '',
+            f'function! s:ScanLabels_{vim_filetype}() abort',
+            '  let l:globals = {}',
+            '  let l:locals = {}',
+            "  for l:lnum in range(1, line('$'))",
+            '    let l:line = getline(l:lnum)',
+            "    let l:line = substitute(l:line, ';.*$', '', '')",
+            "    let l:m = matchlist(l:line, '^\\s*\\(\\.\\?\\w\\+\\)\\s*:')",
+            '    if !empty(l:m)',
+            '      let l:globals[l:m[1]] = 1',
+            '      continue',
+            '    endif',
+            "    let l:m = matchlist(l:line, '^\\s*@\\(\\w\\+\\)\\s*:')",
+            '    if !empty(l:m)',
+            '      let l:locals[l:m[1]] = 1',
+            '    endif',
+            '  endfor',
+            f'  let b:bespokeasm_{vim_filetype}_globals = keys(l:globals)',
+            f'  let b:bespokeasm_{vim_filetype}_locals = keys(l:locals)',
+            'endfunction',
+            '',
+            f'function! s:ApplyLabelHighlight_{vim_filetype}() abort',
+            f'  silent! syntax clear {vim_filetype}LabelUsage',
+            f"  if !empty(get(b:, 'bespokeasm_{vim_filetype}_globals', []))",
+            f"    let l:alt = join(map(copy(b:bespokeasm_{vim_filetype}_globals), 'escape(v:val, ''/\\.'')'), '\\|')",
+            f"    execute 'syntax match {vim_filetype}LabelUsage /\\<\\%(' . l:alt . '\\)\\>/ contained'",
+            '  endif',
+            f"  if !empty(get(b:, 'bespokeasm_{vim_filetype}_locals', []))",
+            f"    let l:alt = join(map(copy(b:bespokeasm_{vim_filetype}_locals), 'escape(v:val, ''/\\.'')'), '\\|')",
+            f"    execute 'syntax match {vim_filetype}LabelUsage /\\%(@\\)\\@<=\\<\\%(' . l:alt . '\\)\\>/ contained'",
+            '  endif',
+            'endfunction',
+            '',
+            f'function! s:RefreshLabels_{vim_filetype}() abort',
+            f'  call s:ScanLabels_{vim_filetype}()',
+            f'  call s:ApplyLabelHighlight_{vim_filetype}()',
+            'endfunction',
+            '',
+            f'if !exists("g:bespokeasm_{vim_filetype}_max_scan_lines")',
+            f'  let g:bespokeasm_{vim_filetype}_max_scan_lines = 10000',
+            'endif',
+            '',
+            f'function! s:RefreshLabelsGuarded_{vim_filetype}() abort',
+            f"  if line('$') > g:bespokeasm_{vim_filetype}_max_scan_lines | return | endif",
+            f'  call s:RefreshLabels_{vim_filetype}()',
+            'endfunction',
+            '',
+            '" Lower updatetime (for example, set updatetime=1000) for snappier semantic refreshes.',
+            f'autocmd bespokeasm_{vim_filetype} BufReadPost <buffer> call s:RefreshLabelsGuarded_{vim_filetype}()',
+            f'autocmd bespokeasm_{vim_filetype} BufWritePost <buffer> call s:RefreshLabelsGuarded_{vim_filetype}()',
+            f'autocmd bespokeasm_{vim_filetype} CursorHold <buffer> call s:RefreshLabelsGuarded_{vim_filetype}()',
+            f'autocmd bespokeasm_{vim_filetype} CursorHoldI <buffer> call s:RefreshLabelsGuarded_{vim_filetype}()',
+            '',
+            f'call s:RefreshLabelsGuarded_{vim_filetype}()',
+            '',
+            f"setlocal keywordprg=:call\\ {vim_filetype}_docs#Show(expand('<cword>'))",
+            '',
+            f"if get(g:, 'bespokeasm_{vim_filetype}_auto_hover', 0)",
+            f'  autocmd bespokeasm_{vim_filetype} CursorHold <buffer>'
+            f" call {vim_filetype}_docs#PopupAtCursor(expand('<cword>'))",
+            'endif',
+            '',
+        ]
+        return '\n'.join(lines)
+
+    def _collect_hover_docs(self) -> dict[str, str]:
+        hover_docs = build_hover_docs(self.model, self.verbose)
+        docs: dict[str, str] = {}
+
+        for name, doc in hover_docs.get('instructions', {}).items():
+            docs[name.lower()] = doc
+        for name, doc in hover_docs.get('macros', {}).items():
+            docs[name.lower()] = doc
+        for name, doc in hover_docs.get('registers', {}).items():
+            docs[name.lower()] = doc
+        for name, doc in hover_docs.get('expression_functions', {}).items():
+            docs[name.lower()] = doc
+
+        directives = hover_docs.get('directives', {})
+        for name, doc in directives.get('compiler', {}).items():
+            docs[f'.{name.lower()}'] = doc
+        for name, doc in directives.get('data_type', {}).items():
+            docs[f'.{name.lower()}'] = doc
+        for name, doc in directives.get('preprocessor', {}).items():
+            docs[f'#{name.lower()}'] = doc
+
+        predefined = hover_docs.get('predefined', {})
+        for category in ('constants', 'data', 'memory_zones'):
+            for name, doc in predefined.get(category, {}).items():
+                docs[name.lower()] = doc
+
+        return docs
+
+    def _vim_string_escape(self, value: str) -> str:
+        return value.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n').replace('\r', '\\r')
+
+    def _build_docs_autoload_vim(self, vim_filetype: str) -> str:
+        docs = self._collect_hover_docs()
+        lines = [
+            '" BespokeASM generated hover-equivalent documentation.',
+            'let s:docs = {',
+        ]
+        for key in sorted(docs):
+            escaped_key = self._vim_string_escape(key)
+            escaped_doc = self._vim_string_escape(docs[key])
+            lines.append(f'\\   "{escaped_key}": "{escaped_doc}",')
+        lines.extend([
+            '\\ }',
+            '',
+            f'function! {vim_filetype}_docs#Show(word) abort',
+            '  let l:key = tolower(a:word)',
+            '  if !has_key(s:docs, l:key)',
+            "    if has_key(s:docs, '.' . l:key)",
+            "      let l:key = '.' . l:key",
+            "    elseif has_key(s:docs, '#' . l:key)",
+            "      let l:key = '#' . l:key",
+            '    else',
+            "      echo 'No docs for ' . a:word",
+            '      return',
+            '    endif',
+            '  endif',
+            '  call s:OpenPreview(l:key, s:docs[l:key])',
+            'endfunction',
+            '',
+            'function! s:OpenPreview(title, body) abort',
+            "  let l:lines = split(a:body, '\\n')",
+            '  silent! pedit __bespokeasm_docs__',
+            '  wincmd P',
+            '  setlocal buftype=nofile bufhidden=wipe noswapfile',
+            '  setlocal filetype=markdown',
+            '  silent %delete _',
+            "  call setline(1, ['# ' . a:title, ''] + l:lines)",
+            '  setlocal nomodifiable',
+            '  wincmd p',
+            'endfunction',
+            '',
+            f'function! {vim_filetype}_docs#PopupAtCursor(word) abort',
+            '  let l:word = tolower(a:word)',
+            '  let l:key = has_key(s:docs, l:word) ? l:word :',
+            "        \\ (has_key(s:docs, '.' . l:word) ? '.' . l:word :",
+            "        \\ (has_key(s:docs, '#' . l:word) ? '#' . l:word : ''))",
+            "  if l:key == '' | return | endif",
+            "  let l:lines = ['# ' . l:key, ''] + split(s:docs[l:key], '\\n')",
+            "  if has('popupwin')",
+            "    call popup_atcursor(l:lines, {'border': [], 'padding': [0,1,0,1]})",
+            "  elseif has('nvim') && exists('*nvim_open_win')",
+            '    let l:buf = nvim_create_buf(v:false, v:true)',
+            '    call nvim_buf_set_lines(l:buf, 0, -1, v:false, l:lines)',
+            '    call nvim_open_win(l:buf, v:false, {',
+            "          \\ 'relative': 'cursor', 'row': 1, 'col': 0,",
+            "          \\ 'width': 60, 'height': len(l:lines),",
+            "          \\ 'style': 'minimal', 'border': 'rounded'",
+            '          \\ })',
+            '  endif',
+            'endfunction',
+            '',
+        ])
         return '\n'.join(lines)
