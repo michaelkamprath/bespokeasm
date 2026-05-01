@@ -108,23 +108,6 @@ class VimConfigGenerator(LanguageConfigGenerator):
         """
         lines = []
 
-        # Set overall editor colors using Normal highlight group
-        bg_color = DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.BACKGROUND)
-        fg_color = DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.FOREGROUND)
-        bg_cterm = self._get_vim_cterm_approximation(bg_color)
-        fg_cterm = self._get_vim_cterm_approximation(fg_color)
-        lines.append(f'hi Normal guifg={fg_color} guibg={bg_color} ctermfg={fg_cterm} ctermbg={bg_cterm}')
-
-        # Set selection colors
-        selection_color = DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.SELECTION)
-        selection_cterm = self._get_vim_cterm_approximation(selection_color)
-        lines.append(f'hi Visual guibg={selection_color} ctermbg={selection_cterm}')
-
-        # Set current line highlighting
-        line_highlight_color = DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.LINE_HIGHLIGHT)
-        line_highlight_cterm = self._get_vim_cterm_approximation(line_highlight_color)
-        lines.append(f'hi CursorLine guibg={line_highlight_color} ctermbg={line_highlight_cterm} cterm=NONE gui=NONE')
-
         # Mapping from generic syntax elements to VIM highlight groups
         vim_mappings = [
             (f'{lang_group}HexNumber', SyntaxElement.HEX_NUMBER),
@@ -140,6 +123,8 @@ class VimConfigGenerator(LanguageConfigGenerator):
             (f'{lang_group}StringPunc', SyntaxElement.PUNCTUATION_STRING),
             (f'{lang_group}Escape', SyntaxElement.STRING_ESCAPE),
             (f'{lang_group}Comment', SyntaxElement.COMMENT),
+            (f'{lang_group}Param', SyntaxElement.PARAMETER),
+            (f'{lang_group}Separator', SyntaxElement.PUNCTUATION_SEPARATOR),
             (f'{lang_group}Instruction', SyntaxElement.INSTRUCTION),
             (f'{lang_group}Macro', SyntaxElement.MACRO),
             (f'{lang_group}Register', SyntaxElement.REGISTER),
@@ -149,6 +134,7 @@ class VimConfigGenerator(LanguageConfigGenerator):
             (f'{lang_group}PreProcPunc', SyntaxElement.PUNCTUATION_PREPROCESSOR),
             (f'{lang_group}DataType', SyntaxElement.DATA_TYPE),
             (f'{lang_group}Operator', SyntaxElement.OPERATOR),
+            (f'{lang_group}AssignOp', SyntaxElement.OPERATOR),
             (f'{lang_group}Directive', SyntaxElement.DIRECTIVE),
         ]
 
@@ -241,11 +227,12 @@ ctermbg=NONE gui=bold cterm=bold')
         # Build vim regex alternations
         directives_words = [d.lstrip('.') for d in compiler_directives]
         datatypes_words = [d.lstrip('.') for d in data_types]
-        # We'll emit separate syn match lines for each directive to keep patterns simple
+        # Emit separate regions for each directive to keep patterns simple.
         preproc_alt = self._alternation(preproc_directives)
         registers_kw = self._join_keywords(registers)
         instructions_alt = self._alternation(instructions)
         macros_alt = self._alternation(macros)
+        operations_alt = self._alternation(list(self.model.operation_mnemonics))
         # Add word boundary to each label alternative as well
         if predefined_labels:
             labels_alt = '\\%(' + '\\|'.join([self._vim_escape(w) + r'\>' for w in predefined_labels]) + '\\)'
@@ -254,6 +241,52 @@ ctermbg=NONE gui=bold cterm=bold')
         expr_funcs_alt = self._alternation(expr_functions)
 
         lang_group = vim_filetype
+        bracket_contains = ','.join([
+            f'{lang_group}Register',
+            f'{lang_group}HexNumber',
+            f'{lang_group}BinNumber',
+            f'{lang_group}DecNumber',
+            f'{lang_group}CharNumber',
+            f'{lang_group}CompilerLabel',
+            f'{lang_group}OperandLabelAt',
+            f'{lang_group}OperandLabelName',
+            f'{lang_group}Operator',
+            f'{lang_group}DoubleBracketExpr',
+            f'{lang_group}BracketExpr',
+            f'{lang_group}ParenExpr',
+            f'{lang_group}Param',
+        ])
+        operand_contains = ','.join([
+            f'{lang_group}String',
+            f'{lang_group}Register',
+            f'{lang_group}HexNumber',
+            f'{lang_group}BinNumber',
+            f'{lang_group}DecNumber',
+            f'{lang_group}CharNumber',
+            f'{lang_group}CompilerLabel',
+            f'{lang_group}OperandLabelAt',
+            f'{lang_group}OperandLabelName',
+            f'{lang_group}Operator',
+            f'{lang_group}Separator',
+            f'{lang_group}DoubleBracketExpr',
+            f'{lang_group}BracketExpr',
+            f'{lang_group}ParenExpr',
+            f'{lang_group}Param',
+        ])
+        directive_contains = ','.join([
+            f'{lang_group}String',
+            f'{lang_group}HexNumber',
+            f'{lang_group}BinNumber',
+            f'{lang_group}DecNumber',
+            f'{lang_group}CharNumber',
+            f'{lang_group}CompilerLabel',
+            f'{lang_group}Operator',
+            f'{lang_group}DoubleBracketExpr',
+            f'{lang_group}BracketExpr',
+            f'{lang_group}ParenExpr',
+            f'{lang_group}Param',
+        ])
+        operation_line_end = fr'\s*\ze\<{operations_alt}\>\|\s*\ze;\|$' if operations_alt else r'\s*\ze;\|$'
 
         lines: list[str] = []
         lines.append('if exists("b:current_syntax")')
@@ -274,6 +307,8 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         lines.append(
             fr"syn match {lang_group}Escape /\\x[0-9A-Fa-f]\{{2}}\|\\o[0-7]\{{2}}\|\\[abfnrtv\"']\|\\\\/ contained"
         )
+        lines.append(fr'syn match {lang_group}Separator /,/ contained')
+        lines.append(fr'syn match {lang_group}Param /\<[A-Za-z_][A-Za-z0-9_.]*\>/ contained')
         # Numbers (split for per-type coloring)
         # - Ensure prefixes like '$' and '%' are included in the match
         # - Prevent numbers from being highlighted inside strings
@@ -306,9 +341,21 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         lines.append(fr'syn match {lang_group}AssignOp /^\s*\w\+\s*\zs\%(=\|EQU\)/')
         # Directives and datatypes
         for w in directives_words:
-            lines.append(fr'syn match {lang_group}Directive /\s*\.' + self._vim_escape(w) + r'\>/')
+            lines.append(
+                fr'syn region {lang_group}DirectiveLine '
+                fr'matchgroup={lang_group}Directive '
+                fr'start=/\s*\.{self._vim_escape(w)}\>/ '
+                fr'end=/\s*\ze;\|$/ oneline '
+                fr'contains={directive_contains}'
+            )
         for w in datatypes_words:
-            lines.append(fr'syn match {lang_group}DataType /\s*\.' + self._vim_escape(w) + r'\>/')
+            lines.append(
+                fr'syn region {lang_group}DataTypeLine '
+                fr'matchgroup={lang_group}DataType '
+                fr'start=/\s*\.{self._vim_escape(w)}\>/ '
+                fr'end=/\s*\ze;\|$/ oneline '
+                fr'contains={directive_contains}'
+            )
         # Preprocessor
         if preproc_alt:
             # Highlight the leading '#' separately as punctuation and chain to macro name
@@ -326,22 +373,50 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
             lines.append(f'syn keyword {lang_group}Register ' + registers_kw)
         # Instructions and macros
         if instructions_alt:
-            lines.append(fr'syn match {lang_group}Instruction /\<' + instructions_alt + r'\>/')
+            lines.append(
+                fr'syn region {lang_group}InstrLine '
+                fr'matchgroup={lang_group}Instruction '
+                fr'start=/\<{instructions_alt}\>/ '
+                fr'end=/{operation_line_end}/ oneline '
+                fr'contains={operand_contains}'
+            )
         if macros_alt:
-            lines.append(fr'syn match {lang_group}Macro /\<' + macros_alt + r'\>/')
+            lines.append(
+                fr'syn region {lang_group}MacroLine '
+                fr'matchgroup={lang_group}Macro '
+                fr'start=/\<{macros_alt}\>/ '
+                fr'end=/{operation_line_end}/ oneline '
+                fr'contains={operand_contains}'
+            )
         # Compiler predefined labels
         if labels_alt:
             lines.append(fr'syn match {lang_group}CompilerLabel /\<' + labels_alt + r'/')
 
         # Punctuation
-        lines.append(fr'syn match {lang_group}Bracket /\[\|\]/')
-        lines.append(fr'syn match {lang_group}DoubleBracket /\[\[\|\]\]/')
-        lines.append(fr'syn match {lang_group}Paren /(\|)/')
+        lines.append(
+            fr'syn region {lang_group}DoubleBracketExpr '
+            fr'matchgroup={lang_group}DoubleBracket '
+            fr'start=/\[\[/ end=/\]\]/ oneline '
+            fr'contains={bracket_contains}'
+        )
+        lines.append(
+            fr'syn region {lang_group}BracketExpr '
+            fr'matchgroup={lang_group}Bracket '
+            fr'start=/\[\(\[\)\@!/ end=/\]/ oneline '
+            fr'contains={bracket_contains}'
+        )
+        lines.append(
+            fr'syn region {lang_group}ParenExpr '
+            fr'matchgroup={lang_group}Paren '
+            fr'start=/(/ end=/)/ oneline '
+            fr'contains={bracket_contains}'
+        )
 
         lines.append('')
         # Base links (fallbacks if explicit colors below are not supported)
         lines.append(f'hi def link {lang_group}Comment Comment')
         lines.append(f'hi def link {lang_group}String String')
+        lines.append(f'hi def link {lang_group}StringPunc Delimiter')
         lines.append(f'hi def link {lang_group}HexNumber Number')
         lines.append(f'hi def link {lang_group}BinNumber Number')
         lines.append(f'hi def link {lang_group}DecNumber Number')
@@ -354,18 +429,22 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         lines.append(f'hi def link {lang_group}Directive Statement')
         lines.append(f'hi def link {lang_group}DataType Type')
         lines.append(f'hi def link {lang_group}PreProc PreProc')
+        lines.append(f'hi def link {lang_group}PreProcPunc PreProc')
         lines.append(f'hi def link {lang_group}Operator Operator')
         lines.append(f'hi def link {lang_group}Register Identifier')
         lines.append(f'hi def link {lang_group}Instruction Keyword')
         lines.append(f'hi def link {lang_group}Macro Keyword')
         lines.append(f'hi def link {lang_group}ConstName Constant')
-        lines.append(f'hi def link {lang_group}AssignOp Operator')
+        lines.append(f'hi def link {lang_group}CompilerLabel Constant')
         lines.append(f'hi def link {lang_group}Escape SpecialChar')
+        lines.append(f'hi def link {lang_group}Bracket Delimiter')
+        lines.append(f'hi def link {lang_group}DoubleBracket Delimiter')
+        lines.append(f'hi def link {lang_group}Paren Delimiter')
+        lines.append(f'hi def link {lang_group}Separator Delimiter')
+        lines.append(f'hi def link {lang_group}Param Identifier')
         # BespokeASM color scheme from central configuration
         color_lines = self._generate_vim_color_lines(lang_group)
         lines.extend(color_lines)
-        # Do not relink CompilerLabel after assigning explicit colors above, to avoid
-        # overriding the custom palette with a generic Constant link.
         lines.append('')
         lines.append(f'let b:current_syntax = "{vim_filetype}"')
 

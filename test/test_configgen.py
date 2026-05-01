@@ -49,6 +49,45 @@ class TestConfigurationGeneration(unittest.TestCase):
         match_list = set(match.group(1).split('|'))
         self.assertSetEqual(match_list, set(target_list), f'all items from "{test_name}" should be found')
 
+    def _assert_vim_contextual_syntax(self, syn: str, vim_ft: str) -> None:
+        self.assertNotRegex(syn, rf'(?m)^syn\s+match\s+{re.escape(vim_ft)}Instruction\b')
+        self.assertNotRegex(syn, rf'(?m)^syn\s+match\s+{re.escape(vim_ft)}Macro\b')
+        self.assertNotRegex(syn, rf'(?m)^syn\s+match\s+{re.escape(vim_ft)}Directive\b')
+        self.assertNotRegex(syn, rf'(?m)^syn\s+match\s+{re.escape(vim_ft)}DataType\b')
+        self.assertNotRegex(syn, rf'(?m)^syn\s+match\s+{re.escape(vim_ft)}Bracket\s+/\\\[')
+        self.assertNotRegex(syn, rf'(?m)^syn\s+match\s+{re.escape(vim_ft)}DoubleBracket\b')
+        self.assertNotRegex(syn, rf'(?m)^syn\s+match\s+{re.escape(vim_ft)}Paren\b')
+        self.assertNotRegex(syn, r'(?m)^hi\s+Normal\b')
+        self.assertNotRegex(syn, r'(?m)^hi\s+Visual\b')
+        self.assertNotRegex(syn, r'(?m)^hi\s+CursorLine\b')
+        self.assertNotIn(f'hi def link {vim_ft}AssignOp', syn)
+
+        self.assertIn(f'syn match {vim_ft}Separator /,/ contained', syn)
+        self.assertRegex(syn, rf'(?m)^syn\s+match\s+{re.escape(vim_ft)}Param\s+/.*contained$')
+        self.assertIn(f'syn region {vim_ft}BracketExpr matchgroup={vim_ft}Bracket', syn)
+        self.assertIn(f'syn region {vim_ft}DoubleBracketExpr matchgroup={vim_ft}DoubleBracket', syn)
+        self.assertIn(f'syn region {vim_ft}ParenExpr matchgroup={vim_ft}Paren', syn)
+        self.assertIn(r'start=/\[\(\[\)\@!/', syn)
+        self.assertIn(r'end=/\s*\ze;\|$/ oneline', syn)
+        for region_name in ('InstrLine', 'MacroLine'):
+            region_line = next(
+                (line for line in syn.splitlines() if line.startswith(f'syn region {vim_ft}{region_name} ')),
+                None,
+            )
+            if region_line is not None:
+                self.assertIn(r'end=/\s*\ze\<', region_line)
+                self.assertIn(r'\|\s*\ze;\|$/ oneline', region_line)
+        self.assertIn(f'hi def link {vim_ft}CompilerLabel Constant', syn)
+        self.assertIn(f'hi def link {vim_ft}Param Identifier', syn)
+        self.assertIn(f'hi def link {vim_ft}Separator Delimiter', syn)
+        self.assertIn(f'hi {vim_ft}AssignOp ', syn)
+
+        param_index = syn.find(f'syn match {vim_ft}Param')
+        compiler_label_index = syn.find(f'syn match {vim_ft}CompilerLabel')
+        self.assertGreaterEqual(param_index, 0, 'Param match should exist')
+        self.assertGreaterEqual(compiler_label_index, 0, 'CompilerLabel match should exist')
+        self.assertLess(param_index, compiler_label_index, 'Param must be defined before CompilerLabel')
+
     def test_operand_label_configgen_scopes_and_colors(self):
         self.assertIn(SyntaxElement.OPERAND_LABEL_AT, DEFAULT_COLOR_SCHEME.colors)
         self.assertIn(SyntaxElement.OPERAND_LABEL_NAME, DEFAULT_COLOR_SCHEME.colors)
@@ -814,11 +853,11 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIsFile(syntax_fp)
         with open(syntax_fp) as f:
             syn = f.read()
-        # The instruction match should contain an escaped version of 'ma.hl' from the test config
-        # and also support word boundary around it.
+        self._assert_vim_contextual_syntax(syn, vim_ft)
+        # The instruction region should contain an escaped version of 'ma.hl' from the test config.
         self.assertRegex(
             syn,
-            r'syn\s+match\s+\w+Instruction\s+/.+ma\\\.hl.+/',
+            r'syn\s+region\s+\w+InstrLine\s+matchgroup=\w+Instruction\s+start=/.+ma\\\.hl.+/',
             'Vim: instruction with period should be escaped and matched',
         )
         # String punctuation should be a separate matchgroup from the string body
@@ -911,9 +950,15 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIsFile(ftdetect_fp)
         with open(syntax_fp) as f:
             syn = f.read()
-        # Instructions present (syn match alternation with word boundaries)
-        m = re.search(rf'^syn\s+match\s+{re.escape(vim_ft)}Instruction\s+/(.+)/$', syn, re.MULTILINE)
-        self.assertIsNotNone(m, 'Instruction match line should exist')
+        self._assert_vim_contextual_syntax(syn, vim_ft)
+        # Instructions present (syn region alternation with word boundaries)
+        m = re.search(
+            rf'^syn\s+region\s+{re.escape(vim_ft)}InstrLine\s+'
+            rf'matchgroup={re.escape(vim_ft)}Instruction\s+start=/(.+?)/\s+end=',
+            syn,
+            re.MULTILINE,
+        )
+        self.assertIsNotNone(m, 'Instruction region line should exist')
         pat = m.group(1)
         # Extract the alternation group between \%( ... ) without using nested-regex
         start = pat.find(r'\%(')
@@ -923,21 +968,30 @@ class TestConfigurationGeneration(unittest.TestCase):
         for mnemonic in ['lda', 'add', 'set', 'big', 'hlt']:
             self.assertRegex(group, rf'(?:^|\\\|){re.escape(mnemonic)}(?:\\\||$)')
         # No macros
-        self.assertIsNone(re.search(rf'^syn\s+keyword\s+{re.escape(vim_ft)}Macro\b', syn, re.MULTILINE), 'No macros expected')
+        self.assertNotRegex(syn, rf'(?m)^syn\s+region\s+{re.escape(vim_ft)}MacroLine\b', 'No macros expected')
         # No registers
         self.assertIsNone(
             re.search(rf'^syn\s+keyword\s+{re.escape(vim_ft)}Register\b', syn, re.MULTILINE),
             'No registers expected',
         )
         # Directives
-        self.assertRegex(syn, rf'syn\s+match\s+{re.escape(vim_ft)}Directive\s+/.+\\.org\\>/', 'directive .org present')
-        self.assertRegex(syn, rf'syn\s+match\s+{re.escape(vim_ft)}Directive\s+/.+\\.memzone\\>/', 'directive .memzone present')
-        self.assertRegex(syn, rf'syn\s+match\s+{re.escape(vim_ft)}Directive\s+/.+\\.align\\>/', 'directive .align present')
+        self.assertIn(
+            f'syn region {vim_ft}DirectiveLine matchgroup={vim_ft}Directive start=/\\s*\\.org\\>/',
+            syn,
+        )
+        self.assertIn(
+            f'syn region {vim_ft}DirectiveLine matchgroup={vim_ft}Directive start=/\\s*\\.memzone\\>/',
+            syn,
+        )
+        self.assertIn(
+            f'syn region {vim_ft}DirectiveLine matchgroup={vim_ft}Directive start=/\\s*\\.align\\>/',
+            syn,
+        )
         # Data types
         for dt in ['fill', 'zero', 'zerountil', 'byte', '2byte', '4byte', '8byte', '16byte', 'cstr', 'asciiz']:
-            self.assertRegex(
+            self.assertIn(
+                f'syn region {vim_ft}DataTypeLine matchgroup={vim_ft}DataType start=/\\s*\\.{dt}\\>/',
                 syn,
-                rf'syn\s+match\s+{re.escape(vim_ft)}DataType\s+/.+\\.{re.escape(dt)}\\>/',
                 f'datatype .{dt} present',
             )
         # Preprocessor
@@ -981,14 +1035,20 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIsFile(syntax_fp)
         with open(syntax_fp) as f:
             syn = f.read()
+        self._assert_vim_contextual_syntax(syn, vim_ft)
         # Registers present
         m = re.search(rf'^syn\s+keyword\s+{re.escape(vim_ft)}Register\s+(.+)$', syn, re.MULTILINE)
         self.assertIsNotNone(m, 'Register keyword line should exist')
         regs = set(m.group(1).split())
         self.assertTrue({'a', 'j', 'i', 'h', 'l', 'hl', 'sp', 'mar'}.issubset(regs))
         # Instructions present
-        m = re.search(rf'^syn\s+match\s+{re.escape(vim_ft)}Instruction\s+/(.+)/$', syn, re.MULTILINE)
-        self.assertIsNotNone(m, 'Instruction match line should exist')
+        m = re.search(
+            rf'^syn\s+region\s+{re.escape(vim_ft)}InstrLine\s+'
+            rf'matchgroup={re.escape(vim_ft)}Instruction\s+start=/(.+?)/\s+end=',
+            syn,
+            re.MULTILINE,
+        )
+        self.assertIsNotNone(m, 'Instruction region line should exist')
         pat = m.group(1)
         start = pat.find(r'\%(')
         end = pat.rfind(r'\)')
@@ -1015,8 +1075,14 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIsFile(syntax_fp)
         with open(syntax_fp) as f:
             syn = f.read()
-        m = re.search(rf'^syn\s+match\s+{re.escape(vim_ft)}Instruction\s+/(.+)/$', syn, re.MULTILINE)
-        self.assertIsNotNone(m, 'Instruction match line should exist')
+        self._assert_vim_contextual_syntax(syn, vim_ft)
+        m = re.search(
+            rf'^syn\s+region\s+{re.escape(vim_ft)}InstrLine\s+'
+            rf'matchgroup={re.escape(vim_ft)}Instruction\s+start=/(.+?)/\s+end=',
+            syn,
+            re.MULTILINE,
+        )
+        self.assertIsNotNone(m, 'Instruction region line should exist')
         pat = m.group(1)
         start = pat.find(r'\%(')
         end = pat.rfind(r'\)')
@@ -1026,8 +1092,117 @@ class TestConfigurationGeneration(unittest.TestCase):
             self.assertRegex(group, rf'(?:^|\\\|){re.escape(mnemonic)}(?:\\\||$)')
         shutil.rmtree(test_dir)
 
+    def test_vim_instruction_region_ends_before_next_same_line_instruction(self):
+        test_dir = tempfile.mkdtemp()
+        config_file = pkg_resources.files(config_files).joinpath('test_instruction_line_creation_little_endian.yaml')
+        configgen = VimConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            None,
+            None,
+            'asmtest',
+        )
+        configgen.generate()
+        vim_ft = (configgen.language_id.replace('-', '').lower())
+        syntax_fp = os.path.join(str(test_dir), 'syntax', f'{vim_ft}.vim')
+        self.assertIsFile(syntax_fp)
+        with open(syntax_fp) as f:
+            syn = f.read()
+
+        region_line = next(
+            line for line in syn.splitlines()
+            if line.startswith(f'syn region {vim_ft}InstrLine ')
+        )
+        self.assertIn(r'end=/\s*\ze\<', region_line)
+        self.assertIn(r'\|\s*\ze;\|$/ oneline', region_line)
+        for mnemonic in ['lda', 'add', 'set', 'big', 'hlt']:
+            self.assertIn(mnemonic, region_line)
+
+        start_index = region_line.index('start=/')
+        end_index = region_line.index(' end=/')
+        self.assertLess(start_index, end_index)
+        shutil.rmtree(test_dir)
+
+    def test_vim_configgen_with_macros(self):
+        test_dir = tempfile.mkdtemp()
+        config_file = pkg_resources.files(config_files).joinpath('test_instruction_macros.yaml')
+        configgen = VimConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            None,
+            None,
+            'asmtest',
+        )
+        configgen.generate()
+        vim_ft = (configgen.language_id.replace('-', '').lower())
+        syntax_fp = os.path.join(str(test_dir), 'syntax', f'{vim_ft}.vim')
+        self.assertIsFile(syntax_fp)
+        with open(syntax_fp) as f:
+            syn = f.read()
+        self._assert_vim_contextual_syntax(syn, vim_ft)
+        m = re.search(
+            rf'^syn\s+region\s+{re.escape(vim_ft)}MacroLine\s+'
+            rf'matchgroup={re.escape(vim_ft)}Macro\s+start=/(.+?)/\s+end=',
+            syn,
+            re.MULTILINE,
+        )
+        self.assertIsNotNone(m, 'Macro region line should exist')
+        self.assertIn('push2', m.group(1))
+        shutil.rmtree(test_dir)
+
+    def test_vim_instruction_and_macro_regions_end_on_either_mnemonic(self):
+        """A line with a mix of instructions and macros: each region must end before
+        the next operation mnemonic regardless of whether it's an instruction or a macro."""
+        test_dir = tempfile.mkdtemp()
+        config_file = pkg_resources.files(config_files).joinpath('test_instruction_macros.yaml')
+        configgen = VimConfigGenerator(
+            str(config_file),
+            0,
+            str(test_dir),
+            None,
+            None,
+            'asmtest',
+        )
+        configgen.generate()
+        vim_ft = (configgen.language_id.replace('-', '').lower())
+        syntax_fp = os.path.join(str(test_dir), 'syntax', f'{vim_ft}.vim')
+        self.assertIsFile(syntax_fp)
+        with open(syntax_fp) as f:
+            syn = f.read()
+
+        instr_line = next(
+            line for line in syn.splitlines()
+            if line.startswith(f'syn region {vim_ft}InstrLine ')
+        )
+        macro_line = next(
+            line for line in syn.splitlines()
+            if line.startswith(f'syn region {vim_ft}MacroLine ')
+        )
+
+        instructions = ['push', 'pop', 'mov', 'add', 'addc', 'ldar']
+        macros = ['push2', 'mov2', 'add16', 'swap', 'incs']
+
+        for region_line, region_name in ((instr_line, 'InstrLine'), (macro_line, 'MacroLine')):
+            end_match = re.search(r' end=/(.+?)/ oneline ', region_line)
+            self.assertIsNotNone(end_match, f'{region_name} should have an end= pattern')
+            end_pat = end_match.group(1)
+            self.assertTrue(
+                end_pat.startswith(r'\s*\ze\<'),
+                f'{region_name} end pattern should start with operation-mnemonic terminator, got: {end_pat}',
+            )
+            self.assertIn(r'\|\s*\ze;\|$', end_pat, f'{region_name} should also terminate on ; or EOL')
+            for mnemonic in instructions + macros:
+                self.assertRegex(
+                    end_pat,
+                    rf'(?:\\%\(|\\\|){re.escape(mnemonic)}(?:\\\||\\\))',
+                    f'{region_name} end pattern should terminate before {mnemonic!r}',
+                )
+        shutil.rmtree(test_dir)
+
     def test_vim_background_foreground_colors(self):
-        """Test that VIM syntax generator includes background and foreground colors."""
+        """Test that VIM syntax generator does not override editor-level colors."""
         test_dir = tempfile.mkdtemp()
         config_file = pkg_resources.files(config_files).joinpath('test_instruction_line_creation_little_endian.yaml')
         configgen = VimConfigGenerator(
@@ -1046,28 +1221,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         with open(syntax_fp) as f:
             syn = f.read()
 
-        # Test Normal highlight group with background and foreground
-        bg_color = DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.BACKGROUND)
-        fg_color = DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.FOREGROUND)
-        self.assertRegex(
-            syn,
-            rf'hi\s+Normal\s+guifg={re.escape(fg_color)}\s+guibg={re.escape(bg_color)}\s+ctermfg=\d+\s+ctermbg=\d+',
-            'Normal highlight should set both foreground and background colors'
-        )
-
-        # Test Visual selection background
-        self.assertRegex(
-            syn,
-            r'hi\s+Visual\s+guibg=#294f7a\s+ctermbg=\d+',
-            'Visual highlight should set selection background color'
-        )
-
-        # Test CursorLine highlighting
-        self.assertRegex(
-            syn,
-            r'hi\s+CursorLine\s+guibg=#444444\s+ctermbg=\d+\s+cterm=NONE\s+gui=NONE',
-            'CursorLine highlight should set line highlight background color'
-        )
+        self._assert_vim_contextual_syntax(syn, vim_ft)
 
         # Test that syntax elements inherit background (use NONE)
         self.assertRegex(
