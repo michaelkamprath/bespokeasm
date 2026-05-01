@@ -487,6 +487,9 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         return '\n'.join(lines)
 
     def _build_ftplugin_vim(self, vim_filetype: str) -> str:
+        # Vim user-defined command names cannot contain underscores
+        # (see :help E182 / :help command-name).
+        cmd_suffix = vim_filetype.replace('_', '')
         lines = [
             '" BespokeASM generated ftplugin.',
             '" Known limitations:',
@@ -555,7 +558,9 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
             '',
             f'call s:RefreshLabelsGuarded_{vim_filetype}()',
             '',
-            f"setlocal keywordprg=:call\\ {vim_filetype}_docs#Show(expand('<cword>'))",
+            f'command! -buffer -nargs=1 BespokeAsmDocsShow{cmd_suffix} '
+            f'call {vim_filetype}_docs#Show(<q-args>)',
+            f'setlocal keywordprg=:BespokeAsmDocsShow{cmd_suffix}',
             '',
             f"if get(g:, 'bespokeasm_{vim_filetype}_auto_hover', 0)",
             f'  autocmd bespokeasm_{vim_filetype} CursorHold <buffer>'

@@ -1161,7 +1161,13 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIn(f'autocmd bespokeasm_{vim_ft} BufReadPost <buffer>', ftplugin)
         self.assertIn(f'autocmd bespokeasm_{vim_ft} BufWritePost <buffer>', ftplugin)
         self.assertIn(f'autocmd bespokeasm_{vim_ft} CursorHold <buffer>', ftplugin)
-        self.assertIn(f'setlocal keywordprg=:call\\ {vim_ft}_docs#Show', ftplugin)
+        self.assertIn(
+            f'command! -buffer -nargs=1 BespokeAsmDocsShow{vim_ft} '
+            f'call {vim_ft}_docs#Show(<q-args>)',
+            ftplugin,
+        )
+        self.assertIn(f'setlocal keywordprg=:BespokeAsmDocsShow{vim_ft}', ftplugin)
+        self.assertNotIn("expand('<cword>')", ftplugin.split('PopupAtCursor')[0])
         self.assertIn(f'g:bespokeasm_{vim_ft}_max_scan_lines = 10000', ftplugin)
         self.assertIn(f'call s:RefreshLabelsGuarded_{vim_ft}()', ftplugin)
         self.assertIn(f'silent! syntax clear {vim_ft}LabelUsage', ftplugin)
@@ -1233,6 +1239,17 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertFalse(vim_ft[0].isdigit())
         self.assertIn(f'function! {vim_ft}_docs#Show(word) abort', docs)
         self.assertIn(f'function! {vim_ft}_docs#PopupAtCursor(word) abort', docs)
+
+        # Vim user-defined command names cannot contain underscores. The
+        # sanitized vim_ft begins with `_`, so the command suffix must strip
+        # underscores before being appended to BespokeAsmDocsShow.
+        ftplugin_fp = os.path.join(str(test_dir), 'ftplugin', f'{vim_ft}.vim')
+        with open(ftplugin_fp) as f:
+            ftplugin = f.read()
+        cmd_suffix = vim_ft.replace('_', '')
+        self.assertIn(f'command! -buffer -nargs=1 BespokeAsmDocsShow{cmd_suffix} ', ftplugin)
+        self.assertIn(f'setlocal keywordprg=:BespokeAsmDocsShow{cmd_suffix}', ftplugin)
+        self.assertNotRegex(ftplugin, r'BespokeAsmDocsShow\w*_')
         shutil.rmtree(test_dir)
 
     def test_vim_syntax_includes_label_usage(self):
