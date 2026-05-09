@@ -7,6 +7,16 @@ from bespokeasm.assembler.pretty_printer.minhex import MinHexPrettyPrinter
 
 
 class PrettyPrinterFactory:
+    """Constructs a `PrettyPrinterBase` subclass keyed by string name.
+
+    Recognized type strings:
+      - 'minhex'    -> MinHexPrettyPrinter
+      - 'hex'       -> IntelHexPrettyPrinter (text dump mode)
+      - 'intel_hex' -> IntelHexPrettyPrinter (Intel HEX file mode)
+      - 'listing'   -> ListingPrettyPrinter
+
+    Any other value raises `NotImplementedError`.
+    """
 
     @classmethod
     def getPrettyPrinter(

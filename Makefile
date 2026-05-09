@@ -2,10 +2,25 @@ PYTHON := $(shell if [ -x ".venv/bin/python" ]; then echo ".venv/bin/python"; el
 PYINSTALLER_DIST := dist
 PYINSTALLER_NAME := bespokeasm
 
-.PHONY: tests clean flake8 pyinstaller nuitka pipx-wheel
+.PHONY: tests coverage coverage-html coverage-xml clean flake8 pyinstaller nuitka pipx-wheel
 
 tests:
-	PYTHONPATH=./src:${PYTHONPATH} $(PYTHON) -m unittest discover . -v
+	@$(PYTHON) -m pytest --version >/dev/null 2>&1 || { echo "ERROR: pytest is not installed in the current Python environment. Install with: pip install pytest"; exit 1; }
+	PYTHONPATH=./src:${PYTHONPATH} $(PYTHON) -m pytest test/ -v
+
+coverage:
+	@$(PYTHON) -m coverage --version >/dev/null 2>&1 || { echo "ERROR: coverage is not installed in the current Python environment. Install with: pip install coverage"; exit 1; }
+	@$(PYTHON) -m pytest --version >/dev/null 2>&1 || { echo "ERROR: pytest is not installed in the current Python environment. Install with: pip install pytest"; exit 1; }
+	PYTHONPATH=./src:${PYTHONPATH} $(PYTHON) -m coverage run --source=src/bespokeasm -m pytest test/
+	$(PYTHON) -m coverage report -m
+
+coverage-html: coverage
+	$(PYTHON) -m coverage html
+	@echo "HTML coverage report generated in ./htmlcov/index.html"
+
+coverage-xml: coverage
+	$(PYTHON) -m coverage xml
+	@echo "XML coverage report generated at ./coverage.xml"
 
 clean:
 	find . -name '*.pyc' -delete
@@ -13,6 +28,9 @@ clean:
 	rm -Rf ./build
 	rm -Rf ./bespokeasm.egg-info
 	rm -Rf ./dist/
+	rm -Rf ./htmlcov
+	rm -f ./.coverage
+	rm -f ./coverage.xml
 
 flake8:
 	flake8 ./src/ ./test/ --count --max-line-length=127 --statistics

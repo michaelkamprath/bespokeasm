@@ -43,6 +43,12 @@ PATTERN_CHARACTER_ORDINAL_COMPILED = re.compile(
 
 
 def normalize_default_numeric_base(default_numeric_base: str | None) -> str:
+    """Resolve a base name (or alias) to its canonical form: 'decimal', 'hex', 'octal', 'binary'.
+
+    `None` resolves to 'decimal'. Matching is case-insensitive and tolerates surrounding
+    whitespace. Aliases (e.g. 'hexadecimal', 'base16', 'base8', 'base2') map to their
+    canonical name. Unknown values raise `ValueError`.
+    """
     if default_numeric_base is None:
         return 'decimal'
     normalized_base = str(default_numeric_base).strip().lower()
@@ -52,6 +58,11 @@ def normalize_default_numeric_base(default_numeric_base: str | None) -> str:
 
 
 def is_explicit_numeric_string(value_str: str) -> bool:
+    """True iff `value_str` carries an explicit base prefix/suffix (`0x`, `$`, `b`, `%`,
+    trailing `H`) or is a single-character ordinal (e.g. `'A'`).
+
+    Whitespace-only and empty strings return False.
+    """
     if value_str.isspace():
         return False
     match = re.match(PATTERN_EXPLICIT_NUMERIC_COMPILED, value_str.strip())
@@ -59,6 +70,11 @@ def is_explicit_numeric_string(value_str: str) -> bool:
 
 
 def is_unprefixed_numeric_string(value_str: str, default_numeric_base: str = 'decimal') -> bool:
+    """True iff `value_str` is a bare numeric token whose digits are valid in `default_numeric_base`.
+
+    Whitespace-only and empty strings return False. The base is normalized via
+    `normalize_default_numeric_base`, so aliases like 'base16' are accepted.
+    """
     if value_str.isspace():
         return False
     normalized_base = normalize_default_numeric_base(default_numeric_base)
@@ -67,9 +83,16 @@ def is_unprefixed_numeric_string(value_str: str, default_numeric_base: str = 'de
 
 
 def parse_numeric_string(numeric_str: str, default_numeric_base: str = 'decimal') -> int:
-    """returns an integer value for the passed numeric string. Supports decimal,
-    hexadecimal, and binary numbers. Throws `ValueError` for strings that are not
-    parsable.
+    """Return the integer value of `numeric_str`.
+
+    Supports explicit prefixes/suffixes (`0x`, `$`, trailing `H` for hex; `0b`, `b`, `%` for binary),
+    single-character ordinals (e.g. `'A'`, `'\\n'`), and an optional leading `+`/`-` sign.
+    Bare digit tokens are interpreted in `default_numeric_base` (decimal/hex/octal/binary).
+    Surrounding whitespace is tolerated.
+
+    Raises `ValueError` for: empty strings, sign-only strings (`'+'`, `'-'`),
+    multi-character or empty character ordinals, unterminated character literals,
+    or digit tokens that aren't valid in the configured base.
     """
     stripped_numeric = numeric_str.strip()
     if stripped_numeric == '':
@@ -140,17 +163,37 @@ def is_valid_label(s: str):
 
 # Number format preservation utilities
 class FormatPreservedInt(int):
-    """An integer that remembers its original string representation."""
+    """An integer that remembers its original string representation.
+
+    The numeric value is taken from `value` (parsed if it's a string). The string used
+    by `repr`/`str` comes from `original_str` if provided, otherwise from `value` itself
+    (or `str(value)` for ints).
+
+    When `original_str` is supplied alongside a `value`, the two must represent the same
+    numeric quantity — otherwise `ValueError` is raised. This guards against accidentally
+    decoupling the displayed format from the underlying integer (which would silently
+    corrupt round-tripped YAML output).
+
+    Note: arithmetic on a FormatPreservedInt returns a plain `int`; format preservation
+    does not propagate through operators.
+    """
 
     def __new__(cls, value, original_str=None):
         if isinstance(value, str):
-            # If value is a string, parse it and store the original
             parsed_value = parse_numeric_string(value)
-            instance = super().__new__(cls, parsed_value)
+        else:
+            parsed_value = int(value)
+        if original_str is not None and parse_numeric_string(original_str) != parsed_value:
+            raise ValueError(
+                f'FormatPreservedInt: original_str {original_str!r} does not represent '
+                f'the same value as {value!r} (parsed as {parsed_value})'
+            )
+        instance = super().__new__(cls, parsed_value)
+        if original_str is not None:
+            instance.original_str = original_str
+        elif isinstance(value, str):
             instance.original_str = value
         else:
-            # If value is already an int, use it as is
-            instance = super().__new__(cls, value)
             instance.original_str = str(value)
         return instance
 
@@ -168,7 +211,15 @@ class FlowStyleList(list):
 
 
 def convert_disallowed_pairs_to_flow_style(obj):
-    """Recursively convert disallowed_pairs inner lists to FlowStyleList."""
+    """Recursively walk `obj` and wrap inner lists found under any `disallowed_pairs` key in
+    `FlowStyleList` so they serialize as YAML flow sequences.
+
+    Recursion descends through dicts and lists. At a `disallowed_pairs` key, the value's
+    direct list children are wrapped, but the wrapping does not recurse further into those
+    children — `disallowed_pairs` is expected to contain leaf pair-lists, not nested
+    structures. Non-list values under `disallowed_pairs` fall through to the normal
+    recursion. Scalars are returned unchanged.
+    """
     if isinstance(obj, dict):
         result = {}
         for key, value in obj.items():

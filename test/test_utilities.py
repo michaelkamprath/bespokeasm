@@ -1,7 +1,13 @@
 import unittest
 
 from bespokeasm.assembler.bytecode.packed_bits import PackedBits
+from bespokeasm.utilities import convert_disallowed_pairs_to_flow_style
+from bespokeasm.utilities import FlowStyleList
+from bespokeasm.utilities import FormatPreservedInt
+from bespokeasm.utilities import is_explicit_numeric_string
 from bespokeasm.utilities import is_string_numeric
+from bespokeasm.utilities import is_unprefixed_numeric_string
+from bespokeasm.utilities import normalize_default_numeric_base
 from bespokeasm.utilities import parse_numeric_string
 
 
@@ -50,6 +56,113 @@ class TestUtilities(unittest.TestCase):
         self.assertTrue(is_string_numeric('face', 'hex'), 'hex mode accepts bare hex words')
         self.assertFalse(is_string_numeric('8', 'octal'), 'octal mode rejects invalid octal digits')
         self.assertFalse(is_string_numeric('2', 'binary'), 'binary mode rejects invalid binary digits')
+
+    def test_normalize_default_numeric_base(self):
+        self.assertEqual(normalize_default_numeric_base(None), 'decimal', 'None defaults to decimal')
+        self.assertEqual(normalize_default_numeric_base('Hex'), 'hex', 'case-insensitive normalization')
+        self.assertEqual(normalize_default_numeric_base('hexadecimal'), 'hex', 'aliases resolve to canonical name')
+        self.assertEqual(normalize_default_numeric_base('  base16  '), 'hex', 'surrounding whitespace tolerated')
+        with self.assertRaises(ValueError):
+            normalize_default_numeric_base('bogus')
+
+    def test_is_explicit_numeric_string_whitespace(self):
+        self.assertFalse(is_explicit_numeric_string('   '), 'whitespace-only is not numeric')
+        self.assertFalse(is_explicit_numeric_string(''), 'empty string is not explicit numeric')
+        self.assertTrue(is_explicit_numeric_string('0xFF'), 'explicit hex is recognized')
+
+    def test_is_unprefixed_numeric_string_whitespace(self):
+        self.assertFalse(is_unprefixed_numeric_string('   '), 'whitespace-only is not numeric')
+        self.assertFalse(is_unprefixed_numeric_string(''), 'empty string is not unprefixed numeric')
+        self.assertTrue(is_unprefixed_numeric_string('123'), 'unprefixed decimal is recognized')
+
+    def test_parse_numeric_string_error_paths(self):
+        # Empty after stripping a sign character.
+        with self.assertRaises(ValueError):
+            parse_numeric_string('+')
+        with self.assertRaises(ValueError):
+            parse_numeric_string('-')
+        # Multi-character "character ordinal" is invalid.
+        with self.assertRaises(ValueError):
+            parse_numeric_string("'ab'")
+        # Malformed character literal that fails the regex (unterminated quote).
+        with self.assertRaises(ValueError):
+            parse_numeric_string("'a")
+        # Empty character literal is invalid.
+        with self.assertRaises(ValueError):
+            parse_numeric_string("''")
+        # Whitespace stripping still allows valid input.
+        self.assertEqual(parse_numeric_string('  42  '), 42, 'leading/trailing whitespace tolerated')
+        # Octal base via configured default.
+        self.assertEqual(parse_numeric_string('17', 'octal'), 15, 'configured octal base parses bare digits')
+
+    def test_FormatPreservedInt_from_string(self):
+        v = FormatPreservedInt('0xFF')
+        self.assertEqual(int(v), 255, 'parsed value matches numeric content')
+        self.assertEqual(repr(v), '0xFF', 'repr returns the original string')
+        self.assertEqual(str(v), '0xFF', 'str returns the original string')
+
+    def test_FormatPreservedInt_from_int(self):
+        v = FormatPreservedInt(42)
+        self.assertEqual(int(v), 42)
+        self.assertEqual(str(v), '42', 'str fallback uses str(value) when no original_str provided')
+
+    def test_FormatPreservedInt_explicit_original_str(self):
+        # Explicit original_str overrides the default for both string and int values.
+        v_str = FormatPreservedInt('0xff', '0xFF')
+        self.assertEqual(int(v_str), 255)
+        self.assertEqual(str(v_str), '0xFF', 'explicit original_str overrides string value')
+
+        v_int = FormatPreservedInt(255, '0xff')
+        self.assertEqual(int(v_int), 255)
+        self.assertEqual(str(v_int), '0xff', 'explicit original_str overrides default str(int)')
+
+    def test_FormatPreservedInt_mismatch_raises(self):
+        # value and original_str must represent the same numeric quantity.
+        with self.assertRaises(ValueError):
+            FormatPreservedInt(255, '0xfe')
+        with self.assertRaises(ValueError):
+            FormatPreservedInt('0xff', '0xfe')
+        # Different formattings of the same value are accepted.
+        v = FormatPreservedInt('255', '0xff')
+        self.assertEqual(int(v), 255)
+        self.assertEqual(str(v), '0xff', 'matching values across formats are allowed')
+
+    def test_FormatPreservedInt_arithmetic_loses_format(self):
+        # Once arithmetic is applied, the result is a plain int (format isn't preserved through ops).
+        v = FormatPreservedInt('0x10')
+        self.assertEqual(v + 1, 17)
+        self.assertNotIsInstance(v + 1, FormatPreservedInt)
+
+    def test_convert_disallowed_pairs_to_flow_style_basic(self):
+        input_dict = {
+            'disallowed_pairs': [['a', 'b'], ['c', 'd']],
+            'other': 'value',
+        }
+        result = convert_disallowed_pairs_to_flow_style(input_dict)
+        self.assertIsInstance(result['disallowed_pairs'][0], FlowStyleList)
+        self.assertIsInstance(result['disallowed_pairs'][1], FlowStyleList)
+        self.assertEqual(list(result['disallowed_pairs'][0]), ['a', 'b'])
+        self.assertEqual(result['other'], 'value', 'sibling values are preserved unchanged')
+
+    def test_convert_disallowed_pairs_to_flow_style_nested(self):
+        # Sub-dicts get recursed into; disallowed_pairs in deeper positions are also converted.
+        input_dict = {'instructions': {'add': {'disallowed_pairs': [['x', 'y']]}}}
+        result = convert_disallowed_pairs_to_flow_style(input_dict)
+        self.assertIsInstance(result['instructions']['add']['disallowed_pairs'][0], FlowStyleList)
+
+    def test_convert_disallowed_pairs_to_flow_style_passthrough(self):
+        # Non-list / non-dict values are returned as-is.
+        self.assertEqual(convert_disallowed_pairs_to_flow_style(42), 42)
+        self.assertEqual(convert_disallowed_pairs_to_flow_style('hello'), 'hello')
+        self.assertIsNone(convert_disallowed_pairs_to_flow_style(None))
+        # Plain lists (not under disallowed_pairs) recurse but are not converted.
+        self.assertEqual(convert_disallowed_pairs_to_flow_style([1, 2, 3]), [1, 2, 3])
+
+    def test_convert_disallowed_pairs_non_list_value(self):
+        # If 'disallowed_pairs' value isn't a list, it falls through to the recursion branch.
+        input_dict = {'disallowed_pairs': 'not-a-list'}
+        result = convert_disallowed_pairs_to_flow_style(input_dict)
+        self.assertEqual(result['disallowed_pairs'], 'not-a-list')
 
     def test_PackedBits(self):
         ib1 = PackedBits()

@@ -10,6 +10,19 @@ from bespokeasm.assembler.pretty_printer import PrettyPrinterBase
 
 
 class MinHexPrettyPrinter(PrettyPrinterBase):
+    """Emit a minimal hex-dump suitable for piping into other tools.
+
+    Output format (8-bit words only):
+    - Each data row begins with `:` followed by lowercase byte values separated by spaces,
+      wrapping to a new row after 16 bytes.
+    - An `AddressOrgLine` flushes any partially-filled data row, then emits the new
+      address as hex (width = `model.address_size / 4` characters).
+    - Muted lines and other non-data lines are skipped.
+    - Empty input produces an empty string.
+
+    Raises `SystemExit` at construction if the model's word size is not 8.
+    """
+
     def __init__(self, line_objs:  list[LineObject], model: AssemblerModel) -> None:
         if model.word_size != 8:
             sys.exit('ERROR - Min Hex Pretty Printer only supports 8-bit words')
