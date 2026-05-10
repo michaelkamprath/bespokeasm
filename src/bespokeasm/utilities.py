@@ -251,12 +251,15 @@ def load_yaml_with_format_preservation(yaml_str):
                 if isinstance(value, str) and value.strip():
                     # Apply our number format detection
                     stripped = value.strip()
-                    if (stripped.startswith('0b') and all(c in '01' for c in stripped[2:])) or \
-                       (stripped.startswith('b') and all(c in '01' for c in stripped[1:])):
+                    if (stripped.startswith('0b') and len(stripped) > 2 and all(c in '01' for c in stripped[2:])) or \
+                       (stripped.startswith('b') and len(stripped) > 1 and all(c in '01' for c in stripped[1:])):
                         obj[key] = FormatPreservedInt(stripped, stripped)
-                    elif (stripped.startswith('0x') and all(c in '0123456789abcdefABCDEF' for c in stripped[2:])) or \
-                         (stripped.startswith('$') and all(c in '0123456789abcdefABCDEF' for c in stripped[1:])) or \
-                         (stripped.endswith('H') and all(c in '0123456789abcdefABCDEF' for c in stripped[:-1])):
+                    elif (stripped.startswith('0x') and len(stripped) > 2
+                          and all(c in '0123456789abcdefABCDEF' for c in stripped[2:])) or \
+                         (stripped.startswith('$') and len(stripped) > 1
+                          and all(c in '0123456789abcdefABCDEF' for c in stripped[1:])) or \
+                         (stripped.endswith('H') and len(stripped) > 1
+                          and all(c in '0123456789abcdefABCDEF' for c in stripped[:-1])):
                         obj[key] = FormatPreservedInt(stripped, stripped)
                     elif stripped.isdigit():
                         obj[key] = FormatPreservedInt(stripped, stripped)
@@ -267,12 +270,15 @@ def load_yaml_with_format_preservation(yaml_str):
                 if isinstance(item, str) and item.strip():
                     # Apply our number format detection
                     stripped = item.strip()
-                    if (stripped.startswith('0b') and all(c in '01' for c in stripped[2:])) or \
-                       (stripped.startswith('b') and all(c in '01' for c in stripped[1:])):
+                    if (stripped.startswith('0b') and len(stripped) > 2 and all(c in '01' for c in stripped[2:])) or \
+                       (stripped.startswith('b') and len(stripped) > 1 and all(c in '01' for c in stripped[1:])):
                         obj[i] = FormatPreservedInt(stripped, stripped)
-                    elif (stripped.startswith('0x') and all(c in '0123456789abcdefABCDEF' for c in stripped[2:])) or \
-                         (stripped.startswith('$') and all(c in '0123456789abcdefABCDEF' for c in stripped[1:])) or \
-                         (stripped.endswith('H') and all(c in '0123456789abcdefABCDEF' for c in stripped[:-1])):
+                    elif (stripped.startswith('0x') and len(stripped) > 2
+                          and all(c in '0123456789abcdefABCDEF' for c in stripped[2:])) or \
+                         (stripped.startswith('$') and len(stripped) > 1
+                          and all(c in '0123456789abcdefABCDEF' for c in stripped[1:])) or \
+                         (stripped.endswith('H') and len(stripped) > 1
+                          and all(c in '0123456789abcdefABCDEF' for c in stripped[:-1])):
                         obj[i] = FormatPreservedInt(stripped, stripped)
                     elif stripped.isdigit():
                         obj[i] = FormatPreservedInt(stripped, stripped)

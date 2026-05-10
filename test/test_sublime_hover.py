@@ -4,6 +4,7 @@ import re
 import sys
 import tempfile
 import types
+from unittest import mock
 
 from bespokeasm.utilities import PATTERN_ALLOWED_LABELS
 
@@ -478,3 +479,302 @@ def test_sublime_code_block_colors_numeric_prefix_directive():
     # Find the span containing "2byte" and verify its color
     assert '>2byte</span>' in html
     assert 'color:#D6ADFF;">2byte</span>' in html
+
+
+# --- View / settings / navigation helper tests ---
+
+
+class _MockSettings:
+    """Stand-in for sublime.View settings or sublime.load_settings results."""
+    def __init__(self, **values):
+        self._values = dict(values)
+
+    def get(self, key, default=None):
+        return self._values.get(key, default)
+
+    def has(self, key):
+        return key in self._values
+
+
+class _MockView:
+    """Minimal sublime.View-like mock supporting the helper functions under test."""
+    def __init__(
+        self,
+        view_id=1,
+        is_scratch=False,
+        is_widget=False,
+        match_selector=True,
+        viewport_extent=None,
+        change_count=0,
+        file_name='/tmp/test.asm',
+        syntax='Packages/BespokeASMTest/syntax.sublime-syntax',
+        view_settings=None,
+        window=None,
+    ):
+        self._id = view_id
+        self._is_scratch = is_scratch
+        self._match_selector = match_selector
+        self._viewport_extent = viewport_extent
+        self._change_count = change_count
+        self._file_name = file_name
+        # 'syntax' must be present in view settings for _get_package_name to work.
+        base = {'syntax': syntax} if syntax is not None else {}
+        if is_widget:
+            base['is_widget'] = True
+        if view_settings:
+            base.update(view_settings)
+        self._settings = _MockSettings(**base)
+        self._window = window
+
+    def id(self):
+        return self._id
+
+    def is_scratch(self):
+        return self._is_scratch
+
+    def settings(self):
+        return self._settings
+
+    def match_selector(self, _point, _selector):
+        return self._match_selector
+
+    def viewport_extent(self):
+        if self._viewport_extent is None:
+            raise RuntimeError('viewport not configured for this test')
+        return self._viewport_extent
+
+    def change_count(self):
+        return self._change_count
+
+    def file_name(self):
+        return self._file_name
+
+    def window(self):
+        return self._window
+
+
+# _get_expected_package_name
+
+
+def test_get_expected_package_name_returns_none_when_unsubstituted():
+    """Unsubstituted ##PACKAGE_NAME## template marker resolves to None (means: any package OK)."""
+    hover = _load_sublime_hover_module()
+    hover.PACKAGE_NAME = '##PACKAGE_NAME##'
+    assert hover._get_expected_package_name() is None
+
+
+def test_get_expected_package_name_returns_substituted_value():
+    """Once configgen substitutes PACKAGE_NAME, the literal value is returned."""
+    hover = _load_sublime_hover_module()
+    hover.PACKAGE_NAME = 'BespokeASMTest'
+    assert hover._get_expected_package_name() == 'BespokeASMTest'
+
+
+# _get_package_name
+
+
+def test_get_package_name_extracts_from_syntax_path():
+    """Package name is parsed out of the view's `syntax` setting (Packages/<NAME>/...)."""
+    hover = _load_sublime_hover_module()
+    view = _MockView(syntax='Packages/MyPkg/syntax.sublime-syntax')
+    assert hover._get_package_name(view) == 'MyPkg'
+
+
+def test_get_package_name_returns_none_for_non_packages_syntax():
+    """Syntax paths that don't start with 'Packages/' yield None."""
+    hover = _load_sublime_hover_module()
+    view = _MockView(syntax='other/path.sublime-syntax')
+    assert hover._get_package_name(view) is None
+
+
+# _is_bespokeasm_view
+
+
+def test_is_bespokeasm_view_rejects_falsy_view():
+    """Falsy view (None) returns False without exception."""
+    hover = _load_sublime_hover_module()
+    assert hover._is_bespokeasm_view(None) is False
+
+
+def test_is_bespokeasm_view_rejects_scratch_view():
+    """Sublime scratch views are excluded (no persistent file backing)."""
+    hover = _load_sublime_hover_module()
+    view = _MockView(is_scratch=True)
+    assert hover._is_bespokeasm_view(view) is False
+
+
+def test_is_bespokeasm_view_rejects_widget_view():
+    """Widget views (UI overlay panes) are excluded."""
+    hover = _load_sublime_hover_module()
+    view = _MockView(is_widget=True)
+    assert hover._is_bespokeasm_view(view) is False
+
+
+def test_is_bespokeasm_view_rejects_non_bespokeasm_syntax():
+    """A view whose syntax selector doesn't match `source.bespokeasm` is excluded."""
+    hover = _load_sublime_hover_module()
+    view = _MockView(match_selector=False)
+    assert hover._is_bespokeasm_view(view) is False
+
+
+def test_is_bespokeasm_view_accepts_when_no_expected_package():
+    """When PACKAGE_NAME is still the template token, any package satisfies the check."""
+    hover = _load_sublime_hover_module()
+    hover.PACKAGE_NAME = '##PACKAGE_NAME##'
+    view = _MockView()
+    assert hover._is_bespokeasm_view(view) is True
+
+
+def test_is_bespokeasm_view_matches_expected_package_name():
+    """When PACKAGE_NAME is substituted, only views whose package matches are accepted."""
+    hover = _load_sublime_hover_module()
+    hover.PACKAGE_NAME = 'BespokeASMTest'
+    view = _MockView(syntax='Packages/BespokeASMTest/syntax.sublime-syntax')
+    assert hover._is_bespokeasm_view(view) is True
+
+
+def test_is_bespokeasm_view_rejects_wrong_expected_package_name():
+    """Views whose package does not match the substituted PACKAGE_NAME are rejected."""
+    hover = _load_sublime_hover_module()
+    hover.PACKAGE_NAME = 'BespokeASMTest'
+    view = _MockView(syntax='Packages/Other/syntax.sublime-syntax')
+    assert hover._is_bespokeasm_view(view) is False
+
+
+# _get_hover_setting
+# Resolution order: view-level override > package-level setting > caller-supplied default.
+
+
+def test_get_hover_setting_view_override_takes_precedence():
+    """A `bespokeasm.hover.<key>` view setting overrides everything else."""
+    hover = _load_sublime_hover_module()
+    view = _MockView(view_settings={'bespokeasm.hover.mnemonics': False})
+    assert hover._get_hover_setting(view, 'mnemonics', True) is False
+
+
+def test_get_hover_setting_returns_default_when_no_overrides():
+    """When neither view nor package settings define the key, the supplied default is returned."""
+    hover = _load_sublime_hover_module()
+    view = _MockView()
+    with mock.patch.object(hover, '_get_package_settings', return_value=None):
+        assert hover._get_hover_setting(view, 'mnemonics', True) is True
+        assert hover._get_hover_setting(view, 'mnemonics', False) is False
+
+
+def test_get_hover_setting_falls_back_to_package_settings():
+    """Without a view override, the package's `hover.<key>` setting wins over the default."""
+    hover = _load_sublime_hover_module()
+    view = _MockView()
+    package_settings = _MockSettings(hover={'mnemonics': False})
+    with mock.patch.object(hover, '_get_package_settings', return_value=package_settings):
+        assert hover._get_hover_setting(view, 'mnemonics', True) is False
+
+
+# _get_hover_numeric_setting
+
+
+def test_get_hover_numeric_setting_uses_view_override():
+    """A numeric `bespokeasm.hover.<key>` view setting overrides everything else."""
+    hover = _load_sublime_hover_module()
+    view = _MockView(view_settings={'bespokeasm.hover.max_width': 1500})
+    assert hover._get_hover_numeric_setting(view, 'max_width') == 1500
+
+
+def test_get_hover_numeric_setting_returns_default_when_unset():
+    """When unset everywhere, the default kwarg is returned."""
+    hover = _load_sublime_hover_module()
+    view = _MockView()
+    with mock.patch.object(hover, '_get_package_settings', return_value=None):
+        assert hover._get_hover_numeric_setting(view, 'max_width', default=42) == 42
+
+
+def test_get_hover_numeric_setting_ignores_non_numeric_view_value():
+    """A non-numeric view-setting value is rejected and falls through to the default."""
+    hover = _load_sublime_hover_module()
+    view = _MockView(view_settings={'bespokeasm.hover.max_width': 'wide'})
+    with mock.patch.object(hover, '_get_package_settings', return_value=None):
+        assert hover._get_hover_numeric_setting(view, 'max_width', default=900) == 900
+
+
+# _get_hover_max_width
+
+
+def test_get_hover_max_width_uses_configured_value():
+    """An explicit `max_width` setting wins over viewport heuristics."""
+    hover = _load_sublime_hover_module()
+    view = _MockView(view_settings={'bespokeasm.hover.max_width': 1200})
+    assert hover._get_hover_max_width(view, 900) == 1200
+
+
+def test_get_hover_max_width_falls_back_to_viewport_minus_margin():
+    """Without an explicit setting, max width derives from viewport_extent minus HOVER_VIEWPORT_MARGIN."""
+    hover = _load_sublime_hover_module()
+    view = _MockView(viewport_extent=(1000, 600))
+    with mock.patch.object(hover, '_get_package_settings', return_value=None):
+        assert hover._get_hover_max_width(view, 900) == 1000 - hover.HOVER_VIEWPORT_MARGIN
+
+
+def test_get_hover_max_width_uses_default_when_viewport_unavailable():
+    """When viewport_extent raises (e.g., no window attached), the caller-supplied default is used."""
+    hover = _load_sublime_hover_module()
+    view = _MockView(viewport_extent=None)
+    with mock.patch.object(hover, '_get_package_settings', return_value=None):
+        assert hover._get_hover_max_width(view, 555) == 555
+
+
+# _get_semantic_setting
+
+
+def test_get_semantic_setting_default_when_no_overrides():
+    """With no overrides, semantic highlighting falls back to DEFAULT_SEMANTIC_HIGHLIGHTING."""
+    hover = _load_sublime_hover_module()
+    view = _MockView()
+    with mock.patch.object(hover, '_get_package_settings', return_value=None):
+        assert hover._get_semantic_setting(view) == hover.DEFAULT_SEMANTIC_HIGHLIGHTING
+
+
+def test_get_semantic_setting_view_override_takes_precedence():
+    """A `bespokeasm.semantic_highlighting` view-setting override beats the default."""
+    hover = _load_sublime_hover_module()
+    view = _MockView(view_settings={'bespokeasm.semantic_highlighting': False})
+    assert hover._get_semantic_setting(view) is False
+
+
+# _handle_hover_navigate
+# Hover popups link to file locations and external URLs; verify each scheme is handled.
+
+
+def test_handle_hover_navigate_opens_bespokeasm_url():
+    """`bespokeasm://open?path=...&line=...&col=...` opens the file via window.open_file with ENCODED_POSITION."""
+    hover = _load_sublime_hover_module()
+    sublime_module = sys.modules['sublime']
+    sublime_module.ENCODED_POSITION = object()
+    window = mock.MagicMock()
+    view = _MockView(window=window)
+    hover._handle_hover_navigate(view, 'bespokeasm://open?path=/tmp/foo.asm&line=4&col=2')
+    window.open_file.assert_called_once_with('/tmp/foo.asm:4:2', sublime_module.ENCODED_POSITION)
+
+
+def test_handle_hover_navigate_ignores_bespokeasm_url_without_path():
+    """A bespokeasm:// URL missing the `path` parameter is silently ignored (no crash, no open)."""
+    hover = _load_sublime_hover_module()
+    window = mock.MagicMock()
+    view = _MockView(window=window)
+    hover._handle_hover_navigate(view, 'bespokeasm://open?line=4&col=2')
+    window.open_file.assert_not_called()
+
+
+def test_handle_hover_navigate_opens_external_url_via_run_command():
+    """http/https/file URLs are handed off to Sublime's `open_url` window command."""
+    hover = _load_sublime_hover_module()
+    window = mock.MagicMock()
+    view = _MockView(window=window)
+    hover._handle_hover_navigate(view, 'https://example.com/docs')
+    window.run_command.assert_called_once_with('open_url', {'url': 'https://example.com/docs'})
+
+
+def test_handle_hover_navigate_no_window_is_safe():
+    """When the view has no window (e.g., during teardown), navigation is a no-op (no exception)."""
+    hover = _load_sublime_hover_module()
+    view = _MockView(window=None)
+    hover._handle_hover_navigate(view, 'https://example.com')

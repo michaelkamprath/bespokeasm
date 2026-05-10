@@ -42,17 +42,19 @@ class TestMinHexPrettyPrinter(unittest.TestCase):
         self.memzone = MemoryZone(4, 0, 15, 'GLOBAL')
 
     def test_init_word_size_error(self):
-        # MinHexPrettyPrinter only supports 8-bit words; non-8 word sizes exit.
+        """Constructing MinHex with a non-8-bit word size aborts via SystemExit (precondition)."""
         self.model._config['general']['word_size'] = 4
         with self.assertRaises(SystemExit):
             MinHexPrettyPrinter([], self.model)
 
     def test_pretty_print_empty(self):
+        """An empty line-object list yields an empty string (no header, no trailing newline)."""
         printer = MinHexPrettyPrinter([], self.model)
         output = printer.pretty_print()
         self.assertEqual(output, '', 'empty input produces empty output')
 
     def test_pretty_print_basic_bytes(self):
+        """A single data line produces one ':'-prefixed row of lowercase hex bytes."""
         line_id = LineIdentifier(1, 'main.asm')
         words = [Word(0xDE, 8), Word(0xAD, 8), Word(0xBE, 8), Word(0xEF, 8)]
         line = DummyLineWithWords(
@@ -66,6 +68,7 @@ class TestMinHexPrettyPrinter(unittest.TestCase):
         self.assertEqual(normalized, ':de ad be ef')
 
     def test_pretty_print_wraps_after_16_bytes(self):
+        """Rows are wrapped at 16 bytes; a 17-byte payload spans exactly two rows."""
         line_id = LineIdentifier(1, 'main.asm')
         # 17 bytes -> first 16 on row 1, 17th on row 2.
         words = [Word(i, 8) for i in range(17)]
@@ -84,6 +87,7 @@ class TestMinHexPrettyPrinter(unittest.TestCase):
         self.assertEqual(second_bytes, ['10'], 'second row contains the 17th byte')
 
     def test_pretty_print_with_address_org(self):
+        """An AddressOrgLine emits a hex address marker between data rows."""
         line_id = LineIdentifier(1, 'main.asm')
         words_a = [Word(0x12, 8), Word(0x34, 8)]
         line_a = DummyLineWithWords(
@@ -104,6 +108,7 @@ class TestMinHexPrettyPrinter(unittest.TestCase):
         self.assertEqual(rows[2].lstrip(':').split(), ['56'])
 
     def test_pretty_print_skips_muted_lines(self):
+        """Muted lines (line._is_muted=True) contribute no bytes to the output."""
         line_id = LineIdentifier(1, 'main.asm')
         words_visible = [Word(0xAA, 8)]
         words_muted = [Word(0xBB, 8)]
@@ -121,7 +126,7 @@ class TestMinHexPrettyPrinter(unittest.TestCase):
         self.assertEqual(normalized, ':aa')
 
     def test_pretty_print_org_after_partial_row(self):
-        # An org line in the middle of a partial row should flush the row before emitting the address.
+        """An org line mid-row flushes the partial data row before emitting the address marker."""
         line_id = LineIdentifier(1, 'main.asm')
         words = [Word(0x01, 8), Word(0x02, 8)]
         line = DummyLineWithWords(
