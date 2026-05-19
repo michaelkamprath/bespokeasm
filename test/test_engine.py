@@ -314,6 +314,34 @@ class TestAssemblerEngine(unittest.TestCase):
                 assembler.assemble_bytecode()
             self.assertIn('overlaps', str(ctx.exception))
 
+    def test_empty_source_reports_diagnostic(self):
+        """An empty source file reports a friendly error instead of IndexError."""
+        fp = pkg_resources.files(config_files).joinpath('test_instruction_operands.yaml')
+        config_path = str(fp)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            asm_path = os.path.join(temp_dir, 'empty.asm')
+            with open(asm_path, 'w') as handle:
+                handle.write('')
+
+            assembler = Assembler(
+                source_file=asm_path,
+                config_file=config_path,
+                generate_binary=False,
+                output_file=None,
+                binary_start=None,
+                binary_end=None,
+                binary_fill_value=0,
+                enable_pretty_print=False,
+                pretty_print_format=None,
+                pretty_print_output=None,
+                is_verbose=0,
+                include_paths=[temp_dir],
+                predefined=[],
+            )
+            with self.assertRaises(SystemExit) as ctx:
+                assembler.assemble_bytecode()
+            self.assertIn('no compilable lines', str(ctx.exception))
+
     def test_msb_mismatch_in_second_pass_reports_line_diagnostic(self):
         fp = pkg_resources.files(config_files).joinpath('test_valid_address_enforcement.yaml')
         config_path = str(fp)
