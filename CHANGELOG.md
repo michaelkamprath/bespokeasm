@@ -23,6 +23,7 @@ Changes that are planned but not implemented yet:
 * Added semantic label-usage highlighting in Vim: references to labels defined in the buffer are highlighted distinctly from arbitrary identifiers.
 * Added hover-equivalent documentation in Vim: pressing `K` over a mnemonic, register, directive, expression function, or predefined symbol opens its documentation in a preview window. An optional auto-popup variant (vim 8.2+ / Neovim) is available via `g:bespokeasm_<ft>_auto_hover`.
 * Improved unit test coverage
+* Fixed an `IndexError` crash when compiling a source file with no compilable lines; a clear diagnostic error is now reported instead.
 
 ## [0.7.3]
 * Added configurable mnemonic decorators (`+`, `-`, `++`, `--`, `!`, `@`) so instruction variants can use prefixed or suffixed decorated mnemonics such as `m+`, `m-`, and `++inc`.

@@ -195,6 +195,11 @@ class Assembler:
         compilable_line_obs.extend(predefined_line_obs)
 
         # Sort lines according to their assigned address. This allows for .org directives
+        if not compilable_line_obs:
+            diagnostic_reporter.error(
+                None,
+                'source file contains no compilable lines',
+            )
         compilable_line_obs.sort(key=lambda x: x.address)
         max_generated_address = compilable_line_obs[-1].address
         line_dict = {
