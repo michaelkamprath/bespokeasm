@@ -9,10 +9,11 @@ The original request in issue #18 is for symbolic stack-slot labels: give a valu
 
 The generalized mechanism is the **flow counter**: a named integer value that the assembler advances line-by-line through the source code according to per-instruction effects declared in the ISA configuration. Flow counters:
 
-* exist only at assembly time and emit no bytecode — the feature is static analysis only, and assembled output is identical with or without it (see *Guiding Requirement* below),
-* are usable in operand expressions (current value and snapshots),
+* exist only at assembly time and add no instructions or layout footprint — metadata, directives, and counter-coordinate declarations are emission-inert, while `COUNTER()`/`OFFSET()` emit exactly the same operand/data values as the equivalent hand-written numeric literals (see *Guiding Requirement* below),
+* are usable in operand expressions through current values and explicitly declared counter-coordinate symbols,
 * are checked for consistency, with ambiguous or out-of-bounds usage reported as errors,
-* are instances of **counter classes** declared in the ISA configuration — instructions declare effects against classes, source code instantiates counters, and any number of counters may be active simultaneously, each tracked independently.
+* are instances of **counter classes** declared in the ISA configuration — instructions declare effects against classes, source code instantiates counters, and any number of counters may be active simultaneously, each tracked independently,
+* run by default but may be bypassed for a compilation with `--no-static-analysis`; analysis-only annotations are then ignored, while any emitted value that depends on analysis is rejected rather than guessed.
 
 Stack depth is the flagship use case, but the mechanism is deliberately general. Because BespokeASM ISAs are user-defined, what a counter *means* is entirely the configuration author's choice — the assembler only does bookkeeping and consistency checking.
 
@@ -33,12 +34,12 @@ Flow counters are best understood as a generalization of machinery the assembler
 | single, implicit, always active | many, explicit, opened by `#track` |
 | starts at `origin`; `.org` re-anchors it | starts at `init`; `#set` / `#resume` re-anchor it |
 | advances by each line's `word_count` | advances by each instruction's declared `flow_effects` delta |
-| an address label (`foo:`) snapshots its current value | a slot constant (`.var = COUNTER(stack)`) snapshots its current value |
+| an address label (`foo:`) snapshots its current value | a counter-coordinate declaration (`.var := COUNTER(stack)`) snapshots its current value |
 | the snapshot feeds address operand values | the snapshot feeds `OFFSET()` operand values |
 | bounded by memory zone start/end | bounded by `min_value` / `max_value` |
-| resolved in the first pass, in source order | resolved in the first pass, in source order |
+| resolved in the first address-assignment pass | resolved in a separate post-layout analysis pass, using source and execution order |
 
-In other words, the address counter is essentially one hardwired flow counter: a single always-on instance whose per-line delta happens to be forced by emission rather than declared in configuration, re-anchored by `.org`, and snapshotted by labels. **The implementation should reuse the existing first-pass walk and the label-scope snapshot machinery rather than build a parallel system** — a slot constant is, mechanically, an address label whose value comes from a counter instead of the address counter.
+In other words, the address counter is essentially one hardwired flow counter: a single always-on instance whose per-line delta happens to be forced by emission rather than declared in configuration, re-anchored by `.org`, and snapshotted by labels. **The implementation should reuse the existing line objects, source-order relationships, and label-scope machinery while keeping flow evaluation in its own post-layout pass** — a counter-coordinate symbol is, mechanically, an address-label-like value whose source is a counter instead of the address counter.
 
 The generalization is not total, and the one axis where it breaks is the most important design fact about the feature:
 
@@ -51,8 +52,8 @@ So flow counters generalize the *counter-with-snapshots mechanism* the assembler
 ### How Much Should They Share?
 The parallel above is a guide to *reuse*, not a mandate to *unify*. The intended relationship:
 
-* **Share the paradigm.** The two should feel like the same idea: a counter advanced during the first pass, re-anchored by a directive, snapshotted into a named compile-time value. Directive and expression design should deliberately echo the address-counter vocabulary (`#track`/`init=` mirroring `.org`/`origin`; slot constants mirroring address labels) so the feature reads as an extension of what users already know.
-* **Share one primitive: the label-scope value sink.** The deepest commonality is not "two counters" but that both produce *named values captured at a source position during the first pass* into the label-scope system. The address counter already does this (an address label is a snapshot of `current_address`). Flow counters should join as a **second producer** into that same machinery — a slot constant is an address-label-like value whose source is a counter instead of the address counter (see Open Question 2 on tagged-origin constants). Reuse flows in one direction: flow counters borrow the existing label/first-pass primitives; the address counter is **not** re-expressed on top of a flow-counter engine.
+* **Share the paradigm.** The two should feel like the same idea: a counter advanced during an assembly pass, re-anchored by a directive, snapshotted into a named compile-time value. Directive and expression design should deliberately echo the address-counter vocabulary (`#track`/`init=` mirroring `.org`/`origin`; counter-coordinate symbols mirroring address labels) so the feature reads as an extension of what users already know.
+* **Share one primitive: the label-scope value sink.** The deepest commonality is not "two counters" but that both produce *named values captured at a source position* into the label-scope system. The address pass already does this for `current_address`; the later flow-analysis pass becomes a **second producer** into the same scoped-symbol machinery. A `:=` declaration creates an address-label-like value whose source and counter identity are recorded explicitly. Reuse flows in one direction: flow counters borrow the existing scoped-symbol primitives; the address counter is **not** re-expressed on top of a flow-counter engine.
 * **Do not unify them under a common Counter base.** A shared base class would be lopsided — the address counter carries memory zones, overlap detection, `.fill`/`.align`, and monotonicity that no flow counter uses, while flow counters carry signed deltas, bounds, suspend/resume, and control-flow analysis that the address counter never uses. The shared bookkeeping is a small fraction of either; a common base would mostly be two disjoint sets of special cases.
 * **Isolation is a hard constraint, not a preference.** The *Static Analysis Only* guarantee forbids flow-counter logic from perturbing address assignment or byte code. Sharing mutable state or a common advance path between the two would create exactly the channel through which an analysis bug could shift an address. Keeping the implementations separate — touching only the immutable label-scope primitive — is what makes the byte-identical guarantee structurally enforceable rather than merely intended. The address counter is also load-bearing and predates this feature; there is no functional upside to refactoring it.
 
@@ -69,20 +70,42 @@ The lesson for scope: when a counter's snapshot must *be* an address that byte c
 ## Requirements
 
 ### Guiding Requirement: Static Analysis Only
-Flow counters are purely a static-analysis feature. **The assembled byte code must be identical whether or not the feature is used** — its only observable effects are diagnostics (and assembly failure when those diagnostics are errors). Specifically:
+Flow counters are an assembly-time analysis and constant-computation feature. **Flow metadata, directives, and `:=` declarations must not change layout or emission; analysis-derived values must be byte-identical to replacing them with their resolved numeric literals.** Apart from those explicitly requested literal values, the feature's only observable effects are diagnostics (and assembly failure when those diagnostics are errors). Specifically:
 
 * Flow counter directives (`#track`, `#endtrack`, `#assert`, `#set`, `#entry`, `#suspend`, `#resume`, `#loop`) emit no byte code and occupy no address space, like all other preprocessor directives.
+* Counter-coordinate declarations (`name := <counter-coordinate expression>`) emit no byte code and occupy no address space. They are distinct from BespokeASM's ordinary `=` / `EQU` constant assignments.
 * The analysis never alters code generation: no instruction insertion, removal, reordering, padding, or operand rewriting based on analysis results. Tracking state has no influence on instruction encoding, address assignment, or memory zone behavior.
-* `COUNTER()` and `OFFSET()` resolve to compile-time constants determined solely by the declared instruction effects and the source's structure — the emitted byte code is bit-identical to what hand-writing the resolved numeric values would produce. They are conveniences for computing values the programmer would otherwise compute (and today does compute) by hand.
-* Equivalence invariant, suitable for a conformance test: take any program that assembles cleanly with flow counters in use; strip every flow counter directive and replace every `COUNTER()`/`OFFSET()` expression with its resolved numeric value; the assembled output must be byte-identical.
+* `COUNTER()`, counter-coordinate symbols, and `OFFSET()` resolve to compile-time numeric values determined solely by the declared instruction effects and the source's structure — the emitted byte code is bit-identical to what hand-writing the resolved values would produce. They are conveniences for computing values the programmer would otherwise compute (and today does compute) by hand.
+* Equivalence invariant, suitable for a conformance test: take any program that assembles cleanly with flow counters in use; strip every flow counter directive and `:=` declaration, then replace every emitted reference to `COUNTER()`, `OFFSET()`, or a counter-coordinate symbol with its resolved numeric value. The assembled output must be byte-identical.
 * Adding `flow_counters` and per-instruction effect metadata to an ISA configuration must not change the assembly of any existing source file that does not use the feature.
 
+### Static-Analysis Execution Control (Command Line)
+The `compile` command provides a Click-style dual boolean option:
+
+```text
+--static-analysis / --no-static-analysis
+```
+
+Static analysis is **enabled by default**. Supplying `--static-analysis` selects that default explicitly; `--no-static-analysis` bypasses every static-analysis pass and suppresses all diagnostics produced by those passes. The option is an umbrella for the analysis framework, beginning with flow counters and applying to future analysis clients hosted by the same framework.
+
+With `--no-static-analysis`:
+
+* flow-counter metadata in the ISA configuration has no behavioral effect, and all flow-specific configuration and usage-time validation is skipped. The configuration must still be syntactically readable, and all ordinary non-analysis ISA validation continues to run;
+* flow directives and well-formed `:=` declarations are recognized as analysis-only syntax but otherwise ignored: they emit nothing, open no regions, create no numeric values, enter no normal symbols, and produce no flow diagnostics. For ordinary compilation semantics, this is equivalent to stripping those lines;
+* the parser records each ignored `:=` declaration's exact scoped spelling and source location in a diagnostic-only index. This index does not reserve, shadow, or collide with an ordinary symbol; it is consulted only when an otherwise-unresolved compiled expression references that spelling, allowing a precise disabled-analysis diagnostic instead of a misleading generic undefined-symbol error;
+* a flow construct used only by another ignored flow construct does not prevent compilation;
+* if any non-ignored construct needs an analysis-derived value to compile — including an instruction operand, fixed-size data value, or other ordinary expression containing `COUNTER()`, `OFFSET()`, or a coordinate name that has no ordinary definition after its `:=` declaration is ignored — compilation fails at that use with a dedicated error such as “static analysis is disabled; cannot resolve `.slot`.” The assembler never substitutes zero, a stale value, or a guessed value;
+* ordinary address labels and `=` / `EQU` constants are unchanged.
+
+Thus a source file may retain optional assertions and tracking annotations when analysis is disabled, but it cannot retain a dependency on an analysis-computed emitted value without supplying an ordinary literal/constant alternative.
+
 ### Feature Enablement (ISA Configuration)
-Flow counters are **off unless the instruction set explicitly enables them**, and any failure is **gated on actual use**:
+When command-line static analysis is enabled, flow counters are **off unless the instruction set explicitly enables them**, and any failure is **gated on actual use**:
 
 * The presence of a `flow_counters` section in the ISA configuration *is* the explicit enablement, and the counter classes it declares *are* the enabled types — an ISA enables exactly the counter types it lists, nothing more. There is no implicit or global "all counters" set to enable, because counter classes are author-defined; the section is the enumeration.
 * An ISA with **no `flow_counters` section** has the feature disabled entirely. It assembles exactly as today, and none of the metadata-completeness or soundness checks ever run.
-* Using any flow-counter construct (`#track` and the other directives, or `COUNTER()`/`OFFSET()`) in source compiled against an ISA that does not enable the feature is an **error** — "this instruction set does not enable flow counters" — and that error fires **only because the construct was used**. Source that uses no flow-counter construct never errors, regardless of configuration.
+* Using any flow-counter construct (`#track` and the other directives, `:=`, or `COUNTER()`/`OFFSET()`) in source compiled against an ISA that does not enable the feature is an **error** — "this instruction set does not enable flow counters" — and that error fires **only because the construct was used**. Source that uses no flow-counter construct never errors, regardless of configuration.
+* Under `--no-static-analysis`, analysis-only constructs are ignored even when the ISA has no `flow_counters` section. A non-ignored use that requires their value fails because static analysis is disabled, before ISA capability is relevant.
 * Likewise, every requirement in *Required Metadata: Fail Loud, Never Silently Inert* is usage-gated: a metadata gap for counter class `X` is an error only when source actually tracks or references `X`. An enabled-but-unused class imposes no obligations and raises no diagnostics.
 
 This keeps the *Static Analysis Only* guarantee intact from both directions: enabling the feature on an ISA changes nothing for source that does not use it, and source cannot accidentally invoke it against an ISA that did not opt in.
@@ -93,7 +116,7 @@ The configuration declares counter **classes**; source code creates counter **in
 In the common case the distinction is invisible: `#track stack` creates an instance whose name defaults to its class name, and everything reads as if "stack" were simply a counter.
 
 #### There Is No Fixed Taxonomy of Counter "Types"
-A counter has no built-in kind. Its behavior is **emergent from the combination of two things**: the class-declaration knobs (`join`, `min_value`/`max_value`, `entry_modes`, `unknown_instructions`) and how each instruction declares it interacts with the class (`flow_effects`, `flow_terminal`, `flow_transfer`). "Stack depth," "cycle counter," "constant-time counter," and "hardware-call-stack limit" are *recognizable configurations* of those knobs, not enumerated types the assembler knows about. The use cases listed earlier are therefore presets/patterns, not a closed set — an ISA author can compose new ones (e.g., a bank-nesting balance counter) purely by choosing knobs and per-instruction effects, with no assembler change. Wherever this document says "a cycle counter" or "a stack counter," read it as shorthand for "a counter configured this way," not a distinct mechanism.
+A counter has no built-in kind. Its behavior is **emergent from the combination of two things**: the class-declaration knobs (`join`, `min_value`/`max_value`, `entry_modes`, `exit_policy`, `unknown_instructions`) and how each instruction declares it interacts with the class (`flow_effects`, `flow_terminal`, `flow_transfer`, `flow_call_effects`). "Stack depth," "cycle counter," "constant-time counter," and "hardware-call-stack limit" are *recognizable configurations* of those knobs, not enumerated types the assembler knows about. The use cases listed earlier are therefore presets/patterns, not a closed set — an ISA author can compose new ones (e.g., a bank-nesting balance counter) purely by choosing knobs and per-instruction effects, with no assembler change. Wherever this document says "a cycle counter" or "a stack counter," read it as shorthand for "a counter configured this way," not a distinct mechanism.
 
 A new optional top-level configuration section, `flow_counters`, declares the classes available to source code:
 
@@ -108,8 +131,9 @@ flow_counters:
     join: require-equal       # paths must agree at a join (default); else join-mismatch error
     min_value: 0              # optional; error if tracking goes below
     max_value: 64             # optional; error if exceeded
-    unknown_instructions: error   # ignore | warn | error (default: warn)
+    unknown_instructions: error   # require an explicit stack_effect, including zero
     default_init: 0           # init value when #track gives neither init= nor mode=
+    exit_policy: balanced     # default: implicit exit value equals initial value
     entry_modes:              # named entry conventions, usable as #track mode=<name>
       called:                 # entered via `call`: 16-bit return address on the stack
         init: 2
@@ -124,10 +148,12 @@ flow_counters:
     operation: add
     join: interval
     unknown_instructions: error
+    exit_policy: none         # assertions/bounds define the contract; closing alone does not
   ct_cycles:                  # a constant-time counter: paths MUST agree
     source: documentation.cycles  # same source field, different join policy
     join: require-equal
     unknown_instructions: error
+    exit_policy: none
 ```
 
 The section is a dictionary keyed by class name, matching the `operand_sets`/`instructions` convention. The `stack` class above reads each instruction's delta from a purpose-defined `stack_effect` field; the `cycles` class reads the per-instruction timing straight out of `documentation.cycles`, so the cycle count is authored once and serves both documentation and the counter.
@@ -142,7 +168,8 @@ The section is a dictionary keyed by class name, matching the `operand_sets`/`in
 | `max_value` | integer | Optional upper bound. Tracking above this value is an error. |
 | `unknown_instructions` | string | Behavior when an instruction with no declared effect for this class appears inside an active tracking region: `ignore`, `warn`, or `error`. Default `warn`. |
 | `default_init` | integer | _(Optional)_ Initial value used when `#track` provides neither `init=` nor `mode=`. Defaults to 0. |
-| `entry_modes` | dictionary | _(Optional)_ Named entry conventions. Each key is an author-defined mode name usable in source as `#track ... mode=<name>`; each value is a dictionary with `init` (required) and `exit` (optional, defaults to `init`). This keeps ISA knowledge — the return-address size, what an interrupt entry pushes — declared once in the configuration, while source code only names *how* a routine is entered. |
+| `exit_policy` | string | _(Optional)_ Default exit contract when neither an entry mode nor `#track` supplies `exit=`. `balanced` (default) sets the expected exit value equal to the initial value. `none` gives the region no implicit equality check; bounds and explicit `#assert` directives still apply, and an explicit `exit=` creates an exact exit contract. `none` is appropriate for accumulating measurement windows such as cycle counters. |
+| `entry_modes` | dictionary | _(Optional)_ Named entry conventions. Each key is an author-defined mode name usable in source as `#track ... mode=<name>`; each value is a dictionary with `init` (required) and `exit` (optional). If `exit` is absent, the class's `exit_policy` supplies the default (`init` for `balanced`, no implicit contract for `none`). This keeps ISA knowledge — the return-address size, what an interrupt entry pushes — declared once in the configuration, while source code only names *how* a routine is entered. |
 
 These are class-level properties, inherited by every instance.
 
@@ -155,10 +182,12 @@ An instruction's effect on a counter is its **delta value, read from the field t
 instructions:
   push:
     stack_effect: 1           # read by the `stack` class (source: stack_effect)
+    flow_transfer: none
     documentation:
       cycles: 11              # read by the `cycles`/`ct_cycles` classes (source: documentation.cycles)
   pop:
     stack_effect: -1
+    flow_transfer: none
     documentation:
       cycles: 10
   ret:
@@ -166,17 +195,29 @@ instructions:
     documentation:
       cycles: 10
     flow_terminal: [stack]    # ends a tracking region for these counters
+    flow_transfer: return     # no executable successor
   jmp:
+    stack_effect: 0
     documentation: { cycles: 8 }
     flow_transfer: unconditional
+    flow_target_operand: 0
   jz:
+    stack_effect: 0
+    documentation: { cycles: { taken: 12, fall_through: 7 } }
     flow_transfer: conditional
+    flow_target_operand: 0
   call:
+    stack_effect: 2
+    documentation: { cycles: 17 }
     flow_transfer: call
+    flow_target_operand: 0
+    flow_call_effects: { stack: 0 }  # declared caller-visible net effect
   jmp_hl:                     # computed/indirect jump
+    stack_effect: 0
     flow_transfer: indirect
   mov_reg:
     flow_effects: { scratch: 1 }   # default source field, for a class that omits `source`
+    flow_transfer: none
 ```
 
 The delta read from `source` is an integer in the common case, but may also be an operand expression or an edge-map (see *Operand-Dependent Effects* and *Edge-Dependent Deltas*); `operation` governs how it accumulates regardless of form. A counter reading `documentation.cycles` simply finds an integer there. `flow_terminal`/`flow_transfer` are independent of `source` and apply to whichever classes they name (terminal) or to the CFG (transfer).
@@ -190,18 +231,21 @@ The delta read from `source` is an integer in the common case, but may also be a
 > callee's frame and the caller's slots — see *Subroutine Arguments and the Return Address*.
 
 1. **Delta** — each counter class reads its per-instruction delta from the field named by its `source` (default `flow_effects.<class>`), applied to *every active instance* of that class when the instruction is encountered. `flow_effects` is thus the *default* source field — a map of class → delta — but a class may instead point `source` at any integer field (e.g., `documentation.cycles`) to reuse existing data. A delta may be a constant integer or, optionally, an operand expression or edge-map (see *Operand-Dependent Effects* and *Edge-Dependent Deltas*).
-2. **`flow_terminal`** — list of counter classes for which this mnemonic terminates tracking regions (typically `ret`, `reti`, `rts`). It terminates *every active instance* of the listed classes, each checked against its own exit value. This is how "end of subroutine" is expressed without the assembler having to infer subroutine structure.
-3. **`flow_transfer`** — classifies control-transfer instructions so the control-flow consistency analysis (see below) knows where execution can flow:
+2. **`flow_terminal`** — list of counter classes for which this mnemonic terminates tracking regions (typically `ret`, `reti`, `rts`). It terminates *every active instance* of the listed classes. An exact exit check is applied only when the instance has an exit contract; bounds and other diagnostics always remain active. This is how "end of subroutine" is expressed without the assembler having to infer subroutine structure.
+3. **`flow_transfer`** — exhaustively classifies instruction control flow so the consistency analysis (see below) knows where execution can flow. Every selected instruction variant encountered while any counter is actively tracked must declare one of these values; ordinary instructions explicitly declare `none`. This completeness rule is usage-gated — an ISA/source combination that never uses flow counters is unaffected:
+   * `none` — ordinary execution proceeds to the physical fall-through successor.
    * `conditional` — execution may continue at the branch target *or* fall through.
    * `unconditional` — execution continues only at the branch target; the following line is not a fall-through successor.
-   * `call` — execution transfers away and returns to the following line. The counter value at the fall-through line is computed by the call-composition rule (see *Path Analysis*), which accounts for both the call's own push and the callee's terminal pop.
-   * `indirect` — a computed or register-indirect jump whose target is unknowable at assembly time. Inside an active region this is an error for any tracked counter (unless the counter is suspended), because the analysis cannot follow it.
+   * `call` — execution transfers to a named callee and returns to the fall-through successor. A direct call may supply a caller-visible per-class net effect through `flow_call_effects`; without a usable declared summary, the state after the call remains an unresolved `CallEffect` (see *Path Analysis*).
+   * `return` — execution returns to a caller and has no intraprocedural successor. It normally appears together with `flow_terminal`.
+   * `indirect` — a computed or register-indirect transfer whose target is unknowable at assembly time. Inside an active region this is an error because suspension makes the counter value indeterminate but does not make the control-flow target knowable.
+   * `multiway` — execution continues at one of a finite, explicitly declared target set. The target-set representation is activated with the M7 richer-effects work; until then such a transfer is treated as `indirect`.
 
-   This classification — plus the branch target, which the assembler already knows from the operand — is *all* the instruction-behavior knowledge the path analysis requires. The analyzer does not need to understand what instructions do, only where control can go and what each one's declared counter deltas are.
+   Direct `conditional`, `unconditional`, and `call` variants also declare `flow_target_operand`, the zero-based index of the operand containing the control-flow target. The analyzer must not guess from operand type: a customizable instruction may contain multiple address-like operands, and loads/stores also use addresses. `flow_target_operand` must identify an operand that resolves to a direct code target. `indirect` has no direct target operand; `multiway` will use its explicit target-set metadata.
 
-Referencing an undeclared counter class in any of these keys is a configuration error (validated in `AssemblerModel._validate_config()`).
+Referencing an undeclared counter class in `flow_effects`, `flow_terminal`, or `flow_call_effects` is a configuration error (validated in `AssemblerModel._validate_config()`). `flow_transfer` and `flow_target_operand` describe the CFG globally and do not name counter classes. A missing/invalid target operand, a target operand on an incompatible transfer kind, or `flow_call_effects` on a non-`call` variant is also a configuration error.
 
-Placement follows existing instruction-config structure: the keys may be declared at the instruction level and overridden per `variants` entry (which is how a `ret 2` callee-pops variant declares a different `stack` delta than plain `ret`). Instruction `aliases` share the root mnemonic's configuration, so effects apply to aliases automatically. Configurations using these keys must declare a `min_version` of at least the release introducing them.
+Placement follows existing instruction-config structure: the keys may be declared at the instruction level and overridden per `variants` entry. The semantic metadata seen by analysis is the explicit merge of instruction-level values with the selected variant's overrides; M0 retains that merged, immutable record. Instruction `aliases` share the root mnemonic's configuration, so effects apply to aliases automatically. Configurations using these keys must declare a `min_version` of at least the release introducing them.
 
 Note the precedent of the existing `documentation.modifies` metadata, where instructions already declare which registers/flags/memory they touch — but only for documentation output. `flow_effects` is the machine-checked analogue for counter state; documentation generation could eventually surface declared flow effects alongside `modifies`.
 
@@ -217,25 +261,26 @@ An instruction's effect on a counter may depend on its operand(s), not just its 
 
 Determinism is the governing rule, and it follows directly from the *Static Analysis Only* guarantee:
 
-* If the operand resolves to a **compile-time constant** (`add sp, 4`, or `add sp, FRAME_SIZE` where `FRAME_SIZE` is a constant), the delta is fully determined and tracking proceeds normally. This is the common stack-frame case and is needed for basic stack tracking — so operand-dependent *constant* deltas are scheduled early (M3, with the subroutine-frame work), not deferred to M7.
+* If the operand exposes a **compile-time semantic value** (`add sp, 4`, or `add sp, FRAME_SIZE` where `FRAME_SIZE` is a constant), the delta is fully determined and tracking proceeds normally. This is the common stack-frame case and is needed for basic stack tracking — so operand-dependent *constant* deltas are scheduled early (M3, with the subroutine-frame work), not deferred to M7.
+* An emitted operand encoding is not automatically a semantic value. A register operand may encode register `a` as an integer field, but that integer is the register selector, not the value held in `a`; `ARG(n)` must therefore see the retained operand's semantic kind and treat such an operand as runtime-valued rather than reading its opcode bits.
 * If the operand resolves to a **runtime value** the assembler cannot know (`add sp, a` where `a` is a register, or a value computed at runtime), the delta is unknowable; the counter enters the indeterminate state exactly as a runtime-variable push loop does (handled per `#suspend`, or an error if used while not suspended). The analysis never guesses.
 * Structural operand quantities (register-set cardinality, page-cross penalties, repeat counts) are the richer cases and remain **M7**.
 
 Operand-dependent deltas depend on the line retaining its resolved operand argument values (architecture change A), which the assembler currently discards.
 
 #### Macros Influence Counters Only in Aggregate
-A macro carries **no independent flow metadata** — `flow_effects`, `flow_terminal`, and `flow_transfer` are not accepted on a macro definition (declaring them is a configuration error). A macro's entire influence on every counter is **the aggregate of the effects of the instructions it expands to**, computed by the analysis seeing through to the expansion (each constituent instruction contributes its own effect, including operand-dependent ones evaluated against the macro's actual arguments). This is definitional, so a macro's counter effect can never drift from what it actually assembles — there is no place to declare an effect that disagrees with the expansion. Consequently a macro may also contain a `flow_terminal` instruction (ending a region) or a control transfer; these participate exactly as if written inline. Macro expansion already produces the constituent instructions (`CompositeAssembledInstruction`), so the aggregate falls out of walking the expansion rather than requiring separately-declared macro effects.
+A macro carries **no independent flow metadata** — `flow_effects`, `flow_terminal`, `flow_transfer`, `flow_target_operand`, and `flow_call_effects` are not accepted on a macro definition (declaring them is a configuration error). A macro's entire influence on every counter and on control flow is **the aggregate of the instructions it expands to**, computed by the analysis seeing through to the expansion (each constituent instruction contributes its own effect, classification, target, and operand-dependent values evaluated against the macro's actual arguments). This is definitional, so a macro's counter effect can never drift from what it actually assembles — there is no separately declared macro effect that can disagree with the expansion. Consequently a macro may contain a `flow_terminal` instruction or a control transfer; these participate exactly as if written inline. Macro expansion already produces the constituent instructions (`CompositeAssembledInstruction`), so the aggregate falls out of walking the expansion rather than requiring separately-declared macro metadata.
 
 #### Required Metadata: Fail Loud, Never Silently Inert
 A flow counter is only as trustworthy as the configuration behind it. The feature **must error when the ISA configuration lacks the metadata a requested capability depends on**, rather than silently tracking nothing or analyzing unsoundly. A counter that quietly stays at its initial value because no instruction declares an effect on it would give false confidence — "the stack is balanced" about an analysis that never ran — which is worse than not offering the feature. The required-metadata checks, by capability:
 
 * **Tracking a class at all.** `#track X` requires class `X` to be declared in `flow_counters` (else error) **and** at least one instruction in the ISA to populate `X`'s `source` field (or a `flow_terminal` listing `X`). A *declared-but-inert* class — tracked in source yet whose `source` field is set on no instruction — is an error: the configuration cannot actually track it. (A per-counter override exists for the rare counter intended to move only via `#set`, but inert is an error by default.) Validation also checks that `source` is a well-formed config path and that the values found there are deltas (integer or a supported delta expression), not arbitrary data — a `source` pointing at a non-numeric field is a configuration error.
 * **Entry modes.** `#track X mode=M` requires class `X` to declare `entry_modes.M` (else error).
-* **Path analysis (M5).** If a tracked region contains a control-transfer instruction that declares no `flow_transfer`, the CFG cannot be built soundly for that region → error naming the unclassified instruction ("`jz` transfers control inside a region tracking `X` but declares no `flow_transfer`"). The analyzer must never silently treat a branch as a straight-line instruction.
+* **Control-flow coverage.** Every selected instruction variant encountered while a counter is active must explicitly declare `flow_transfer`, including `flow_transfer: none` for ordinary instructions. Absence is therefore mechanically detectable and is an error naming the unclassified instruction. Direct transfers also require a valid `flow_target_operand`. Earlier linear milestones reject any variant classified other than `none` (apart from the specifically supported unconditional terminal in M3); M5 consumes the same exhaustive metadata to build the CFG. The analyzer never infers "ordinary instruction" from missing metadata and never guesses a branch target from an address-like operand.
 * **Terminal-based ending.** A region that relies on a `flow_terminal` instruction to close (no explicit `#endtrack`) requires the ISA to declare `flow_terminal[X]` on at least one instruction; absent that, the region can only be closed explicitly, and reaching its end otherwise is the existing no-clear-end-point error — but the diagnostic should name the missing-terminal cause when the ISA declares no terminal for `X` at all.
 * **Interval timing (M6).** Using `join: interval` across conditional branches that declare only scalar cycle deltas is permitted (scalar = same cost on both edges) and is not an error, only less precise.
 
-Two error timings: **config-load checks** run in `AssemblerModel._validate_config()` independent of any source (internal consistency — an undeclared class named in `flow_effects` or `flow_terminal`, malformed `entry_modes`, divergent `flow_terminal` effects for one class); **usage-time checks** run when a counter is instantiated or used, because what counts as "sufficient metadata" depends on the capability the source actually invokes (inert-class, `flow_transfer` coverage, mode availability). Both report in the `flow` diagnostic category.
+Two error timings: **config-load checks** run in `AssemblerModel._validate_config()` independent of any source (internal consistency — an undeclared class named in `flow_effects`, `flow_terminal`, or `flow_call_effects`; malformed `entry_modes`; invalid transfer/target combinations); **usage-time checks** run when a counter is instantiated or used, because what counts as "sufficient metadata" depends on what the source actually invokes (inert class, exhaustive `flow_transfer` coverage within an active region, mode availability, and usable call summaries). Both report in the `flow` diagnostic category.
 
 #### Edge-Dependent Deltas (configuring a branch with two-or-more relevant values)
 A scalar delta assumes the effect is the same however control proceeds. That holds for stack operations but breaks for **conditional-branch cycle costs**: real CPUs charge different cycles for a branch taken vs. not taken (6502: 2 not-taken / 3 taken / 4 taken-across-page; Z80 conditional `RET`: 5 vs 11; `JR cc`: 7 vs 12). The cost belongs to the *edge*, not the instruction.
@@ -245,6 +290,7 @@ So the value found in a counter's `source` field may be an **edge-keyed map** in
 ```yaml
   jr_cc:                          # `cycles` class has source: documentation.cycles
     flow_transfer: conditional
+    flow_target_operand: 0
     documentation:
       cycles: { taken: 12, fall_through: 7 }   # edge-keyed; documentable as "12/7"
     stack_effect: 0               # scalar: a branch cannot change stack depth by outcome
@@ -264,23 +310,23 @@ Edge-keyed cycle costs are an M6 feature (meaningless without the edge-aware CFG
 Subroutine boundaries cannot be reliably inferred from assembly source, and subroutines may have multiple entry points (multiple labels). Therefore region starts are **declared, not inferred**:
 
 ```asm
-#track stack                    ; begin tracking; counter starts at 0
+#track stack mode=called        ; called-entry convention: init 2, exit 0
 multiply:                       ; any number of labels may follow the directive —
 multiply_alt_entry:             ;   all are entry points, all see the same counter state
-    push a                      ; stack: 0 -> 1
-.var_x = COUNTER(stack)         ; snapshot: name this stack slot
-    push b                      ; stack: 1 -> 2
-.var_y = COUNTER(stack)
-    ld a, [sp + OFFSET(var_x)]  ; assembler computes current offset to var_x ( = 1 )
-    pop b                       ; stack: 2 -> 1
-    pop a                       ; stack: 1 -> 0
-    ret                         ; flow_terminal for 'stack' -> region ends cleanly
+    push a                      ; stack: 2 -> 3
+.var_x := COUNTER(stack)        ; snapshot: name this stack slot
+    push b                      ; stack: 3 -> 4
+.var_y := COUNTER(stack)
+    ld a, [sp + OFFSET(.var_x)] ; assembler computes current offset to .var_x ( = 1 )
+    pop b                       ; stack: 4 -> 3
+    pop a                       ; stack: 3 -> 2
+    ret                         ; ret applies -2: 2 -> 0; region ends cleanly
 ```
 
-* `#track <class> [as=<counter name>] [mode=<entry mode>] [init=<initial value>] [exit=<exit value>]` — creates a counter instance of the named class and opens its tracking region (keyword parameters follow the `#create-scope prefix="..."` convention). The counter's name defaults to the class name, so `#track stack` creates a counter named `stack`. `mode=` selects one of the class's configured `entry_modes`, supplying both init and exit values; explicit `init=`/`exit=` override the mode's values. With neither, the initial value is the class's `default_init` (0 unless configured) and the exit value equals the initial value. Opening a counter whose name is already active is an error (the prior region had no clear end point); multiple *concurrent* instances of the same class are allowed with distinct `as=` names.
-* All other directives (`#assert`, `#set`, `#suspend`, `#resume`, `#endtrack`, `#entry`) and the `COUNTER()` / `OFFSET()` expression operators reference counter *instances* by name; slot snapshots record the instance they were taken from.
-* A `flow_terminal` instruction (e.g. `ret`) ends the *path* that reaches it; an `#endtrack` ends the region explicitly. These are similar — both apply the exit-value check — but not identical: a `flow_terminal` is a real instruction that applies its own delta *before* the check and may occur many times (one per return path, each checked independently), whereas `#endtrack` is a single no-bytecode directive applying no delta. A region needs no `#endtrack` when every path terminates at a `flow_terminal`; it is closed once all paths have terminated. At every terminal, the counter value (after applying the terminal instruction's own delta, if any) must equal the region's exit value — a mismatch is an error. This is the **push-leak check**: every path out of the region must be balanced, not just the one the programmer was thinking about.
-* `#endtrack <counter> [exit=<expected value>]` — explicitly ends a region; needed for counters with no natural terminal instruction (e.g., a cycle counter). The expected value defaults to the region's exit value. In CFG terms it is an exit node: every reachable edge arriving at it is exit-checked, and no edge may bypass it from inside the region to code after it. An edge entering after `#endtrack`, or leaving a region other than through its terminal / `#endtrack`, is a region-boundary error rather than a warning.
+* `#track <class> [as=<counter name>] [mode=<entry mode>] [init=<initial value>] [exit=<exit value>]` — creates a counter instance of the named class and opens its tracking region (keyword parameters follow the `#create-scope prefix="..."` convention). The counter's name defaults to the class name, so `#track stack` creates a counter named `stack`. `mode=` selects one of the class's configured `entry_modes`; explicit `init=`/`exit=` override values supplied by the mode. With no explicit or mode-provided initial value, the initial value is the class's `default_init` (0 unless configured). With no explicit or mode-provided exit value, `exit_policy: balanced` creates an exit contract equal to the resolved initial value, while `exit_policy: none` creates no implicit equality contract. Opening a counter whose name is already active is an error (the prior region had no clear end point); multiple *concurrent* instances of the same class are allowed with distinct `as=` names.
+* All other directives (`#assert`, `#set`, `#suspend`, `#resume`, `#endtrack`, `#entry`), counter-coordinate declarations, and the `COUNTER()` / `OFFSET()` expression operators reference counter *instances* by name; coordinate symbols record the instance from which they were derived.
+* A `flow_terminal` instruction (e.g. `ret`) ends the *path* that reaches it; an `#endtrack` ends the region explicitly. A terminal is a real instruction that applies its own delta *before* closing the path and may occur many times, whereas `#endtrack` is a single no-bytecode directive applying no delta. If the instance has an exit contract, every terminal checks the resulting value against it; a mismatch is an error. If it has no exit contract, the terminal still closes the path and all bounds/assertion/structural checks still apply, but there is no implicit equality test.
+* `#endtrack <counter> [exit=<expected value>]` — explicitly ends a region; needed for counters with no natural terminal instruction (e.g., a cycle counter). An explicit `exit=` always creates an exact check. Without it, the instance's existing exit contract is checked if one exists; under `exit_policy: none`, the directive simply closes the region. In CFG terms it is an exit node: every reachable edge arriving at it is closed (and checked when applicable), and no edge may bypass it from inside the region to code after it. An edge entering after `#endtrack`, or leaving a region other than through its terminal / `#endtrack`, is a region-boundary error rather than a warning.
 * `#entry <counter>` — declares the immediately following label an intentional alternate entry point at the current tracked value. It suppresses the mid-region entry-point warning **and adds that label as an independent CFG root** carrying the declared value, so its path to an exit is checked even when no in-region edge reaches it. Any ordinary incoming edge must reconcile with that value under the class's join policy.
 * `#loop count=<N>` / `#loop max=<N>` — declares the number of **loop iterations** of the loop whose head immediately follows, letting interval counters compute a finite contribution and accumulating `require-equal` counters know the post-loop value (see *Loops*; M7). Thus `count=1` executes the body once and takes its back-edge zero times. `<N>` must be a compile-time constant.
 * Multiple counters may have active regions simultaneously — whether of different classes or the same class — and each is tracked independently.
@@ -301,44 +347,55 @@ Concurrent instances of one class are what make measurement-window use cases wor
 #### Expressions
 Counter access uses function-style expression operators, following the existing `BYTE0(..)` / `LSB(..)` precedent in the numeric expression grammar (a sigil prefix is not viable: `^` is the bitwise XOR operator, `$` is a hex prefix, `%` is binary, `@` is the operand-label sigil, `#` introduces preprocessor directives):
 
-* `COUNTER(<counter>)` — the counter's current tracked scalar value at this line, usable in any numeric expression (including indirect-register offsets, which accept numeric expressions). It is invalid for an `interval` class.
+* `COUNTER(<counter>)` — the counter's current tracked scalar value at this program point. It is invalid for an `interval` class.
 * `COUNTER(<counter>).min` / `COUNTER(<counter>).max` — the lower / upper bound of an `interval` counter at this line. These selectors are valid only in flow assertions, never as ordinary numeric operands. Scalar counters have no `.min` / `.max` selectors.
-* Slot snapshots are ordinary constants assigned from a counter value (`.var_x = COUNTER(stack)`), riding the existing constant-label syntax and label-scope machinery. No new scoping rules.
-* `OFFSET(<slot>)` — sugar for `COUNTER(<counter>) - <slot>`: the current offset of a snapshotted slot relative to the associated scalar counter's present value. This is the feature issue #18 asks for. (The counter association of a slot is recorded at snapshot time; see Open Questions.) It is invalid for interval counters.
+* `<symbol> := <counter-coordinate expression>` declares an immutable **counter-coordinate symbol**, distinct from an ordinary `=` / `EQU` constant. Its fully spelled name follows the existing label-scope and namespace rules: `.var_x` and `var_x` are different symbols, so a reference must preserve the dot. The declaration emits no bytes and does not move the address counter.
+* The right-hand side of `:=` must identify exactly one active scalar counter and must preserve that counter with coefficient `+1`. M2 permits `COUNTER(name)` plus or minus an ordinary compile-time scalar expression containing no other flow-derived value; for example, `.slot := COUNTER(stack)` and `.arg := COUNTER(stack) - 2`. A right-hand side with no counter (`.x := 4`), more than one counter, an interval counter, a coordinate symbol in the scalar term, or a scaled/otherwise non-coordinate counter term is an error. Ordinary constants may not be assigned a flow-derived value with `=` or `EQU`.
+* `OFFSET(<coordinate-symbol>)` — the current value of the symbol's associated scalar counter minus the symbol's saved coordinate. This is the feature issue #18 asks for. It accepts only a symbol declared with `:=`; an ordinary constant, address label, or untagged numeric expression is an error.
+
+Flow-derived values are deliberately restricted to contexts that cannot affect layout or instruction selection:
+
+* **Allowed:** fixed-width instruction operand values; fixed-size data element values; `:=` counter-coordinate declarations; and flow directives such as `#assert`, `#set`, and `#resume`.
+* **Rejected:** `.org`, memory-zone selection, alignment expressions, repetition/fill counts, conditional-preprocessor expressions, expressions used to select an instruction variant or operand form, and any other context that affects address assignment, emitted word count, or which instruction is selected.
+
+The parser reports a flow diagnostic when `COUNTER()` or `OFFSET()` appears in a rejected context. This context rule is what permits the tracking pass to run after address assignment without creating a dependency from analysis back into layout.
+
+At an instruction, `COUNTER()`/`OFFSET()` operand expressions observe the **entry value before that instruction's own delta**. The instruction's delta then produces the state on its outgoing edge(s). A `:=` declaration or flow directive between instructions observes the state after all preceding instructions on that source line and before the following instruction. A `flow_terminal` applies its delta before its exit check.
 
 #### Assertions and Re-anchoring
-* `#assert <counter> == <expr>` is shorthand for `#assert COUNTER(<counter>) == <expr>`. The general form is `#assert <flow-value> <comparison> <expr>`, where `<flow-value>` is `COUNTER(name)` for scalar counters or `COUNTER(name).min` / `.max` for interval counters, and `<comparison>` is one of `==`, `!=`, `<`, `<=`, `>`, or `>=`. It is a checkpoint: assembly errors when the comparison is false. For a scalar counter it also supplies ground truth at a join; for an interval assertion it checks the relevant bound and does not collapse the interval.
+* `#assert <counter> == <expr>` is shorthand for `#assert COUNTER(<counter>) == <expr>`. The general form is `#assert <flow-value> <comparison> <expr>`, where `<flow-value>` is `COUNTER(name)` for scalar counters or `COUNTER(name).min` / `.max` for interval counters, and `<comparison>` is one of `==`, `!=`, `<`, `<=`, `>`, or `>=`. It is purely a checkpoint: assembly errors when the comparison is false and otherwise forwards the incoming state unchanged. It does **not** collapse a join, discard an infeasible path, or re-anchor a value.
 * `#set <counter> = <expr>` — re-anchors the tracked value when the programmer knows better than the assembler (e.g., after a stack-pointer manipulation the effect model cannot express). This is a programmer assertion and is taken on faith. In the CFG it transforms each incoming scalar state into the asserted scalar outgoing state; paths that bypass it remain unchanged and reconcile normally at a later join.
 
 #### Subroutine Arguments and the Return Address
-On many 8-bit ISAs, `call` pushes a 16-bit return address (+2) and `ret` pops it (−2). A subroutine that addresses caller-pushed arguments through the stack pointer must account for that return address sitting between its own frame and the caller's slots. Flow counters express this with two pieces already defined above: the region's *initial value* encodes the entry-time depth (the return address), and slot constants at or below that entry depth represent caller-owned slots.
+On many 8-bit ISAs, `call` pushes a 16-bit return address (+2) and `ret` pops it (−2). A subroutine that addresses caller-pushed arguments through the stack pointer must account for that return address sitting between its own frame and the caller's slots. Flow counters express this with two pieces already defined above: the region's *initial value* encodes the entry-time depth (the return address), and counter-coordinate symbols at or below that entry depth represent caller-owned slots.
 
 ```asm
 ; ---- caller ----
-#track stack
-    push a                  ; argument: stack 0 -> 1
-    call my_func            ; composition rule: +2 (call) -2 (ret) -> net 0
-    pop a                   ; reclaim argument: stack 1 -> 0
-    ret
+#track stack mode=called    ; this example's caller is itself a called routine
+    push a                  ; argument: stack 2 -> 3
+    call my_func            ; declared flow_call_effects.stack = 0 at caller fall-through
+    pop a                   ; reclaim argument: stack 3 -> 2
+    ret                     ; applies -2 -> 0
 
 ; ---- callee (possibly in another file) ----
 #track stack mode=called    ; from ISA config: init=2 (16-bit return address), exit=0
 my_func:
-.arg_x = 0                  ; caller's argument sits just below the return address
+.arg_x := COUNTER(stack) - 2    ; caller baseline: coordinate 0, associated with stack
     push b                      ; stack: 2 -> 3
-    ld a, [sp + OFFSET(arg_x)]  ; = COUNTER(stack) - arg_x = 3:
+    ld a, [sp + OFFSET(.arg_x)] ; = COUNTER(stack) - .arg_x = 3:
                                 ;   past pushed b (1) + return address (2)
     pop b                       ; stack: 3 -> 2
     ret                         ; applies -2 -> 0, matching the declared exit value
 ```
 
-(The `.arg_x` constant is declared after `my_func:` because local-scope symbols cannot precede their parent non-local label; it lands in `my_func`'s local scope, which is where it belongs.)
+(The `.arg_x` counter-coordinate symbol is declared after `my_func:` because local-scope symbols cannot precede their parent non-local label; it lands in `my_func`'s local scope, which is where it belongs.)
 
 Points of note:
 
 * The `called` entry mode's `init: 2` *is* the return-address size, matching the `call` instruction's declared effect; its `exit: 0` exists because the terminal `ret` legitimately drives the counter below its entry value. `#track stack init=2 exit=0` is the equivalent explicit form, but the mode keeps that knowledge in the ISA configuration.
-* Caller-side argument slots cannot be inherited automatically — a subroutine may be called from many sites at many depths. The callee instead *declares its calling convention* with explicit slot constants (`.arg_x = 0`, a second argument at `-1`, etc.), and `OFFSET()` arithmetic works unchanged. Inserting a new `push` inside the callee still updates every argument offset automatically, which is the core promise of issue #18.
+* Caller-side argument slots cannot be inherited automatically — a subroutine may be called from many sites at many depths. The callee instead *declares its calling convention* with `:=` expressions such as `.arg_x := COUNTER(stack) - 2`, producing baseline coordinates (`0`, `-1`, etc.) explicitly associated with the stack counter. The same offset arithmetic then applies. Inserting a new `push` inside the callee still updates every argument offset automatically, which is the core promise of issue #18.
 * The caller's and callee's declarations are independent conventions; the analyzer cannot yet verify they agree (a caller pushing one argument where the callee expects two). That is the cross-region verification problem noted in Open Questions.
+* `.arg_x = 0` would be an ordinary constant and is intentionally rejected by `OFFSET(.arg_x)`. The `:=` spelling makes the counter association explicit in the declaration rather than inferring it from an arbitrary number.
 
 #### Entry Modes: Called vs. Jumped-To Routines
 How a routine is *entered* is not inferable from its code — it is a calling-convention fact that lives in the heads of the routine's callers. A routine entered via `call` begins life with a return address on the stack; the same instructions entered via `jmp` (a dispatcher target, a coroutine, a tail-call destination) begin with nothing extra. The programmer declares which applies with `mode=`:
@@ -369,21 +426,21 @@ process_fast:
 * A routine entered via `call` from some sites and `jmp` from others has two genuinely different entry depths — no single static value exists, and the analyzer deliberately refuses to model it. The code must pick one convention (or be restructured, e.g., a thin called wrapper that falls into the jumped body).
 
 ### Tracking Semantics
-* Tracking runs alongside the assembler's existing first pass (address assignment), which already walks line objects in source order.
+* Tracking runs in the separate analysis pass after address assignment. It retains the original source-ordered line collection for directives and lexical regions, and uses the address index/CFG when execution order diverges from source order.
 * Every label inside an active region records the counter value at its position; these recorded values feed the consistency checks below.
-* `COUNTER()` values and slot constants are fully determined during the first pass (constant deltas), so they resolve during second-pass expression evaluation exactly like label addresses — no new fixed-point iteration is required.
+* `COUNTER()` values and counter-coordinate symbols are fully determined during the analysis pass for straight-line constant deltas, so they resolve during second-pass expression evaluation exactly like other compile-time values — no new fixed-point iteration is required.
 * Lines that emit no instructions (data directives, labels, comments) have no effect unless explicitly configured.
 
 ### Path Analysis and Ambiguity Rules
 The analyzer is deliberately conservative: if it cannot prove the counter value at a line is unique, that is an error, not a guess.
 
 #### The analysis model
-Within a tracking region, the analyzer builds a small control-flow graph from the `flow_transfer` metadata and branch-target operands, then propagates counter values forward from the region entry and every `#entry` label with a worklist algorithm. A tracking region is a CFG region, not merely a source-text span: no CFG edge may enter after its `#track`, leave before a `flow_terminal` or `#endtrack`, or jump across an `#endtrack`. Such an edge is an error, because accepting it would create an untracked execution path. Directives are zero-bytecode CFG nodes: `#assert` checks and forwards its incoming state; `#set` re-anchors it; `#suspend` changes it to suspended; `#resume` restores a scalar state; and `#endtrack` is an exit node.
+Within a tracking region, the analyzer builds a small control-flow graph from exhaustive `flow_transfer` metadata and the operands explicitly selected by `flow_target_operand`, then propagates counter values forward from the region entry and every `#entry` label with a worklist algorithm. A tracking region is a CFG region, not merely a source-text span: no CFG edge may enter after its `#track`, leave before a `flow_terminal` or `#endtrack`, or jump across an `#endtrack`. Such an edge is an error, because accepting it would create an untracked execution path. Directives are zero-bytecode CFG nodes: `#assert` checks and forwards its incoming state; `#set` re-anchors it; `#suspend` changes it to suspended; `#resume` restores a scalar state; and `#endtrack` is an exit node.
 
 * Each line in the region gets *one* counter value per program point (not per path), reconciled across incoming edges per the class's `join` policy. Under `require-equal` (default) the first edge assigns the value and any later edge arriving with a *different* value is a join-mismatch error. Under `interval` the value is a `[min,max]` hull and a join unions the incoming hulls (never an error).
-* A `conditional` transfer propagates to both the branch target and the fall-through line; an `unconditional` transfer propagates only to the target; a `call` propagates an abstract named-callee summary to the fall-through line. Each propagated edge applies that edge's delta — which for branch instructions may differ between the taken and fall-through edges (see *Edge-Dependent Deltas*).
+* A `conditional` transfer propagates to both the explicitly identified branch target and the physical fall-through successor; an `unconditional` transfer propagates only to its target; a `call` applies a declared caller-visible summary when available or propagates an unresolved named-callee summary to the physical fall-through successor. For an emitted instruction, physical fall-through begins at `instruction.address + instruction.word_count`, not at the next instruction in source order. Labels and zero-width analysis directives at that address may lead to the instruction node there, but the resolver must not skip emitted data, an address gap, an ambiguous same-address group, or a region boundary. Each propagated edge applies that edge's delta — which for branch instructions may differ between the taken and fall-through edges (see *Edge-Dependent Deltas*).
 
-* Every path must terminate at a `flow_terminal` instruction or `#endtrack`, where the exit-value check applies. `#suspend` / `#resume` must also be structurally balanced on every path: paths may not join in active and suspended states, bypass a `#resume`, or reach a terminal while suspended.
+* Every path must terminate at a `flow_terminal` instruction or `#endtrack`. An exit-value equality check applies when the instance has an exit contract; termination remains structurally required when it does not. `#suspend` / `#resume` must also be structurally balanced on every path: paths may not join in active and suspended states, bypass a `#resume`, or reach a terminal while suspended.
 * Lines not reachable from any entry point have no counter value; referencing `COUNTER()` or `OFFSET()` on an unreachable line is an error (it usually indicates a label the analyzer could not connect, e.g., a target of an `indirect` jump).
 
 The *Loops* and *Consecutive Branches and Path Count* subsections below explain how this per-point model handles cyclic and heavily-branched control flow.
@@ -391,17 +448,18 @@ The *Loops* and *Consecutive Branches and Path Count* subsections below explain 
 Because each path is checked independently, **per-path imbalances ("push leaks") are detected even when only one path is wrong**:
 
 ```asm
-#track stack
+#track stack mode=called
 divide:
-    push b                  ; stack: 0 -> 1
+    push b                  ; stack: 2 -> 3
     cmp a, 0
     jz .div_by_zero
     ; ... normal path ...
-    pop b                   ; stack: 1 -> 0
-    ret                     ; exit check: 0 == 0, OK
+    pop b                   ; stack: 3 -> 2
+    ret                     ; applies -2: 2 -> 0; exit check passes
 .div_by_zero:
     ld a, 0xff
-    ret                     ; ERROR: counter 'stack' is 1 at terminal, expected 0
+    ret                     ; applies -2: 3 -> 1
+                            ; ERROR: counter 'stack' is 1 at terminal, expected 0
                             ;   push at line 3 is never popped on this path
 ```
 
@@ -434,7 +492,7 @@ The deliberate trade is that the analysis is **path-insensitive**: merging at jo
 * `require-equal` never misses a real imbalance, but may report a mismatch on a path that cannot actually occur (a false positive).
 * `interval` never under-estimates, but may report a WCET higher than any real execution reaches (a conservative over-approximation).
 
-Where path-insensitivity costs precision, the programmer injects ground truth: `#assert` pins a counter to a known value at a point (collapsing spurious divergence), and `#set` re-anchors it. So consecutive branches are accounted for in linear time, with any imprecision surfaced as a *safe* error/over-estimate the programmer can refine — never as a silent wrong answer. Nested and consecutive branches compose freely: as long as each branch reconverges to a consistent value (for `require-equal`) before the next merge, arbitrarily many compose with no special handling.
+Where path-insensitivity costs precision, `#assert` can document and verify what the analysis already proves, but it cannot make a conflicting incoming path disappear. The programmer may explicitly re-anchor with `#set` on the relevant predecessor path(s), accepting responsibility for that override; a future predicate-aware `#assume` construct would be needed to prune dynamically infeasible paths soundly enough for the counter lattice. Consecutive branches are therefore accounted for in linear time, with imprecision surfaced as a safe error/over-estimate rather than a silent wrong answer. Nested and consecutive branches compose freely as long as each branch reconverges to a consistent value (for `require-equal`) before the next merge.
 
 #### Label-Scope Awareness (mid-region entry points)
 The analysis only follows control flow it can see; it cannot know about a `jmp` or `call` elsewhere in the program targeting a label inside the region. Whether such an outside transfer is *possible* is determined by the label's scope, which the assembler already tracks:
@@ -446,30 +504,34 @@ Therefore: a global, file, or named-scope label inside an active region where th
 
 For the rare label that *is* an intentional alternate entry at a non-entry depth, the `#entry <counter>` directive placed before the label acknowledges it: the warning is suppressed, the label's tracked value becomes its documented entry convention, **and the label is added as an independent CFG root carrying that value**. This verifies the alternate-entry path to its terminal now; a future cross-region verification phase can additionally check that outside call sites honor the convention.
 
-This analysis needs surprisingly little knowledge of instruction behavior: only the transfer classification (4 categories), branch targets the assembler already parses, and the declared deltas. It does *not* model registers, memory, or flags — which is why `conditional` branches are treated as "either way is possible" and both paths must independently check out. The analysis can therefore flag a path that is dynamically impossible (e.g., a branch guarded by a condition that always holds); the `#set` / `#suspend` escape hatches and per-counter `unknown_instructions` setting exist for exactly those cases.
+This analysis needs surprisingly little knowledge of instruction behavior: exhaustive transfer classification, explicitly identified direct targets, and declared deltas. It does *not* model registers, memory, or flags — which is why `conditional` branches are treated as "either way is possible" and both paths must independently check out. The analysis can therefore flag a path that is dynamically impossible (e.g., a branch guarded by a condition that always holds); an explicit `#set` on the affected predecessor path is the available override. `#suspend` acknowledges an indeterminate counter value but does not alter or excuse unknown control flow.
 
 **Calls compose rather than inline:** when the analyzer encounters a `call`, it does not descend into the callee. Its fall-through value carries an abstract per-class summary, `CallEffect(<resolved callee label>, <counter class>)`. The summary records the callee identity instead of silently assuming that every class has the same callee behavior. A later interprocedural phase resolves it from the named callee's verified region.
 
-For stack-style counters, the existing terminal convention is an immediately resolvable summary: the analyzer assumes the callee is balanced — that the callee's terminal instruction consumes exactly what the call pushed — and computes:
+M5 supports the conventional balanced-call case only through an **explicit caller-visible summary** declared on the call instruction:
 
+```yaml
+call:
+  stack_effect: 2                    # what entry into the callee does to true depth
+  flow_transfer: call
+  flow_target_operand: 0
+  flow_call_effects: { stack: 0 }    # caller-visible net after the callee returns
 ```
-value_after = value_before + call.flow_effects + terminal.flow_effects
-```
 
-With `call: +2` and `ret: -2` this nets to zero, as it should: the return address is pushed and later popped, invisible to the caller. The rule also models callee-pops-arguments conventions naturally (e.g., a `ret 2` variant declared as `stack: -4` yields a caller-visible net of −2). Configuration validation requires all `flow_terminal` mnemonics for a counter to declare identical `flow_effects`; if an ISA needs divergent terminals, an explicit per-call-instruction net override would be required (deferred until a real ISA demands it).
+The `stack_effect: 2` is used when checking the callee's own called-entry region; the caller applies the declared net `0` to its fall-through state. This declaration is an ISA calling-convention contract, not a value inferred from whichever `ret` variants happen to exist.
 
-For every other class — notably cycles — the summary remains unresolved in M5/M6. The analyzer must not turn it into a scalar, interval bound, or operand literal: a value after such a call cannot be used by `COUNTER()`/`OFFSET()`, bounds checks, or precise timing assertions until the later phase resolves the named callee. This is conservative by design: counting only the call instruction and omitting the callee body would make WCET and constant-time claims unsound.
+If a class has no `flow_call_effects` entry — notably cycles, whose callee cost depends on the named callee — its summary remains unresolved in M5/M6. The analyzer must not turn it into a scalar, interval bound, or operand literal: a value after such a call cannot be used by `COUNTER()`/`OFFSET()`, bounds checks, or precise timing assertions until the later phase resolves the named callee. Counting only the call instruction and omitting the callee body would make WCET and constant-time claims unsound.
 
-The callee's own balance is verified by the callee's own tracking region. Stack-style composition therefore remains tractable — each subroutine is verified once and callers use the terminal convention — while other classes retain their named summary until the later whole-program phase verifies that a *specific callee* supplies the required effect (see Open Questions).
+The callee's own balance is verified independently by its own tracking region. M5 does not claim to verify that a particular call target honors the declared caller-visible summary. Callee-pops-arguments conventions, body-based caller-visible stack changes, and target-specific summaries are rejected as unresolved unless the source is re-anchored explicitly after the call. The later post-M7 interprocedural phase records each named callee's verified entry/exit summary, checks it against call sites, and supports target-specific effects (see Open Questions).
 
 #### Error and warning rules
 1. **No clear end point** — a `#track` region that reaches end of file, the start of another region for the same counter, or an unconditional transfer out of the region without hitting a `flow_terminal` instruction or `#endtrack` → error.
 2. **Join mismatch** (`require-equal` classes only) — a line reachable along multiple paths carrying different counter values → error reporting both values and their source lines. Backward branches (loops) are the common case: a branch back to a loop head errors unless the loop body is net-zero for the counter — precisely the class of bug this feature should catch. See *Runtime-Variable Counter Changes* for loops that are intentionally not net-zero. For `interval` classes this is not an error; paths simply union into the hull, and divergence is surfaced only if a `#assert` bound is violated.
-3. **Exit imbalance (push leak)** — any path reaching a `flow_terminal` instruction or `#endtrack` with a counter value different from the region's exit value → error identifying the path's distinguishing branch.
+3. **Exit imbalance (push leak)** — for an instance with an exit contract, any path reaching a `flow_terminal` instruction or `#endtrack` with a different value → error identifying the path's distinguishing branch. An instance with `exit_policy: none` and no explicit/mode-provided exit has no equality check at closure.
 4. **Bounds violation** — counter exceeds `max_value` or drops below `min_value` (e.g., more pops than pushes) on any path → error.
-5. **Dead slot reference** — a slot snapshot has a monotonic validity bit in addition to its numeric counter value. It is permanently invalidated on every path that drops below its snapshot value: the stack has popped that particular slot, and a later push to the same depth creates a different slot. At a join, a slot invalid on any incoming path is invalid thereafter. `OFFSET(slot)` on an invalid slot → error. This is distinct from a `min_value` violation: dropping below a slot's depth can be normal even when the counter remains within its configured bounds. `#set`, `#resume`, and an `#entry` root at a non-initial depth also invalidate prior slot snapshots unless a future explicit preservation contract says otherwise.
+5. **Dead coordinate reference** — a counter-coordinate symbol has a monotonic validity bit in addition to its numeric counter value. It is permanently invalidated on every path that drops below its saved value: the stack has popped that particular slot, and a later push to the same depth creates a different slot. At a join, a coordinate invalid on any incoming path is invalid thereafter. `OFFSET(symbol)` on an invalid coordinate → error. This is distinct from a `min_value` violation: dropping below a slot's depth can be normal even when the counter remains within its configured bounds. `#set`, `#resume`, and an `#entry` root at a non-initial depth also invalidate prior coordinates unless a future explicit preservation contract says otherwise.
 6. **Unknown instruction effect** — an instruction with no declared effect for an actively tracked counter, handled per the counter's `unknown_instructions` setting.
-7. **Indirect transfer** — an `indirect` jump inside an active region → error (the analysis cannot follow it) unless the counter is suspended.
+7. **Indirect transfer** — an `indirect` jump inside an active region → error because the analysis cannot follow it. Suspending the counter does not waive this structural error; close the region before the transfer or, in the future, declare a finite target set.
 8. **Region-boundary crossing** — a branch targeting a label outside the active region for the counter, entering a region after its `#track`, or jumping across an `#endtrack` → error. Unlike a `.org` auto-close warning, this is an actual execution path that would otherwise be silently untracked.
 9. **Mid-region external entry point** — a global, file-scope, or named-scope label inside a region where the tracked value differs from the region's initial value → warning by default, escalatable to an error via warnings-as-errors; suppressed by a preceding `#entry` directive. Local-scope (`.`) labels are exempt (see *Label-Scope Awareness*).
 
@@ -495,7 +557,7 @@ A flow counter is a *static* quantity; no assembly-time analysis can know the st
 * **Acknowledgement mechanism:** the counter can be placed in an explicit **indeterminate state**:
 
 ```asm
-.before_push = COUNTER(stack)   ; snapshot the known depth
+.before_push := COUNTER(stack)  ; snapshot the known depth
 #suspend stack              ; counter becomes indeterminate
 .loop:
     ld a, [hl]
@@ -512,40 +574,40 @@ A flow counter is a *static* quantity; no assembly-time analysis can know the st
 * While a counter is **suspended**:
   * instruction effects are not applied and bounds/join checks are not performed for that counter;
   * any reference to `COUNTER()`, and any `OFFSET()` against it, is an **error** — there is no value to resolve;
-  * creating new slot snapshots against it is an error;
+  * creating new counter-coordinate symbols against it is an error;
   * encountering a `flow_terminal` instruction for the counter (e.g., `ret`) while suspended is an error: the region's balance cannot be verified, so the programmer must `#resume` (asserting a value) or `#endtrack` explicitly first.
 * `#resume <counter> = <expr>` re-anchors the counter to a known value, typically a snapshot taken before suspension. Like `#set`, it is an unverifiable programmer assertion.
-* Slot snapshots taken *before* suspension retain their numeric snapshot values, but `#suspend` / `#resume` does not prove that the run-time slots survived the indeterminate interval. Therefore `#resume` permanently invalidates every slot snapshot for that counter unless the directive explicitly names a future, stronger slot-preservation contract. An invalid snapshot may never be passed to `OFFSET()`.
+* Counter-coordinate symbols declared *before* suspension retain their numeric coordinate values, but `#suspend` / `#resume` does not prove that the run-time slots survived the indeterminate interval. Therefore `#resume` permanently invalidates every coordinate for that counter unless the directive explicitly names a future, stronger slot-preservation contract. An invalid coordinate may never be passed to `OFFSET()`.
 
 Note the deliberate parallel with run-time reality: when the stack pointer moves by a runtime-determined amount, `sp`-relative addressing of older slots is invalid *at run time* too — the standard assembly idiom is to save the stack pointer into a frame-pointer register first. The indeterminate state mirrors exactly the window in which the programmer cannot use `sp`-relative offsets anyway, and the pre-suspension snapshot mirrors the frame pointer.
 
 A possible refinement for *bounded* runtime variability (e.g., "this loop pushes at most 16 items") would be a suspended-with-bounds mode that keeps `min_value`/`max_value` checking alive using an interval instead of a point value (M7, alongside bounded-loop iteration counts). Out of scope for earlier milestones.
 
 ### Diagnostics
-All violations are reported through the existing `DiagnosticReporter` with a new category (e.g., `flow`), so `--warnings-as-errors` selection and tooling integration come for free.
+All violations are reported through the existing `DiagnosticReporter` with a new `flow` category. The reporter must add `flow` to the categories elevated by `--warnings-as-errors` (its current default set contains only `user`) and preserve the category for tests/tooling; this is small plumbing work, not behavior that comes automatically from naming the category.
 
 ## Key Acceptance Test Cases
 Organized by what each group proves. "Error/warning" expectations include asserting the diagnostic's category (`flow`), file, and line number — a diagnostic on the wrong line is a failing test.
 
 ### Static-analysis-only invariant (the load-bearing guarantee)
-1. **Strip-equivalence golden test:** at each milestone, assemble a program exercising every **shipped** directive and expression operator; assemble its hand-stripped twin (directives removed, `COUNTER()`/`OFFSET()` replaced with resolved literals); outputs are byte-identical.
+1. **Strip-equivalence golden test:** at each milestone, assemble a program exercising every **shipped** directive, `:=` declaration form, and expression operator; assemble its hand-stripped twin (directives and coordinate declarations removed, all emitted analysis-derived references replaced with resolved literals); outputs are byte-identical.
 2. **Config inertness:** the same source assembles to identical bytes under an ISA config with and without `flow_counters`/`flow_effects` metadata, when the source uses no flow counter features.
 3. **Zero address footprint:** label addresses and `.org`-relative layout are identical with and without flow counter directives interleaved in the source.
 
 ### Configuration validation
-4. `flow_effects`, `flow_terminal`, or `flow_transfer` naming an undeclared counter → config error.
-5. Two `flow_terminal` mnemonics for the same counter with different `flow_effects` → config error (composition rule would be ambiguous).
-6. Invalid `unknown_instructions` value or non-integer delta → config error.
+4. With static analysis enabled, `flow_effects`, `flow_terminal`, or `flow_call_effects` naming an undeclared counter → config error. (`flow_transfer` is a global CFG classification and does not name a counter.)
+5. With static analysis enabled, invalid `flow_transfer` value; missing/incompatible `flow_target_operand`; or `flow_call_effects` on a non-`call` variant → config error.
+6. With static analysis enabled, invalid `unknown_instructions`/`exit_policy` value or non-integer delta → config error.
 
 ### Linear tracking and expressions (M1; slot/`OFFSET` cases in M2; control/multi-counter cases in M4)
 7. `COUNTER(stack)` reflects declared deltas through a push/pop sequence; verified via emitted operand bytes.
-8. **Issue #18 scenario:** slot snapshots + `OFFSET()`; inserting a new `push` between snapshot and use changes the emitted offset byte by exactly one — no source edits to the `OFFSET()` line.
-9. `OFFSET()` inside an indirect-register operand (`[sp + OFFSET(x)]`) emits the same bytes as the hand-written literal.
+8. **Issue #18 scenario:** `:=` counter-coordinate declaration + `OFFSET()`; inserting a new `push` between declaration and use changes the emitted offset byte by exactly one — no source edits to the `OFFSET()` line.
+9. `OFFSET()` inside an indirect-register operand (`[sp + OFFSET(.x)]`) emits the same bytes as the hand-written literal.
 10. `min_value` underflow (one pop too many) and `max_value` overflow → errors on the offending instruction's line.
 11. `#assert` passing is silent; failing reports expected vs. actual.
 12. `#set` re-anchors and downstream values reflect it.
 13. Balanced region ending at a `flow_terminal` is silent; straight-line push leak → exit-imbalance error.
-14. `#endtrack` default and explicit `exit=` expectations; mismatch → error.
+14. Under `exit_policy: balanced`, plain `#endtrack` checks against the initial value; under `exit_policy: none`, plain `#endtrack` closes without an equality check; explicit `exit=` checks exactly under either policy. A mismatch → error.
 15. Region reaching EOF unterminated → error; second `#track` for an active counter → error.
 16. Two counters (`stack`, `cycles`) advance independently from one instruction stream; each reports its own violations.
 17. `unknown_instructions: ignore | warn | error` each behave as configured for an effect-less instruction inside a region.
@@ -562,8 +624,8 @@ Organized by what each group proves. "Error/warning" expectations include assert
 24. One branch missing its pop, paths return separately (the spec's `divide` example) → exit-imbalance error on that path's `ret` only. A slot popped on one path and not another is invalid after the join; pushing a replacement slot to the same depth does not make `OFFSET()` valid again.
 25. Net-zero loop body → silent; net-positive loop body → join mismatch at the loop head.
 26. Code after an unconditional `jmp` is not treated as fall-through; an unreachable line using `COUNTER()` → error.
-27. Call composition: `call`(+2)/`ret`(−2) nets zero at the fall-through; a callee-pops variant (`ret 2` as −4) nets −2; verified via a subsequent `OFFSET()` operand byte.
-28. `indirect` jump inside an active region → error; same jump with the counter suspended → accepted.
+27. Call composition: `call` with `stack_effect: +2` and explicit `flow_call_effects: {stack: 0}` leaves the caller's stack counter unchanged at fall-through; verified via a subsequent `OFFSET()` operand byte. Without a summary for the active class, the post-call value is unresolved. A callee-pops convention remains unresolved/rejected until target-specific interprocedural summaries exist.
+28. `indirect` jump inside an active region → error whether the counter is active or suspended; explicitly ending the region before the jump → accepted.
 29. Branch targeting a label outside the region, entering after `#track`, or jumping across `#endtrack` → region-boundary error.
 
 ### Cycle counting, join policy, and edge deltas
@@ -575,11 +637,11 @@ Organized by what each group proves. "Error/warning" expectations include assert
 
 ### Indeterminate state
 35. Runtime-length push loop with no acknowledgement → join-mismatch error (the default catches it).
-36. `#suspend` silences tracking; `COUNTER()` reference, new snapshot, or `flow_terminal` instruction while suspended → errors.
-37. `#resume` to a pre-suspension snapshot restores tracking but invalidates pre-suspension slots; `OFFSET()` on one of those slots → error. A slot popped below its snapshot and then replaced by a new push at the same depth remains invalid (it is not resurrected).
+36. `#suspend` silences tracking; `COUNTER()` reference, new `:=` coordinate declaration, or `flow_terminal` instruction while suspended → errors.
+37. `#resume` to a pre-suspension coordinate restores tracking but invalidates pre-suspension coordinates; `OFFSET()` on one of those symbols → error. A slot popped below its coordinate and then replaced by a new push at the same depth remains invalid (it is not resurrected).
 
 ### Subroutine arguments across the return address
-38. Callee with `init=2 exit=0` and caller-arg slot constants at/below 0: `OFFSET(arg)` operand bytes account for callee pushes plus the return address; `ret`'s −2 satisfies `exit=0`.
+38. Callee with `init=2 exit=0` and `.arg := COUNTER(stack) - 2`: `OFFSET(.arg)` accounts for callee pushes plus the return address; `ret`'s −2 satisfies `exit=0`. Replacing the declaration with ordinary `.arg = 0` makes `OFFSET(.arg)` an error because an ordinary constant has no counter association.
 
 ### Entry modes
 39. `#track stack mode=called` applies the class's configured `init`/`exit`; explicit `init=`/`exit=` on the same directive override the mode's values; `#track` with neither uses `default_init`.
@@ -591,30 +653,30 @@ Organized by what each group proves. "Error/warning" expectations include assert
 43. `#track stack` with no `as=` creates a counter named after its class; all references by class name work (the common-case ergonomics test).
 44. Two concurrent instances of one class (the overlapping cycle-windows example): one instruction's declared cost accrues to both; each `#endtrack exit=` is checked independently.
 45. Opening a counter whose name is already active → error; two concurrent instances with distinct `as=` names → accepted.
-46. A `flow_terminal` instruction terminates every active instance of its class, each against its own exit value; an active instance of a *different* class is unaffected.
+46. A `flow_terminal` instruction terminates every active instance of its class, checking each instance that has an exit contract; an active instance of a *different* class is unaffected.
 47. `#track` naming an undeclared class, or `COUNTER()` naming an inactive instance → errors.
 
 ### Interaction with existing features
 48. Flow counter directives inside an inactive `#if` block are ignored entirely (no region opened).
 49. `#mute` does not affect tracking (analysis follows compiled code, not emitted code).
 50. Multiple instructions on one source line apply their effects in order.
-51. Instruction macro inside a region contributes the aggregate effect of its expansion (e.g., a macro expanding to two `push`es moves `stack` by +2); a macro whose expansion contains a `flow_terminal` instruction ends the region. Declaring `flow_effects`/`flow_terminal`/`flow_transfer` on a macro definition → configuration error.
-52. Region active at an `#include`, `.org`, or memory zone change → behavior per Open Questions 3 and 7 once settled; the test exists to force the decision.
+51. Instruction macro inside a region contributes the aggregate effect and CFG behavior of its expansion (e.g., a macro expanding to two `push`es moves `stack` by +2); a macro whose expansion contains a `flow_terminal` instruction ends the region. Declaring instruction-level flow metadata (`flow_effects`, `flow_terminal`, `flow_transfer`, `flow_target_operand`, or `flow_call_effects`) on a macro definition → configuration error.
+52. A global counter remains available through an `#include`; a file-scoped counter does not project into included-file lines and auto-closes with a warning at the file boundary; `.org` or a memory-zone change likewise auto-closes an active region with a warning. Any applicable exit contract is checked.
 
 ### Required configuration metadata (fail loud)
 53. `#track X` where `X` is declared in `flow_counters` but no instruction populates `X`'s `source` field (and no `flow_terminal` lists `X`) → error (declared-but-inert class); the counter is never silently tracked as a no-op. A `source` path pointing at a non-numeric field → configuration error.
-54. A control-transfer instruction lacking `flow_transfer` appearing inside a region under path analysis → error naming the instruction (M5); the branch is never silently treated as straight-line.
-55. Error timing: malformed `entry_modes` and divergent per-class `flow_terminal` effects error at config load even when no source uses the counter; inert-class and `flow_transfer`-coverage error only when the counter is actually tracked.
+54. Any selected instruction variant lacking an explicit `flow_transfer` (including `none` for ordinary instructions) while a counter is active → error naming the instruction; missing metadata is never interpreted as straight-line.
+55. Error timing: malformed `entry_modes` and internally invalid transfer/target metadata error at config load; inert-class, exhaustive `flow_transfer` coverage within an active region, and unavailable call-summary errors are usage-time.
 
 ### Feature enablement (usage-gated)
-56. ISA with **no** `flow_counters` section + source using a flow-counter construct (`#track`, `COUNTER()`, etc.) → error ("instruction set does not enable flow counters"); the error fires only because the construct was used.
+56. With static analysis enabled, ISA with **no** `flow_counters` section + source using a flow-counter construct (`#track`, `:=`, `COUNTER()`, etc.) → error ("instruction set does not enable flow counters"); the error fires only because the construct was used.
 57. ISA with no `flow_counters` section + source using no flow-counter construct → assembles byte-identically to the same source/ISA pre-feature (feature fully dormant).
 58. ISA enabling classes `A` and `B`; source tracks only `A` → no diagnostic about `B`, even if `B` is inert or never used (enabled-but-unused class imposes no obligation).
 
 ### Operand-dependent and macro-aggregate effects
 59. `add sp, 4` with `flow_effects: { stack: -ARG(0) }` → `stack` decreases by 4; a subsequent `OFFSET()`/`COUNTER()` value reflects it. `add sp, FRAME_SIZE` (constant symbol) resolves identically to the literal.
 60. `add sp, a` (runtime register operand) inside a region tracking `stack` → counter indeterminate: error if `COUNTER()`/`OFFSET()` is used while not suspended; accepted under `#suspend`.
-61. Macro expanding to `push`/`push` contributes net `stack` +2 (aggregate of expansion); a macro expanding to a sequence ending in a `flow_terminal` instruction ends the region. A macro definition declaring `flow_effects`/`flow_terminal`/`flow_transfer` → configuration error.
+61. Macro expanding to `push`/`push` contributes net `stack` +2 (aggregate of expansion); a macro expanding to a sequence ending in a `flow_terminal` instruction ends the region. A macro definition declaring any instruction-level flow metadata → configuration error.
 
 ### Source field binding
 62. A counter reading `source: documentation.cycles` accumulates each instruction's `documentation.cycles` integer; a class omitting `source` reads `flow_effects.<class>`; two classes (`cycles`, `ct_cycles`) reading the same `source` field both track it, differing only by `join`.
@@ -625,28 +687,38 @@ Organized by what each group proves. "Error/warning" expectations include assert
 65. Multi-counter branch: one branch carrying an edge-map for `cycles` and a scalar for `stack` updates each counter from its own source field independently.
 66. Net-zero loop body (`require-equal`) → silent; net-nonzero loop body → join-mismatch at the loop head; runtime-length accumulating loop under `#suspend` → accepted.
 67. `interval` counter across an unbounded loop → WCET reported as unbounded (widening terminates the worklist); the same loop with `#loop count=N` → finite `body × N` contribution; `#loop count=<runtime expr>` → error (count must be compile-time constant).
-68. `k` consecutive balanced branches assemble in time linear in lines (no 2ᵏ blow-up); an infeasible-path false positive under `require-equal` is silenced by `#assert`; interior `COUNTER()` inside a `#loop`-counted nonzero loop → indeterminate error.
+68. `k` consecutive balanced branches assemble in time linear in lines (no 2ᵏ blow-up); `#assert` does not silence a join mismatch, while an explicit `#set` on the relevant predecessor state can re-anchor at the programmer's responsibility; interior `COUNTER()` inside a `#loop`-counted nonzero loop → indeterminate error.
 
 ### Tooling collateral (M1 and per-milestone)
-69. At **each milestone**, extensions generated from a flow-enabled ISA include every **then-shipped** flow directive and expression form in all three grammars (VS Code, Sublime, Vim), with hover docs present; extensions generated from a non-enabled ISA contain none of the flow-counter tokens. Every shipped flow directive/operator has a `directive_docs.py` entry (enforced by the existing docsgen test). The fixture matrix grows as syntax ships: M1 (`#track`, `#endtrack`, `COUNTER()`); M2 (`OFFSET()`); M4 (`#assert`, `#set`, `#suspend`, `#resume`); M5 (`#entry`); M6 (`COUNTER(x).min` / `.max` assertion forms); M7 (`#loop`).
-70. **Analysis-record preservation (M0):** assembling a flow-enabled program containing an instruction variant, a branch-target operand expression, and an instruction macro preserves an immutable analysis record for every constituent instruction (selected variant, source mnemonic, matched operands / expressions, and source-order identity), while producing byte-identical output to the same program assembled without the analysis pass.
-71. **Straight-line slot invalidation (M2):** after a slot snapshot, a pop below its snapshot followed by a replacement push to the same counter value leaves `OFFSET(slot)` invalid; the original slot is never resurrected.
+69. At **each milestone**, extensions generated from a flow-enabled ISA include every **then-shipped** flow directive, declaration, and expression form in all three grammars (VS Code, Sublime, Vim), with hover docs present; extensions generated from a non-enabled ISA contain none of the flow-counter tokens. Every shipped flow directive/operator/declaration has a `directive_docs.py` entry (enforced by the existing docsgen test). The fixture matrix grows as syntax ships: M1 (`#track`, `#endtrack`, `COUNTER()`); M2 (`:=`, `OFFSET()`); M4 (`#assert`, `#set`, `#suspend`, `#resume`); M5 (`#entry`); M6 (`COUNTER(x).min` / `.max` assertion forms); M7 (`#loop`).
+70. **Analysis-record preservation (M0):** assembling a flow-enabled program containing an instruction variant, a branch-target operand expression, two instructions on one source line, and an instruction macro preserves an immutable analysis record for every constituent instruction (selected variant, merged root/variant semantics, source/canonical mnemonic, typed matched operands and parsed expressions, source-line ordinal, and macro-constituent identity), while producing byte-identical output to the same program assembled without the analysis pass. A register's emitted selector value is retained as an encoding but is not exposed as a compile-time semantic `ARG()` value.
+71. **Straight-line coordinate invalidation (M2):** after a slot coordinate is declared, a pop below its coordinate followed by a replacement push to the same counter value leaves `OFFSET(slot)` invalid; the original slot is never resurrected.
+72. **Expression-context isolation (M1):** `COUNTER()` in a fixed-width operand or fixed-size data value is accepted; the same operator in `.org`, alignment, fill count, conditional preprocessing, or instruction/operand-form selection → flow error before it can influence layout.
+73. **Physical fall-through resolution (M5):** a non-transfer instruction's fall-through successor is resolved at `address + word_count`, even when that instruction appears earlier in source; emitted data, an address gap, an ambiguous same-address group, or a region boundary at that address is diagnosed rather than skipped to the next source/executable instruction.
+74. **Coordinate declaration and symbol identity (M2):** with static analysis enabled and within a valid local-label region, `.x := COUNTER(stack)` is accepted and `OFFSET(.x)` resolves that local slot. A distinct global `x` does not collide with it, and writing `OFFSET(x)` does not silently resolve `.x`. A dot-prefixed coordinate before the first non-local label, or after `.org` but before the next non-local label, remains invalid under the existing local-scope rules. `.x := 4`, `.x := 2 * COUNTER(stack)`, and `.x := COUNTER(stack) + COUNTER(other)` are rejected; `.arg := COUNTER(stack) - 2` is accepted; `.x = COUNTER(stack)` is rejected as an ordinary-constant assignment of a flow value.
+
+### Command-line static-analysis control
+75. With no flag and with explicit `--static-analysis`, the same flow-enabled source produces identical bytes and identical diagnostics; enabled is the default.
+76. Under `--no-static-analysis`, a source containing only flow directives, assertions, and unused `:=` declarations assembles byte-identically to a copy with those constructs stripped, emits no flow diagnostics, and also succeeds against an ISA with no `flow_counters` section.
+77. Under `--no-static-analysis`, an instruction operand or fixed-size data value containing `COUNTER()` or `OFFSET()` fails at the value's source line with a dedicated “static analysis is disabled” diagnostic; no numeric fallback is emitted.
+78. Under `--no-static-analysis`, `.x := COUNTER(stack)` does not enter `.x` in the normal symbol table. If no ordinary `.x` exists, a compiled expression referencing `.x` fails with the dedicated disabled-analysis diagnostic using the diagnostic-only declaration index; `.x` remains distinct from `x`. Ignored coordinate declarations do not create duplicate-definition conflicts or shadow an ordinary symbol, matching literal source stripping.
+79. Under `--no-static-analysis`, flow-specific config checks (tests 4–6) and usage-time analysis-soundness checks such as inert counter classes, missing `flow_transfer`, unbalanced exits, bounds, and joins do not run. Syntactically invalid YAML/JSON, ordinary source errors, and non-analysis ISA validation continue to fail normally.
 
 ## Implementation Phasing
 The work splits into small vertical slices, each independently shippable and gated by a specific group of acceptance tests (numbers refer to *Key Acceptance Test Cases*). Each milestone delivers a usable capability or de-risks the next, and is ordered by dependency. The three coarse stages map as: **analysis substrate = M0**, **linear tracking = M1–M4**, **path analysis = M5–M6**, **richer effects = M7**.
 
 Each milestone names an **acceptance demo**: a concrete, runnable scenario with an observable outcome that proves the milestone's goal. The demos are specific enough to be committed as example programs under `examples/` and to double as end-to-end integration tests — a durable, re-runnable artifact per milestone, not just a green unit-test suite.
 
-1. **M0 — Analysis substrate + inertness proof.** Retain an immutable analysis record for every selected instruction variant and macro constituent (selected variant, source mnemonic, parsed/matched operands, and source-order identity); add deferred flow-expression support so a future `COUNTER()` constant is not evaluated during source loading; establish a source-order executable-node index and the `flow` diagnostic category. Parse the `flow_counters` schema and per-instruction metadata, but expose no flow directives or expression operators yet. *Delivers:* the data needed by every later milestone while proving that carrying it does not alter assembly. *Gated by:* 2, 4–6, 70. **Demo:** assemble a flow-enabled program containing an instruction variant, a symbolic branch target, and a macro; the normal binary is byte-identical to its baseline, while an integration test inspects the retained analysis records and verifies every constituent’s metadata and operand expression.
-2. **M1 — Single-counter linear core + tooling pipeline.** Ship `#track` / `#endtrack`, scalar `COUNTER()` in expressions, constant deltas, `min`/`max` bounds, and the exit-value check for straight-line regions. A region containing a transfer emits a "path analysis not yet applied" warning; `COUNTER()` / `OFFSET()` occurrences in such a region are errors until M5 can prove their values. Ship the editor/documentation pipeline with this first visible syntax: central keyword entries, hover docs, per-ISA grammar gating, generated-extension verification, wiki, and changelog. *Delivers:* straight-line depth/cycle tracking that changes no bytecode. *Gated by:* 1, 3, 7, 10, 14, 15, 17, 48–50, 56–58, 69. **Demo:** assemble a straight-line routine using `COUNTER(stack)` in an operand; its byte and hand-stripped twin are identical, while an explicit `#endtrack` mismatch and a `min_value` underflow each fail on the relevant line. Generate an extension from the same flow-enabled ISA and verify `#track`, `#endtrack`, and `COUNTER()` are highlighted with hover documentation.
-3. **M2 — Stack slot labels (closes issue #18 for straight-line code).** Add deferred slot snapshots (`.x = COUNTER(stack)`), tagged origins, `OFFSET()`, and straight-line permanent dead-slot invalidation. *Delivers:* the headline issue-#18 capability without waiting for CFG analysis. *Gated by:* 8, 9, 71. **Demo:** the issue-#18 program snapshots a slot and addresses it with `[sp + OFFSET(x)]`; inserting one `push` changes the emitted offset from 1 to 2 without editing the access, while popping the slot and pushing a replacement at the same depth still makes `OFFSET(x)` fail.
-4. **M3 — Linear subroutine and frame ergonomics.** Add unconditional `flow_terminal` processing, entry modes, called-entry argument slots, and compile-time-constant operand-dependent deltas (`add sp, N`). Calls, jumps, tail calls, and conditional terminals remain transfer-containing regions until M5. *Delivers:* straight-line called routines with return-address-aware stack offsets. *Gated by:* 13, 38–40, 42, 59. **Demo:** the `multiply`/`factorial` routine assembles under `#track stack mode=called`; an `[sp + OFFSET(arg)]` operand accounts for the return address and local pushes, and an `add sp, N` teardown balances at `ret`; a wrong pop or frame adjustment fails at the terminal.
+1. **M0 — Analysis substrate + inertness proof.** Retain an immutable analysis record for every selected instruction variant and macro constituent: merged instruction/variant semantics, source and canonical mnemonics, typed parsed/matched operands (distinguishing compile-time semantic values from register encodings), parsed operand expressions, and stable source identity including an ordinal for multiple instructions on one source line and macro-constituent identity. Add deferred flow-expression recognition plus context tagging so later milestones can reject layout-affecting uses before evaluation; establish a source-order executable-node index and the `flow` diagnostic category, including warnings-as-errors plumbing. Parse the `flow_counters` schema and per-instruction metadata, but expose no flow directives or expression operators yet. *Delivers:* the data needed by every later milestone while proving that carrying it does not alter assembly. *Gated by:* 2, 4–6, 70. **Demo:** assemble a flow-enabled program containing an instruction variant, a symbolic branch target, two instructions on one source line, and a macro; the normal binary is byte-identical to its baseline, while an integration test inspects the retained analysis records and verifies every constituent’s merged metadata, typed operands/expression, and unique source identity.
+2. **M1 — Single-counter linear core + tooling pipeline.** Ship `#track` / `#endtrack`, scalar `COUNTER()` in allowed fixed-width/fixed-size value contexts, constant deltas, `min`/`max` bounds, `exit_policy`, applicable exit checks for straight-line regions, and the compile option `--static-analysis/--no-static-analysis` (enabled by default). Disabled mode bypasses the analysis pass, ignores analysis-only statements, and rejects any emitted-value dependency on analysis. Every instruction in an active region must explicitly declare `flow_transfer`; a variant other than `none` is a hard "path analysis not yet available" error until its behavior is shipped (M3 permits the specifically supported unconditional terminal, M5 handles general CFG transfers). Ship the editor/documentation pipeline with this first visible syntax: central keyword entries, hover docs, per-ISA grammar gating, generated-extension verification, CLI help, wiki, and changelog. *Delivers:* controllable straight-line depth/cycle tracking that changes no layout. *Gated by:* 1, 3, 7, 10, 14, 15, 17, 48–50, 54, 56–58, 69, 72, 75–77, 79. **Demo:** assemble a straight-line routine using `COUNTER(stack)` in a fixed-width operand; its byte and hand-stripped twin are identical, while an explicit `#endtrack` mismatch, a `min_value` underflow, and a layout-affecting `COUNTER()` use each fail on the relevant line. Re-run an annotation-only version with `--no-static-analysis` and observe byte-identical output with no flow diagnostics, then demonstrate that the operand-dependent version fails instead of receiving a guessed value. Generate an extension from the same flow-enabled ISA and verify `#track`, `#endtrack`, and `COUNTER()` are highlighted with hover documentation.
+3. **M2 — Stack slot labels (closes issue #18 for straight-line code).** Add scoped counter-coordinate declarations (`.x := COUNTER(stack)` and the narrow `COUNTER(name) ± compile-time scalar` form), `OFFSET()`, the disabled-mode diagnostic index, and straight-line permanent dead-coordinate invalidation. The `:=` parser is distinct from ordinary `=` / `EQU` constant assignment and preserves normal label-scope identity when enabled. *Delivers:* the headline issue-#18 capability without waiting for CFG analysis. *Gated by:* 8, 9, 71, 74, 78. **Demo:** the issue-#18 program declares a slot coordinate and addresses it with `[sp + OFFSET(.x)]`; inserting one `push` changes the emitted offset from 1 to 2 without editing the access, while popping the slot and pushing a replacement at the same depth still makes `OFFSET(.x)` fail. Under `--no-static-analysis`, leaving `.x` unused is accepted while an operand depending on it reports that analysis is disabled.
+4. **M3 — Linear subroutine and frame ergonomics.** Add unconditional `flow_terminal` processing, entry modes, called-entry argument slots, and compile-time-constant operand-dependent deltas (`add sp, N`). Calls, jumps, tail calls, and conditional terminals remain transfer-containing regions until M5. *Delivers:* straight-line called routines with return-address-aware stack offsets. *Gated by:* 13, 38–40, 42, 59. **Demo:** the `multiply`/`factorial` routine assembles under `#track stack mode=called`; an `[sp + OFFSET(.arg)]` operand accounts for the return address and local pushes, and an `add sp, N` teardown balances at `ret`; a wrong pop or frame adjustment fails at the terminal.
 5. **M4 — Manual linear control + concurrent counters.** Add scalar `#assert` / `#set`, `#suspend` / `#resume` for straight-line indeterminate spans, and concurrent instances/classes with `as=` naming. Full path-sensitive suspended-state checking waits for M5. *Delivers:* explicit programmer control and overlapping measurement windows. *Gated by:* 11, 12, 16, 36, 43–47. **Demo:** one routine tracks `stack` and two overlapping `cycles` windows; each instruction updates the active instances independently, an assertion and re-anchor affect only the named counter, and a suspended straight-line span rejects `COUNTER()` until resumed.
-6. **M5 — CFG and path-consistency core.** Build `flow_transfer` CFG edges, label→executable-node resolution, per-program-point `require-equal` propagation, region-boundary validation, `#entry` roots, call summaries, tail-call handling, and complete suspended-state analysis. Add per-path terminal checks, join mismatches, net-zero loop checks, indirect-transfer errors, label-scope warnings, and path-aware slot invalidation. *Delivers:* branchy stack routines are genuinely verified rather than merely scanned in source order. *Gated by:* 18–29, 35, 37 (path-sensitive portion), 41, 54, 66, 68. **Demo:** Example C reports the leaked push at the incorrect return path; adding the missing pop succeeds. A runtime-length loop fails without `#suspend`, succeeds when suspended/resumed, and a tail-call routine closes at its entry depth before the jump.
+6. **M5 — CFG and path-consistency core.** Build CFG edges from exhaustive `flow_transfer` metadata and explicit `flow_target_operand`, resolve physical fall-through at `address + word_count`, perform label→executable-node resolution, per-program-point `require-equal` propagation, region-boundary validation, `#entry` roots, declared conventional call summaries, tail-call handling, and complete suspended-state analysis. Add per-path terminal checks, join mismatches, net-zero loop checks, fall-through-into-data/gap/ambiguity errors, indirect-transfer errors (including while suspended), label-scope warnings, and path-aware slot invalidation. Target-specific/callee-pops call effects remain unresolved until the later interprocedural phase. *Delivers:* branchy stack routines are genuinely verified rather than merely scanned in source order. *Gated by:* 18–29, 35, 37 (path-sensitive portion), 41, 54, 66, 68, 73. **Demo:** Example C reports the leaked push at the incorrect return path; adding the missing pop succeeds. A runtime-length loop fails without `#suspend`, succeeds when suspended/resumed, an indirect jump remains rejected until the region is closed, a fall-through into data is diagnosed instead of skipped, and a tail-call routine closes at its entry depth before the jump.
 7. **M6 — Timing and interval analysis.** Add `join: interval`, edge-keyed deltas, widening for unbounded loops, range assertions, and constant-time checking. Carry unresolved named-callee summaries so timing claims cannot silently exclude callees. *Delivers:* sound branch-sensitive WCET/constant-time analysis for regions without unresolved callees. *Gated by:* 30–34, 64, 65, 67 (unbounded case). **Demo:** a branchy routine passes or fails `#assert COUNTER(cycles).max <= N` based on its computed worst case; Example F catches unequal path timing; a timing assertion after an unresolved call is rejected.
 8. **M7 — Rich effects and finite loops.** Add structural operand-dependent deltas (`COUNT(0)`, page-cross penalties), runtime-operand handling, conditional terminals, `#loop count=/max=`, and finite post-loop interval results. *Delivers:* bounded-loop timing and richer ISA-specific effects. *Gated by:* 51, 60, 61, 67 (bounded case), and extensions of earlier groups. **Demo:** Example E computes a finite bound for `#loop count=100` and becomes unbounded when the annotation is removed; `pushm {r0-r3}` and a macro expanding to two pushes each produce their expected tracked offsets.
 
-**Collateral definition-of-done (every visible milestone from M1 on): new language surface ships with its collateral.** M1 builds the pipeline with its first directives/operators; afterward, any milestone that adds or activates source syntax, an expression form, or a config key must ride it in the same release: keyword-registry entries (`keywords.py`), hover/doc entries (`directive_docs.py`), regenerated-extension verification, wiki section, and changelog line. Concretely: `OFFSET()` lands with **M2**; `#assert`/`#set`/`#suspend`/`#resume` with **M4**; `#entry` with **M5**; interval selectors / assertion forms with **M6**; and `#loop` with **M7**. Config-key documentation (`join`, `entry_modes`, call summaries, edge maps) lands with the milestone that activates each. A milestone is not done while its syntax is invisible to the editors.
+**Collateral definition-of-done (every visible milestone from M1 on): new language surface ships with its collateral.** M1 builds the pipeline with its first directives/operators and the static-analysis CLI switch; afterward, any milestone that adds or activates source syntax, an expression form, or a config key must ride it in the same release: keyword-registry entries (`keywords.py`), hover/doc entries (`directive_docs.py`), regenerated-extension verification, wiki section, CLI documentation where applicable, and changelog line. Concretely: `:=` and `OFFSET()` land with **M2**; `#assert`/`#set`/`#suspend`/`#resume` with **M4**; `#entry` with **M5**; interval selectors / assertion forms with **M6**; and `#loop` with **M7**. Config-key documentation (`join`, `entry_modes`, call summaries, edge maps) lands with the milestone that activates each. A milestone is not done while its syntax is invisible to the editors.
 
 Sequencing notes:
 * M0 is deliberately testable even though it adds no source syntax: its byte-identical compile plus retained-record integration test is the contract that permits every later milestone to rely on the new data without risking bytecode changes.
@@ -655,29 +727,31 @@ Sequencing notes:
 
 ## Architecture Anchors
 * **Config parsing/validation:** `AssemblerModel` (`src/bespokeasm/assembler/model/__init__.py`), `_validate_config()`.
+* **CLI control:** add `--static-analysis/--no-static-analysis` to the `compile` command in `src/bespokeasm/cli.py`, defaulting to enabled, and forward the boolean through `CommandHandlers.compile`, `_compile_handler`, and the `Assembler` constructor. Legacy no-subcommand invocation inherits the same compile option because it is routed to `compile`.
 * **Directive parsing:** new preprocessor line types alongside `#create-scope` et al. in `line_object/preprocessor_line/factory.py`.
-* **Tracking pass:** a *separate* analysis pass in `Assembler.assemble_bytecode()` (`src/bespokeasm/assembler/engine.py`). It must run after first-pass address assignment (so labels resolve) but **before** the existing `compilable_line_obs.sort(key=address)` step — because the tracker walks *source/execution* order (fall-through = the next source line), whereas the sort reorders the list into *address* order for the second pass, and `.org`/memory-zone use makes the two orders differ. It must not share mutable state with, or alter, the address-counter / `MemoryZoneManager` advance path (see *How Much Should They Share?* and the *Static Analysis Only* guarantee).
-* **Diagnostics:** `DiagnosticReporter` (`src/bespokeasm/assembler/diagnostic_reporter.py`) with a new `flow` category; lines are identified by the existing `LineIdentifier` (filename + line number) every line object already carries.
+* **Tracking pass:** a *separate* analysis pass in `Assembler.assemble_bytecode()` (`src/bespokeasm/assembler/engine.py`). It must run after first-pass address assignment (so labels and physical fall-through addresses resolve) but **before mutating the source-ordered collection with the existing `compilable_line_obs.sort(key=address)` step**. The analysis retains source order for directives, lexical region membership, and diagnostics, while CFG fall-through edges use physical address adjacency (`address + word_count`). It must not share mutable state with, or alter, the address-counter / `MemoryZoneManager` advance path (see *How Much Should They Share?* and the *Static Analysis Only* guarantee). When static analysis is disabled, this pass and its usage-time soundness validation are not invoked.
+* **Diagnostics:** `DiagnosticReporter` (`src/bespokeasm/assembler/diagnostic_reporter.py`) with a new `flow` category added to warnings-as-errors elevation; lines are identified by the existing `LineIdentifier` (filename + line number) every line object already carries.
 
 ## Architecture Changes Required
 A code-level review of the current assembler establishes that the pass scaffolding, diagnostics, label scope, expression parser, and preprocessor-directive system are all either ready or need only small additive changes — but two structural facts about the codebase drive real work. First, the assembler is a *generate-bytecode-then-discard* pipeline: once an `InstructionLine` produces its `AssembledInstruction` (bytecode parts + word count), it drops the matched `InstructionVariant`, the `isa_model`, the mnemonic, and the operand expression trees. Second, it has **no control-flow awareness whatsoever** — a branch operand is just an expression, with no notion of a target line, successor, or predecessor. The changes below are organized by how much they disturb existing code.
 
 ### Ready as-is (no change)
 * **Pass insertion.** A third pass slots cleanly between first-pass address assignment and the existing second pass; the two existing passes have no coupling that a read-only analysis pass between them would break.
-* **Branch-target → CFG-node resolution.** The engine already builds an address→line map (`line_dict`), but that alone is not sufficient: labels, directives, data, and multiple source lines may share one address. The CFG resolver must retain the resolved target label when available and map it to the next executable instruction node; an address-only target must resolve uniquely to such a node or report a flow diagnostic. A target into data, a non-executable directive, or an ambiguous same-address group is not silently assigned a successor.
+* **Branch-target / fall-through → CFG-node resolution.** The engine already builds an address→line map (`line_dict`), but that alone is not sufficient: labels, directives, data, and multiple source lines may share one address. For a direct branch, the CFG resolver retains the resolved target label when available and maps it to the executable instruction at that label; an address-only target must resolve uniquely. For ordinary fall-through, it looks specifically at `instruction.address + instruction.word_count`. Labels and zero-width analysis directives may be traversed at that address, but emitted data, a gap, a non-executable target, an ambiguous same-address group, or crossing the lexical region boundary produces a flow diagnostic rather than being skipped.
 * **New `#` directives.** `#track` and friends follow the existing `#create-scope` / `#mute` precedent exactly — persistent, source-ordered line objects registered in the preprocessor-line factory, receiving `label_scope`/memory-zone context. `#if`-excluded lines are retained but flagged `compilable = False` (filter them, matching "tracking follows compiled code"); `#define` is a separate textual pre-pass and does not interfere.
-* **Diagnostics.** `DiagnosticReporter` + `LineIdentifier` cover error/warn/info with line attribution.
+* **Diagnostics.** `DiagnosticReporter` + `LineIdentifier` cover error/warn/info with line attribution. Adding `flow` requires explicitly including it in the categories elevated by `--warnings-as-errors` and preserving the category for tests/tooling.
 
 ### Small additive changes (low risk)
-* **Label-scope origin tags.** `LabelScope.LabelInfo` stores an `int` value; `get_label_value()` returns that int. Adding an optional origin tag (counter name + snapshot) is backward-compatible — existing callers read `.value` unchanged. This realizes "slot snapshots as tagged-origin constants."
+* **Counter-coordinate symbol records.** With analysis enabled, extend the scoped-symbol machinery with a distinct `COUNTER_COORDINATE` kind carrying the resolved integer, owning counter instance, declaration site, and validity state. Under `--no-static-analysis`, do not insert that symbol; instead retain only its exact spelling, would-be scope, and source location in a separate diagnostic-only index consulted after ordinary symbol resolution fails. This produces a precise dependency error without shadowing or colliding with normal address labels and `=` / `EQU` constants, and makes disabled compilation semantically equivalent to stripping the declaration.
+* **`:=` declaration parsing.** Add a dedicated line form before ordinary address-label matching. The current address-label regex would otherwise read `.slot := ...` as label `.slot:` followed by an instruction beginning `=`, so either `:=` must receive precedence or the colon-label pattern must explicitly exclude `:=`. The declaration accepts all existing label-scope spellings, inserts the coordinate record into the same namespace, and does not reuse or change ordinary constant-assignment parsing.
 * **Expression operators.** The hand-rolled recursive-descent parser (`src/bespokeasm/expression/__init__.py`) implements `LSB(..)` / `BYTE0(..)` as function-style tokens; `COUNTER(..)` / `OFFSET(..)` replicate that pattern (token, regex, parse case, compute case). Add both to the reserved `EXPRESSION_FUNCTIONS_SET` (`keywords.py`) so they cannot collide with user labels.
-* **Config parsing.** `flow_counters` classes and the per-instruction `flow_effects`/`flow_terminal`/`flow_transfer` keys are parsed and validated in `AssemblerModel._validate_config()` (config-load consistency checks). The capability-completeness checks (inert class, `flow_transfer` coverage, mode availability — see *Required Metadata: Fail Loud, Never Silently Inert*) run usage-time in the tracking pass, since whether the metadata is sufficient depends on what the source asks of the counter.
+* **Config parsing.** With analysis enabled, `flow_counters` classes and the per-instruction `flow_effects`/`flow_terminal`/`flow_transfer`/`flow_target_operand`/`flow_call_effects` keys are parsed and validated in `AssemblerModel._validate_config()` (config-load consistency checks). The capability-completeness checks (inert class, exhaustive `flow_transfer` coverage inside active regions, mode availability, usable call summary — see *Required Metadata: Fail Loud, Never Silently Inert*) run usage-time in the tracking pass, since whether the metadata is sufficient depends on what the source asks of the counter. With analysis disabled, the model loader retains or skips these fields without interpreting or validating them; ordinary configuration parsing and all unrelated model validation remain active.
 
 ### Genuine structural changes (the real work)
-* **(A) Retain per-instruction config and operands on the line.** *(M0; M1 consumes effects and M5 consumes operand expressions.)* Today neither is reachable from an `InstructionLine` at analysis time. Store the matched `InstructionVariant` (or just its extracted effect map + transfer classification) and the **parsed operand expression(s)** on the `AssembledInstruction`/`InstructionLine` (per Q10 — retain the expression tree, not just the source string), plus the mnemonic for diagnostics. Additive — it does not change bytecode generation — but it touches the core instruction objects, which is the single most invasive change.
-* **(B) A distinct analysis pass on source order.** *(M1, fully required at M5.)* Grows the engine from two passes to three (address assignment → flow analysis → bytecode). The new pass iterates the **source-ordered** line list (see the Tracking-pass anchor) and maintains counter state independent of the address counter. M0 establishes the source-order executable-node index it consumes.
-* **(C) Control-flow graph + branch-target resolution.** *(M5.)* Net-new infrastructure: classify transfer instructions via `flow_transfer`, evaluate each branch's target operand expression to an address (depends on (A) retaining that expression), retain label identity where present, resolve it to the next executable CFG node, build edges, and run the worklist propagation. The assembler has nothing like this today. **Build this as an analysis-agnostic framework** — a CFG plus a worklist parameterized by a lattice and a per-instruction transfer function — with flow counters as its first client, not as a bespoke counter-walker. Doing so makes the related analyses below incremental clients rather than new infrastructure (see *Related Static Analyses*).
-* **(D) Deliver tracker-resolved `COUNTER()`/`OFFSET()` values to operand evaluation.** *(M1/M2.)* These operators are position-dependent (the same `COUNTER(stack)` differs line to line), but the expression evaluator (`ExpressionNode.get_value()`) currently receives only `(label_scope, active_named_scopes, line_id)` — not the line's counter state (the instruction address is even available one level up in `parts.py` but dropped at the call). Preferred approach, preserving the *Static Analysis Only* guarantee: the tracking pass **pre-resolves each `COUNTER()`/`OFFSET()` occurrence to a literal keyed to its line and deposits it** (as a tagged constant or per-line annotation) for second-pass evaluation to read. Data flows one way (tracker → operand value), so analysis can never perturb addresses. The alternative — threading per-line counter state through every `get_value()` call site — is more invasive and weakens isolation.
+* **(A) Retain per-instruction config and typed operands on the line.** *(M0; M1 consumes effects and M5 consumes targets.)* Today neither is reachable from an `InstructionLine` at analysis time. Store an immutable analysis record containing the selected `InstructionVariant`, the explicit merge of root-instruction semantics with selected-variant overrides, source and canonical mnemonics, typed matched operands, and the **parsed operand expression(s)** (per Q10 — retain the expression tree, not just the source string). An operand must distinguish a compile-time semantic value from an emitted encoding: a register's numeric opcode is not its runtime value and cannot satisfy `ARG(n)`. Give each record a stable source identity including line-object ordinal and macro-constituent identity. This is additive to emission but touches the core instruction objects, making it the single most invasive substrate change.
+* **(B) A distinct analysis pass retaining source and layout relationships.** *(M1, fully required at M5.)* Grows the engine from two passes to three (address assignment → flow analysis → bytecode). The new pass iterates the **source-ordered** line list for directives and lexical regions while consulting an immutable address index for physical fall-through and direct targets. Counter state remains independent of the address counter. M0 establishes stable source identities; M5 adds the address-indexed executable/occupied-location view.
+* **(C) Control-flow graph + target/fall-through resolution.** *(M5.)* Net-new infrastructure: require exhaustive `flow_transfer` classification, read a direct target from the configured `flow_target_operand`, evaluate that operand expression to an address (depends on (A) retaining the typed expression), retain label identity where present, resolve direct targets and `address + word_count` fall-through to CFG nodes, build edges, and run worklist propagation. The analyzer never guesses which of several address-like operands is the target and never substitutes “next source instruction” for physical adjacency. The assembler has nothing like this today. **Build this as an analysis-agnostic framework** — a CFG plus a worklist parameterized by a lattice and a per-instruction transfer function — with flow counters as its first client, not as a bespoke counter-walker. Doing so makes the related analyses below incremental clients rather than new infrastructure (see *Related Static Analyses*).
+* **(D) Deliver tracker-resolved `COUNTER()`/`OFFSET()` values to allowed value contexts.** *(M1/M2.)* These operators are position-dependent (the same `COUNTER(stack)` differs line to line), but the expression evaluator (`ExpressionNode.get_value()`) currently receives only `(label_scope, active_named_scopes, line_id)` — not the line's counter state (the instruction address is even available one level up in `parts.py` but dropped at the call). The parser must first tag the expression's use context and reject layout-affecting/selection-affecting contexts. For allowed fixed-width/fixed-size values, the tracking pass **pre-resolves each `COUNTER()`/`OFFSET()` occurrence to a literal keyed to its stable source identity and deposits it** (as a coordinate-symbol value or per-line annotation) for second-pass evaluation to read. Data flows one way (tracker → value), so analysis cannot perturb addresses, word counts, or variant selection. With analysis disabled, the evaluator recognizes operator nodes directly; ordinary symbol resolution runs normally, and only an unresolved name matching the ignored-coordinate diagnostic index receives the dedicated dependency error. It never requests a value from the skipped pass. The alternative — threading per-line counter state through every `get_value()` call site — is more invasive and weakens isolation.
 
 ### Note on macros
 Macros influence counters only in aggregate (no own flow metadata; see *Macros Influence Counters Only in Aggregate*). Macro invocations expand into a `CompositeAssembledInstruction` exposing the constituent `AssembledInstruction`s, so the aggregate is computed by walking the expansion — but each constituent has the same config-retention gap as (A) (it must expose its own effect map and operand values). Aggregation therefore depends on (A) and is available as soon as the constituents' effects are (M1–M3); only constituents using *structural* operand-dependent effects defer to M7.
@@ -713,8 +787,10 @@ Beyond the assembler itself, this feature touches every surface that knows the l
 
 **Wiki:** the project wiki documents *shipped* behavior, so wiki updates are **ship-time work, scoped per milestone** — not to be written while this remains a draft (documenting an unparsed schema would mislead ISA authors). When a milestone lands, it touches two wiki pages:
 
-* **`Instruction-Set-Configuration-File.md`** — a new `flow_counters` top-level section (counter classes: `source`, `operation`, `join`, `min_value`/`max_value`, `unknown_instructions`, `default_init`, `entry_modes`); the per-instruction delta field (the `source` target — `flow_effects.<class>` by default, or a custom field, or `documentation.cycles`), including the operand-expression and edge-dependent `{ taken, fall_through }` delta forms and per-`variants` overrides; and the `flow_terminal` / `flow_transfer` classification keys. Document `documentation.cycles` as a recognized instruction field. Cross-reference the existing `documentation.modifies` precedent.
-* **`Assembly-Language-Syntax.md`** — the new preprocessor directives (`#track`, `#endtrack`, `#assert`, `#set`, `#entry`, `#suspend`, `#resume`, `#loop`) alongside the other `#`-directives, and the `COUNTER()` / `OFFSET()` operators in the numeric-expression operator table next to `BYTE0(..)` / `LSB(..)`.
+* **`Instruction-Set-Configuration-File.md`** — a new `flow_counters` top-level section (counter classes: `source`, `operation`, `join`, `min_value`/`max_value`, `unknown_instructions`, `default_init`, `exit_policy`, `entry_modes`); the per-instruction delta field (the `source` target — `flow_effects.<class>` by default, or a custom field, or `documentation.cycles`), including the operand-expression and edge-dependent `{ taken, fall_through }` delta forms and per-`variants` overrides; and the exhaustive `flow_transfer`, `flow_target_operand`, `flow_call_effects`, and `flow_terminal` keys. Document `documentation.cycles` as a recognized instruction field. Cross-reference the existing `documentation.modifies` precedent.
+* **`Assembly-Language-Syntax.md`** — the new preprocessor directives (`#track`, `#endtrack`, `#assert`, `#set`, `#entry`, `#suspend`, `#resume`, `#loop`) alongside the other `#`-directives; the distinct `:=` counter-coordinate declaration syntax and its narrow right-hand-side grammar; and the `COUNTER()` / `OFFSET()` operators in the numeric-expression operator table next to `BYTE0(..)` / `LSB(..)`, including the explicit list of allowed and rejected expression contexts.
+
+**CLI documentation:** `Installation-and-Usage.md`, `bespokeasm compile --help`, and shell-completion fixtures document `--static-analysis/--no-static-analysis`, its enabled default, the fact that analysis-only annotations are ignored when disabled, and the hard error for emitted values that depend on skipped analysis.
 
 Single-source-of-truth note: a counter's `source` field *is* the single source for its deltas. A cycle counter pointed at `documentation.cycles` reads the same per-instruction integer that documentation/timing output uses — one authored value, two consumers, no duplication and nothing to drift. (Document the new `source`/`operation` class keys, and `documentation.cycles` as a recognized instruction field, when the wiki is updated.)
 
@@ -728,27 +804,60 @@ flow_counters:
     source: stack_effect          # per-instruction delta read from this field
     join: require-equal           # every path must agree; divergence is a bug
     min_value: 0
+    unknown_instructions: error   # every instruction explicitly says how it affects the stack
+    exit_policy: balanced
     entry_modes:
       called: { init: 2, exit: 0 }   # `call` leaves a 16-bit return address on entry
       jumped: { init: 0 }
   cycles:                         # worst-case timing
     source: documentation.cycles  # reuse the timing already documented per instruction
     join: interval                # paths may differ; track the [min,max] hull
+    unknown_instructions: error
+    exit_policy: none             # the budget assertion is the contract
   ct_cycles:                      # constant-time guard: SAME field, strict join
     source: documentation.cycles
     join: require-equal           # paths must take identical cycles, else timing leak
+    unknown_instructions: error
+    exit_policy: none
 
 instructions:
-  push: { stack_effect: 1,  documentation: { cycles: 11 } }
-  pop:  { stack_effect: -1, documentation: { cycles: 10 } }
-  ld:   { documentation: { cycles: 8 } }                      # no stack effect
-  nop:  { documentation: { cycles: 4 } }
-  add_sp: { stack_effect: -ARG(0), documentation: { cycles: 8 } }   # `add sp, N` frees N
-  call: { stack_effect: 2,  flow_transfer: call,        documentation: { cycles: 17 } }
-  ret:  { stack_effect: -2, flow_terminal: [stack],     documentation: { cycles: 10 } }
-  jmp:  { flow_transfer: unconditional,                 documentation: { cycles: 10 } }
-  jz:   { flow_transfer: conditional, documentation: { cycles: { taken: 12, fall_through: 7 } } }
-  jnz:  { flow_transfer: conditional, documentation: { cycles: { taken: 12, fall_through: 7 } } }
+  push: { stack_effect: 1,  flow_transfer: none, documentation: { cycles: 11 } }
+  pop:  { stack_effect: -1, flow_transfer: none, documentation: { cycles: 10 } }
+  ld:   { stack_effect: 0,  flow_transfer: none, documentation: { cycles: 8 } }
+  nop:  { stack_effect: 0,  flow_transfer: none, documentation: { cycles: 4 } }
+  cmp:  { stack_effect: 0,  flow_transfer: none, documentation: { cycles: 4 } }
+  inc:  { stack_effect: 0,  flow_transfer: none, documentation: { cycles: 4 } }
+  dec:  { stack_effect: 0,  flow_transfer: none, documentation: { cycles: 4 } }
+  add_sp:
+    stack_effect: -ARG(0)          # `add sp, N` frees N
+    flow_transfer: none
+    documentation: { cycles: 8 }
+  call:
+    stack_effect: 2
+    flow_transfer: call
+    flow_target_operand: 0
+    flow_call_effects: { stack: 0 }
+    documentation: { cycles: 17 }
+  ret:
+    stack_effect: -2
+    flow_terminal: [stack]
+    flow_transfer: return
+    documentation: { cycles: 10 }
+  jmp:
+    stack_effect: 0
+    flow_transfer: unconditional
+    flow_target_operand: 0
+    documentation: { cycles: 10 }
+  jz:
+    stack_effect: 0
+    flow_transfer: conditional
+    flow_target_operand: 0
+    documentation: { cycles: { taken: 12, fall_through: 7 } }
+  jnz:
+    stack_effect: 0
+    flow_transfer: conditional
+    flow_target_operand: 0
+    documentation: { cycles: { taken: 12, fall_through: 7 } }
 ```
 
 ### Example A — stack slot labels (issue #18; straight-line, M2)
@@ -756,28 +865,29 @@ instructions:
 #track stack                       ; region opens, stack = 0
 build_record:
     push a                         ; stack 0 -> 1
-.field_x = COUNTER(stack)          ; name this slot  (snapshot = 1)
+.field_x := COUNTER(stack)         ; name this slot  (coordinate = 1)
     push b                         ; stack 1 -> 2
-.field_y = COUNTER(stack)          ; snapshot = 2
-    ld a, [sp + OFFSET(field_x)]   ; OFFSET = COUNTER(stack) - field_x = 2 - 1 = 1  -> [sp+1]
+.field_y := COUNTER(stack)         ; coordinate = 2
+    ld a, [sp + OFFSET(.field_x)]  ; OFFSET = COUNTER(stack) - .field_x = 2 - 1 = 1 -> [sp+1]
     pop b                          ; stack 2 -> 1
     pop a                          ; stack 1 -> 0
 #endtrack stack                    ; exit check 0 == 0  ✓
 ```
-The payoff: insert `push c` right after `field_y` and the `[sp + OFFSET(field_x)]` line is **untouched** — its offset recomputes from 1 to 2 automatically. That is exactly the manual bookkeeping issue #18 asked to eliminate.
+The payoff: insert `push c` right after `.field_y` and the `[sp + OFFSET(.field_x)]` line is **untouched** — its offset recomputes from 1 to 2 automatically. That is exactly the manual bookkeeping issue #18 asked to eliminate.
 
 ### Example B — subroutine taking a stack argument (M3)
 ```asm
 ; multiply(n): caller pushes n, then `call`s; result returned in A
 #track stack mode=called           ; init = 2 (return address), exit = 0
 multiply:
-.arg = 0                           ; caller's argument, baseline slot
+.arg := COUNTER(stack) - 2         ; caller baseline coordinate = 0, associated with stack
     push b                         ; stack 2 -> 3
-    ld a, [sp + OFFSET(arg)]       ; OFFSET = 3 - 0 = 3  -> reaches the argument past b + retaddr
+    ld a, [sp + OFFSET(.arg)]      ; OFFSET = 3 - 0 = 3  -> reaches the argument past b + retaddr
     ; ... compute, result in A ...
     pop b                          ; stack 3 -> 2
     ret                            ; stack_effect -2: 2 -> 0  -> exit check 0 == 0  ✓
 ```
+The `:=` declaration makes `.arg` a stack coordinate rather than an ordinary constant. Writing `.arg = 0` would create an ordinary constant and `OFFSET(.arg)` would reject it.
 
 ### Example C — push leak caught on one path (M5)
 ```asm
@@ -800,7 +910,7 @@ Both `ret`s are `flow_terminal` instructions, not `#endtrack` directives: each e
 ```asm
 #track stack
 push_string:                       ; HL -> NUL-terminated string of unknown length
-.saved = COUNTER(stack)            ; depth before the variable region (= 0)
+.saved := COUNTER(stack)           ; depth before the variable region (= 0)
 #suspend stack                     ; depth is now runtime-dependent; tracking pauses
 .loop:
     ld a, [hl]
@@ -825,24 +935,24 @@ delay:
     nop                            ; cycles += 4
     dec a
     jnz .spin                      ; taken 12 / fall_through 7 (edge-keyed cost)
-#assert COUNTER(cycles).max <= 1700  ; whole routine must fit the budget
-#endtrack cycles
+#assert COUNTER(cycles).max <= 2000  ; exact total is 1995 cycles
+#endtrack cycles                     ; exit_policy:none: close without equality check
 ```
-The interval counter accumulates `body × 100` (the `#loop` count makes it finite instead of widening to ∞), uses the *taken* edge cost inside the loop and the *fall_through* cost on exit, and the `#assert` fails if the computed worst case exceeds the budget.
+The interval counter computes `100 × (nop 4 + dec 4) + 99 × jnz-taken 12 + 1 × jnz-fall-through 7 = 1995` cycles. The `#loop` count makes the result finite instead of widening to ∞, and the `#assert` fails if the computed worst case exceeds the budget. Because the class uses `exit_policy: none`, `#endtrack` closes the measurement window without additionally requiring the accumulated value to equal its initial value.
 
 ### Example F — constant-time check catches a timing leak (M6)
 ```asm
 #track ct_cycles init=0            ; join: require-equal — both paths must cost the same
 ct_compare:
-    cmp a, b
-    jz .equal                      ; conditional
-    ld a, 0                        ; unequal path:  ld(8)
-    jmp .end                       ;               + jmp(10)  = 18 cycles
+    cmp a, b                       ; common prefix: 4 cycles
+    jz .equal                      ; unequal edge 7 / equal edge 12
+    ld a, 0                        ; unequal: 4 + 7 + ld(8)
+    jmp .end                       ;                 + jmp(10) = 29 cycles
 .equal:
-    ld a, 1                        ; equal path:    ld(8)               =  8 cycles
-.end:                              ; ERROR(flow): paths reach .end with ct_cycles 18 vs 8
+    ld a, 1                        ; equal:   4 + 12 + ld(8)            = 24 cycles
+.end:                              ; ERROR(flow): paths reach .end with ct_cycles 29 vs 24
                                    ;   -> timing leak; the `jmp` makes the unequal path slower
-#endtrack ct_cycles
+#endtrack ct_cycles                ; unreachable as a valid join until paths are balanced
 ```
 The fix is to balance the paths (e.g. structure both arms to identical cost); the same `require-equal` join that flags a stack imbalance flags a timing side-channel here — same machinery, opposite intent.
 
@@ -860,22 +970,22 @@ isr:
     pop a                          ; stack 1 -> 0 ; cycles += 10
 #assert COUNTER(cycles).max <= 60  ; ISR latency budget
 #endtrack stack                    ; exit 0 == 0  ✓
-#endtrack cycles
+#endtrack cycles                   ; exit_policy:none: budget above is the contract
 ```
 Each instruction updates every active counter from its own `source` field; the two counters are checked independently against their own rules (`stack` balance, `cycles` budget).
 
 ## Open Questions
 1. **Expression operator names:** *resolved.* `COUNTER(..)` and `OFFSET(..)` are the operators (sigil prefixes are non-viable — `^` is bitwise XOR, `$` hex, `%` binary, `@` operand labels, `#` preprocessor), following the `BYTE0(..)`/`LSB(..)` function-style precedent. They are reserved words **only in ISAs that enable the feature** (declare a `flow_counters` section), so source for non-feature ISAs is unaffected and collision risk falls only on authors who opt in and control their own namespace.
-2. **Slot typing:** *resolved.* Slot snapshots become constants in the existing label scope with an optional origin tag added to `LabelScope.LabelInfo` (backward-compatible, since callers read `.value`). The dead-slot rule and `OFFSET()` both consult that tag (which counter + snapshot value). Position-dependent bare `COUNTER()`/`OFFSET()` values are delivered per Q9.
-3. **Region/directive interaction:** *resolved.* A `.org` / memory-zone change while a region is open **auto-closes the region** (applying its exit-value check) and emits a **warning** — escalatable to a hard error via `-W` (warnings-as-errors). This avoids silently spanning a relocation while not forcing a hard error on every relocate. (Labels inside a region continue the region, with label-scope-aware entry-point warnings.)
-4. **Conditional terminals:** *resolved.* A conditional `ret` (an instruction carrying both `flow_terminal` and `flow_transfer: conditional`) ends one path but not the fall-through. M5 join analysis handles this naturally as a two-edge node. Earlier milestones (M1–M4, no CFG) treat a conditional terminal as **non-terminating, with a warning** that its terminal effect is deferred until path analysis — conservative and honest, never silently dropping the fall-through path.
+2. **Counter association for coordinate symbols:** *resolved with `:=`.* Label scope and counter association are separate axes: `.var` and `var` remain different symbols, while `:=` distinguishes a counter coordinate from BespokeASM's ordinary `=` / `EQU` constants. `.var := COUNTER(stack)` records both coordinate value and owning counter; `.arg := COUNTER(stack) - 2` records coordinate 0 while preserving the same owner. The permitted M2 right-hand side is narrowly `COUNTER(name)` plus or minus an ordinary compile-time scalar expression containing no other flow-derived value, with exactly one scalar counter at coefficient `+1`. `OFFSET()` accepts only these coordinate symbols. This makes `.arg = 0`, `.arg := 0`, multi-counter expressions, coordinate-symbol arithmetic, and scaled counter expressions invalid rather than guessing an association.
+3. **Region/directive interaction:** *resolved.* A `.org` / memory-zone change while a region is open **auto-closes the region** (applying an exit-value check when the instance has a contract) and emits a **warning** — escalatable to a hard error via `-W` (warnings-as-errors). This avoids silently spanning a relocation while not forcing a hard error on every relocate. (Labels inside a region continue the region, with label-scope-aware entry-point warnings.)
+4. **Conditional terminals:** *resolved.* A conditional `ret` (an instruction carrying both `flow_terminal` and `flow_transfer: conditional`) ends one path but not the fall-through. The M5 CFG infrastructure can represent this naturally as a two-edge node, but activation remains scheduled for M7 as listed in *Implementation Phasing*. Until M7, encountering a conditional terminal in an active region is a hard "conditional terminals not yet supported" error; treating it as a warning would allow analysis to continue with behavior the shipped transfer function does not implement.
 5. **Counter name namespace & scoping:** *resolved — counters get label-style scope, two levels (global + file).* Counter names are their **own namespace, separate from labels** (a counter `stack` and a label `stack` never collide — counter names appear only in `COUNTER()`/`OFFSET()` argument position and the flow directives). The name carries a **scope prefix mirroring labels**, and the prefix sets the boundary the tracking region is confined to:
    * **Global** (no prefix, e.g. `#track stack`): program-wide; the region **may span `#include`** (inline included code is tracked, and included code referencing `COUNTER(stack)` binds to the same counter).
    * **File** (`_` prefix, e.g. `#track _stack`): confined to the file; **does not project into `#include`**, so an included library's `_stack` is a distinct counter from the caller's — collision-free, exactly like file-scope labels.
    * *Local* (`.`) and *named* (`#create-scope`-style) scopes are **not** adopted: the tracking region itself already provides local-like lifetime, and `as=` plus the global/file split cover the rest. (Named counter scopes remain a possible future addition only if cross-file counter sharing becomes a real need.)
    The prefix attaches to the effective instance name (the class name, or the `as=` name — `#track cycles as=_sync` is a file-scoped instance `_sync`). A region must open and close within its scope's boundary; if execution would carry an open file-scoped region across an `#include` (or any boundary), that is the auto-close-with-warning of Q3, never a silent untracked gap. Non-overlapping regions reuse a name freely; concurrent instances need distinct `as=` names.
-6. **Cross-region call verification:** *resolved — staged.* M5/M6 do not inline callees. Stack-style counters use the existing immediately resolvable call/terminal convention; every other class carries an unresolved `CallEffect(callee, class)` summary, which prevents a false precise operand value or timing claim after the call. The later post-M7 interprocedural phase resolves those summaries by recording each region's verified entry/exit effect and declared argument slots per entry-point label, then checking call sites against the named callee's convention.
+6. **Cross-region call verification:** *resolved — staged.* M5/M6 do not inline callees or infer caller-visible effects from terminal mnemonics. A direct call may declare a conventional per-class caller-visible net through `flow_call_effects` (for example, balanced stack calls declare `stack: 0`); this is an ISA calling-convention contract, while the callee's own region is checked independently. A class with no declared call summary carries an unresolved `CallEffect(callee, class)`, preventing a false precise operand value, bound check, or timing claim after the call. Callee-pops arguments and other target-specific effects remain unresolved/rejected. The later post-M7 interprocedural phase resolves named summaries by recording each region's verified entry/exit effect and declared argument slots per entry-point label, then checking call sites against the named callee's convention.
 7. **`#include` interaction:** *resolved by counter scope (Q5).* `#include` is textually inline and a counter tracks execution (not layout — distinct from memzone/named-scope, which are layout/visibility context and correctly reset per-file). So whether a region spans an `#include` is the programmer's choice, expressed by scope: a **global** counter's region spans the include (included instructions tracked, name shared); a **file** (`_`) counter's region is confined to the file and may not cross the include — if execution would carry an open file-scoped region into an `#include`, it auto-closes with a warning (Q3). This gives both the inline-fragment case (global) and library isolation (file) without a special-case `#include` rule.
 8. **Return-address size sugar / entry mode names:** *resolved.* The return-address size is stated once in the ISA configuration (`entry_modes.<mode>.init`) and source names the convention (`#track stack mode=called`). Mode names stay **fully author-defined** (flexibility for unusual ISAs), but documentation **recommends conventional names** — `called`, `jumped`, `interrupt` — so tooling and cross-ISA readers see consistency. No reservation or enforcement.
-9. **`COUNTER()`/`OFFSET()` value delivery:** *resolved.* The tracking pass pre-resolves each occurrence to a per-line literal that second-pass evaluation reads, keeping data flow one-way (tracker → value) and isolation intact, so analysis can never perturb addresses. (Architecture change D.)
-10. **Operand-expression retention:** *resolved.* The **parsed operand expression is retained on the `InstructionLine`** (architecture change A), so the M5 CFG evaluates branch targets directly — no re-parsing at analysis time and no divergence risk. Costs some memory per line, but is robust and handles complex target expressions. (Re-parsing from the retained operand string and storing only the resolved address were the rejected alternatives.)
+9. **`COUNTER()`/`OFFSET()` value delivery:** *resolved.* After rejecting layout- or selection-affecting contexts, the tracking pass pre-resolves each allowed occurrence to a literal keyed by stable source identity that second-pass evaluation reads. Data flows one way (tracker → fixed-width/fixed-size value), so analysis cannot perturb addresses, word counts, or variant selection. (Architecture change D.)
+10. **Operand-expression retention:** *resolved.* The selected variant's **typed parsed operands and parsed operand expressions** are retained in an immutable analysis record reachable from the `InstructionLine` (architecture change A), so M5 reads the configured `flow_target_operand` directly — no re-parsing at analysis time and no divergence risk. Costs some memory per line, but is robust and handles complex target expressions while distinguishing semantic constants from emitted encodings. (Re-parsing from the retained operand string and storing only the resolved address were the rejected alternatives.)
