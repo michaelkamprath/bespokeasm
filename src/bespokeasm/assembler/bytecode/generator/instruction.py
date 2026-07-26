@@ -1,6 +1,13 @@
 import sys
 
+from bespokeasm.assembler.analysis import AnalysisOperand
+from bespokeasm.assembler.analysis import freeze_analysis_value
+from bespokeasm.assembler.analysis import FrozenExpression
+from bespokeasm.assembler.analysis import InstructionAnalysisRecord
+from bespokeasm.assembler.analysis import OperandSemanticKind
+from bespokeasm.assembler.analysis import SourceIdentity
 from bespokeasm.assembler.bytecode.assembled import AssembledInstruction
+from bespokeasm.assembler.bytecode.parts import ExpressionByteCodePart
 from bespokeasm.assembler.bytecode.parts import NumericByteCodePart
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
@@ -24,6 +31,7 @@ class InstructionBytecodeGenerator:
         isa_model: AssemblerModel,
         memzone_manager: MemoryZoneManager,
         source_mnemonic: str | None = None,
+        source_identity: SourceIdentity | None = None,
     ) -> AssembledInstruction:
         if mnemonic != instruction.mnemonic:
             # this shouldn't happen
@@ -41,6 +49,7 @@ class InstructionBytecodeGenerator:
                     operands,
                     isa_model,
                     memzone_manager,
+                    source_identity,
                 )
             except OperandLabelError as e:
                 if operand_label_error is None:
@@ -70,6 +79,7 @@ class InstructionBytecodeGenerator:
         operands: str,
         isa_model: AssemblerModel,
         memzone_manager: MemoryZoneManager,
+        source_identity: SourceIdentity | None,
     ) -> AssembledInstruction:
         if mnemonic != variant.mnemonic:
             # this shouldn't happen
@@ -127,6 +137,45 @@ class InstructionBytecodeGenerator:
         else:
             machine_code = [base_bytecode]
             operand_label_bindings = []
+            matched_operands = MatchedOperandSet([], False, False)
+
+        analysis_record = None
+        if isa_model.analysis_records_enabled:
+            if source_identity is None:
+                raise RuntimeError('analysis-enabled instruction has no source identity')
+            analysis_operands = []
+            for parsed_operand in matched_operands.operands:
+                if parsed_operand.operand.null_operand:
+                    continue
+                expression = (
+                    FrozenExpression.from_node(parsed_operand.argument.parsed_expression)
+                    if isinstance(parsed_operand.argument, ExpressionByteCodePart)
+                    else None
+                )
+                if 'REGISTER' in parsed_operand.operand.type.name:
+                    semantic_kind = OperandSemanticKind.RUNTIME_REGISTER
+                elif expression is not None:
+                    semantic_kind = OperandSemanticKind.COMPILE_TIME_EXPRESSION
+                else:
+                    semantic_kind = OperandSemanticKind.OPAQUE
+                analysis_operands.append(
+                    AnalysisOperand(
+                        operand_id=parsed_operand.operand_id,
+                        operand_type=parsed_operand.operand.type,
+                        source_text=parsed_operand.operand_string,
+                        semantic_kind=semantic_kind,
+                        expression=expression,
+                    )
+                )
+            analysis_record = InstructionAnalysisRecord(
+                source_identity=source_identity,
+                selected_variant=variant,
+                variant_number=variant.variant_number,
+                source_mnemonic=source_mnemonic,
+                canonical_mnemonic=mnemonic,
+                semantics=freeze_analysis_value(variant.semantic_config),
+                operands=tuple(analysis_operands),
+            )
 
         return AssembledInstruction(
             line_id,
@@ -136,4 +185,5 @@ class InstructionBytecodeGenerator:
             multi_word_endian,
             intra_word_endian,
             operand_label_bindings=operand_label_bindings,
+            analysis_record=analysis_record,
         )

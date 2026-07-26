@@ -198,6 +198,11 @@ def build_cli(handlers: CommandHandlers):
             default=False,
             help='Treat warnings as errors and stop compilation.'
         )
+    @click.option(
+            '--static-analysis/--no-static-analysis',
+            default=True,
+            help='Enable or disable assembly-time static analysis.'
+        )
     def compile(
                 asm_file,
                 config_file,
@@ -213,6 +218,7 @@ def build_cli(handlers: CommandHandlers):
                 include_path,
                 macro_symbol,
                 warnings_as_errors,
+                static_analysis,
             ):
         return handlers.compile(
             asm_file,
@@ -229,6 +235,7 @@ def build_cli(handlers: CommandHandlers):
             include_path,
             macro_symbol,
             warnings_as_errors,
+            static_analysis,
         )
 
     @main.command(cls=OptionForwardingCommand, short_help='generate markdown documentation for an ISA')

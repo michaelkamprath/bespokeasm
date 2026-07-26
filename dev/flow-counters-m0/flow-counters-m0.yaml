@@ -1,0 +1,94 @@
+description: Flow analysis M0 development acceptance harness
+general:
+  min_version: "0.7.4a0"
+  address_size: 8
+  multi_word_endian: little
+  registers:
+    - a
+  identifier:
+    name: flow-analysis-m0
+    version: "0.1.0"
+flow_counters:
+  stack:
+    operation: add
+    join: require-equal
+    min_value: 0
+    max_value: 16
+    unknown_instructions: error
+    default_init: 0
+    exit_policy: balanced
+    entry_modes:
+      called:
+        init: 1
+        exit: 0
+operand_sets:
+  source:
+    operand_values:
+      register_a:
+        type: register
+        register: a
+        bytecode:
+          value: 0
+          size: 1
+      immediate:
+        type: numeric
+        bytecode:
+          value: 1
+          size: 1
+        argument:
+          size: 8
+          word_align: true
+  target:
+    operand_values:
+      address:
+        type: address
+        argument:
+          size: 8
+          word_align: true
+instructions:
+  nop:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    bytecode:
+      value: 0
+      size: 8
+  load:
+    aliases:
+      - move
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    documentation:
+      family: load
+    variants:
+      - flow_effects:
+          stack: 1
+        documentation:
+          cycles: 2
+        bytecode:
+          value: 0x40
+          size: 7
+        operands:
+          count: 1
+          operand_sets:
+            list:
+              - source
+  jmp:
+    flow_effects:
+      stack: 0
+    flow_transfer: unconditional
+    flow_target_operand: 0
+    bytecode:
+      value: 0x80
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - target
+macros:
+  load_and_nop:
+    - instructions:
+        - load 4
+        - nop

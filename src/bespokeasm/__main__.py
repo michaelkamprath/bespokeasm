@@ -19,6 +19,7 @@ def _compile_handler(
             include_path,
             macro_symbol,
             warnings_as_errors,
+            static_analysis,
         ):
     import os
 
@@ -45,6 +46,7 @@ def _compile_handler(
         include_path,
         macro_symbol,
         warnings_as_errors,
+        static_analysis=static_analysis,
     )
     asm.assemble_bytecode()
 

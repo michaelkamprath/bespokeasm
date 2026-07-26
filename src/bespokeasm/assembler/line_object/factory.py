@@ -120,6 +120,7 @@ class LineOjectFactory:
                     model,
                     current_memzone,
                     memzone_manager,
+                    source_ordinal=len(line_obj_list),
                 )
                 if line_obj is not None:
                     line_obj_list.append(line_obj)

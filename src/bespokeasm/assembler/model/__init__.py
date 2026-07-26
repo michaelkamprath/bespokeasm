@@ -30,8 +30,10 @@ class AssemblerModel:
         config_file_path: str,
         is_verbose: int,
         diagnostic_reporter: DiagnosticReporter,
+        static_analysis: bool = True,
     ):
         self._config_file = config_file_path
+        self._static_analysis_enabled = static_analysis
         if diagnostic_reporter is None:
             raise ValueError('DiagnosticReporter is required for AssemblerModel')
         self._diagnostic_reporter = diagnostic_reporter
@@ -106,7 +108,27 @@ class AssemblerModel:
                 self.word_size,
                 self.word_segment_size,
                 self._diagnostic_reporter,
+                retain_analysis_semantics=self.analysis_records_enabled,
             )
+
+    _FLOW_TRANSFER_VALUES = {
+        'none',
+        'conditional',
+        'unconditional',
+        'call',
+        'return',
+        'indirect',
+        'multiway',
+    }
+    _FLOW_DIRECT_TARGET_TRANSFERS = {'conditional', 'unconditional', 'call'}
+    _FLOW_DIRECT_TARGET_OPERAND_TYPES = {'numeric', 'address', 'relative_address'}
+    _FLOW_METADATA_KEYS = {
+        'flow_effects',
+        'flow_terminal',
+        'flow_transfer',
+        'flow_target_operand',
+        'flow_call_effects',
+    }
 
     def _validate_config(self, is_verbose: int) -> None:
         '''Performs some validation checks on configuration dictionary'''
@@ -151,6 +173,8 @@ class AssemblerModel:
                 'octal/base8, binary/base2.'
             )
         self._validate_ambiguous_source_identifiers()
+        if self._static_analysis_enabled:
+            self._validate_flow_analysis_config()
 
         # check for min required BespokeASM version
         if 'min_version' in self._config['general']:
@@ -179,6 +203,253 @@ class AssemblerModel:
                         f'ERROR: The ISA configuration file has redefined the GLOBAL memory zone and the '
                         f'default origin value of {self.default_origin} is less than the GLOBAL memory '
                         f'zone start value of {zone["start"]}.'
+                    )
+
+    def _flow_config_error(self, message: str) -> None:
+        self._diagnostic_reporter.error(None, message, category='flow')
+
+    @staticmethod
+    def _is_flow_delta_expression(value: str) -> bool:
+        expression = re.sub(r'(?:ARG|COUNT)\(\d+\)', '1', value)
+        return bool(re.fullmatch(r'[\d\s\+\-\*\/\%\(\)]+', expression))
+
+    def _validate_flow_delta(self, value, context: str) -> None:
+        if isinstance(value, bool):
+            self._flow_config_error(f'{context} must be an integer or supported flow-delta expression')
+        if isinstance(value, int):
+            return
+        if isinstance(value, str) and self._is_flow_delta_expression(value):
+            return
+        if isinstance(value, dict):
+            if not value:
+                self._flow_config_error(f'{context} edge map must not be empty')
+            for edge_name, edge_value in value.items():
+                self._validate_flow_delta(edge_value, f'{context}.{edge_name}')
+            return
+        self._flow_config_error(f'{context} must be an integer or supported flow-delta expression')
+
+    def _validate_counter_class(self, counter_name: str, counter_config) -> None:
+        context = f'flow_counters.{counter_name}'
+        if not isinstance(counter_config, dict):
+            self._flow_config_error(f'{context} must be a dictionary')
+        if counter_config.get('operation', 'add') != 'add':
+            self._flow_config_error(f'{context}.operation must be "add"')
+        if counter_config.get('join', 'require-equal') not in {'require-equal', 'interval'}:
+            self._flow_config_error(
+                f'{context}.join must be "require-equal" or "interval"'
+            )
+        if counter_config.get('unknown_instructions', 'warn') not in {'ignore', 'warn', 'error'}:
+            self._flow_config_error(
+                f'{context}.unknown_instructions must be "ignore", "warn", or "error"'
+            )
+        if counter_config.get('exit_policy', 'balanced') not in {'balanced', 'none'}:
+            self._flow_config_error(
+                f'{context}.exit_policy must be "balanced" or "none"'
+            )
+        source = counter_config.get('source')
+        if source is not None and (not isinstance(source, str) or not source.strip()):
+            self._flow_config_error(f'{context}.source must be a non-empty dotted path')
+        for option in ('min_value', 'max_value', 'default_init'):
+            if option in counter_config and (
+                isinstance(counter_config[option], bool)
+                or not isinstance(counter_config[option], int)
+            ):
+                self._flow_config_error(f'{context}.{option} must be an integer')
+        entry_modes = counter_config.get('entry_modes', {})
+        if not isinstance(entry_modes, dict):
+            self._flow_config_error(f'{context}.entry_modes must be a dictionary')
+        for mode_name, mode_config in entry_modes.items():
+            mode_context = f'{context}.entry_modes.{mode_name}'
+            if not isinstance(mode_config, dict) or 'init' not in mode_config:
+                self._flow_config_error(f'{mode_context} must be a dictionary containing integer init')
+            for option in ('init', 'exit'):
+                if option in mode_config and (
+                    isinstance(mode_config[option], bool)
+                    or not isinstance(mode_config[option], int)
+                ):
+                    self._flow_config_error(f'{mode_context}.{option} must be an integer')
+
+    @staticmethod
+    def _effective_instruction_configs(instruction_config: dict) -> list[dict]:
+        root_config = {
+            key: value
+            for key, value in instruction_config.items()
+            if key != 'variants'
+        }
+        if 'bytecode' in instruction_config:
+            effective_configs = [root_config]
+        else:
+            effective_configs = []
+        for variant_config in instruction_config.get('variants', []):
+            effective_configs.append({**root_config, **variant_config})
+        return effective_configs
+
+    @staticmethod
+    def _config_path_value(config: dict, path: str):
+        value = config
+        for component in path.split('.'):
+            if not isinstance(value, dict) or component not in value:
+                return None
+            value = value[component]
+        return value
+
+    def _validate_flow_metadata_references(
+        self,
+        config: dict,
+        context: str,
+        counter_names: set[str],
+    ) -> None:
+        flow_effects = config.get('flow_effects')
+        if flow_effects is not None:
+            if not isinstance(flow_effects, dict):
+                self._flow_config_error(f'{context}.flow_effects must be a dictionary')
+            for counter_name, delta in flow_effects.items():
+                if counter_name not in counter_names:
+                    self._flow_config_error(
+                        f'{context}.flow_effects names undeclared counter "{counter_name}"'
+                    )
+                self._validate_flow_delta(delta, f'{context}.flow_effects.{counter_name}')
+
+        flow_terminal = config.get('flow_terminal')
+        if flow_terminal is not None:
+            if not isinstance(flow_terminal, list | tuple):
+                self._flow_config_error(f'{context}.flow_terminal must be a list')
+            for counter_name in flow_terminal:
+                if counter_name not in counter_names:
+                    self._flow_config_error(
+                        f'{context}.flow_terminal names undeclared counter "{counter_name}"'
+                    )
+
+        call_effects = config.get('flow_call_effects')
+        if call_effects is not None:
+            if not isinstance(call_effects, dict):
+                self._flow_config_error(f'{context}.flow_call_effects must be a dictionary')
+            for counter_name, delta in call_effects.items():
+                if counter_name not in counter_names:
+                    self._flow_config_error(
+                        f'{context}.flow_call_effects names undeclared counter "{counter_name}"'
+                    )
+                self._validate_flow_delta(delta, f'{context}.flow_call_effects.{counter_name}')
+
+    def _validate_effective_transfer_config(self, config: dict, context: str) -> None:
+        transfer = config.get('flow_transfer')
+        target_operand = config.get('flow_target_operand')
+        call_effects = config.get('flow_call_effects')
+
+        if transfer is not None and transfer not in self._FLOW_TRANSFER_VALUES:
+            self._flow_config_error(
+                f'{context}.flow_transfer has invalid value "{transfer}"'
+            )
+        if transfer in self._FLOW_DIRECT_TARGET_TRANSFERS:
+            if isinstance(target_operand, bool) or not isinstance(target_operand, int):
+                self._flow_config_error(
+                    f'{context}.flow_target_operand is required for flow_transfer "{transfer}"'
+                )
+            operand_count = config.get('operands', {}).get('count', 0)
+            if target_operand < 0 or target_operand >= operand_count:
+                self._flow_config_error(
+                    f'{context}.flow_target_operand {target_operand} is outside '
+                    f'the configured operand range 0..{operand_count - 1}'
+                )
+            target_types = self._configured_operand_types(
+                config.get('operands', {}),
+                target_operand,
+            )
+            if not target_types or not target_types.issubset(
+                self._FLOW_DIRECT_TARGET_OPERAND_TYPES
+            ):
+                configured_types = ', '.join(sorted(target_types)) or 'unknown'
+                self._flow_config_error(
+                    f'{context}.flow_target_operand {target_operand} has incompatible '
+                    f'operand type(s): {configured_types}'
+                )
+        elif target_operand is not None:
+            self._flow_config_error(
+                f'{context}.flow_target_operand is incompatible with '
+                f'flow_transfer "{transfer or "unspecified"}"'
+            )
+        if call_effects is not None and transfer != 'call':
+            self._flow_config_error(
+                f'{context}.flow_call_effects is only valid with flow_transfer "call"'
+            )
+
+    def _configured_operand_types(
+        self,
+        operands_config: dict,
+        target_operand: int,
+    ) -> set[str]:
+        configured_types = set()
+        operand_sets = operands_config.get('operand_sets', {}).get('list', [])
+        if target_operand < len(operand_sets):
+            operand_set = self._config.get('operand_sets', {}).get(
+                operand_sets[target_operand],
+                {},
+            )
+            configured_types.update(
+                operand.get('type', 'unknown')
+                for operand in operand_set.get('operand_values', {}).values()
+            )
+
+        for specific_config in operands_config.get('specific_operands', {}).values():
+            source_operands = [
+                operand
+                for operand in specific_config.get('list', {}).values()
+                if operand.get('type') != 'empty'
+            ]
+            if target_operand < len(source_operands):
+                configured_types.add(source_operands[target_operand].get('type', 'unknown'))
+        return configured_types
+
+    def _validate_flow_analysis_config(self) -> None:
+        flow_counters = self._config.get('flow_counters', {})
+        if not isinstance(flow_counters, dict):
+            self._flow_config_error('flow_counters must be a dictionary')
+        counter_names = set(flow_counters)
+        for counter_name, counter_config in flow_counters.items():
+            self._validate_counter_class(counter_name, counter_config)
+
+        for mnemonic, instruction_config in self._config['instructions'].items():
+            context = f'instructions.{mnemonic}'
+            self._validate_flow_metadata_references(
+                instruction_config,
+                context,
+                counter_names,
+            )
+            for variant_number, variant_config in enumerate(
+                instruction_config.get('variants', []),
+                start=1,
+            ):
+                self._validate_flow_metadata_references(
+                    variant_config,
+                    f'{context}.variants[{variant_number}]',
+                    counter_names,
+                )
+            for variant_number, effective_config in enumerate(
+                self._effective_instruction_configs(instruction_config)
+            ):
+                effective_context = f'{context}.effective_variant[{variant_number}]'
+                self._validate_effective_transfer_config(effective_config, effective_context)
+                for counter_name, counter_config in flow_counters.items():
+                    source = counter_config.get('source', f'flow_effects.{counter_name}')
+                    delta = self._config_path_value(effective_config, source)
+                    if delta is not None:
+                        self._validate_flow_delta(
+                            delta,
+                            f'{effective_context}.{source}',
+                        )
+
+        for mnemonic, macro_config in (self._config.get('macros') or {}).items():
+            variants = macro_config if isinstance(macro_config, list) else macro_config.get('variants', [])
+            metadata_locations = [macro_config] if isinstance(macro_config, dict) else []
+            metadata_locations.extend(variants)
+            for metadata in metadata_locations:
+                if not isinstance(metadata, dict):
+                    continue
+                invalid_keys = self._FLOW_METADATA_KEYS.intersection(metadata)
+                if invalid_keys:
+                    invalid_key = sorted(invalid_keys)[0]
+                    self._flow_config_error(
+                        f'macros.{mnemonic} may not declare instruction flow metadata "{invalid_key}"'
                     )
 
     def _configured_register_names(self) -> list[str]:
@@ -373,6 +644,26 @@ class AssemblerModel:
     @property
     def instructions(self) -> InstructionSet:
         return self._instructions
+
+    @property
+    def static_analysis_enabled(self) -> bool:
+        return self._static_analysis_enabled
+
+    @property
+    def analysis_features(self) -> frozenset[str]:
+        if not self._static_analysis_enabled:
+            return frozenset()
+        return frozenset({'flow_counters'}) if 'flow_counters' in self._config else frozenset()
+
+    @property
+    def analysis_records_enabled(self) -> bool:
+        return bool(self.analysis_features)
+
+    @property
+    def flow_counters(self) -> dict:
+        if not self._static_analysis_enabled:
+            return {}
+        return self._config.get('flow_counters', {})
 
     def get_operand_set(self, operand_set_name: str) -> OperandSet:
         return self._operand_sets.get_operand_set(operand_set_name)

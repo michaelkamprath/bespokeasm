@@ -2,6 +2,7 @@ import math
 from dataclasses import dataclass
 from typing import Literal
 
+from bespokeasm.assembler.analysis import InstructionAnalysisRecord
 from bespokeasm.assembler.bytecode.parts import ByteCodePart
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.label_scope import LabelScope
@@ -24,6 +25,7 @@ class AssembledInstruction:
         multi_word_endian: Literal['little', 'big'],
         intra_word_endian: Literal['little', 'big'],
         operand_label_bindings: list[tuple[str, ByteCodePart]] | None = None,
+        analysis_record: InstructionAnalysisRecord | None = None,
     ):
         self._parts = parts
         self._line_id = line_id
@@ -35,6 +37,8 @@ class AssembledInstruction:
             AssembledInstruction.OperandLabelBinding(label, part)
             for label, part in (operand_label_bindings or [])
         ]
+        if analysis_record is not None:
+            self._analysis_record = analysis_record
         # calculate word count
         total_bits = 0
         for bcp in self._parts:
@@ -62,6 +66,17 @@ class AssembledInstruction:
     @property
     def parts(self):
         return self._parts
+
+    @property
+    def analysis_record(self) -> InstructionAnalysisRecord | None:
+        return getattr(self, '_analysis_record', None)
+
+    @property
+    def analysis_records(self) -> tuple[InstructionAnalysisRecord, ...]:
+        analysis_record = self.analysis_record
+        if analysis_record is None:
+            return ()
+        return (analysis_record,)
 
     @property
     def has_operand_labels(self) -> bool:
@@ -155,3 +170,11 @@ class CompositeAssembledInstruction(AssembledInstruction):
     @property
     def instructions(self):
         return self._instructions
+
+    @property
+    def analysis_records(self) -> tuple[InstructionAnalysisRecord, ...]:
+        return tuple(
+            record
+            for instruction in self._instructions
+            for record in instruction.analysis_records
+        )

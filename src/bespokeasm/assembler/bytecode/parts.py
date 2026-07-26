@@ -375,6 +375,11 @@ class ExpressionByteCodePart(ByteCodePart):
     def instruction_string(self) -> str:
         return self._expression.strip()
 
+    @property
+    def parsed_expression(self):
+        """Return the parsed expression tree retained by this bytecode part."""
+        return self._parsed_expression
+
     def __str__(self) -> str:
         return f'ExpressionByteCodePart<expression="{self._expression}",size={self.value_size}>'
 

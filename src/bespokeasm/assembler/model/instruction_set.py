@@ -21,6 +21,7 @@ class InstructionSet(dict[str, InstructionBase]):
                 word_size: int,
                 word_segment_size: int,
                 diagnostic_reporter,
+                retain_analysis_semantics: bool = False,
             ):
         self._instructions_config = instructions_config
         self._macros_config = macros_config
@@ -54,6 +55,7 @@ class InstructionSet(dict[str, InstructionBase]):
                 diagnostic_reporter,
                 aliases=aliases,
                 default_numeric_base=default_numeric_base,
+                retain_analysis_semantics=retain_analysis_semantics,
             )
             for instruction_stem in instr_obj.source_mnemonic_stems:
                 self._instruction_stems[instruction_stem] = instr_obj

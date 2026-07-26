@@ -1,6 +1,7 @@
 import os
 
 import click
+from bespokeasm.assembler.analysis import AnalysisSourceIndex
 from bespokeasm.assembler.assembly_file import AssemblyFile
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
@@ -36,6 +37,7 @@ class Assembler:
                 include_paths: list[str],
                 predefined: list[str],
                 warnings_as_errors: bool = False,
+                static_analysis: bool = True,
             ):
         self._source_file = source_file
         self._output_file = output_file
@@ -51,11 +53,25 @@ class Assembler:
         self._include_paths = include_paths
         self._predefined_symbols = predefined
         self._warnings_as_errors = warnings_as_errors
+        self._static_analysis = static_analysis
         self._diagnostic_reporter = DiagnosticReporter(
             warnings_as_errors=self._warnings_as_errors,
             verbosity=self._verbose,
         )
-        self._model = AssemblerModel(self._config_file, self._verbose, self._diagnostic_reporter)
+        self._model = AssemblerModel(
+            self._config_file,
+            self._verbose,
+            self._diagnostic_reporter,
+            static_analysis=self._static_analysis,
+        )
+
+    @property
+    def model(self) -> AssemblerModel:
+        return self._model
+
+    @property
+    def analysis_source_index(self) -> AnalysisSourceIndex | None:
+        return getattr(self, '_analysis_source_index', None)
 
     def assemble_bytecode(self):
         # Create the named scope manager for this assembly session
@@ -150,6 +166,12 @@ class Assembler:
             )
 
         compilable_line_obs: list[LineObject] = [lobj for lobj in line_obs if lobj.compilable]
+        if self._model.analysis_records_enabled:
+            self._analysis_source_index = AnalysisSourceIndex.from_line_objects(
+                lobj
+                for lobj in compilable_line_obs
+                if isinstance(lobj, InstructionLine)
+            )
         # First pass: assign addresses to labels
         for lobj in compilable_line_obs:
             lobj.set_start_address(lobj.memory_zone.current_address)

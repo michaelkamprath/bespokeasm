@@ -23,10 +23,20 @@ from bespokeasm.utilities import PATTERN_CHARACTER_ORDINAL
 from bespokeasm.utilities import PATTERN_HEX
 
 EXPRESSION_PARTS_PATTERN = \
-    r'(?:(?:\%|b)[01]+|{}|[\+\-\*\/\&\|\^\(\)]|>>|<<|%|LSB\(|BYTE\d\(|(?:\.|_)?\w+|{}|[><])'.format(
+    r'(?:(?:\%|b)[01]+|{}|[\+\-\*\/\&\|\^\(\)]|>>|<<|%|COUNTER\(|OFFSET\(|LSB\(|BYTE\d\(|(?:\.|_)?\w+|{}|[><])'.format(
         PATTERN_HEX,
         PATTERN_CHARACTER_ORDINAL,
     )
+
+
+class ExpressionUseContext(enum.Enum):
+    """The assembly context in which an expression is consumed."""
+
+    OPERAND_VALUE = 'operand_value'
+    DATA_VALUE = 'data_value'
+    LAYOUT = 'layout'
+    PREPROCESSOR_CONDITION = 'preprocessor_condition'
+    INSTRUCTION_SELECTION = 'instruction_selection'
 
 
 class TokenType(enum.Enum):
@@ -49,6 +59,8 @@ class TokenType(enum.Enum):
     T_LPAR = 16
     T_RPAR = 17
     T_END = 18
+    T_COUNTER = 19
+    T_OFFSET = 20
 
 
 class ExpressionNode:
@@ -72,7 +84,12 @@ class ExpressionNode:
         self.default_numeric_base = normalize_default_numeric_base(default_numeric_base)
         self.left_child: ExpressionNode = None
         self.right_child: ExpressionNode = None
-        self._is_unary = token_type in [TokenType.T_BYTE, TokenType.T_LSB]
+        self._is_unary = token_type in [
+            TokenType.T_BYTE,
+            TokenType.T_LSB,
+            TokenType.T_COUNTER,
+            TokenType.T_OFFSET,
+        ]
 
     def __repr__(self):
         return str(self)
@@ -85,8 +102,26 @@ class ExpressionNode:
         return self.token_type in [
             TokenType.T_BYTE,
             TokenType.T_LSB,
+            TokenType.T_COUNTER,
+            TokenType.T_OFFSET,
             TokenType.T_NEGATION,
         ]
+
+    @property
+    def expression_context(self) -> ExpressionUseContext | None:
+        """Return the use context attached by deferred analysis parsing."""
+        return getattr(self, '_expression_context', None)
+
+    def deferred_flow_nodes(self) -> tuple:
+        """Return deferred flow-expression nodes in source-tree order."""
+        nodes = []
+        if self.token_type in [TokenType.T_COUNTER, TokenType.T_OFFSET]:
+            nodes.append(self)
+        if self.left_child is not None:
+            nodes.extend(self.left_child.deferred_flow_nodes())
+        if not self.is_unary and self.right_child is not None:
+            nodes.extend(self.right_child.deferred_flow_nodes())
+        return tuple(nodes)
 
     def _numeric_value(
         self,
@@ -125,6 +160,11 @@ class ExpressionNode:
     ) -> int:
         if self.token_type in [TokenType.T_NUM, TokenType.T_LABEL, TokenType.T_LABEL_OR_NUM]:
             return self._numeric_value(label_scope, active_named_scopes, line_id)
+        if self.token_type in [TokenType.T_COUNTER, TokenType.T_OFFSET]:
+            raise RuntimeError(
+                'deferred flow expression reached numeric evaluation before '
+                'the static-analysis pass resolved it'
+            )
         if self.token_type in [TokenType.T_LSB, TokenType.T_BYTE]:
             byte_idx = 0
             if self.token_type == TokenType.T_BYTE:
@@ -171,6 +211,8 @@ class ExpressionNode:
         return int(calculated_value)
 
     def contains_register_labels(self, register_labels: set[str]) -> bool:
+        if self.token_type in [TokenType.T_COUNTER, TokenType.T_OFFSET]:
+            return False
         if self.token_type in [TokenType.T_LABEL, TokenType.T_LABEL_OR_NUM]:
             return self.value in register_labels
         if self.token_type == TokenType.T_NUM:
@@ -182,6 +224,8 @@ class ExpressionNode:
         return False
 
     def contained_labels(self) -> set[str]:
+        if self.token_type in [TokenType.T_COUNTER, TokenType.T_OFFSET]:
+            return set()
         if self.token_type == TokenType.T_LABEL:
             return {self.value}
         elif self.token_type in [TokenType.T_NUM, TokenType.T_LABEL_OR_NUM]:
@@ -197,6 +241,44 @@ def parse_expression(
     line_id: LineIdentifier,
     expression: str,
     default_numeric_base: str = 'decimal',
+) -> ExpressionNode:
+    """Parse an ordinary numeric expression.
+
+    M0 recognizes flow-expression tokens internally, but the public language
+    does not expose them until M1. Keep rejecting them on this normal path.
+    """
+    ast = _parse_expression_ast(line_id, expression, default_numeric_base)
+    if ast.deferred_flow_nodes():
+        raise SyntaxError(
+            f'ERROR: {line_id} - invalid token in numeric expression'
+        )
+    return ast
+
+
+def parse_deferred_flow_expression(
+    line_id: LineIdentifier,
+    expression: str,
+    context: ExpressionUseContext,
+    default_numeric_base: str = 'decimal',
+) -> ExpressionNode:
+    """Parse and context-tag flow operators without evaluating or exposing them.
+
+    This analysis-only M0 entry point gives later milestones a stable parsed
+    representation. Normal source parsing continues through ``parse_expression``
+    and rejects these operators until their semantics ship.
+    """
+    if not isinstance(context, ExpressionUseContext):
+        raise TypeError('context must be an ExpressionUseContext')
+    ast = _parse_expression_ast(line_id, expression, default_numeric_base)
+    for node in ast.deferred_flow_nodes():
+        node._expression_context = context
+    return ast
+
+
+def _parse_expression_ast(
+    line_id: LineIdentifier,
+    expression: str,
+    default_numeric_base: str,
 ) -> ExpressionNode:
     tokens = _lexical_analysis(line_id, expression, default_numeric_base)
     ast = _parse_e(line_id, tokens)
@@ -218,6 +300,8 @@ TOKEN_MAPPINGS = {
     '(': TokenType.T_LPAR,
     ')': TokenType.T_RPAR,
     'LSB(': TokenType.T_LSB,
+    'COUNTER(': TokenType.T_COUNTER,
+    'OFFSET(': TokenType.T_OFFSET,
 }
 
 
@@ -380,7 +464,12 @@ def _parse_e4(line_id: LineIdentifier, tokens: list[ExpressionNode]) -> Expressi
     if tokens[0].token_type in [TokenType.T_NUM, TokenType.T_LABEL, TokenType.T_LABEL_OR_NUM]:
         return tokens.pop(0)
 
-    if tokens[0].token_type in [TokenType.T_LSB, TokenType.T_BYTE]:
+    if tokens[0].token_type in [
+        TokenType.T_LSB,
+        TokenType.T_BYTE,
+        TokenType.T_COUNTER,
+        TokenType.T_OFFSET,
+    ]:
         node = tokens.pop(0)
         node.left_child = _parse_e(line_id, tokens)
         _match(line_id, tokens, TokenType.T_RPAR)
