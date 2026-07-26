@@ -303,6 +303,8 @@ def test_m0_development_acceptance_harness_is_runnable():
         (None, True),
         ('--static-analysis', True),
         ('--no-static-analysis', False),
+        ('-a', True),
+        ('-A', False),
     ],
 )
 def test_m0_static_analysis_cli_flag_defaults_on_and_forwards_value(flag, expected):

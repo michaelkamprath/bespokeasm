@@ -3,8 +3,8 @@ from pathlib import Path
 
 from bespokeasm.assembler.keywords import BYTECODE_DIRECTIVES_SET
 from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET
-from bespokeasm.assembler.keywords import EXPRESSION_FUNCTIONS_SET
-from bespokeasm.assembler.keywords import PREPROCESSOR_DIRECTIVES_SET
+from bespokeasm.assembler.keywords import expression_functions_for_isa
+from bespokeasm.assembler.keywords import preprocessor_directives_for_isa
 from bespokeasm.configgen import LanguageConfigGenerator
 from bespokeasm.configgen.color_scheme import DEFAULT_COLOR_SCHEME
 from bespokeasm.configgen.color_scheme import SyntaxElement
@@ -242,9 +242,13 @@ ctermbg=NONE gui=bold cterm=bold')
         data_types = ['.' + d for d in BYTECODE_DIRECTIVES_SET]
 
         # Preprocessor directives (sorted by length desc to avoid prefix shadowing)
-        preproc_directives = sorted(list(PREPROCESSOR_DIRECTIVES_SET), key=len, reverse=True)
+        preproc_directives = sorted(
+            preprocessor_directives_for_isa(self.model.flow_counters_enabled),
+            key=len,
+            reverse=True,
+        )
 
-        expr_functions = list(EXPRESSION_FUNCTIONS_SET)
+        expr_functions = list(expression_functions_for_isa(self.model.flow_counters_enabled))
 
         # Build vim regex alternations
         directives_words = [d.lstrip('.') for d in compiler_directives]

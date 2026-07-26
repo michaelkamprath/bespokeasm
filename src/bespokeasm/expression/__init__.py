@@ -123,6 +123,12 @@ class ExpressionNode:
             nodes.extend(self.right_child.deferred_flow_nodes())
         return tuple(nodes)
 
+    def resolve_flow_value(self, value: int) -> None:
+        """Attach the value computed by the static-analysis pass."""
+        if self.token_type not in [TokenType.T_COUNTER, TokenType.T_OFFSET]:
+            raise TypeError('only flow-expression nodes can receive a flow value')
+        self._resolved_flow_value = value
+
     def _numeric_value(
         self,
         label_scope: LabelScope | None,
@@ -161,6 +167,8 @@ class ExpressionNode:
         if self.token_type in [TokenType.T_NUM, TokenType.T_LABEL, TokenType.T_LABEL_OR_NUM]:
             return self._numeric_value(label_scope, active_named_scopes, line_id)
         if self.token_type in [TokenType.T_COUNTER, TokenType.T_OFFSET]:
+            if hasattr(self, '_resolved_flow_value'):
+                return self._resolved_flow_value
             raise RuntimeError(
                 'deferred flow expression reached numeric evaluation before '
                 'the static-analysis pass resolved it'
@@ -241,17 +249,30 @@ def parse_expression(
     line_id: LineIdentifier,
     expression: str,
     default_numeric_base: str = 'decimal',
+    *,
+    context: ExpressionUseContext | None = None,
 ) -> ExpressionNode:
-    """Parse an ordinary numeric expression.
-
-    M0 recognizes flow-expression tokens internally, but the public language
-    does not expose them until M1. Keep rejecting them on this normal path.
-    """
+    """Parse a source numeric expression, including M1 ``COUNTER()``."""
     ast = _parse_expression_ast(line_id, expression, default_numeric_base)
-    if ast.deferred_flow_nodes():
+    flow_nodes = ast.deferred_flow_nodes()
+    if any(node.token_type == TokenType.T_OFFSET for node in flow_nodes):
         raise SyntaxError(
             f'ERROR: {line_id} - invalid token in numeric expression'
         )
+    if flow_nodes and context is None:
+        raise SyntaxError(
+            f'ERROR: {line_id} - flow expression has no tagged use context'
+        )
+    if flow_nodes and context not in {
+        ExpressionUseContext.OPERAND_VALUE,
+        ExpressionUseContext.DATA_VALUE,
+    }:
+        raise SyntaxError(
+            f'ERROR: {line_id} - flow expressions are not allowed in '
+            f'{context.value.replace("_", " ")} expressions'
+        )
+    for node in flow_nodes:
+        node._expression_context = context
     return ast
 
 

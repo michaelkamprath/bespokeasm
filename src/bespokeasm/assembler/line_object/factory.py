@@ -1,3 +1,4 @@
+import re
 import sys
 
 from bespokeasm.assembler.label_scope import LabelScope
@@ -18,6 +19,50 @@ from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
 
 
 class LineOjectFactory:
+    _FLOW_EXPRESSION_PATTERN = re.compile(
+        r'\b(?:COUNTER|OFFSET)\s*\(',
+        flags=re.IGNORECASE,
+    )
+
+    @classmethod
+    def _flow_expression_error(
+        cls,
+        line_id: LineIdentifier,
+        model: AssemblerModel,
+        context: str,
+    ) -> None:
+        """Report the capability-appropriate diagnostic for a forbidden use."""
+        if not model.static_analysis_enabled:
+            message = f'static analysis is disabled; cannot use a flow expression in {context}'
+        elif not model.flow_counters_enabled:
+            message = 'this instruction set does not enable flow counters'
+        else:
+            message = f'flow expressions are not allowed in {context}'
+        model.diagnostic_reporter.error(line_id, message, category='flow')
+
+    @classmethod
+    def _validate_flow_expression_context(
+        cls,
+        line_id: LineIdentifier,
+        instruction: str,
+        model: AssemblerModel,
+    ) -> None:
+        """Reject flow operators before they can affect layout or selection."""
+        if cls._FLOW_EXPRESSION_PATTERN.search(instruction) is None:
+            return
+        lowered = instruction.lower()
+        if lowered.startswith('#'):
+            cls._flow_expression_error(line_id, model, 'preprocessor directives')
+        if lowered.startswith(('.org', '.align', '.zero', '.zerountil')):
+            cls._flow_expression_error(line_id, model, 'layout expressions')
+        if lowered.startswith('.fill'):
+            arguments = instruction.split(None, 1)
+            count_expression = arguments[1].split(',', 1)[0] if len(arguments) > 1 else ''
+            if cls._FLOW_EXPRESSION_PATTERN.search(count_expression):
+                cls._flow_expression_error(line_id, model, 'fill-count expressions')
+        if re.match(r'^\s*\w+\s*(?:=|\bEQU\b)', instruction, flags=re.IGNORECASE):
+            cls._flow_expression_error(line_id, model, 'ordinary constant assignments')
+
     @classmethod
     def parse_line(
                 cls,
@@ -36,6 +81,7 @@ class LineOjectFactory:
         instruction_portion, comment_portion = split_line_comment(line_str)
         comment_str = comment_portion.strip()
         instruction_str = instruction_portion.strip()
+        cls._validate_flow_expression_context(line_id, instruction_str, model)
 
         line_obj_list: list[LineObject] = []
         label_seen = False
@@ -59,6 +105,7 @@ class LineOjectFactory:
         else:
             # resolve preprocessor symbols
             instruction_str = preprocessor.resolve_symbols(line_id, instruction_str)
+            cls._validate_flow_expression_context(line_id, instruction_str, model)
             # parse instruction
             while len(instruction_str) > 0:
                 # try label

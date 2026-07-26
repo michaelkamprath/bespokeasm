@@ -120,6 +120,11 @@ class LineObject:
         """Sets the muted state of this line object"""
         self._is_muted = value
 
+    @property
+    def flow_expression_nodes(self) -> tuple:
+        """Flow-expression nodes emitted or consumed by this source object."""
+        return ()
+
 
 class LineWithWords(LineObject):
     def __init__(

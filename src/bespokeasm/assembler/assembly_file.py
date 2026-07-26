@@ -184,6 +184,20 @@ class AssemblyFile:
                                 lobj.label_scope = current_scope
                                 lobj.active_named_scopes = active_named_scopes
                                 lobj.diagnostic_reporter = self._diagnostic_reporter
+                                if lobj.flow_expression_nodes:
+                                    if not isa_model.static_analysis_enabled:
+                                        function_name = lobj.flow_expression_nodes[0].value.rstrip('(')
+                                        self._diagnostic_reporter.error(
+                                            lobj.line_id,
+                                            f'static analysis is disabled; cannot resolve {function_name}()',
+                                            category='flow',
+                                        )
+                                    if not isa_model.flow_counters_enabled:
+                                        self._diagnostic_reporter.error(
+                                            lobj.line_id,
+                                            'this instruction set does not enable flow counters',
+                                            category='flow',
+                                        )
                                 # setting constants now so they can be used when evaluating lines later.
                                 if isinstance(lobj, LabelLine) and lobj.is_constant:
                                     # first check if label belongs to an active named scope

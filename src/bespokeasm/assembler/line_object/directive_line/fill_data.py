@@ -5,6 +5,7 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.expression import ExpressionNode
+from bespokeasm.expression import ExpressionUseContext
 from bespokeasm.expression import parse_expression
 
 
@@ -37,7 +38,12 @@ class FillDataLine(LineWithWords):
             multi_word_endianness,
         )
         self._count_expr = parse_expression(line_id, fill_count_expression, default_numeric_base)
-        self._value_expr = parse_expression(line_id, fill_value_expression, default_numeric_base)
+        self._value_expr = parse_expression(
+            line_id,
+            fill_value_expression,
+            default_numeric_base,
+            context=ExpressionUseContext.DATA_VALUE,
+        )
         self._count = None
         self._value = None
 
@@ -46,6 +52,11 @@ class FillDataLine(LineWithWords):
         if self._count is None:
             self._count = self._count_expr.get_value(self.label_scope, self.active_named_scopes, self.line_id)
         return self._count
+
+    @property
+    def flow_expression_nodes(self) -> tuple:
+        """Return deferred flow expressions from the fixed-width fill value."""
+        return self._value_expr.deferred_flow_nodes()
 
     def generate_words(self):
         if self._count is None:

@@ -170,6 +170,16 @@ class InstructionLine(LineWithWords):
     def analysis_records(self):
         return self._assembled_instruction.analysis_records
 
+    @property
+    def analysis_units(self):
+        """Expose semantic records and flow nodes for each real instruction."""
+        return self._assembled_instruction.analysis_units
+
+    @property
+    def flow_expression_nodes(self):
+        """Expose deferred flow expressions retained by instruction operands."""
+        return self._assembled_instruction.flow_expression_nodes
+
     def get_operand_label_addresses(self) -> list[tuple[str, int]]:
         return self._assembled_instruction.get_operand_label_addresses(self.address)
 

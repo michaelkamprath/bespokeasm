@@ -5,6 +5,7 @@ from bespokeasm.assembler.analysis import AnalysisSourceIndex
 from bespokeasm.assembler.assembly_file import AssemblyFile
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
+from bespokeasm.assembler.flow_analysis import FlowLinearAnalyzer
 from bespokeasm.assembler.label_scope import LabelScopeType
 from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
@@ -213,6 +214,15 @@ class Assembler:
                         lobj.line_id,
                     )
 
+        if (
+            self._model.analysis_records_enabled
+            and FlowLinearAnalyzer.source_uses_flow(compilable_line_obs)
+        ):
+            FlowLinearAnalyzer(
+                self._model,
+                diagnostic_reporter,
+            ).run(compilable_line_obs)
+
         # now merge prefined line objects and parsed line objects
         compilable_line_obs.extend(predefined_line_obs)
 
@@ -223,7 +233,18 @@ class Assembler:
                 'source file contains no compilable lines',
             )
         compilable_line_obs.sort(key=lambda x: x.address)
-        max_generated_address = compilable_line_obs[-1].address
+        emitted_line_objects = [
+            line_object
+            for line_object in compilable_line_obs
+            if isinstance(line_object, LineWithWords) and line_object.word_count > 0
+        ]
+        max_generated_address = max(
+            (
+                line_object.address + line_object.word_count - 1
+                for line_object in emitted_line_objects
+            ),
+            default=0,
+        )
         line_dict = {
             lobj.address: lobj
             for lobj in compilable_line_obs

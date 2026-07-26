@@ -10,8 +10,8 @@ from zipfile import ZipFile
 import bespokeasm.configgen.sublime.resources as resources
 from bespokeasm.assembler.keywords import BYTECODE_DIRECTIVES_SET
 from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET
-from bespokeasm.assembler.keywords import EXPRESSION_FUNCTIONS_SET
-from bespokeasm.assembler.keywords import PREPROCESSOR_DIRECTIVES_SET
+from bespokeasm.assembler.keywords import expression_functions_for_isa
+from bespokeasm.assembler.keywords import preprocessor_directives_for_isa
 from bespokeasm.configgen import LanguageConfigGenerator
 from bespokeasm.configgen.color_scheme import build_hover_color_map
 from bespokeasm.configgen.color_scheme import DEFAULT_COLOR_SCHEME
@@ -266,7 +266,11 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
 
         # preprocessor directives
         # Sort by length (desc) to avoid prefix matches like 'if' matching 'ifdef'
-        preprocessor_regex = '|'.join(sorted(PREPROCESSOR_DIRECTIVES_SET, key=len, reverse=True))
+        preprocessor_regex = '|'.join(sorted(
+            preprocessor_directives_for_isa(self.model.flow_counters_enabled),
+            key=len,
+            reverse=True,
+        ))
         updated = False
         for rule in syntax_dict['contexts']['preprocessor_directives'][0]['push']:
             if 'match' in rule and '##PREPROCESSOR##' in rule['match']:
@@ -278,7 +282,7 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             sys.exit('ERROR - INTERNAL - did not find correct preprocessor rule for Sublime systax file.')
 
         # expression functions
-        func_regex = '|'.join([d for d in EXPRESSION_FUNCTIONS_SET])
+        func_regex = '|'.join(expression_functions_for_isa(self.model.flow_counters_enabled))
         updated = False
         for rule in syntax_dict['contexts']['numerical_expressions']:
             if 'scope' in rule and rule['scope'] == 'keyword.operator.word':

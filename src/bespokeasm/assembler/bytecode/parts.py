@@ -11,6 +11,7 @@ from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone import MemoryZone
+from bespokeasm.expression import ExpressionUseContext
 from bespokeasm.expression import parse_expression
 
 from .packed_bits import PackedBits
@@ -369,6 +370,7 @@ class ExpressionByteCodePart(ByteCodePart):
             self.line_id,
             self._expression,
             default_numeric_base,
+            context=ExpressionUseContext.OPERAND_VALUE,
         )
 
     @property

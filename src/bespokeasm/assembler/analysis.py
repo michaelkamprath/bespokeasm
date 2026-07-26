@@ -114,6 +114,7 @@ class AnalysisExecutableNode:
     source_identity: SourceIdentity
     line_object: InstructionLine
     record: InstructionAnalysisRecord
+    expression_nodes: tuple[ExpressionNode, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -124,15 +125,16 @@ class AnalysisSourceIndex:
 
     @classmethod
     def from_line_objects(cls, line_objects) -> AnalysisSourceIndex:
+        """Build an immutable source-order index of real instruction units."""
         nodes = []
         for line_object in line_objects:
-            records = line_object.analysis_records
-            for record in records:
+            for record, expression_nodes in line_object.analysis_units:
                 nodes.append(
                     AnalysisExecutableNode(
                         source_identity=record.source_identity,
                         line_object=line_object,
                         record=record,
+                        expression_nodes=expression_nodes,
                     )
                 )
         return cls(tuple(nodes))

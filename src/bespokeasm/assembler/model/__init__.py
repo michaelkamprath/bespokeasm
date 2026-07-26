@@ -38,6 +38,7 @@ class AssemblerModel:
             raise ValueError('DiagnosticReporter is required for AssemblerModel')
         self._diagnostic_reporter = diagnostic_reporter
         self._global_label_scope = None
+        self._flow_effect_metadata_cache: dict[str, bool] = {}
 
         if config_file_path.endswith('.json'):
             with open(config_file_path) as json_file:
@@ -660,10 +661,38 @@ class AssemblerModel:
         return bool(self.analysis_features)
 
     @property
+    def flow_counters_enabled(self) -> bool:
+        """Return whether the optional top-level flow-counter section is present."""
+        return 'flow_counters' in self._config
+
+    @property
     def flow_counters(self) -> dict:
+        """Return configured counter classes when static analysis is enabled."""
         if not self._static_analysis_enabled:
             return {}
         return self._config.get('flow_counters', {})
+
+    def flow_counter_has_effect_metadata(self, counter_name: str) -> bool:
+        """Return, with per-model memoization, whether a class has any producer.
+
+        A producer is an effective instruction variant containing the class's
+        configured source field or naming the class in ``flow_terminal``.
+        """
+        cached_result = self._flow_effect_metadata_cache.get(counter_name)
+        if cached_result is not None:
+            return cached_result
+        counter_config = self._config.get('flow_counters', {}).get(counter_name, {})
+        source = counter_config.get('source', f'flow_effects.{counter_name}')
+        for instruction_config in self._config['instructions'].values():
+            for effective_config in self._effective_instruction_configs(instruction_config):
+                if self._config_path_value(effective_config, source) is not None:
+                    self._flow_effect_metadata_cache[counter_name] = True
+                    return True
+                if counter_name in effective_config.get('flow_terminal', []):
+                    self._flow_effect_metadata_cache[counter_name] = True
+                    return True
+        self._flow_effect_metadata_cache[counter_name] = False
+        return False
 
     def get_operand_set(self, operand_set_name: str) -> OperandSet:
         return self._operand_sets.get_operand_set(operand_set_name)

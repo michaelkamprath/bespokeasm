@@ -45,6 +45,24 @@ def test_compile_flag_pair_shows_enable_disable():
         assert '[disable]' in text
 
 
+def test_static_analysis_short_flag_pair_shows_enable_disable():
+    items = _zsh_completions(['compile'], '-')
+    enabled_help = {
+        item.value: (item.help or '')
+        for item in items
+        if item.value in {'--static-analysis', '-a'}
+    }
+    disabled_help = {
+        item.value: (item.help or '')
+        for item in items
+        if item.value in {'--no-static-analysis', '-A'}
+    }
+    assert set(enabled_help) == {'--static-analysis', '-a'}
+    assert set(disabled_help) == {'--no-static-analysis', '-A'}
+    assert all('[enable]' in text for text in enabled_help.values())
+    assert all('[disable]' in text for text in disabled_help.values())
+
+
 def test_docs_options_surface_without_dash():
     items = _zsh_completions(['docs'], '')
     values = {item.value for item in items}

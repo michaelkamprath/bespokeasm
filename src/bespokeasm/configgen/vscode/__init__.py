@@ -7,8 +7,8 @@ from pathlib import Path
 import bespokeasm.configgen.vscode.resources as resources
 from bespokeasm.assembler.keywords import BYTECODE_DIRECTIVES_SET
 from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET
-from bespokeasm.assembler.keywords import EXPRESSION_FUNCTIONS_SET
-from bespokeasm.assembler.keywords import PREPROCESSOR_DIRECTIVES_SET
+from bespokeasm.assembler.keywords import expression_functions_for_isa
+from bespokeasm.assembler.keywords import preprocessor_directives_for_isa
 from bespokeasm.configgen import LanguageConfigGenerator
 from bespokeasm.configgen.color_scheme import DEFAULT_COLOR_SCHEME
 from bespokeasm.configgen.color_scheme import SyntaxElement
@@ -277,14 +277,18 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
                 for pattern in item['patterns']:
                     if 'name' in pattern and 'keyword.control.preprocessor' == pattern['name']:
                         # Sort by length (desc) to avoid prefix matches like 'if' matching 'ifdef'
-                        preprocessor_regex = '|'.join(sorted(PREPROCESSOR_DIRECTIVES_SET, key=len, reverse=True))
+                        preprocessor_regex = '|'.join(sorted(
+                            preprocessor_directives_for_isa(self.model.flow_counters_enabled),
+                            key=len,
+                            reverse=True,
+                        ))
                         preprocesspr_str = pattern['match']
                         pattern['match'] = preprocesspr_str.replace('##PREPROCESSOR##', preprocessor_regex)
 
         # handle expresion functions
         for item in grammar_json['repository']['operators']['patterns']:
             if 'keyword.operator.word' == item['name']:
-                func_regex = '|'.join([d for d in EXPRESSION_FUNCTIONS_SET])
+                func_regex = '|'.join(expression_functions_for_isa(self.model.flow_counters_enabled))
                 func_str = item['match']
                 item['match'] = func_str.replace('##EXPRESSION_FUNCTIONS##', func_regex)
 

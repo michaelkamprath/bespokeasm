@@ -8,6 +8,7 @@ from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.expression import ExpressionNode
 
 
 class AssembledInstruction:
@@ -77,6 +78,24 @@ class AssembledInstruction:
         if analysis_record is None:
             return ()
         return (analysis_record,)
+
+    @property
+    def flow_expression_nodes(self) -> tuple[ExpressionNode, ...]:
+        """Return deferred flow nodes retained by emitted expression parts."""
+        return tuple(
+            node
+            for part in self._parts
+            if hasattr(part, 'parsed_expression')
+            for node in part.parsed_expression.deferred_flow_nodes()
+        )
+
+    @property
+    def analysis_units(self) -> tuple:
+        """Pair this instruction's semantic record with its live expression nodes."""
+        analysis_record = self.analysis_record
+        if analysis_record is None:
+            return ()
+        return ((analysis_record, self.flow_expression_nodes),)
 
     @property
     def has_operand_labels(self) -> bool:
@@ -177,4 +196,13 @@ class CompositeAssembledInstruction(AssembledInstruction):
             record
             for instruction in self._instructions
             for record in instruction.analysis_records
+        )
+
+    @property
+    def analysis_units(self) -> tuple:
+        """Flatten analysis units from each real macro constituent in order."""
+        return tuple(
+            unit
+            for instruction in self._instructions
+            for unit in instruction.analysis_units
         )

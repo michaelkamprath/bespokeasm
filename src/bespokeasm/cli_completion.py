@@ -47,10 +47,15 @@ class AutoOptionHelpCommand(click.Command):
                     if name.startswith(incomplete):
                         help_text = _option_help_with_metavar(param, name, ctx)
                         item = click.shell_completion.CompletionItem(name, help=help_text)
-                        option_items.append((not getattr(param, 'required', False), name.lower(), item))
+                        option_items.append((
+                            not getattr(param, 'required', False),
+                            name.lower(),
+                            name,
+                            item,
+                        ))
 
             option_items.sort()
-            results.extend(item for _, _, item in option_items)
+            results.extend(item for _, _, _, item in option_items)
 
         # Include base completions (commands, etc.) while avoiding duplicates.
         # Delegate to Click's current Command completion implementation.
@@ -84,13 +89,14 @@ class OptionForwardingCommand(AutoOptionHelpCommand):
                         (
                             not getattr(param, 'required', False),
                             opt.lower(),
+                            opt,
                             click.shell_completion.CompletionItem(opt, help=help_text),
                         )
                     )
                     seen.add(opt)
 
         option_items.sort()
-        results.extend(item for _, _, item in option_items)
+        results.extend(item for _, _, _, item in option_items)
         return results
 
 

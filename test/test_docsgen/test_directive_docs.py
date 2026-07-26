@@ -1,10 +1,12 @@
 """Tests for the directive_docs hover strings module."""
 from bespokeasm.assembler.keywords import BYTECODE_DIRECTIVES_SET
 from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET
+from bespokeasm.assembler.keywords import EXPRESSION_FUNCTIONS_SET
 from bespokeasm.assembler.keywords import PREPROCESSOR_DIRECTIVES_SET
 from bespokeasm.docsgen.directive_docs import ALL_DIRECTIVE_DOCS
 from bespokeasm.docsgen.directive_docs import BYTECODE_DIRECTIVE_DOCS
 from bespokeasm.docsgen.directive_docs import COMPILER_DIRECTIVE_DOCS
+from bespokeasm.docsgen.directive_docs import EXPRESSION_FUNCTION_DOCS
 from bespokeasm.docsgen.directive_docs import PREPROCESSOR_DIRECTIVE_DOCS
 
 
@@ -21,6 +23,11 @@ def test_all_bytecode_directives_have_docs():
 def test_all_preprocessor_directives_have_docs():
     for name in PREPROCESSOR_DIRECTIVES_SET:
         assert name in PREPROCESSOR_DIRECTIVE_DOCS, f'missing doc for preprocessor directive: {name}'
+
+
+def test_all_expression_functions_have_docs():
+    for name in EXPRESSION_FUNCTIONS_SET:
+        assert name in EXPRESSION_FUNCTION_DOCS, f'missing doc for expression function: {name}'
 
 
 def test_all_directive_docs_is_union():

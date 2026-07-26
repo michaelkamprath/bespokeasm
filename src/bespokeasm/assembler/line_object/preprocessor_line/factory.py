@@ -9,6 +9,8 @@ from bespokeasm.assembler.line_object.preprocessor_line.create_scope import Crea
 from bespokeasm.assembler.line_object.preprocessor_line.deactivate_scope import DeactivateScopeLine
 from bespokeasm.assembler.line_object.preprocessor_line.define_symbol import DefineSymbolLine
 from bespokeasm.assembler.line_object.preprocessor_line.error_line import ErrorLine
+from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowEndTrackLine
+from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowTrackLine
 from bespokeasm.assembler.line_object.preprocessor_line.print_line import PrintLine
 from bespokeasm.assembler.line_object.preprocessor_line.required_language import RequiredLanguageLine
 from bespokeasm.assembler.line_object.preprocessor_line.use_scope import UseScopeLine
@@ -37,6 +39,24 @@ class PreprocessorLineFactory:
         filename: str,
     ) -> list[LineObject]:
         '''Parse a preprocessor line.'''
+        if instruction.lower() == '#track' or instruction.lower().startswith('#track '):
+            return [FlowTrackLine(
+                line_id,
+                instruction,
+                comment,
+                current_memzone,
+                isa_model,
+            )]
+
+        if instruction.lower() == '#endtrack' or instruction.lower().startswith('#endtrack '):
+            return [FlowEndTrackLine(
+                line_id,
+                instruction,
+                comment,
+                current_memzone,
+                isa_model,
+            )]
+
         if instruction.startswith('#create-scope '):
             return [CreateScopeLine(
                         line_id,

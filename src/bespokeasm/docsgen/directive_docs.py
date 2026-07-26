@@ -371,6 +371,34 @@ PREPROCESSOR_DIRECTIVE_DOCS: dict[str, str] = {
         '```\n\n'
         'Labels from the scope are no longer resolved on subsequent lines.'
     ),
+    'track': (
+        '### `#track` : Begin Flow-Counter Tracking\n\n'
+        '---\n\n'
+        'Begins a straight-line static-analysis region for a configured '
+        'flow-counter class.\n\n'
+        '**Usage:**\n\n'
+        '```\n'
+        '#track <counter-class>\n'
+        '#track <counter-class> init=<expression> exit=<expression>\n'
+        '```\n\n'
+        '`init=` overrides the class default for the initial value. '
+        '`exit=` requires that value when the region closes. The directive '
+        'does not emit bytecode or consume an address.'
+    ),
+    'endtrack': (
+        '### `#endtrack` : End Flow-Counter Tracking\n\n'
+        '---\n\n'
+        'Closes the active straight-line flow-counter region and applies '
+        'its exit check.\n\n'
+        '**Usage:**\n\n'
+        '```\n'
+        '#endtrack <counter-name>\n'
+        '#endtrack <counter-name> exit=<expression>\n'
+        '```\n\n'
+        'With `exit_policy: balanced`, omitting `exit=` requires the final '
+        'value to equal the initial value. With `exit_policy: none`, an '
+        'omitted exit check simply closes the region.'
+    ),
 }
 
 # Expression functions used in numeric expressions
@@ -385,6 +413,19 @@ EXPRESSION_FUNCTION_DOCS: dict[str, str] = {
         '```\n\n'
         'Equivalent to `BYTE0(expression)`. Extracts bits 7\u20130 '
         'of the evaluated value.'
+    ),
+    'COUNTER': (
+        '### `COUNTER()` : Current Flow-Counter Value\n\n'
+        '---\n\n'
+        'Returns the current scalar value of an active flow counter during '
+        'static analysis.\n\n'
+        '**Usage:**\n\n'
+        '```\n'
+        'COUNTER(counter-name)\n'
+        '```\n\n'
+        'In M1 this function is valid only in fixed-width instruction '
+        'operands and fixed-size data values. It is rejected in layout, '
+        'preprocessor, and instruction-selection expressions.'
     ),
 }
 # Generate BYTEx docs for BYTE0 through BYTE9

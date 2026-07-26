@@ -199,9 +199,13 @@ def build_cli(handlers: CommandHandlers):
             help='Treat warnings as errors and stop compilation.'
         )
     @click.option(
-            '--static-analysis/--no-static-analysis',
+            '--static-analysis/--no-static-analysis', '-a/-A',
             default=True,
-            help='Enable or disable assembly-time static analysis.'
+            help=(
+                'Enable or disable assembly-time static analysis (enabled by default). '
+                'Disabled analysis ignores analysis-only annotations, but emitted values '
+                'that depend on analysis are rejected.'
+            )
         )
     def compile(
                 asm_file,
