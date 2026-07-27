@@ -450,6 +450,116 @@ def test_m1_counter_is_rejected_from_layout_and_selection_contexts(tmp_path, lin
 
 
 @pytest.mark.parametrize(
+    ('line', 'context'),
+    [
+        ('start: .org COUNTER(stack)', 'layout expressions'),
+        ('start: .align COUNTER(stack)', 'layout expressions'),
+        ('start: .fill COUNTER(stack), 0', 'fill-count expressions'),
+    ],
+)
+def test_m1_label_prefixed_layout_contexts_still_reject_flow_expressions(
+    tmp_path,
+    line,
+    context,
+):
+    """Bug: label-prefixed layout lines escaped the flow-context check entirely.
+
+    ``LineOjectFactory._validate_flow_expression_context`` only examined the
+    start of the *full* line text, so ``start: .org COUNTER(stack)`` did not
+    look like a layout directive to it. The flow expression then reached the
+    expression parser's backstop, which raised a raw ``SyntaxError`` that
+    nothing caught — a Python traceback for a CLI user instead of a diagnostic.
+
+    Expected behavior (acceptance case 72): a labeled layout line must produce
+    the same flow-category diagnostic, on the same line, as its unlabeled form;
+    flow expressions must be rejected from every layout context before they
+    can influence address assignment.
+    """
+    _assert_flow_error(
+        tmp_path,
+        f'#track stack\n{line}\n#endtrack stack\n',
+        context,
+        expected_line=2,
+    )
+
+
+def test_m1_labels_starting_with_layout_directive_names_are_not_layout_contexts(tmp_path):
+    """Bug: the layout-context check false-positived on layout-like label names.
+
+    The check used ``startswith(('.org', '.align', '.zero', ...))`` against the
+    raw line text, so a line whose *label* merely begins with a layout directive
+    name — for example the local label ``.orglabel:`` — poisoned any legitimate
+    flow expression sharing the line: ``.orglabel: depth COUNTER(stack)`` was
+    rejected as "flow expressions are not allowed in layout expressions".
+
+    Expected behavior: layout-directive matching respects token boundaries, so
+    a label that merely starts with a directive name is not a layout context
+    and the line assembles normally.
+    """
+    source = '\n'.join([
+        '#track stack',
+        'main:',
+        'push',
+        '.orglabel: depth COUNTER(stack)',
+        'pop',
+        '#endtrack stack',
+    ])
+    _, bytecode = _assemble(tmp_path, source)
+    assert bytecode == bytes([0x10, 0x80, 0x01, 0x11])
+
+
+def test_m1_disabled_mode_ignores_future_directive_parameters(tmp_path):
+    """Bug: disabled analysis rejected well-formed but not-yet-shipped parameters.
+
+    ``#track stack mode=called`` compiled with ``--no-static-analysis`` errored
+    with 'flow directive parameter "mode" is not available in M1', even though
+    ``mode=`` is well-formed spec syntax (shipping with M3). The requirements
+    (Static-Analysis Execution Control; acceptance case 76) say disabled mode
+    must treat flow directives as recognized analysis-only syntax that is
+    otherwise ignored — equivalent to stripping those lines — and produce no
+    flow diagnostics. Rejecting unshipped parameters is correct M1 phasing only
+    while analysis is *enabled*.
+    """
+    annotated = '#track stack mode=called\npush\npop\n#endtrack stack\n'
+    disabled, annotated_bytes = _assemble(
+        tmp_path,
+        annotated,
+        static_analysis=False,
+    )
+    assert not any(
+        diagnostic.category == 'flow'
+        for diagnostic in disabled.model.diagnostic_reporter.diagnostics
+    )
+    SymbolScope._global_scope = None
+    _, stripped_bytes = _assemble(
+        tmp_path,
+        'push\npop\n',
+        static_analysis=False,
+        output_name='stripped.bin',
+    )
+    assert annotated_bytes == stripped_bytes == bytes([0x10, 0x11])
+
+    # even a malformed flow directive is ignored rather than diagnosed
+    SymbolScope._global_scope = None
+    _, malformed_bytes = _assemble(
+        tmp_path,
+        '#track\nnop\n',
+        static_analysis=False,
+        output_name='malformed.bin',
+    )
+    assert malformed_bytes == bytes([0])
+
+    # with analysis enabled, unshipped parameters remain hard M1 errors
+    SymbolScope._global_scope = None
+    _assert_flow_error(
+        tmp_path,
+        '#track stack mode=called\npush\npop\n#endtrack stack\n',
+        'not available in M1',
+        expected_line=1,
+    )
+
+
+@pytest.mark.parametrize(
     'context',
     [
         ExpressionUseContext.LAYOUT,

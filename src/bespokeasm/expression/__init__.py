@@ -151,6 +151,13 @@ class ExpressionNode:
             else:
                 val = symbol_scope.get_label_value(self.value, line_id)
             if val is None:
+                # The numeric fallback must win before any coordinate lookup:
+                # a token that is a valid numeral in the default base resolved
+                # numerically before flow counters existed, and strip
+                # equivalence requires it to keep doing so. Coordinate
+                # diagnostics apply only to otherwise-unresolvable references.
+                if self.token_type == TokenType.T_LABEL_OR_NUM:
+                    return parse_numeric_string(self.value, self.default_numeric_base)
                 coordinate = (
                     active_named_scopes.named_scope_manager.get_counter_coordinate(
                         self.value,
@@ -168,8 +175,6 @@ class ExpressionNode:
                     raise FlowSymbolError(
                         f'static analysis is disabled; cannot resolve {self.value}'
                     )
-                if self.token_type == TokenType.T_LABEL_OR_NUM:
-                    return parse_numeric_string(self.value, self.default_numeric_base)
                 sys.exit(f'ERROR: {line_id} - Label {self.value} resolves to NONE = {self}')
             return val
         else:

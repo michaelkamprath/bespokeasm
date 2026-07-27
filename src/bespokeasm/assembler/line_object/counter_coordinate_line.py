@@ -3,7 +3,9 @@ import re
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.memory_zone import MemoryZone
+from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.expression import ExpressionNode
+from bespokeasm.expression import ExpressionUseContext
 from bespokeasm.expression import parse_expression
 from bespokeasm.utilities import is_valid_label
 from bespokeasm.utilities import PATTERN_SYMBOL
@@ -22,13 +24,25 @@ class CounterCoordinateLine(LineObject):
     )
 
     @classmethod
+    def _offset_error(
+        cls,
+        line_id: LineIdentifier,
+        model: AssemblerModel,
+        message: str,
+    ) -> None:
+        """Report the capability-appropriate diagnostic for an invalid offset."""
+        if not model.flow_counters_enabled:
+            message = 'this instruction set does not enable flow counters'
+        model.diagnostic_reporter.error(line_id, message, category='flow')
+
+    @classmethod
     def factory(
         cls,
         line_id: LineIdentifier,
         line_str: str,
         comment: str,
         current_memzone: MemoryZone,
-        default_numeric_base: str,
+        model: AssemblerModel,
     ) -> LineObject | None:
         """Parse ``name := COORDINATE(counter, offset)`` before address labels."""
         match = cls._PATTERN.fullmatch(line_str)
@@ -46,11 +60,34 @@ class CounterCoordinateLine(LineObject):
                 raise SyntaxError(
                     f'ERROR: {line_id} - invalid flow-counter name: {counter_name}'
                 )
-            offset_expression = parse_expression(
-                line_id,
-                coordinate_match.group(2),
-                default_numeric_base,
-            )
+            # The offset must be an ordinary compile-time scalar expression. A
+            # flow expression inside it is a source error when analysis runs;
+            # with analysis disabled the whole declaration is ignored syntax,
+            # so the offset is dropped rather than diagnosed.
+            try:
+                offset_expression = parse_expression(
+                    line_id,
+                    coordinate_match.group(2),
+                    model.default_numeric_base,
+                    context=ExpressionUseContext.DATA_VALUE,
+                )
+            except SyntaxError as error:
+                if model.static_analysis_enabled:
+                    cls._offset_error(line_id, model, str(error))
+                offset_expression = None
+            if (
+                offset_expression is not None
+                and offset_expression.deferred_flow_nodes()
+            ):
+                if model.static_analysis_enabled:
+                    cls._offset_error(
+                        line_id,
+                        model,
+                        'the offset of a coordinate declaration must be an '
+                        'ordinary compile-time expression and cannot contain '
+                        'COUNTER(), OFFSET(), or COORDINATE()',
+                    )
+                offset_expression = None
         return cls(
             line_id,
             label,

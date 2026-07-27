@@ -29,6 +29,16 @@ class LineOjectFactory:
         r'\bCOORDINATE\s*\(',
         flags=re.IGNORECASE,
     )
+    # \b keeps a label that merely starts with a directive name (".orglabel:")
+    # from being mistaken for the directive itself.
+    _LAYOUT_DIRECTIVE_PATTERN = re.compile(
+        r'\.(?:org|align|zerountil|zero)\b',
+        flags=re.IGNORECASE,
+    )
+    _FILL_DIRECTIVE_PATTERN = re.compile(
+        r'\.fill\b',
+        flags=re.IGNORECASE,
+    )
 
     @classmethod
     def _flow_expression_error(
@@ -68,9 +78,9 @@ class LineOjectFactory:
             )
         if lowered.startswith('#'):
             cls._flow_expression_error(line_id, model, 'preprocessor directives')
-        if lowered.startswith(('.org', '.align', '.zero', '.zerountil')):
+        if cls._LAYOUT_DIRECTIVE_PATTERN.match(lowered):
             cls._flow_expression_error(line_id, model, 'layout expressions')
-        if lowered.startswith('.fill'):
+        if cls._FILL_DIRECTIVE_PATTERN.match(lowered):
             arguments = instruction.split(None, 1)
             count_expression = arguments[1].split(',', 1)[0] if len(arguments) > 1 else ''
             if cls._FLOW_EXPRESSION_PATTERN.search(count_expression):
@@ -126,7 +136,15 @@ class LineOjectFactory:
             instruction_str = preprocessor.resolve_symbols(line_id, instruction_str)
             cls._validate_flow_expression_context(line_id, instruction_str, model)
             # parse instruction
+            first_fragment = True
             while len(instruction_str) > 0:
+                # Re-validate every fragment after the first: a leading label can
+                # hide a layout directive from the whole-line check above
+                # ("start: .org COUNTER(...)"), and flow expressions must be
+                # rejected before any layout parsing sees them.
+                if not first_fragment:
+                    cls._validate_flow_expression_context(line_id, instruction_str, model)
+                first_fragment = False
                 # Counter coordinates must precede colon-style label parsing:
                 # otherwise ``.slot := ...`` looks like label ``.slot:``.
                 line_obj = CounterCoordinateLine.factory(
@@ -134,7 +152,7 @@ class LineOjectFactory:
                     instruction_str,
                     comment_str,
                     current_memzone,
-                    model.default_numeric_base,
+                    model,
                 )
                 if line_obj is not None:
                     if label_seen:

@@ -369,6 +369,105 @@ def test_m2_offset_rejects_ordinary_symbols(tmp_path, ordinary_symbol):
     _assert_flow_error(tmp_path, source, 'requires a symbol declared with :=')
 
 
+@pytest.mark.parametrize(
+    'offset',
+    ['COUNTER(stack)', 'OFFSET(slot)', '1 + COUNTER(stack)'],
+)
+def test_m2_coordinate_offset_with_flow_content_reports_flow_error(tmp_path, offset):
+    """Bug: a flow expression inside a COORDINATE() offset crashed the assembler.
+
+    ``slot := COORDINATE(stack, COUNTER(stack))`` raised an uncaught
+    ``SyntaxError`` ('flow expression has no tagged use context') out of the
+    coordinate line factory, presenting a CLI user with a Python traceback
+    instead of a diagnostic. Acceptance case 74 requires exactly this form —
+    ``.x := COORDINATE(stack, COUNTER(other))`` — to be *rejected*: the offset
+    must be an ordinary compile-time scalar expression containing no
+    flow-derived value.
+
+    Expected behavior: a flow-category error on the declaration line stating
+    the offset must be an ordinary compile-time expression.
+    """
+    _assert_flow_error(
+        tmp_path,
+        f'#track stack\npush\nslot := COORDINATE(stack, {offset})\npop\n#endtrack stack\n',
+        'ordinary compile-time expression',
+        expected_line=3,
+    )
+
+
+def test_m2_disabled_coordinate_with_flow_offset_is_ignored(tmp_path):
+    """Bug: the same flow-in-offset form also crashed under --no-static-analysis.
+
+    The requirements state that with analysis disabled, "a flow construct used
+    only by another ignored flow construct does not prevent compilation": the
+    entire ``:=`` declaration is ignored analysis-only syntax, so flow content
+    inside its offset must be ignored along with it, not crash the assembler.
+
+    Expected behavior: the declaration is ignored (recorded only in the
+    diagnostic-only spelling index), no flow diagnostics are produced, and the
+    rest of the source assembles normally.
+    """
+    disabled, bytecode = _assemble(
+        tmp_path,
+        'slot := COORDINATE(stack, COUNTER(stack))\nnop\n',
+        static_analysis=False,
+    )
+    assert bytecode == bytes([0x00])
+    assert not any(
+        diagnostic.category == 'flow'
+        for diagnostic in disabled.model.diagnostic_reporter.diagnostics
+    )
+
+
+def test_m2_numeric_fallback_takes_precedence_over_coordinate_indexes(tmp_path):
+    """Bug: coordinate lookups intercepted numerically resolvable references.
+
+    Pre-flow-counters, an unresolved label-or-number token (e.g. ``face`` under
+    ``default_numeric_base: hex``) fell back to numeric interpretation. The M2
+    symbol resolution consulted the coordinate record and the disabled-mode
+    ignored-declaration index *before* that fallback, so with hex as the
+    default base, ``face := COORDINATE(stack, 1)`` followed by
+    ``.byte face & $ff`` failed ('static analysis is disabled; cannot resolve
+    face') under --no-static-analysis while its stripped twin assembled the
+    byte 0xCE — violating strip-equivalence (acceptance cases 76/78, which
+    require the index to be consulted only for *otherwise-unresolved*
+    references).
+
+    Expected behavior: the numeric fallback wins first in both disabled and
+    enabled modes; coordinate-specific diagnostics apply only to references
+    that cannot be resolved any ordinary way.
+    """
+    config = _load_config()
+    config['general']['default_numeric_base'] = 'hex'
+    config_path = _write_config(tmp_path, config)
+
+    disabled_source = 'face := COORDINATE(stack, 1)\n.byte face & $ff\n'
+    _, disabled_bytes = _assemble(
+        tmp_path,
+        disabled_source,
+        config_path=config_path,
+        static_analysis=False,
+    )
+    assert disabled_bytes == bytes([0xCE])
+
+    SymbolScope._global_scope = None
+    enabled_source = (
+        '#track stack\n'
+        'push\n'
+        'face := COORDINATE(stack, 1)\n'
+        '.byte face & $ff\n'
+        'pop\n'
+        '#endtrack stack\n'
+    )
+    _, enabled_bytes = _assemble(
+        tmp_path,
+        enabled_source,
+        config_path=config_path,
+        output_name='enabled.bin',
+    )
+    assert enabled_bytes == bytes([0x10, 0xCE, 0x11])
+
+
 def test_m2_disabled_unused_declaration_is_ignored(tmp_path):
     assembler, bytecode = _assemble(
         tmp_path,

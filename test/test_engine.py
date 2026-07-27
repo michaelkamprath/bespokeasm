@@ -379,6 +379,90 @@ class TestAssemblerEngine(unittest.TestCase):
         self.assertIn('target address 0x29fa', error_text)
         self.assertIn('line 2', str(ctx.exception))
 
+    def _assemble_to_binary(self, asm_source: str, fill_value: int) -> bytes:
+        """Assemble a source string with eater-sap1-isa.yaml and return the binary image."""
+        fp = pkg_resources.files(config_files).joinpath('eater-sap1-isa.yaml')
+        with tempfile.TemporaryDirectory() as temp_dir:
+            asm_path = os.path.join(temp_dir, 'image.asm')
+            out_path = os.path.join(temp_dir, 'image.bin')
+            with open(asm_path, 'w') as handle:
+                handle.write(asm_source)
+            assembler = Assembler(
+                source_file=asm_path,
+                config_file=str(fp),
+                generate_binary=True,
+                output_file=out_path,
+                binary_start=0,
+                binary_end=None,
+                binary_fill_value=fill_value,
+                enable_pretty_print=False,
+                pretty_print_format=None,
+                pretty_print_output=None,
+                is_verbose=0,
+                include_paths=[temp_dir],
+                predefined=[],
+            )
+            assembler.assemble_bytecode()
+            with open(out_path, 'rb') as handle:
+                return handle.read()
+
+    def test_trailing_muted_lines_do_not_extend_binary_image(self):
+        """Bug: trailing #mute'd content silently extended the binary image with fill words.
+
+        The flow-counters M0 image-extent rewrite sized the binary from lines that
+        emit words (``word_count > 0``) but did not exclude muted lines, while the
+        emission ``line_dict`` right below it does exclude them. The result was
+        inconsistent in both directions: ``nop / #mute / .byte 1,2,3`` produced a
+        4-byte image (the nop plus three *fill* bytes standing in for the muted
+        data) even though #mute suppresses emission entirely.
+
+        Expected behavior: muted lines occupy address space (so later unmuted code
+        keeps its layout) but never contribute to the image's emission extent. A
+        muted region *between* unmuted lines is still covered by fill because the
+        later unmuted line extends the image past it; a muted region at the *end*
+        of the image simply does not extend it.
+        """
+        # trailing muted content: image ends at the last unmuted emitted word
+        trailing = self._assemble_to_binary(
+            '    nop\n'
+            '#mute\n'
+            '    .byte 1,2,3\n',
+            fill_value=0xAA,
+        )
+        self.assertEqual(trailing, bytes([0x00]))
+
+        # interior muted content: address space is preserved and filled
+        interior = self._assemble_to_binary(
+            '    nop\n'
+            '#mute\n'
+            '    .byte 1,2,3\n'
+            '#unmute\n'
+            '    nop\n',
+            fill_value=0xAA,
+        )
+        self.assertEqual(interior, bytes([0x00, 0xAA, 0xAA, 0xAA, 0x00]))
+
+    def test_trailing_zero_width_lines_do_not_pad_binary_image(self):
+        """Pins a deliberate behavior change introduced with the flow-counters work.
+
+        Through v0.7.x the binary image extent was computed from the *last sorted
+        line object's address*, so a trailing zero-width line — a label, a ``.org``,
+        or now a flow directive such as ``#endtrack`` — padded the image with a
+        fill word at its address (``nop / nop / end:`` emitted 3 bytes, the last
+        being fill). The image extent is now computed from emitted words only,
+        which is required so that trailing analysis-only lines cannot change the
+        image and is the more sensible behavior in its own right. This test pins
+        the new behavior; if it ever needs to change again, that must be a
+        deliberate, documented decision.
+        """
+        image = self._assemble_to_binary(
+            '    nop\n'
+            '    nop\n'
+            'end_of_code:\n',
+            fill_value=0xAA,
+        )
+        self.assertEqual(image, bytes([0x00, 0x00]))
+
     def test_generate_bytes_from_line_objects_4bit_words_with_fill(self):
         # Simulate a 4-bit word ISA with a gap, so fill_word is used and must be packed
         class DummyLineWithWords(LineWithWords):

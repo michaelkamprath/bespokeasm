@@ -237,7 +237,9 @@ class Assembler:
         emitted_line_objects = [
             line_object
             for line_object in compilable_line_obs
-            if isinstance(line_object, LineWithWords) and line_object.word_count > 0
+            if isinstance(line_object, LineWithWords)
+            and line_object.word_count > 0
+            and not line_object.is_muted
         ]
         max_generated_address = max(
             (
