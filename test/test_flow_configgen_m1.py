@@ -5,6 +5,7 @@ import pytest
 from bespokeasm.configgen.sublime import SublimeConfigGenerator
 from bespokeasm.configgen.vim import VimConfigGenerator
 from bespokeasm.configgen.vscode import VSCodeConfigGenerator
+from ruamel.yaml import YAML
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -13,6 +14,10 @@ PLAIN_CONFIG = PROJECT_ROOT / 'test' / 'config_files' / 'eater-sap1-isa.yaml'
 FLOW_TOKENS = ('track', 'endtrack', 'COORDINATE', 'COUNTER', 'OFFSET', ':=')
 FLOW_COORDINATE_SCOPE = 'variable.other.flow.coordinate'
 FLOW_COORDINATE_DEFINITION_SCOPE = 'variable.other.flow.coordinate.definition'
+FLOW_COORDINATE_USAGE_SCOPE = 'variable.other.flow.coordinate.usage'
+FLOW_COUNTER_SCOPE = 'variable.other.flow.counter'
+FLOW_COUNTER_USAGE_SCOPE = 'variable.other.flow.counter.usage'
+FLOW_OPERATOR_SCOPE = 'keyword.operator.flow'
 SYMBOL_PATTERN_TOKENS = (
     '##SYMBOL_PATTERN##',
     '##LABEL_PATTERN##',
@@ -75,10 +80,101 @@ def test_m2_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
         assert token in generated
 
     if generator_class is VimConfigGenerator:
+        assert 'FlowCoordinateName' in generated
         assert 'FlowCoordinateDefinition' in generated
+        assert 'FlowCoordinateUsage' in generated
+        assert 'FlowCounterName' in generated
+        assert 'FlowCounterUsage' in generated
+        assert 'FlowOperator' in generated
     else:
         assert FLOW_COORDINATE_SCOPE in generated
         assert FLOW_COORDINATE_DEFINITION_SCOPE in generated
+        assert FLOW_COORDINATE_USAGE_SCOPE in generated
+        assert FLOW_COUNTER_SCOPE in generated
+        assert FLOW_COUNTER_USAGE_SCOPE in generated
+        assert FLOW_OPERATOR_SCOPE in generated
+
+    generated_dir = tmp_path / generator_class.__name__
+    if generator_class is VSCodeConfigGenerator:
+        grammar_path = next(generated_dir.rglob('tmGrammar.json'))
+        grammar = json.loads(grammar_path.read_text())
+        usage = grammar['repository']['flow_coordinate_usages']
+        assert usage['captures']['1']['name'] == FLOW_OPERATOR_SCOPE
+        assert usage['captures']['5']['name'] == (
+            f'{FLOW_COORDINATE_SCOPE} {FLOW_COORDINATE_USAGE_SCOPE}'
+        )
+        counter_usage = grammar['repository']['flow_counter_usages']
+        assert counter_usage['captures']['1']['name'] == FLOW_OPERATOR_SCOPE
+        assert counter_usage['captures']['5']['name'].endswith(
+            FLOW_COUNTER_USAGE_SCOPE
+        )
+        assert all(
+            token in counter_usage['match']
+            for token in ('COORDINATE', 'COUNTER')
+        )
+        directive_patterns = grammar['repository']['flow_counter_directives'][
+            'patterns'
+        ]
+        track = next(pattern for pattern in directive_patterns if '(track)' in pattern['match'])
+        endtrack = next(
+            pattern
+            for pattern in directive_patterns
+            if '(endtrack)' in pattern['match']
+        )
+        assert track['captures']['3']['name'] == FLOW_COUNTER_SCOPE
+        assert endtrack['captures']['3']['name'] == (
+            f'{FLOW_COUNTER_SCOPE} {FLOW_COUNTER_USAGE_SCOPE}'
+        )
+        preprocessor = next(
+            pattern
+            for pattern in grammar['repository']['directives']['patterns']
+            if pattern.get('name') == 'meta.preprocessor'
+        )
+        assert preprocessor['patterns'][0]['include'] == '#flow_counter_directives'
+        assert all(
+            token in grammar['repository']['flow_operators']['match']
+            for token in ('COORDINATE', 'COUNTER', 'OFFSET')
+        )
+    elif generator_class is SublimeConfigGenerator:
+        syntax_path = next(generated_dir.rglob('*.sublime-syntax'))
+        syntax = YAML().load(syntax_path)
+        usage = syntax['contexts']['flow_coordinate_usages'][0]
+        assert usage['captures'][1] == FLOW_OPERATOR_SCOPE
+        assert usage['captures'][5] == (
+            f'{FLOW_COORDINATE_SCOPE} {FLOW_COORDINATE_USAGE_SCOPE}'
+        )
+        counter_usage = syntax['contexts']['flow_counter_usages'][0]
+        assert counter_usage['captures'][1] == FLOW_OPERATOR_SCOPE
+        assert counter_usage['captures'][5].endswith(FLOW_COUNTER_USAGE_SCOPE)
+        assert all(
+            token in counter_usage['match']
+            for token in ('COORDINATE', 'COUNTER')
+        )
+        directive_patterns = syntax['contexts']['flow_counter_directives']
+        track = next(pattern for pattern in directive_patterns if '(track)' in pattern['match'])
+        endtrack = next(
+            pattern
+            for pattern in directive_patterns
+            if '(endtrack)' in pattern['match']
+        )
+        assert track['captures'][3] == FLOW_COUNTER_SCOPE
+        assert endtrack['captures'][3] == (
+            f'{FLOW_COUNTER_SCOPE} {FLOW_COUNTER_USAGE_SCOPE}'
+        )
+        assert (
+            syntax['contexts']['preprocessor_directives'][0]['push'][1]['include']
+            == 'flow_counter_directives'
+        )
+        assert all(
+            token in syntax['contexts']['flow_operators'][0]['match']
+            for token in ('COORDINATE', 'COUNTER', 'OFFSET')
+        )
+    else:
+        assert 'syn match flowm1testassemblyFlowCoordinateUsage' in generated
+        assert (
+            'syn keyword flowm1testassemblyFlowOperator '
+            'COORDINATE COUNTER OFFSET'
+        ) in generated
 
     if generator_class is not VimConfigGenerator:
         assert {'track', 'endtrack'} <= set(
@@ -115,7 +211,15 @@ def test_m2_flow_tokens_are_absent_from_non_enabled_isa(
     assert 'Declare Counter Coordinate' not in generated
     assert FLOW_COORDINATE_SCOPE not in generated
     assert FLOW_COORDINATE_DEFINITION_SCOPE not in generated
+    assert FLOW_COORDINATE_USAGE_SCOPE not in generated
+    assert 'FlowCoordinateName' not in generated
     assert 'FlowCoordinateDefinition' not in generated
+    assert 'FlowCoordinateUsage' not in generated
+    assert 'FlowCounterName' not in generated
+    assert 'FlowCounterUsage' not in generated
+    assert 'FlowOperator' not in generated
+    assert FLOW_COUNTER_USAGE_SCOPE not in generated
+    assert FLOW_OPERATOR_SCOPE not in generated
 
     if generator_class is not VimConfigGenerator:
         assert 'track' not in hover_docs['directives']['preprocessor']

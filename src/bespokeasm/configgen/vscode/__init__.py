@@ -69,7 +69,27 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.CONSTANT_DEFINITION, 'variable.other.constant.definition', 'Constants - Definition'),
             (SyntaxElement.CONSTANT_USAGE, 'variable.other.constant.usage', 'Constants - Usage'),
             (
-                SyntaxElement.FLOW_COORDINATE,
+                SyntaxElement.FLOW_COORDINATE_DEFINITION,
+                'variable.other.flow.coordinate.definition',
+                'Flow Coordinates - Definitions',
+            ),
+            (
+                SyntaxElement.FLOW_COORDINATE_USAGE,
+                'variable.other.flow.coordinate.usage',
+                'Flow Coordinates - Usages',
+            ),
+            (
+                SyntaxElement.FLOW_COUNTER_NAME,
+                'variable.other.flow.counter',
+                'Flow Counters',
+            ),
+            (
+                SyntaxElement.FLOW_COUNTER_USAGE,
+                'variable.other.flow.counter.usage',
+                'Flow Counters - Usages',
+            ),
+            (
+                SyntaxElement.FLOW_COORDINATE_NAME,
                 'variable.other.flow.coordinate',
                 'Flow Coordinates',
             ),
@@ -77,16 +97,29 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.PREPROCESSOR, 'keyword.control.preprocessor', 'Keyword - Preprocessor'),
             (SyntaxElement.DATA_TYPE, 'storage.type', 'Data Types'),
             (SyntaxElement.OPERATOR, 'keyword.operator', 'Keyword - Operators'),
+            (
+                SyntaxElement.FLOW_OPERATOR,
+                'keyword.operator.flow',
+                'Keyword - Flow Operators',
+            ),
             (SyntaxElement.DIRECTIVE, 'keyword.other', 'Keyword - Other'),
             (SyntaxElement.PUNCTUATION_PREPROCESSOR, 'punctuation.definition.preprocessor', 'Punctuation - Preprocessor'),
             (SyntaxElement.PUNCTUATION_SEPARATOR, 'punctuation.separator', 'Punctuation - Separator'),
             (SyntaxElement.PUNCTUATION_VARIABLE, 'punctuation.definition.variable', 'Punctuation - Variable'),
         ]
         if not self.model.flow_counters_enabled:
+            flow_coordinate_elements = {
+                SyntaxElement.FLOW_COORDINATE_NAME,
+                SyntaxElement.FLOW_COORDINATE_DEFINITION,
+                SyntaxElement.FLOW_COORDINATE_USAGE,
+                SyntaxElement.FLOW_COUNTER_NAME,
+                SyntaxElement.FLOW_COUNTER_USAGE,
+                SyntaxElement.FLOW_OPERATOR,
+            }
             scope_mappings = [
                 mapping
                 for mapping in scope_mappings
-                if mapping[0] is not SyntaxElement.FLOW_COORDINATE
+                if mapping[0] not in flow_coordinate_elements
             ]
 
         rules = []
@@ -217,10 +250,33 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
         grammar_json['scopeName'] = scope_name
         if not self.model.flow_counters_enabled:
             del grammar_json['repository']['counter_coordinates']
+            del grammar_json['repository']['flow_coordinate_usages']
+            del grammar_json['repository']['flow_counter_usages']
+            del grammar_json['repository']['flow_counter_directives']
+            del grammar_json['repository']['flow_operators']
             grammar_json['repository']['main']['patterns'] = [
                 pattern
                 for pattern in grammar_json['repository']['main']['patterns']
                 if pattern.get('include') != '#counter_coordinates'
+            ]
+            grammar_json['repository']['operators']['patterns'] = [
+                pattern
+                for pattern in grammar_json['repository']['operators']['patterns']
+                if pattern.get('include') not in {
+                    '#flow_coordinate_usages',
+                    '#flow_counter_usages',
+                    '#flow_operators',
+                }
+            ]
+            preprocessor = next(
+                pattern
+                for pattern in grammar_json['repository']['directives']['patterns']
+                if pattern.get('name') == 'meta.preprocessor'
+            )
+            preprocessor['patterns'] = [
+                pattern
+                for pattern in preprocessor['patterns']
+                if pattern.get('include') != '#flow_counter_directives'
             ]
         # handle instructions
         grammar_json['repository']['instructions']['begin'] = self._replace_token_with_regex_list(
@@ -306,7 +362,7 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
 
         # handle expresion functions
         for item in grammar_json['repository']['operators']['patterns']:
-            if 'keyword.operator.word' == item['name']:
+            if 'keyword.operator.word' == item.get('name'):
                 func_regex = '|'.join(expression_functions_for_isa(self.model.flow_counters_enabled))
                 func_str = item['match']
                 item['match'] = func_str.replace('##EXPRESSION_FUNCTIONS##', func_regex)

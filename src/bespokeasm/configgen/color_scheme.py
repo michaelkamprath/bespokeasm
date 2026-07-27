@@ -54,7 +54,11 @@ class SyntaxElement(Enum):
     CONSTANT_NAME = 'constant_name'
     CONSTANT_DEFINITION = 'constant_definition'
     CONSTANT_USAGE = 'constant_usage'
-    FLOW_COORDINATE = 'flow_coordinate'
+    FLOW_COUNTER_NAME = 'flow_counter_name'
+    FLOW_COUNTER_USAGE = 'flow_counter_usage'
+    FLOW_COORDINATE_NAME = 'flow_coordinate_name'
+    FLOW_COORDINATE_DEFINITION = 'flow_coordinate_definition'
+    FLOW_COORDINATE_USAGE = 'flow_coordinate_usage'
     COMPILER_LABEL = 'compiler_label'
     PARAMETER = 'parameter'
 
@@ -65,6 +69,7 @@ class SyntaxElement(Enum):
 
     # Operators
     OPERATOR = 'operator'
+    FLOW_OPERATOR = 'flow_operator'
 
     # Punctuation
     PUNCTUATION_SEPARATOR = 'punctuation_separator'
@@ -134,7 +139,11 @@ DEFAULT_COLOR_SCHEME = ColorScheme(
         SyntaxElement.CONSTANT_NAME: '#abd7ed',
         SyntaxElement.CONSTANT_DEFINITION: '#29e768',
         SyntaxElement.CONSTANT_USAGE: '#6fe797',
-        SyntaxElement.FLOW_COORDINATE: '#29e768',
+        SyntaxElement.FLOW_COUNTER_NAME: '#abd7ed',
+        SyntaxElement.FLOW_COUNTER_USAGE: '#6fe797',
+        SyntaxElement.FLOW_COORDINATE_NAME: '#abd7ed',
+        SyntaxElement.FLOW_COORDINATE_DEFINITION: '#29e768',
+        SyntaxElement.FLOW_COORDINATE_USAGE: '#6fe797',
         SyntaxElement.COMPILER_LABEL: '#abedc1',
         SyntaxElement.PARAMETER: '#abd7ed',
 
@@ -145,6 +154,7 @@ DEFAULT_COLOR_SCHEME = ColorScheme(
 
         # Operators
         SyntaxElement.OPERATOR: '#cc99ff',
+        SyntaxElement.FLOW_OPERATOR: '#e06cff',
 
         # Punctuation
         SyntaxElement.PUNCTUATION_SEPARATOR: '#ed80a2',

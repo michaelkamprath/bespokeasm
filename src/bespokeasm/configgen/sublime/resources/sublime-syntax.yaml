@@ -41,6 +41,35 @@ contexts:
         1: variable.other.flow.coordinate variable.other.flow.coordinate.definition
         2: keyword.operator.assignment
 
+  flow_coordinate_usages:
+    - match: (?i)\b(OFFSET)(\s*)(\()(\s*)(##SYMBOL_PATTERN##)(\s*)(\))
+      captures:
+        1: keyword.operator.flow
+        3: punctuation.section.parens.begin
+        5: variable.other.flow.coordinate variable.other.flow.coordinate.usage
+        7: punctuation.section.parens.end
+
+  flow_counter_usages:
+    - match: (?i)\b(COORDINATE|COUNTER)(\s*)(\()(\s*)(##SYMBOL_PATTERN##)
+      captures:
+        1: keyword.operator.flow
+        3: punctuation.section.parens.begin
+        5: variable.other.flow.counter variable.other.flow.counter.usage
+
+  flow_counter_directives:
+    - match: (?i)\b(track)(\s+)(##SYMBOL_PATTERN##)
+      captures:
+        1: keyword.control.preprocessor
+        3: variable.other.flow.counter
+    - match: (?i)\b(endtrack)(\s+)(##SYMBOL_PATTERN##)
+      captures:
+        1: keyword.control.preprocessor
+        3: variable.other.flow.counter variable.other.flow.counter.usage
+
+  flow_operators:
+    - match: (?i)\b(?:COORDINATE|COUNTER|OFFSET)\b
+      scope: keyword.operator.flow
+
   instructions:
     - match: (?i)(?:##INSTRUCTIONS##)
       scope: variable.function.instruction
@@ -118,6 +147,9 @@ contexts:
       scope: keyword.operator.logical
 
   numerical_expressions:
+    - include: flow_coordinate_usages
+    - include: flow_counter_usages
+    - include: flow_operators
     - include: numbers
     - include: registers
     - include: operand_label_definitions
@@ -205,6 +237,7 @@ contexts:
       scope: punctuation.definition.preprocessor
       push:
         - meta_scope: meta.preprocessor
+        - include: flow_counter_directives
         - match: (?<=\#)(?:##PREPROCESSOR##)\b
           scope: keyword.control.preprocessor
         - include: strings

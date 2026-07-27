@@ -105,7 +105,12 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIn(SyntaxElement.OPERAND_LABEL_AT, DEFAULT_COLOR_SCHEME.colors)
         self.assertIn(SyntaxElement.OPERAND_LABEL_NAME, DEFAULT_COLOR_SCHEME.colors)
         self.assertIn(SyntaxElement.OPERAND_LABEL_COLON, DEFAULT_COLOR_SCHEME.colors)
-        self.assertIn(SyntaxElement.FLOW_COORDINATE, DEFAULT_COLOR_SCHEME.colors)
+        self.assertIn(SyntaxElement.FLOW_COORDINATE_NAME, DEFAULT_COLOR_SCHEME.colors)
+        self.assertIn(SyntaxElement.FLOW_COORDINATE_DEFINITION, DEFAULT_COLOR_SCHEME.colors)
+        self.assertIn(SyntaxElement.FLOW_COORDINATE_USAGE, DEFAULT_COLOR_SCHEME.colors)
+        self.assertIn(SyntaxElement.FLOW_COUNTER_NAME, DEFAULT_COLOR_SCHEME.colors)
+        self.assertIn(SyntaxElement.FLOW_COUNTER_USAGE, DEFAULT_COLOR_SCHEME.colors)
+        self.assertIn(SyntaxElement.FLOW_OPERATOR, DEFAULT_COLOR_SCHEME.colors)
 
         test_dir = tempfile.mkdtemp()
         config_file = pkg_resources.files(config_files).joinpath('test_operand_labels.yaml')

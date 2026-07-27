@@ -76,7 +76,27 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             # (SyntaxElement.CONSTANT_USAGE, 'variable.other.constant.usage', 'Constants - Usages'),
             (SyntaxElement.CONSTANT_NAME, 'variable.other.constant', 'Variables - Constant'),
             (
-                SyntaxElement.FLOW_COORDINATE,
+                SyntaxElement.FLOW_COORDINATE_DEFINITION,
+                'variable.other.flow.coordinate.definition',
+                'Flow Coordinates - Definitions',
+            ),
+            (
+                SyntaxElement.FLOW_COORDINATE_USAGE,
+                'variable.other.flow.coordinate.usage',
+                'Flow Coordinates - Usages',
+            ),
+            (
+                SyntaxElement.FLOW_COUNTER_NAME,
+                'variable.other.flow.counter',
+                'Flow Counters',
+            ),
+            (
+                SyntaxElement.FLOW_COUNTER_USAGE,
+                'variable.other.flow.counter.usage',
+                'Flow Counters - Usages',
+            ),
+            (
+                SyntaxElement.FLOW_COORDINATE_NAME,
                 'variable.other.flow.coordinate',
                 'Flow Coordinates',
             ),
@@ -84,16 +104,29 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.PREPROCESSOR, 'keyword.control.preprocessor', 'Keyword - Preprocessor'),
             (SyntaxElement.DATA_TYPE, 'storage.type', 'Data Types'),
             (SyntaxElement.OPERATOR, 'keyword.operator', 'Keyword - Operators'),
+            (
+                SyntaxElement.FLOW_OPERATOR,
+                'keyword.operator.flow',
+                'Keyword - Flow Operators',
+            ),
             (SyntaxElement.DIRECTIVE, 'keyword.other', 'Keyword - Other'),
             (SyntaxElement.PUNCTUATION_PREPROCESSOR, 'punctuation.definition.preprocessor', 'Punctuation - Preprocessor'),
             (SyntaxElement.PUNCTUATION_SEPARATOR, 'punctuation.separator', 'Punctuation - Separator'),
             (SyntaxElement.PUNCTUATION_VARIABLE, 'punctuation.definition.variable', 'Punctuation - Variable'),
         ]
         if not self.model.flow_counters_enabled:
+            flow_coordinate_elements = {
+                SyntaxElement.FLOW_COORDINATE_NAME,
+                SyntaxElement.FLOW_COORDINATE_DEFINITION,
+                SyntaxElement.FLOW_COORDINATE_USAGE,
+                SyntaxElement.FLOW_COUNTER_NAME,
+                SyntaxElement.FLOW_COUNTER_USAGE,
+                SyntaxElement.FLOW_OPERATOR,
+            }
             scope_mappings = [
                 mapping
                 for mapping in scope_mappings
-                if mapping[0] is not SyntaxElement.FLOW_COORDINATE
+                if mapping[0] not in flow_coordinate_elements
             ]
 
         rules = []
@@ -182,10 +215,28 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         self._replace_symbol_pattern_tokens(syntax_dict)
         if not self.model.flow_counters_enabled:
             del syntax_dict['contexts']['counter_coordinates']
+            del syntax_dict['contexts']['flow_coordinate_usages']
+            del syntax_dict['contexts']['flow_counter_usages']
+            del syntax_dict['contexts']['flow_counter_directives']
+            del syntax_dict['contexts']['flow_operators']
             syntax_dict['contexts']['main'] = [
                 rule
                 for rule in syntax_dict['contexts']['main']
                 if rule.get('include') != 'counter_coordinates'
+            ]
+            syntax_dict['contexts']['numerical_expressions'] = [
+                rule
+                for rule in syntax_dict['contexts']['numerical_expressions']
+                if rule.get('include') not in {
+                    'flow_coordinate_usages',
+                    'flow_counter_usages',
+                    'flow_operators',
+                }
+            ]
+            syntax_dict['contexts']['preprocessor_directives'][0]['push'] = [
+                rule
+                for rule in syntax_dict['contexts']['preprocessor_directives'][0]['push']
+                if rule.get('include') != 'flow_counter_directives'
             ]
 
         # handle instructions

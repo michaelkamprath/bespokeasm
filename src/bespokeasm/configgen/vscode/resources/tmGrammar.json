@@ -36,6 +36,67 @@
       },
       "match": "^\\s*(##SYMBOL_PATTERN##)\\s*(:=)"
     },
+    "flow_coordinate_usages": {
+      "captures": {
+        "1": {
+          "name": "keyword.operator.flow"
+        },
+        "3": {
+          "name": "punctuation.section.parens.begin"
+        },
+        "5": {
+          "name": "variable.other.flow.coordinate variable.other.flow.coordinate.usage"
+        },
+        "7": {
+          "name": "punctuation.section.parens.end"
+        }
+      },
+      "match": "(?i)\\b(OFFSET)(\\s*)(\\()(\\s*)(##SYMBOL_PATTERN##)(\\s*)(\\))"
+    },
+    "flow_counter_usages": {
+      "captures": {
+        "1": {
+          "name": "keyword.operator.flow"
+        },
+        "3": {
+          "name": "punctuation.section.parens.begin"
+        },
+        "5": {
+          "name": "variable.other.flow.counter variable.other.flow.counter.usage"
+        }
+      },
+      "match": "(?i)\\b(COORDINATE|COUNTER)(\\s*)(\\()(\\s*)(##SYMBOL_PATTERN##)"
+    },
+    "flow_counter_directives": {
+      "patterns": [
+        {
+          "captures": {
+            "1": {
+              "name": "keyword.control.preprocessor"
+            },
+            "3": {
+              "name": "variable.other.flow.counter"
+            }
+          },
+          "match": "(?i)\\b(track)(\\s+)(##SYMBOL_PATTERN##)"
+        },
+        {
+          "captures": {
+            "1": {
+              "name": "keyword.control.preprocessor"
+            },
+            "3": {
+              "name": "variable.other.flow.counter variable.other.flow.counter.usage"
+            }
+          },
+          "match": "(?i)\\b(endtrack)(\\s+)(##SYMBOL_PATTERN##)"
+        }
+      ]
+    },
+    "flow_operators": {
+      "match": "(?i)\\b(?:COORDINATE|COUNTER|OFFSET)\\b",
+      "name": "keyword.operator.flow"
+    },
     "deferred-addressing": {
       "begin": "(?<!\\[)([\\[]{2})\\b",
       "beginCaptures": {
@@ -127,6 +188,9 @@
           "end": "(?=(?:\\s*\\;|\\s*$))",
           "name": "meta.preprocessor",
           "patterns": [
+            {
+              "include": "#flow_counter_directives"
+            },
             {
               "match": "(?<=\\#)(?:##PREPROCESSOR##)\\b",
               "name": "keyword.control.preprocessor"
@@ -472,6 +536,15 @@
     },
     "operators": {
       "patterns": [
+        {
+          "include": "#flow_coordinate_usages"
+        },
+        {
+          "include": "#flow_counter_usages"
+        },
+        {
+          "include": "#flow_operators"
+        },
         {
           "match": "[\\+\\-\\*\\/]{1}",
           "name": "keyword.operator.arithmetic"

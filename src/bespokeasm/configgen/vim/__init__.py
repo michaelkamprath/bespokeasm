@@ -131,7 +131,15 @@ class VimConfigGenerator(LanguageConfigGenerator):
             (f'{lang_group}Macro', SyntaxElement.MACRO),
             (f'{lang_group}Register', SyntaxElement.REGISTER),
             (f'{lang_group}ConstName', SyntaxElement.CONSTANT_NAME),
-            (f'{lang_group}FlowCoordinateDefinition', SyntaxElement.FLOW_COORDINATE),
+            (f'{lang_group}FlowCoordinateName', SyntaxElement.FLOW_COORDINATE_NAME),
+            (
+                f'{lang_group}FlowCoordinateDefinition',
+                SyntaxElement.FLOW_COORDINATE_DEFINITION,
+            ),
+            (f'{lang_group}FlowCoordinateUsage', SyntaxElement.FLOW_COORDINATE_USAGE),
+            (f'{lang_group}FlowCounterName', SyntaxElement.FLOW_COUNTER_NAME),
+            (f'{lang_group}FlowCounterUsage', SyntaxElement.FLOW_COUNTER_USAGE),
+            (f'{lang_group}FlowOperator', SyntaxElement.FLOW_OPERATOR),
             (f'{lang_group}FlowAssignment', SyntaxElement.OPERATOR),
             (f'{lang_group}CompilerLabel', SyntaxElement.COMPILER_LABEL),
             (f'{lang_group}PreProc', SyntaxElement.PREPROCESSOR),
@@ -282,6 +290,15 @@ ctermbg=NONE gui=bold cterm=bold')
         constant_pattern = self._vim_symbol_pattern(self._constant_pattern())
 
         lang_group = vim_filetype
+        flow_contains = (
+            [
+                f'{lang_group}FlowCoordinateUsage',
+                f'{lang_group}FlowCounterUsage',
+                f'{lang_group}FlowOperator',
+            ]
+            if self.model.flow_counters_enabled
+            else []
+        )
         bracket_contains = ','.join([
             f'{lang_group}Register',
             f'{lang_group}HexNumber',
@@ -297,7 +314,7 @@ ctermbg=NONE gui=bold cterm=bold')
             f'{lang_group}ParenExpr',
             f'{lang_group}Param',
             f'{lang_group}LabelUsage',
-        ])
+        ] + flow_contains)
         operand_contains = ','.join([
             f'{lang_group}String',
             f'{lang_group}Register',
@@ -315,7 +332,7 @@ ctermbg=NONE gui=bold cterm=bold')
             f'{lang_group}ParenExpr',
             f'{lang_group}Param',
             f'{lang_group}LabelUsage',
-        ])
+        ] + flow_contains)
         directive_contains = ','.join([
             f'{lang_group}String',
             f'{lang_group}HexNumber',
@@ -328,7 +345,7 @@ ctermbg=NONE gui=bold cterm=bold')
             f'{lang_group}BracketExpr',
             f'{lang_group}ParenExpr',
             f'{lang_group}Param',
-        ])
+        ] + flow_contains)
         operation_line_end = fr'\s*\ze\<{operations_alt}\>\|\s*\ze;\|$' if operations_alt else r'\s*\ze;\|$'
 
         lines: list[str] = []
@@ -398,6 +415,22 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
             fr'/^\s*\zs{symbol_pattern}\ze\s*:=/'
         )
         lines.append(
+            fr'syn match {lang_group}FlowCoordinateUsage '
+            fr'/\<OFFSET\s*(\s*\zs{symbol_pattern}\ze\s*)/'
+        )
+        lines.append(
+            fr'syn match {lang_group}FlowCounterUsage '
+            fr'/\<\%(COORDINATE\|COUNTER\)\s*(\s*\zs{symbol_pattern}\ze/'
+        )
+        lines.append(
+            fr'syn match {lang_group}FlowCounterName '
+            fr'/^#track\s\+\zs{symbol_pattern}/'
+        )
+        lines.append(
+            fr'syn match {lang_group}FlowCounterUsage '
+            fr'/^#endtrack\s\+\zs{symbol_pattern}/'
+        )
+        lines.append(
             fr'syn match {lang_group}FlowAssignment '
             fr'/^\s*{symbol_pattern}\s*\zs:=/'
         )
@@ -430,6 +463,9 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
             lines.append(fr'syn match {lang_group}Operator /\<' + expr_funcs_alt + r'\>/')
         # Operators
         lines.append(rf'syn match {lang_group}Operator /==\|!=\|>=\|<=\|>>\|<<\|[+\-*/&|^]/')
+        lines.append(
+            f'syn keyword {lang_group}FlowOperator COORDINATE COUNTER OFFSET'
+        )
         # Registers
         if registers_kw:
             lines.append(f'syn keyword {lang_group}Register ' + registers_kw)
@@ -498,7 +534,12 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         lines.append(f'hi def link {lang_group}Instruction Keyword')
         lines.append(f'hi def link {lang_group}Macro Keyword')
         lines.append(f'hi def link {lang_group}ConstName Constant')
+        lines.append(f'hi def link {lang_group}FlowCoordinateName Identifier')
         lines.append(f'hi def link {lang_group}FlowCoordinateDefinition Identifier')
+        lines.append(f'hi def link {lang_group}FlowCoordinateUsage Identifier')
+        lines.append(f'hi def link {lang_group}FlowCounterName Identifier')
+        lines.append(f'hi def link {lang_group}FlowCounterUsage Identifier')
+        lines.append(f'hi def link {lang_group}FlowOperator Operator')
         lines.append(f'hi def link {lang_group}FlowAssignment Operator')
         lines.append(f'hi def link {lang_group}CompilerLabel Constant')
         lines.append(f'hi def link {lang_group}Escape SpecialChar')
