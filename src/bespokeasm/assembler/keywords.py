@@ -56,6 +56,21 @@ ASSEMBLER_KEYWORD_SET = (
 )
 
 
+def assembler_keywords_for_isa(flow_counters_enabled: bool) -> set[str]:
+    """Return names reserved by an ISA with the selected capabilities."""
+    keywords = (
+        COMPILER_DIRECTIVES_SET
+        .union(BYTECODE_DIRECTIVES_SET)
+        .union(BASE_PREPROCESSOR_DIRECTIVES_SET)
+        .union(BASE_EXPRESSION_FUNCTIONS_SET)
+        .union(BUILTIN_CONSTANTS_SET)
+    )
+    if flow_counters_enabled:
+        keywords.update(FLOW_PREPROCESSOR_DIRECTIVES_SET)
+        keywords.update(FLOW_EXPRESSION_FUNCTIONS_SET)
+    return keywords
+
+
 def preprocessor_directives_for_isa(flow_counters_enabled: bool) -> set[str]:
     """Return preprocessor tokens visible for the selected ISA capabilities."""
     directives = set(BASE_PREPROCESSOR_DIRECTIVES_SET)

@@ -264,9 +264,31 @@ def test_m1_track_init_and_exit_parameters(tmp_path):
     assert bytecode == bytes([0x11])
 
 
-@pytest.mark.parametrize('directive', ['#track', '#endtrack'])
-def test_m1_malformed_flow_directive_reports_flow_syntax_error(tmp_path, directive):
-    _assert_flow_error(tmp_path, f'{directive}\n', 'directive syntax')
+@pytest.mark.parametrize(
+    ('directive', 'message'),
+    [
+        ('#track', 'directive syntax'),
+        ('#endtrack', 'directive syntax'),
+        ('#track stack init=', 'requires a value'),
+        ('#endtrack stack nonsense', 'invalid flow directive parameters'),
+        ('#track 123', 'invalid flow counter class name'),
+        ('#track stack mode=(', 'Invalid syntax'),
+        ('#track stack mode=called mode=jumped', 'duplicate flow directive parameter'),
+    ],
+)
+@pytest.mark.parametrize('static_analysis', [True, False])
+def test_m1_malformed_flow_directive_always_reports_syntax_error(
+    tmp_path,
+    directive,
+    message,
+    static_analysis,
+):
+    _assert_flow_error(
+        tmp_path,
+        f'{directive}\n',
+        message,
+        static_analysis=static_analysis,
+    )
 
 
 @pytest.mark.parametrize(
@@ -403,6 +425,55 @@ def test_m1_feature_enablement_and_inactive_condition_are_usage_gated(tmp_path):
         config_path=no_flow_path,
     )
     assert inactive == bytes([0])
+
+
+def test_m1_flow_keywords_are_reserved_only_for_enabled_isas(tmp_path):
+    no_flow_config = _without_flow_metadata(_load_config())
+    for value, mnemonic in enumerate(
+        ('track', 'endtrack', 'counter', 'offset', 'coordinate'),
+        start=0x70,
+    ):
+        no_flow_config['instructions'][mnemonic] = {
+            'bytecode': {'value': value, 'size': 8},
+        }
+    no_flow_path = _write_config(tmp_path, no_flow_config, 'no-flow-keywords.yaml')
+
+    source = (
+        'track:\n'
+        'COUNTER = 9\n'
+        'track\n'
+        'endtrack\n'
+        'counter\n'
+        'offset\n'
+        'coordinate\n'
+        '.byte track\n'
+        '.byte COUNTER\n'
+    )
+    _, bytecode = _assemble(
+        tmp_path,
+        source,
+        config_path=no_flow_path,
+        output_name='no-flow-keywords.bin',
+    )
+    assert bytecode == bytes([0x70, 0x71, 0x72, 0x73, 0x74, 0, 9])
+
+    flow_config = _load_config()
+    flow_config['instructions']['counter'] = {
+        'flow_transfer': 'none',
+        'bytecode': {'value': 0x72, 'size': 8},
+    }
+    flow_path = _write_config(tmp_path, flow_config, 'flow-keywords.yaml')
+    with pytest.raises(SystemExit, match='also a BespokeASM keyword'):
+        _assembler(tmp_path, 'nop\n', config_path=flow_path)
+
+    for static_analysis in (True, False):
+        with pytest.raises(SystemExit, match='used an assembler keyword'):
+            _assemble(
+                tmp_path,
+                'track:\nnop\n',
+                static_analysis=static_analysis,
+                output_name=f'flow-label-{static_analysis}.bin',
+            )
 
 
 def test_m1_disabled_analysis_ignores_annotations_but_rejects_dependency(tmp_path):
@@ -550,16 +621,6 @@ def test_m1_disabled_mode_ignores_future_directive_parameters(tmp_path):
         output_name='stripped.bin',
     )
     assert annotated_bytes == stripped_bytes == bytes([0x10, 0x11])
-
-    # even a malformed flow directive is ignored rather than diagnosed
-    SymbolScope._global_scope = None
-    _, malformed_bytes = _assemble(
-        tmp_path,
-        '#track\nnop\n',
-        static_analysis=False,
-        output_name='malformed.bin',
-    )
-    assert malformed_bytes == bytes([0])
 
     # with analysis enabled, unshipped parameters remain hard M1 errors
     SymbolScope._global_scope = None

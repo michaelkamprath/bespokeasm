@@ -44,43 +44,48 @@ class FlowCounterDirectiveLine(PreprocessorLine):
         """Parse whitespace-separated ``name=expression`` directive parameters.
 
         With static analysis disabled, flow directives are analysis-only syntax
-        that must be ignored as if stripped from the source, so no parameter
-        validation may error; unrecognized or malformed parameters are simply
-        dropped.
+        that must be ignored as if stripped from the source. Syntactic
+        validation still runs, while well-formed parameters belonging to a
+        future milestone are ignored until their analysis is available.
         """
         enforce = self._isa_model.static_analysis_enabled
         if not text.strip():
             return {}
         matches = list(self._PARAMETER_PATTERN.finditer(text))
         if not matches or text[:matches[0].start()].strip():
-            if enforce:
-                self._error(f'invalid flow directive parameters: {text.strip()}')
-            if not matches:
-                return {}
-        parameters = {}
+            self._error(f'invalid flow directive parameters: {text.strip()}')
+            return {}
+        parsed_parameters = {}
+        seen_names = set()
         for index, match in enumerate(matches):
             name = match.group(1).lower()
-            if name not in allowed:
-                if enforce:
-                    self._error(f'flow directive parameter "{name}" is not available in M1')
-                continue
-            if name in parameters and enforce:
-                self._error(f'duplicate flow directive parameter "{name}"')
             value_end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
             value_text = text[match.end():value_end].strip()
             if not value_text:
-                if enforce:
-                    self._error(f'flow directive parameter "{name}" requires a value')
+                self._error(f'flow directive parameter "{name}" requires a value')
                 continue
+            if name in seen_names:
+                self._error(f'duplicate flow directive parameter "{name}"')
+                continue
+            seen_names.add(name)
             try:
-                parameters[name] = parse_expression(
+                value_expression = parse_expression(
                     self.line_id,
                     value_text,
                     self._isa_model.default_numeric_base,
                 )
             except (SyntaxError, SystemExit) as error:
+                self._error(str(error))
+                continue
+            parsed_parameters[name] = value_expression
+
+        parameters = {}
+        for name, value_expression in parsed_parameters.items():
+            if name not in allowed:
                 if enforce:
-                    self._error(str(error))
+                    self._error(f'flow directive parameter "{name}" is not available in M1')
+                continue
+            parameters[name] = value_expression
         return parameters
 
     def evaluate_parameter(self, name: str) -> int | None:
@@ -114,15 +119,12 @@ class FlowTrackLine(FlowCounterDirectiveLine):
         super().__init__(line_id, instruction, comment, memzone, isa_model)
         match = self._PATTERN.fullmatch(instruction.strip())
         if match is None:
-            # With analysis disabled the directive is inert, so even a
-            # malformed spelling is ignored rather than diagnosed.
-            if isa_model.static_analysis_enabled:
-                self._error(f'invalid #track directive syntax: {instruction}')
+            self._error(f'invalid #track directive syntax: {instruction}')
             self._counter_class = None
             self._parameters = {}
             return
         self._counter_class = match.group(1)
-        if not is_valid_label(self._counter_class) and isa_model.static_analysis_enabled:
+        if not is_valid_label(self._counter_class):
             self._error(f'invalid flow counter class name "{self._counter_class}"')
         self._parameters = self._parse_parameters(match.group(2) or '', {'init', 'exit'})
         if isa_model.static_analysis_enabled and not isa_model.flow_counters_enabled:
@@ -153,15 +155,12 @@ class FlowEndTrackLine(FlowCounterDirectiveLine):
         super().__init__(line_id, instruction, comment, memzone, isa_model)
         match = self._PATTERN.fullmatch(instruction.strip())
         if match is None:
-            # With analysis disabled the directive is inert, so even a
-            # malformed spelling is ignored rather than diagnosed.
-            if isa_model.static_analysis_enabled:
-                self._error(f'invalid #endtrack directive syntax: {instruction}')
+            self._error(f'invalid #endtrack directive syntax: {instruction}')
             self._counter_name = None
             self._parameters = {}
             return
         self._counter_name = match.group(1)
-        if not is_valid_label(self._counter_name) and isa_model.static_analysis_enabled:
+        if not is_valid_label(self._counter_name):
             self._error(f'invalid flow counter name "{self._counter_name}"')
         self._parameters = self._parse_parameters(match.group(2) or '', {'exit'})
         if isa_model.static_analysis_enabled and not isa_model.flow_counters_enabled:

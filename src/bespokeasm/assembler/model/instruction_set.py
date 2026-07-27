@@ -22,6 +22,7 @@ class InstructionSet(dict[str, InstructionBase]):
                 word_segment_size: int,
                 diagnostic_reporter,
                 retain_analysis_semantics: bool = False,
+                reserved_keywords: set[str] | frozenset[str] | None = None,
             ):
         self._instructions_config = instructions_config
         self._macros_config = macros_config
@@ -30,7 +31,9 @@ class InstructionSet(dict[str, InstructionBase]):
         self._operation_mnemonics: list[str] = []
         self._instruction_stems: dict[str, Instruction] = {}
 
-        lower_keywords = {kw.lower(): kw for kw in ASSEMBLER_KEYWORD_SET}
+        if reserved_keywords is None:
+            reserved_keywords = ASSEMBLER_KEYWORD_SET
+        lower_keywords = {kw.lower(): kw for kw in reserved_keywords}
 
         for mnemonic, instr_config in self._instructions_config.items():
             mnemonic = mnemonic.lower()

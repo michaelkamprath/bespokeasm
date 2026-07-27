@@ -12,8 +12,20 @@ from bespokeasm.assembler.symbol_scope.flow_symbols import CounterCoordinate
 class NamedSymbolScope(SymbolScope):
     """Represents a named scope."""
 
-    def __init__(self, name: str, prefix: str, scope_reference: str, defined_at: LineIdentifier):
-        super().__init__(SymbolScopeType.NAMED, None, scope_reference)
+    def __init__(
+        self,
+        name: str,
+        prefix: str,
+        scope_reference: str,
+        defined_at: LineIdentifier,
+        reserved_keywords: set[str] | frozenset[str] | None = None,
+    ):
+        super().__init__(
+            SymbolScopeType.NAMED,
+            None,
+            scope_reference,
+            reserved_keywords,
+        )
         self._name = name
         self._prefix = prefix
         self._defined_at = defined_at
@@ -37,13 +49,18 @@ class NamedSymbolScope(SymbolScope):
 class NamedScopeManager:
     """Manage named lexical symbol scopes throughout assembly."""
 
-    def __init__(self, diagnostic_reporter: DiagnosticReporter):
+    def __init__(
+        self,
+        diagnostic_reporter: DiagnosticReporter,
+        reserved_keywords: set[str] | frozenset[str] | None = None,
+    ):
         if diagnostic_reporter is None:
             raise ValueError('DiagnosticReporter is required for NamedScopeManager')
         # Global scope definitions: {scope_name: NamedScopeDefinition}
         self._scope_definitions: dict[str, NamedSymbolScope] = {}
         self._used_prefixes: set[str] = set()
         self._diagnostic_reporter = diagnostic_reporter
+        self._reserved_keywords = reserved_keywords
 
     @property
     def diagnostic_reporter(self) -> DiagnosticReporter:
@@ -100,7 +117,13 @@ class NamedScopeManager:
                     )
 
         # Create the scope definition
-        definition = NamedSymbolScope(name, prefix, name, defined_at)
+        definition = NamedSymbolScope(
+            name,
+            prefix,
+            name,
+            defined_at,
+            self._reserved_keywords,
+        )
         self._scope_definitions[name] = definition
         self._used_prefixes.add(prefix)
 

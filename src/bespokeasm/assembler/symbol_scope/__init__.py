@@ -80,10 +80,18 @@ class SymbolScope:
         scope_type: SymbolScopeType,
         parent: SymbolScope | None,
         scope_reference: str,
+        reserved_keywords: set[str] | frozenset[str] | None = None,
     ) -> None:
         self._type = scope_type
         self._parent = parent
         self._reference = scope_reference
+        if reserved_keywords is None and parent is not None:
+            reserved_keywords = parent.reserved_keywords
+        self._reserved_keywords = frozenset(
+            ASSEMBLER_KEYWORD_SET
+            if reserved_keywords is None
+            else reserved_keywords
+        )
         self._labels = {}
         self._counter_coordinates: dict[str, CounterCoordinate] = {}
         self._ignored_counter_coordinates: dict[str, LineIdentifier] = {}
@@ -106,6 +114,11 @@ class SymbolScope:
     @property
     def reference(self) -> str:
         return self._reference
+
+    @property
+    def reserved_keywords(self) -> frozenset[str]:
+        """Return names unavailable to symbols in this assembly session."""
+        return self._reserved_keywords
 
     def get_label_value(self, label: str, line_id: LineIdentifier) -> int:
         if label in self._labels:
@@ -131,7 +144,7 @@ class SymbolScope:
         """Insert a coordinate into its label-style scope without numeric exposure."""
         symbol_scope = SymbolScopeType.get_symbol_scope(coordinate.label) if scope is None else scope
         base_label = coordinate.label[len(symbol_scope.symbol_prefix):]
-        if base_label in ASSEMBLER_KEYWORD_SET:
+        if base_label in self.reserved_keywords:
             raise ValueError(
                 f"coordinate '{coordinate.label}' cannot use assembler keyword '{base_label}'"
             )
@@ -178,7 +191,7 @@ class SymbolScope:
         # first check to see if label name is a keyword
         # remove label prefix for checking
         base_label = label[len(symbol_scope.symbol_prefix):]
-        if base_label in ASSEMBLER_KEYWORD_SET:
+        if base_label in self.reserved_keywords:
             sys.exit(f"ERROR: {line_id} - Label '{label}' is unallowed because it used an assembler keyword '{base_label}'")
         if symbol_scope.value < self.type.value:
             self.parent.set_label_value(label, value, line_id)
@@ -196,15 +209,39 @@ class SymbolScope:
     _global_scope = None
 
     @classmethod
-    def global_scope(cls, register_labels: set[str]) -> SymbolScope:
-        if cls._global_scope is None:
-            cls._global_scope = GlobalSymbolScope(register_labels)
+    def global_scope(
+        cls,
+        register_labels: set[str],
+        reserved_keywords: set[str] | frozenset[str] | None = None,
+    ) -> SymbolScope:
+        effective_keywords = frozenset(
+            ASSEMBLER_KEYWORD_SET
+            if reserved_keywords is None
+            else reserved_keywords
+        )
+        if (
+            cls._global_scope is None
+            or cls._global_scope.reserved_keywords != effective_keywords
+        ):
+            cls._global_scope = GlobalSymbolScope(
+                register_labels,
+                effective_keywords,
+            )
         return cls._global_scope
 
 
 class GlobalSymbolScope(SymbolScope):
-    def __init__(self, register_labels: set[str]) -> None:
-        super().__init__(SymbolScopeType.GLOBAL, None, '--GLOBAL--')
+    def __init__(
+        self,
+        register_labels: set[str],
+        reserved_keywords: set[str] | frozenset[str] | None = None,
+    ) -> None:
+        super().__init__(
+            SymbolScopeType.GLOBAL,
+            None,
+            '--GLOBAL--',
+            reserved_keywords,
+        )
         self._register_labels = register_labels
 
     def get_label_value(self, label: str, line_id: LineIdentifier) -> int:

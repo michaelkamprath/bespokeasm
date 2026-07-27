@@ -9,7 +9,7 @@ import click
 from bespokeasm import BESPOKEASM_MIN_REQUIRED_STR
 from bespokeasm import BESPOKEASM_VERSION_STR
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
-from bespokeasm.assembler.keywords import ASSEMBLER_KEYWORD_SET
+from bespokeasm.assembler.keywords import assembler_keywords_for_isa
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.model.instruction_set import InstructionSet
 from bespokeasm.assembler.model.operand_set import OperandSet
@@ -57,6 +57,9 @@ class AssemblerModel:
             sys.exit('ERROR: unknown ISA config file type')
 
         self._config = config_dict
+        self._reserved_keywords = frozenset(
+            assembler_keywords_for_isa('flow_counters' in self._config)
+        )
         self._validate_config(is_verbose)
 
         # load ISA version information
@@ -87,7 +90,7 @@ class AssemblerModel:
         self._registers = set(register_names)
         # check to see if any registers named with a keyword
         for reg in self._registers:
-            if reg in ASSEMBLER_KEYWORD_SET:
+            if reg in self._reserved_keywords:
                 sys.exit(f'ERROR: the instruction set configuration file specified an unallowed register name: {reg}')
         self._operand_sets = OperandSetCollection(
             self._config['operand_sets'],
@@ -111,6 +114,7 @@ class AssemblerModel:
                 self.word_segment_size,
                 self._diagnostic_reporter,
                 retain_analysis_semantics=self.analysis_records_enabled,
+                reserved_keywords=self._reserved_keywords,
             )
 
     _FLOW_TRANSFER_VALUES = {
@@ -684,6 +688,11 @@ class AssemblerModel:
         return 'flow_counters' in self._config
 
     @property
+    def reserved_keywords(self) -> frozenset[str]:
+        """Return assembler names reserved for this ISA's enabled features."""
+        return self._reserved_keywords
+
+    @property
     def flow_counters(self) -> dict:
         """Return configured counter classes when static analysis is enabled."""
         if not self._static_analysis_enabled:
@@ -763,7 +772,10 @@ class AssemblerModel:
     @property
     def global_symbol_scope(self) -> SymbolScope:
         if self._global_symbol_scope is None:
-            self._global_symbol_scope = SymbolScope.global_scope(self.registers)
+            self._global_symbol_scope = SymbolScope.global_scope(
+                self.registers,
+                self.reserved_keywords,
+            )
             # add predefined constants to global scope
             predefines_lineid = LineIdentifier(0, os.path.basename(self._config_file))
             for predefined_constant in self.predefined_constants:

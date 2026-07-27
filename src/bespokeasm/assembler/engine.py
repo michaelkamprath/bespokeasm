@@ -78,7 +78,10 @@ class Assembler:
     def assemble_bytecode(self):
         # Create the named scope manager for this assembly session
         diagnostic_reporter = self._diagnostic_reporter
-        named_scope_manager = NamedScopeManager(diagnostic_reporter)
+        named_scope_manager = NamedScopeManager(
+            diagnostic_reporter,
+            self._model.reserved_keywords,
+        )
 
         global_symbol_scope = self._model.global_symbol_scope
         memzone_manager = MemoryZoneManager(
