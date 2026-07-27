@@ -2,7 +2,6 @@ import re
 import sys
 
 from bespokeasm.assembler.analysis import SourceIdentity
-from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.assembler.line_object.emdedded_string import EMBEDDED_STRING_PATTERN
@@ -14,6 +13,7 @@ from bespokeasm.assembler.model.decorators import MNEMONIC_TOKEN_PATTERN
 from bespokeasm.assembler.model.decorators import split_decorated_mnemonic
 from bespokeasm.assembler.model.instruction_parser import InstructioParser
 from bespokeasm.assembler.parsing import split_line_comment
+from bespokeasm.assembler.symbol_scope.named_scope_manager import NamedScopeManager
 
 
 class InstructionLine(LineWithWords):
@@ -191,13 +191,13 @@ class InstructionLine(LineWithWords):
                 self.line_id,
                 self.active_named_scopes,
             ):
-                self.label_scope.set_label_value(label, value, self.line_id)
+                self.symbol_scope.set_label_value(label, value, self.line_id)
 
     def generate_words(self) -> bytearray:
         """Finalize the bytes for this line with the label assignemnts"""
         self._words.extend(
             self._assembled_instruction.get_words(
-                self.label_scope,
+                self.symbol_scope,
                 self.active_named_scopes,
                 self.address,
                 self.word_count,

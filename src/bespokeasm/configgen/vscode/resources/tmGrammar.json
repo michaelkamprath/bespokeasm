@@ -23,7 +23,18 @@
           "name": "keyword.operator.assignment"
         }
       },
-      "match": "^\\s*(\\w*)(?:\\s*)?(\\=|EQU)"
+      "match": "^\\s*(##CONSTANT_PATTERN##)(?:\\s*)?(\\=|EQU)"
+    },
+    "counter_coordinates": {
+      "captures": {
+        "1": {
+          "name": "variable.other.flow.coordinate variable.other.flow.coordinate.definition"
+        },
+        "2": {
+          "name": "keyword.operator.assignment"
+        }
+      },
+      "match": "^\\s*(##SYMBOL_PATTERN##)\\s*(:=)"
     },
     "deferred-addressing": {
       "begin": "(?<!\\[)([\\[]{2})\\b",
@@ -280,7 +291,7 @@
               "name": "punctuation.definition.variable.colon.label"
             }
           },
-          "match": "([a-zA-Z]{1}[\\w\\d_]*)(\\:)"
+          "match": "^\\s*(##GLOBAL_SYMBOL_PATTERN##)\\s*(\\:)"
         },
         {
           "captures": {
@@ -291,7 +302,7 @@
               "name": "punctuation.definition.variable.colon.label"
             }
           },
-          "match": "(\\.{1}[\\w\\d_]*)(\\:)"
+          "match": "^\\s*(##LOCAL_SYMBOL_PATTERN##)\\s*(\\:)"
         },
         {
           "captures": {
@@ -302,22 +313,22 @@
               "name": "punctuation.definition.variable.colon.label"
             }
           },
-          "match": "(_{1}[\\w\\d_]*)(\\:)"
+          "match": "^\\s*(##FILE_SYMBOL_PATTERN##)\\s*(\\:)"
         }
       ]
     },
     "label_usages": {
       "patterns": [
         {
-          "match": "\\b[a-zA-Z][\\w\\d_]*\\b",
+          "match": "(?<![.\\w])##GLOBAL_SYMBOL_PATTERN##(?!\\w)",
           "name": "variable.other.label.usage"
         },
         {
-          "match": "\\.[\\w\\d_]+\\b",
+          "match": "(?<!\\w)##LOCAL_SYMBOL_PATTERN##(?!\\w)",
           "name": "variable.other.label.usage"
         },
         {
-          "match": "_[\\w\\d_]+\\b",
+          "match": "(?<!\\w)##FILE_SYMBOL_PATTERN##(?!\\w)",
           "name": "variable.other.label.usage"
         }
       ]
@@ -386,6 +397,9 @@
     "main": {
       "patterns": [
         {
+          "include": "#counter_coordinates"
+        },
+        {
           "include": "#instructions"
         },
         {
@@ -453,7 +467,7 @@
       ]
     },
     "operands_variables": {
-      "match": "(?<!\\w)([A-Za-z][\\w\\d_]*)\\b",
+      "match": "(?<![.\\w])(##GLOBAL_SYMBOL_PATTERN##)(?!\\w)",
       "name": "variable.parameter.instruction"
     },
     "operators": {

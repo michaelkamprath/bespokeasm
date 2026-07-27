@@ -54,6 +54,7 @@ class SyntaxElement(Enum):
     CONSTANT_NAME = 'constant_name'
     CONSTANT_DEFINITION = 'constant_definition'
     CONSTANT_USAGE = 'constant_usage'
+    FLOW_COORDINATE = 'flow_coordinate'
     COMPILER_LABEL = 'compiler_label'
     PARAMETER = 'parameter'
 
@@ -133,6 +134,7 @@ DEFAULT_COLOR_SCHEME = ColorScheme(
         SyntaxElement.CONSTANT_NAME: '#abd7ed',
         SyntaxElement.CONSTANT_DEFINITION: '#29e768',
         SyntaxElement.CONSTANT_USAGE: '#6fe797',
+        SyntaxElement.FLOW_COORDINATE: '#29e768',
         SyntaxElement.COMPILER_LABEL: '#abedc1',
         SyntaxElement.PARAMETER: '#abd7ed',
 

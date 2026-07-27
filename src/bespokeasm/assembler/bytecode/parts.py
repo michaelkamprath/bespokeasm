@@ -7,10 +7,10 @@ from typing import Literal
 from bespokeasm.assembler.bytecode.value import Value
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.bytecode.word_slice import WordSlice
-from bespokeasm.assembler.label_scope import LabelScope
-from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone import MemoryZone
+from bespokeasm.assembler.symbol_scope import SymbolScope
+from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.expression import ExpressionUseContext
 from bespokeasm.expression import parse_expression
 
@@ -100,7 +100,7 @@ class ByteCodePart:
 
     def get_value(
         self,
-        _label_scope: LabelScope,
+        _symbol_scope: SymbolScope,
         _active_named_scopes: ActiveNamedScopeList,
         _instruction_address: int,
         _instruction_size: int,
@@ -111,7 +111,7 @@ class ByteCodePart:
 
     def get_value_representation(
         self,
-        label_scope: LabelScope,
+        symbol_scope: SymbolScope,
         active_named_scopes: ActiveNamedScopeList,
         instruction_address: int,
         instruction_size: int,
@@ -119,7 +119,7 @@ class ByteCodePart:
     ) -> WordSlice | Value:
         return WordSlice(
             self.get_value(
-                label_scope,
+                symbol_scope,
                 active_named_scopes,
                 instruction_address,
                 instruction_size,
@@ -130,14 +130,14 @@ class ByteCodePart:
 
     def get_words(
             self,
-            label_scope: LabelScope,
+            symbol_scope: SymbolScope,
             active_named_scopes: ActiveNamedScopeList,
             instruction_address: int,
             instruction_size: int,
             bytecode_address: int | None = None,
     ) -> list[Word]:
         value_representation = self.get_value_representation(
-            label_scope,
+            symbol_scope,
             active_named_scopes,
             instruction_address,
             instruction_size,
@@ -186,7 +186,7 @@ class ByteCodePart:
         word_size: int,
         segment_size: int,
         multi_word_endianness: Literal['little', 'big'],
-        label_scope: LabelScope,
+        symbol_scope: SymbolScope,
         active_named_scopes: ActiveNamedScopeList,
         instruction_address: int,
         instruction_size: int,
@@ -244,7 +244,7 @@ class ByteCodePart:
                     if current_word_slices:
                         words.extend(flush_word_slices(word_size, segment_size, multi_word_endianness))
                     words.extend(part.get_words(
-                        label_scope,
+                        symbol_scope,
                         active_named_scopes,
                         instruction_address,
                         instruction_size,
@@ -252,7 +252,7 @@ class ByteCodePart:
                     ))
                 else:
                     value_representation = part.get_value_representation(
-                        label_scope,
+                        symbol_scope,
                         active_named_scopes,
                         instruction_address,
                         instruction_size,
@@ -267,7 +267,7 @@ class ByteCodePart:
                         )
             else:
                 value_representation = part.get_value_representation(
-                    label_scope,
+                    symbol_scope,
                     active_named_scopes,
                     instruction_address,
                     instruction_size,
@@ -334,7 +334,7 @@ class NumericByteCodePart(ByteCodePart):
 
     def get_value(
         self,
-        label_scope: LabelScope,
+        symbol_scope: SymbolScope,
         active_named_scopes: ActiveNamedScopeList,
         instruction_address: int,
         instruction_size: int,
@@ -387,14 +387,14 @@ class ExpressionByteCodePart(ByteCodePart):
 
     def get_value(
         self,
-        label_scope: LabelScope,
+        symbol_scope: SymbolScope,
         active_named_scopes: ActiveNamedScopeList,
         instruction_address: int,
         instruction_size: int,
         bytecode_address: int | None = None,
     ) -> int:
         value = self._parsed_expression.get_value(
-            label_scope,
+            symbol_scope,
             active_named_scopes,
             self.line_id,
         )
@@ -440,14 +440,14 @@ class ExpressionByteCodePartWithValidation(ExpressionByteCodePart):
 
     def get_value(
         self,
-        label_scope: LabelScope,
+        symbol_scope: SymbolScope,
         active_named_scopes: ActiveNamedScopeList,
         instruction_address: int,
         instruction_size: int,
         bytecode_address: int | None = None,
     ) -> int:
         value = super().get_value(
-            label_scope,
+            symbol_scope,
             active_named_scopes,
             instruction_address,
             instruction_size,
@@ -492,14 +492,14 @@ class ExpressionByteCodePartInMemoryZone(ExpressionByteCodePart):
 
     def get_value(
         self,
-        label_scope: LabelScope,
+        symbol_scope: SymbolScope,
         active_named_scopes: ActiveNamedScopeList,
         instruction_address: int,
         instruction_size: int,
         bytecode_address: int | None = None,
     ) -> int:
         value = super().get_value(
-            label_scope,
+            symbol_scope,
             active_named_scopes,
             instruction_address,
             instruction_size,
@@ -552,14 +552,14 @@ class ExpressionEnumerationByteCodePart(ExpressionByteCodePart):
 
     def get_value(
         self,
-        label_scope: LabelScope,
+        symbol_scope: SymbolScope,
         active_named_scopes: ActiveNamedScopeList,
         instruction_address: int,
         instruction_size: int,
         bytecode_address: int | None = None,
     ) -> int:
         value = super().get_value(
-            label_scope,
+            symbol_scope,
             active_named_scopes,
             instruction_address,
             instruction_size,
@@ -612,7 +612,7 @@ class CompositeByteCodePart(ByteCodePart):
 
     def get_value(
         self,
-        label_scope: LabelScope,
+        symbol_scope: SymbolScope,
         active_named_scopes: ActiveNamedScopeList,
         instruction_address: int,
         instruction_size: int,
@@ -626,7 +626,7 @@ class CompositeByteCodePart(ByteCodePart):
         ):
             bits.append_bits(
                 part.get_value(
-                    label_scope,
+                    symbol_scope,
                     active_named_scopes,
                     instruction_address,
                     instruction_size,
@@ -643,7 +643,7 @@ class CompositeByteCodePart(ByteCodePart):
 
     def get_value_representation(
         self,
-        label_scope: LabelScope,
+        symbol_scope: SymbolScope,
         active_named_scopes: ActiveNamedScopeList,
         instruction_address: int,
         instruction_size: int,
@@ -654,7 +654,7 @@ class CompositeByteCodePart(ByteCodePart):
         '''
         return WordSlice(
             self.get_value(
-                label_scope,
+                symbol_scope,
                 active_named_scopes,
                 instruction_address,
                 instruction_size,
@@ -665,7 +665,7 @@ class CompositeByteCodePart(ByteCodePart):
 
     def get_words(
         self,
-        label_scope: LabelScope,
+        symbol_scope: SymbolScope,
         active_named_scopes: ActiveNamedScopeList,
         instruction_address: int,
         instruction_size: int,
@@ -680,7 +680,7 @@ class CompositeByteCodePart(ByteCodePart):
             self.word_size,
             self.segment_size,
             self.multi_word_endian,
-            label_scope,
+            symbol_scope,
             active_named_scopes,
             instruction_address,
             instruction_size,

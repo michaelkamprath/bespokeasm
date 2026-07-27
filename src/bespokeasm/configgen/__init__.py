@@ -2,7 +2,11 @@ import re
 
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.model import AssemblerModel
-from bespokeasm.utilities import PATTERN_ALLOWED_LABELS
+from bespokeasm.utilities import PATTERN_CONSTANT_SYMBOL
+from bespokeasm.utilities import PATTERN_FILE_SYMBOL
+from bespokeasm.utilities import PATTERN_GLOBAL_SYMBOL
+from bespokeasm.utilities import PATTERN_LOCAL_SYMBOL
+from bespokeasm.utilities import PATTERN_SYMBOL
 
 
 class LanguageConfigGenerator:
@@ -81,12 +85,47 @@ class LanguageConfigGenerator:
             file.write(modified_content)
 
     def _label_pattern(self) -> str:
-        pattern = PATTERN_ALLOWED_LABELS.pattern
-        if pattern.startswith('^'):
-            pattern = pattern[1:]
-        if pattern.endswith('$'):
-            pattern = pattern[:-1]
-        return pattern
+        """Return the unanchored canonical pattern for any scoped symbol."""
+        return PATTERN_SYMBOL
+
+    def _constant_pattern(self) -> str:
+        """Return the canonical pattern for a constant symbol."""
+        return PATTERN_CONSTANT_SYMBOL
+
+    def _global_symbol_pattern(self) -> str:
+        """Return the canonical pattern for a global symbol."""
+        return PATTERN_GLOBAL_SYMBOL
+
+    def _file_symbol_pattern(self) -> str:
+        """Return the canonical pattern for a file-scoped symbol."""
+        return PATTERN_FILE_SYMBOL
+
+    def _local_symbol_pattern(self) -> str:
+        """Return the canonical pattern for a local symbol."""
+        return PATTERN_LOCAL_SYMBOL
+
+    def _replace_symbol_pattern_tokens(self, value):
+        """Replace canonical symbol-pattern placeholders recursively."""
+        replacements = {
+            '##SYMBOL_PATTERN##': self._label_pattern(),
+            '##LABEL_PATTERN##': self._label_pattern(),
+            '##CONSTANT_PATTERN##': self._constant_pattern(),
+            '##GLOBAL_SYMBOL_PATTERN##': self._global_symbol_pattern(),
+            '##FILE_SYMBOL_PATTERN##': self._file_symbol_pattern(),
+            '##LOCAL_SYMBOL_PATTERN##': self._local_symbol_pattern(),
+        }
+        if isinstance(value, str):
+            for token, pattern in replacements.items():
+                value = value.replace(token, pattern)
+            return value
+        if isinstance(value, list):
+            for index, item in enumerate(value):
+                value[index] = self._replace_symbol_pattern_tokens(item)
+            return value
+        if isinstance(value, dict):
+            for key, item in value.items():
+                value[key] = self._replace_symbol_pattern_tokens(item)
+        return value
 
     def _mnemonic_pattern(self) -> str:
         mnemonics = list(self.model.instruction_mnemonics) + list(self.model.macro_mnemonics)

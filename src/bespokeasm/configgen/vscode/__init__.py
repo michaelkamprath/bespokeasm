@@ -68,6 +68,11 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.REGISTER, 'variable.language', 'Variables - Language'),
             (SyntaxElement.CONSTANT_DEFINITION, 'variable.other.constant.definition', 'Constants - Definition'),
             (SyntaxElement.CONSTANT_USAGE, 'variable.other.constant.usage', 'Constants - Usage'),
+            (
+                SyntaxElement.FLOW_COORDINATE,
+                'variable.other.flow.coordinate',
+                'Flow Coordinates',
+            ),
             (SyntaxElement.COMPILER_LABEL, 'constant.language', 'Variables - Language Defined'),
             (SyntaxElement.PREPROCESSOR, 'keyword.control.preprocessor', 'Keyword - Preprocessor'),
             (SyntaxElement.DATA_TYPE, 'storage.type', 'Data Types'),
@@ -77,6 +82,12 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.PUNCTUATION_SEPARATOR, 'punctuation.separator', 'Punctuation - Separator'),
             (SyntaxElement.PUNCTUATION_VARIABLE, 'punctuation.definition.variable', 'Punctuation - Variable'),
         ]
+        if not self.model.flow_counters_enabled:
+            scope_mappings = [
+                mapping
+                for mapping in scope_mappings
+                if mapping[0] is not SyntaxElement.FLOW_COORDINATE
+            ]
 
         rules = []
 
@@ -202,7 +213,15 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
         with open(fp) as json_file:
             grammar_json = json.load(json_file)
 
+        self._replace_symbol_pattern_tokens(grammar_json)
         grammar_json['scopeName'] = scope_name
+        if not self.model.flow_counters_enabled:
+            del grammar_json['repository']['counter_coordinates']
+            grammar_json['repository']['main']['patterns'] = [
+                pattern
+                for pattern in grammar_json['repository']['main']['patterns']
+                if pattern.get('include') != '#counter_coordinates'
+            ]
         # handle instructions
         grammar_json['repository']['instructions']['begin'] = self._replace_token_with_regex_list(
             grammar_json['repository']['instructions']['begin'],
@@ -292,12 +311,6 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
                 func_str = item['match']
                 item['match'] = func_str.replace('##EXPRESSION_FUNCTIONS##', func_regex)
 
-        operand_label_defs = grammar_json['repository'].get('operand_label_definitions')
-        if operand_label_defs:
-            for pattern in operand_label_defs.get('patterns', []):
-                if isinstance(pattern, dict) and 'match' in pattern:
-                    pattern['match'] = pattern['match'].replace('##LABEL_PATTERN##', self._label_pattern())
-
         tmGrammar_fp = os.path.join(extension_dir_path, 'syntaxes', 'tmGrammar.json')
         with open(tmGrammar_fp, 'w', encoding='utf-8') as f:
             json.dump(grammar_json, f, ensure_ascii=False, indent=4)
@@ -347,10 +360,20 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
         else:
             register_pattern = '(?!)'
         self._replace_token_in_file(extension_fp, '##LABEL_PATTERN##', label_pattern)
+        self._replace_token_in_file(
+            extension_fp,
+            '##CONSTANT_PATTERN##',
+            self._constant_pattern(),
+        )
         self._replace_token_in_file(extension_fp, '##MNEMONIC_PATTERN##', mnemonic_pattern)
         self._replace_token_in_file(extension_fp, '##REGISTERS##', register_pattern)
         self._replace_token_in_file(label_hover_fp, '##LABEL_PATTERN##', label_pattern)
         self._replace_token_in_file(constants_hover_fp, '##LABEL_PATTERN##', label_pattern)
+        self._replace_token_in_file(
+            constants_hover_fp,
+            '##CONSTANT_PATTERN##',
+            self._constant_pattern(),
+        )
 
         # Generate theme file from central color configuration
         theme_json = self._generate_theme_json(self.language_id)

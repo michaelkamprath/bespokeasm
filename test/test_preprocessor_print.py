@@ -4,15 +4,15 @@ from unittest.mock import patch
 
 from bespokeasm.assembler.assembly_file import AssemblyFile
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
-from bespokeasm.assembler.label_scope import GlobalLabelScope
-from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
-from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object.factory import LineOjectFactory
 from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.preprocessor import Preprocessor
+from bespokeasm.assembler.symbol_scope import GlobalSymbolScope
+from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
+from bespokeasm.assembler.symbol_scope.named_scope_manager import NamedScopeManager
 
 from test import config_files
 from test import test_code
@@ -30,12 +30,12 @@ class TestPreprocessorPrint(unittest.TestCase):
             isa_model.default_origin,
             isa_model.predefined_memory_zones,
         )
-        label_scope = GlobalLabelScope(isa_model.registers)
+        symbol_scope = GlobalSymbolScope(isa_model.registers)
         preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
         named_scope_manager = NamedScopeManager(self.diagnostic_reporter)
 
         asm_fp = pkg_resources.files(test_code).joinpath(asm_filename)
-        asm_obj = AssemblyFile(asm_fp, label_scope, named_scope_manager, named_scope_manager.diagnostic_reporter)
+        asm_obj = AssemblyFile(asm_fp, symbol_scope, named_scope_manager, named_scope_manager.diagnostic_reporter)
 
         return asm_obj.load_line_objects(
             isa_model,
@@ -53,10 +53,10 @@ class TestPreprocessorPrint(unittest.TestCase):
             isa_model.default_origin,
             isa_model.predefined_memory_zones,
         )
-        label_scope = GlobalLabelScope(isa_model.registers)
+        symbol_scope = GlobalSymbolScope(isa_model.registers)
         preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
         active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
-        return isa_model, memzone_mngr, label_scope, preprocessor, active_named_scopes
+        return isa_model, memzone_mngr, symbol_scope, preprocessor, active_named_scopes
 
     def test_print_basic_always(self):
         with patch('click.echo') as mock_echo:
@@ -97,14 +97,14 @@ class TestPreprocessorPrint(unittest.TestCase):
                 self.assertEqual(calls.count('unterminated'), 0, 'no printing should occur when malformed')
 
     def test_print_line_object_parsing_basic(self):
-        isa_model, memzone_mngr, label_scope, preprocessor, active_named_scopes = self._model_and_state()
+        isa_model, memzone_mngr, symbol_scope, preprocessor, active_named_scopes = self._model_and_state()
         lineid = LineIdentifier(10, 'test_print_line_object_parsing_basic')
         with patch('click.echo') as mock_echo:
             objs = LineOjectFactory.parse_line(
                 lineid,
                 '#print "inline"',
                 isa_model,
-                label_scope,
+                symbol_scope,
                 active_named_scopes,
                 memzone_mngr.global_zone,
                 memzone_mngr,
@@ -122,7 +122,7 @@ class TestPreprocessorPrint(unittest.TestCase):
             self.assertIn('inline', calls)
 
     def test_print_line_object_parsing_min_verbosity(self):
-        isa_model, memzone_mngr, label_scope, preprocessor, active_named_scopes = self._model_and_state()
+        isa_model, memzone_mngr, symbol_scope, preprocessor, active_named_scopes = self._model_and_state()
         lineid = LineIdentifier(11, 'test_print_line_object_parsing_min_verbosity')
         # below threshold
         with patch('click.echo') as mock_echo_low:
@@ -130,7 +130,7 @@ class TestPreprocessorPrint(unittest.TestCase):
                 lineid,
                 '#print 3 "gated"',
                 isa_model,
-                label_scope,
+                symbol_scope,
                 active_named_scopes,
                 memzone_mngr.global_zone,
                 memzone_mngr,
@@ -149,7 +149,7 @@ class TestPreprocessorPrint(unittest.TestCase):
                 lineid,
                 '#print 3 "gated"',
                 isa_model,
-                label_scope,
+                symbol_scope,
                 active_named_scopes,
                 memzone_mngr.global_zone,
                 memzone_mngr,

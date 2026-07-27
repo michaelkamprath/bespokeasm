@@ -75,6 +75,11 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.CONSTANT_DEFINITION, 'variable.other.constant.definition', 'Constants - Definitions'),
             # (SyntaxElement.CONSTANT_USAGE, 'variable.other.constant.usage', 'Constants - Usages'),
             (SyntaxElement.CONSTANT_NAME, 'variable.other.constant', 'Variables - Constant'),
+            (
+                SyntaxElement.FLOW_COORDINATE,
+                'variable.other.flow.coordinate',
+                'Flow Coordinates',
+            ),
             (SyntaxElement.COMPILER_LABEL, 'constant.language', 'Variables - Language Defined'),
             (SyntaxElement.PREPROCESSOR, 'keyword.control.preprocessor', 'Keyword - Preprocessor'),
             (SyntaxElement.DATA_TYPE, 'storage.type', 'Data Types'),
@@ -84,6 +89,12 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.PUNCTUATION_SEPARATOR, 'punctuation.separator', 'Punctuation - Separator'),
             (SyntaxElement.PUNCTUATION_VARIABLE, 'punctuation.definition.variable', 'Punctuation - Variable'),
         ]
+        if not self.model.flow_counters_enabled:
+            scope_mappings = [
+                mapping
+                for mapping in scope_mappings
+                if mapping[0] is not SyntaxElement.FLOW_COORDINATE
+            ]
 
         rules = []
 
@@ -168,6 +179,14 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             syntax_dict = yaml_loader.load(fp)
         except Exception as exc:
             sys.exit(f'ERROR: {exc}')
+        self._replace_symbol_pattern_tokens(syntax_dict)
+        if not self.model.flow_counters_enabled:
+            del syntax_dict['contexts']['counter_coordinates']
+            syntax_dict['contexts']['main'] = [
+                rule
+                for rule in syntax_dict['contexts']['main']
+                if rule.get('include') != 'counter_coordinates'
+            ]
 
         # handle instructions
         update_instructions = False
@@ -228,13 +247,6 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         else:
             # remove the registers syntax
             del syntax_dict['contexts']['registers']
-
-        if 'operand_label_definitions' in syntax_dict['contexts']:
-            syntax_dict['contexts']['operand_label_definitions'][0]['match'] = \
-                syntax_dict['contexts']['operand_label_definitions'][0]['match'].replace(
-                    '##LABEL_PATTERN##',
-                    self._label_pattern(),
-                )
 
         # handle compiler predefined labels and built-in constants
         from bespokeasm.assembler.keywords import BUILTIN_CONSTANTS_SET
@@ -356,6 +368,11 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         shutil.copy(str(fp), hover_plugin_fp)
         self._replace_token_in_file(hover_plugin_fp, '##PACKAGE_NAME##', self.language_name)
         self._replace_token_in_file(hover_plugin_fp, '##LABEL_PATTERN##', self._label_pattern())
+        self._replace_token_in_file(
+            hover_plugin_fp,
+            '##CONSTANT_PATTERN##',
+            self._constant_pattern(),
+        )
         self._replace_token_in_file(hover_plugin_fp, '##MNEMONIC_PATTERN##', self._mnemonic_pattern())
         if self.model.registers:
             register_regex = self._replace_token_with_regex_list(

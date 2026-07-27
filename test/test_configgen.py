@@ -105,6 +105,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIn(SyntaxElement.OPERAND_LABEL_AT, DEFAULT_COLOR_SCHEME.colors)
         self.assertIn(SyntaxElement.OPERAND_LABEL_NAME, DEFAULT_COLOR_SCHEME.colors)
         self.assertIn(SyntaxElement.OPERAND_LABEL_COLON, DEFAULT_COLOR_SCHEME.colors)
+        self.assertIn(SyntaxElement.FLOW_COORDINATE, DEFAULT_COLOR_SCHEME.colors)
 
         test_dir = tempfile.mkdtemp()
         config_file = pkg_resources.files(config_files).joinpath('test_operand_labels.yaml')
@@ -318,7 +319,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertNotIn('#label_usages', pattern_includes)
         self.assertEqual(
             grammar_json['repository']['operands_variables']['match'],
-            '(?<!\\w)([A-Za-z][\\w\\d_]*)\\b',
+            '(?<![.\\w])([a-zA-Z][a-zA-Z0-9_]*)(?!\\w)',
             'operand variables should not match dot/underscore-prefixed labels'
         )
         # there should be no macros for this ISA

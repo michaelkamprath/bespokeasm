@@ -6,9 +6,10 @@ from dataclasses import dataclass
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.model.operand import OperandType
 from bespokeasm.utilities import is_valid_label
+from bespokeasm.utilities import PATTERN_SYMBOL
 
 
-_OPERAND_LABEL_PATTERN = re.compile(r'@([._a-zA-Z][a-zA-Z0-9_]*):')
+_OPERAND_LABEL_PATTERN = re.compile(fr'@({PATTERN_SYMBOL}):')
 
 _SUPPORTED_OPERAND_LABEL_TYPES = {
     OperandType.NUMERIC,

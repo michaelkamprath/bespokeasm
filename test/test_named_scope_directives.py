@@ -2,12 +2,12 @@ import unittest
 from unittest.mock import Mock
 
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
-from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object.preprocessor_line.create_scope import CreateScopeLine
 from bespokeasm.assembler.line_object.preprocessor_line.deactivate_scope import DeactivateScopeLine
 from bespokeasm.assembler.line_object.preprocessor_line.use_scope import UseScopeLine
 from bespokeasm.assembler.memory_zone import MemoryZone
+from bespokeasm.assembler.symbol_scope.named_scope_manager import NamedScopeManager
 
 
 class TestNamedScopeDirectives(unittest.TestCase):
@@ -215,8 +215,8 @@ class TestNamedScopeDirectives(unittest.TestCase):
         If a label could match multiple scope prefixes, the most recently activated
         scope's prefix is checked first due to the order in the active scope list.
         """
-        from bespokeasm.assembler.label_scope import LabelScope, LabelScopeType
-        from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
+        from bespokeasm.assembler.symbol_scope import SymbolScope, SymbolScopeType
+        from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
 
         # Create two scopes with different prefixes
         self.named_scope_manager.create_scope('scope_a', 'a_', LineIdentifier(1, 'test.asm'))
@@ -237,11 +237,11 @@ class TestNamedScopeDirectives(unittest.TestCase):
         scope_a_def = self.named_scope_manager.get_scope_definition('scope_a')
         scope_b_def = self.named_scope_manager.get_scope_definition('scope_b')
 
-        scope_a_def.set_label_value('a_label', 100, LineIdentifier(3, 'test.asm'), LabelScopeType.NAMED)
-        scope_b_def.set_label_value('b_label', 200, LineIdentifier(4, 'test.asm'), LabelScopeType.NAMED)
+        scope_a_def.set_label_value('a_label', 100, LineIdentifier(3, 'test.asm'), SymbolScopeType.NAMED)
+        scope_b_def.set_label_value('b_label', 200, LineIdentifier(4, 'test.asm'), SymbolScopeType.NAMED)
 
         # Create a dummy current scope for fallback
-        current_scope = LabelScope(LabelScopeType.GLOBAL, None, 'global')
+        current_scope = SymbolScope(SymbolScopeType.GLOBAL, None, 'global')
 
         # Get label value for b_label - should return value from scope_b
         value = self.named_scope_manager.get_label_value(

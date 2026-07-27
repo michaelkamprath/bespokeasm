@@ -1,12 +1,12 @@
 import re
 import unittest
 
-from bespokeasm.assembler.line_object.utility import is_valid_label
-from bespokeasm.assembler.line_object.utility import PATTERN_ALLOWED_LABELS
+from bespokeasm.utilities import is_valid_label
+from bespokeasm.utilities import PATTERN_ALLOWED_LABELS
 
 
-class TestLineObjectUtility(unittest.TestCase):
-    """Test cases for the utility functions in assembler.line_object.utility"""
+class TestSymbolUtility(unittest.TestCase):
+    """Test the canonical symbol patterns in ``bespokeasm.utilities``."""
 
     def test_valid_label_patterns(self):
         """Test various valid label patterns"""

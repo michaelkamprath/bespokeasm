@@ -6,8 +6,6 @@ from bespokeasm.assembler.assembly_file import AssemblyFile
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.flow_analysis import FlowLinearAnalyzer
-from bespokeasm.assembler.label_scope import LabelScopeType
-from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object import LineWithWords
@@ -19,6 +17,9 @@ from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.pretty_printer.factory import PrettyPrinterFactory
+from bespokeasm.assembler.symbol_scope import SymbolScopeType
+from bespokeasm.assembler.symbol_scope.flow_symbols import FlowSymbolError
+from bespokeasm.assembler.symbol_scope.named_scope_manager import NamedScopeManager
 
 
 class Assembler:
@@ -79,7 +80,7 @@ class Assembler:
         diagnostic_reporter = self._diagnostic_reporter
         named_scope_manager = NamedScopeManager(diagnostic_reporter)
 
-        global_label_scope = self._model.global_label_scope
+        global_symbol_scope = self._model.global_symbol_scope
         memzone_manager = MemoryZoneManager(
             self._model.address_size,
             self._model.default_origin,
@@ -118,11 +119,11 @@ class Assembler:
             data_obj.set_start_address(address)
             predefined_line_obs.append(data_obj)
             # set data object's label
-            global_label_scope.set_label_value(
+            global_symbol_scope.set_label_value(
                 label,
                 address,
                 predefines_lineid,
-                scope=LabelScopeType.GLOBAL,
+                scope=SymbolScopeType.GLOBAL,
             )
 
             # add its label to the global scope
@@ -150,7 +151,7 @@ class Assembler:
                 min_verbosity=2,
             )
 
-        asm_file = AssemblyFile(self._source_file, global_label_scope, named_scope_manager, diagnostic_reporter)
+        asm_file = AssemblyFile(self._source_file, global_symbol_scope, named_scope_manager, diagnostic_reporter)
         line_obs: list[LineObject] = asm_file.load_line_objects(
             self._model,
             include_dirs,
@@ -208,7 +209,7 @@ class Assembler:
                     lobj.active_named_scopes
                 ):
                     # if not in an active named scope, set to the current scope
-                    lobj.label_scope.set_label_value(
+                    lobj.symbol_scope.set_label_value(
                         lobj.get_label(),
                         lobj.get_value(),
                         lobj.line_id,
@@ -265,6 +266,12 @@ class Assembler:
             if isinstance(lobj, LineWithWords):
                 try:
                     lobj.generate_words()
+                except FlowSymbolError as error:
+                    diagnostic_reporter.error(
+                        lobj.line_id,
+                        str(error),
+                        category='flow',
+                    )
                 except ValueError as e:
                     diagnostic_reporter.error(
                         lobj.line_id,

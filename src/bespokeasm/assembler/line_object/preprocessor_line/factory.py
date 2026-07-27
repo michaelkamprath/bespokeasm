@@ -1,5 +1,3 @@
-from bespokeasm.assembler.label_scope import LabelScope
-from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object.preprocessor_line.condition_line import CONDITIONAL_LINE_PREFIX_LIST
@@ -19,6 +17,8 @@ from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
+from bespokeasm.assembler.symbol_scope import SymbolScope
+from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
 
 
 class PreprocessorLineFactory:
@@ -29,7 +29,7 @@ class PreprocessorLineFactory:
         instruction: str,
         comment: str,
         isa_model: AssemblerModel,
-        label_scope: LabelScope,
+        symbol_scope: SymbolScope,
         active_named_scopes: ActiveNamedScopeList,
         current_memzone: MemoryZone,
         memzone_manager: MemoryZoneManager,

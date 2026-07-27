@@ -3,11 +3,11 @@ from __future__ import annotations
 import re
 import sys
 
-from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import INSTRUCTION_EXPRESSION_PATTERN
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.symbol import SYMBOL_PATTERN
+from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.expression import ExpressionNode
 from bespokeasm.expression import parse_expression
 

@@ -11,9 +11,10 @@ import operator
 import re
 import sys
 
-from bespokeasm.assembler.label_scope import LabelScope
-from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.symbol_scope import SymbolScope
+from bespokeasm.assembler.symbol_scope.flow_symbols import FlowSymbolError
+from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.utilities import is_explicit_numeric_string
 from bespokeasm.utilities import is_unprefixed_numeric_string
 from bespokeasm.utilities import is_valid_label
@@ -131,27 +132,44 @@ class ExpressionNode:
 
     def _numeric_value(
         self,
-        label_scope: LabelScope | None,
+        symbol_scope: SymbolScope | None,
         active_named_scopes: ActiveNamedScopeList,
         line_id: LineIdentifier,
     ) -> int:
         if self.token_type == TokenType.T_NUM:
             return self.value
         elif self.token_type in [TokenType.T_LABEL, TokenType.T_LABEL_OR_NUM]:
-            if label_scope is None:
+            if symbol_scope is None:
                 if self.token_type == TokenType.T_LABEL_OR_NUM:
                     return parse_numeric_string(self.value, self.default_numeric_base)
-                sys.exit(f'ERROR - INTERNAL: {line_id} - Label {self.value} has no label scope = {self}')
+                sys.exit(f'ERROR - INTERNAL: {line_id} - Label {self.value} has no symbol scope = {self}')
             # in ths case value is a label
             if active_named_scopes is not None:
                 val = active_named_scopes.named_scope_manager.get_label_value(
-                    self.value, label_scope, active_named_scopes, line_id
+                    self.value, symbol_scope, active_named_scopes, line_id
                 )
             else:
-                val = label_scope.get_label_value(self.value, line_id)
-            if val is None and self.token_type == TokenType.T_LABEL_OR_NUM:
-                return parse_numeric_string(self.value, self.default_numeric_base)
+                val = symbol_scope.get_label_value(self.value, line_id)
             if val is None:
+                coordinate = (
+                    active_named_scopes.named_scope_manager.get_counter_coordinate(
+                        self.value,
+                        symbol_scope,
+                        active_named_scopes,
+                    )
+                    if active_named_scopes is not None
+                    else symbol_scope.get_counter_coordinate(self.value)
+                )
+                if coordinate is not None:
+                    raise FlowSymbolError(
+                        f'counter coordinate "{self.value}" may only be used through OFFSET()'
+                    )
+                if symbol_scope.ignored_counter_coordinate_site(self.value) is not None:
+                    raise FlowSymbolError(
+                        f'static analysis is disabled; cannot resolve {self.value}'
+                    )
+                if self.token_type == TokenType.T_LABEL_OR_NUM:
+                    return parse_numeric_string(self.value, self.default_numeric_base)
                 sys.exit(f'ERROR: {line_id} - Label {self.value} resolves to NONE = {self}')
             return val
         else:
@@ -160,12 +178,12 @@ class ExpressionNode:
 
     def _compute(
         self,
-        label_scope: LabelScope,
+        symbol_scope: SymbolScope,
         active_named_scopes: ActiveNamedScopeList,
         line_id: LineIdentifier
     ) -> int:
         if self.token_type in [TokenType.T_NUM, TokenType.T_LABEL, TokenType.T_LABEL_OR_NUM]:
-            return self._numeric_value(label_scope, active_named_scopes, line_id)
+            return self._numeric_value(symbol_scope, active_named_scopes, line_id)
         if self.token_type in [TokenType.T_COUNTER, TokenType.T_OFFSET]:
             if hasattr(self, '_resolved_flow_value'):
                 return self._resolved_flow_value
@@ -177,7 +195,7 @@ class ExpressionNode:
             byte_idx = 0
             if self.token_type == TokenType.T_BYTE:
                 byte_idx = int(self.value[4])
-            arg_value = int(self.left_child._compute(label_scope, active_named_scopes, line_id))
+            arg_value = int(self.left_child._compute(symbol_scope, active_named_scopes, line_id))
             byte_count = max(((abs(arg_value).bit_length() + 7) // 8), byte_idx+1)
             masked_arg = arg_value & (2**(8 * byte_count) - 1)
             try:
@@ -188,12 +206,12 @@ class ExpressionNode:
                 )
             return arg_value_bytes[byte_idx]
         elif self.token_type == TokenType.T_NEGATION:
-            arg_value = self.left_child._compute(label_scope, active_named_scopes, line_id)
+            arg_value = self.left_child._compute(symbol_scope, active_named_scopes, line_id)
             operation = ExpressionNode._operations[self.token_type]
             return operation(arg_value)
         else:
-            left_result = self.left_child._compute(label_scope, active_named_scopes, line_id)
-            right_result = self.right_child._compute(label_scope, active_named_scopes, line_id)
+            left_result = self.left_child._compute(symbol_scope, active_named_scopes, line_id)
+            right_result = self.right_child._compute(symbol_scope, active_named_scopes, line_id)
             operation = ExpressionNode._operations[self.token_type]
             if self.token_type in [
                         TokenType.T_AND,
@@ -211,11 +229,11 @@ class ExpressionNode:
 
     def get_value(
         self,
-        label_scope: LabelScope,
+        symbol_scope: SymbolScope,
         active_named_scopes: ActiveNamedScopeList,
         line_id: LineIdentifier
     ) -> int:
-        calculated_value = self._compute(label_scope, active_named_scopes, line_id)
+        calculated_value = self._compute(symbol_scope, active_named_scopes, line_id)
         return int(calculated_value)
 
     def contains_register_labels(self, register_labels: set[str]) -> bool:
@@ -252,13 +270,9 @@ def parse_expression(
     *,
     context: ExpressionUseContext | None = None,
 ) -> ExpressionNode:
-    """Parse a source numeric expression, including M1 ``COUNTER()``."""
+    """Parse a source numeric expression with deferred flow-value support."""
     ast = _parse_expression_ast(line_id, expression, default_numeric_base)
     flow_nodes = ast.deferred_flow_nodes()
-    if any(node.token_type == TokenType.T_OFFSET for node in flow_nodes):
-        raise SyntaxError(
-            f'ERROR: {line_id} - invalid token in numeric expression'
-        )
     if flow_nodes and context is None:
         raise SyntaxError(
             f'ERROR: {line_id} - flow expression has no tagged use context'

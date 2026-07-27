@@ -6,13 +6,13 @@ import unittest
 
 from bespokeasm.assembler.assembly_file import AssemblyFile
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
-from bespokeasm.assembler.label_scope import LabelScopeType
-from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.preprocessor import Preprocessor
+from bespokeasm.assembler.symbol_scope import SymbolScopeType
+from bespokeasm.assembler.symbol_scope.named_scope_manager import NamedScopeManager
 
 from test import config_files
 
@@ -36,7 +36,7 @@ class TestNamedScopeIsolation(unittest.TestCase):
         self.named_scope_manager = NamedScopeManager(self.diagnostic_reporter)
 
         # Create global label scope with named scope manager
-        self.global_scope = self.isa_model.global_label_scope
+        self.global_scope = self.isa_model.global_symbol_scope
 
         # Create memory zone manager
         self.memzone_manager = MemoryZoneManager(
@@ -139,7 +139,7 @@ _file_local_label: .byte 10
             # look for the `jmp` instruction
             if isinstance(lobj, InstructionLine) and lobj.instruction == 'jmp ml16_signed_multiply':
                 # assert label scope is local and there are no active named scopes
-                self.assertEqual(lobj.label_scope.type, LabelScopeType.LOCAL)
+                self.assertEqual(lobj.symbol_scope.type, SymbolScopeType.LOCAL)
                 self.assertEqual(lobj.active_named_scopes, [])
 
     def test_named_scope_labels_should_be_accessible_when_scope_active(self):
@@ -293,7 +293,7 @@ _file_local_label: .byte 10
             # look for the `jmp` instruction
             if isinstance(lobj, InstructionLine) and lobj.instruction == 'jmp ml16_signed_multiply':
                 # assert label scope is local and there are no active named scopes
-                self.assertEqual(lobj.label_scope.type, LabelScopeType.LOCAL)
+                self.assertEqual(lobj.symbol_scope.type, SymbolScopeType.LOCAL)
                 self.assertEqual(lobj.active_named_scopes, ['mathlib16'])
 
 

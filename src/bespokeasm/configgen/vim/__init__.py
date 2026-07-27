@@ -131,6 +131,8 @@ class VimConfigGenerator(LanguageConfigGenerator):
             (f'{lang_group}Macro', SyntaxElement.MACRO),
             (f'{lang_group}Register', SyntaxElement.REGISTER),
             (f'{lang_group}ConstName', SyntaxElement.CONSTANT_NAME),
+            (f'{lang_group}FlowCoordinateDefinition', SyntaxElement.FLOW_COORDINATE),
+            (f'{lang_group}FlowAssignment', SyntaxElement.OPERATOR),
             (f'{lang_group}CompilerLabel', SyntaxElement.COMPILER_LABEL),
             (f'{lang_group}PreProc', SyntaxElement.PREPROCESSOR),
             (f'{lang_group}PreProcPunc', SyntaxElement.PUNCTUATION_PREPROCESSOR),
@@ -229,6 +231,17 @@ ctermbg=NONE gui=bold cterm=bold')
         # space-separated; do not escape to allow Vim to treat each as a keyword
         return ' '.join(items)
 
+    @staticmethod
+    def _vim_symbol_pattern(pattern: str) -> str:
+        """Translate a canonical Python/TextMate symbol pattern to Vim regex."""
+        return (
+            pattern
+            .replace('(?!_)', r'\%(_\)\@!')
+            .replace('(?:', r'\%(')
+            .replace('|', r'\|')
+            .replace('+', r'\+')
+        )
+
     def _build_syntax_vim(self, vim_filetype: str) -> str:
         # Collect token groups
         from bespokeasm.assembler.keywords import BUILTIN_CONSTANTS_SET
@@ -265,6 +278,8 @@ ctermbg=NONE gui=bold cterm=bold')
         else:
             labels_alt = ''
         expr_funcs_alt = self._alternation(expr_functions)
+        symbol_pattern = self._vim_symbol_pattern(self._label_pattern())
+        constant_pattern = self._vim_symbol_pattern(self._constant_pattern())
 
         lang_group = vim_filetype
         bracket_contains = ','.join([
@@ -336,7 +351,7 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
             fr"syn match {lang_group}Escape /\\x[0-9A-Fa-f]\{{2}}\|\\o[0-7]\{{2}}\|\\[abfnrtv\"']\|\\\\/ contained"
         )
         lines.append(fr'syn match {lang_group}Separator /,/ contained')
-        lines.append(fr'syn match {lang_group}Param /\<[A-Za-z_][A-Za-z0-9_.]*\>/ contained')
+        lines.append(fr'syn match {lang_group}Param /{symbol_pattern}/ contained')
         # Numbers (split for per-type coloring)
         # - Ensure prefixes like '$' and '%' are included in the match
         # - Prevent numbers from being highlighted inside strings
@@ -347,26 +362,45 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         lines.append(fr'syn match {lang_group}DecNumber /\<\d\+\>/')
         lines.append(f"syn match {lang_group}CharNumber /'.'/")
         # Labels
-        lines.append(fr'syn match {lang_group}LabelName /^\s*\%(' + '\\.' + '\\w\\+\\|_\\w\\+\\|\\w\\+\\)\\s*\\ze:/ contained')
+        lines.append(
+            fr'syn match {lang_group}LabelName '
+            fr'/^\s*{symbol_pattern}\s*\ze:/ contained'
+        )
         lines.append(fr'syn match {lang_group}LabelColon /:/ contained')
         lines.append(
-            fr'syn match {lang_group}LabelName /^\s*\%('
-            + '\\.'
-            + f'\\w\\+\\|_\\w\\+\\|\\w\\+\\)\\s*:/ contains={lang_group}LabelName,{lang_group}LabelColon'
+            fr'syn match {lang_group}LabelName '
+            fr'/^\s*{symbol_pattern}\s*:/ '
+            fr'contains={lang_group}LabelName,{lang_group}LabelColon'
         )
         lines.append(
-            fr'syn match {lang_group}OperandLabelAt /@\ze\%(\.\|_\|[A-Za-z]\)\w*\s*:/'
+            fr'syn match {lang_group}OperandLabelAt /@\ze{symbol_pattern}\s*:/'
         )
         lines.append(
-            fr'syn match {lang_group}OperandLabelName /\%(@\)\@<=\%(\.\w\+\|_\w\+\|[A-Za-z]\w*\)\ze\s*:/'
+            fr'syn match {lang_group}OperandLabelName '
+            fr'/\%(@\)\@<={symbol_pattern}\ze\s*:/'
         )
         lines.append(
-            fr'syn match {lang_group}OperandLabelColon /\%(@\%(\.\|_\|[A-Za-z]\)\w*\s*\)\@<=:/'
+            fr'syn match {lang_group}OperandLabelColon '
+            fr'/\%(@{symbol_pattern}\s*\)\@<=:/'
         )
 
         # Constant assignments (name before '=' or EQU at start-of-line)
-        lines.append(fr'syn match {lang_group}ConstName /^\s*\zs\w\+\ze\s*\%(=\|EQU\)/')
-        lines.append(fr'syn match {lang_group}AssignOp /^\s*\w\+\s*\zs\%(=\|EQU\)/')
+        lines.append(
+            fr'syn match {lang_group}ConstName '
+            fr'/^\s*\zs{constant_pattern}\ze\s*\%(=\|EQU\)/'
+        )
+        lines.append(
+            fr'syn match {lang_group}AssignOp '
+            fr'/^\s*{constant_pattern}\s*\zs\%(=\|EQU\)/'
+        )
+        lines.append(
+            fr'syn match {lang_group}FlowCoordinateDefinition '
+            fr'/^\s*\zs{symbol_pattern}\ze\s*:=/'
+        )
+        lines.append(
+            fr'syn match {lang_group}FlowAssignment '
+            fr'/^\s*{symbol_pattern}\s*\zs:=/'
+        )
         # Directives and datatypes
         for w in directives_words:
             lines.append(
@@ -464,6 +498,8 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         lines.append(f'hi def link {lang_group}Instruction Keyword')
         lines.append(f'hi def link {lang_group}Macro Keyword')
         lines.append(f'hi def link {lang_group}ConstName Constant')
+        lines.append(f'hi def link {lang_group}FlowCoordinateDefinition Identifier')
+        lines.append(f'hi def link {lang_group}FlowAssignment Operator')
         lines.append(f'hi def link {lang_group}CompilerLabel Constant')
         lines.append(f'hi def link {lang_group}Escape SpecialChar')
         lines.append(f'hi def link {lang_group}Bracket Delimiter')
@@ -476,6 +512,10 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         lines.extend(color_lines)
         lines.append('')
         lines.append(f'let b:current_syntax = "{vim_filetype}"')
+
+        if not self.model.flow_counters_enabled:
+            flow_group_prefix = f'{lang_group}Flow'
+            lines = [line for line in lines if flow_group_prefix not in line]
 
         return '\n'.join(lines) + '\n'
 
@@ -494,6 +534,7 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         # Vim user-defined command names cannot contain underscores
         # (see :help E182 / :help command-name).
         cmd_suffix = vim_filetype.replace('_', '')
+        symbol_pattern = self._vim_symbol_pattern(self._label_pattern())
         lines = [
             '" BespokeASM generated ftplugin.',
             '" Known limitations:',
@@ -514,12 +555,12 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
             "  for l:lnum in range(1, line('$'))",
             '    let l:line = getline(l:lnum)',
             "    let l:line = substitute(l:line, ';.*$', '', '')",
-            "    let l:m = matchlist(l:line, '^\\s*\\(\\.\\?\\w\\+\\)\\s*:')",
+            f"    let l:m = matchlist(l:line, '^\\s*\\({symbol_pattern}\\)\\s*:')",
             '    if !empty(l:m)',
             '      let l:globals[l:m[1]] = 1',
             '      continue',
             '    endif',
-            "    let l:m = matchlist(l:line, '^\\s*@\\(\\w\\+\\)\\s*:')",
+            f"    let l:m = matchlist(l:line, '^\\s*@\\({symbol_pattern}\\)\\s*:')",
             '    if !empty(l:m)',
             '      let l:locals[l:m[1]] = 1',
             '    endif',
@@ -594,6 +635,8 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
             docs[f'.{name.lower()}'] = doc
         for name, doc in directives.get('preprocessor', {}).items():
             docs[f'#{name.lower()}'] = doc
+        for name, doc in directives.get('counter_coordinate', {}).items():
+            docs[name.lower()] = doc
 
         predefined = hover_docs.get('predefined', {})
         for category in ('constants', 'data', 'memory_zones'):

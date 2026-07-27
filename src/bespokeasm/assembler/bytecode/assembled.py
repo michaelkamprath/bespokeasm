@@ -5,9 +5,9 @@ from typing import Literal
 from bespokeasm.assembler.analysis import InstructionAnalysisRecord
 from bespokeasm.assembler.bytecode.parts import ByteCodePart
 from bespokeasm.assembler.bytecode.word import Word
-from bespokeasm.assembler.label_scope import LabelScope
-from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.symbol_scope import SymbolScope
+from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.expression import ExpressionNode
 
 
@@ -142,7 +142,7 @@ class AssembledInstruction:
 
     def get_words(
             self,
-            label_scope: LabelScope,
+            symbol_scope: SymbolScope,
             active_named_scopes: ActiveNamedScopeList,
             instruction_address: int,
             instruction_size: int,
@@ -150,7 +150,7 @@ class AssembledInstruction:
         '''
         Returns a list of words that represent the assembled instruction.
 
-        :param label_scope: The label scope to use for resolving label values.
+        :param symbol_scope: The lexical symbol scope used to resolve label values.
         :param instruction_address: The address of the instruction.
         :param instruction_size: The size of the instruction in words.
         :returns: A list of words that represent the assembled instruction.
@@ -160,7 +160,7 @@ class AssembledInstruction:
             word_size=self._word_size,
             segment_size=self._segment_size,
             multi_word_endianness=self._multi_word_endian,
-            label_scope=label_scope,
+            symbol_scope=symbol_scope,
             active_named_scopes=active_named_scopes,
             instruction_address=instruction_address,
             instruction_size=instruction_size,

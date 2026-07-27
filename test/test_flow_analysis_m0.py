@@ -14,10 +14,10 @@ from bespokeasm.assembler.analysis import OperandSemanticKind
 from bespokeasm.assembler.analysis import SourceIdentity
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.engine import Assembler
-from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.assembler.symbol_scope import SymbolScope
 from bespokeasm.cli import build_cli
 from bespokeasm.cli import CommandHandlers
 from bespokeasm.expression import parse_deferred_flow_expression
@@ -33,10 +33,10 @@ FLOW_SOURCE_PATH = M0_DEV_HARNESS_DIR / 'analysis-records.asm'
 
 
 @pytest.fixture(autouse=True)
-def _reset_global_label_scope():
-    LabelScope._global_scope = None
+def _reset_global_symbol_scope():
+    SymbolScope._global_scope = None
     yield
-    LabelScope._global_scope = None
+    SymbolScope._global_scope = None
 
 
 def _load_flow_config() -> dict:
@@ -152,7 +152,7 @@ def test_m0_records_are_gated_and_bytecode_is_invariant(tmp_path):
         source,
         output_name='enabled.bin',
     )
-    LabelScope._global_scope = None
+    SymbolScope._global_scope = None
     disabled = _assembler(
         tmp_path,
         FLOW_CONFIG_PATH,
@@ -160,7 +160,7 @@ def test_m0_records_are_gated_and_bytecode_is_invariant(tmp_path):
         static_analysis=False,
         output_name='disabled.bin',
     )
-    LabelScope._global_scope = None
+    SymbolScope._global_scope = None
     no_flow_config = _write_config(
         tmp_path,
         _without_flow_metadata(_load_flow_config()),
@@ -202,7 +202,7 @@ def test_m0_deferred_flow_expressions_are_recognized_and_context_tagged(context)
     assert frozen.left.expression_context is context
     assert frozen.right.expression_context is context
 
-    with pytest.raises(SyntaxError, match='invalid token in numeric expression'):
+    with pytest.raises(SyntaxError, match='flow expression has no tagged use context'):
         parse_expression(line_id, expression)
 
 
@@ -346,8 +346,16 @@ def test_m0_flow_warning_category_is_elevated_by_warnings_as_errors():
             'undeclared counter "stack"',
         ),
         (
-            lambda config: config['instructions']['nop'].update({'flow_terminal': ['missing']}),
+            lambda config: config['instructions']['nop'].update(
+                {'flow_terminal': {'missing': 'before_effect'}}
+            ),
             'undeclared counter "missing"',
+        ),
+        (
+            lambda config: config['instructions']['nop'].update(
+                {'flow_terminal': {'stack': 'during_effect'}}
+            ),
+            'before_effect',
         ),
         (
             lambda config: config['instructions']['nop'].update(
@@ -390,6 +398,18 @@ def test_m0_flow_warning_category_is_elevated_by_warnings_as_errors():
                 {'exit_policy': 'sometimes'}
             ),
             'exit_policy',
+        ),
+        (
+            lambda config: config['flow_counters']['stack'].update(
+                {'coordinate_offsets': 'sideways'}
+            ),
+            'coordinate_offsets',
+        ),
+        (
+            lambda config: config['flow_counters']['stack'].update(
+                {'allow_zero_offset': 'sometimes'}
+            ),
+            'allow_zero_offset',
         ),
         (
             lambda config: config['instructions']['nop']['flow_effects'].update(

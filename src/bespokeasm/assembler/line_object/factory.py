@@ -1,10 +1,9 @@
 import re
 import sys
 
-from bespokeasm.assembler.label_scope import LabelScope
-from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
+from bespokeasm.assembler.line_object.counter_coordinate_line import CounterCoordinateLine
 from bespokeasm.assembler.line_object.directive_line.factory import DirectiveLine
 from bespokeasm.assembler.line_object.emdedded_string import EmbeddedString
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
@@ -16,11 +15,18 @@ from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.parsing import split_line_comment
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
+from bespokeasm.assembler.symbol_scope import SymbolScope
+from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
+from bespokeasm.utilities import PATTERN_SYMBOL
 
 
 class LineOjectFactory:
     _FLOW_EXPRESSION_PATTERN = re.compile(
-        r'\b(?:COUNTER|OFFSET)\s*\(',
+        r'\b(?:COORDINATE|COUNTER|OFFSET)\s*\(',
+        flags=re.IGNORECASE,
+    )
+    _COORDINATE_EXPRESSION_PATTERN = re.compile(
+        r'\bCOORDINATE\s*\(',
         flags=re.IGNORECASE,
     )
 
@@ -51,6 +57,15 @@ class LineOjectFactory:
         if cls._FLOW_EXPRESSION_PATTERN.search(instruction) is None:
             return
         lowered = instruction.lower()
+        if (
+            cls._COORDINATE_EXPRESSION_PATTERN.search(instruction)
+            and ':=' not in instruction
+        ):
+            cls._flow_expression_error(
+                line_id,
+                model,
+                'anything except a := counter-coordinate declaration',
+            )
         if lowered.startswith('#'):
             cls._flow_expression_error(line_id, model, 'preprocessor directives')
         if lowered.startswith(('.org', '.align', '.zero', '.zerountil')):
@@ -60,7 +75,11 @@ class LineOjectFactory:
             count_expression = arguments[1].split(',', 1)[0] if len(arguments) > 1 else ''
             if cls._FLOW_EXPRESSION_PATTERN.search(count_expression):
                 cls._flow_expression_error(line_id, model, 'fill-count expressions')
-        if re.match(r'^\s*\w+\s*(?:=|\bEQU\b)', instruction, flags=re.IGNORECASE):
+        if re.match(
+            fr'^\s*{PATTERN_SYMBOL}\s*(?:=|\bEQU\b)',
+            instruction,
+            flags=re.IGNORECASE,
+        ):
             cls._flow_expression_error(line_id, model, 'ordinary constant assignments')
 
     @classmethod
@@ -69,7 +88,7 @@ class LineOjectFactory:
                 line_id: LineIdentifier,
                 line_str: str,
                 model: AssemblerModel,
-                label_scope: LabelScope,
+                symbol_scope: SymbolScope,
                 active_named_scopes: ActiveNamedScopeList,
                 current_memzone: MemoryZone,
                 memzone_manager: MemoryZoneManager,
@@ -93,7 +112,7 @@ class LineOjectFactory:
                     instruction_str,
                     comment_str,
                     model,
-                    label_scope,
+                    symbol_scope,
                     active_named_scopes,
                     current_memzone,
                     memzone_manager,
@@ -108,13 +127,33 @@ class LineOjectFactory:
             cls._validate_flow_expression_context(line_id, instruction_str, model)
             # parse instruction
             while len(instruction_str) > 0:
+                # Counter coordinates must precede colon-style label parsing:
+                # otherwise ``.slot := ...`` looks like label ``.slot:``.
+                line_obj = CounterCoordinateLine.factory(
+                    line_id,
+                    instruction_str,
+                    comment_str,
+                    current_memzone,
+                    model.default_numeric_base,
+                )
+                if line_obj is not None:
+                    if label_seen:
+                        sys.exit(
+                            f'ERROR: {line_id} - only one label or coordinate declaration '
+                            'is allowed per line'
+                        )
+                    line_obj_list.append(line_obj)
+                    label_seen = True
+                    instruction_str = instruction_str.replace(line_obj.instruction, '', 1).strip()
+                    continue
+
                 # try label
                 line_obj: LineObject = LabelLine.factory(
                     line_id,
                     instruction_str,
                     comment_str,
                     model.registers,
-                    label_scope,
+                    symbol_scope,
                     active_named_scopes,
                     current_memzone,
                     default_numeric_base=model.default_numeric_base,

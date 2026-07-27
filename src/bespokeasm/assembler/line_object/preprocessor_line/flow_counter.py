@@ -69,12 +69,12 @@ class FlowCounterDirectiveLine(PreprocessorLine):
         return parameters
 
     def evaluate_parameter(self, name: str) -> int | None:
-        """Resolve a parsed parameter in the directive's assigned label scopes."""
+        """Resolve a parsed parameter in the directive's assigned symbol scopes."""
         expression = self._parameters.get(name)
         if expression is None:
             return None
         return expression.get_value(
-            self.label_scope,
+            self.symbol_scope,
             self.active_named_scopes,
             self.line_id,
         )

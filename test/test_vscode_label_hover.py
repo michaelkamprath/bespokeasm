@@ -42,7 +42,9 @@ class TestVSCodeLabelHover(unittest.TestCase):
             encoding='utf-8'
         )
         constants_helper_path.write_text(
-            (helper_path.parent / 'constants_hover.js').read_text().replace('##LABEL_PATTERN##', label_pattern),
+            (helper_path.parent / 'constants_hover.js').read_text()
+            .replace('##LABEL_PATTERN##', label_pattern)
+            .replace('##CONSTANT_PATTERN##', label_pattern),
             encoding='utf-8'
         )
 
@@ -214,7 +216,9 @@ console.log(JSON.stringify({{
             encoding='utf-8'
         )
         (temp_path / 'constants_hover.js').write_text(
-            constants_helper_path.read_text().replace('##LABEL_PATTERN##', label_pattern),
+            constants_helper_path.read_text()
+            .replace('##LABEL_PATTERN##', label_pattern)
+            .replace('##CONSTANT_PATTERN##', label_pattern),
             encoding='utf-8'
         )
         shutil.copy(str(include_files_path), str(temp_path / 'include_files.js'))
@@ -222,6 +226,7 @@ console.log(JSON.stringify({{
         # Read extension.js and extract just the functions we need
         ext_src = extension_path.read_text()
         ext_src = ext_src.replace('##LABEL_PATTERN##', label_pattern)
+        ext_src = ext_src.replace('##CONSTANT_PATTERN##', label_pattern)
         ext_src = ext_src.replace('##MNEMONIC_PATTERN##', r'\bLDA\b|\bJMP\b|\bNOP\b')
         ext_src = ext_src.replace('##REGISTERS##', r'\ba\b|\bb\b')
 
@@ -268,8 +273,9 @@ m.require = function(id) {{
 }};
 
 const extSource = fs.readFileSync('{extension_path.as_posix()}', 'utf8')
-  .replace(/##LABEL_PATTERN##/g, '{label_pattern}')
-  .replace(/##MNEMONIC_PATTERN##/g, '\\\\bLDA\\\\b|\\\\bJMP\\\\b|\\\\bNOP\\\\b')
+      .replace(/##LABEL_PATTERN##/g, '{label_pattern}')
+      .replace(/##CONSTANT_PATTERN##/g, '{label_pattern}')
+      .replace(/##MNEMONIC_PATTERN##/g, '\\\\bLDA\\\\b|\\\\bJMP\\\\b|\\\\bNOP\\\\b')
   .replace(/##REGISTERS##/g, '\\\\ba\\\\b|\\\\bb\\\\b');
 m._compile(extSource, 'extension.js');
 

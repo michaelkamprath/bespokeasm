@@ -1,13 +1,14 @@
 from typing import Literal
 
 from bespokeasm.assembler.bytecode.word import Word
-from bespokeasm.assembler.label_scope import LabelScope
-from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone import MemoryZone
+from bespokeasm.assembler.symbol_scope import SymbolScope
+from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.expression import EXPRESSION_PARTS_PATTERN
+from bespokeasm.utilities import PATTERN_SYMBOL
 
-PATTERN_LABEL_DEFINITION = r'\s*(?:\.?\w+:)'
+PATTERN_LABEL_DEFINITION = fr'\s*(?:{PATTERN_SYMBOL}:)'
 INSTRUCTION_EXPRESSION_PATTERN = r'(?:{}|(?:[ \t]*)(?!(?:[ \t]*\;|[ \t]*\v)|{}))+'.format(
     EXPRESSION_PARTS_PATTERN,
     PATTERN_LABEL_DEFINITION,
@@ -20,7 +21,7 @@ class LineObject:
         self._instruction = instruction.strip()
         self._comment = comment.strip()
         self._address = None
-        self._label_scope = None
+        self._symbol_scope = None
         self._memzone = memzone
         self._compilable = True
         self._is_muted = False
@@ -71,12 +72,12 @@ class LineObject:
         return self._comment
 
     @property
-    def label_scope(self) -> LabelScope:
-        return self._label_scope
+    def symbol_scope(self) -> SymbolScope:
+        return self._symbol_scope
 
-    @label_scope.setter
-    def label_scope(self, value):
-        self._label_scope = value
+    @symbol_scope.setter
+    def symbol_scope(self, value):
+        self._symbol_scope = value
 
     @property
     def active_named_scopes(self) -> ActiveNamedScopeList:

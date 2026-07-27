@@ -45,6 +45,11 @@ def build_hover_docs(assembler_model: AssemblerModel, verbose: int = 0) -> dict:
                 for name, doc in directive_docs.PREPROCESSOR_DIRECTIVE_DOCS.items()
                 if name in preprocessor_names
             },
+            'counter_coordinate': (
+                directive_docs.COUNTER_COORDINATE_DOCS
+                if assembler_model.flow_counters_enabled
+                else {}
+            ),
         },
         'registers': markdown_generator.generate_register_hover_docs(),
         'expression_functions': {

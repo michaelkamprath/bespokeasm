@@ -10,12 +10,12 @@ from bespokeasm import BESPOKEASM_MIN_REQUIRED_STR
 from bespokeasm import BESPOKEASM_VERSION_STR
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.keywords import ASSEMBLER_KEYWORD_SET
-from bespokeasm.assembler.label_scope import LabelScope
-from bespokeasm.assembler.label_scope import LabelScopeType
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.model.instruction_set import InstructionSet
 from bespokeasm.assembler.model.operand_set import OperandSet
 from bespokeasm.assembler.model.operand_set import OperandSetCollection
+from bespokeasm.assembler.symbol_scope import SymbolScope
+from bespokeasm.assembler.symbol_scope import SymbolScopeType
 from bespokeasm.utilities import is_unprefixed_numeric_string
 from bespokeasm.utilities import normalize_default_numeric_base
 from packaging import version
@@ -37,7 +37,7 @@ class AssemblerModel:
         if diagnostic_reporter is None:
             raise ValueError('DiagnosticReporter is required for AssemblerModel')
         self._diagnostic_reporter = diagnostic_reporter
-        self._global_label_scope = None
+        self._global_symbol_scope = None
         self._flow_effect_metadata_cache: dict[str, bool] = {}
 
         if config_file_path.endswith('.json'):
@@ -247,6 +247,21 @@ class AssemblerModel:
             self._flow_config_error(
                 f'{context}.exit_policy must be "balanced" or "none"'
             )
+        if counter_config.get('coordinate_offsets', 'both') not in {
+            'positive',
+            'negative',
+            'both',
+        }:
+            self._flow_config_error(
+                f'{context}.coordinate_offsets must be "positive", "negative", or "both"'
+            )
+        if (
+            'allow_zero_offset' in counter_config
+            and not isinstance(counter_config['allow_zero_offset'], bool)
+        ):
+            self._flow_config_error(
+                f'{context}.allow_zero_offset must be true or false'
+            )
         source = counter_config.get('source')
         if source is not None and (not isinstance(source, str) or not source.strip()):
             self._flow_config_error(f'{context}.source must be a non-empty dotted path')
@@ -313,12 +328,17 @@ class AssemblerModel:
 
         flow_terminal = config.get('flow_terminal')
         if flow_terminal is not None:
-            if not isinstance(flow_terminal, list | tuple):
-                self._flow_config_error(f'{context}.flow_terminal must be a list')
-            for counter_name in flow_terminal:
+            if not isinstance(flow_terminal, dict):
+                self._flow_config_error(f'{context}.flow_terminal must be a dictionary')
+            for counter_name, reconciliation_order in flow_terminal.items():
                 if counter_name not in counter_names:
                     self._flow_config_error(
                         f'{context}.flow_terminal names undeclared counter "{counter_name}"'
+                    )
+                if reconciliation_order not in {'before_effect', 'after_effect'}:
+                    self._flow_config_error(
+                        f'{context}.flow_terminal.{counter_name} must be '
+                        '"before_effect" or "after_effect"'
                     )
 
         call_effects = config.get('flow_call_effects')
@@ -743,21 +763,21 @@ class AssemblerModel:
             return []
 
     @property
-    def global_label_scope(self) -> LabelScope:
-        if self._global_label_scope is None:
-            self._global_label_scope = LabelScope.global_scope(self.registers)
+    def global_symbol_scope(self) -> SymbolScope:
+        if self._global_symbol_scope is None:
+            self._global_symbol_scope = SymbolScope.global_scope(self.registers)
             # add predefined constants to global scope
             predefines_lineid = LineIdentifier(0, os.path.basename(self._config_file))
             for predefined_constant in self.predefined_constants:
                 label: str = predefined_constant['name']
                 value: int = predefined_constant['value']
-                self._global_label_scope.set_label_value(
+                self._global_symbol_scope.set_label_value(
                     label,
                     value,
                     predefines_lineid,
-                    scope=LabelScopeType.GLOBAL,
+                    scope=SymbolScopeType.GLOBAL,
                 )
-        return self._global_label_scope
+        return self._global_symbol_scope
 
     @property
     def predefined_symbols(self) -> list[dict]:

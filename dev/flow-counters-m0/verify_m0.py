@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 
 from bespokeasm.assembler.engine import Assembler
-from bespokeasm.assembler.label_scope import LabelScope
+from bespokeasm.assembler.symbol_scope import SymbolScope
 from ruamel.yaml import YAML
 
 
@@ -38,7 +38,7 @@ def _without_flow_metadata(config: dict) -> dict:
 
 
 def _assemble(config_path: Path, output_path: Path, static_analysis: bool) -> Assembler:
-    LabelScope._global_scope = None
+    SymbolScope._global_scope = None
     assembler = Assembler(
         source_file=str(SOURCE_PATH),
         config_file=str(config_path),

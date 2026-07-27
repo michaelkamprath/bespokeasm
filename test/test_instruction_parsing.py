@@ -4,11 +4,6 @@ from pathlib import Path
 
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
-from bespokeasm.assembler.label_scope import GlobalLabelScope
-from bespokeasm.assembler.label_scope import LabelScope
-from bespokeasm.assembler.label_scope import LabelScopeType
-from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
-from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object import LineWithWords
@@ -19,6 +14,11 @@ from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
+from bespokeasm.assembler.symbol_scope import GlobalSymbolScope
+from bespokeasm.assembler.symbol_scope import SymbolScope
+from bespokeasm.assembler.symbol_scope import SymbolScopeType
+from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
+from bespokeasm.assembler.symbol_scope.named_scope_manager import NamedScopeManager
 
 from test import config_files
 
@@ -28,11 +28,11 @@ class TestInstructionParsing(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        global_scope = GlobalLabelScope(set())
+        global_scope = GlobalSymbolScope(set())
         global_scope.set_label_value('var1', 12, 1)
         global_scope.set_label_value('my_val', 8, 2)
         global_scope.set_label_value('the_two', 2, 3)
-        local_scope = LabelScope(LabelScopeType.LOCAL, global_scope, 'TestInstructionParsing')
+        local_scope = SymbolScope(SymbolScopeType.LOCAL, global_scope, 'TestInstructionParsing')
         local_scope.set_label_value('.local_var', 10, 3)
         local_scope.set_label_value('.loop', 0x8020, 3)
         cls.label_values = local_scope
@@ -63,7 +63,7 @@ class TestInstructionParsing(unittest.TestCase):
         ins1.set_start_address(1212)
         self.assertIsInstance(ins1, InstructionLine)
         self.assertEqual(ins1.word_count, 2, 'has 2 words')
-        ins1.label_scope = TestInstructionParsing.label_values
+        ins1.symbol_scope = TestInstructionParsing.label_values
         ins1.generate_words()
         self.assertEqual(
             ins1.get_words(),
@@ -95,7 +95,7 @@ class TestInstructionParsing(unittest.TestCase):
         ins1.set_start_address(1212)
         self.assertIsInstance(ins1, InstructionLine)
         self.assertEqual(ins1.word_count, 1, 'has 1 word')
-        ins1.label_scope = TestInstructionParsing.label_values
+        ins1.symbol_scope = TestInstructionParsing.label_values
         ins1.generate_words()
         self.assertEqual(
             ins1.get_words(),
@@ -115,7 +115,7 @@ class TestInstructionParsing(unittest.TestCase):
         ins2.set_start_address(1212)
         self.assertIsInstance(ins2, InstructionLine)
         self.assertEqual(ins2.word_count, 2, 'has 2 words')
-        ins2.label_scope = TestInstructionParsing.label_values
+        ins2.symbol_scope = TestInstructionParsing.label_values
         ins2.generate_words()
         self.assertEqual(
             ins2.get_words(),
@@ -135,7 +135,7 @@ class TestInstructionParsing(unittest.TestCase):
         ins3.set_start_address(1212)
         self.assertIsInstance(ins3, InstructionLine)
         self.assertEqual(ins3.word_count, 2, 'has 2 words')
-        ins3.label_scope = TestInstructionParsing.label_values
+        ins3.symbol_scope = TestInstructionParsing.label_values
         ins3.generate_words()
         self.assertEqual(
             ins3.get_words(),
@@ -155,7 +155,7 @@ class TestInstructionParsing(unittest.TestCase):
         ins4.set_start_address(1212)
         self.assertIsInstance(ins4, InstructionLine)
         self.assertEqual(ins4.word_count, 1, 'has 1 word')
-        ins4.label_scope = TestInstructionParsing.label_values
+        ins4.symbol_scope = TestInstructionParsing.label_values
         ins4.generate_words()
         self.assertEqual(
             ins4.get_words(),
@@ -175,7 +175,7 @@ class TestInstructionParsing(unittest.TestCase):
         ins5.set_start_address(1212)
         self.assertIsInstance(ins5, InstructionLine)
         self.assertEqual(ins5.word_count, 2, 'has 2 words')
-        ins5.label_scope = TestInstructionParsing.label_values
+        ins5.symbol_scope = TestInstructionParsing.label_values
         ins5.generate_words()
         self.assertEqual(
             ins5.get_words(),
@@ -220,7 +220,7 @@ class TestInstructionParsing(unittest.TestCase):
         ins0.set_start_address(1212)
         self.assertIsInstance(ins0, InstructionLine)
         self.assertEqual(ins0.word_count, 2, 'has 2 words')
-        ins0.label_scope = TestInstructionParsing.label_values
+        ins0.symbol_scope = TestInstructionParsing.label_values
         ins0.generate_words()
         self.assertEqual(
             ins0.get_words(),
@@ -238,7 +238,7 @@ class TestInstructionParsing(unittest.TestCase):
         ins1.set_start_address(1212)
         self.assertIsInstance(ins1, InstructionLine)
         self.assertEqual(ins1.word_count, 3, 'has 3 words')
-        ins1.label_scope = TestInstructionParsing.label_values
+        ins1.symbol_scope = TestInstructionParsing.label_values
         ins1.generate_words()
         self.assertEqual(
             ins1.get_words(),
@@ -257,7 +257,7 @@ class TestInstructionParsing(unittest.TestCase):
         ins2.set_start_address(1212)
         self.assertIsInstance(ins2, InstructionLine)
         self.assertEqual(ins2.word_count, 3, 'has 3 words')
-        ins2.label_scope = TestInstructionParsing.label_values
+        ins2.symbol_scope = TestInstructionParsing.label_values
         ins2.generate_words()
         self.assertEqual(
             ins2.get_words(),
@@ -305,7 +305,7 @@ class TestInstructionParsing(unittest.TestCase):
             )
             instruction.set_start_address(0x20)
             self.assertIsInstance(instruction, InstructionLine, f'{instruction_str} should parse as instruction')
-            instruction.label_scope = TestInstructionParsing.label_values
+            instruction.symbol_scope = TestInstructionParsing.label_values
             instruction.generate_words()
             self.assertEqual(
                 instruction.get_words(),
@@ -341,7 +341,7 @@ class TestInstructionParsing(unittest.TestCase):
         ins0.set_start_address(1212)
         self.assertIsInstance(ins0, InstructionLine)
         self.assertEqual(ins0.word_count, 1, 'has 1 words')
-        ins0.label_scope = TestInstructionParsing.label_values
+        ins0.symbol_scope = TestInstructionParsing.label_values
         ins0.generate_words()
         self.assertEqual(
             ins0.get_words(),
@@ -356,7 +356,7 @@ class TestInstructionParsing(unittest.TestCase):
         ins1.set_start_address(1212)
         self.assertIsInstance(ins1, InstructionLine)
         self.assertEqual(ins1.word_count, 2, 'has 2 words')
-        ins1.label_scope = TestInstructionParsing.label_values
+        ins1.symbol_scope = TestInstructionParsing.label_values
         ins1.generate_words()
         self.assertEqual(
             ins1.get_words(),
@@ -380,7 +380,7 @@ class TestInstructionParsing(unittest.TestCase):
         ins0.set_start_address(1212)
         self.assertIsInstance(ins0, InstructionLine)
         self.assertEqual(ins0.word_count, 1, 'has 1 words')
-        ins0.label_scope = TestInstructionParsing.label_values
+        ins0.symbol_scope = TestInstructionParsing.label_values
         ins0.generate_words()
         self.assertEqual(
             ins0.get_words(),
@@ -395,7 +395,7 @@ class TestInstructionParsing(unittest.TestCase):
         ins1.set_start_address(1212)
         self.assertIsInstance(ins1, InstructionLine)
         self.assertEqual(ins1.word_count, 3, 'has 3 words')
-        ins1.label_scope = TestInstructionParsing.label_values
+        ins1.symbol_scope = TestInstructionParsing.label_values
         ins1.generate_words()
         self.assertEqual(
             ins1.get_words(),
@@ -410,7 +410,7 @@ class TestInstructionParsing(unittest.TestCase):
         ins2.set_start_address(1212)
         self.assertIsInstance(ins2, InstructionLine)
         self.assertEqual(ins2.word_count, 4, 'has 4 words')
-        ins2.label_scope = TestInstructionParsing.label_values
+        ins2.symbol_scope = TestInstructionParsing.label_values
         ins2.generate_words()
         self.assertEqual(
             ins2.get_words(),
@@ -430,7 +430,7 @@ class TestInstructionParsing(unittest.TestCase):
         ins2.set_start_address(1212)
         self.assertIsInstance(ins2, InstructionLine)
         self.assertEqual(ins2.word_count, 4, 'has 4 words')
-        ins2.label_scope = TestInstructionParsing.label_values
+        ins2.symbol_scope = TestInstructionParsing.label_values
         ins2.generate_words()
         self.assertEqual(
             ins2.get_words(),
@@ -450,7 +450,7 @@ class TestInstructionParsing(unittest.TestCase):
         ins4.set_start_address(1212)
         self.assertIsInstance(ins4, InstructionLine)
 #        self.assertEqual(ins4.word_count, 3, 'has 3 words')
-        ins4.label_scope = TestInstructionParsing.label_values
+        ins4.symbol_scope = TestInstructionParsing.label_values
         ins4.generate_words()
         self.assertEqual(
             ins4.get_words(),
@@ -468,7 +468,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
         ins5.set_start_address(1212)
         self.assertIsInstance(ins5, InstructionLine)
-        ins5.label_scope = TestInstructionParsing.label_values
+        ins5.symbol_scope = TestInstructionParsing.label_values
         ins5.generate_words()
         self.assertEqual(
             ins5.get_words(),
@@ -487,7 +487,7 @@ class TestInstructionParsing(unittest.TestCase):
                 isa_model, memzone_mngr.global_zone, memzone_mngr,
             )
             bad1.set_start_address(666)
-            bad1.label_scope = TestInstructionParsing.label_values
+            bad1.symbol_scope = TestInstructionParsing.label_values
             bad1.generate_words()
 
     def test_decorator_operands_and_negative_offsets(self):
@@ -500,7 +500,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model.predefined_memory_zones,
         )
         lineid = LineIdentifier(77, 'test_decorator_operands_and_negative_offsets')
-        label_scope = GlobalLabelScope(isa_model.registers)
+        symbol_scope = GlobalSymbolScope(isa_model.registers)
         active_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
 
         decorator_cases = {
@@ -521,7 +521,7 @@ class TestInstructionParsing(unittest.TestCase):
                 memzone_mngr,
             )
             ins.set_start_address(0x100)
-            ins.label_scope = label_scope
+            ins.symbol_scope = symbol_scope
             ins.active_named_scopes = active_scopes
             ins.generate_words()
             self.assertEqual(
@@ -539,7 +539,7 @@ class TestInstructionParsing(unittest.TestCase):
             memzone_mngr,
         )
         neg_offset.set_start_address(0x100)
-        neg_offset.label_scope = label_scope
+        neg_offset.symbol_scope = symbol_scope
         neg_offset.active_named_scopes = active_scopes
         neg_offset.generate_words()
         self.assertEqual(
@@ -590,7 +590,7 @@ class TestInstructionParsing(unittest.TestCase):
             0,
         )[0]
         l2.set_start_address(42)
-        l2.label_scope = TestInstructionParsing.label_values
+        l2.symbol_scope = TestInstructionParsing.label_values
         self.assertIsInstance(l2, LabelLine)
         self.assertFalse(l2.is_constant, )
         self.assertEqual(l2.get_value(), 42, 'value should be right')
@@ -608,7 +608,7 @@ class TestInstructionParsing(unittest.TestCase):
             0,
         )[0]
         l3.set_start_address(42)
-        l3.label_scope = TestInstructionParsing.label_values
+        l3.symbol_scope = TestInstructionParsing.label_values
         self.assertIsInstance(l3, LabelLine)
         self.assertTrue(l3.is_constant, 'label should be a constant')
         self.assertEqual(l3.get_value(), 0x42, 'value should be right')
@@ -629,7 +629,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
         t1.set_start_address(1)
-        t1.label_scope = TestInstructionParsing.label_values
+        t1.symbol_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
         self.assertEqual(t1.word_count, 2, 'has 2 words')
         t1.generate_words()
@@ -644,7 +644,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
         t2.set_start_address(1)
-        t2.label_scope = TestInstructionParsing.label_values
+        t2.symbol_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t2, InstructionLine)
         self.assertEqual(t2.word_count, 2, 'has 2 words')
         t2.generate_words()
@@ -670,7 +670,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
         t1.set_start_address(1)
-        t1.label_scope = TestInstructionParsing.label_values
+        t1.symbol_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
         self.assertEqual(t1.word_count, 2, 'has 2 words')
         t1.generate_words()
@@ -685,7 +685,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
         t2.set_start_address(1)
-        t2.label_scope = TestInstructionParsing.label_values
+        t2.symbol_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t2, InstructionLine)
         self.assertEqual(t2.word_count, 2, 'has 2 words')
         t2.generate_words()
@@ -711,7 +711,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
         t1.set_start_address(1)
-        t1.label_scope = TestInstructionParsing.label_values
+        t1.symbol_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
         self.assertEqual(t1.word_count, 2, 'has 2 words')
         t1.generate_words()
@@ -737,7 +737,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
         t1.set_start_address(1)
-        t1.label_scope = TestInstructionParsing.label_values
+        t1.symbol_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
         self.assertEqual(t1.word_count, 2, 'has 2 words')
         t1.generate_words()
@@ -764,7 +764,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
         t1.set_start_address(1)
-        t1.label_scope = TestInstructionParsing.label_values
+        t1.symbol_scope = TestInstructionParsing.label_values
         t1.active_named_scopes = active_named_scopes
         self.assertIsInstance(t1, InstructionLine)
         self.assertEqual(t1.word_count, 1, 'has 1 words')
@@ -780,7 +780,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
         t2.set_start_address(1)
-        t2.label_scope = TestInstructionParsing.label_values
+        t2.symbol_scope = TestInstructionParsing.label_values
         t2.active_named_scopes = active_named_scopes
         self.assertIsInstance(t2, InstructionLine)
         self.assertEqual(t2.word_count, 1, 'has 1 words')
@@ -796,7 +796,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
         t3.set_start_address(1)
-        t3.label_scope = TestInstructionParsing.label_values
+        t3.symbol_scope = TestInstructionParsing.label_values
         t3.active_named_scopes = active_named_scopes
         self.assertIsInstance(t3, InstructionLine)
         self.assertEqual(t3.word_count, 2, 'has 2 words')
@@ -812,7 +812,7 @@ class TestInstructionParsing(unittest.TestCase):
                 lineid, '  tstb b, 14', 'second argument is too large',
                 isa_model, memzone_mngr.global_zone, memzone_mngr,
             )
-            e1.label_scope = TestInstructionParsing.label_values
+            e1.symbol_scope = TestInstructionParsing.label_values
             e1.active_named_scopes = active_named_scopes
             e1.generate_words()
 
@@ -821,7 +821,7 @@ class TestInstructionParsing(unittest.TestCase):
                 lineid, '  enumarg 12', 'comment',
                 isa_model, memzone_mngr.global_zone, memzone_mngr,
             )
-            e2.label_scope = TestInstructionParsing.label_values
+            e2.symbol_scope = TestInstructionParsing.label_values
             e2.active_named_scopes = active_named_scopes
             e2.generate_words()
 
@@ -841,7 +841,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
         t1.set_start_address(1)
-        t1.label_scope = TestInstructionParsing.label_values
+        t1.symbol_scope = TestInstructionParsing.label_values
         t1.active_named_scopes = active_named_scopes
         self.assertIsInstance(t1, InstructionLine)
         self.assertEqual(t1.word_count, 1, 'has 1 words')
@@ -857,7 +857,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
         t2.set_start_address(1)
-        t2.label_scope = TestInstructionParsing.label_values
+        t2.symbol_scope = TestInstructionParsing.label_values
         t2.active_named_scopes = active_named_scopes
         self.assertIsInstance(t2, InstructionLine)
         self.assertEqual(t2.word_count, 1, 'has 1 words')
@@ -873,7 +873,7 @@ class TestInstructionParsing(unittest.TestCase):
                 lineid, 'num 7', 'number 7 is not allowed',
                 isa_model, memzone_mngr.global_zone, memzone_mngr,
             )
-            e1.label_scope = TestInstructionParsing.label_values
+            e1.symbol_scope = TestInstructionParsing.label_values
             e1.active_named_scopes = active_named_scopes
             e1.generate_words()
 
@@ -893,7 +893,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
         t1.set_start_address(1)
-        t1.label_scope = TestInstructionParsing.label_values
+        t1.symbol_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
         self.assertEqual(t1.word_count, 2, 'has 2 words')
         t1.generate_words()
@@ -931,7 +931,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
         t1.set_start_address(1)
-        t1.label_scope = TestInstructionParsing.label_values
+        t1.symbol_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
         self.assertEqual(t1.word_count, 2, 'has 2 words')
         t1.generate_words()
@@ -957,7 +957,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
         t1.set_start_address(1)
-        t1.label_scope = TestInstructionParsing.label_values
+        t1.symbol_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
         self.assertEqual(t1.word_count, 3, 'has 3 words')
         t1.generate_words()
@@ -976,7 +976,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
         t2.set_start_address(1)
-        t2.label_scope = TestInstructionParsing.label_values
+        t2.symbol_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t2, InstructionLine)
         self.assertEqual(t2.word_count, 3, 'has 3 words')
         t2.generate_words()
@@ -991,7 +991,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
         t3.set_start_address(1)
-        t3.label_scope = TestInstructionParsing.label_values
+        t3.symbol_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t3, InstructionLine)
         self.assertEqual(t3.word_count, 3, 'has 3 words')
         t3.generate_words()
@@ -1025,7 +1025,7 @@ class TestInstructionParsing(unittest.TestCase):
             memzone_mngr,
         )
 
-        t1.label_scope = TestInstructionParsing.label_values
+        t1.symbol_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
         self.assertEqual(t1.word_count, 2, 'has 2 words')
 
@@ -1045,7 +1045,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
         t1.set_start_address(0x8000)
-        t1.label_scope = TestInstructionParsing.label_values
+        t1.symbol_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
         self.assertEqual(t1.word_count, 3, 'has 3 words')
         t1.generate_words()
@@ -1064,7 +1064,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
         t2.set_start_address(0x8000)
-        t2.label_scope = TestInstructionParsing.label_values
+        t2.symbol_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t2, InstructionLine)
         self.assertEqual(t2.word_count, 2, 'has 2 words')
         t2.generate_words()
@@ -1079,7 +1079,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
         t3.set_start_address(0x8000)
-        t3.label_scope = TestInstructionParsing.label_values
+        t3.symbol_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t3, InstructionLine)
         self.assertEqual(t3.word_count, 2, 'has 2 words')
         t3.generate_words()
@@ -1094,7 +1094,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
         t4.set_start_address(0x8000)
-        t4.label_scope = TestInstructionParsing.label_values
+        t4.symbol_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t4, InstructionLine)
         self.assertEqual(t4.word_count, 2, 'has 2 words')
         t4.generate_words()
@@ -1111,7 +1111,7 @@ class TestInstructionParsing(unittest.TestCase):
                 isa_model, memzone_mngr.global_zone, memzone_mngr,
             )
             bt1.set_start_address(0x7000)
-            bt1.label_scope = TestInstructionParsing.label_values
+            bt1.symbol_scope = TestInstructionParsing.label_values
             bt1.generate_words()
 
         with self.assertRaises(SystemExit, msg='offset out of range'):
@@ -1120,7 +1120,7 @@ class TestInstructionParsing(unittest.TestCase):
                 isa_model, memzone_mngr.global_zone, memzone_mngr,
             )
             bt2.set_start_address(0x9000)
-            bt2.label_scope = TestInstructionParsing.label_values
+            bt2.symbol_scope = TestInstructionParsing.label_values
             bt2.generate_words()
 
     def test_valid_address_operand_enforcement(self):
@@ -1138,7 +1138,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
         t1.set_start_address(0x3000)
-        t1.label_scope = TestInstructionParsing.label_values
+        t1.symbol_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
         self.assertEqual(t1.word_count, 2, 'has 2 words')
         t1.generate_words()
@@ -1158,7 +1158,7 @@ class TestInstructionParsing(unittest.TestCase):
                 isa_model, memzone_mngr.global_zone, memzone_mngr,
             )
             t1.set_start_address(memzone_mngr.global_zone.start)
-            t1.label_scope = TestInstructionParsing.label_values
+            t1.symbol_scope = TestInstructionParsing.label_values
             self.assertIsInstance(t1, InstructionLine)
             self.assertEqual(t1.word_count, 2, 'has 2 words')
             t1.generate_words()
@@ -1170,7 +1170,7 @@ class TestInstructionParsing(unittest.TestCase):
                 isa_model, memzone_mngr.global_zone, memzone_mngr,
             )
             e2.set_start_address(memzone_mngr.global_zone.start)
-            e2.label_scope = TestInstructionParsing.label_values
+            e2.symbol_scope = TestInstructionParsing.label_values
             self.assertIsInstance(e2, InstructionLine)
             self.assertEqual(e2.word_count, 3, 'has 3 words')
             e2.generate_words()
@@ -1338,7 +1338,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
         t1.set_start_address(0x2F10)
-        t1.label_scope = TestInstructionParsing.label_values
+        t1.symbol_scope = TestInstructionParsing.label_values
         t1.active_named_scopes = self.active_named_scopes
         self.assertIsInstance(t1, InstructionLine)
         self.assertEqual(t1.word_count, 2, 'has 2 words')
@@ -1363,7 +1363,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
         t1_operand_page.set_start_address(0x26FF)
-        t1_operand_page.label_scope = TestInstructionParsing.label_values
+        t1_operand_page.symbol_scope = TestInstructionParsing.label_values
         t1_operand_page.active_named_scopes = self.active_named_scopes
         self.assertIsInstance(t1_operand_page, InstructionLine)
         t1_operand_page.generate_words()
@@ -1382,7 +1382,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
         t2.set_start_address(0x2F10)
-        t2.label_scope = TestInstructionParsing.label_values
+        t2.symbol_scope = TestInstructionParsing.label_values
         t2.active_named_scopes = self.active_named_scopes
         self.assertIsInstance(t2, InstructionLine)
         self.assertEqual(t2.word_count, 3, 'has 3 words')
@@ -1403,7 +1403,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
         t3.set_start_address(0x2F10)
-        t3.label_scope = TestInstructionParsing.label_values
+        t3.symbol_scope = TestInstructionParsing.label_values
         t3.active_named_scopes = self.active_named_scopes
         self.assertIsInstance(t3, InstructionLine)
         self.assertEqual(t3.word_count, 3, 'has 3 words')
@@ -1424,7 +1424,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
         t4.set_start_address(0x2F10)
-        t4.label_scope = TestInstructionParsing.label_values
+        t4.symbol_scope = TestInstructionParsing.label_values
         t4.active_named_scopes = self.active_named_scopes
         self.assertIsInstance(t4, InstructionLine)
         self.assertEqual(t4.word_count, 3, 'has 3 words')
@@ -1472,7 +1472,7 @@ class TestInstructionParsing(unittest.TestCase):
                         memzone_mngr,
                     )
                     line.set_start_address(instruction_address)
-                    line.label_scope = isa_model.global_label_scope
+                    line.symbol_scope = isa_model.global_symbol_scope
                     line.active_named_scopes = self.active_named_scopes
                     self.assertIsInstance(line, InstructionLine)
                     self.assertEqual(line.word_count, 2, 'fast ops should emit opcode plus one-byte operand')
@@ -1518,7 +1518,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model, memzone_mngr.global_zone, memzone_mngr,
         )
         t1.set_start_address(1)
-        t1.label_scope = TestInstructionParsing.label_values
+        t1.symbol_scope = TestInstructionParsing.label_values
         self.assertIsInstance(t1, InstructionLine)
         self.assertEqual(t1.word_count, 2, 'has 2 words')
         t1.generate_words()
@@ -1559,7 +1559,7 @@ class TestInstructionParsing(unittest.TestCase):
                 memzone_mngr,
             )
             ins.set_start_address(0)
-            ins.label_scope = TestInstructionParsing.label_values
+            ins.symbol_scope = TestInstructionParsing.label_values
             ins.generate_words()
             self.assertEqual(
                 ins.get_words(),
@@ -1598,7 +1598,7 @@ class TestInstructionParsing(unittest.TestCase):
         instruction = line_objects[0]
         self.assertIsInstance(instruction, InstructionLine)
         instruction.set_start_address(0)
-        instruction.label_scope = TestInstructionParsing.label_values
+        instruction.symbol_scope = TestInstructionParsing.label_values
         instruction.active_named_scopes = self.active_named_scopes
         instruction.generate_words()
         self.assertEqual(instruction.comment, 'trailing comment')
@@ -1629,7 +1629,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
         ins_jsr.set_start_address(0)
         self.assertIsInstance(ins_jsr, InstructionLine)
-        ins_jsr.label_scope = TestInstructionParsing.label_values
+        ins_jsr.symbol_scope = TestInstructionParsing.label_values
         ins_jsr.generate_words()
         jsr_words = ins_jsr.get_words()
         self.assertEqual(jsr_words, [Word(42, 8, 8, 'little')], 'jsr should assemble to correct word')
@@ -1644,7 +1644,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
         ins_call.set_start_address(0)
         self.assertIsInstance(ins_call, InstructionLine)
-        ins_call.label_scope = TestInstructionParsing.label_values
+        ins_call.symbol_scope = TestInstructionParsing.label_values
         ins_call.generate_words()
         call_words = ins_call.get_words()
         self.assertEqual(call_words, [Word(42, 8, 8, 'little')], 'call (alias) should assemble to same word as jsr')
@@ -1659,7 +1659,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
         ins_nop.set_start_address(0)
         self.assertIsInstance(ins_nop, InstructionLine)
-        ins_nop.label_scope = TestInstructionParsing.label_values
+        ins_nop.symbol_scope = TestInstructionParsing.label_values
         ins_nop.generate_words()
         nop_words = ins_nop.get_words()
         self.assertEqual(nop_words, [Word(0, 8, 8, 'little')], 'nop should assemble to correct word')
@@ -1928,7 +1928,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
         ins_jsr2.set_start_address(0)
         self.assertIsInstance(ins_jsr2, InstructionLine)
-        ins_jsr2.label_scope = TestInstructionParsing.label_values
+        ins_jsr2.symbol_scope = TestInstructionParsing.label_values
         ins_jsr2.generate_words()
         jsr2_words = ins_jsr2.get_words()
         self.assertEqual(jsr2_words, [Word(99, 8, 8, 'little')], 'jsr2 should assemble to correct word')
@@ -1943,7 +1943,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
         ins_call2.set_start_address(0)
         self.assertIsInstance(ins_call2, InstructionLine)
-        ins_call2.label_scope = TestInstructionParsing.label_values
+        ins_call2.symbol_scope = TestInstructionParsing.label_values
         ins_call2.generate_words()
         call2_words = ins_call2.get_words()
         self.assertEqual(call2_words, [Word(99, 8, 8, 'little')], 'call2 (alias) should assemble to same word as jsr2')
@@ -1958,7 +1958,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
         ins_jts.set_start_address(0)
         self.assertIsInstance(ins_jts, InstructionLine)
-        ins_jts.label_scope = TestInstructionParsing.label_values
+        ins_jts.symbol_scope = TestInstructionParsing.label_values
         ins_jts.generate_words()
         jts_words = ins_jts.get_words()
         self.assertEqual(
@@ -1977,7 +1977,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
         ins_nop.set_start_address(0)
         self.assertIsInstance(ins_nop, InstructionLine)
-        ins_nop.label_scope = TestInstructionParsing.label_values
+        ins_nop.symbol_scope = TestInstructionParsing.label_values
         ins_nop.generate_words()
         nop_words = ins_nop.get_words()
         self.assertEqual(nop_words, [Word(0, 8, 8, 'little')], 'nop should assemble to correct word')
@@ -1990,7 +1990,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model.default_origin,
             isa_model.predefined_memory_zones,
         )
-        labels = GlobalLabelScope(set())
+        labels = GlobalSymbolScope(set())
         labels.set_label_value('face', 9, LineIdentifier(0, 'test_instruction_default_numeric_base_from_model'))
 
         ins1 = InstructionLine.factory(
@@ -2002,7 +2002,7 @@ class TestInstructionParsing(unittest.TestCase):
             memzone_mngr,
         )
         ins1.set_start_address(0)
-        ins1.label_scope = labels
+        ins1.symbol_scope = labels
         ins1.generate_words()
         self.assertEqual(
             ins1.get_words(),
@@ -2019,7 +2019,7 @@ class TestInstructionParsing(unittest.TestCase):
             memzone_mngr,
         )
         ins2.set_start_address(0)
-        ins2.label_scope = labels
+        ins2.symbol_scope = labels
         ins2.generate_words()
         self.assertEqual(
             ins2.get_words(),

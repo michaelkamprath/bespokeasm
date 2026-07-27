@@ -14,8 +14,8 @@ import sublime_plugin
 WORD_PATTERN = re.compile(r'(?:##MNEMONIC_PATTERN##|##LABEL_PATTERN##)', re.IGNORECASE)
 LABEL_DEFINITION_PATTERN = re.compile(r'^\s*(?P<name>##LABEL_PATTERN##)\s*:')
 OPERAND_LABEL_DEFINITION_PATTERN = re.compile(r'@(?P<name>##LABEL_PATTERN##):\s*')
-CONSTANT_DEFINITION_PATTERN = re.compile(r'^\s*(?P<name>##LABEL_PATTERN##)\s*(?:=|\bEQU\b)')
-CONSTANT_VALUE_PATTERN = re.compile(r'^\s*##LABEL_PATTERN##\s*(?:=|\bEQU\b)\s*(?P<value>.+?)(?:\s*;.*)?$')
+CONSTANT_DEFINITION_PATTERN = re.compile(r'^\s*(?P<name>##CONSTANT_PATTERN##)\s*(?:=|\bEQU\b)')
+CONSTANT_VALUE_PATTERN = re.compile(r'^\s*##CONSTANT_PATTERN##\s*(?:=|\bEQU\b)\s*(?P<value>.+?)(?:\s*;.*)?$')
 COMPILER_DIRECTIVE_PATTERN = re.compile(r'\.(\w+)\b', re.IGNORECASE)
 PREPROCESSOR_DIRECTIVE_PATTERN = re.compile(r'#(\S+)\b', re.IGNORECASE)
 REGISTER_PATTERN = re.compile(r'(?i)(?:##REGISTERS##)')
@@ -510,6 +510,10 @@ def _get_directive_at_point(view, point):
     line_region = view.line(point)
     line_text = view.substr(line_region)
     column = point - line_region.begin()
+    coordinate_operator = line_text.find(':=')
+    if coordinate_operator >= 0 and coordinate_operator <= column < coordinate_operator + 2:
+        if _is_offset_in_code_region(line_text, coordinate_operator):
+            return ':='
     for match in COMPILER_DIRECTIVE_PATTERN.finditer(line_text):
         dir_start = match.start(1) - 1  # include the dot
         dir_end = match.end(1)
@@ -1124,6 +1128,7 @@ class BespokeAsmHoverListener(sublime_plugin.EventListener):
                     ('preprocessor', 'preprocessor', 'punctuation_preprocessor'),
                     ('data_type', 'data_type', None),
                     ('compiler', 'directive', None),
+                    ('counter_coordinate', 'operator', None),
                 ]
                 for category_key, color_key, prefix_color_key in directive_categories:
                     category_docs = all_directives.get(category_key, {})

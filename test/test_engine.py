@@ -6,11 +6,6 @@ import unittest
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.engine import Assembler
-from bespokeasm.assembler.label_scope import GlobalLabelScope
-from bespokeasm.assembler.label_scope import LabelScope
-from bespokeasm.assembler.label_scope import LabelScopeType
-from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
-from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object import LineWithWords
@@ -21,6 +16,11 @@ from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
+from bespokeasm.assembler.symbol_scope import GlobalSymbolScope
+from bespokeasm.assembler.symbol_scope import SymbolScope
+from bespokeasm.assembler.symbol_scope import SymbolScopeType
+from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
+from bespokeasm.assembler.symbol_scope.named_scope_manager import NamedScopeManager
 
 from test import config_files
 
@@ -39,7 +39,7 @@ class TestAssemblerEngine(unittest.TestCase):
             isa_model.predefined_memory_zones,
         )
 
-        label_values = GlobalLabelScope(isa_model.registers)
+        label_values = GlobalSymbolScope(isa_model.registers)
         label_values.set_label_value('a_const', 40, 1)
         preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
         condition_stack = ConditionStack(self.diagnostic_reporter)
@@ -100,10 +100,10 @@ class TestAssemblerEngine(unittest.TestCase):
         for lobj in line_objects:
             lobj.set_start_address(lobj.memory_zone.current_address)
             lobj.memory_zone.current_address = lobj.address + lobj.word_count
-            lobj.label_scope = label_values
+            lobj.symbol_scope = label_values
             lobj.active_named_scopes = active_named_scopes
             if isinstance(lobj, LabelLine) and not lobj.is_constant:
-                lobj.label_scope.set_label_value(lobj.get_label(), lobj.get_value(), lobj.line_id)
+                lobj.symbol_scope.set_label_value(lobj.get_label(), lobj.get_value(), lobj.line_id)
             line_dict[lobj.address] = lobj
 
         line_objects.sort(key=lambda x: x.address)
@@ -138,7 +138,7 @@ class TestAssemblerEngine(unittest.TestCase):
             isa_model.predefined_memory_zones,
         )
 
-        label_values = GlobalLabelScope(isa_model.registers)
+        label_values = GlobalSymbolScope(isa_model.registers)
         label_values.set_label_value('a_const', 40, 1)
         preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
         condition_stack = ConditionStack(self.diagnostic_reporter)
@@ -210,10 +210,10 @@ class TestAssemblerEngine(unittest.TestCase):
         for lobj in line_objects:
             lobj.set_start_address(lobj.memory_zone.current_address)
             lobj.memory_zone.current_address = lobj.address + lobj.word_count
-            lobj.label_scope = label_values
+            lobj.symbol_scope = label_values
             lobj.active_named_scopes = active_named_scopes
             if isinstance(lobj, LabelLine) and not lobj.is_constant:
-                lobj.label_scope.set_label_value(lobj.get_label(), lobj.get_value(), lobj.line_id)
+                lobj.symbol_scope.set_label_value(lobj.get_label(), lobj.get_value(), lobj.line_id)
             line_dict[lobj.address] = lobj
 
         line_objects.sort(key=lambda x: x.address)
@@ -416,7 +416,7 @@ class TestAssemblerEngine(unittest.TestCase):
         )
         self.assertEqual(bytecode, bytearray([0xAF, 0xB0]), 'fill_word should be packed with real words correctly')
 
-    def test_operand_label_scope_prefix_behavior(self):
+    def test_operand_symbol_scope_prefix_behavior(self):
         fp = pkg_resources.files(config_files).joinpath('test_operand_labels.yaml')
         isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
@@ -425,9 +425,9 @@ class TestAssemblerEngine(unittest.TestCase):
             isa_model.predefined_memory_zones,
         )
 
-        global_scope = GlobalLabelScope(isa_model.registers)
-        file_scope = LabelScope(LabelScopeType.FILE, global_scope, 'scope_test.asm')
-        local_scope = LabelScope(LabelScopeType.LOCAL, file_scope, 'anchor')
+        global_scope = GlobalSymbolScope(isa_model.registers)
+        file_scope = SymbolScope(SymbolScopeType.FILE, global_scope, 'scope_test.asm')
+        local_scope = SymbolScope(SymbolScopeType.LOCAL, file_scope, 'anchor')
 
         named_scope_manager = NamedScopeManager(self.diagnostic_reporter)
         named_scope_manager.create_scope('lib', 'lib_', LineIdentifier(1, 'scope_test.asm'))
@@ -444,7 +444,7 @@ class TestAssemblerEngine(unittest.TestCase):
         )
         self.assertIsInstance(local_instr, InstructionLine)
         local_instr.set_start_address(0)
-        local_instr.label_scope = local_scope
+        local_instr.symbol_scope = local_scope
         local_instr.active_named_scopes = active_named_scopes
         local_instr.register_operand_labels(named_scope_manager)
         self.assertEqual(
@@ -463,7 +463,7 @@ class TestAssemblerEngine(unittest.TestCase):
         )
         self.assertIsInstance(file_instr, InstructionLine)
         file_instr.set_start_address(2)
-        file_instr.label_scope = local_scope
+        file_instr.symbol_scope = local_scope
         file_instr.active_named_scopes = active_named_scopes
         file_instr.register_operand_labels(named_scope_manager)
         self.assertEqual(
@@ -482,7 +482,7 @@ class TestAssemblerEngine(unittest.TestCase):
         )
         self.assertIsInstance(global_instr, InstructionLine)
         global_instr.set_start_address(4)
-        global_instr.label_scope = local_scope
+        global_instr.symbol_scope = local_scope
         global_instr.active_named_scopes = active_named_scopes
         global_instr.register_operand_labels(named_scope_manager)
         self.assertEqual(
@@ -501,7 +501,7 @@ class TestAssemblerEngine(unittest.TestCase):
         )
         self.assertIsInstance(named_instr, InstructionLine)
         named_instr.set_start_address(6)
-        named_instr.label_scope = local_scope
+        named_instr.symbol_scope = local_scope
         named_instr.active_named_scopes = active_named_scopes
         named_instr.register_operand_labels(named_scope_manager)
 
@@ -524,9 +524,9 @@ class TestAssemblerEngine(unittest.TestCase):
 
         named_scope_manager = NamedScopeManager(self.diagnostic_reporter)
         active_named_scopes = ActiveNamedScopeList(named_scope_manager)
-        global_scope = GlobalLabelScope(isa_model.registers)
-        file_scope = LabelScope(LabelScopeType.FILE, global_scope, 'dupe.asm')
-        local_scope = LabelScope(LabelScopeType.LOCAL, file_scope, 'anchor')
+        global_scope = GlobalSymbolScope(isa_model.registers)
+        file_scope = SymbolScope(SymbolScopeType.FILE, global_scope, 'dupe.asm')
+        local_scope = SymbolScope(SymbolScopeType.LOCAL, file_scope, 'anchor')
 
         first = InstructionLine.factory(
             LineIdentifier(1, 'dupe.asm'),
@@ -538,7 +538,7 @@ class TestAssemblerEngine(unittest.TestCase):
         )
         self.assertIsInstance(first, InstructionLine)
         first.set_start_address(0)
-        first.label_scope = local_scope
+        first.symbol_scope = local_scope
         first.active_named_scopes = active_named_scopes
         first.register_operand_labels(named_scope_manager)
 
@@ -552,7 +552,7 @@ class TestAssemblerEngine(unittest.TestCase):
         )
         self.assertIsInstance(second, InstructionLine)
         second.set_start_address(2)
-        second.label_scope = local_scope
+        second.symbol_scope = local_scope
         second.active_named_scopes = active_named_scopes
 
         with self.assertRaises(SystemExit) as duplicate_error:

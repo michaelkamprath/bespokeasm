@@ -10,8 +10,8 @@ encounter language version symbols.
 """
 import sys
 
-from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
 
 
 class LanguageVersionEvaluator:

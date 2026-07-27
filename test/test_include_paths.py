@@ -5,12 +5,12 @@ import unittest
 
 from bespokeasm.assembler.assembly_file import AssemblyFile
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
-from bespokeasm.assembler.label_scope import GlobalLabelScope
-from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.preprocessor import Preprocessor
+from bespokeasm.assembler.symbol_scope import GlobalSymbolScope
+from bespokeasm.assembler.symbol_scope.named_scope_manager import NamedScopeManager
 
 from test import config_files
 
@@ -27,7 +27,7 @@ class TestIncludePaths(unittest.TestCase):
             self.isa_model.default_origin,
             self.isa_model.predefined_memory_zones,
         )
-        self.global_scope = GlobalLabelScope(self.isa_model.registers)
+        self.global_scope = GlobalSymbolScope(self.isa_model.registers)
         self.preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
 
     def _load_line_objects(self, filename: str, include_paths: set[str]):

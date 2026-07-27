@@ -263,7 +263,7 @@ class DataLine(LineWithWords):
                 arg_val = arg_item
             elif isinstance(arg_item, ExpressionNode):
                 arg_val = arg_item.get_value(
-                    self.label_scope,
+                    self.symbol_scope,
                     self.active_named_scopes,
                     self.line_id,
                 )

@@ -1,9 +1,12 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
+from dataclasses import field
 
+from bespokeasm.assembler.line_object.counter_coordinate_line import CounterCoordinateLine
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowEndTrackLine
 from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowTrackLine
+from bespokeasm.assembler.symbol_scope.flow_symbols import CounterCoordinate
 from bespokeasm.expression import ExpressionNode
 from bespokeasm.expression import TokenType
 
@@ -12,27 +15,33 @@ from bespokeasm.expression import TokenType
 class _LinearCounterState:
     counter_class: str
     name: str
+    instance_id: int
     value: int
     initial_value: int
     expected_exit: int | None
     config: dict
     opened_by: FlowTrackLine
+    coordinates: list[CounterCoordinate] = field(default_factory=list)
 
 
 class FlowLinearAnalyzer:
-    """M1 source-order analyzer for one scalar, straight-line counter."""
+    """Source-order analyzer for scalar, straight-line flow counters."""
 
     def __init__(self, model, diagnostic_reporter) -> None:
         """Create an analyzer bound to one immutable ISA model and reporter."""
         self._model = model
         self._diagnostic_reporter = diagnostic_reporter
         self._active: _LinearCounterState | None = None
+        self._next_instance_id = 0
 
     @staticmethod
     def source_uses_flow(line_objects) -> bool:
-        """Return whether compiled source contains any M1 flow construct."""
+        """Return whether compiled source contains any shipped flow construct."""
         return any(
-            isinstance(line_object, FlowTrackLine | FlowEndTrackLine)
+            isinstance(
+                line_object,
+                FlowTrackLine | FlowEndTrackLine | CounterCoordinateLine,
+            )
             or bool(line_object.flow_expression_nodes)
             for line_object in line_objects
         )
@@ -97,12 +106,14 @@ class FlowLinearAnalyzer:
         self._active = _LinearCounterState(
             counter_class=line_object.counter_class,
             name=line_object.counter_class,
+            instance_id=self._next_instance_id,
             value=initial,
             initial_value=initial,
             expected_exit=expected_exit,
             config=counter_config,
             opened_by=line_object,
         )
+        self._next_instance_id += 1
         self._check_bounds(line_object)
 
     def _close(self, line_object: FlowEndTrackLine) -> None:
@@ -142,9 +153,70 @@ class FlowLinearAnalyzer:
             self._error(line_object, 'COUNTER() requires one counter name')
         return str(argument.value)
 
+    def _coordinate_name(self, line_object, node: ExpressionNode) -> str:
+        """Extract the exact coordinate spelling supplied to ``OFFSET()``."""
+        argument = node.left_child
+        if (
+            node.token_type != TokenType.T_OFFSET
+            or argument is None
+            or argument.token_type not in {TokenType.T_LABEL, TokenType.T_LABEL_OR_NUM}
+            or argument.left_child is not None
+            or argument.right_child is not None
+        ):
+            self._error(line_object, 'OFFSET() requires one counter-coordinate symbol')
+        return str(argument.value)
+
+    @staticmethod
+    def _lookup_coordinate(line_object, label: str) -> CounterCoordinate | None:
+        """Resolve a coordinate using the declaration line's active namespaces."""
+        if line_object.active_named_scopes is not None:
+            return line_object.active_named_scopes.named_scope_manager.get_counter_coordinate(
+                label,
+                line_object.symbol_scope,
+                line_object.active_named_scopes,
+            )
+        return line_object.symbol_scope.get_counter_coordinate(label)
+
+    def _resolve_offset(self, line_object, node: ExpressionNode) -> None:
+        """Resolve ``OFFSET(coordinate)`` against the active pre-line state."""
+        label = self._coordinate_name(line_object, node)
+        coordinate = self._lookup_coordinate(line_object, label)
+        if coordinate is None:
+            self._error(
+                line_object,
+                f'OFFSET({label}) requires a symbol declared with :=',
+            )
+        if self._active is None:
+            self._error(
+                line_object,
+                f'OFFSET({label}) references inactive flow counter "{coordinate.counter_name}"',
+            )
+        if coordinate.counter_name != self._active.name:
+            self._error(
+                line_object,
+                f'OFFSET({label}) belongs to counter "{coordinate.counter_name}", '
+                f'not active counter "{self._active.name}"',
+            )
+        if coordinate.counter_instance_id != self._active.instance_id:
+            self._error(
+                line_object,
+                f'OFFSET({label}) belongs to an earlier tracking instance of '
+                f'counter "{coordinate.counter_name}"',
+            )
+        if not coordinate.is_valid:
+            self._error(
+                line_object,
+                f'counter coordinate "{label}" is invalid because its saved position '
+                'was crossed and is no longer live',
+            )
+        node.resolve_flow_value(self._active.value - coordinate.value)
+
     def _resolve_expressions(self, line_object, nodes: tuple[ExpressionNode, ...]) -> None:
         """Deposit the active pre-instruction value into deferred expressions."""
         for node in nodes:
+            if node.token_type == TokenType.T_OFFSET:
+                self._resolve_offset(line_object, node)
+                continue
             counter_name = self._counter_name(line_object, node)
             if self._active is None:
                 self._error(
@@ -157,6 +229,102 @@ class FlowLinearAnalyzer:
                     f'COUNTER({counter_name}) does not name active counter "{self._active.name}"',
                 )
             node.resolve_flow_value(self._active.value)
+
+    def _declare_coordinate(self, line_object: CounterCoordinateLine) -> None:
+        """Validate, resolve, and register one immutable counter coordinate."""
+        if (
+            line_object.counter_name is None
+            or line_object.offset_expression is None
+        ):
+            self._error(
+                line_object,
+                'a coordinate declaration must use COORDINATE(counter, offset)',
+            )
+        counter_name = line_object.counter_name
+        if self._active is None:
+            self._error(
+                line_object,
+                f'COORDINATE({counter_name}, ...) references an inactive flow counter',
+            )
+        if counter_name != self._active.name:
+            self._error(
+                line_object,
+                f'COORDINATE({counter_name}, ...) does not name active counter '
+                f'"{self._active.name}"',
+            )
+
+        for label in self._expression_labels(line_object.offset_expression):
+            if self._lookup_coordinate(line_object, label) is not None:
+                self._error(
+                    line_object,
+                    'the offset of a coordinate declaration cannot contain '
+                    f'counter coordinate "{label}"',
+                )
+
+        try:
+            declared_offset = line_object.offset_expression.get_value(
+                line_object.symbol_scope,
+                line_object.active_named_scopes,
+                line_object.line_id,
+            )
+        except ValueError as error:
+            self._error(line_object, str(error))
+        offset_policy = self._active.config.get('coordinate_offsets', 'both')
+        if (
+            declared_offset == 0
+            and not self._active.config.get('allow_zero_offset', True)
+        ):
+            self._error(
+                line_object,
+                f'flow counter "{counter_name}" does not permit zero coordinate offsets',
+            )
+        if offset_policy == 'positive' and declared_offset < 0:
+            self._error(
+                line_object,
+                f'flow counter "{counter_name}" permits only positive coordinate offsets; '
+                f'got {declared_offset}',
+            )
+        if offset_policy == 'negative' and declared_offset > 0:
+            self._error(
+                line_object,
+                f'flow counter "{counter_name}" permits only negative coordinate offsets; '
+                f'got {declared_offset}',
+            )
+
+        coordinate = CounterCoordinate(
+            label=line_object.label,
+            value=self._active.value - declared_offset,
+            counter_name=counter_name,
+            counter_instance_id=self._active.instance_id,
+            declared_offset=declared_offset,
+            line_id=line_object.line_id,
+        )
+        try:
+            named_scope_manager = line_object.active_named_scopes.named_scope_manager
+            if not named_scope_manager.set_counter_coordinate(
+                coordinate,
+                line_object.active_named_scopes,
+            ):
+                line_object.symbol_scope.set_counter_coordinate(coordinate)
+        except ValueError as error:
+            self._error(line_object, str(error))
+        self._active.coordinates.append(coordinate)
+
+    @classmethod
+    def _expression_labels(cls, node: ExpressionNode) -> set[str]:
+        """Collect scalar symbol tokens while excluding flow-function arguments."""
+        if node.token_type in {TokenType.T_COUNTER, TokenType.T_OFFSET}:
+            return set()
+        if node.token_type in {TokenType.T_LABEL, TokenType.T_LABEL_OR_NUM}:
+            return {str(node.value)}
+        labels = (
+            cls._expression_labels(node.left_child)
+            if node.left_child is not None
+            else set()
+        )
+        if not node.is_unary and node.right_child is not None:
+            labels.update(cls._expression_labels(node.right_child))
+        return labels
 
     @staticmethod
     def _path_value(mapping: Mapping, path: str):
@@ -214,7 +382,30 @@ class FlowLinearAnalyzer:
                 f'"{self._active.counter_class}"; M1 supports integer deltas only',
             )
         self._active.value += delta
+        for coordinate in self._active.coordinates:
+            if not coordinate.is_valid:
+                continue
+            coordinate.is_valid = self._coordinate_is_live(coordinate)
         self._check_bounds(line_object)
+
+    def _coordinate_is_live(self, coordinate: CounterCoordinate) -> bool:
+        """Return whether the current value has not crossed a named position."""
+        zero_is_live = self._active.config.get('allow_zero_offset', True)
+        offset_policy = self._active.config.get('coordinate_offsets', 'both')
+        uses_positive_side = coordinate.declared_offset > 0 or (
+            coordinate.declared_offset == 0 and offset_policy != 'negative'
+        )
+        if uses_positive_side:
+            return (
+                self._active.value >= coordinate.value
+                if zero_is_live
+                else self._active.value > coordinate.value
+            )
+        return (
+            self._active.value <= coordinate.value
+            if zero_is_live
+            else self._active.value < coordinate.value
+        )
 
     def run(self, line_objects) -> None:
         """Analyze compiled line objects once in physical source order."""
@@ -226,6 +417,9 @@ class FlowLinearAnalyzer:
                 continue
             if isinstance(line_object, FlowEndTrackLine):
                 self._close(line_object)
+                continue
+            if isinstance(line_object, CounterCoordinateLine):
+                self._declare_coordinate(line_object)
                 continue
             if isinstance(line_object, InstructionLine):
                 for record, expression_nodes in line_object.analysis_units:

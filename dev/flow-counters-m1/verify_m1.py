@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 
 from bespokeasm.assembler.engine import Assembler
-from bespokeasm.assembler.label_scope import LabelScope
+from bespokeasm.assembler.symbol_scope import SymbolScope
 from bespokeasm.configgen.vscode import VSCodeConfigGenerator
 
 
@@ -14,7 +14,7 @@ CONFIG_PATH = HARNESS_DIR / 'flow-counters-m1.yaml'
 
 def _assemble(source_path: Path, output_path: Path, static_analysis: bool = True) -> bytes:
     """Assemble one fixture and return its emitted bytes."""
-    LabelScope._global_scope = None
+    SymbolScope._global_scope = None
     assembler = Assembler(
         source_file=str(source_path),
         config_file=str(CONFIG_PATH),

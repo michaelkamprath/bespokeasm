@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 from bespokeasm.assembler.engine import Assembler
-from bespokeasm.assembler.label_scope import LabelScope
 from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.symbol_scope import SymbolScope
 from bespokeasm.expression import ExpressionUseContext
 from bespokeasm.expression import parse_expression
 from ruamel.yaml import YAML
@@ -19,10 +19,10 @@ M1_CONFIG_PATH = M1_HARNESS_DIR / 'flow-counters-m1.yaml'
 
 
 @pytest.fixture(autouse=True)
-def _reset_global_label_scope():
-    LabelScope._global_scope = None
+def _reset_global_symbol_scope():
+    SymbolScope._global_scope = None
     yield
-    LabelScope._global_scope = None
+    SymbolScope._global_scope = None
 
 
 def _load_config() -> dict:
@@ -130,9 +130,9 @@ def test_m1_counter_operand_data_and_strip_equivalence(tmp_path):
     annotation_only = (M1_HARNESS_DIR / 'annotation-only.asm').read_text()
 
     _, tracked_bytes = _assemble(tmp_path, tracked, output_name='tracked.bin')
-    LabelScope._global_scope = None
+    SymbolScope._global_scope = None
     _, stripped_bytes = _assemble(tmp_path, stripped, output_name='stripped.bin')
-    LabelScope._global_scope = None
+    SymbolScope._global_scope = None
     disabled, disabled_bytes = _assemble(
         tmp_path,
         annotation_only,
@@ -186,7 +186,7 @@ def test_m1_directives_have_zero_address_footprint(tmp_path):
     )
     stripped = '.org 4\nbefore:\nnop\nafter:\n.byte after - before\n'
     _, tracked_bytes = _assemble(tmp_path, tracked, output_name='tracked-layout.bin')
-    LabelScope._global_scope = None
+    SymbolScope._global_scope = None
     _, stripped_bytes = _assemble(tmp_path, stripped, output_name='stripped-layout.bin')
     assert tracked_bytes == stripped_bytes
     assert tracked_bytes[-2:] == bytes([0, 1])
@@ -243,11 +243,11 @@ def test_m1_exit_policy_none_and_explicit_exit(tmp_path):
     source = '#track stack\npush\n#endtrack stack\n'
     _assemble(tmp_path, source, config_path=config_path)
 
-    LabelScope._global_scope = None
+    SymbolScope._global_scope = None
     source = '#track stack\npush\n#endtrack stack exit=1\n'
     _assemble(tmp_path, source, config_path=config_path)
 
-    LabelScope._global_scope = None
+    SymbolScope._global_scope = None
     _assert_flow_error(
         tmp_path,
         '#track stack\npush\n#endtrack stack exit=0\n',
@@ -308,7 +308,7 @@ def test_m1_missing_and_non_linear_transfer_metadata_fail_on_use(tmp_path):
         config_path=missing_path,
     )
 
-    LabelScope._global_scope = None
+    SymbolScope._global_scope = None
     config = _load_config()
     config['instructions']['nop']['flow_transfer'] = 'unconditional'
     config['instructions']['nop']['flow_target_operand'] = 0
@@ -338,7 +338,7 @@ def test_m1_inert_and_unused_counter_classes_are_usage_gated(tmp_path):
         config_path=config_path,
     )
 
-    LabelScope._global_scope = None
+    SymbolScope._global_scope = None
     _assert_flow_error(
         tmp_path,
         '#track unused\nnop\n#endtrack unused\n',
@@ -376,7 +376,7 @@ def test_m1_feature_enablement_and_inactive_condition_are_usage_gated(tmp_path):
     _, ordinary = _assemble(tmp_path, 'push\npop\n', config_path=no_flow_path)
     assert ordinary == bytes([0x10, 0x11])
 
-    LabelScope._global_scope = None
+    SymbolScope._global_scope = None
     _assert_flow_error(
         tmp_path,
         '#track stack\n#endtrack stack\n',
@@ -384,7 +384,7 @@ def test_m1_feature_enablement_and_inactive_condition_are_usage_gated(tmp_path):
         config_path=no_flow_path,
     )
 
-    LabelScope._global_scope = None
+    SymbolScope._global_scope = None
     _, inactive = _assemble(
         tmp_path,
         '#ifdef NEVER\n#track stack\n#endtrack stack\n#endif\nnop\n',
@@ -402,7 +402,7 @@ def test_m1_disabled_analysis_ignores_annotations_but_rejects_dependency(tmp_pat
         config_path=no_flow_path,
         static_analysis=False,
     )
-    LabelScope._global_scope = None
+    SymbolScope._global_scope = None
     _, stripped_bytes = _assemble(
         tmp_path,
         'push\npop\n',
@@ -412,14 +412,14 @@ def test_m1_disabled_analysis_ignores_annotations_but_rejects_dependency(tmp_pat
     )
     assert annotated_bytes == stripped_bytes
 
-    LabelScope._global_scope = None
+    SymbolScope._global_scope = None
     _assert_flow_error(
         tmp_path,
         'depth COUNTER(stack)\n',
         'static analysis is disabled',
         static_analysis=False,
     )
-    LabelScope._global_scope = None
+    SymbolScope._global_scope = None
     _assert_flow_error(
         tmp_path,
         '.byte COUNTER(stack)\n',

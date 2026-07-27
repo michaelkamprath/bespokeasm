@@ -423,9 +423,51 @@ EXPRESSION_FUNCTION_DOCS: dict[str, str] = {
         '```\n'
         'COUNTER(counter-name)\n'
         '```\n\n'
-        'In M1 this function is valid only in fixed-width instruction '
+        'This function is valid only in fixed-width instruction '
         'operands and fixed-size data values. It is rejected in layout, '
         'preprocessor, and instruction-selection expressions.'
+    ),
+    'COORDINATE': (
+        '### `COORDINATE()` : Declare a Counter Coordinate\n\n'
+        '---\n\n'
+        'Identifies a position at a signed offset from the current position '
+        'of an active scalar flow counter.\n\n'
+        '**Usage:**\n\n'
+        '```\n'
+        '.parameter := COORDINATE(stack, 3)\n'
+        '```\n\n'
+        'The second argument is an ordinary compile-time expression. The '
+        "counter class's `coordinate_offsets` policy controls whether "
+        'positive, negative, or both nonzero offset directions are valid; '
+        '`allow_zero_offset` controls zero independently. '
+        '`COORDINATE()` is valid only on the right side of a `:=` declaration.'
+    ),
+    'OFFSET': (
+        '### `OFFSET()` : Counter-Coordinate Offset\n\n'
+        '---\n\n'
+        'Returns the active scalar counter value minus a coordinate saved '
+        'with `:=`.\n\n'
+        '**Usage:**\n\n'
+        '```\n'
+        'OFFSET(.coordinate)\n'
+        '```\n\n'
+        'The argument must be a counter-coordinate symbol, not an ordinary '
+        'constant or address label. Referencing a coordinate invalidated by '
+        'crossing its saved position is an error.'
+    ),
+}
+
+COUNTER_COORDINATE_DOCS: dict[str, str] = {
+    ':=': (
+        '### `:=` : Declare Counter Coordinate\n\n'
+        '---\n\n'
+        'Saves an immutable coordinate on one active scalar flow counter '
+        'without emitting bytecode or consuming address space.\n\n'
+        '**Usage:**\n\n'
+        '```\n'
+        '.slot := COORDINATE(stack, 0)\n'
+        '.arg := COORDINATE(stack, 3)\n'
+        '```'
     ),
 }
 # Generate BYTEx docs for BYTE0 through BYTE9

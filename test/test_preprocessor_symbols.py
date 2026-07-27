@@ -8,9 +8,6 @@ import unittest
 from bespokeasm import BESPOKEASM_VERSION_STR
 from bespokeasm.assembler.assembly_file import AssemblyFile
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
-from bespokeasm.assembler.label_scope import GlobalLabelScope
-from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
-from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object.factory import LineOjectFactory
@@ -29,6 +26,9 @@ from bespokeasm.assembler.preprocessor.condition import IfPreprocessorCondition
 from bespokeasm.assembler.preprocessor.condition import MutePreprocessorCondition
 from bespokeasm.assembler.preprocessor.condition import UnmutePreprocessorCondition
 from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
+from bespokeasm.assembler.symbol_scope import GlobalSymbolScope
+from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
+from bespokeasm.assembler.symbol_scope.named_scope_manager import NamedScopeManager
 
 from test import config_files
 from test import test_code
@@ -184,7 +184,7 @@ class TestPreprocessorSymbols(unittest.TestCase):
             isa_model.predefined_memory_zones,
         )
 
-        global_scope = GlobalLabelScope(set())
+        global_scope = GlobalSymbolScope(set())
         active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         lineid = LineIdentifier(12, 'test_define_symbol_line_objects')
         preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
@@ -283,7 +283,7 @@ class TestPreprocessorSymbols(unittest.TestCase):
     def test_compilation_control_and_symbol_replacement(self):
         fp = pkg_resources.files(config_files).joinpath('test_compilation_control.yaml')
         isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
-        label_scope = GlobalLabelScope(isa_model.registers)
+        symbol_scope = GlobalSymbolScope(isa_model.registers)
         memzone_manager = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -293,7 +293,7 @@ class TestPreprocessorSymbols(unittest.TestCase):
         named_scope_manager = NamedScopeManager(self.diagnostic_reporter)
 
         asm_fp = pkg_resources.files(test_code).joinpath('test_compilation_control.asm')
-        asm_obj = AssemblyFile(asm_fp, label_scope, named_scope_manager, named_scope_manager.diagnostic_reporter)
+        asm_obj = AssemblyFile(asm_fp, symbol_scope, named_scope_manager, named_scope_manager.diagnostic_reporter)
 
         try:
             line_objs: list[LineObject] = asm_obj.load_line_objects(
@@ -331,7 +331,7 @@ class TestPreprocessorSymbols(unittest.TestCase):
     def test_ifdef_undefined_symbol_is_inactive(self):
         fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')
         isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
-        label_scope = GlobalLabelScope(isa_model.registers)
+        symbol_scope = GlobalSymbolScope(isa_model.registers)
         memzone_manager = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -351,7 +351,7 @@ nop
             with open(asm_fp, 'w') as f:
                 f.write(asm_content)
 
-            asm_obj = AssemblyFile(asm_fp, label_scope, named_scope_manager, named_scope_manager.diagnostic_reporter)
+            asm_obj = AssemblyFile(asm_fp, symbol_scope, named_scope_manager, named_scope_manager.diagnostic_reporter)
             line_objs = asm_obj.load_line_objects(
                 isa_model,
                 {temp_dir},
@@ -368,7 +368,7 @@ nop
     def test_inactive_ifdef_does_not_evaluate_constants(self):
         fp = pkg_resources.files(config_files).joinpath('test_instructions_with_variants.yaml')
         isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
-        label_scope = GlobalLabelScope(isa_model.registers)
+        symbol_scope = GlobalSymbolScope(isa_model.registers)
         memzone_manager = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -388,7 +388,7 @@ nop
             with open(asm_fp, 'w') as f:
                 f.write(asm_content)
 
-            asm_obj = AssemblyFile(asm_fp, label_scope, named_scope_manager, named_scope_manager.diagnostic_reporter)
+            asm_obj = AssemblyFile(asm_fp, symbol_scope, named_scope_manager, named_scope_manager.diagnostic_reporter)
             try:
                 line_objs = asm_obj.load_line_objects(
                     isa_model,
@@ -481,7 +481,7 @@ nop
         """Doc: Preprocessor > Bytecode Emission Control - #mute is file-local and does not affect includes."""
         fp = pkg_resources.files(config_files).joinpath('test_instruction_operands.yaml')
         isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
-        label_scope = GlobalLabelScope(isa_model.registers)
+        symbol_scope = GlobalSymbolScope(isa_model.registers)
         memzone_manager = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -505,7 +505,7 @@ nop
             with open(include_path, 'w') as handle:
                 handle.write(include_source)
 
-            asm_file = AssemblyFile(main_path, label_scope, named_scope_manager, named_scope_manager.diagnostic_reporter)
+            asm_file = AssemblyFile(main_path, symbol_scope, named_scope_manager, named_scope_manager.diagnostic_reporter)
             stderr = io.StringIO()
             with contextlib.redirect_stderr(stderr):
                 line_objects = asm_file.load_line_objects(
