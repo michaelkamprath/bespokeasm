@@ -344,7 +344,7 @@ def test_m1_missing_and_non_linear_transfer_metadata_fail_on_use(tmp_path):
     _assert_flow_error(
         tmp_path,
         '#track stack\nnop 0\n#endtrack stack\n',
-        'path analysis is not yet available in M1',
+        'end the region with #endtrack stack before this transfer',
         config_path=transfer_path,
     )
 
@@ -591,17 +591,17 @@ def test_m1_labels_starting_with_layout_directive_names_are_not_layout_contexts(
     assert bytecode == bytes([0x10, 0x80, 0x01, 0x11])
 
 
-def test_m1_disabled_mode_ignores_future_directive_parameters(tmp_path):
-    """Bug: disabled analysis rejected well-formed but not-yet-shipped parameters.
+def test_m1_disabled_mode_ignores_analysis_directive_parameters(tmp_path):
+    """Disabled analysis strips valid parameters without checking their modes.
 
     ``#track stack mode=called`` compiled with ``--no-static-analysis`` errored
     with 'flow directive parameter "mode" is not available in M1', even though
-    ``mode=`` is well-formed spec syntax (shipping with M3). The requirements
+    ``mode=`` is well-formed syntax. The requirements
     (Static-Analysis Execution Control; acceptance case 76) say disabled mode
     must treat flow directives as recognized analysis-only syntax that is
     otherwise ignored — equivalent to stripping those lines — and produce no
-    flow diagnostics. Rejecting unshipped parameters is correct M1 phasing only
-    while analysis is *enabled*.
+    flow diagnostics. With analysis enabled, the selected ISA must declare the
+    requested entry mode.
     """
     annotated = '#track stack mode=called\npush\npop\n#endtrack stack\n'
     disabled, annotated_bytes = _assemble(
@@ -622,12 +622,12 @@ def test_m1_disabled_mode_ignores_future_directive_parameters(tmp_path):
     )
     assert annotated_bytes == stripped_bytes == bytes([0x10, 0x11])
 
-    # with analysis enabled, unshipped parameters remain hard M1 errors
+    # With analysis enabled, a mode absent from this M1 fixture is an error.
     SymbolScope._global_scope = None
     _assert_flow_error(
         tmp_path,
         '#track stack mode=called\npush\npop\n#endtrack stack\n',
-        'not available in M1',
+        'has no entry mode "called"',
         expected_line=1,
     )
 

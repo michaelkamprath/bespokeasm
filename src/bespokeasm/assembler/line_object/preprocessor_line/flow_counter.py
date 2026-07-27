@@ -6,6 +6,7 @@ from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.expression import ExpressionNode
 from bespokeasm.expression import parse_expression
+from bespokeasm.expression import TokenType
 from bespokeasm.utilities import is_valid_label
 
 
@@ -83,7 +84,9 @@ class FlowCounterDirectiveLine(PreprocessorLine):
         for name, value_expression in parsed_parameters.items():
             if name not in allowed:
                 if enforce:
-                    self._error(f'flow directive parameter "{name}" is not available in M1')
+                    self._error(
+                        f'flow directive parameter "{name}" is not supported'
+                    )
                 continue
             parameters[name] = value_expression
         return parameters
@@ -98,6 +101,23 @@ class FlowCounterDirectiveLine(PreprocessorLine):
             self.active_named_scopes,
             self.line_id,
         )
+
+    def identifier_parameter(self, name: str) -> str | None:
+        """Return a parameter that must be one unqualified identifier."""
+        expression = self._parameters.get(name)
+        if expression is None:
+            return None
+        if (
+            expression.token_type not in {TokenType.T_LABEL, TokenType.T_LABEL_OR_NUM}
+            or expression.left_child is not None
+            or expression.right_child is not None
+            or not is_valid_label(str(expression.value))
+        ):
+            self._error(
+                f'flow directive parameter "{name}" requires one identifier'
+            )
+            return None
+        return str(expression.value)
 
 
 class FlowTrackLine(FlowCounterDirectiveLine):
@@ -126,7 +146,10 @@ class FlowTrackLine(FlowCounterDirectiveLine):
         self._counter_class = match.group(1)
         if not is_valid_label(self._counter_class):
             self._error(f'invalid flow counter class name "{self._counter_class}"')
-        self._parameters = self._parse_parameters(match.group(2) or '', {'init', 'exit'})
+        self._parameters = self._parse_parameters(
+            match.group(2) or '',
+            {'mode', 'init', 'exit'},
+        )
         if isa_model.static_analysis_enabled and not isa_model.flow_counters_enabled:
             self._error('this instruction set does not enable flow counters')
 

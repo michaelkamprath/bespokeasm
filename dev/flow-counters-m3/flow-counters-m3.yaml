@@ -1,0 +1,158 @@
+description: Flow analysis M3 development acceptance harness
+general:
+  min_version: "0.8.0a0"
+  address_size: 8
+  multi_word_endian: little
+  registers:
+    - sp
+  identifier:
+    name: flow-analysis-m3
+    version: "0.3.0"
+flow_counters:
+  stack:
+    min_value: 0
+    max_value: 32
+    unknown_instructions: error
+    default_init: 0
+    exit_policy: balanced
+    coordinate_offsets: positive
+    allow_zero_offset: false
+    entry_modes:
+      called:
+        init: 0
+        exit: 0
+      jumped:
+        init: 0
+        exit: 0
+operand_sets:
+  frame_adjustment:
+    operand_values:
+      immediate:
+        type: numeric
+        argument:
+          size: 8
+          word_align: true
+      stack_pointer:
+        type: register
+        register: sp
+        bytecode:
+          value: 0xff
+          size: 8
+  stack_position:
+    operand_values:
+      offset:
+        type: numeric
+        argument:
+          size: 8
+          word_align: true
+  target:
+    operand_values:
+      absolute:
+        type: address
+        argument:
+          size: 8
+          word_align: true
+instructions:
+  push:
+    flow_effects:
+      stack: 1
+    flow_transfer: none
+    bytecode:
+      value: 0x10
+      size: 8
+  pop:
+    flow_effects:
+      stack: -1
+    flow_transfer: none
+    bytecode:
+      value: 0x11
+      size: 8
+  push4:
+    flow_effects:
+      stack: 4
+    flow_transfer: none
+    bytecode:
+      value: 0x14
+      size: 8
+  addsp:
+    flow_effects:
+      stack: -ARG(0)
+    flow_transfer: none
+    bytecode:
+      value: 0x16
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - frame_adjustment
+  lds:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    bytecode:
+      value: 0x6c
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - stack_position
+  sts:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    bytecode:
+      value: 0x6d
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - stack_position
+  rts:
+    # The physical return-address pull belongs to the calling convention,
+    # outside the routine-owned 0 -> 0 counter contract.
+    flow_effects:
+      stack: -2
+    flow_terminal:
+      stack: before_effect
+    flow_transfer: return
+    bytecode:
+      value: 0x69
+      size: 8
+  leave:
+    # Test-only terminal whose effect belongs inside the region contract.
+    flow_effects:
+      stack: -1
+    flow_terminal:
+      stack: after_effect
+    flow_transfer: return
+    bytecode:
+      value: 0x6a
+      size: 8
+  jmp:
+    flow_effects:
+      stack: 0
+    flow_transfer: unconditional
+    flow_target_operand: 0
+    bytecode:
+      value: 0x70
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - target
+  nop:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    bytecode:
+      value: 0
+      size: 8
+macros:
+  free4:
+    variants:
+      - instructions:
+          - addsp 4

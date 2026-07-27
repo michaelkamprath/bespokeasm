@@ -147,9 +147,15 @@ class InstructionBytecodeGenerator:
             for parsed_operand in matched_operands.operands:
                 if parsed_operand.operand.null_operand:
                     continue
+                if isinstance(parsed_operand.argument, ExpressionByteCodePart):
+                    expression_part = parsed_operand.argument
+                elif isinstance(parsed_operand.bytecode, ExpressionByteCodePart):
+                    expression_part = parsed_operand.bytecode
+                else:
+                    expression_part = None
                 expression = (
-                    FrozenExpression.from_node(parsed_operand.argument.parsed_expression)
-                    if isinstance(parsed_operand.argument, ExpressionByteCodePart)
+                    FrozenExpression.from_node(expression_part.parsed_expression)
+                    if expression_part is not None
                     else None
                 )
                 if 'REGISTER' in parsed_operand.operand.type.name:

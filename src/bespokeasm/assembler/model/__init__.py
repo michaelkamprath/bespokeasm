@@ -18,6 +18,7 @@ from bespokeasm.assembler.model.semantics import merge_instruction_semantics
 from bespokeasm.assembler.symbol_scope import SymbolScope
 from bespokeasm.assembler.symbol_scope import SymbolScopeType
 from bespokeasm.utilities import is_unprefixed_numeric_string
+from bespokeasm.utilities import is_valid_label
 from bespokeasm.utilities import normalize_default_numeric_base
 from packaging import version
 from ruamel.yaml import YAML
@@ -234,6 +235,52 @@ class AssemblerModel:
             return
         self._flow_config_error(f'{context} must be an integer or supported flow-delta expression')
 
+    def _validate_flow_delta_operand_indexes(
+        self,
+        value,
+        operand_counts: set[int],
+        context: str,
+    ) -> None:
+        """Validate ``ARG(n)`` for every source signature of one variant."""
+        if isinstance(value, dict):
+            for edge_name, edge_value in value.items():
+                self._validate_flow_delta_operand_indexes(
+                    edge_value,
+                    operand_counts,
+                    f'{context}.{edge_name}',
+                )
+            return
+        if not isinstance(value, str):
+            return
+        for index_text in re.findall(r'ARG\((\d+)\)', value):
+            index = int(index_text)
+            invalid_counts = sorted(
+                count for count in operand_counts
+                if index >= count
+            )
+            if invalid_counts:
+                counts_text = ', '.join(str(count) for count in invalid_counts)
+                self._flow_config_error(
+                    f'{context} references ARG({index}), outside the configured '
+                    f'source-written operand count(s): {counts_text}'
+                )
+
+    @staticmethod
+    def _configured_source_operand_counts(operands_config: dict) -> set[int]:
+        """Return possible post-match source operand counts for a variant."""
+        counts = set()
+        operand_sets = operands_config.get('operand_sets', {}).get('list', [])
+        if operand_sets:
+            counts.add(len(operand_sets))
+        for specific_config in operands_config.get('specific_operands', {}).values():
+            counts.add(sum(
+                operand.get('type') != 'empty'
+                for operand in specific_config.get('list', {}).values()
+            ))
+        if not counts:
+            counts.add(operands_config.get('count', 0))
+        return counts
+
     def _validate_counter_class(self, counter_name: str, counter_config) -> None:
         context = f'flow_counters.{counter_name}'
         if not isinstance(counter_config, dict):
@@ -281,8 +328,18 @@ class AssemblerModel:
             self._flow_config_error(f'{context}.entry_modes must be a dictionary')
         for mode_name, mode_config in entry_modes.items():
             mode_context = f'{context}.entry_modes.{mode_name}'
+            if not isinstance(mode_name, str) or not is_valid_label(mode_name):
+                self._flow_config_error(
+                    f'{context}.entry_modes contains invalid mode name "{mode_name}"'
+                )
             if not isinstance(mode_config, dict) or 'init' not in mode_config:
                 self._flow_config_error(f'{mode_context} must be a dictionary containing integer init')
+            unexpected_options = set(mode_config) - {'init', 'exit'}
+            if unexpected_options:
+                option = sorted(unexpected_options)[0]
+                self._flow_config_error(
+                    f'{mode_context} has unsupported option "{option}"'
+                )
             for option in ('init', 'exit'):
                 if option in mode_config and (
                     isinstance(mode_config[option], bool)
@@ -452,12 +509,30 @@ class AssemblerModel:
             ):
                 effective_context = f'{context}.effective_variant[{variant_number}]'
                 self._validate_effective_transfer_config(effective_config, effective_context)
+                operand_counts = self._configured_source_operand_counts(
+                    effective_config.get('operands', {}),
+                )
+                for metadata_key in ('flow_effects', 'flow_call_effects'):
+                    for counter_name, delta in effective_config.get(
+                        metadata_key,
+                        {},
+                    ).items():
+                        self._validate_flow_delta_operand_indexes(
+                            delta,
+                            operand_counts,
+                            f'{effective_context}.{metadata_key}.{counter_name}',
+                        )
                 for counter_name, counter_config in flow_counters.items():
                     source = counter_config.get('source', f'flow_effects.{counter_name}')
                     delta = self._config_path_value(effective_config, source)
                     if delta is not None:
                         self._validate_flow_delta(
                             delta,
+                            f'{effective_context}.{source}',
+                        )
+                        self._validate_flow_delta_operand_indexes(
+                            delta,
+                            operand_counts,
                             f'{effective_context}.{source}',
                         )
 

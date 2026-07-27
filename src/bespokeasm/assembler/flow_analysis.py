@@ -1,13 +1,16 @@
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from dataclasses import field
 
+from bespokeasm.assembler.analysis import OperandSemanticKind
 from bespokeasm.assembler.line_object.counter_coordinate_line import CounterCoordinateLine
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowEndTrackLine
 from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowTrackLine
 from bespokeasm.assembler.symbol_scope.flow_symbols import CounterCoordinate
 from bespokeasm.expression import ExpressionNode
+from bespokeasm.expression import parse_expression
 from bespokeasm.expression import TokenType
 
 
@@ -22,6 +25,7 @@ class _LinearCounterState:
     config: dict
     opened_by: FlowTrackLine
     coordinates: list[CounterCoordinate] = field(default_factory=list)
+    path_live: bool = True
 
 
 class FlowLinearAnalyzer:
@@ -76,10 +80,15 @@ class FlowLinearAnalyzer:
     def _open(self, line_object: FlowTrackLine) -> None:
         """Validate and initialize the scalar counter named by ``#track``."""
         if self._active is not None:
+            suffix = (
+                f'the prior region is still lexically open after its terminal; '
+                f'add a lexical #endtrack {self._active.name} before opening another counter'
+                if not self._active.path_live
+                else f'insert #endtrack {self._active.name} before opening another counter'
+            )
             self._error(
                 line_object,
-                f'flow counter "{self._active.name}" is still active; '
-                f'insert #endtrack {self._active.name} before opening another counter',
+                f'flow counter "{self._active.name}" is still active; {suffix}',
             )
             return
         counter_config = self._model.flow_counters.get(line_object.counter_class)
@@ -93,7 +102,7 @@ class FlowLinearAnalyzer:
             self._error(
                 line_object,
                 f'flow counter class "{line_object.counter_class}" is not scalar; '
-                'interval analysis is not available in M1',
+                'interval analysis is not available in M3',
             )
             return
         if not self._model.flow_counter_has_effect_metadata(line_object.counter_class):
@@ -104,11 +113,31 @@ class FlowLinearAnalyzer:
             )
             return
 
+        mode_name = line_object.identifier_parameter('mode')
+        mode_config = {}
+        if mode_name is not None:
+            mode_config = counter_config.get('entry_modes', {}).get(mode_name)
+            if mode_config is None:
+                self._error(
+                    line_object,
+                    f'flow counter class "{line_object.counter_class}" has no '
+                    f'entry mode "{mode_name}"',
+                )
+                return
+
         initial = line_object.evaluate_parameter('init')
         if initial is None:
-            initial = counter_config.get('default_init', 0)
+            initial = mode_config.get(
+                'init',
+                counter_config.get('default_init', 0),
+            )
         expected_exit = line_object.evaluate_parameter('exit')
-        if expected_exit is None and counter_config.get('exit_policy', 'balanced') == 'balanced':
+        if expected_exit is None:
+            expected_exit = mode_config.get('exit')
+        if (
+            expected_exit is None
+            and counter_config.get('exit_policy', 'balanced') == 'balanced'
+        ):
             expected_exit = initial
         self._active = _LinearCounterState(
             counter_class=line_object.counter_class,
@@ -138,7 +167,17 @@ class FlowLinearAnalyzer:
                 f'"{self._active.name}"',
             )
             return
+        if not self._active.path_live:
+            self._active = None
+            return
         expected = line_object.evaluate_parameter('exit')
+        if expected is None:
+            expected = self._active.expected_exit
+        self._check_exit(line_object, expected)
+        self._active = None
+
+    def _check_exit(self, line_object, expected: int | None = None) -> None:
+        """Check the active path against an exact exit contract when present."""
         if expected is None:
             expected = self._active.expected_exit
         if expected is not None and self._active.value != expected:
@@ -147,7 +186,6 @@ class FlowLinearAnalyzer:
                 f'flow counter "{self._active.name}" exit mismatch: '
                 f'expected {expected}, actual {self._active.value}',
             )
-        self._active = None
 
     def _counter_name(self, line_object, node: ExpressionNode) -> str | None:
         """Extract and validate the simple counter-name argument to ``COUNTER``."""
@@ -206,6 +244,12 @@ class FlowLinearAnalyzer:
                 f'OFFSET({label}) references inactive flow counter "{coordinate.counter_name}"',
             )
             return
+        if not self._active.path_live:
+            self._error(
+                line_object,
+                f'OFFSET({label}) is unreachable after the flow counter path terminated',
+            )
+            return
         if coordinate.counter_name != self._active.name:
             self._error(
                 line_object,
@@ -244,6 +288,12 @@ class FlowLinearAnalyzer:
                     f'COUNTER({counter_name}) references an inactive flow counter',
                 )
                 continue
+            if not self._active.path_live:
+                self._error(
+                    line_object,
+                    f'COUNTER({counter_name}) is unreachable after the flow counter path terminated',
+                )
+                continue
             if counter_name != self._active.name:
                 self._error(
                     line_object,
@@ -268,6 +318,13 @@ class FlowLinearAnalyzer:
             self._error(
                 line_object,
                 f'COORDINATE({counter_name}, ...) references an inactive flow counter',
+            )
+            return
+        if not self._active.path_live:
+            self._error(
+                line_object,
+                f'COORDINATE({counter_name}, ...) is unreachable after the '
+                'flow counter path terminated',
             )
             return
         if counter_name != self._active.name:
@@ -367,10 +424,152 @@ class FlowLinearAnalyzer:
             value = value[component]
         return value
 
+    def _operand_semantic_value(self, line_object, record, index: int) -> int:
+        """Resolve one ``ARG(n)`` to its source-level compile-time value."""
+        if index >= len(record.operands):
+            self._error(
+                line_object,
+                f'instruction "{record.source_mnemonic}" effect references ARG({index}), '
+                f'but the selected variant has {len(record.operands)} source operand(s)',
+            )
+            return 0
+        operand = record.operands[index]
+        if (
+            operand.semantic_kind is not OperandSemanticKind.COMPILE_TIME_EXPRESSION
+            or operand.expression is None
+        ):
+            self._error(
+                line_object,
+                f'instruction "{record.source_mnemonic}" effect references ARG({index}), '
+                f'but operand "{operand.source_text}" is runtime-valued',
+            )
+            return 0
+        if operand.expression.contains_flow_value():
+            self._error(
+                line_object,
+                f'instruction "{record.source_mnemonic}" effect ARG({index}) cannot '
+                'depend on COUNTER() or OFFSET()',
+            )
+            return 0
+        try:
+            return operand.expression.to_node().get_value(
+                line_object.symbol_scope,
+                line_object.active_named_scopes,
+                line_object.line_id,
+            )
+        except (
+            ArithmeticError,
+            RuntimeError,
+            SyntaxError,
+            SystemExit,
+            ValueError,
+        ) as error:
+            self._error(
+                line_object,
+                f'instruction "{record.source_mnemonic}" cannot resolve ARG({index}) '
+                f'as a compile-time value: {error}',
+            )
+            return 0
+
+    def _resolve_delta(self, line_object, record, delta) -> int:
+        """Evaluate an integer or M3 ``ARG(n)`` flow-delta expression."""
+        if isinstance(delta, bool):
+            self._error(
+                line_object,
+                f'instruction "{record.source_mnemonic}" has an invalid boolean effect',
+            )
+            return 0
+        if isinstance(delta, int):
+            return delta
+        if not isinstance(delta, str):
+            self._error(
+                line_object,
+                f'instruction "{record.source_mnemonic}" has a non-scalar effect for '
+                f'"{self._active.counter_class}"; edge-dependent effects are not available in M3',
+            )
+            return 0
+        if 'COUNT(' in delta:
+            self._error(
+                line_object,
+                f'instruction "{record.source_mnemonic}" uses COUNT(); '
+                'structural operand effects are not available in M3',
+            )
+            return 0
+
+        def substitute_argument(match: re.Match) -> str:
+            value = self._operand_semantic_value(
+                line_object,
+                record,
+                int(match.group(1)),
+            )
+            return f'({value})'
+
+        expression_text = re.sub(r'ARG\((\d+)\)', substitute_argument, delta)
+        try:
+            expression = parse_expression(
+                line_object.line_id,
+                expression_text,
+                self._model.default_numeric_base,
+            )
+            return expression.get_value(
+                line_object.symbol_scope,
+                line_object.active_named_scopes,
+                line_object.line_id,
+            )
+        except (
+            ArithmeticError,
+            RuntimeError,
+            SyntaxError,
+            SystemExit,
+            ValueError,
+        ) as error:
+            self._error(
+                line_object,
+                f'instruction "{record.source_mnemonic}" has an invalid flow effect '
+                f'"{delta}": {error}',
+            )
+            return 0
+
+    def _instruction_delta(self, line_object, record) -> int | None:
+        """Fetch and resolve the active class's selected instruction effect."""
+        source = self._active.config.get(
+            'source',
+            f'flow_effects.{self._active.counter_class}',
+        )
+        delta = self._path_value(record.semantics, source)
+        if delta is not None:
+            return self._resolve_delta(line_object, record, delta)
+
+        unknown_policy = self._active.config.get('unknown_instructions', 'warn')
+        message = (
+            f'instruction "{record.source_mnemonic}" has no effect metadata '
+            f'for flow counter class "{self._active.counter_class}"'
+        )
+        if unknown_policy == 'warn':
+            self._diagnostic_reporter.warn(
+                line_object.line_id,
+                message,
+                category='flow',
+            )
+        elif unknown_policy == 'error':
+            self._error(line_object, message)
+        return None
+
+    def _apply_delta(self, line_object, record) -> None:
+        """Apply one selected instruction effect and update coordinate liveness."""
+        delta = self._instruction_delta(line_object, record)
+        if delta is None:
+            return
+        self._active.value += delta
+        for coordinate in self._active.coordinates:
+            if coordinate.is_valid:
+                coordinate.is_valid = self._coordinate_is_live(coordinate)
+        self._check_bounds(line_object)
+
     def _apply_instruction(self, line_object, record, expression_nodes) -> None:
         """Resolve operand uses, validate transfer metadata, and apply one delta."""
         self._resolve_expressions(line_object, expression_nodes)
-        if self._active is None:
+        if self._active is None or not self._active.path_live:
             return
 
         transfer = record.semantics.get('flow_transfer')
@@ -380,47 +579,40 @@ class FlowLinearAnalyzer:
                 f'instruction "{record.source_mnemonic}" is missing required flow_transfer metadata',
             )
             return
+        terminals = record.semantics.get('flow_terminal', {})
+        reconciliation_order = (
+            terminals.get(self._active.counter_class)
+            if isinstance(terminals, Mapping)
+            else None
+        )
+        if reconciliation_order is not None:
+            if transfer != 'return':
+                self._error(
+                    line_object,
+                    f'instruction "{record.source_mnemonic}" is a flow terminal for '
+                    f'"{self._active.counter_class}", but its flow_transfer "{transfer}" '
+                    'is not an unconditional return',
+                )
+                return
+            if reconciliation_order == 'after_effect':
+                self._apply_delta(line_object, record)
+            self._check_exit(line_object)
+            self._active.path_live = False
+            return
+
         if transfer != 'none':
+            corrective_action = (
+                f'end the region with #endtrack {self._active.name} before this transfer'
+                if transfer in {'unconditional', 'call'}
+                else 'path analysis is not yet available in M3'
+            )
             self._error(
                 line_object,
                 f'instruction "{record.source_mnemonic}" uses flow_transfer "{transfer}"; '
-                'path analysis is not yet available in M1',
+                f'{corrective_action}',
             )
             return
-
-        source = self._active.config.get(
-            'source',
-            f'flow_effects.{self._active.counter_class}',
-        )
-        delta = self._path_value(record.semantics, source)
-        if delta is None:
-            unknown_policy = self._active.config.get('unknown_instructions', 'warn')
-            message = (
-                f'instruction "{record.source_mnemonic}" has no effect metadata '
-                f'for flow counter class "{self._active.counter_class}"'
-            )
-            if unknown_policy == 'warn':
-                self._diagnostic_reporter.warn(
-                    line_object.line_id,
-                    message,
-                    category='flow',
-                )
-            elif unknown_policy == 'error':
-                self._error(line_object, message)
-            return
-        if isinstance(delta, bool) or not isinstance(delta, int):
-            self._error(
-                line_object,
-                f'instruction "{record.source_mnemonic}" has a non-constant effect for '
-                f'"{self._active.counter_class}"; M1 supports integer deltas only',
-            )
-            return
-        self._active.value += delta
-        for coordinate in self._active.coordinates:
-            if not coordinate.is_valid:
-                continue
-            coordinate.is_valid = self._coordinate_is_live(coordinate)
-        self._check_bounds(line_object)
+        self._apply_delta(line_object, record)
 
     def _coordinate_is_live(self, coordinate: CounterCoordinate) -> bool:
         """Return whether the current value has not crossed a named position."""
@@ -462,8 +654,9 @@ class FlowLinearAnalyzer:
             if line_object.flow_expression_nodes:
                 self._resolve_expressions(line_object, line_object.flow_expression_nodes)
 
-        if self._active is not None:
+        if self._active is not None and self._active.path_live:
             self._error(
                 last_line or self._active.opened_by,
-                f'flow counter "{self._active.name}" reaches EOF without #endtrack',
+                f'flow counter "{self._active.name}" reaches EOF without '
+                'a flow terminal or #endtrack',
             )

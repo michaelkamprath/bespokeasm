@@ -34,6 +34,7 @@ class FrozenExpression:
     left: FrozenExpression | None = None
     right: FrozenExpression | None = None
     expression_context: ExpressionUseContext | None = None
+    default_numeric_base: str = 'decimal'
 
     @classmethod
     def from_node(cls, node: ExpressionNode | None) -> FrozenExpression | None:
@@ -45,6 +46,38 @@ class FrozenExpression:
             left=cls.from_node(node.left_child),
             right=cls.from_node(node.right_child),
             expression_context=node.expression_context,
+            default_numeric_base=node.default_numeric_base,
+        )
+
+    def to_node(self) -> ExpressionNode:
+        """Rebuild a private mutable tree for semantic-value evaluation.
+
+        Analysis records retain immutable expression snapshots so later
+        passes cannot mutate the bytecode generator's live trees.  Consumers
+        that need a compile-time operand value evaluate this reconstructed
+        copy against the source line's completed symbol scopes.
+        """
+        node = ExpressionNode(
+            self.token_type,
+            self.value,
+            self.default_numeric_base,
+        )
+        node.left_child = self.left.to_node() if self.left is not None else None
+        node.right_child = self.right.to_node() if self.right is not None else None
+        if self.expression_context is not None:
+            node._expression_context = self.expression_context
+        return node
+
+    def contains_flow_value(self) -> bool:
+        """Return whether the snapshot contains ``COUNTER`` or ``OFFSET``."""
+        if self.token_type in {TokenType.T_COUNTER, TokenType.T_OFFSET}:
+            return True
+        return (
+            self.left is not None
+            and self.left.contains_flow_value()
+        ) or (
+            self.right is not None
+            and self.right.contains_flow_value()
         )
 
 

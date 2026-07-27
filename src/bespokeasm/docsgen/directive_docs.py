@@ -379,17 +379,18 @@ PREPROCESSOR_DIRECTIVE_DOCS: dict[str, str] = {
         '**Usage:**\n\n'
         '```\n'
         '#track <counter-class>\n'
-        '#track <counter-class> init=<expression> exit=<expression>\n'
+        '#track <counter-class> mode=<entry-mode> '
+        'init=<expression> exit=<expression>\n'
         '```\n\n'
-        '`init=` overrides the class default for the initial value. '
-        '`exit=` requires that value when the region closes. The directive '
-        'does not emit bytecode or consume an address.'
+        '`mode=` selects an entry convention configured by the counter class. '
+        'Explicit `init=` and `exit=` values override the selected mode. '
+        'The directive does not emit bytecode or consume an address.'
     ),
     'endtrack': (
         '### `#endtrack` : End Flow-Counter Tracking\n\n'
         '---\n\n'
-        'Closes the active straight-line flow-counter region and applies '
-        'its exit check.\n\n'
+        'Closes the active flow-counter region lexically and applies its exit '
+        'check when the execution path is still live.\n\n'
         '**Usage:**\n\n'
         '```\n'
         '#endtrack <counter-name>\n'
@@ -397,7 +398,8 @@ PREPROCESSOR_DIRECTIVE_DOCS: dict[str, str] = {
         '```\n\n'
         'With `exit_policy: balanced`, omitting `exit=` requires the final '
         'value to equal the initial value. With `exit_policy: none`, an '
-        'omitted exit check simply closes the region.'
+        'omitted exit check simply closes the region. After a terminal has '
+        'already reconciled the path, `#endtrack` is a lexical-only delimiter.'
     ),
 }
 
