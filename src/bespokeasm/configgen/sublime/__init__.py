@@ -417,6 +417,11 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         hover_plugin = self._hover_plugin_filename()
         hover_plugin_fp = os.path.join(destination_dir, hover_plugin)
         shutil.copy(str(fp), hover_plugin_fp)
+        self._replace_token_in_file(
+            hover_plugin_fp,
+            '##DECLARATION_OPERATOR##',
+            ':=' if self.model.flow_counters_enabled else '',
+        )
         self._replace_token_in_file(hover_plugin_fp, '##PACKAGE_NAME##', self.language_name)
         self._replace_token_in_file(hover_plugin_fp, '##LABEL_PATTERN##', self._label_pattern())
         self._replace_token_in_file(

@@ -119,6 +119,8 @@ def _assert_flow_error(
     diagnostic = assembler.model.diagnostic_reporter.diagnostics[-1]
     assert diagnostic.category == 'flow'
     assert diagnostic.line_id is not None
+    # diagnostics must attribute the source *file* as well as the line
+    assert diagnostic.line_id.filename.endswith('out.bin.asm')
     if expected_line is not None:
         assert diagnostic.line_id.line_num == expected_line
     return assembler
@@ -384,6 +386,16 @@ def test_m1_feature_enablement_and_inactive_condition_are_usage_gated(tmp_path):
         config_path=no_flow_path,
     )
 
+    # acceptance case 56 also covers the expression-operand path: a COUNTER()
+    # operand against a non-enabled ISA errors at the use, like #track does
+    SymbolScope._global_scope = None
+    _assert_flow_error(
+        tmp_path,
+        'depth COUNTER(stack)\n',
+        'does not enable flow counters',
+        config_path=no_flow_path,
+    )
+
     SymbolScope._global_scope = None
     _, inactive = _assemble(
         tmp_path,
@@ -574,6 +586,147 @@ def test_m1_expression_parser_rejects_counter_from_non_value_contexts(context):
             'COUNTER(stack)',
             context=context,
         )
+
+
+def test_m1_retrack_of_active_counter_errors_with_endtrack_guidance(tmp_path):
+    """Coverage for acceptance case 15 (second half): the re-``#track`` diagnostic.
+
+    A second ``#track`` for a counter whose lexical region is still open must
+    error even when the counter is balanced, and case 15 explicitly requires
+    the diagnostic to identify the still-open prior region and recommend
+    inserting a lexical ``#endtrack <counter>``. The behavior existed but the
+    required guidance text had no test pinning it. (M1 has no flow terminals,
+    so a balanced-but-open region stands in for the spec's "even if all
+    earlier paths terminated" case until M3/M5 ship terminals.)
+    """
+    _assert_flow_error(
+        tmp_path,
+        '#track stack\npush\npop\n#track stack\nnop\n#endtrack stack\n',
+        'insert #endtrack stack before opening another counter',
+        expected_line=4,
+    )
+
+
+def test_m1_explicit_static_analysis_flag_matches_default(tmp_path):
+    """Coverage for acceptance case 75: ``--static-analysis`` equals the default.
+
+    With no flag and with explicit ``--static-analysis``, the same flow-enabled
+    source must produce identical bytes and identical diagnostics — enabled is
+    the default. The CLI-forwarding unit test only checked the boolean reaching
+    the handler; this test drives the real compile handler through the real CLI
+    twice and compares the produced binary and the full (path-normalized) CLI
+    output, including a flow *warning* emitted by the analysis pass, so a
+    regression in either the default or the diagnostic stream fails here.
+    """
+    from bespokeasm.__main__ import _compile_handler
+    from bespokeasm.cli import build_cli
+    from bespokeasm.cli import CommandHandlers
+    from click.testing import CliRunner
+
+    config = _load_config()
+    config['flow_counters']['stack']['unknown_instructions'] = 'warn'
+    config['instructions']['mystery'] = {
+        'flow_transfer': 'none',
+        'bytecode': {'value': 0x33, 'size': 8},
+    }
+    config_path = _write_config(tmp_path, config)
+    source = (
+        '#track stack\n'
+        'push\n'
+        'mystery\n'
+        'depth COUNTER(stack)\n'
+        'pop\n'
+        '#endtrack stack\n'
+    )
+
+    def noop(*_args):
+        return None
+
+    results = {}
+    for label, extra_args in (('default', []), ('explicit', ['--static-analysis'])):
+        run_dir = tmp_path / label
+        run_dir.mkdir()
+        source_path = run_dir / 'prog.asm'
+        source_path.write_text(source)
+        SymbolScope._global_scope = None
+        cli = build_cli(CommandHandlers(_compile_handler, noop, noop, noop, noop))
+        result = CliRunner().invoke(
+            cli,
+            ['compile', str(source_path), '--config-file', str(config_path), *extra_args],
+        )
+        assert result.exit_code == 0, result.output
+        results[label] = (
+            (run_dir / 'prog.bin').read_bytes(),
+            result.output.replace(str(run_dir), '<dir>'),
+        )
+
+    assert results['default'] == results['explicit']
+    default_bytes, default_output = results['default']
+    assert default_bytes == bytes([0x10, 0x33, 0x80, 0x01, 0x11])
+    assert 'no effect metadata' in default_output
+
+
+def test_m1_analyzer_survives_a_nonfatal_diagnostic_reporter(tmp_path, monkeypatch):
+    """Design hardening: the analyzer must not rely on ``error()`` never returning.
+
+    ``DiagnosticReporter.error`` currently calls ``sys.exit``, and several
+    analyzer error paths dereference state that is invalid in the error case on
+    the very next line — e.g. ``#endtrack`` with no active counter immediately
+    reads ``self._active.name``, and ``#track`` of an undeclared class reads
+    the ``None`` class config. They were safe only because the reporter is
+    fail-fast today. If the reporter ever becomes accumulate-and-continue (the
+    ``diagnostics`` list points that way, and the M5 worklist will want to
+    report several path errors in one run), those sites turn into
+    ``AttributeError``/``TypeError`` crashes that mask the real diagnostic.
+
+    This test simulates a non-exiting reporter and drives the linear analyzer's
+    error paths, asserting each degrades to a recorded flow diagnostic instead
+    of an unhandled exception. Every ``_error()`` call site is expected to
+    guard-and-return rather than fall through into invalid state.
+    """
+    from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
+
+    original_error = DiagnosticReporter.error
+
+    def nonfatal_error(self, line_id, message, category='user'):
+        try:
+            original_error(self, line_id, message, category=category)
+        except SystemExit:
+            pass
+
+    monkeypatch.setattr(DiagnosticReporter, 'error', nonfatal_error)
+
+    bad_delta_config = _load_config()
+    bad_delta_config['instructions']['nop']['flow_effects']['stack'] = 'runtime'
+    bad_delta_path = _write_config(tmp_path, bad_delta_config, 'bad-delta.yaml')
+
+    scenarios = [
+        # #endtrack with no active counter (read self._active.name after error)
+        ('close-no-active', '#endtrack stack\nnop\n', M1_CONFIG_PATH),
+        # #track of an undeclared class (read counter_config.get after error)
+        ('unknown-class', '#track bogus\nnop\n', M1_CONFIG_PATH),
+        # re-#track while active (must not clobber the open region)
+        (
+            'retrack',
+            '#track stack\nnop\n#track stack\nnop\n#endtrack stack\n',
+            M1_CONFIG_PATH,
+        ),
+        # non-integer delta (value += delta after error)
+        ('bad-delta', '#track stack\nnop\n#endtrack stack\n', bad_delta_path),
+    ]
+    for name, source, config_path in scenarios:
+        SymbolScope._global_scope = None
+        assembler = _assembler(
+            tmp_path,
+            source,
+            config_path=config_path,
+            output_name=f'{name}.bin',
+        )
+        assembler.assemble_bytecode()
+        assert any(
+            diagnostic.category == 'flow' and diagnostic.level == 'error'
+            for diagnostic in assembler.model.diagnostic_reporter.diagnostics
+        ), f'scenario {name} recorded no flow error'
 
 
 def test_m1_harness_is_runnable():

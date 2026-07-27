@@ -14,6 +14,7 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.model.instruction_set import InstructionSet
 from bespokeasm.assembler.model.operand_set import OperandSet
 from bespokeasm.assembler.model.operand_set import OperandSetCollection
+from bespokeasm.assembler.model.semantics import merge_instruction_semantics
 from bespokeasm.assembler.symbol_scope import SymbolScope
 from bespokeasm.assembler.symbol_scope import SymbolScopeType
 from bespokeasm.utilities import is_unprefixed_numeric_string
@@ -287,17 +288,14 @@ class AssemblerModel:
 
     @staticmethod
     def _effective_instruction_configs(instruction_config: dict) -> list[dict]:
-        root_config = {
-            key: value
-            for key, value in instruction_config.items()
-            if key != 'variants'
-        }
         if 'bytecode' in instruction_config:
-            effective_configs = [root_config]
+            effective_configs = [merge_instruction_semantics(instruction_config, {})]
         else:
             effective_configs = []
         for variant_config in instruction_config.get('variants', []):
-            effective_configs.append({**root_config, **variant_config})
+            effective_configs.append(
+                merge_instruction_semantics(instruction_config, variant_config)
+            )
         return effective_configs
 
     @staticmethod

@@ -250,18 +250,22 @@ const COMPILER_DIRECTIVE_RE = /\.(\w+)\b/gi;
 const PREPROCESSOR_DIRECTIVE_RE = /#(\S+)\b/gi;
 const REGISTER_RE = /(?:##REGISTERS##)/gi;
 const CONSTANT_VALUE_RE = /^\s*##CONSTANT_PATTERN##\s*(?:=|\bEQU\b)\s*(.+?)(?:\s*;.*)?$/;
+// Replaced at generation time: the coordinate operator spelling for a
+// flow-counter-enabled ISA, or the empty string when the feature is disabled
+// (so no flow spelling ships in a non-flow extension).
+const DECLARATION_OPERATOR = '##DECLARATION_OPERATOR##';
 
 function getDirectiveAtPosition(lineText, character) {
   if (!isOffsetInCodeRegion(lineText, character)) {
     return null;
   }
-  const coordinateOperator = lineText.indexOf(':=');
+  const coordinateOperator = DECLARATION_OPERATOR ? lineText.indexOf(DECLARATION_OPERATOR) : -1;
   if (
     coordinateOperator >= 0
     && character >= coordinateOperator
-    && character < coordinateOperator + 2
+    && character < coordinateOperator + DECLARATION_OPERATOR.length
   ) {
-    return ':=';
+    return DECLARATION_OPERATOR;
   }
   COMPILER_DIRECTIVE_RE.lastIndex = 0;
   let match;

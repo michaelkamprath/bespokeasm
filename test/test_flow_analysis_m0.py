@@ -7,6 +7,7 @@ from pathlib import Path
 import bespokeasm.assembler.analysis as analysis_module
 import bespokeasm.assembler.bytecode.assembled as assembled_module
 import bespokeasm.assembler.bytecode.generator.instruction as instruction_generator_module
+import bespokeasm.assembler.flow_analysis as flow_analysis_module
 import pytest
 from bespokeasm.assembler.analysis import ExpressionUseContext
 from bespokeasm.assembler.analysis import FrozenExpression
@@ -137,7 +138,15 @@ def test_m0_records_variants_operands_expressions_ordinals_and_macro_constituent
     assert immediate.operands[0].expression_context is ExpressionUseContext.OPERAND_VALUE
     assert register.operands[0].semantic_kind is OperandSemanticKind.RUNTIME_REGISTER
     assert register.operands[0].expression is None
-    assert branch.parsed_operand_expressions[0] is not None
+    # the retained expression tree must be a faithful snapshot, not merely
+    # non-None: `jmp target + 0` freezes as (+ (label target) (num 0))
+    branch_expression = branch.parsed_operand_expressions[0]
+    assert branch_expression is not None
+    assert branch_expression.token_type is TokenType.T_PLUS
+    assert branch_expression.left.token_type is TokenType.T_LABEL
+    assert branch_expression.left.value == 'target'
+    assert branch_expression.right.token_type is TokenType.T_NUM
+    assert branch_expression.right.value == 0
 
     assert macro_load.source_identity.macro_path == (('load_and_nop', 0),)
     assert macro_nop.source_identity.macro_path == (('load_and_nop', 1),)
@@ -243,6 +252,16 @@ def test_m0_large_dormant_compile_has_no_analysis_allocations_or_traversal(
         instruction_generator_module,
         'InstructionAnalysisRecord',
         unexpected_analysis_work,
+    )
+    # Dormant compilation must not perform the flow-usage source scan either:
+    # `source_uses_flow` walks every line object, and the M0 dormant-overhead
+    # acceptance criterion (case 70) is structural — no additional whole-source
+    # traversal — so the scan must stay behind the analysis-enabled gate in the
+    # engine rather than merely returning False.
+    monkeypatch.setattr(
+        flow_analysis_module.FlowLinearAnalyzer,
+        'source_uses_flow',
+        staticmethod(unexpected_analysis_work),
     )
 
     original_assembled_init = assembled_module.AssembledInstruction.__init__
@@ -438,3 +457,126 @@ def test_m0_flow_config_validation_is_analysis_gated(tmp_path, mutate, message):
     )
     assert not model.analysis_records_enabled
     assert disabled_reporter.diagnostics == ()
+
+
+def test_m0_variant_semantics_merge_is_deep_for_metadata(tmp_path):
+    """Bug: the variant semantics merge was shallow, dropping root nested keys.
+
+    ``InstructionVariant`` and ``AssemblerModel._effective_instruction_configs``
+    both computed ``{**root, **variant}``, so a variant overriding one key of a
+    nested metadata dictionary silently discarded the root's sibling keys:
+    root ``documentation: {family: load}`` plus variant ``documentation:
+    {cycles: 2}`` produced merged semantics with ``family`` gone. With counter
+    ``source:`` binding (e.g. ``source: documentation.cycles``, shipped in M1)
+    and per-class ``flow_effects`` maps, that silently loses deltas — the
+    "silently tracking nothing" failure mode the Fail Loud requirement exists
+    to prevent.
+
+    Pinned merge semantics:
+    * nested metadata dictionaries (``documentation``, ``flow_effects``,
+      custom fields) merge recursively key-by-key; the variant wins per key;
+    * a variant can never remove a root key: an explicit ``null`` override is
+      ignored (decided 2026-07: no removal escape hatch);
+    * ``bytecode`` and ``operands`` replace wholesale, mirroring the emission
+      machinery, which reads them only from the selected variant's config;
+    * the raw ``variants`` list never appears in merged semantics (previously
+      it leaked into variant 0 of a root-bytecode-plus-variants instruction);
+    * the retained ``semantic_config`` and the validation-side
+      ``_effective_instruction_configs`` agree exactly — validation must check
+      the same data the analyzer consumes.
+    """
+    config = _load_flow_config()
+    config['flow_counters']['aux'] = {
+        'unknown_instructions': 'ignore',
+        'exit_policy': 'balanced',
+    }
+    load_config = config['instructions']['load']
+    load_config['flow_effects'] = {'stack': 0, 'aux': 2}
+    load_config['variants'][0]['flow_effects'] = {'stack': 1}
+    load_config['variants'][0]['documentation'] = {'cycles': 2, 'family': None}
+    config['instructions']['wide'] = {
+        'flow_effects': {'stack': 0},
+        'flow_transfer': 'none',
+        'documentation': {'family': 'wide'},
+        'bytecode': {'value': 0x50, 'size': 8, 'suffix': {'value': 1, 'size': 8}},
+        'variants': [{
+            'flow_effects': {'stack': 0},
+            'flow_transfer': 'none',
+            'bytecode': {'value': 0x60, 'size': 7},
+            'operands': {'count': 1, 'operand_sets': {'list': ['source']}},
+        }],
+    }
+    config_path = _write_config(tmp_path, config, 'deep-merge.yaml')
+    model = AssemblerModel(str(config_path), 0, DiagnosticReporter(), static_analysis=True)
+
+    load_semantics = model.instructions.get('load').variants[0].semantic_config
+    # variant overrides merge into root nested metadata instead of replacing it
+    assert load_semantics['documentation'] == {'family': 'load', 'cycles': 2}
+    # per-class effect maps retain root classes the variant does not mention
+    assert load_semantics['flow_effects'] == {'stack': 1, 'aux': 2}
+
+    wide_variants = model.instructions.get('wide').variants
+    # the raw variants list is not semantic data
+    assert 'variants' not in wide_variants[0].semantic_config
+    assert 'variants' not in wide_variants[1].semantic_config
+    # bytecode/operands mirror emission: the variant's values replace wholesale
+    assert wide_variants[1].semantic_config['bytecode'] == {'value': 0x60, 'size': 7}
+    # but semantic metadata still inherits
+    assert wide_variants[1].semantic_config['documentation'] == {'family': 'wide'}
+
+    # the validation-side merge must agree with the retained semantics
+    assert AssemblerModel._effective_instruction_configs(load_config) == [
+        load_semantics,
+    ]
+    assert AssemblerModel._effective_instruction_configs(
+        config['instructions']['wide']
+    ) == [
+        wide_variants[0].semantic_config,
+        wide_variants[1].semantic_config,
+    ]
+
+
+def test_m0_flow_metadata_is_validated_even_without_flow_counters_section(tmp_path):
+    """Pins a deliberate design decision about flow validation and enablement.
+
+    With static analysis enabled, per-instruction flow metadata is validated
+    at config load for *every* ISA, whether or not it declares a
+    ``flow_counters`` section: an instruction set must either carry a proper
+    section or carry only valid (or no) flow keys. An invalid
+    ``flow_transfer`` value, or ``flow_effects`` naming a counter class that
+    no section declares, fails at load even though the ISA never enabled the
+    feature. This is deliberately stricter than "a no-section ISA assembles
+    exactly as today" for a configuration that coincidentally carries a
+    malformed flow key: silently ignoring malformed flow metadata would let a
+    typo'd configuration masquerade as valid. (Under ``--no-static-analysis``
+    all of these checks are skipped — covered by the analysis-gating test
+    above.)
+    """
+    config = _without_flow_metadata(_load_flow_config())
+    config['instructions']['nop']['flow_transfer'] = 'garbage'
+    config_path = _write_config(tmp_path, config, 'no-section-bad-transfer.yaml')
+    reporter = DiagnosticReporter()
+    with pytest.raises(SystemExit, match='flow_transfer has invalid value "garbage"'):
+        AssemblerModel(str(config_path), 0, reporter, static_analysis=True)
+    assert reporter.diagnostics[-1].category == 'flow'
+
+    config = _without_flow_metadata(_load_flow_config())
+    config['instructions']['nop']['flow_effects'] = {'stack': 1}
+    config_path = _write_config(tmp_path, config, 'no-section-effects.yaml')
+    reporter = DiagnosticReporter()
+    with pytest.raises(SystemExit, match='names undeclared counter "stack"'):
+        AssemblerModel(str(config_path), 0, reporter, static_analysis=True)
+    assert reporter.diagnostics[-1].category == 'flow'
+
+    # a *valid* flow_transfer classification on a no-section ISA is acceptable
+    # (it is inert metadata; the feature remains disabled)
+    config = _without_flow_metadata(_load_flow_config())
+    config['instructions']['nop']['flow_transfer'] = 'none'
+    config_path = _write_config(tmp_path, config, 'no-section-valid.yaml')
+    model = AssemblerModel(
+        str(config_path),
+        0,
+        DiagnosticReporter(),
+        static_analysis=True,
+    )
+    assert not model.flow_counters_enabled

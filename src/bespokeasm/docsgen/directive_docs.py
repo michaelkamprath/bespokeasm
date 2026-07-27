@@ -485,9 +485,11 @@ for _i in range(10):
         f'This is bits {_i * 8 + 7}\u2013{_i * 8} of the value.'
     )
 
-# Combined lookup: all directive docs keyed by name (no prefix).
+# Combined lookup: all directive docs keyed by name (no prefix). Includes the
+# `:=` counter-coordinate declaration so aggregate consumers cannot miss it.
 ALL_DIRECTIVE_DOCS: dict[str, str] = {
     **COMPILER_DIRECTIVE_DOCS,
     **BYTECODE_DIRECTIVE_DOCS,
     **PREPROCESSOR_DIRECTIVE_DOCS,
+    **COUNTER_COORDINATE_DOCS,
 }

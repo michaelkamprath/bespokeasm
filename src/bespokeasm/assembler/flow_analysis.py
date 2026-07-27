@@ -47,6 +47,9 @@ class FlowLinearAnalyzer:
         )
 
     def _error(self, line_object, message: str) -> None:
+        # The reporter is fail-fast today (error() exits), but every call site
+        # still guards-and-returns afterward so an accumulate-and-continue
+        # reporter cannot turn an error path into a crash on invalid state.
         self._diagnostic_reporter.error(
             line_object.line_id,
             message,
@@ -78,24 +81,28 @@ class FlowLinearAnalyzer:
                 f'flow counter "{self._active.name}" is still active; '
                 f'insert #endtrack {self._active.name} before opening another counter',
             )
+            return
         counter_config = self._model.flow_counters.get(line_object.counter_class)
         if counter_config is None:
             self._error(
                 line_object,
                 f'flow counter class "{line_object.counter_class}" is not declared by this instruction set',
             )
+            return
         if counter_config.get('join', 'require-equal') != 'require-equal':
             self._error(
                 line_object,
                 f'flow counter class "{line_object.counter_class}" is not scalar; '
                 'interval analysis is not available in M1',
             )
+            return
         if not self._model.flow_counter_has_effect_metadata(line_object.counter_class):
             self._error(
                 line_object,
                 f'flow counter class "{line_object.counter_class}" is inert: '
                 'no instruction declares an effect or terminal',
             )
+            return
 
         initial = line_object.evaluate_parameter('init')
         if initial is None:
@@ -123,12 +130,14 @@ class FlowLinearAnalyzer:
                 line_object,
                 f'#endtrack {line_object.counter_name} has no active counter',
             )
+            return
         if line_object.counter_name != self._active.name:
             self._error(
                 line_object,
                 f'#endtrack names "{line_object.counter_name}", but active counter is '
                 f'"{self._active.name}"',
             )
+            return
         expected = line_object.evaluate_parameter('exit')
         if expected is None:
             expected = self._active.expected_exit
@@ -140,7 +149,7 @@ class FlowLinearAnalyzer:
             )
         self._active = None
 
-    def _counter_name(self, line_object, node: ExpressionNode) -> str:
+    def _counter_name(self, line_object, node: ExpressionNode) -> str | None:
         """Extract and validate the simple counter-name argument to ``COUNTER``."""
         argument = node.left_child
         if (
@@ -151,9 +160,10 @@ class FlowLinearAnalyzer:
             or argument.right_child is not None
         ):
             self._error(line_object, 'COUNTER() requires one counter name')
+            return None
         return str(argument.value)
 
-    def _coordinate_name(self, line_object, node: ExpressionNode) -> str:
+    def _coordinate_name(self, line_object, node: ExpressionNode) -> str | None:
         """Extract the exact coordinate spelling supplied to ``OFFSET()``."""
         argument = node.left_child
         if (
@@ -164,6 +174,7 @@ class FlowLinearAnalyzer:
             or argument.right_child is not None
         ):
             self._error(line_object, 'OFFSET() requires one counter-coordinate symbol')
+            return None
         return str(argument.value)
 
     @staticmethod
@@ -180,35 +191,42 @@ class FlowLinearAnalyzer:
     def _resolve_offset(self, line_object, node: ExpressionNode) -> None:
         """Resolve ``OFFSET(coordinate)`` against the active pre-line state."""
         label = self._coordinate_name(line_object, node)
+        if label is None:
+            return
         coordinate = self._lookup_coordinate(line_object, label)
         if coordinate is None:
             self._error(
                 line_object,
                 f'OFFSET({label}) requires a symbol declared with :=',
             )
+            return
         if self._active is None:
             self._error(
                 line_object,
                 f'OFFSET({label}) references inactive flow counter "{coordinate.counter_name}"',
             )
+            return
         if coordinate.counter_name != self._active.name:
             self._error(
                 line_object,
                 f'OFFSET({label}) belongs to counter "{coordinate.counter_name}", '
                 f'not active counter "{self._active.name}"',
             )
+            return
         if coordinate.counter_instance_id != self._active.instance_id:
             self._error(
                 line_object,
                 f'OFFSET({label}) belongs to an earlier tracking instance of '
                 f'counter "{coordinate.counter_name}"',
             )
+            return
         if not coordinate.is_valid:
             self._error(
                 line_object,
                 f'counter coordinate "{label}" is invalid because its saved position '
                 'was crossed and is no longer live',
             )
+            return
         node.resolve_flow_value(self._active.value - coordinate.value)
 
     def _resolve_expressions(self, line_object, nodes: tuple[ExpressionNode, ...]) -> None:
@@ -218,16 +236,20 @@ class FlowLinearAnalyzer:
                 self._resolve_offset(line_object, node)
                 continue
             counter_name = self._counter_name(line_object, node)
+            if counter_name is None:
+                continue
             if self._active is None:
                 self._error(
                     line_object,
                     f'COUNTER({counter_name}) references an inactive flow counter',
                 )
+                continue
             if counter_name != self._active.name:
                 self._error(
                     line_object,
                     f'COUNTER({counter_name}) does not name active counter "{self._active.name}"',
                 )
+                continue
             node.resolve_flow_value(self._active.value)
 
     def _declare_coordinate(self, line_object: CounterCoordinateLine) -> None:
@@ -240,18 +262,21 @@ class FlowLinearAnalyzer:
                 line_object,
                 'a coordinate declaration must use COORDINATE(counter, offset)',
             )
+            return
         counter_name = line_object.counter_name
         if self._active is None:
             self._error(
                 line_object,
                 f'COORDINATE({counter_name}, ...) references an inactive flow counter',
             )
+            return
         if counter_name != self._active.name:
             self._error(
                 line_object,
                 f'COORDINATE({counter_name}, ...) does not name active counter '
                 f'"{self._active.name}"',
             )
+            return
 
         for label in self._expression_labels(line_object.offset_expression):
             if self._lookup_coordinate(line_object, label) is not None:
@@ -260,6 +285,7 @@ class FlowLinearAnalyzer:
                     'the offset of a coordinate declaration cannot contain '
                     f'counter coordinate "{label}"',
                 )
+                return
 
         try:
             declared_offset = line_object.offset_expression.get_value(
@@ -269,6 +295,7 @@ class FlowLinearAnalyzer:
             )
         except ValueError as error:
             self._error(line_object, str(error))
+            return
         offset_policy = self._active.config.get('coordinate_offsets', 'both')
         if (
             declared_offset == 0
@@ -278,18 +305,21 @@ class FlowLinearAnalyzer:
                 line_object,
                 f'flow counter "{counter_name}" does not permit zero coordinate offsets',
             )
+            return
         if offset_policy == 'positive' and declared_offset < 0:
             self._error(
                 line_object,
                 f'flow counter "{counter_name}" permits only positive coordinate offsets; '
                 f'got {declared_offset}',
             )
+            return
         if offset_policy == 'negative' and declared_offset > 0:
             self._error(
                 line_object,
                 f'flow counter "{counter_name}" permits only negative coordinate offsets; '
                 f'got {declared_offset}',
             )
+            return
 
         coordinate = CounterCoordinate(
             label=line_object.label,
@@ -308,6 +338,7 @@ class FlowLinearAnalyzer:
                 line_object.symbol_scope.set_counter_coordinate(coordinate)
         except ValueError as error:
             self._error(line_object, str(error))
+            return
         self._active.coordinates.append(coordinate)
 
     @classmethod
@@ -348,12 +379,14 @@ class FlowLinearAnalyzer:
                 line_object,
                 f'instruction "{record.source_mnemonic}" is missing required flow_transfer metadata',
             )
+            return
         if transfer != 'none':
             self._error(
                 line_object,
                 f'instruction "{record.source_mnemonic}" uses flow_transfer "{transfer}"; '
                 'path analysis is not yet available in M1',
             )
+            return
 
         source = self._active.config.get(
             'source',
@@ -381,6 +414,7 @@ class FlowLinearAnalyzer:
                 f'instruction "{record.source_mnemonic}" has a non-constant effect for '
                 f'"{self._active.counter_class}"; M1 supports integer deltas only',
             )
+            return
         self._active.value += delta
         for coordinate in self._active.coordinates:
             if not coordinate.is_valid:

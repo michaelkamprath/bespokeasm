@@ -6,6 +6,7 @@ from bespokeasm.assembler.keywords import PREPROCESSOR_DIRECTIVES_SET
 from bespokeasm.docsgen.directive_docs import ALL_DIRECTIVE_DOCS
 from bespokeasm.docsgen.directive_docs import BYTECODE_DIRECTIVE_DOCS
 from bespokeasm.docsgen.directive_docs import COMPILER_DIRECTIVE_DOCS
+from bespokeasm.docsgen.directive_docs import COUNTER_COORDINATE_DOCS
 from bespokeasm.docsgen.directive_docs import EXPRESSION_FUNCTION_DOCS
 from bespokeasm.docsgen.directive_docs import PREPROCESSOR_DIRECTIVE_DOCS
 
@@ -30,8 +31,25 @@ def test_all_expression_functions_have_docs():
         assert name in EXPRESSION_FUNCTION_DOCS, f'missing doc for expression function: {name}'
 
 
+def test_counter_coordinate_declaration_has_docs():
+    """The `:=` declaration ships with M2 and must carry hover documentation.
+
+    Unlike directives and expression functions, `:=` has no keyword-set entry
+    to iterate, so its docs coverage is asserted directly here — previously
+    nothing in docsgen enforced it.
+    """
+    assert ':=' in COUNTER_COORDINATE_DOCS, 'missing doc for the := coordinate declaration'
+
+
 def test_all_directive_docs_is_union():
-    expected = set(COMPILER_DIRECTIVE_DOCS) | set(BYTECODE_DIRECTIVE_DOCS) | set(PREPROCESSOR_DIRECTIVE_DOCS)
+    # COUNTER_COORDINATE_DOCS is part of the aggregate: a consumer of
+    # ALL_DIRECTIVE_DOCS must not silently miss the `:=` declaration.
+    expected = (
+        set(COMPILER_DIRECTIVE_DOCS)
+        | set(BYTECODE_DIRECTIVE_DOCS)
+        | set(PREPROCESSOR_DIRECTIVE_DOCS)
+        | set(COUNTER_COORDINATE_DOCS)
+    )
     assert set(ALL_DIRECTIVE_DOCS) == expected
 
 

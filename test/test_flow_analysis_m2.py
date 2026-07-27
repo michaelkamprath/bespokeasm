@@ -2,8 +2,10 @@ import copy
 from pathlib import Path
 
 import pytest
+from bespokeasm.assembler.analysis import OperandSemanticKind
 from bespokeasm.assembler.engine import Assembler
 from bespokeasm.assembler.symbol_scope import SymbolScope
+from bespokeasm.expression import TokenType
 from ruamel.yaml import YAML
 
 
@@ -73,6 +75,8 @@ def _assert_flow_error(
         assembler.assemble_bytecode()
     diagnostic = assembler.model.diagnostic_reporter.diagnostics[-1]
     assert diagnostic.category == 'flow'
+    # diagnostics must attribute the source *file* as well as the line
+    assert diagnostic.line_id.filename.endswith('out.bin.asm')
     if expected_line is not None:
         assert diagnostic.line_id.line_num == expected_line
     return assembler
@@ -262,6 +266,100 @@ def test_m2_negative_and_both_coordinate_policies(tmp_path):
     assert bytecode == bytes([3, 0xFD])
 
 
+def test_m2_allow_zero_offset_keeps_reached_coordinate_live(tmp_path):
+    """Coverage for acceptance case 71: the allow_zero_offset=true liveness half.
+
+    Case 71 distinguishes two invalidation rules: with ``allow_zero_offset:
+    false``, the counter merely *reaching* a coordinate's saved position
+    invalidates it (the position is no longer addressable); with it enabled
+    (the default), the coordinate stays live at the reached position — where
+    ``OFFSET()`` legitimately resolves to zero — and only *crossing beyond*
+    kills it. Only the reach-invalidates half had test coverage.
+
+    Expected behavior: with allow_zero_offset enabled, popping down to exactly
+    the saved position keeps the coordinate valid (OFFSET = 0), and pushing
+    back above it keeps it valid too.
+    """
+    config = _load_config()
+    config['flow_counters']['stack']['allow_zero_offset'] = True
+    config_path = _write_config(tmp_path, config)
+    source = (
+        'function:\n'
+        '#track stack\n'
+        'push\n'
+        '.slot := COORDINATE(stack, 1)\n'
+        '.byte OFFSET(.slot)\n'
+        'pop\n'
+        '.byte OFFSET(.slot)\n'
+        'push\n'
+        '.byte OFFSET(.slot)\n'
+        'pop\n'
+        '#endtrack stack\n'
+    )
+    _, bytecode = _assemble(tmp_path, source, config_path=config_path)
+    assert bytecode == bytes([0x10, 1, 0x11, 0, 0x10, 1, 0x11])
+
+
+def test_m2_allow_zero_offset_coordinate_dies_only_when_crossed(tmp_path):
+    """Coverage for acceptance case 71: crossing still kills under allow_zero_offset.
+
+    Companion to the reach-stays-live test: with ``allow_zero_offset: true``,
+    popping *past* the saved position permanently invalidates the coordinate,
+    and a replacement push back to the same depth does not resurrect it —
+    the original slot's value is gone regardless of what now occupies its
+    address.
+    """
+    config = _load_config()
+    config['flow_counters']['stack']['allow_zero_offset'] = True
+    config_path = _write_config(tmp_path, config)
+    source = (
+        'function:\n'
+        '#track stack\n'
+        'push\n'
+        'push\n'
+        '.slot := COORDINATE(stack, 1)\n'
+        'pop\n'
+        'pop\n'
+        'push\n'
+        '.byte OFFSET(.slot)\n'
+        'push\n'
+        '#endtrack stack exit=2\n'
+    )
+    _assert_flow_error(
+        tmp_path,
+        source,
+        'invalid.*saved position was crossed and is no longer live',
+        expected_line=9,
+        config_path=config_path,
+    )
+
+
+def test_m2_negative_coordinate_policy_rejects_positive_offset(tmp_path):
+    """Coverage for acceptance case 74: the negative-rejects-positive direction.
+
+    Case 74 requires all four policy directions to be enforced. Positive
+    rejecting a negative offset, and both accepting either sign, were tested;
+    a ``coordinate_offsets: negative`` class rejecting a *positive* declared
+    offset was not.
+    """
+    config = _load_config()
+    config['flow_counters']['stack']['coordinate_offsets'] = 'negative'
+    config_path = _write_config(tmp_path, config)
+    source = (
+        'function:\n'
+        '#track stack\n'
+        '.above := COORDINATE(stack, 3)\n'
+        '#endtrack stack\n'
+    )
+    _assert_flow_error(
+        tmp_path,
+        source,
+        'permits only negative coordinate offsets',
+        expected_line=3,
+        config_path=config_path,
+    )
+
+
 def test_m2_popped_coordinate_is_never_resurrected(tmp_path):
     _assert_flow_error(
         tmp_path,
@@ -330,6 +428,7 @@ def test_m2_local_and_global_coordinate_identity_are_distinct(tmp_path):
     'declaration',
     [
         '.x := 4',
+        '.x := COUNTER(stack)',
         '.x := 2 * COUNTER(stack)',
         '.x := COUNTER(stack) + COUNTER(other)',
         '.x := COUNTER(stack) - 2',
@@ -466,6 +565,85 @@ def test_m2_numeric_fallback_takes_precedence_over_coordinate_indexes(tmp_path):
         output_name='enabled.bin',
     )
     assert enabled_bytes == bytes([0x10, 0xCE, 0x11])
+
+
+def test_m2_indirect_register_operand_record_keeps_selector_and_expression_apart(tmp_path):
+    """Coverage sharpening for acceptance case 70 (register selector vs. semantics).
+
+    The M0 harness only proves the plain-register case (record expression is
+    ``None``). The sharper case is an operand carrying *both* a register
+    selector and a semantic expression — ``load [sp + 2 + 1]`` — where the
+    record must classify the operand as runtime-register-valued (the ``sp``
+    selector bits are never a semantic value ``ARG()`` could read) while still
+    retaining the offset expression tree faithfully for later operand-dependent
+    analysis.
+    """
+    source = (
+        'function:\n'
+        '#track stack\n'
+        'push\n'
+        'load [sp + 2 + 1]\n'
+        'pop\n'
+        '#endtrack stack\n'
+    )
+    assembler, _ = _assemble(tmp_path, source)
+    records = assembler.analysis_source_index.records
+    load_record = next(
+        record for record in records if record.canonical_mnemonic == 'load'
+    )
+    operand = load_record.operands[0]
+    assert operand.semantic_kind is OperandSemanticKind.RUNTIME_REGISTER
+    # the retained tree is the offset expression `2 + 1`; the register itself
+    # is stripped by the indirect-register parser and never appears in it
+    assert operand.expression is not None
+    assert operand.expression.token_type is TokenType.T_PLUS
+    assert operand.expression.left.token_type is TokenType.T_NUM
+    assert operand.expression.left.value == 2
+    assert operand.expression.right.token_type is TokenType.T_NUM
+    assert operand.expression.right.value == 1
+    # the register selector's encoded bits appear nowhere in the record's
+    # semantic view — only the source spelling does
+    assert 'sp' in operand.source_text
+
+
+def test_m2_coordinate_paths_survive_a_nonfatal_diagnostic_reporter(tmp_path, monkeypatch):
+    """Design hardening: coordinate error paths must not rely on a fail-fast reporter.
+
+    Companion to the M1 analyzer test of the same name: ``_declare_coordinate``
+    error paths dereference invalid state after ``_error()`` — a malformed
+    declaration (``.x := 4``) walks a ``None`` offset expression, and a
+    policy-rejected offset still registered the coordinate. With a non-exiting
+    reporter, each path must degrade to a recorded flow diagnostic without an
+    unhandled exception, and a rejected coordinate must not be registered.
+    """
+    from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
+
+    original_error = DiagnosticReporter.error
+
+    def nonfatal_error(self, line_id, message, category='user'):
+        try:
+            original_error(self, line_id, message, category=category)
+        except SystemExit:
+            pass
+
+    monkeypatch.setattr(DiagnosticReporter, 'error', nonfatal_error)
+
+    scenarios = [
+        # RHS is not a COORDINATE() call: offset expression is None and must
+        # not be walked for coordinate labels after the error
+        ('non-coordinate-rhs', 'function:\n#track stack\n.x := 4\nnop\n#endtrack stack\n'),
+        # zero offset rejected by policy (allow_zero_offset: false in this
+        # ISA): the invalid coordinate must not be registered after the error
+        ('zero-offset', 'function:\n#track stack\n.z := COORDINATE(stack, 0)\nnop\n#endtrack stack\n'),
+    ]
+    for name, source in scenarios:
+        SymbolScope._global_scope = None
+        assembler = _assembler(tmp_path, source, output_name=f'{name}.bin')
+        assembler.assemble_bytecode()
+        assert any(
+            diagnostic.category == 'flow' and diagnostic.level == 'error'
+            for diagnostic in assembler.model.diagnostic_reporter.diagnostics
+        ), f'scenario {name} recorded no flow error'
 
 
 def test_m2_disabled_unused_declaration_is_ignored(tmp_path):

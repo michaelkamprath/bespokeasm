@@ -19,6 +19,7 @@ Changes that are planned but not implemented yet:
 
 
 ## [Unreleased]
+* **Breaking**: New assembler keywords are reserved globally in preparation for the flow-counter static-analysis feature, regardless of whether an instruction set enables it: the preprocessor directives `#track` and `#endtrack`, and the expression functions `COUNTER()`, `OFFSET()`, and `COORDINATE()`. Existing source code using `track` or `endtrack` as a label or constant name, or an instruction set configuration defining a mnemonic named `counter`, `offset`, or `coordinate` (mnemonic matching is case-insensitive), must rename it. As with the existing `LSB()`/`BYTEx()` functions, the expression-function keywords are recognized in their uppercase spelling; a lowercase `counter(...)` in an expression is treated as an ordinary symbol reference.
 * Improved Vim syntax highlighting with context-aware operand coloring on par with the VS Code and Sublime Text extensions, including correct scoping for multiple instructions/macros on the same line. The user's editor-wide colorscheme is no longer overridden.
 * Added semantic label-usage highlighting in Vim: references to labels defined in the buffer are highlighted distinctly from arbitrary identifiers.
 * Added hover-equivalent documentation in Vim: pressing `K` over a mnemonic, register, directive, expression function, or predefined symbol opens its documentation in a preview window. An optional auto-popup variant (vim 8.2+ / Neovim) is available via `g:bespokeasm_<ft>_auto_hover`.

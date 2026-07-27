@@ -67,7 +67,7 @@ def _generated_text(generator_class, config_path: Path, destination: Path) -> tu
     'generator_class',
     [VSCodeConfigGenerator, SublimeConfigGenerator, VimConfigGenerator],
 )
-def test_m2_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
+def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
     tmp_path,
     generator_class,
 ):
@@ -197,7 +197,7 @@ def test_m2_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
     'generator_class',
     [VSCodeConfigGenerator, SublimeConfigGenerator, VimConfigGenerator],
 )
-def test_m2_flow_tokens_are_absent_from_non_enabled_isa(
+def test_flow_tokens_are_absent_from_non_enabled_isa(
     tmp_path,
     generator_class,
 ):
@@ -207,7 +207,13 @@ def test_m2_flow_tokens_are_absent_from_non_enabled_isa(
         tmp_path / generator_class.__name__,
     )
     for token in FLOW_TOKENS[:-1]:
-        assert token not in generated
+        assert token not in generated, f'flow token {token!r} leaked into non-flow extension'
+    # ':=' cannot be asserted as a bare substring — ordinary regex syntax such
+    # as the non-capturing group in `(?:=|\bEQU\b)` contains it. The only
+    # legitimate carrier of the spelling is the hover-detection code, which
+    # templates it via ##DECLARATION_OPERATOR##; assert the quoted operator
+    # literal never ships in a non-flow extension.
+    assert "':='" not in generated, "':=' hover spelling leaked into non-flow extension"
     assert 'Declare Counter Coordinate' not in generated
     assert FLOW_COORDINATE_SCOPE not in generated
     assert FLOW_COORDINATE_DEFINITION_SCOPE not in generated

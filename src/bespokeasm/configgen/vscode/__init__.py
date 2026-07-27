@@ -415,6 +415,11 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             )
         else:
             register_pattern = '(?!)'
+        self._replace_token_in_file(
+            extension_fp,
+            '##DECLARATION_OPERATOR##',
+            ':=' if self.model.flow_counters_enabled else '',
+        )
         self._replace_token_in_file(extension_fp, '##LABEL_PATTERN##', label_pattern)
         self._replace_token_in_file(
             extension_fp,

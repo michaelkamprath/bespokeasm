@@ -5,6 +5,7 @@ from bespokeasm.assembler.model.decorators import apply_decorator_symbol
 from bespokeasm.assembler.model.instruction_base import InstructionBase
 from bespokeasm.assembler.model.operand_parser import OperandParser
 from bespokeasm.assembler.model.operand_set import OperandSetCollection
+from bespokeasm.assembler.model.semantics import merge_instruction_semantics
 
 # Instruction
 #
@@ -40,15 +41,10 @@ class InstructionVariant(InstructionBase):
         self._variant_config = instruction_variant_config
         if instruction_config is not None:
             self._variant_num = variant_num
-            root_semantics = {
-                key: value
-                for key, value in instruction_config.items()
-                if key != 'variants'
-            }
-            self._semantic_config = {
-                **root_semantics,
-                **instruction_variant_config,
-            }
+            self._semantic_config = merge_instruction_semantics(
+                instruction_config,
+                instruction_variant_config,
+            )
         # validate config
         if 'bytecode' not in self._variant_config:
             if variant_num == 0:

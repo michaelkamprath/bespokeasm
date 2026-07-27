@@ -81,7 +81,13 @@ class AssembledInstruction:
 
     @property
     def flow_expression_nodes(self) -> tuple[ExpressionNode, ...]:
-        """Return deferred flow nodes retained by emitted expression parts."""
+        """Return deferred flow nodes retained by emitted expression parts.
+
+        Top-level parts are exhaustive here because CompositeByteCodePart is
+        only ever built from fixed opcode/register-selector bits, never from
+        expression-bearing parts; an operand type that changes that must make
+        this walk (and the flow-usage gating scan built on it) recursive.
+        """
         return tuple(
             node
             for part in self._parts

@@ -16,6 +16,10 @@ LABEL_DEFINITION_PATTERN = re.compile(r'^\s*(?P<name>##LABEL_PATTERN##)\s*:')
 OPERAND_LABEL_DEFINITION_PATTERN = re.compile(r'@(?P<name>##LABEL_PATTERN##):\s*')
 CONSTANT_DEFINITION_PATTERN = re.compile(r'^\s*(?P<name>##CONSTANT_PATTERN##)\s*(?:=|\bEQU\b)')
 CONSTANT_VALUE_PATTERN = re.compile(r'^\s*##CONSTANT_PATTERN##\s*(?:=|\bEQU\b)\s*(?P<value>.+?)(?:\s*;.*)?$')
+# Replaced at generation time: the coordinate operator spelling for a
+# flow-counter-enabled ISA, or the empty string when the feature is disabled
+# (so no flow spelling ships in a non-flow extension).
+DECLARATION_OPERATOR = '##DECLARATION_OPERATOR##'
 COMPILER_DIRECTIVE_PATTERN = re.compile(r'\.(\w+)\b', re.IGNORECASE)
 PREPROCESSOR_DIRECTIVE_PATTERN = re.compile(r'#(\S+)\b', re.IGNORECASE)
 REGISTER_PATTERN = re.compile(r'(?i)(?:##REGISTERS##)')
@@ -510,10 +514,13 @@ def _get_directive_at_point(view, point):
     line_region = view.line(point)
     line_text = view.substr(line_region)
     column = point - line_region.begin()
-    coordinate_operator = line_text.find(':=')
-    if coordinate_operator >= 0 and coordinate_operator <= column < coordinate_operator + 2:
+    coordinate_operator = line_text.find(DECLARATION_OPERATOR) if DECLARATION_OPERATOR else -1
+    if (
+        coordinate_operator >= 0
+        and coordinate_operator <= column < coordinate_operator + len(DECLARATION_OPERATOR)
+    ):
         if _is_offset_in_code_region(line_text, coordinate_operator):
-            return ':='
+            return DECLARATION_OPERATOR
     for match in COMPILER_DIRECTIVE_PATTERN.finditer(line_text):
         dir_start = match.start(1) - 1  # include the dot
         dir_end = match.end(1)
