@@ -1,16 +1,35 @@
 import re
+import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.preprocessor import Preprocessor
+from bespokeasm.assembler.preprocessor.symbol import SYMBOL_PATTERN
 from bespokeasm.expression import ExpressionNode
 from bespokeasm.expression import ExpressionUseContext
 from bespokeasm.expression import parse_expression
 from bespokeasm.expression import TokenType
 from bespokeasm.utilities import is_valid_label
 
+_FLOW_OPERATOR_PATTERN = re.compile(
+    r'\b(?:COUNTER|OFFSET)\s*\(',
+    flags=re.IGNORECASE,
+)
+# A flow operator call may not be assembled from separate expansion fragments
+# (the name from a macro value, the parenthesis from the referencing context):
+# that split form defeats positional argument protection. The hazard exists
+# only in *call position* — a flow keyword used as a plain value is an
+# ordinary identifier, which non-flow ISAs legitimately allow. Detection
+# therefore couples a trailing operator name in one fragment with an opening
+# parenthesis in the adjoining fragment.
+_TRAILING_FLOW_OPERATOR_PATTERN = re.compile(
+    r'\b(?:COUNTER|OFFSET|COORDINATE)\s*$',
+    flags=re.IGNORECASE,
+)
+_TRAILING_SYMBOL_PATTERN = re.compile(rf'\b({SYMBOL_PATTERN})\s*$')
+_OPEN_CALL_PATTERN = re.compile(r'\s*\(')
 # Only the name immediately after the opening parenthesis is protected: for
 # COORDINATE(counter, offset) the offset is a value expression and remains
 # macro-resolvable.
@@ -19,6 +38,73 @@ _FLOW_ARGUMENT_PATTERN = re.compile(
     r'_(?!_)[A-Za-z0-9_]+|\.[A-Za-z0-9_]+))',
     flags=re.IGNORECASE,
 )
+
+
+def macro_expansion_introduces_flow_operator(
+    preprocessor: Preprocessor,
+    text: str,
+) -> bool:
+    """Return whether any macro reachable from ``text`` carries a flow operator.
+
+    This is a dependency *scan*, not an expansion: it walks symbol values
+    breadth-first with a visited set, so it tolerates definition cycles and
+    never grows any text. It exists for classification — deciding whether a
+    general-looking construct is actually flow-dependent — without evaluating
+    operands that an ignored (``--no-static-analysis``) construct must never
+    evaluate.
+    """
+    seen: set[str] = set()
+    pending = [text]
+    while pending:
+        current = pending.pop()
+        if _FLOW_OPERATOR_PATTERN.search(current):
+            return True
+        for match in re.finditer(rf'\b({SYMBOL_PATTERN})\b', current):
+            name = match.group(1)
+            symbol = preprocessor.get_symbol(name)
+            if symbol is None:
+                continue
+            # A symbol referenced in call position whose expansion ends with
+            # a bare operator name would assemble a split flow call; the
+            # resolver rejects that form, and for classification it counts as
+            # flow dependence.
+            if _OPEN_CALL_PATTERN.match(current[match.end():]) and (
+                _expands_to_trailing_flow_operator(preprocessor, name, frozenset())
+            ):
+                return True
+            if name not in seen:
+                seen.add(name)
+                pending.append(str(symbol.value))
+    return False
+
+
+def _expands_to_trailing_flow_operator(
+    preprocessor: Preprocessor,
+    name: str,
+    expanding: frozenset[str],
+) -> bool:
+    """Return whether a symbol's transitive expansion ends with a flow keyword.
+
+    Cycle-tolerant and expansion-free: only the trailing token of each value
+    is followed. A trailing token that is itself a defined symbol is chased
+    instead of being matched as an operator, so an ISA that legitimately
+    defines one of these words (possible when the ISA does not enable flow
+    counters) resolves to that definition rather than the flow meaning.
+    """
+    if name in expanding:
+        return False
+    symbol = preprocessor.get_symbol(name)
+    if symbol is None:
+        return False
+    value = str(symbol.value)
+    trailing = _TRAILING_SYMBOL_PATTERN.search(value)
+    if trailing is not None and preprocessor.get_symbol(trailing.group(1)) is not None:
+        return _expands_to_trailing_flow_operator(
+            preprocessor,
+            trailing.group(1),
+            expanding | {name},
+        )
+    return bool(_TRAILING_FLOW_OPERATOR_PATTERN.search(value))
 
 
 def resolve_symbols_protecting_flow_names(
@@ -32,18 +118,89 @@ def resolve_symbols_protecting_flow_names(
     preprocessor macros — but the counter/coordinate names passed to
     ``COUNTER()``, ``OFFSET()``, and ``COORDINATE()`` identify flow entities
     and must never be macro-substituted, in any context.
+
+    The algorithm mirrors ``Preprocessor.resolve_symbols``: each symbol's
+    value is resolved recursively with the active expansion chain tracked, so
+    a definition cycle errors on its first self-reference (before a
+    self-amplifying value like ``A → A+A`` can grow the text), and a
+    legitimate chain of any depth resolves fully. Flow-operator argument
+    names are re-protected at every expansion level — an expansion may itself
+    introduce a flow expression (e.g. a command-line predefined symbol whose
+    value is ``COUNTER(stack)``). The placeholder is NUL-delimited so it can
+    never lex as a preprocessor symbol (a user could legally ``#define`` any
+    identifier-shaped placeholder) and restores unambiguously.
     """
-    protected_names = []
+    return _resolve_protecting_flow_names(preprocessor, line_id, text, frozenset())
+
+
+def _resolve_protecting_flow_names(
+    preprocessor: Preprocessor,
+    line_id: LineIdentifier,
+    text: str,
+    expanding: frozenset[str],
+) -> str:
+    protected_names: list[str] = []
 
     def protect(match: re.Match[str]) -> str:
         protected_names.append(match.group(2))
-        return f'{match.group(1)}__FLOW_PROTECTED_NAME_{len(protected_names) - 1}'
+        return f'{match.group(1)}\x00{len(protected_names) - 1}\x00'
 
-    protected = _FLOW_ARGUMENT_PATTERN.sub(protect, text)
-    resolved = preprocessor.resolve_symbols(line_id, protected)
+    current = _FLOW_ARGUMENT_PATTERN.sub(protect, text)
+    while True:
+        defined_names = [
+            name
+            for name in dict.fromkeys(
+                re.findall(rf'\b({SYMBOL_PATTERN})\b', current)
+            )
+            if preprocessor.get_symbol(name) is not None
+        ]
+        if not defined_names:
+            break
+        for name in defined_names:
+            if name in expanding:
+                sys.exit(
+                    f'ERROR - {line_id}: Preprocessor macro symbol {name} is '
+                    'indirectly referring to itself'
+                )
+            replacement = _resolve_protecting_flow_names(
+                preprocessor,
+                line_id,
+                preprocessor.get_symbol(name).value,
+                expanding | {name},
+            )
+            replacement = _FLOW_ARGUMENT_PATTERN.sub(protect, replacement)
+
+            def splice(
+                match: re.Match[str],
+                _replacement: str = replacement,
+                _name: str = name,
+            ) -> str:
+                # Reject a flow operator call assembled from separate
+                # fragments: the expansion supplying the name while the
+                # context supplies the parenthesis (or vice versa). A bare
+                # keyword spliced as a plain value is left alone — non-flow
+                # ISAs use these words ordinarily.
+                forms_split_call = (
+                    _TRAILING_FLOW_OPERATOR_PATTERN.search(_replacement)
+                    and _OPEN_CALL_PATTERN.match(match.string[match.end():])
+                ) or (
+                    _TRAILING_FLOW_OPERATOR_PATTERN.search(match.string[:match.start()])
+                    and _OPEN_CALL_PATTERN.match(_replacement)
+                )
+                if forms_split_call:
+                    sys.exit(
+                        f'ERROR - {line_id}: macro "{_name}" expansion forms a '
+                        'flow operator call from separate fragments; flow '
+                        'operators must be written as complete calls such as '
+                        'COUNTER(name)'
+                    )
+                return _replacement
+
+            current = re.sub(rf'\b{re.escape(name)}\b', splice, current)
+        expanding = expanding | set(defined_names)
     for index, name in enumerate(protected_names):
-        resolved = resolved.replace(f'__FLOW_PROTECTED_NAME_{index}', name)
-    return resolved
+        current = current.replace(f'\x00{index}\x00', name)
+    return current
 
 
 class FlowCounterDirectiveLine(PreprocessorLine):
@@ -68,8 +225,17 @@ class FlowCounterDirectiveLine(PreprocessorLine):
         self._preprocessor = preprocessor
 
     def _resolve_value_text(self, text: str) -> str:
-        """Resolve preprocessor macros in one directive value expression."""
-        if self._preprocessor is None:
+        """Resolve preprocessor macros in one directive value expression.
+
+        With static analysis disabled these directives are ignored as if
+        stripped from the source, so their values must not be macro-resolved
+        (resolution could itself fail, e.g. on a macro cycle only they
+        reference); source-level syntax validation still runs on the raw text.
+        """
+        if (
+            self._preprocessor is None
+            or not self._isa_model.static_analysis_enabled
+        ):
             return text
         return resolve_symbols_protecting_flow_names(
             self._preprocessor,

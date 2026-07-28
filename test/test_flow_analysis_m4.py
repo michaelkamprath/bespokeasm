@@ -41,6 +41,7 @@ def _assembler(
     config_path: Path = M4_CONFIG_PATH,
     static_analysis: bool = True,
     output_name: str = 'out.bin',
+    predefined: list[str] | None = None,
 ) -> Assembler:
     source_path = tmp_path / f'{output_name}.asm'
     output_path = tmp_path / output_name
@@ -58,7 +59,7 @@ def _assembler(
         pretty_print_output=None,
         is_verbose=0,
         include_paths=[str(tmp_path)],
-        predefined=[],
+        predefined=predefined or [],
         static_analysis=static_analysis,
     )
 
@@ -74,12 +75,14 @@ def _assert_flow_error(
     source: str,
     expected: str,
     *,
+    config_path: Path = M4_CONFIG_PATH,
     static_analysis: bool = True,
     expected_line: int | None = None,
 ) -> Assembler:
     assembler = _assembler(
         tmp_path,
         source,
+        config_path=config_path,
         static_analysis=static_analysis,
     )
     with pytest.raises(SystemExit, match=expected):
@@ -748,3 +751,168 @@ def test_m4_ordinary_line_macro_resolution_protects_flow_names(tmp_path):
         output_name='offset.bin',
     )
     assert offset_bytes == bytes([0x10, 0x20, 0x01, 0x11])
+
+
+def test_m4_after_effect_return_mapping_counts_return_cost(tmp_path):
+    """Pins the documented alternative for counting a return's own cost.
+
+    With the unmapped-counter-cannot-cross-a-return rule, a cycles counter
+    that must include the return instruction's cost maps the class on the
+    return with ``after_effect``: the delta (and bounds/coordinate updates)
+    apply first, then the exit contract is checked and the path ends.
+    """
+    config = _load_config()
+    config['instructions']['rts']['flow_terminal']['cycles'] = 'after_effect'
+    config_path = _write_config(tmp_path, config)
+
+    _, bytecode = _assemble(
+        tmp_path,
+        '#track stack mode=called\n'
+        '#track cycles exit=4\n'
+        'nop\n'
+        'rts\n',
+        config_path=config_path,
+    )
+    assert bytecode == bytes([0x00, 0x69])
+
+    SymbolScope._global_scope = None
+    _assert_flow_error(
+        tmp_path,
+        '#track stack mode=called\n'
+        '#track cycles exit=5\n'
+        'nop\n'
+        'rts\n',
+        'flow counter "cycles" exit mismatch: expected 5, actual 4',
+        config_path=config_path,
+        expected_line=4,
+    )
+
+
+def test_m4_macro_expansion_introduced_flow_names_stay_literal(tmp_path):
+    """Names inside macro-*expanded* flow expressions are protected too.
+
+    Bug: protection ran once, before expansion. If a macro value itself
+    expanded to a flow expression, the recursive resolution then substituted
+    the freshly introduced argument name (``#define stack 9`` →
+    ``COUNTER(9)``), violating the context-universal literal-names rule.
+    Resolution now re-protects after each expansion step until the text
+    stabilizes.
+
+    A source-level ``#define`` cannot carry a flow expression (the context
+    validation rejects flow operators in preprocessor directives), but a
+    command-line predefined symbol bypasses source validation entirely, so
+    the expansion path is reachable in practice.
+    """
+    _, bytecode = _assemble(
+        tmp_path,
+        '#define stack 9\n'
+        '#track stack\n'
+        '#track cycles\n'
+        'nop\n'
+        '#set cycles = FLOW_VALUE + 1\n'
+        '#assert cycles == 1\n'
+        '#endtrack cycles\n'
+        '#endtrack stack\n',
+        predefined=['FLOW_VALUE=COUNTER(stack)'],
+    )
+    assert bytecode == bytes([0x00])
+
+
+def test_m4_protection_sentinel_cannot_be_hijacked_by_user_macros(tmp_path):
+    """The name-protection placeholder must not be a definable symbol.
+
+    Bug: the placeholder was a valid preprocessor identifier
+    (``__FLOW_PROTECTED_NAME_0``), so a user legally defining that symbol
+    made the substitution rewrite the protected name (``COUNTER(stack)`` →
+    ``COUNTER(9)``); plain-string restoration could also corrupt longer
+    placeholders sharing a prefix. The placeholder now uses NUL-delimited
+    text that can never lex as a preprocessor symbol and restores
+    unambiguously.
+    """
+    _, bytecode = _assemble(
+        tmp_path,
+        '#define __FLOW_PROTECTED_NAME_0 9\n'
+        '#track stack\n'
+        'push\n'
+        'depth COUNTER(stack)\n'
+        'pop\n'
+        '#endtrack stack\n',
+    )
+    assert bytecode == bytes([0x10, 0x20, 0x01, 0x11])
+
+
+def test_m4_disabled_analysis_does_not_resolve_ignored_directive_values(tmp_path):
+    """Ignored flow-directive values must not be macro-resolved under -A.
+
+    Bug: value macro resolution ran even with static analysis disabled, so a
+    pathological macro pair referenced only by an *ignored* ``#set``/flow
+    ``#assert`` failed the compile — but the spec requires ignored analysis
+    constructs to behave as if stripped from the source. Value resolution is
+    now gated on analysis being enabled; source-level directive syntax
+    remains validated either way.
+    """
+    disabled, bytecode = _assemble(
+        tmp_path,
+        '#define LOOP_A LOOP_B\n'
+        '#define LOOP_B LOOP_A\n'
+        '#track stack\n'
+        '#set stack = LOOP_A\n'
+        '#assert stack == LOOP_A\n'
+        'nop\n'
+        '#endtrack stack\n',
+        static_analysis=False,
+    )
+    assert bytecode == bytes([0x00])
+    assert not any(
+        diagnostic.category == 'flow'
+        for diagnostic in disabled.model.diagnostic_reporter.diagnostics
+    )
+
+
+def test_m4_macro_cycle_in_directive_value_errors_without_blowup(tmp_path):
+    """A self-amplifying macro cycle must error via expansion-stack detection.
+
+    Bug: the protecting resolver substituted layer-by-layer with a fixed
+    100-layer cap instead of tracking the active expansion chain. A cycle
+    like ``A → A+A`` doubles the text every layer, exhausting memory long
+    before the cap. The resolver now mirrors the canonical expansion-stack
+    cycle detection, erroring on the first self-reference.
+    """
+    assembler = _assembler(
+        tmp_path,
+        '#define DOUBLING DOUBLING+DOUBLING\n'
+        '#track stack\n'
+        '#set stack = DOUBLING\n'
+        'nop\n'
+        '#endtrack stack\n',
+    )
+    with pytest.raises(SystemExit, match='indirectly referring to itself'):
+        assembler.assemble_bytecode()
+
+
+def test_m4_long_macro_chains_keep_flow_name_protection(tmp_path):
+    """Flow-name protection must hold for arbitrarily deep macro chains.
+
+    Bug: past the resolver's 100-layer cap it fell back to the canonical
+    resolver with no protection, so a 102-symbol chain ending in
+    ``COUNTER(stack)`` resolved to ``COUNTER(9)`` when ``stack`` was
+    ``#define``d. With expansion-stack resolution there is no cap: the chain
+    resolves fully with the counter name literal.
+    """
+    chain_defines = ''.join(
+        f'#define CHAIN_{i} CHAIN_{i + 1}\n' for i in range(101)
+    )
+    _, bytecode = _assemble(
+        tmp_path,
+        '#define stack 9\n'
+        f'{chain_defines}'
+        '#track stack\n'
+        '#track cycles\n'
+        'nop\n'
+        '#set cycles = CHAIN_0 + 1\n'
+        '#assert cycles == 1\n'
+        '#endtrack cycles\n'
+        '#endtrack stack\n',
+        predefined=['CHAIN_101=COUNTER(stack)'],
+    )
+    assert bytecode == bytes([0x00])

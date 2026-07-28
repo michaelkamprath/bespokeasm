@@ -3,6 +3,9 @@ import re
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
 from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import (
+    macro_expansion_introduces_flow_operator,
+)
+from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import (
     resolve_symbols_protecting_flow_names,
 )
 from bespokeasm.assembler.line_object.preprocessor_line.message import (
@@ -83,6 +86,20 @@ class AssertLine(PreprocessorLine):
             self._uses_explicit_flow or self._counter_name is not None
         )
 
+        # Expansion can introduce a flow expression (e.g. a command-line
+        # predefined symbol whose value is COUNTER(stack)), so flow dependence
+        # is also determined from the operands' macro dependencies. This is a
+        # cycle-tolerant scan, not a resolution: a flow-dependent assertion
+        # may be ignored under --no-static-analysis, in which case its
+        # operands — including a sibling operand carrying a macro cycle —
+        # must never be evaluated during classification.
+        if not self._is_flow_dependent and (
+            macro_expansion_introduces_flow_operator(preprocessor, self._lhs_text)
+            or macro_expansion_introduces_flow_operator(preprocessor, self._rhs_text)
+        ):
+            self._uses_explicit_flow = True
+            self._is_flow_dependent = True
+
         if (
             self._uses_explicit_flow
             and isa_model.static_analysis_enabled
@@ -94,9 +111,9 @@ class AssertLine(PreprocessorLine):
             )
 
         # General evaluation belongs to general asserts only: a flow-dependent
-        # assert (explicit operator or bare-name shorthand) is evaluated by
-        # the flow-analysis pass and must not compute a throwaway general
-        # result here.
+        # assert (explicit operator, bare-name shorthand, or macro-introduced
+        # flow expression) is evaluated by the flow-analysis pass and must not
+        # compute a throwaway general result here.
         self._general_result = (
             None
             if self._is_flow_dependent
@@ -151,7 +168,15 @@ class AssertLine(PreprocessorLine):
         expression: str,
         preprocessor: Preprocessor,
     ) -> str:
-        """Resolve macros while preserving names passed to flow operators."""
+        """Resolve macros while preserving names passed to flow operators.
+
+        The resolved text feeds only flow-dependent evaluation, which is
+        skipped entirely under ``--no-static-analysis`` — so resolution is
+        skipped too, keeping ignored flow assertions strip-equivalent even
+        when resolution itself would fail (e.g. a macro cycle).
+        """
+        if not self._isa_model.static_analysis_enabled:
+            return expression
         return resolve_symbols_protecting_flow_names(
             preprocessor,
             self.line_id,
