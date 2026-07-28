@@ -2,6 +2,9 @@ import re
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
+from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import (
+    resolve_symbols_protecting_flow_names,
+)
 from bespokeasm.assembler.line_object.preprocessor_line.message import (
     parse_trailing_message_candidates,
 )
@@ -20,11 +23,6 @@ class AssertLine(PreprocessorLine):
 
     _FLOW_OPERATOR_PATTERN = re.compile(
         r'\b(?:COUNTER|OFFSET)\s*\(',
-        flags=re.IGNORECASE,
-    )
-    _FLOW_ARGUMENT_PATTERN = re.compile(
-        r'(\b(?:COUNTER|OFFSET)\s*\(\s*)((?:[A-Za-z][A-Za-z0-9_]*|'
-        r'_(?!_)[A-Za-z0-9_]+|\.[A-Za-z0-9_]+))',
         flags=re.IGNORECASE,
     )
 
@@ -95,9 +93,13 @@ class AssertLine(PreprocessorLine):
                 category='flow',
             )
 
+        # General evaluation belongs to general asserts only: a flow-dependent
+        # assert (explicit operator or bare-name shorthand) is evaluated by
+        # the flow-analysis pass and must not compute a throwaway general
+        # result here.
         self._general_result = (
             None
-            if self._uses_explicit_flow
+            if self._is_flow_dependent
             else condition.evaluate(preprocessor)
         )
         self._flow_lhs_text = self._resolve_flow_expression(
@@ -150,17 +152,11 @@ class AssertLine(PreprocessorLine):
         preprocessor: Preprocessor,
     ) -> str:
         """Resolve macros while preserving names passed to flow operators."""
-        protected_names = []
-
-        def protect(match: re.Match[str]) -> str:
-            protected_names.append(match.group(2))
-            return f'{match.group(1)}__FLOW_ASSERT_NAME_{len(protected_names) - 1}'
-
-        protected = self._FLOW_ARGUMENT_PATTERN.sub(protect, expression)
-        resolved = preprocessor.resolve_symbols(self.line_id, protected)
-        for index, name in enumerate(protected_names):
-            resolved = resolved.replace(f'__FLOW_ASSERT_NAME_{index}', name)
-        return resolved
+        return resolve_symbols_protecting_flow_names(
+            preprocessor,
+            self.line_id,
+            expression,
+        )
 
     def _parse_flow_expression(self, expression: str) -> ExpressionNode:
         """Parse an assertion operand for deferred flow-aware evaluation."""

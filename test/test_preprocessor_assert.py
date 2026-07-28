@@ -202,3 +202,71 @@ def test_explicit_flow_assert_requires_a_flow_enabled_isa(tmp_path):
         match='instruction set does not enable flow counters',
     ):
         assembler.assemble_bytecode()
+
+
+def test_flow_dependent_assert_skips_general_evaluation(tmp_path, monkeypatch):
+    """A flow-dependent assert must never invoke general condition evaluation.
+
+    Bug (robustness): the bare-name flow shorthand (``#assert stack == 1``)
+    still computed a throwaway general result at parse time because the gate
+    checked ``_uses_explicit_flow`` rather than ``_is_flow_dependent``.
+    Harmless while the fallback string comparison cannot fail, but fragile:
+    any future change to general-evaluation semantics would silently apply to
+    flow asserts too. General evaluation belongs to general asserts only.
+    """
+    from bespokeasm.assembler.preprocessor.condition import IfPreprocessorCondition
+
+    original = IfPreprocessorCondition.evaluate
+    calls = []
+
+    def counting_evaluate(self, preprocessor):
+        calls.append(self)
+        return original(self, preprocessor)
+
+    monkeypatch.setattr(IfPreprocessorCondition, 'evaluate', counting_evaluate)
+    _assemble(
+        tmp_path,
+        '#track stack\npush\n#assert stack == 1\npop\n#endtrack stack\n',
+        config=FLOW_CONFIG,
+    )
+    assert not calls, 'flow-dependent assert performed general evaluation'
+
+
+def test_general_assert_failure_reports_exactly_once(tmp_path, monkeypatch):
+    """A failing general assert must produce exactly one diagnostic.
+
+    Bug (robustness): general asserts were enforced twice — once in the
+    ``AssertLine`` constructor at parse time and again by the flow analyzer's
+    redundant ``enforce_general()`` call. Benign under the fail-fast reporter
+    (the first report exits), but a future accumulate-and-continue reporter
+    would emit the same diagnostic twice. The analyzer must not re-enforce
+    general asserts; the parse-time evaluation is the single enforcement
+    point (which is also what keeps general asserts active under
+    ``--no-static-analysis``).
+    """
+    from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
+
+    original_error = DiagnosticReporter.error
+
+    def nonfatal_error(self, line_id, message, category='user', color=None):
+        try:
+            original_error(self, line_id, message, category=category, color=color)
+        except SystemExit:
+            pass
+
+    monkeypatch.setattr(DiagnosticReporter, 'error', nonfatal_error)
+    assembler = _assemble(
+        tmp_path,
+        '#define VALUE 1\n'
+        '#track stack\n'
+        '#assert VALUE == 2\n'
+        'nop\n'
+        '#endtrack stack\n',
+        config=FLOW_CONFIG,
+    )
+    failures = [
+        diagnostic
+        for diagnostic in assembler.model.diagnostic_reporter.diagnostics
+        if 'assertion failed' in diagnostic.message
+    ]
+    assert len(failures) == 1, f'expected one report, got {len(failures)}'

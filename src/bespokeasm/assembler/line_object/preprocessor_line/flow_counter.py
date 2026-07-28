@@ -4,11 +4,46 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.expression import ExpressionNode
 from bespokeasm.expression import ExpressionUseContext
 from bespokeasm.expression import parse_expression
 from bespokeasm.expression import TokenType
 from bespokeasm.utilities import is_valid_label
+
+# Only the name immediately after the opening parenthesis is protected: for
+# COORDINATE(counter, offset) the offset is a value expression and remains
+# macro-resolvable.
+_FLOW_ARGUMENT_PATTERN = re.compile(
+    r'(\b(?:COUNTER|OFFSET|COORDINATE)\s*\(\s*)((?:[A-Za-z][A-Za-z0-9_]*|'
+    r'_(?!_)[A-Za-z0-9_]+|\.[A-Za-z0-9_]+))',
+    flags=re.IGNORECASE,
+)
+
+
+def resolve_symbols_protecting_flow_names(
+    preprocessor: Preprocessor,
+    line_id: LineIdentifier,
+    text: str,
+) -> str:
+    """Resolve ``#define`` macros in expression text, keeping flow names literal.
+
+    Value expressions accept every compile-time constant kind, including
+    preprocessor macros — but the counter/coordinate names passed to
+    ``COUNTER()``, ``OFFSET()``, and ``COORDINATE()`` identify flow entities
+    and must never be macro-substituted, in any context.
+    """
+    protected_names = []
+
+    def protect(match: re.Match[str]) -> str:
+        protected_names.append(match.group(2))
+        return f'{match.group(1)}__FLOW_PROTECTED_NAME_{len(protected_names) - 1}'
+
+    protected = _FLOW_ARGUMENT_PATTERN.sub(protect, text)
+    resolved = preprocessor.resolve_symbols(line_id, protected)
+    for index, name in enumerate(protected_names):
+        resolved = resolved.replace(f'__FLOW_PROTECTED_NAME_{index}', name)
+    return resolved
 
 
 class FlowCounterDirectiveLine(PreprocessorLine):
@@ -26,9 +61,21 @@ class FlowCounterDirectiveLine(PreprocessorLine):
         comment: str,
         memzone: MemoryZone,
         isa_model: AssemblerModel,
+        preprocessor: Preprocessor | None = None,
     ) -> None:
         super().__init__(line_id, instruction, comment, memzone)
         self._isa_model = isa_model
+        self._preprocessor = preprocessor
+
+    def _resolve_value_text(self, text: str) -> str:
+        """Resolve preprocessor macros in one directive value expression."""
+        if self._preprocessor is None:
+            return text
+        return resolve_symbols_protecting_flow_names(
+            self._preprocessor,
+            self.line_id,
+            text,
+        )
 
     def _error(self, message: str) -> None:
         """Report a source-local diagnostic in the flow category."""
@@ -42,6 +89,7 @@ class FlowCounterDirectiveLine(PreprocessorLine):
         self,
         text: str,
         allowed: set[str],
+        identifier_names: frozenset[str] = frozenset(),
     ) -> dict[str, ExpressionNode]:
         """Parse whitespace-separated ``name=expression`` directive parameters.
 
@@ -49,6 +97,11 @@ class FlowCounterDirectiveLine(PreprocessorLine):
         that must be ignored as if stripped from the source. Syntactic
         validation still runs, while well-formed parameters belonging to a
         future milestone are ignored until their analysis is available.
+
+        Values are ordinary compile-time expressions and receive preprocessor
+        macro resolution — except the ``identifier_names`` parameters (such as
+        ``as=`` and ``mode=``), whose values name flow entities and must stay
+        literal.
         """
         enforce = self._isa_model.static_analysis_enabled
         if not text.strip():
@@ -70,6 +123,8 @@ class FlowCounterDirectiveLine(PreprocessorLine):
                 self._error(f'duplicate flow directive parameter "{name}"')
                 continue
             seen_names.add(name)
+            if name not in identifier_names:
+                value_text = self._resolve_value_text(value_text)
             try:
                 value_expression = parse_expression(
                     self.line_id,
@@ -152,7 +207,6 @@ class FlowTrackLine(FlowCounterDirectiveLine):
 
     _PATTERN = re.compile(
         r'^#track\s+(\S+)(?:\s+(.*))?$',
-        flags=re.IGNORECASE,
     )
 
     def __init__(
@@ -162,8 +216,9 @@ class FlowTrackLine(FlowCounterDirectiveLine):
         comment: str,
         memzone: MemoryZone,
         isa_model: AssemblerModel,
+        preprocessor: Preprocessor | None = None,
     ) -> None:
-        super().__init__(line_id, instruction, comment, memzone, isa_model)
+        super().__init__(line_id, instruction, comment, memzone, isa_model, preprocessor)
         match = self._PATTERN.fullmatch(instruction.strip())
         if match is None:
             self._error(f'invalid #track directive syntax: {instruction}')
@@ -176,6 +231,7 @@ class FlowTrackLine(FlowCounterDirectiveLine):
         self._parameters = self._parse_parameters(
             match.group(2) or '',
             {'as', 'mode', 'init', 'exit'},
+            identifier_names=frozenset({'as', 'mode'}),
         )
         instance_name = self.identifier_parameter('as')
         if instance_name is not None:
@@ -198,7 +254,6 @@ class FlowEndTrackLine(FlowCounterDirectiveLine):
 
     _PATTERN = re.compile(
         r'^#endtrack\s+(\S+)(?:\s+(.*))?$',
-        flags=re.IGNORECASE,
     )
 
     def __init__(
@@ -208,8 +263,9 @@ class FlowEndTrackLine(FlowCounterDirectiveLine):
         comment: str,
         memzone: MemoryZone,
         isa_model: AssemblerModel,
+        preprocessor: Preprocessor | None = None,
     ) -> None:
-        super().__init__(line_id, instruction, comment, memzone, isa_model)
+        super().__init__(line_id, instruction, comment, memzone, isa_model, preprocessor)
         match = self._PATTERN.fullmatch(instruction.strip())
         if match is None:
             self._error(f'invalid #endtrack directive syntax: {instruction}')
@@ -240,8 +296,9 @@ class FlowNamedCounterDirectiveLine(FlowCounterDirectiveLine):
         comment: str,
         memzone: MemoryZone,
         isa_model: AssemblerModel,
+        preprocessor: Preprocessor | None = None,
     ) -> None:
-        super().__init__(line_id, instruction, comment, memzone, isa_model)
+        super().__init__(line_id, instruction, comment, memzone, isa_model, preprocessor)
         match = self._PATTERN.fullmatch(instruction.strip())
         if match is None:
             self._error(
@@ -265,7 +322,6 @@ class FlowSetLine(FlowNamedCounterDirectiveLine):
     _DIRECTIVE = 'set'
     _PATTERN = re.compile(
         r'^#set\s+(\S+)\s*=\s*(.+)$',
-        flags=re.IGNORECASE,
     )
 
     def __init__(
@@ -275,11 +331,12 @@ class FlowSetLine(FlowNamedCounterDirectiveLine):
         comment: str,
         memzone: MemoryZone,
         isa_model: AssemblerModel,
+        preprocessor: Preprocessor | None = None,
     ) -> None:
-        super().__init__(line_id, instruction, comment, memzone, isa_model)
+        super().__init__(line_id, instruction, comment, memzone, isa_model, preprocessor)
         match = self._PATTERN.fullmatch(instruction.strip())
         self._value_expression = (
-            self._parse_flow_expression(match.group(2))
+            self._parse_flow_expression(self._resolve_value_text(match.group(2)))
             if match is not None
             else None
         )
@@ -296,7 +353,6 @@ class FlowSuspendLine(FlowNamedCounterDirectiveLine):
     _DIRECTIVE = 'suspend'
     _PATTERN = re.compile(
         r'^#suspend\s+(\S+)$',
-        flags=re.IGNORECASE,
     )
 
 
@@ -306,7 +362,6 @@ class FlowResumeLine(FlowNamedCounterDirectiveLine):
     _DIRECTIVE = 'resume'
     _PATTERN = re.compile(
         r'^#resume\s+(\S+)\s*=\s*(.+)$',
-        flags=re.IGNORECASE,
     )
 
     def __init__(
@@ -316,11 +371,12 @@ class FlowResumeLine(FlowNamedCounterDirectiveLine):
         comment: str,
         memzone: MemoryZone,
         isa_model: AssemblerModel,
+        preprocessor: Preprocessor | None = None,
     ) -> None:
-        super().__init__(line_id, instruction, comment, memzone, isa_model)
+        super().__init__(line_id, instruction, comment, memzone, isa_model, preprocessor)
         match = self._PATTERN.fullmatch(instruction.strip())
         self._value_expression = (
-            self._parse_flow_expression(match.group(2))
+            self._parse_flow_expression(self._resolve_value_text(match.group(2)))
             if match is not None
             else None
         )

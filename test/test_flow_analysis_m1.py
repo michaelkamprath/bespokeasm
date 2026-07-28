@@ -803,6 +803,18 @@ def test_m1_analyzer_survives_a_nonfatal_diagnostic_reporter(tmp_path, monkeypat
         ), f'scenario {name} recorded no flow error'
 
 
+def test_m1_flow_directives_are_case_sensitive(tmp_path):
+    """Requirements clarification (2026-07): all preprocessor directives —
+    everything introduced with ``#``, including the flow-counter directives —
+    are case-sensitive and lowercase. ``#TRACK`` is not a directive; it falls
+    through to the ordinary unknown-instruction error rather than being
+    recognized case-insensitively.
+    """
+    assembler = _assembler(tmp_path, '#TRACK stack\nnop\n')
+    with pytest.raises(SystemExit, match='unknown instruction'):
+        assembler.assemble_bytecode()
+
+
 def test_m1_harness_is_runnable():
     environment = os.environ.copy()
     environment['PYTHONPATH'] = str(PROJECT_ROOT / 'src')

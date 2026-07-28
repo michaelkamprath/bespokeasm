@@ -371,3 +371,111 @@ def test_m3_frozen_operand_preserves_non_decimal_default_base(tmp_path):
         config_path=config_path,
     )
     assert bytecode == bytes([0x16, 0x0A, 0x69])
+
+
+@pytest.mark.parametrize(
+    ('unreachable_line', 'expected'),
+    [
+        (
+            'lds COUNTER(stack)',
+            'is unreachable after flow counter "stack" terminated',
+        ),
+        (
+            'lds OFFSET(.slot)',
+            'is unreachable after the flow counter path terminated',
+        ),
+    ],
+)
+def test_m3_unreachable_lines_have_no_counter_state(
+    tmp_path,
+    unreachable_line,
+    expected,
+):
+    """Requirements: unreachable code after all paths terminated has no state.
+
+    "Unreachable instructions receive no counter state and are not subjected
+    to effect/transfer completeness checks until declared as an entry ...
+    ``COUNTER()``/``OFFSET()`` use on any unreachable line remains an error."
+    The error half was probe-verified during the M3 review but had no test.
+    """
+    _assert_flow_error(
+        tmp_path,
+        'function:\n'
+        '#track stack mode=called\n'
+        'push\n'
+        '.slot := COORDINATE(stack, 1)\n'
+        'pop\n'
+        'rts\n'
+        f'{unreachable_line}\n'
+        '#endtrack stack\n',
+        expected,
+        expected_line=7,
+    )
+
+
+def test_m3_unreachable_instructions_are_exempt_from_completeness_checks(tmp_path):
+    """Requirements: transfer/effect completeness checks stop at termination.
+
+    An instruction with *missing* ``flow_transfer`` metadata after every path
+    has terminated must be accepted (it is unreachable); the same instruction
+    while the path is live must error. Probe-verified during review; untested.
+    """
+    config = _load_config()
+    config['instructions']['nop'] = {
+        'bytecode': {'value': 0x77, 'size': 8},
+    }
+    config_path = _write_config(tmp_path, config)
+
+    _, bytecode = _assemble(
+        tmp_path,
+        '#track stack mode=called\nrts\nnop\n',
+        config_path=config_path,
+    )
+    assert bytecode == bytes([0x69, 0x77])
+
+    SymbolScope._global_scope = None
+    _assert_flow_error(
+        tmp_path,
+        '#track stack mode=called\nnop\nrts\n',
+        'missing required flow_transfer',
+        config_path=config_path,
+        expected_line=2,
+    )
+
+
+def test_m3_error_paths_survive_a_nonfatal_diagnostic_reporter(tmp_path, monkeypatch):
+    """Extends the M1/M2 nonfatal-reporter regression tests with M3 error sites.
+
+    Every ``_error()`` call site must guard-and-return; with a non-exiting
+    reporter each scenario must degrade to a recorded flow diagnostic rather
+    than crash on invalid state (see the M1 test of the same name for the full
+    rationale).
+    """
+    from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
+
+    original_error = DiagnosticReporter.error
+
+    def nonfatal_error(self, line_id, message, category='user', color=None):
+        try:
+            original_error(self, line_id, message, category=category, color=color)
+        except SystemExit:
+            pass
+
+    monkeypatch.setattr(DiagnosticReporter, 'error', nonfatal_error)
+
+    scenarios = [
+        # terminal exit mismatch (before_effect check against incoming value)
+        ('terminal-mismatch', '#track stack mode=called\npush\nrts\n#endtrack stack\n'),
+        # unknown entry mode
+        ('unknown-mode', '#track stack mode=interrupt\nrts\n'),
+        # runtime-valued ARG operand
+        ('runtime-arg', '#track stack mode=called\naddsp sp\nrts\n#endtrack stack\n'),
+    ]
+    for name, source in scenarios:
+        SymbolScope._global_scope = None
+        assembler = _assembler(tmp_path, source, output_name=f'{name}.bin')
+        assembler.assemble_bytecode()
+        assert any(
+            diagnostic.category == 'flow' and diagnostic.level == 'error'
+            for diagnostic in assembler.model.diagnostic_reporter.diagnostics
+        ), f'scenario {name} recorded no flow error'

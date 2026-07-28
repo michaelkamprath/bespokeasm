@@ -674,7 +674,18 @@ class FlowLinearAnalyzer:
                     else None
                 )
                 if reconciliation_order is None:
-                    self._apply_delta(line_object, record, state)
+                    # A live counter not mapped on this terminal has no way
+                    # across a return: there is no fall-through successor, so
+                    # its region has no reachable end — the same rule as a
+                    # bare return with no terminal at all. The path is closed
+                    # so following lines are uniformly unreachable.
+                    self._error(
+                        line_object,
+                        f'instruction "{record.source_mnemonic}" returns while '
+                        f'flow counter "{state.name}" is still active; end the '
+                        f'region with #endtrack {state.name} before this transfer',
+                    )
+                    state.path_live = False
                     continue
                 if state.suspended:
                     self._error(
@@ -770,6 +781,16 @@ class FlowLinearAnalyzer:
                         f'to flow counter "{getattr(coordinate_state, "name", "")}"',
                     )
                     return None
+                if not coordinate.is_valid:
+                    # Re-anchoring to a coordinate the analysis already proved
+                    # crossed is accepted on faith, but deserves a warning.
+                    self._diagnostic_reporter.warn(
+                        line_object.line_id,
+                        f'counter coordinate "{expression.value}" was invalidated '
+                        'before this directive; re-anchoring to its saved '
+                        'position is taken on faith',
+                        category='flow',
+                    )
                 return coordinate.value
         try:
             return expression.get_value(
@@ -789,9 +810,14 @@ class FlowLinearAnalyzer:
             return None
 
     def _assert(self, line_object: AssertLine) -> None:
-        """Evaluate either a general assertion or a flow-dependent checkpoint."""
+        """Evaluate a flow-dependent checkpoint against the current state.
+
+        General assertions were already enforced once at parse time by the
+        ``AssertLine`` constructor (which is also what keeps them active under
+        ``--no-static-analysis``); re-enforcing them here would double-report
+        under an accumulate-and-continue reporter.
+        """
         if not line_object.is_flow_dependent:
-            line_object.enforce_general()
             return
 
         comparison = {
@@ -871,9 +897,11 @@ class FlowLinearAnalyzer:
         if value is None:
             return
         state.value = value
+        # A re-anchor means the effect model could not express what happened
+        # to the counter, so no prior slot's survival is provable: #set
+        # permanently invalidates every coordinate, exactly like #resume.
         for coordinate in state.coordinates:
-            if coordinate.is_valid:
-                coordinate.is_valid = self._coordinate_is_live(state, coordinate)
+            coordinate.is_valid = False
         self._check_bounds(line_object, state)
 
     def _suspend_counter(self, line_object: FlowSuspendLine) -> None:

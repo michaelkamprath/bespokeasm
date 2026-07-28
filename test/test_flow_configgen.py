@@ -199,6 +199,12 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
             hover_docs['expression_functions'],
         )
         assert ':=' in hover_docs['directives']['counter_coordinate']
+        # a flow-enabled ISA's #assert hover carries the flow-form suffix
+        # (FLOW_ASSERT_DOC_SUFFIX) describing COUNTER()/OFFSET() operands
+        assert (
+            'never controls conditional compilation'
+            in hover_docs['directives']['preprocessor']['assert']
+        )
     else:
         assert '#track' in generated
         assert '#endtrack' in generated
@@ -248,6 +254,11 @@ def test_flow_tokens_are_absent_from_non_enabled_isa(
         assert 'track' not in hover_docs['directives']['preprocessor']
         assert 'endtrack' not in hover_docs['directives']['preprocessor']
         assert 'assert' in hover_docs['directives']['preprocessor']
+        # the non-flow #assert hover must not carry the flow-form suffix
+        assert (
+            'never controls conditional compilation'
+            not in hover_docs['directives']['preprocessor']['assert']
+        )
         assert not M4_FLOW_DIRECTIVES & set(
             hover_docs['directives']['preprocessor'],
         )

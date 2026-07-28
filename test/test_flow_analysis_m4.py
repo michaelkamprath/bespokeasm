@@ -5,11 +5,26 @@ from pathlib import Path
 import pytest
 from bespokeasm.assembler.engine import Assembler
 from bespokeasm.assembler.symbol_scope import SymbolScope
+from ruamel.yaml import YAML
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 M4_HARNESS_DIR = PROJECT_ROOT / 'dev' / 'flow-counters-m4'
 M4_CONFIG_PATH = M4_HARNESS_DIR / 'flow-counters-m4.yaml'
+
+
+def _load_config() -> dict:
+    yaml = YAML(typ='safe')
+    with M4_CONFIG_PATH.open() as config_file:
+        return yaml.load(config_file)
+
+
+def _write_config(tmp_path: Path, config: dict, name: str = 'isa.yaml') -> Path:
+    config_path = tmp_path / name
+    yaml = YAML()
+    with config_path.open('w') as config_file:
+        yaml.dump(config, config_file)
+    return config_path
 
 
 @pytest.fixture(autouse=True)
@@ -23,6 +38,7 @@ def _assembler(
     tmp_path: Path,
     source: str,
     *,
+    config_path: Path = M4_CONFIG_PATH,
     static_analysis: bool = True,
     output_name: str = 'out.bin',
 ) -> Assembler:
@@ -31,7 +47,7 @@ def _assembler(
     source_path.write_text(source)
     return Assembler(
         source_file=str(source_path),
-        config_file=str(M4_CONFIG_PATH),
+        config_file=str(config_path),
         generate_binary=True,
         output_file=str(output_path),
         binary_start=0,
@@ -285,18 +301,205 @@ def test_m4_plain_endtrack_may_abandon_a_suspended_region(tmp_path):
 
 
 def test_m4_terminal_reconciles_all_instances_of_mapped_class_only(tmp_path):
+    """Case 46: a return terminal reconciles every active instance of each
+    mapped class; an active instance of a different class is unaffected by the
+    reconciliation — but it cannot *cross* the return either (see the
+    companion cross-return test), so it must be closed before the terminal.
+    Here both same-class frames are reconciled by one ``rts`` while the
+    ``cycles`` window observes only its own effects and closes beforehand.
+    """
     _, bytecode = _assemble(
         tmp_path,
         '#track stack as=frame_a mode=called\n'
         '#track stack as=frame_b mode=called\n'
         '#track cycles\n'
+        'nop\n'
+        '#endtrack cycles exit=1\n'
         'rts\n'
-        '#assert cycles == 3\n'
-        '#endtrack cycles exit=3\n'
         '#endtrack frame_a\n'
         '#endtrack frame_b\n',
     )
-    assert bytecode == bytes([0x69])
+    assert bytecode == bytes([0x00, 0x69])
+
+
+def test_m4_unmapped_counter_cannot_cross_a_return_terminal(tmp_path):
+    """Bug: a live counter not mapped on a return terminal silently survived it.
+
+    With ``stack`` mapped on ``rts`` and ``cycles`` merely active, the old
+    behavior applied the normal cycles delta at the ``rts`` and kept the
+    cycles path live — so cycles accrued effects from *unreachable* code after
+    the return, and ``COUNTER(cycles)`` even resolved there. The requirements
+    say unreachable lines receive no counter state, and the behavior was
+    internally inconsistent: the same cycles region crossing the same ``rts``
+    errors when tracked alone. Expected behavior: a return terminal is a
+    region exit with no fall-through, so every live counter must either be
+    reconciled by it (mapped) or have been closed with ``#endtrack`` before
+    it; a live unmapped counter errors on the terminal's line.
+    """
+    _assert_flow_error(
+        tmp_path,
+        '#track stack mode=called\n'
+        '#track cycles\n'
+        'rts\n'
+        '#endtrack cycles\n'
+        '#endtrack stack\n',
+        r'returns while flow counter "cycles" is still active; '
+        r'end the region with #endtrack cycles before this transfer',
+        expected_line=3,
+    )
+
+
+def test_m4_set_invalidates_prior_coordinates(tmp_path):
+    """Bug: ``#set`` re-anchored a counter without invalidating its coordinates.
+
+    Dead-coordinate rule 5 of the requirements: "``#set``, ``#resume``, and an
+    ``#entry`` root at a non-initial depth also invalidate prior coordinates
+    unless a future explicit preservation contract says otherwise." ``#set``
+    exists precisely because the effect model could not express what happened
+    to the counter, so no prior slot's survival is provable. The old behavior
+    only ran the crossing-based liveness check, so ``OFFSET(.x)`` after a
+    ``#set`` happily emitted an offset from a stale slot.
+    """
+    _assert_flow_error(
+        tmp_path,
+        'function:\n'
+        '#track stack\n'
+        'push\n'
+        '.x := COORDINATE(stack, 1)\n'
+        '#set stack = 5\n'
+        'depth OFFSET(.x)\n'
+        '#endtrack stack exit=5\n',
+        r'counter coordinate "\.x" is invalid',
+        expected_line=6,
+    )
+
+
+def test_m4_set_checks_bounds_after_reanchor(tmp_path):
+    """Pins existing behavior: a ``#set`` value outside the class bounds errors.
+
+    The spec is silent on whether the taken-on-faith ``#set`` value is bounds
+    checked; the implementation checks it, which is the safer reading — a
+    programmer asserting a value the class declares impossible is most likely
+    a mistake. This test makes that a deliberate, documented choice.
+    """
+    _assert_flow_error(
+        tmp_path,
+        '#track stack\n'
+        '#set stack = -3\n'
+        'nop\n'
+        '#endtrack stack\n',
+        'underflow',
+        expected_line=2,
+    )
+
+
+def test_m4_resume_to_invalidated_coordinate_warns(tmp_path):
+    """Decision (2026-07): ``#resume <counter> = <coordinate>`` naming a
+    coordinate the analyzer already invalidated is accepted on faith — the
+    spec only forbids ``OFFSET()`` on invalid coordinates — but re-anchoring
+    to a position that was provably crossed deserves a flow warning.
+    """
+    source = (
+        'function:\n'
+        '#track stack\n'
+        'push\n'
+        'push\n'
+        '.x := COORDINATE(stack, 1)\n'
+        'pop\n'
+        'pop\n'
+        '#suspend stack\n'
+        'nop\n'
+        '#resume stack = .x\n'
+        'pop\n'
+        '#endtrack stack\n'
+    )
+    assembler, _ = _assemble(tmp_path, source)
+    warnings = [
+        diagnostic
+        for diagnostic in assembler.model.diagnostic_reporter.diagnostics
+        if diagnostic.level == 'warning' and diagnostic.category == 'flow'
+    ]
+    assert any(
+        '.x' in diagnostic.message and 'invalidated' in diagnostic.message
+        for diagnostic in warnings
+    ), 'expected a flow warning about resuming to an invalidated coordinate'
+
+
+def test_m4_failing_endtrack_on_one_of_two_same_class_windows(tmp_path):
+    """Case 44 (negative half): each overlapping same-class window's
+    ``#endtrack exit=`` is checked independently — a mismatch on the inner
+    window errors, naming that window, while the outer remains unaffected.
+    """
+    _assert_flow_error(
+        tmp_path,
+        '#track cycles as=outer\n'
+        '#track cycles as=inner\n'
+        'nop\n'
+        '#endtrack inner exit=5\n'
+        '#endtrack outer exit=1\n',
+        'flow counter "inner" exit mismatch: expected 5, actual 1',
+        expected_line=4,
+    )
+
+
+def test_m4_violation_names_the_offending_counter_among_concurrent_classes(tmp_path):
+    """Case 16: with two different-class counters active on one instruction
+    stream, a violation is attributed to the specific offending counter.
+    """
+    _assert_flow_error(
+        tmp_path,
+        '#track stack\n'
+        '#track cycles\n'
+        'pop\n'
+        '#endtrack cycles\n'
+        '#endtrack stack\n',
+        'flow counter "stack" underflow',
+        expected_line=3,
+    )
+
+
+def test_m4_error_paths_survive_a_nonfatal_diagnostic_reporter(tmp_path, monkeypatch):
+    """Extends the M1/M2 nonfatal-reporter regression tests with M4 error sites.
+
+    Every ``_error()`` call site must guard-and-return; with a non-exiting
+    reporter each scenario must degrade to a recorded flow diagnostic rather
+    than crash on invalid state (see the M1 test of the same name for the full
+    rationale).
+    """
+    from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
+
+    original_error = DiagnosticReporter.error
+
+    def nonfatal_error(self, line_id, message, category='user', color=None):
+        try:
+            original_error(self, line_id, message, category=category, color=color)
+        except SystemExit:
+            pass
+
+    monkeypatch.setattr(DiagnosticReporter, 'error', nonfatal_error)
+
+    scenarios = [
+        ('set-inactive', '#set absent = 1\nnop\n'),
+        ('resume-not-suspended', '#track stack\n#resume stack = 0\nnop\n#endtrack stack\n'),
+        ('suspend-twice', '#track stack\n#suspend stack\n#suspend stack\nnop\n'),
+        ('assert-failure', '#track stack\npush\n#assert stack == 5\npop\n#endtrack stack\n'),
+        (
+            'unmapped-cross-return',
+            '#track stack mode=called\n#track cycles\nrts\n#endtrack cycles\n#endtrack stack\n',
+        ),
+        (
+            'suspended-terminal',
+            '#track stack\n#suspend stack\nrts\n',
+        ),
+    ]
+    for name, source in scenarios:
+        SymbolScope._global_scope = None
+        assembler = _assembler(tmp_path, source, output_name=f'{name}.bin')
+        assembler.assemble_bytecode()
+        assert any(
+            diagnostic.category == 'flow' and diagnostic.level == 'error'
+            for diagnostic in assembler.model.diagnostic_reporter.diagnostics
+        ), f'scenario {name} recorded no flow error'
 
 
 def test_m4_inactive_or_undeclared_instance_errors(tmp_path):
@@ -386,3 +589,162 @@ def test_m4_disabled_analysis_ignores_valid_manual_control_but_not_bad_syntax(
         static_analysis=False,
         expected_line=1,
     )
+
+
+@pytest.mark.parametrize(
+    ('slot', 'source'),
+    [
+        (
+            'set',
+            '#define FRAME 2\n'
+            '#track stack\n'
+            '#set stack = FRAME\n'
+            'pop\npop\n'
+            '#endtrack stack exit=0\n',
+        ),
+        (
+            'resume',
+            '#define RESUMED 2\n'
+            '#track stack\n'
+            '#suspend stack\n'
+            'nop\n'
+            '#resume stack = RESUMED\n'
+            'pop\npop\n'
+            '#endtrack stack exit=0\n',
+        ),
+        (
+            'init',
+            '#define START 2\n'
+            '#track stack init=START exit=0\n'
+            'pop\npop\n'
+            '#endtrack stack\n',
+        ),
+        (
+            'exit',
+            '#define BALANCE 2\n'
+            '#track stack\n'
+            'push\npush\n'
+            '#endtrack stack exit=BALANCE\n',
+        ),
+    ],
+)
+def test_m4_flow_directive_values_resolve_define_macros(tmp_path, slot, source):
+    """Decision (2026-07): flow-directive value expressions accept every
+    compile-time constant kind — assembler-assigned (``=``/``EQU``) constants,
+    ``#define`` preprocessor macros, and ISA-configuration predefined
+    constants — matching ``#assert`` and ordinary instruction operands.
+
+    Previously ``#define``'d macros failed in all four value slots ("Label
+    FRAME resolves to NONE"): preprocessor lines are dispatched before macro
+    substitution, and unlike ``#assert`` the flow directives did not resolve
+    their own value text. Only the *value* side is macro-resolved; counter and
+    coordinate names stay literal.
+    """
+    expected = {
+        'set': bytes([0x11, 0x11]),
+        'resume': bytes([0x00, 0x11, 0x11]),
+        'init': bytes([0x11, 0x11]),
+        'exit': bytes([0x10, 0x10]),
+    }[slot]
+    _, bytecode = _assemble(tmp_path, source, output_name=f'{slot}.bin')
+    assert bytecode == expected
+
+
+def test_m4_flow_directive_values_resolve_isa_predefined_constants(tmp_path):
+    """Companion pin: ISA-configuration predefined constants already resolve
+    in flow-directive values (they enter the global symbol scope at model
+    load, like ``=``/``EQU`` constants). Pinned so the all-constant-kinds rule
+    is enforced for every kind, not just the one that needed fixing.
+    """
+    config = _load_config()
+    config['predefined'] = {'constants': [{'name': 'ISAFRAME', 'value': 2}]}
+    config_path = _write_config(tmp_path, config)
+    _, bytecode = _assemble(
+        tmp_path,
+        '#track stack init=ISAFRAME\n'
+        '#set stack = ISAFRAME\n'
+        'pop\npop\n'
+        '#endtrack stack exit=0\n',
+        config_path=config_path,
+    )
+    assert bytecode == bytes([0x11, 0x11])
+
+
+def test_m4_macro_resolution_protects_flow_operand_and_identifier_names(tmp_path):
+    """Macro resolution must never rewrite flow names, only values.
+
+    With ``#define source 5`` in effect, ``#track cycles as=source`` must
+    still create an instance literally named ``source`` (identifier
+    parameters are not macro-resolved), and ``COUNTER(source)`` inside a
+    ``#set`` value must still reference that instance (flow-operator argument
+    names are protected from substitution, as in ``#assert``).
+    """
+    _, bytecode = _assemble(
+        tmp_path,
+        '#define source 5\n'
+        '#track cycles as=source\n'
+        '#track cycles as=target\n'
+        'nop\n'
+        '#set target = COUNTER(source) + 2\n'
+        '#assert target == 3\n'
+        '#endtrack source exit=1\n'
+        '#endtrack target exit=3\n',
+    )
+    assert bytecode == bytes([0x00])
+
+
+def test_m4_ordinary_line_macro_resolution_protects_flow_names(tmp_path):
+    """Names passed to flow operators are literal in every context.
+
+    Bug (inconsistency): ordinary lines receive whole-line preprocessor
+    substitution in the line factory with no flow-name protection, so with
+    ``#define stack 5`` in effect, ``depth COUNTER(stack)`` became
+    ``COUNTER(5)`` ("COUNTER() requires one counter name") and
+    ``.x := COORDINATE(stack, 1)`` became ``COORDINATE(5, 1)`` — while the
+    same names in ``#assert``/``#set`` values were protected. The
+    name-vs-value rule is context-universal: the names passed to
+    ``COUNTER()``, ``OFFSET()``, and ``COORDINATE()`` stay literal wherever
+    they appear; only value expressions are macro-resolved.
+    """
+    _, counter_bytes = _assemble(
+        tmp_path,
+        '#define stack 5\n'
+        '#track stack\n'
+        'push\n'
+        'depth COUNTER(stack)\n'
+        'pop\n'
+        '#endtrack stack\n',
+        output_name='counter.bin',
+    )
+    assert counter_bytes == bytes([0x10, 0x20, 0x01, 0x11])
+
+    SymbolScope._global_scope = None
+    _, coordinate_bytes = _assemble(
+        tmp_path,
+        '#define stack 5\n'
+        'fn:\n'
+        '#track stack\n'
+        'push\n'
+        '.x := COORDINATE(stack, 1)\n'
+        'depth OFFSET(.x)\n'
+        'pop\n'
+        '#endtrack stack\n',
+        output_name='coordinate.bin',
+    )
+    assert coordinate_bytes == bytes([0x10, 0x20, 0x01, 0x11])
+
+    # the COORDINATE() *offset* is a value expression: macros resolve there
+    SymbolScope._global_scope = None
+    _, offset_bytes = _assemble(
+        tmp_path,
+        '#define FRAMEOFF 1\n'
+        'fn:\n'
+        '#track stack\n'
+        'push\n'
+        '.x := COORDINATE(stack, FRAMEOFF)\n'
+        'depth OFFSET(.x)\n'
+        'pop\n'
+        '#endtrack stack\n',
+        output_name='offset.bin',
+    )
+    assert offset_bytes == bytes([0x10, 0x20, 0x01, 0x11])

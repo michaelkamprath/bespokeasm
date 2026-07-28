@@ -53,6 +53,7 @@ class PreprocessorLineFactory:
                     comment,
                     current_memzone,
                     isa_model,
+                    preprocessor,
                 )
             case ('#endtrack', _):
                 line_object = FlowEndTrackLine(
@@ -61,6 +62,7 @@ class PreprocessorLineFactory:
                     comment,
                     current_memzone,
                     isa_model,
+                    preprocessor,
                 )
             case ('#assert', _):
                 line_object = AssertLine(
@@ -78,6 +80,7 @@ class PreprocessorLineFactory:
                     comment,
                     current_memzone,
                     isa_model,
+                    preprocessor,
                 )
             case ('#suspend', _):
                 line_object = FlowSuspendLine(
@@ -86,6 +89,7 @@ class PreprocessorLineFactory:
                     comment,
                     current_memzone,
                     isa_model,
+                    preprocessor,
                 )
             case ('#resume', _):
                 line_object = FlowResumeLine(
@@ -94,6 +98,7 @@ class PreprocessorLineFactory:
                     comment,
                     current_memzone,
                     isa_model,
+                    preprocessor,
                 )
             case ('#create-scope', True):
                 line_object = CreateScopeLine(

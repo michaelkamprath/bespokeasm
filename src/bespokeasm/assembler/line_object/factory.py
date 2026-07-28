@@ -9,6 +9,9 @@ from bespokeasm.assembler.line_object.emdedded_string import EmbeddedString
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.line_object.preprocessor_line.factory import PreprocessorLineFactory
+from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import (
+    resolve_symbols_protecting_flow_names,
+)
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
@@ -143,8 +146,13 @@ class LineOjectFactory:
                     filename,
                 ))
         else:
-            # resolve preprocessor symbols
-            instruction_str = preprocessor.resolve_symbols(line_id, instruction_str)
+            # resolve preprocessor symbols; the names passed to flow operators
+            # identify flow entities and stay literal in every context
+            instruction_str = resolve_symbols_protecting_flow_names(
+                preprocessor,
+                line_id,
+                instruction_str,
+            )
             cls._validate_flow_expression_context(line_id, instruction_str, model)
             # parse instruction
             first_fragment = True
