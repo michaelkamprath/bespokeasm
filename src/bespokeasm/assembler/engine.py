@@ -226,7 +226,6 @@ class Assembler:
                 self._model,
                 diagnostic_reporter,
             ).run(compilable_line_obs)
-
         # now merge prefined line objects and parsed line objects
         compilable_line_obs.extend(predefined_line_obs)
 

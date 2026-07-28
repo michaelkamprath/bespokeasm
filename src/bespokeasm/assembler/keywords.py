@@ -8,14 +8,14 @@ BYTECODE_DIRECTIVES_SET = {
 }
 
 BASE_PREPROCESSOR_DIRECTIVES_SET = {
-    'include', 'require', 'error', 'create_memzone', 'print',
+    'include', 'require', 'error', 'create_memzone', 'print', 'assert',
     'define', 'if', 'elif', 'else', 'endif', 'ifdef', 'ifndef',
     'mute', 'unmute', 'emit',
     'create-scope', 'use-scope', 'deactivate-scope',
 }
 
 FLOW_PREPROCESSOR_DIRECTIVES_SET = {
-    'track', 'endtrack',
+    'endtrack', 'resume', 'set', 'suspend', 'track',
 }
 
 PREPROCESSOR_DIRECTIVES_SET = (

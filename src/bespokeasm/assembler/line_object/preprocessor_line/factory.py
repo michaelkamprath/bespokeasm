@@ -1,6 +1,6 @@
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
-from bespokeasm.assembler.line_object.preprocessor_line.condition_line import CONDITIONAL_LINE_PREFIX_LIST
+from bespokeasm.assembler.line_object.preprocessor_line.assert_line import AssertLine
 from bespokeasm.assembler.line_object.preprocessor_line.condition_line import ConditionLine
 from bespokeasm.assembler.line_object.preprocessor_line.create_memzone import CreateMemzoneLine
 from bespokeasm.assembler.line_object.preprocessor_line.create_scope import CreateScopeLine
@@ -8,6 +8,9 @@ from bespokeasm.assembler.line_object.preprocessor_line.deactivate_scope import 
 from bespokeasm.assembler.line_object.preprocessor_line.define_symbol import DefineSymbolLine
 from bespokeasm.assembler.line_object.preprocessor_line.error_line import ErrorLine
 from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowEndTrackLine
+from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowResumeLine
+from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowSetLine
+from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowSuspendLine
 from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowTrackLine
 from bespokeasm.assembler.line_object.preprocessor_line.print_line import PrintLine
 from bespokeasm.assembler.line_object.preprocessor_line.required_language import RequiredLanguageLine
@@ -39,113 +42,151 @@ class PreprocessorLineFactory:
         filename: str,
     ) -> list[LineObject]:
         '''Parse a preprocessor line.'''
-        if instruction.lower() == '#track' or instruction.lower().startswith('#track '):
-            return [FlowTrackLine(
-                line_id,
-                instruction,
-                comment,
-                current_memzone,
-                isa_model,
-            )]
+        directive, separator, _ = instruction.partition(' ')
+        has_arguments = bool(separator)
 
-        if instruction.lower() == '#endtrack' or instruction.lower().startswith('#endtrack '):
-            return [FlowEndTrackLine(
-                line_id,
-                instruction,
-                comment,
-                current_memzone,
-                isa_model,
-            )]
+        match directive, has_arguments:
+            case ('#track', _):
+                line_object = FlowTrackLine(
+                    line_id,
+                    instruction,
+                    comment,
+                    current_memzone,
+                    isa_model,
+                )
+            case ('#endtrack', _):
+                line_object = FlowEndTrackLine(
+                    line_id,
+                    instruction,
+                    comment,
+                    current_memzone,
+                    isa_model,
+                )
+            case ('#assert', _):
+                line_object = AssertLine(
+                    line_id,
+                    instruction,
+                    comment,
+                    current_memzone,
+                    isa_model,
+                    preprocessor,
+                )
+            case ('#set', _):
+                line_object = FlowSetLine(
+                    line_id,
+                    instruction,
+                    comment,
+                    current_memzone,
+                    isa_model,
+                )
+            case ('#suspend', _):
+                line_object = FlowSuspendLine(
+                    line_id,
+                    instruction,
+                    comment,
+                    current_memzone,
+                    isa_model,
+                )
+            case ('#resume', _):
+                line_object = FlowResumeLine(
+                    line_id,
+                    instruction,
+                    comment,
+                    current_memzone,
+                    isa_model,
+                )
+            case ('#create-scope', True):
+                line_object = CreateScopeLine(
+                    line_id,
+                    instruction,
+                    comment,
+                    current_memzone,
+                    isa_model,
+                    active_named_scopes.named_scope_manager,
+                )
+            case ('#use-scope', True):
+                line_object = UseScopeLine(
+                    line_id,
+                    instruction,
+                    comment,
+                    current_memzone,
+                    isa_model,
+                    active_named_scopes.named_scope_manager,
+                    filename,
+                )
+            case ('#deactivate-scope', True):
+                line_object = DeactivateScopeLine(
+                    line_id,
+                    instruction,
+                    comment,
+                    current_memzone,
+                    isa_model,
+                    active_named_scopes.named_scope_manager,
+                    filename,
+                )
+            case ('#require', True):
+                line_object = RequiredLanguageLine(
+                    line_id,
+                    instruction,
+                    comment,
+                    current_memzone,
+                    isa_model,
+                    preprocessor,
+                )
+            case ('#error', _):
+                line_object = ErrorLine(
+                    line_id,
+                    instruction,
+                    comment,
+                    current_memzone,
+                    preprocessor,
+                    condition_stack,
+                )
+            case ('#create_memzone', True):
+                line_object = CreateMemzoneLine(
+                    line_id,
+                    instruction,
+                    comment,
+                    current_memzone,
+                    memzone_manager,
+                    isa_model,
+                )
+            case ('#define', True):
+                line_object = DefineSymbolLine(
+                    line_id,
+                    instruction,
+                    comment,
+                    current_memzone,
+                    memzone_manager,
+                    isa_model,
+                    preprocessor,
+                )
+            case ('#print', True):
+                line_object = PrintLine(
+                    line_id,
+                    instruction,
+                    comment,
+                    current_memzone,
+                    preprocessor,
+                    condition_stack,
+                    log_verbosity,
+                )
+            case (
+                '#if' | '#ifdef' | '#ifndef' | '#elif',
+                True,
+            ) | (
+                '#else' | '#endif' | '#mute' | '#emit' | '#unmute',
+                _,
+            ):
+                line_object = ConditionLine(
+                    line_id,
+                    instruction,
+                    comment,
+                    current_memzone,
+                    preprocessor,
+                    condition_stack,
+                )
+            case _:
+                return []
 
-        if instruction.startswith('#create-scope '):
-            return [CreateScopeLine(
-                        line_id,
-                        instruction,
-                        comment,
-                        current_memzone,
-                        isa_model,
-                        active_named_scopes.named_scope_manager
-                    )]
-
-        if instruction.startswith('#use-scope '):
-            return [UseScopeLine(
-                        line_id,
-                        instruction,
-                        comment,
-                        current_memzone,
-                        isa_model,
-                        active_named_scopes.named_scope_manager,
-                        filename
-                    )]
-
-        if instruction.startswith('#deactivate-scope '):
-            return [DeactivateScopeLine(
-                        line_id,
-                        instruction,
-                        comment,
-                        current_memzone,
-                        isa_model,
-                        active_named_scopes.named_scope_manager,
-                        filename
-                    )]
-
-        if instruction.startswith('#require '):
-            return [RequiredLanguageLine(
-                        line_id,
-                        instruction,
-                        comment,
-                        current_memzone,
-                        isa_model,
-                        preprocessor
-                    )]
-
-        if instruction == '#error' or instruction.startswith('#error '):
-            return [ErrorLine(
-                        line_id,
-                        instruction,
-                        comment,
-                        current_memzone,
-                        preprocessor,
-                        condition_stack,
-                    )]
-
-        if instruction.startswith('#create_memzone '):
-            return [CreateMemzoneLine(
-                        line_id,
-                        instruction,
-                        comment,
-                        current_memzone,
-                        memzone_manager,
-                        isa_model,
-                    )]
-
-        if instruction.startswith('#define '):
-            return [DefineSymbolLine(
-                        line_id,
-                        instruction,
-                        comment,
-                        current_memzone,
-                        memzone_manager,
-                        isa_model,
-                        preprocessor,
-                    )]
-        if instruction.startswith('#print '):
-            return [PrintLine(
-                        line_id,
-                        instruction,
-                        comment,
-                        current_memzone,
-                        preprocessor,
-                        condition_stack,
-                        log_verbosity,
-                    )]
-        if instruction.startswith(tuple(CONDITIONAL_LINE_PREFIX_LIST)):
-            return [ConditionLine(
-                        line_id,
-                        instruction,
-                        comment,
-                        current_memzone,
-                        preprocessor,
-                        condition_stack,
-                    )]
-        return []
+        return [line_object]

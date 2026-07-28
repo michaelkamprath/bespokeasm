@@ -33,6 +33,13 @@ def build_hover_docs(assembler_model: AssemblerModel, verbose: int = 0) -> dict:
     expression_names = expression_functions_for_isa(
         assembler_model.flow_counters_enabled,
     )
+    preprocessor_docs = {
+        name: doc
+        for name, doc in directive_docs.PREPROCESSOR_DIRECTIVE_DOCS.items()
+        if name in preprocessor_names
+    }
+    if assembler_model.flow_counters_enabled:
+        preprocessor_docs['assert'] += directive_docs.FLOW_ASSERT_DOC_SUFFIX
     return {
         'instructions': instruction_docs,
         'macros': macro_docs,
@@ -40,11 +47,7 @@ def build_hover_docs(assembler_model: AssemblerModel, verbose: int = 0) -> dict:
         'directives': {
             'compiler': directive_docs.COMPILER_DIRECTIVE_DOCS,
             'data_type': directive_docs.BYTECODE_DIRECTIVE_DOCS,
-            'preprocessor': {
-                name: doc
-                for name, doc in directive_docs.PREPROCESSOR_DIRECTIVE_DOCS.items()
-                if name in preprocessor_names
-            },
+            'preprocessor': preprocessor_docs,
             'counter_coordinate': (
                 directive_docs.COUNTER_COORDINATE_DOCS
                 if assembler_model.flow_counters_enabled

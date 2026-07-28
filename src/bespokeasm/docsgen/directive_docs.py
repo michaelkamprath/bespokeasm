@@ -186,7 +186,9 @@ PREPROCESSOR_DIRECTIVE_DOCS: dict[str, str] = {
         '#require __BESPOKEASM_VERSION__ >= 0.7.2\n'
         '```\n\n'
         'Supports both the legacy quoted-string format and symbol-based '
-        'comparisons with built-in version constants.'
+        'comparisons restricted to built-in language/BespokeASM version '
+        'symbols and literals. Complete versions use semantic-version '
+        'ordering. Use `#assert` for invariants involving user macros.'
     ),
     'define': (
         '### `#define` : Define Preprocessor Macro\n\n'
@@ -212,6 +214,8 @@ PREPROCESSOR_DIRECTIVE_DOCS: dict[str, str] = {
         '```\n\n'
         'The single-expression form implies `!= 0`. Expressions may use '
         'preprocessor macros and built-in version symbols. '
+        'Static-analysis values are not allowed because this directive '
+        'selects which source is compiled. '
         'Must be closed with `#endif`.'
     ),
     'elif': (
@@ -223,7 +227,8 @@ PREPROCESSOR_DIRECTIVE_DOCS: dict[str, str] = {
         '#elif <expr> <comparison> <expr>\n'
         '#elif <expr>\n'
         '```\n\n'
-        'Must follow a `#if` or another `#elif`.'
+        'Must follow a `#if` or another `#elif`. Static-analysis values are '
+        'not allowed because this directive selects which source is compiled.'
     ),
     'else': (
         '### `#else` : Else Block\n\n'
@@ -379,9 +384,11 @@ PREPROCESSOR_DIRECTIVE_DOCS: dict[str, str] = {
         '**Usage:**\n\n'
         '```\n'
         '#track <counter-class>\n'
-        '#track <counter-class> mode=<entry-mode> '
+        '#track <counter-class> as=<counter-name> mode=<entry-mode> '
         'init=<expression> exit=<expression>\n'
         '```\n\n'
+        '`as=` gives the instance a distinct name so multiple counters may '
+        'overlap; otherwise the class name is used. '
         '`mode=` selects an entry convention configured by the counter class. '
         'Explicit `init=` and `exit=` values override the selected mode. '
         'The directive does not emit bytecode or consume an address.'
@@ -401,7 +408,71 @@ PREPROCESSOR_DIRECTIVE_DOCS: dict[str, str] = {
         'omitted exit check simply closes the region. After a terminal has '
         'already reconciled the path, `#endtrack` is a lexical-only delimiter.'
     ),
+    'assert': (
+        '### `#assert` : Require a Compile-Time Condition\n\n'
+        '---\n\n'
+        'Stops assembly when a compile-time condition is false.\n\n'
+        '**Usage:**\n\n'
+        '```\n'
+        '#assert <expression>\n'
+        '#assert <expression> <comparison> <expression-or-string>\n'
+        '#assert <condition> "message"\n'
+        '#assert <condition> <color> "message"\n'
+        '```\n\n'
+        'The condition has the same semantics as `#if`: the one-expression '
+        'form implies `!= 0`, comparisons may be `==`, `!=`, `<`, `<=`, '
+        '`>`, or `>=`, and preprocessor macros and built-in version symbols '
+        'are resolved. Unlike `#if`, an assertion only validates; it never '
+        'selects which source is compiled. The optional colors are the same '
+        'as for `#print`.\n\n'
+        'Unlike `#require`, which declares language or tool version '
+        'compatibility, `#assert` states an arbitrary compile-time invariant.'
+    ),
+    'set': (
+        '### `#set` : Re-anchor a Flow Counter\n\n'
+        '---\n\n'
+        'Assigns a programmer-supplied value to an active scalar counter.\n\n'
+        '**Usage:**\n\n'
+        '```\n'
+        '#set <counter-name> = <expression>\n'
+        '```\n\n'
+        'Only the named instance changes; other active counters continue '
+        'independently.'
+    ),
+    'suspend': (
+        '### `#suspend` : Suspend Flow-Counter Tracking\n\n'
+        '---\n\n'
+        'Marks one scalar counter indeterminate across a straight-line span.\n\n'
+        '**Usage:**\n\n'
+        '```\n'
+        '#suspend <counter-name>\n'
+        '```\n\n'
+        'Instruction effects are ignored for that instance until it is '
+        'resumed. Its value and coordinates cannot be used while suspended.'
+    ),
+    'resume': (
+        '### `#resume` : Resume Flow-Counter Tracking\n\n'
+        '---\n\n'
+        'Restores a known value to a suspended scalar counter.\n\n'
+        '**Usage:**\n\n'
+        '```\n'
+        '#resume <counter-name> = <expression>\n'
+        '```\n\n'
+        'A coordinate from the same instance may be named directly to restore '
+        'its saved scalar anchor. Resumption is a programmer assertion, and '
+        'coordinates created before the suspended span are permanently '
+        'invalidated.'
+    ),
 }
+
+FLOW_ASSERT_DOC_SUFFIX = (
+    '\n\nIn a flow-enabled ISA, `COUNTER(name)` and `OFFSET(coordinate)` may '
+    'be used in either operand. An otherwise undefined bare left operand is '
+    'retained as shorthand for an active scalar counter, such as '
+    '`#assert stack == 0`. Prefer `COUNTER(stack)` when an explicit flow '
+    'reference is clearer. This does not extend `#if` or `#elif`; static '
+    'analysis never controls conditional compilation.'
+)
 
 # Expression functions used in numeric expressions
 EXPRESSION_FUNCTION_DOCS: dict[str, str] = {
@@ -425,8 +496,9 @@ EXPRESSION_FUNCTION_DOCS: dict[str, str] = {
         '```\n'
         'COUNTER(counter-name)\n'
         '```\n\n'
-        'This function is valid only in fixed-width instruction '
-        'operands and fixed-size data values. It is rejected in layout, '
+        'This function is valid in fixed-width instruction operands, '
+        'fixed-size data values, and flow directives such as `#assert`, '
+        '`#set`, and `#resume`. It is rejected in layout, conditional '
         'preprocessor, and instruction-selection expressions.'
     ),
     'COORDINATE': (

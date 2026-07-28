@@ -430,7 +430,16 @@ def test_m1_feature_enablement_and_inactive_condition_are_usage_gated(tmp_path):
 def test_m1_flow_keywords_are_reserved_only_for_enabled_isas(tmp_path):
     no_flow_config = _without_flow_metadata(_load_config())
     for value, mnemonic in enumerate(
-        ('track', 'endtrack', 'counter', 'offset', 'coordinate'),
+        (
+            'track',
+            'endtrack',
+            'set',
+            'suspend',
+            'resume',
+            'counter',
+            'offset',
+            'coordinate',
+        ),
         start=0x70,
     ):
         no_flow_config['instructions'][mnemonic] = {
@@ -443,6 +452,9 @@ def test_m1_flow_keywords_are_reserved_only_for_enabled_isas(tmp_path):
         'COUNTER = 9\n'
         'track\n'
         'endtrack\n'
+        'set\n'
+        'suspend\n'
+        'resume\n'
         'counter\n'
         'offset\n'
         'coordinate\n'
@@ -455,14 +467,15 @@ def test_m1_flow_keywords_are_reserved_only_for_enabled_isas(tmp_path):
         config_path=no_flow_path,
         output_name='no-flow-keywords.bin',
     )
-    assert bytecode == bytes([0x70, 0x71, 0x72, 0x73, 0x74, 0, 9])
+    assert bytecode == bytes([
+        0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0, 9,
+    ])
 
-    flow_config = _load_config()
-    flow_config['instructions']['counter'] = {
-        'flow_transfer': 'none',
+    no_flow_config = _without_flow_metadata(_load_config())
+    no_flow_config['instructions']['assert'] = {
         'bytecode': {'value': 0x72, 'size': 8},
     }
-    flow_path = _write_config(tmp_path, flow_config, 'flow-keywords.yaml')
+    flow_path = _write_config(tmp_path, no_flow_config, 'base-keywords.yaml')
     with pytest.raises(SystemExit, match='also a BespokeASM keyword'):
         _assembler(tmp_path, 'nop\n', config_path=flow_path)
 
@@ -519,7 +532,7 @@ def test_m1_disabled_analysis_ignores_annotations_but_rejects_dependency(tmp_pat
         ('.fill COUNTER(stack), 0', 'fill-count expressions'),
         ('.zero COUNTER(stack)', 'layout expressions'),
         ('.zerountil COUNTER(stack)', 'layout expressions'),
-        ('#if COUNTER(stack)', 'preprocessor directives'),
+        ('#if COUNTER(stack)', 'conditional-compilation directives'),
         ('VALUE = COUNTER(stack)', 'ordinary constant assignments'),
     ],
 )

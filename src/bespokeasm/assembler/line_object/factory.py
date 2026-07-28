@@ -39,6 +39,9 @@ class LineOjectFactory:
         r'\.fill\b',
         flags=re.IGNORECASE,
     )
+    _FLOW_DIRECTIVE_PATTERN = re.compile(
+        r'^#(?:assert|set|resume)\b',
+    )
 
     @classmethod
     def _flow_expression_error(
@@ -66,7 +69,6 @@ class LineOjectFactory:
         """Reject flow operators before they can affect layout or selection."""
         if cls._FLOW_EXPRESSION_PATTERN.search(instruction) is None:
             return
-        lowered = instruction.lower()
         if (
             cls._COORDINATE_EXPRESSION_PATTERN.search(instruction)
             and ':=' not in instruction
@@ -76,11 +78,20 @@ class LineOjectFactory:
                 model,
                 'anything except a := counter-coordinate declaration',
             )
-        if lowered.startswith('#'):
-            cls._flow_expression_error(line_id, model, 'preprocessor directives')
-        if cls._LAYOUT_DIRECTIVE_PATTERN.match(lowered):
+        if (
+            instruction.startswith('#')
+            and cls._FLOW_DIRECTIVE_PATTERN.match(instruction) is None
+        ):
+            if instruction.startswith(('#if ', '#elif ', '#ifdef ', '#ifndef ')):
+                context = 'conditional-compilation directives'
+            elif instruction.startswith('#require '):
+                context = 'version requirements'
+            else:
+                context = 'preprocessor directives'
+            cls._flow_expression_error(line_id, model, context)
+        if cls._LAYOUT_DIRECTIVE_PATTERN.match(instruction):
             cls._flow_expression_error(line_id, model, 'layout expressions')
-        if cls._FILL_DIRECTIVE_PATTERN.match(lowered):
+        if cls._FILL_DIRECTIVE_PATTERN.match(instruction):
             arguments = instruction.split(None, 1)
             count_expression = arguments[1].split(',', 1)[0] if len(arguments) > 1 else ''
             if cls._FLOW_EXPRESSION_PATTERN.search(count_expression):

@@ -35,6 +35,7 @@ class ExpressionUseContext(enum.Enum):
 
     OPERAND_VALUE = 'operand_value'
     DATA_VALUE = 'data_value'
+    FLOW_DIRECTIVE = 'flow_directive'
     LAYOUT = 'layout'
     PREPROCESSOR_CONDITION = 'preprocessor_condition'
     INSTRUCTION_SELECTION = 'instruction_selection'
@@ -285,6 +286,7 @@ def parse_expression(
     if flow_nodes and context not in {
         ExpressionUseContext.OPERAND_VALUE,
         ExpressionUseContext.DATA_VALUE,
+        ExpressionUseContext.FLOW_DIRECTIVE,
     }:
         raise SyntaxError(
             f'ERROR: {line_id} - flow expressions are not allowed in '

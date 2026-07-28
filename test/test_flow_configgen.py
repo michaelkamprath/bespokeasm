@@ -12,6 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FLOW_CONFIG = PROJECT_ROOT / 'dev' / 'flow-counters-m2' / 'flow-counters-m2.yaml'
 PLAIN_CONFIG = PROJECT_ROOT / 'test' / 'config_files' / 'eater-sap1-isa.yaml'
 FLOW_TOKENS = ('track', 'endtrack', 'COORDINATE', 'COUNTER', 'OFFSET', ':=')
+M4_FLOW_DIRECTIVES = {'resume', 'set', 'suspend'}
 FLOW_COORDINATE_SCOPE = 'variable.other.flow.coordinate'
 FLOW_COORDINATE_DEFINITION_SCOPE = 'variable.other.flow.coordinate.definition'
 FLOW_COORDINATE_USAGE_SCOPE = 'variable.other.flow.coordinate.usage'
@@ -116,13 +117,19 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
             'patterns'
         ]
         track = next(pattern for pattern in directive_patterns if '(track)' in pattern['match'])
-        endtrack = next(
+        usages = next(
             pattern
             for pattern in directive_patterns
-            if '(endtrack)' in pattern['match']
+            if 'endtrack|resume|set|suspend' in pattern['match']
+        )
+        instance_name = next(
+            pattern
+            for pattern in directive_patterns
+            if '(as)' in pattern['match']
         )
         assert track['captures']['3']['name'] == FLOW_COUNTER_SCOPE
-        assert endtrack['captures']['3']['name'] == (
+        assert instance_name['captures']['3']['name'] == FLOW_COUNTER_SCOPE
+        assert usages['captures']['3']['name'] == (
             f'{FLOW_COUNTER_SCOPE} {FLOW_COUNTER_USAGE_SCOPE}'
         )
         preprocessor = next(
@@ -152,13 +159,19 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
         )
         directive_patterns = syntax['contexts']['flow_counter_directives']
         track = next(pattern for pattern in directive_patterns if '(track)' in pattern['match'])
-        endtrack = next(
+        usages = next(
             pattern
             for pattern in directive_patterns
-            if '(endtrack)' in pattern['match']
+            if 'endtrack|resume|set|suspend' in pattern['match']
+        )
+        instance_name = next(
+            pattern
+            for pattern in directive_patterns
+            if '(as)' in pattern['match']
         )
         assert track['captures'][3] == FLOW_COUNTER_SCOPE
-        assert endtrack['captures'][3] == (
+        assert instance_name['captures'][3] == FLOW_COUNTER_SCOPE
+        assert usages['captures'][3] == (
             f'{FLOW_COUNTER_SCOPE} {FLOW_COUNTER_USAGE_SCOPE}'
         )
         assert (
@@ -171,13 +184,15 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
         )
     else:
         assert 'syn match flowm1testassemblyFlowCoordinateUsage' in generated
+        assert r'#\%(endtrack\|resume\|set\|suspend\)' in generated
+        assert r'\<as\s*=\s*\zs' in generated
         assert (
             'syn keyword flowm1testassemblyFlowOperator '
             'COORDINATE COUNTER OFFSET'
         ) in generated
 
     if generator_class is not VimConfigGenerator:
-        assert {'track', 'endtrack'} <= set(
+        assert {'track', 'endtrack', 'assert', *M4_FLOW_DIRECTIVES} <= set(
             hover_docs['directives']['preprocessor'],
         )
         assert {'COORDINATE', 'COUNTER', 'OFFSET'} <= set(
@@ -187,6 +202,8 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
     else:
         assert '#track' in generated
         assert '#endtrack' in generated
+        for directive in M4_FLOW_DIRECTIVES:
+            assert f'`#{directive}`' in generated
         assert '`COUNTER()`' in generated
         assert '`COORDINATE()`' in generated
         assert '`OFFSET()`' in generated
@@ -230,6 +247,10 @@ def test_flow_tokens_are_absent_from_non_enabled_isa(
     if generator_class is not VimConfigGenerator:
         assert 'track' not in hover_docs['directives']['preprocessor']
         assert 'endtrack' not in hover_docs['directives']['preprocessor']
+        assert 'assert' in hover_docs['directives']['preprocessor']
+        assert not M4_FLOW_DIRECTIVES & set(
+            hover_docs['directives']['preprocessor'],
+        )
         assert 'COUNTER' not in hover_docs['expression_functions']
         assert 'COORDINATE' not in hover_docs['expression_functions']
         assert 'OFFSET' not in hover_docs['expression_functions']

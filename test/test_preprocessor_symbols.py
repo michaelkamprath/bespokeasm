@@ -466,6 +466,21 @@ nop
         stack.process_condition(UnmutePreprocessorCondition('#unmute', LineIdentifier('test_muting', 8)), preprocessor)
         self.assertFalse(stack.is_muted, 'condition should be False')
 
+    def test_condition_line_rejects_unparsed_trailing_text(self):
+        stack = ConditionStack(self.diagnostic_reporter)
+        preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
+        memzone = MemoryZone(16, 0, 0xFFFF, 'GLOBAL')
+
+        with self.assertRaises(SystemExit):
+            ConditionLine(
+                LineIdentifier(1, 'test_incomplete_condition'),
+                '#if 1 == 1 @',
+                '',
+                memzone,
+                preprocessor,
+                stack,
+            )
+
     def test_emit_aliases_unmute(self):
         """Doc: Preprocessor > Bytecode Emission Control - #emit acts as an alias of #unmute."""
         preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
@@ -686,6 +701,16 @@ nop
                 preprocessor,
             )
 
+        with self.assertRaises(SystemExit):
+            RequiredLanguageLine(
+                line_id,
+                '#require "eater-sap1-isa >= 0.0.1" trailing-text',
+                '',
+                memzone_mngr.global_zone,
+                isa_model,
+                preprocessor,
+            )
+
     def test_require_directive_symbol_format(self):
         """Test the new symbol-based format for #require directive."""
         from bespokeasm.assembler.line_object.preprocessor_line.required_language import RequiredLanguageLine
@@ -758,6 +783,28 @@ nop
             RequiredLanguageLine(
                 line_id,
                 '#require SOME_OTHER_SYMBOL >= 1',
+                '',
+                memzone_mngr.global_zone,
+                isa_model,
+                preprocessor,
+            )
+
+        # #require is a compatibility declaration, not a general assertion.
+        preprocessor.create_symbol('MINIMUM', '0')
+        with self.assertRaises(SystemExit):
+            RequiredLanguageLine(
+                line_id,
+                '#require __LANGUAGE_VERSION_MAJOR__ >= MINIMUM',
+                '',
+                memzone_mngr.global_zone,
+                isa_model,
+                preprocessor,
+            )
+
+        with self.assertRaises(SystemExit):
+            RequiredLanguageLine(
+                line_id,
+                '#require __LANGUAGE_VERSION_MAJOR__ + 1 >= 1',
                 '',
                 memzone_mngr.global_zone,
                 isa_model,

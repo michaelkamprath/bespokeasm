@@ -61,7 +61,11 @@ contexts:
       captures:
         1: keyword.control.preprocessor
         3: variable.other.flow.counter
-    - match: (?i)\b(endtrack)(\s+)(##SYMBOL_PATTERN##)
+    - match: (?i)\b(as)(\s*=\s*)(##SYMBOL_PATTERN##)
+      captures:
+        1: keyword.other.flow.parameter
+        3: variable.other.flow.counter
+    - match: (?i)\b(endtrack|resume|set|suspend)(\s+)(##SYMBOL_PATTERN##)
       captures:
         1: keyword.control.preprocessor
         3: variable.other.flow.counter variable.other.flow.counter.usage

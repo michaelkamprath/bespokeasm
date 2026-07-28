@@ -1,3 +1,4 @@
+import operator
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -6,9 +7,14 @@ from dataclasses import field
 from bespokeasm.assembler.analysis import OperandSemanticKind
 from bespokeasm.assembler.line_object.counter_coordinate_line import CounterCoordinateLine
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
+from bespokeasm.assembler.line_object.preprocessor_line.assert_line import AssertLine
 from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowEndTrackLine
+from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowResumeLine
+from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowSetLine
+from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowSuspendLine
 from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowTrackLine
 from bespokeasm.assembler.symbol_scope.flow_symbols import CounterCoordinate
+from bespokeasm.assembler.symbol_scope.flow_symbols import FlowSymbolError
 from bespokeasm.expression import ExpressionNode
 from bespokeasm.expression import parse_expression
 from bespokeasm.expression import TokenType
@@ -26,6 +32,7 @@ class _LinearCounterState:
     opened_by: FlowTrackLine
     coordinates: list[CounterCoordinate] = field(default_factory=list)
     path_live: bool = True
+    suspended: bool = False
 
 
 class FlowLinearAnalyzer:
@@ -35,16 +42,27 @@ class FlowLinearAnalyzer:
         """Create an analyzer bound to one immutable ISA model and reporter."""
         self._model = model
         self._diagnostic_reporter = diagnostic_reporter
-        self._active: _LinearCounterState | None = None
+        self._active: dict[str, _LinearCounterState] = {}
         self._next_instance_id = 0
 
     @staticmethod
     def source_uses_flow(line_objects) -> bool:
         """Return whether compiled source contains any shipped flow construct."""
         return any(
-            isinstance(
+            (
+                isinstance(line_object, AssertLine)
+                and line_object.is_flow_dependent
+            )
+            or isinstance(
                 line_object,
-                FlowTrackLine | FlowEndTrackLine | CounterCoordinateLine,
+                (
+                    FlowEndTrackLine
+                    | FlowResumeLine
+                    | FlowSetLine
+                    | FlowSuspendLine
+                    | FlowTrackLine
+                    | CounterCoordinateLine
+                ),
             )
             or bool(line_object.flow_expression_nodes)
             for line_object in line_objects
@@ -60,35 +78,41 @@ class FlowLinearAnalyzer:
             category='flow',
         )
 
-    def _check_bounds(self, line_object) -> None:
-        """Report a bound violation for the active counter at this source line."""
-        minimum = self._active.config.get('min_value')
-        maximum = self._active.config.get('max_value')
-        if minimum is not None and self._active.value < minimum:
+    def _check_bounds(
+        self,
+        line_object,
+        state: _LinearCounterState,
+    ) -> None:
+        """Report a bound violation for one counter at this source line."""
+        minimum = state.config.get('min_value')
+        maximum = state.config.get('max_value')
+        if minimum is not None and state.value < minimum:
             self._error(
                 line_object,
-                f'flow counter "{self._active.name}" underflow: '
-                f'value {self._active.value} is below minimum {minimum}',
+                f'flow counter "{state.name}" underflow: '
+                f'value {state.value} is below minimum {minimum}',
             )
-        if maximum is not None and self._active.value > maximum:
+        if maximum is not None and state.value > maximum:
             self._error(
                 line_object,
-                f'flow counter "{self._active.name}" overflow: '
-                f'value {self._active.value} exceeds maximum {maximum}',
+                f'flow counter "{state.name}" overflow: '
+                f'value {state.value} exceeds maximum {maximum}',
             )
 
     def _open(self, line_object: FlowTrackLine) -> None:
         """Validate and initialize the scalar counter named by ``#track``."""
-        if self._active is not None:
+        counter_name = line_object.counter_name
+        prior_state = self._active.get(counter_name)
+        if prior_state is not None:
             suffix = (
                 f'the prior region is still lexically open after its terminal; '
-                f'add a lexical #endtrack {self._active.name} before opening another counter'
-                if not self._active.path_live
-                else f'insert #endtrack {self._active.name} before opening another counter'
+                f'add a lexical #endtrack {prior_state.name} before opening another counter'
+                if not prior_state.path_live
+                else f'insert #endtrack {prior_state.name} before opening another counter'
             )
             self._error(
                 line_object,
-                f'flow counter "{self._active.name}" is still active; {suffix}',
+                f'flow counter "{prior_state.name}" is still active; {suffix}',
             )
             return
         counter_config = self._model.flow_counters.get(line_object.counter_class)
@@ -102,7 +126,7 @@ class FlowLinearAnalyzer:
             self._error(
                 line_object,
                 f'flow counter class "{line_object.counter_class}" is not scalar; '
-                'interval analysis is not available in M3',
+                'interval analysis is not available in M4',
             )
             return
         if not self._model.flow_counter_has_effect_metadata(line_object.counter_class):
@@ -139,9 +163,9 @@ class FlowLinearAnalyzer:
             and counter_config.get('exit_policy', 'balanced') == 'balanced'
         ):
             expected_exit = initial
-        self._active = _LinearCounterState(
+        state = _LinearCounterState(
             counter_class=line_object.counter_class,
-            name=line_object.counter_class,
+            name=counter_name,
             instance_id=self._next_instance_id,
             value=initial,
             initial_value=initial,
@@ -149,43 +173,76 @@ class FlowLinearAnalyzer:
             config=counter_config,
             opened_by=line_object,
         )
+        self._active[counter_name] = state
         self._next_instance_id += 1
-        self._check_bounds(line_object)
+        self._check_bounds(line_object, state)
 
     def _close(self, line_object: FlowEndTrackLine) -> None:
         """Apply the exit contract and close the active tracking region."""
-        if self._active is None:
+        state = self._active.get(line_object.counter_name)
+        if state is None:
             self._error(
                 line_object,
                 f'#endtrack {line_object.counter_name} has no active counter',
             )
             return
-        if line_object.counter_name != self._active.name:
-            self._error(
-                line_object,
-                f'#endtrack names "{line_object.counter_name}", but active counter is '
-                f'"{self._active.name}"',
-            )
+        if state.suspended:
+            if line_object.evaluate_parameter('exit') is not None:
+                self._error(
+                    line_object,
+                    f'#endtrack {state.name} cannot check exit= while the '
+                    'counter is suspended',
+                )
+                return
+            del self._active[state.name]
             return
-        if not self._active.path_live:
-            self._active = None
+        if not state.path_live:
+            del self._active[state.name]
             return
         expected = line_object.evaluate_parameter('exit')
         if expected is None:
-            expected = self._active.expected_exit
-        self._check_exit(line_object, expected)
-        self._active = None
+            expected = state.expected_exit
+        self._check_exit(line_object, state, expected)
+        del self._active[state.name]
 
-    def _check_exit(self, line_object, expected: int | None = None) -> None:
-        """Check the active path against an exact exit contract when present."""
+    def _check_exit(
+        self,
+        line_object,
+        state: _LinearCounterState,
+        expected: int | None = None,
+    ) -> None:
+        """Check one active path against an exact exit contract when present."""
         if expected is None:
-            expected = self._active.expected_exit
-        if expected is not None and self._active.value != expected:
+            expected = state.expected_exit
+        if expected is not None and state.value != expected:
             self._error(
                 line_object,
-                f'flow counter "{self._active.name}" exit mismatch: '
-                f'expected {expected}, actual {self._active.value}',
+                f'flow counter "{state.name}" exit mismatch: '
+                f'expected {expected}, actual {state.value}',
             )
+
+    def _require_live_state(
+        self,
+        line_object,
+        counter_name: str,
+        operation: str,
+    ) -> _LinearCounterState | None:
+        """Return a named live state or report why an operation cannot use it."""
+        state = self._active.get(counter_name)
+        if state is None:
+            self._error(
+                line_object,
+                f'{operation} references inactive flow counter "{counter_name}"',
+            )
+            return None
+        if not state.path_live:
+            self._error(
+                line_object,
+                f'{operation} is unreachable after flow counter '
+                f'"{counter_name}" terminated',
+            )
+            return None
+        return state
 
     def _counter_name(self, line_object, node: ExpressionNode) -> str | None:
         """Extract and validate the simple counter-name argument to ``COUNTER``."""
@@ -238,26 +295,27 @@ class FlowLinearAnalyzer:
                 f'OFFSET({label}) requires a symbol declared with :=',
             )
             return
-        if self._active is None:
+        state = self._active.get(coordinate.counter_name)
+        if state is None:
             self._error(
                 line_object,
                 f'OFFSET({label}) references inactive flow counter "{coordinate.counter_name}"',
             )
             return
-        if not self._active.path_live:
+        if not state.path_live:
             self._error(
                 line_object,
                 f'OFFSET({label}) is unreachable after the flow counter path terminated',
             )
             return
-        if coordinate.counter_name != self._active.name:
+        if state.suspended:
             self._error(
                 line_object,
-                f'OFFSET({label}) belongs to counter "{coordinate.counter_name}", '
-                f'not active counter "{self._active.name}"',
+                f'OFFSET({label}) cannot be resolved while flow counter '
+                f'"{state.name}" is suspended',
             )
             return
-        if coordinate.counter_instance_id != self._active.instance_id:
+        if coordinate.counter_instance_id != state.instance_id:
             self._error(
                 line_object,
                 f'OFFSET({label}) belongs to an earlier tracking instance of '
@@ -271,7 +329,7 @@ class FlowLinearAnalyzer:
                 'was crossed and is no longer live',
             )
             return
-        node.resolve_flow_value(self._active.value - coordinate.value)
+        node.resolve_flow_value(state.value - coordinate.value)
 
     def _resolve_expressions(self, line_object, nodes: tuple[ExpressionNode, ...]) -> None:
         """Deposit the active pre-instruction value into deferred expressions."""
@@ -282,25 +340,21 @@ class FlowLinearAnalyzer:
             counter_name = self._counter_name(line_object, node)
             if counter_name is None:
                 continue
-            if self._active is None:
+            state = self._require_live_state(
+                line_object,
+                counter_name,
+                f'COUNTER({counter_name})',
+            )
+            if state is None:
+                continue
+            if state.suspended:
                 self._error(
                     line_object,
-                    f'COUNTER({counter_name}) references an inactive flow counter',
+                    f'COUNTER({counter_name}) cannot be resolved while flow counter '
+                    f'"{counter_name}" is suspended',
                 )
                 continue
-            if not self._active.path_live:
-                self._error(
-                    line_object,
-                    f'COUNTER({counter_name}) is unreachable after the flow counter path terminated',
-                )
-                continue
-            if counter_name != self._active.name:
-                self._error(
-                    line_object,
-                    f'COUNTER({counter_name}) does not name active counter "{self._active.name}"',
-                )
-                continue
-            node.resolve_flow_value(self._active.value)
+            node.resolve_flow_value(state.value)
 
     def _declare_coordinate(self, line_object: CounterCoordinateLine) -> None:
         """Validate, resolve, and register one immutable counter coordinate."""
@@ -314,24 +368,18 @@ class FlowLinearAnalyzer:
             )
             return
         counter_name = line_object.counter_name
-        if self._active is None:
-            self._error(
-                line_object,
-                f'COORDINATE({counter_name}, ...) references an inactive flow counter',
-            )
+        state = self._require_live_state(
+            line_object,
+            counter_name,
+            f'COORDINATE({counter_name}, ...)',
+        )
+        if state is None:
             return
-        if not self._active.path_live:
+        if state.suspended:
             self._error(
                 line_object,
-                f'COORDINATE({counter_name}, ...) is unreachable after the '
-                'flow counter path terminated',
-            )
-            return
-        if counter_name != self._active.name:
-            self._error(
-                line_object,
-                f'COORDINATE({counter_name}, ...) does not name active counter '
-                f'"{self._active.name}"',
+                f'COORDINATE({counter_name}, ...) cannot declare a coordinate '
+                'while the counter is suspended',
             )
             return
 
@@ -353,10 +401,10 @@ class FlowLinearAnalyzer:
         except ValueError as error:
             self._error(line_object, str(error))
             return
-        offset_policy = self._active.config.get('coordinate_offsets', 'both')
+        offset_policy = state.config.get('coordinate_offsets', 'both')
         if (
             declared_offset == 0
-            and not self._active.config.get('allow_zero_offset', True)
+            and not state.config.get('allow_zero_offset', True)
         ):
             self._error(
                 line_object,
@@ -380,9 +428,9 @@ class FlowLinearAnalyzer:
 
         coordinate = CounterCoordinate(
             label=line_object.label,
-            value=self._active.value - declared_offset,
+            value=state.value - declared_offset,
             counter_name=counter_name,
-            counter_instance_id=self._active.instance_id,
+            counter_instance_id=state.instance_id,
             declared_offset=declared_offset,
             line_id=line_object.line_id,
         )
@@ -396,7 +444,7 @@ class FlowLinearAnalyzer:
         except ValueError as error:
             self._error(line_object, str(error))
             return
-        self._active.coordinates.append(coordinate)
+        state.coordinates.append(coordinate)
 
     @classmethod
     def _expression_labels(cls, node: ExpressionNode) -> set[str]:
@@ -471,8 +519,14 @@ class FlowLinearAnalyzer:
             )
             return 0
 
-    def _resolve_delta(self, line_object, record, delta) -> int:
-        """Evaluate an integer or M3 ``ARG(n)`` flow-delta expression."""
+    def _resolve_delta(
+        self,
+        line_object,
+        record,
+        delta,
+        state: _LinearCounterState,
+    ) -> int:
+        """Evaluate an integer or ``ARG(n)`` flow-delta expression."""
         if isinstance(delta, bool):
             self._error(
                 line_object,
@@ -485,14 +539,14 @@ class FlowLinearAnalyzer:
             self._error(
                 line_object,
                 f'instruction "{record.source_mnemonic}" has a non-scalar effect for '
-                f'"{self._active.counter_class}"; edge-dependent effects are not available in M3',
+                f'"{state.counter_class}"; edge-dependent effects are not available in M4',
             )
             return 0
         if 'COUNT(' in delta:
             self._error(
                 line_object,
                 f'instruction "{record.source_mnemonic}" uses COUNT(); '
-                'structural operand effects are not available in M3',
+                'structural operand effects are not available in M4',
             )
             return 0
 
@@ -530,20 +584,25 @@ class FlowLinearAnalyzer:
             )
             return 0
 
-    def _instruction_delta(self, line_object, record) -> int | None:
-        """Fetch and resolve the active class's selected instruction effect."""
-        source = self._active.config.get(
+    def _instruction_delta(
+        self,
+        line_object,
+        record,
+        state: _LinearCounterState,
+    ) -> int | None:
+        """Fetch and resolve one active class's selected instruction effect."""
+        source = state.config.get(
             'source',
-            f'flow_effects.{self._active.counter_class}',
+            f'flow_effects.{state.counter_class}',
         )
         delta = self._path_value(record.semantics, source)
         if delta is not None:
-            return self._resolve_delta(line_object, record, delta)
+            return self._resolve_delta(line_object, record, delta, state)
 
-        unknown_policy = self._active.config.get('unknown_instructions', 'warn')
+        unknown_policy = state.config.get('unknown_instructions', 'warn')
         message = (
             f'instruction "{record.source_mnemonic}" has no effect metadata '
-            f'for flow counter class "{self._active.counter_class}"'
+            f'for flow counter class "{state.counter_class}"'
         )
         if unknown_policy == 'warn':
             self._diagnostic_reporter.warn(
@@ -555,21 +614,32 @@ class FlowLinearAnalyzer:
             self._error(line_object, message)
         return None
 
-    def _apply_delta(self, line_object, record) -> None:
+    def _apply_delta(
+        self,
+        line_object,
+        record,
+        state: _LinearCounterState,
+    ) -> None:
         """Apply one selected instruction effect and update coordinate liveness."""
-        delta = self._instruction_delta(line_object, record)
+        if state.suspended:
+            return
+        delta = self._instruction_delta(line_object, record, state)
         if delta is None:
             return
-        self._active.value += delta
-        for coordinate in self._active.coordinates:
+        state.value += delta
+        for coordinate in state.coordinates:
             if coordinate.is_valid:
-                coordinate.is_valid = self._coordinate_is_live(coordinate)
-        self._check_bounds(line_object)
+                coordinate.is_valid = self._coordinate_is_live(state, coordinate)
+        self._check_bounds(line_object, state)
 
     def _apply_instruction(self, line_object, record, expression_nodes) -> None:
         """Resolve operand uses, validate transfer metadata, and apply one delta."""
         self._resolve_expressions(line_object, expression_nodes)
-        if self._active is None or not self._active.path_live:
+        live_states = [
+            state for state in self._active.values()
+            if state.path_live
+        ]
+        if not live_states:
             return
 
         transfer = record.semantics.get('flow_transfer')
@@ -580,31 +650,62 @@ class FlowLinearAnalyzer:
             )
             return
         terminals = record.semantics.get('flow_terminal', {})
-        reconciliation_order = (
-            terminals.get(self._active.counter_class)
+        mapped_states = [
+            state for state in live_states
             if isinstance(terminals, Mapping)
-            else None
-        )
-        if reconciliation_order is not None:
+            and state.counter_class in terminals
+        ]
+        if mapped_states:
             if transfer != 'return':
+                terminal_classes = ', '.join(sorted({
+                    state.counter_class for state in mapped_states
+                }))
                 self._error(
                     line_object,
                     f'instruction "{record.source_mnemonic}" is a flow terminal for '
-                    f'"{self._active.counter_class}", but its flow_transfer "{transfer}" '
+                    f'"{terminal_classes}", but its flow_transfer "{transfer}" '
                     'is not an unconditional return',
                 )
                 return
-            if reconciliation_order == 'after_effect':
-                self._apply_delta(line_object, record)
-            self._check_exit(line_object)
-            self._active.path_live = False
+            for state in live_states:
+                reconciliation_order = (
+                    terminals.get(state.counter_class)
+                    if isinstance(terminals, Mapping)
+                    else None
+                )
+                if reconciliation_order is None:
+                    self._apply_delta(line_object, record, state)
+                    continue
+                if state.suspended:
+                    self._error(
+                        line_object,
+                        f'flow terminal "{record.source_mnemonic}" cannot reconcile '
+                        f'suspended flow counter "{state.name}"',
+                    )
+                    continue
+                if reconciliation_order == 'after_effect':
+                    self._apply_delta(line_object, record, state)
+                self._check_exit(line_object, state)
+                state.path_live = False
             return
 
         if transfer != 'none':
+            if len(live_states) == 1:
+                end_action = (
+                    f'end the region with #endtrack {live_states[0].name} '
+                    'before this transfer'
+                )
+            else:
+                end_directives = ', '.join(
+                    f'#endtrack {state.name}' for state in live_states
+                )
+                end_action = (
+                    f'end all active regions ({end_directives}) before this transfer'
+                )
             corrective_action = (
-                f'end the region with #endtrack {self._active.name} before this transfer'
+                end_action
                 if transfer in {'unconditional', 'call'}
-                else 'path analysis is not yet available in M3'
+                else 'path analysis is not yet available in M4'
             )
             self._error(
                 line_object,
@@ -612,26 +713,213 @@ class FlowLinearAnalyzer:
                 f'{corrective_action}',
             )
             return
-        self._apply_delta(line_object, record)
+        for state in live_states:
+            self._apply_delta(line_object, record, state)
 
-    def _coordinate_is_live(self, coordinate: CounterCoordinate) -> bool:
+    @staticmethod
+    def _coordinate_is_live(
+        state: _LinearCounterState,
+        coordinate: CounterCoordinate,
+    ) -> bool:
         """Return whether the current value has not crossed a named position."""
-        zero_is_live = self._active.config.get('allow_zero_offset', True)
-        offset_policy = self._active.config.get('coordinate_offsets', 'both')
+        zero_is_live = state.config.get('allow_zero_offset', True)
+        offset_policy = state.config.get('coordinate_offsets', 'both')
         uses_positive_side = coordinate.declared_offset > 0 or (
             coordinate.declared_offset == 0 and offset_policy != 'negative'
         )
         if uses_positive_side:
             return (
-                self._active.value >= coordinate.value
+                state.value >= coordinate.value
                 if zero_is_live
-                else self._active.value > coordinate.value
+                else state.value > coordinate.value
             )
         return (
-            self._active.value <= coordinate.value
+            state.value <= coordinate.value
             if zero_is_live
-            else self._active.value < coordinate.value
+            else state.value < coordinate.value
         )
+
+    def _evaluate_directive_expression(
+        self,
+        line_object,
+        expression: ExpressionNode,
+        *,
+        coordinate_state: _LinearCounterState | None = None,
+    ) -> int | None:
+        """Evaluate a directive expression after resolving its flow operands."""
+        if expression is None:
+            return None
+        self._resolve_expressions(
+            line_object,
+            expression.deferred_flow_nodes(),
+        )
+        if expression.token_type in {TokenType.T_LABEL, TokenType.T_LABEL_OR_NUM}:
+            coordinate = self._lookup_coordinate(
+                line_object,
+                str(expression.value),
+            )
+            if coordinate is not None:
+                if (
+                    coordinate_state is None
+                    or coordinate.counter_name != coordinate_state.name
+                    or coordinate.counter_instance_id != coordinate_state.instance_id
+                ):
+                    self._error(
+                        line_object,
+                        f'counter coordinate "{expression.value}" does not belong '
+                        f'to flow counter "{getattr(coordinate_state, "name", "")}"',
+                    )
+                    return None
+                return coordinate.value
+        try:
+            return expression.get_value(
+                line_object.symbol_scope,
+                line_object.active_named_scopes,
+                line_object.line_id,
+            )
+        except (
+            ArithmeticError,
+            FlowSymbolError,
+            RuntimeError,
+            SyntaxError,
+            SystemExit,
+            ValueError,
+        ) as error:
+            self._error(line_object, str(error))
+            return None
+
+    def _assert(self, line_object: AssertLine) -> None:
+        """Evaluate either a general assertion or a flow-dependent checkpoint."""
+        if not line_object.is_flow_dependent:
+            line_object.enforce_general()
+            return
+
+        comparison = {
+            '==': operator.eq,
+            '!=': operator.ne,
+            '<': operator.lt,
+            '<=': operator.le,
+            '>': operator.gt,
+            '>=': operator.ge,
+        }[line_object.comparison]
+
+        if line_object.counter_name is not None:
+            state = self._require_live_state(
+                line_object,
+                line_object.counter_name,
+                '#assert',
+            )
+            if state is None:
+                return
+            if state.suspended:
+                self._error(
+                    line_object,
+                    f'#assert cannot read suspended flow counter "{state.name}"',
+                )
+                return
+            lhs_value = state.value
+            rhs_value = self._evaluate_directive_expression(
+                line_object,
+                line_object.flow_rhs_expression,
+            )
+            if rhs_value is None:
+                return
+            if not comparison(lhs_value, rhs_value):
+                line_object.report_flow_failure(
+                    f'flow counter "{state.name}" assertion failed: '
+                    f'expected {line_object.comparison} {rhs_value}, '
+                    f'actual {lhs_value}',
+                )
+            return
+
+        lhs_value = self._evaluate_directive_expression(
+            line_object,
+            line_object.flow_lhs_expression,
+        )
+        rhs_value = self._evaluate_directive_expression(
+            line_object,
+            line_object.flow_rhs_expression,
+        )
+        if lhs_value is None or rhs_value is None:
+            return
+        if not comparison(lhs_value, rhs_value):
+            line_object.report_flow_failure(
+                f'flow assertion failed: {line_object.condition_text}; '
+                f'left side was {lhs_value}, right side was {rhs_value}',
+            )
+
+    def _set_counter(self, line_object: FlowSetLine) -> None:
+        """Re-anchor one live scalar counter to a programmer-supplied value."""
+        state = self._require_live_state(
+            line_object,
+            line_object.counter_name,
+            '#set',
+        )
+        if state is None:
+            return
+        if state.suspended:
+            self._error(
+                line_object,
+                f'flow counter "{state.name}" is suspended; use #resume to '
+                'restore a known value',
+            )
+            return
+        value = self._evaluate_directive_expression(
+            line_object,
+            line_object.value_expression,
+        )
+        if value is None:
+            return
+        state.value = value
+        for coordinate in state.coordinates:
+            if coordinate.is_valid:
+                coordinate.is_valid = self._coordinate_is_live(state, coordinate)
+        self._check_bounds(line_object, state)
+
+    def _suspend_counter(self, line_object: FlowSuspendLine) -> None:
+        """Put one live scalar counter into an explicit indeterminate state."""
+        state = self._require_live_state(
+            line_object,
+            line_object.counter_name,
+            '#suspend',
+        )
+        if state is None:
+            return
+        if state.suspended:
+            self._error(
+                line_object,
+                f'flow counter "{state.name}" is already suspended',
+            )
+            return
+        state.suspended = True
+
+    def _resume_counter(self, line_object: FlowResumeLine) -> None:
+        """Restore a suspended scalar counter and invalidate its old slots."""
+        state = self._require_live_state(
+            line_object,
+            line_object.counter_name,
+            '#resume',
+        )
+        if state is None:
+            return
+        if not state.suspended:
+            self._error(
+                line_object,
+                f'flow counter "{state.name}" is not suspended',
+            )
+            return
+        value = self._evaluate_directive_expression(
+            line_object,
+            line_object.value_expression,
+            coordinate_state=state,
+        )
+        if value is None:
+            return
+        state.value = value
+        state.suspended = False
+        for coordinate in state.coordinates:
+            coordinate.is_valid = False
+        self._check_bounds(line_object, state)
 
     def run(self, line_objects) -> None:
         """Analyze compiled line objects once in physical source order."""
@@ -644,6 +932,18 @@ class FlowLinearAnalyzer:
             if isinstance(line_object, FlowEndTrackLine):
                 self._close(line_object)
                 continue
+            if isinstance(line_object, AssertLine):
+                self._assert(line_object)
+                continue
+            if isinstance(line_object, FlowSetLine):
+                self._set_counter(line_object)
+                continue
+            if isinstance(line_object, FlowSuspendLine):
+                self._suspend_counter(line_object)
+                continue
+            if isinstance(line_object, FlowResumeLine):
+                self._resume_counter(line_object)
+                continue
             if isinstance(line_object, CounterCoordinateLine):
                 self._declare_coordinate(line_object)
                 continue
@@ -654,9 +954,10 @@ class FlowLinearAnalyzer:
             if line_object.flow_expression_nodes:
                 self._resolve_expressions(line_object, line_object.flow_expression_nodes)
 
-        if self._active is not None and self._active.path_live:
-            self._error(
-                last_line or self._active.opened_by,
-                f'flow counter "{self._active.name}" reaches EOF without '
-                'a flow terminal or #endtrack',
-            )
+        for state in self._active.values():
+            if state.path_live:
+                self._error(
+                    last_line or state.opened_by,
+                    f'flow counter "{state.name}" reaches EOF without '
+                    'a flow terminal or #endtrack',
+                )

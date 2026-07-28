@@ -4,6 +4,7 @@ import sys
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+import click
 from bespokeasm.assembler.line_identifier import LineIdentifier
 
 
@@ -43,9 +44,21 @@ class DiagnosticReporter:
             return f'{prefix}: {message}'
         return f'{prefix}: {line_id} - {message}'
 
-    def error(self, line_id: LineIdentifier | None, message: str, category: str = 'user') -> None:
+    def error(
+        self,
+        line_id: LineIdentifier | None,
+        message: str,
+        category: str = 'user',
+        color: str | None = None,
+    ) -> None:
+        """Record an error and terminate, optionally coloring its display text."""
         self._diagnostics.append(self.Diagnostic('error', line_id, message, category))
-        text = self._format('ERROR', line_id, message)
+        display_message = (
+            click.style(message, fg=color)
+            if color is not None
+            else message
+        )
+        text = self._format('ERROR', line_id, display_message)
         sys.exit(text)
 
     def warn(self, line_id: LineIdentifier | None, message: str, category: str = 'user') -> None:

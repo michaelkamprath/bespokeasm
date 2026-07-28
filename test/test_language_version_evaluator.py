@@ -166,8 +166,8 @@ class TestLanguageVersionEvaluator(unittest.TestCase):
             LanguageVersionEvaluator.evaluate_expression(
                 '__LANGUAGE_VERSION_MAJOR__ ~= 1', self.preprocessor, self.line_id)
 
-    def test_numeric_comparison_uses_numeric_semantics(self):
-        """Demonstrate that explicit comparisons are currently evaluated as strings."""
+    def test_numeric_and_full_version_comparisons_use_numeric_semantics(self):
+        """Version components and complete versions use numeric ordering."""
         config_yaml = textwrap.dedent(
             '''
             description: Numeric Comparison Test ISA
@@ -206,12 +206,25 @@ class TestLanguageVersionEvaluator(unittest.TestCase):
             preprocessor = Preprocessor(isa_model.predefined_symbols, isa_model, diagnostic_reporter=self.diagnostic_reporter)
             line_id = LineIdentifier(1, 'numeric_comparison_test')
 
-            # With numeric semantics, 10 < 2 should be False; current bug returns True.
             self.assertFalse(
                 LanguageVersionEvaluator.evaluate_expression(
                     '__LANGUAGE_VERSION_PATCH__ < 2', preprocessor, line_id
                 ),
                 msg='Version comparisons are being performed using string ordering instead of numeric ordering.'
+            )
+            self.assertTrue(
+                LanguageVersionEvaluator.evaluate_expression(
+                    '__LANGUAGE_VERSION__ > 1.0.2',
+                    preprocessor,
+                    line_id,
+                )
+            )
+            self.assertFalse(
+                LanguageVersionEvaluator.evaluate_expression(
+                    '__LANGUAGE_VERSION__ < 1.0.2',
+                    preprocessor,
+                    line_id,
+                )
             )
         finally:
             os.unlink(tmp_path)

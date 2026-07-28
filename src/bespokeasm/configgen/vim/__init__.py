@@ -427,8 +427,13 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
             fr'/^#track\s\+\zs{symbol_pattern}/'
         )
         lines.append(
+            fr'syn match {lang_group}FlowCounterName '
+            fr'/^#track.\{{-}}\<as\s*=\s*\zs{symbol_pattern}/'
+        )
+        lines.append(
             fr'syn match {lang_group}FlowCounterUsage '
-            fr'/^#endtrack\s\+\zs{symbol_pattern}/'
+            fr'/^#\%(endtrack\|resume\|set\|suspend\)'
+            fr'\s\+\zs{symbol_pattern}/'
         )
         lines.append(
             fr'syn match {lang_group}FlowAssignment '
