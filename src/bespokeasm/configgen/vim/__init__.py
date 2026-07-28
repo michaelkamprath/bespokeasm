@@ -432,7 +432,7 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         )
         lines.append(
             fr'syn match {lang_group}FlowCounterUsage '
-            fr'/^#\%(endtrack\|resume\|set\|suspend\)'
+            fr'/^#\%(endtrack\|entry\|resume\|set\|suspend\)'
             fr'\s\+\zs{symbol_pattern}/'
         )
         lines.append(

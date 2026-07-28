@@ -27,6 +27,8 @@ class LineObject:
         self._is_muted = False
         self._active_named_scopes = None
         self._diagnostic_reporter = None
+        self._flow_observations: list[tuple[str, str]] = []
+        self._flow_transitions: list[tuple[tuple[str, str, str], ...]] = []
 
     def __repr__(self):
         return str(self)
@@ -125,6 +127,53 @@ class LineObject:
     def flow_expression_nodes(self) -> tuple:
         """Flow-expression nodes emitted or consumed by this source object."""
         return ()
+
+    def record_flow_transition(
+        self,
+        before: dict[str, object],
+        after: dict[str, object],
+    ) -> None:
+        """Record changed flow values for one path through this source line."""
+        transition = tuple(
+            (
+                name,
+                str(before[name]) if name in before else 'entry',
+                str(after[name]) if name in after else 'exit',
+            )
+            for name in sorted(before.keys() | after.keys())
+            if (
+                name not in before
+                or name not in after
+                or before[name] != after[name]
+            )
+        )
+        if transition and transition not in self._flow_transitions:
+            self._flow_transitions.append(transition)
+
+    def record_flow_observation(self, name: str, value: object) -> None:
+        """Record a flow-derived value evaluated on this source line."""
+        observation = (name, str(value))
+        if observation not in self._flow_observations:
+            self._flow_observations.append(observation)
+
+    @property
+    def flow_annotation_lines(self) -> tuple[str, ...]:
+        """Return one printable row for each observed or changed flow value."""
+        observations = tuple(
+            f'{name}={value}'
+            for name, value in self._flow_observations
+        )
+        transitions = tuple(
+            f'{name}={before} → {after}'
+            for transition in self._flow_transitions
+            for name, before, after in transition
+        )
+        return observations + transitions
+
+    @property
+    def flow_annotation(self) -> str:
+        """Return a compact single-string representation of flow annotations."""
+        return ' | '.join(self.flow_annotation_lines)
 
 
 class LineWithWords(LineObject):

@@ -134,6 +134,7 @@ class InstructionAnalysisRecord:
     canonical_mnemonic: str
     semantics: Mapping[str, Any]
     operands: tuple[AnalysisOperand, ...]
+    word_count: int
 
     @property
     def parsed_operand_expressions(self) -> tuple[FrozenExpression | None, ...]:

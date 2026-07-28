@@ -28,6 +28,16 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         )
         self._word_size = model.word_size
         self._word_segment_size = model.word_segment_size
+        self._flow_width = max(
+            (
+                len(annotation)
+                for line_object in line_objs
+                for annotation in line_object.flow_annotation_lines
+            ),
+            default=0,
+        )
+        if self._flow_width:
+            self._flow_width = max(self._flow_width, len('flow'))
 
     def pretty_print(self) -> str:
         if len(self.line_objects) < 1:
@@ -67,6 +77,11 @@ class ListingPrettyPrinter(PrettyPrinterBase):
             '-'*(self._address_size + 2) + '+' +
             '-'*(self._bytes_per_line*(hex_width+1) + 1) + '+' +
             '-'*(self.max_instruction_width + 2) + '+' +
+            (
+                '-'*(self._flow_width + 2) + '+'
+                if self._flow_width
+                else ''
+            ) +
             '-'*(comment_header_width + 2) + '\n'
         )
 
@@ -102,6 +117,11 @@ class ListingPrettyPrinter(PrettyPrinterBase):
             address_header.center(self._address_size + 2) + '|' +
             bytes_header.center(self._bytes_per_line*(hex_width+1) + 1) + '|' +
             instruction_header.ljust(self.max_instruction_width + 2) + '|' +
+            (
+                f' {"flow":<{self._flow_width}} |'
+                if self._flow_width
+                else ''
+            ) +
             f' {COMMENT_HEADER}\n'
         )
 
@@ -110,6 +130,11 @@ class ListingPrettyPrinter(PrettyPrinterBase):
             '-'*(self._address_size + 2) + '+' +
             '-'*(self._bytes_per_line*(hex_width+1) + 1) + '+' +
             '-'*(self.max_instruction_width + 2) + '+' +
+            (
+                '-'*(self._flow_width + 2) + '+'
+                if self._flow_width
+                else ''
+            ) +
             '-'*(comment_header_width + 2) + '\n'
         )
 
@@ -165,17 +190,69 @@ class ListingPrettyPrinter(PrettyPrinterBase):
             instruction_str = lobj.instruction
         output.write(f'{instruction_str: <{self.max_instruction_width}} | ')
 
+        flow_annotations = lobj.flow_annotation_lines
+        if self._flow_width:
+            first_flow_annotation = (
+                flow_annotations[0]
+                if flow_annotations
+                else ''
+            )
+            output.write(
+                f'{first_flow_annotation: <{self._flow_width}} | '
+            )
+
         # write the comment
         output.write(lobj.comment)
         output.write('\n')
 
-        if line_bytes is not None and len(line_bytes) > 1:
-            for bytes in line_bytes[1:]:
-                output.write(
-                    ' '*(self.max_line_num_width+1) + ' | ' + ' '*self._address_size
-                    + ' | ' + bytes + '| '
-                    + ' '*self.max_instruction_width + ' | \n'
-                )
+        remaining_byte_rows = line_bytes[1:] if line_bytes is not None else ()
+        remaining_flow_rows = flow_annotations[1:]
+        continuation_count = max(
+            len(remaining_byte_rows),
+            len(remaining_flow_rows),
+        )
+        for index in range(continuation_count):
+            self._print_continuation_row(
+                output,
+                hex_width,
+                line_bytes=(
+                    remaining_byte_rows[index]
+                    if index < len(remaining_byte_rows)
+                    else ''
+                ),
+                flow_annotation=(
+                    remaining_flow_rows[index]
+                    if index < len(remaining_flow_rows)
+                    else ''
+                ),
+            )
+
+    def _print_continuation_row(
+        self,
+        output: io.StringIO,
+        hex_width: int,
+        *,
+        line_bytes: str = '',
+        flow_annotation: str = '',
+    ) -> None:
+        """Print an aligned row whose source-level fields are intentionally blank."""
+        byte_width = self._bytes_per_line * (hex_width + 1)
+        output.write(
+            ' ' * (self.max_line_num_width + 1)
+            + ' | '
+            + ' ' * self._address_size
+            + ' | '
+            + f'{line_bytes:<{byte_width}}'
+            + '| '
+            + ' ' * self.max_instruction_width
+            + ' | '
+            + (
+                f'{flow_annotation:<{self._flow_width}} | '
+                if self._flow_width
+                else ''
+            )
+            + '\n'
+        )
 
     @classmethod
     def _generate_bytecode_line_string(

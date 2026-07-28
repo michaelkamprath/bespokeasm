@@ -246,7 +246,7 @@ def test_m3_terminal_does_not_end_lexical_extent(tmp_path):
     )
 
 
-def test_m3_jumped_mode_must_close_before_unconditional_transfer(tmp_path):
+def test_m5_cfg_supersedes_m3_unconditional_transfer_limitation(tmp_path):
     source = (
         '#track stack mode=jumped\n'
         '#endtrack stack\n'
@@ -257,15 +257,14 @@ def test_m3_jumped_mode_must_close_before_unconditional_transfer(tmp_path):
     assert bytecode == bytes([0x70, 2, 0])
 
     SymbolScope._global_scope = None
-    _assert_flow_error(
+    _, bytecode = _assemble(
         tmp_path,
         '#track stack mode=jumped\n'
         'jmp target\n'
         'target: nop\n'
         '#endtrack stack\n',
-        'end the region with #endtrack stack before this transfer',
-        expected_line=2,
     )
+    assert bytecode == bytes([0x70, 2, 0])
 
 
 def test_m3_arg_delta_uses_immediate_constant_and_updates_offset(tmp_path):

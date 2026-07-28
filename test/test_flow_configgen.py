@@ -11,7 +11,14 @@ from ruamel.yaml import YAML
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FLOW_CONFIG = PROJECT_ROOT / 'dev' / 'flow-counters-m2' / 'flow-counters-m2.yaml'
 PLAIN_CONFIG = PROJECT_ROOT / 'test' / 'config_files' / 'eater-sap1-isa.yaml'
-FLOW_TOKENS = ('track', 'endtrack', 'COORDINATE', 'COUNTER', 'OFFSET', ':=')
+FLOW_TOKENS = (
+    'track',
+    'endtrack',
+    'COORDINATE',
+    'COUNTER',
+    'OFFSET',
+    ':=',
+)
 M4_FLOW_DIRECTIVES = {'resume', 'set', 'suspend'}
 FLOW_COORDINATE_SCOPE = 'variable.other.flow.coordinate'
 FLOW_COORDINATE_DEFINITION_SCOPE = 'variable.other.flow.coordinate.definition'
@@ -79,6 +86,7 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
     )
     for token in FLOW_TOKENS:
         assert token in generated
+    assert '#entry' in generated
 
     if generator_class is VimConfigGenerator:
         assert 'FlowCoordinateName' in generated
@@ -120,7 +128,7 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
         usages = next(
             pattern
             for pattern in directive_patterns
-            if 'endtrack|resume|set|suspend' in pattern['match']
+            if 'endtrack|entry|resume|set|suspend' in pattern['match']
         )
         instance_name = next(
             pattern
@@ -162,7 +170,7 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
         usages = next(
             pattern
             for pattern in directive_patterns
-            if 'endtrack|resume|set|suspend' in pattern['match']
+            if 'endtrack|entry|resume|set|suspend' in pattern['match']
         )
         instance_name = next(
             pattern
@@ -184,7 +192,7 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
         )
     else:
         assert 'syn match flowm1testassemblyFlowCoordinateUsage' in generated
-        assert r'#\%(endtrack\|resume\|set\|suspend\)' in generated
+        assert r'#\%(endtrack\|entry\|resume\|set\|suspend\)' in generated
         assert r'\<as\s*=\s*\zs' in generated
         assert (
             'syn keyword flowm1testassemblyFlowOperator '
@@ -192,7 +200,7 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
         ) in generated
 
     if generator_class is not VimConfigGenerator:
-        assert {'track', 'endtrack', 'assert', *M4_FLOW_DIRECTIVES} <= set(
+        assert {'track', 'endtrack', 'entry', 'assert', *M4_FLOW_DIRECTIVES} <= set(
             hover_docs['directives']['preprocessor'],
         )
         assert {'COORDINATE', 'COUNTER', 'OFFSET'} <= set(
@@ -208,6 +216,7 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
     else:
         assert '#track' in generated
         assert '#endtrack' in generated
+        assert '#entry' in generated
         for directive in M4_FLOW_DIRECTIVES:
             assert f'`#{directive}`' in generated
         assert '`COUNTER()`' in generated
@@ -231,6 +240,7 @@ def test_flow_tokens_are_absent_from_non_enabled_isa(
     )
     for token in FLOW_TOKENS[:-1]:
         assert token not in generated, f'flow token {token!r} leaked into non-flow extension'
+    assert '#entry' not in generated
     # ':=' cannot be asserted as a bare substring — ordinary regex syntax such
     # as the non-capturing group in `(?:=|\bEQU\b)` contains it. The only
     # legitimate carrier of the spelling is the hover-detection code, which
@@ -253,6 +263,7 @@ def test_flow_tokens_are_absent_from_non_enabled_isa(
     if generator_class is not VimConfigGenerator:
         assert 'track' not in hover_docs['directives']['preprocessor']
         assert 'endtrack' not in hover_docs['directives']['preprocessor']
+        assert 'entry' not in hover_docs['directives']['preprocessor']
         assert 'assert' in hover_docs['directives']['preprocessor']
         # the non-flow #assert hover must not carry the flow-form suffix
         assert (

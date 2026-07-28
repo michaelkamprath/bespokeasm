@@ -379,7 +379,7 @@ PREPROCESSOR_DIRECTIVE_DOCS: dict[str, str] = {
     'track': (
         '### `#track` : Begin Flow-Counter Tracking\n\n'
         '---\n\n'
-        'Begins a straight-line static-analysis region for a configured '
+        'Begins a control-flow-aware static-analysis region for a configured '
         'flow-counter class.\n\n'
         '**Usage:**\n\n'
         '```\n'
@@ -407,6 +407,21 @@ PREPROCESSOR_DIRECTIVE_DOCS: dict[str, str] = {
         'value to equal the initial value. With `exit_policy: none`, an '
         'omitted exit check simply closes the region. After a terminal has '
         'already reconciled the path, `#endtrack` is a lexical-only delimiter.'
+    ),
+    'entry': (
+        '### `#entry` : Declare an Alternate Flow Entry\n\n'
+        '---\n\n'
+        'Attaches an intentional control-flow entry to the next address '
+        'label inside an active tracking region.\n\n'
+        '**Usage:**\n\n'
+        '```\n'
+        '#entry <counter-name>\n'
+        '#entry <counter-name> value=<expression>\n'
+        '```\n\n'
+        'An unreachable label requires `value=`. A reachable label may omit '
+        'it and reuse its unique incoming value. Consecutive `#entry` '
+        'directives for different active counters attach to the same label. '
+        'The directive emits no bytecode.'
     ),
     'assert': (
         '### `#assert` : Require a Compile-Time Condition\n\n'
@@ -442,7 +457,8 @@ PREPROCESSOR_DIRECTIVE_DOCS: dict[str, str] = {
     'suspend': (
         '### `#suspend` : Suspend Flow-Counter Tracking\n\n'
         '---\n\n'
-        'Marks one scalar counter indeterminate across a straight-line span.\n\n'
+        'Marks one scalar counter indeterminate across a span, including '
+        'run-time-length loops.\n\n'
         '**Usage:**\n\n'
         '```\n'
         '#suspend <counter-name>\n'

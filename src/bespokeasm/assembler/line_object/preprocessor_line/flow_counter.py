@@ -449,6 +449,55 @@ class FlowEndTrackLine(FlowCounterDirectiveLine):
         return self._counter_name
 
 
+class FlowEntryLine(FlowCounterDirectiveLine):
+    """Analysis-only alternate-entry declaration attached to the next label."""
+
+    _PATTERN = re.compile(
+        r'^#entry\s+(\S+)(?:\s+(.*))?$',
+    )
+
+    def __init__(
+        self,
+        line_id: LineIdentifier,
+        instruction: str,
+        comment: str,
+        memzone: MemoryZone,
+        isa_model: AssemblerModel,
+        preprocessor: Preprocessor | None = None,
+    ) -> None:
+        super().__init__(
+            line_id,
+            instruction,
+            comment,
+            memzone,
+            isa_model,
+            preprocessor,
+        )
+        match = self._PATTERN.fullmatch(instruction.strip())
+        if match is None:
+            self._error(f'invalid #entry directive syntax: {instruction}')
+            self._counter_name = None
+            self._parameters = {}
+            return
+        self._counter_name = match.group(1)
+        self._validate_counter_name(self._counter_name, 'name')
+        self._parameters = self._parse_parameters(
+            match.group(2) or '',
+            {'value'},
+        )
+        self._validate_feature_enabled()
+
+    @property
+    def counter_name(self) -> str:
+        """Return the counter instance whose alternate entry is declared."""
+        return self._counter_name
+
+    @property
+    def value_expression(self) -> ExpressionNode | None:
+        """Return the optional explicit state for the attached entry root."""
+        return self._parameters.get('value')
+
+
 class FlowNamedCounterDirectiveLine(FlowCounterDirectiveLine):
     """Base for directives whose first operand names a counter instance."""
 

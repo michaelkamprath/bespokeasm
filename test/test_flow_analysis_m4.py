@@ -550,6 +550,7 @@ def test_m4_inactive_conditional_ignores_all_flow_directives(tmp_path):
         tmp_path,
         '#ifdef NEVER\n'
         '#track malformed as===\n'
+        '#entry malformed value===\n'
         '#assert not valid syntax\n'
         '#set cycles\n'
         '#suspend\n'

@@ -15,7 +15,7 @@ BASE_PREPROCESSOR_DIRECTIVES_SET = {
 }
 
 FLOW_PREPROCESSOR_DIRECTIVES_SET = {
-    'endtrack', 'resume', 'set', 'suspend', 'track',
+    'endtrack', 'entry', 'resume', 'set', 'suspend', 'track',
 }
 
 PREPROCESSOR_DIRECTIVES_SET = (

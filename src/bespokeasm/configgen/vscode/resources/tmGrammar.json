@@ -100,7 +100,7 @@
               "name": "variable.other.flow.counter variable.other.flow.counter.usage"
             }
           },
-          "match": "(?i)\\b(endtrack|resume|set|suspend)(\\s+)(##SYMBOL_PATTERN##)"
+          "match": "(?i)\\b(endtrack|entry|resume|set|suspend)(\\s+)(##SYMBOL_PATTERN##)"
         }
       ]
     },

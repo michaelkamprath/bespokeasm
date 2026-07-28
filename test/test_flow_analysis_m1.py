@@ -321,7 +321,7 @@ def test_m1_unknown_instruction_policy(tmp_path, policy, outcome):
     assert bool(flow_warnings) is (outcome == 'warning')
 
 
-def test_m1_missing_and_non_linear_transfer_metadata_fail_on_use(tmp_path):
+def test_missing_transfer_metadata_fails_and_m5_handles_direct_transfer(tmp_path):
     config = _load_config()
     config['instructions']['nop'].pop('flow_transfer')
     missing_path = _write_config(tmp_path, config, 'missing.yaml')
@@ -341,12 +341,12 @@ def test_m1_missing_and_non_linear_transfer_metadata_fail_on_use(tmp_path):
         'operand_sets': {'list': ['depth']},
     }
     transfer_path = _write_config(tmp_path, config, 'transfer.yaml')
-    _assert_flow_error(
+    _, bytecode = _assemble(
         tmp_path,
         '#track stack\nnop 0\n#endtrack stack\n',
-        'end the region with #endtrack stack before this transfer',
         config_path=transfer_path,
     )
+    assert bytecode == bytes([0, 0])
 
 
 def test_m1_inert_and_unused_counter_classes_are_usage_gated(tmp_path):
@@ -433,6 +433,7 @@ def test_m1_flow_keywords_are_reserved_only_for_enabled_isas(tmp_path):
         (
             'track',
             'endtrack',
+            'entry',
             'set',
             'suspend',
             'resume',
@@ -452,6 +453,7 @@ def test_m1_flow_keywords_are_reserved_only_for_enabled_isas(tmp_path):
         'COUNTER = 9\n'
         'track\n'
         'endtrack\n'
+        'entry\n'
         'set\n'
         'suspend\n'
         'resume\n'
@@ -468,7 +470,7 @@ def test_m1_flow_keywords_are_reserved_only_for_enabled_isas(tmp_path):
         output_name='no-flow-keywords.bin',
     )
     assert bytecode == bytes([
-        0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0, 9,
+        0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0, 9,
     ])
 
     no_flow_config = _without_flow_metadata(_load_config())

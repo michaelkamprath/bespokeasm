@@ -1,23 +1,33 @@
 import operator
 import re
+from collections import deque
 from collections.abc import Mapping
 from dataclasses import dataclass
 from dataclasses import field
+from dataclasses import replace
 
 from bespokeasm.assembler.analysis import OperandSemanticKind
+from bespokeasm.assembler.control_flow import ControlFlowGraph
+from bespokeasm.assembler.control_flow import ControlFlowNode
+from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object.counter_coordinate_line import CounterCoordinateLine
+from bespokeasm.assembler.line_object.directive_line.memzone import SetMemoryZoneLine
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
+from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.line_object.preprocessor_line.assert_line import AssertLine
 from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowEndTrackLine
+from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowEntryLine
 from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowResumeLine
 from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowSetLine
 from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowSuspendLine
 from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowTrackLine
+from bespokeasm.assembler.symbol_scope import SymbolScopeType
 from bespokeasm.assembler.symbol_scope.flow_symbols import CounterCoordinate
 from bespokeasm.assembler.symbol_scope.flow_symbols import FlowSymbolError
 from bespokeasm.expression import ExpressionNode
 from bespokeasm.expression import parse_expression
 from bespokeasm.expression import TokenType
+from bespokeasm.utilities import is_unprefixed_numeric_string
 
 
 @dataclass
@@ -31,8 +41,13 @@ class _LinearCounterState:
     config: dict
     opened_by: FlowTrackLine
     coordinates: list[CounterCoordinate] = field(default_factory=list)
+    invalid_coordinate_ids: set[int] = field(default_factory=set)
     path_live: bool = True
     suspended: bool = False
+    region_id: int | None = None
+    branch_provenance: dict[int, tuple[object, str]] = field(
+        default_factory=dict,
+    )
 
 
 class FlowLinearAnalyzer:
@@ -57,6 +72,7 @@ class FlowLinearAnalyzer:
                 line_object,
                 (
                     FlowEndTrackLine
+                    | FlowEntryLine
                     | FlowResumeLine
                     | FlowSetLine
                     | FlowSuspendLine
@@ -284,7 +300,7 @@ class FlowLinearAnalyzer:
         return line_object.symbol_scope.get_counter_coordinate(label)
 
     def _resolve_offset(self, line_object, node: ExpressionNode) -> None:
-        """Resolve ``OFFSET(coordinate)`` against the active pre-line state."""
+        """Resolve and annotate ``OFFSET(coordinate)`` at the pre-line state."""
         label = self._coordinate_name(line_object, node)
         if label is None:
             return
@@ -322,14 +338,16 @@ class FlowLinearAnalyzer:
                 f'counter "{coordinate.counter_name}"',
             )
             return
-        if not coordinate.is_valid:
+        if id(coordinate) in state.invalid_coordinate_ids:
             self._error(
                 line_object,
                 f'counter coordinate "{label}" is invalid because its saved position '
                 'was crossed and is no longer live',
             )
             return
-        node.resolve_flow_value(state.value - coordinate.value)
+        resolved_offset = state.value - coordinate.value
+        node.resolve_flow_value(resolved_offset)
+        line_object.record_flow_observation(label, resolved_offset)
 
     def _resolve_expressions(self, line_object, nodes: tuple[ExpressionNode, ...]) -> None:
         """Deposit the active pre-instruction value into deferred expressions."""
@@ -445,6 +463,10 @@ class FlowLinearAnalyzer:
             self._error(line_object, str(error))
             return
         state.coordinates.append(coordinate)
+        line_object.record_flow_observation(
+            line_object.label,
+            declared_offset,
+        )
 
     @classmethod
     def _expression_labels(cls, node: ExpressionNode) -> set[str]:
@@ -628,8 +650,12 @@ class FlowLinearAnalyzer:
             return
         state.value += delta
         for coordinate in state.coordinates:
-            if coordinate.is_valid:
-                coordinate.is_valid = self._coordinate_is_live(state, coordinate)
+            if (
+                id(coordinate) not in state.invalid_coordinate_ids
+                and not self._coordinate_is_live(state, coordinate)
+            ):
+                state.invalid_coordinate_ids.add(id(coordinate))
+                coordinate.is_valid = False
         self._check_bounds(line_object, state)
 
     def _apply_instruction(self, line_object, record, expression_nodes) -> None:
@@ -781,7 +807,7 @@ class FlowLinearAnalyzer:
                         f'to flow counter "{getattr(coordinate_state, "name", "")}"',
                     )
                     return None
-                if not coordinate.is_valid:
+                if id(coordinate) in coordinate_state.invalid_coordinate_ids:
                     # Re-anchoring to a coordinate the analysis already proved
                     # crossed is accepted on faith, but deserves a warning.
                     self._diagnostic_reporter.warn(
@@ -901,6 +927,7 @@ class FlowLinearAnalyzer:
         # to the counter, so no prior slot's survival is provable: #set
         # permanently invalidates every coordinate, exactly like #resume.
         for coordinate in state.coordinates:
+            state.invalid_coordinate_ids.add(id(coordinate))
             coordinate.is_valid = False
         self._check_bounds(line_object, state)
 
@@ -946,41 +973,78 @@ class FlowLinearAnalyzer:
         state.value = value
         state.suspended = False
         for coordinate in state.coordinates:
+            state.invalid_coordinate_ids.add(id(coordinate))
             coordinate.is_valid = False
         self._check_bounds(line_object, state)
+
+    def _flow_values(self) -> dict[str, object]:
+        """Return the live scalar values used by listing annotations."""
+        return {
+            state.name: '?' if state.suspended else state.value
+            for state in self._active.values()
+            if state.path_live
+        }
+
+    def _warn_external_label(self, line_object: LabelLine) -> None:
+        """Warn when a non-local label exposes a non-entry tracked state."""
+        label = line_object.get_label()
+        if label.startswith('.'):
+            return
+        for state in self._active.values():
+            if not state.path_live:
+                self._diagnostic_reporter.warn(
+                    line_object.line_id,
+                    f'label "{label}" is an unreachable potential entry '
+                    f'inside flow counter region "{state.name}"; add '
+                    f'#entry {state.name} value=<expression> or a lexical '
+                    f'#endtrack {state.name}',
+                    category='flow',
+                )
+            elif (
+                state.suspended
+                or state.value != state.initial_value
+            ):
+                self._diagnostic_reporter.warn(
+                    line_object.line_id,
+                    f'label "{label}" is a potential external entry where '
+                    f'flow counter "{state.name}" has value '
+                    f'{"suspended" if state.suspended else state.value}, not '
+                    f'entry value {state.initial_value}; add '
+                    f'#entry {state.name}',
+                    category='flow',
+                )
 
     def run(self, line_objects) -> None:
         """Analyze compiled line objects once in physical source order."""
         last_line = None
         for line_object in line_objects:
             last_line = line_object
+            before = self._flow_values()
             if isinstance(line_object, FlowTrackLine):
                 self._open(line_object)
-                continue
-            if isinstance(line_object, FlowEndTrackLine):
+            elif isinstance(line_object, FlowEndTrackLine):
                 self._close(line_object)
-                continue
-            if isinstance(line_object, AssertLine):
+            elif isinstance(line_object, AssertLine):
                 self._assert(line_object)
-                continue
-            if isinstance(line_object, FlowSetLine):
+            elif isinstance(line_object, FlowSetLine):
                 self._set_counter(line_object)
-                continue
-            if isinstance(line_object, FlowSuspendLine):
+            elif isinstance(line_object, FlowSuspendLine):
                 self._suspend_counter(line_object)
-                continue
-            if isinstance(line_object, FlowResumeLine):
+            elif isinstance(line_object, FlowResumeLine):
                 self._resume_counter(line_object)
-                continue
-            if isinstance(line_object, CounterCoordinateLine):
+            elif isinstance(line_object, CounterCoordinateLine):
                 self._declare_coordinate(line_object)
-                continue
-            if isinstance(line_object, InstructionLine):
+            elif (
+                isinstance(line_object, LabelLine)
+                and not line_object.is_constant
+            ):
+                self._warn_external_label(line_object)
+            elif isinstance(line_object, InstructionLine):
                 for record, expression_nodes in line_object.analysis_units:
                     self._apply_instruction(line_object, record, expression_nodes)
-                continue
-            if line_object.flow_expression_nodes:
+            elif line_object.flow_expression_nodes:
                 self._resolve_expressions(line_object, line_object.flow_expression_nodes)
+            line_object.record_flow_transition(before, self._flow_values())
 
         for state in self._active.values():
             if state.path_live:
@@ -989,3 +1053,1253 @@ class FlowLinearAnalyzer:
                     f'flow counter "{state.name}" reaches EOF without '
                     'a flow terminal or #endtrack',
                 )
+
+
+@dataclass(frozen=True)
+class _UnresolvedCall:
+    callee: str
+    counter_class: str
+
+    def __str__(self) -> str:
+        return f'?call({self.callee})'
+
+
+@dataclass
+class _GraphInput:
+    states: dict[str, _LinearCounterState]
+    sources: dict[str, object]
+
+
+@dataclass
+class _LexicalRegion:
+    region_id: int
+    name: str
+    counter_class: str
+    track_index: int
+    end_index: int | None
+    track_line: FlowTrackLine
+
+
+class FlowGraphAnalyzer(FlowLinearAnalyzer):
+    """Address-based M5 CFG analyzer for scalar ``require-equal`` counters."""
+
+    def __init__(self, model, diagnostic_reporter) -> None:
+        super().__init__(model, diagnostic_reporter)
+        self._graph = None
+        self._line_objects = ()
+        self._inputs: dict[int, _GraphInput] = {}
+        self._queue = deque()
+        self._memberships: list[dict[str, _LexicalRegion]] = []
+        self._regions: dict[int, _LexicalRegion] = {}
+        self._region_by_track_index: dict[int, _LexicalRegion] = {}
+        self._templates: dict[int, _LinearCounterState] = {}
+        self._entries_by_label: dict[int, tuple[FlowEntryLine, ...]] = {}
+        self._entry_lines: set[int] = set()
+        self._coordinates_by_line: dict[int, CounterCoordinate] = {}
+        self._coordinate_line_index: dict[int, int] = {}
+        self._reported_expression_errors: set[tuple[int, str]] = set()
+
+    def _expression_error_once(
+        self,
+        line_object,
+        expression: ExpressionNode,
+        message: str,
+    ) -> None:
+        """Report one expression failure once across worklist revisits."""
+        diagnostic_key = (id(expression), message)
+        if diagnostic_key in self._reported_expression_errors:
+            return
+        self._reported_expression_errors.add(diagnostic_key)
+        self._error(line_object, message)
+
+    @staticmethod
+    def _clone_state(state: _LinearCounterState) -> _LinearCounterState:
+        return replace(
+            state,
+            coordinates=list(state.coordinates),
+            invalid_coordinate_ids=set(state.invalid_coordinate_ids),
+            branch_provenance=dict(state.branch_provenance),
+        )
+
+    @classmethod
+    def _clone_states(
+        cls,
+        states: dict[str, _LinearCounterState],
+    ) -> dict[str, _LinearCounterState]:
+        return {
+            name: cls._clone_state(state)
+            for name, state in states.items()
+        }
+
+    def _prepare_regions(self) -> None:
+        """Index lexical counter membership at every compiled source line."""
+        active: dict[str, _LexicalRegion] = {}
+        for line_index, line_object in enumerate(self._line_objects):
+            if isinstance(line_object, FlowTrackLine):
+                if line_object.counter_name in active:
+                    prior = active[line_object.counter_name]
+                    terminal_seen = any(
+                        isinstance(candidate, InstructionLine)
+                        and any(
+                            record.semantics.get('flow_transfer') == 'return'
+                            for record, _ in candidate.analysis_units
+                        )
+                        for candidate in self._line_objects[
+                            prior.track_index + 1:line_index
+                        ]
+                    )
+                    guidance = (
+                        'the prior region is still lexically open after its '
+                        f'terminal; add a lexical #endtrack {prior.name} '
+                        'before opening another counter'
+                        if terminal_seen
+                        else f'insert #endtrack {prior.name} before opening '
+                        'another counter'
+                    )
+                    self._error(
+                        line_object,
+                        f'flow counter "{line_object.counter_name}" is still '
+                        f'active; {guidance}',
+                    )
+                    self._memberships.append(dict(active))
+                    continue
+                region = _LexicalRegion(
+                    region_id=len(self._regions),
+                    name=line_object.counter_name,
+                    counter_class=line_object.counter_class,
+                    track_index=line_index,
+                    end_index=None,
+                    track_line=line_object,
+                )
+                self._regions[region.region_id] = region
+                self._region_by_track_index[line_index] = region
+                active[region.name] = region
+                self._memberships.append(dict(active))
+                continue
+
+            self._memberships.append(dict(active))
+            if isinstance(line_object, FlowEndTrackLine):
+                region = active.get(line_object.counter_name)
+                if region is None:
+                    self._error(
+                        line_object,
+                        f'#endtrack {line_object.counter_name} has no active counter',
+                    )
+                    continue
+                region.end_index = line_index
+                del active[line_object.counter_name]
+            elif isinstance(line_object, SetMemoryZoneLine):
+                for region in active.values():
+                    region.end_index = line_index
+                active.clear()
+
+        final_index = max(len(self._line_objects) - 1, 0)
+        for region in active.values():
+            region.end_index = final_index
+
+    def _validate_coordinate_scopes(self) -> None:
+        """Reject coordinate names that cannot exist in their lexical scope.
+
+        This validation is independent of reachability. In particular, a
+        relocation resets the ordinary local-label scope before it also
+        auto-closes flow regions, so the established symbol-scope diagnostic
+        must not be hidden by a later control-flow boundary diagnostic.
+        """
+        reset_by_layout_boundary = False
+        for line_object in self._line_objects:
+            if isinstance(line_object, SetMemoryZoneLine):
+                reset_by_layout_boundary = True
+                continue
+            if (
+                isinstance(line_object, LabelLine)
+                and not line_object.is_constant
+                and not line_object.get_label().startswith('.')
+            ):
+                reset_by_layout_boundary = False
+                continue
+            if not isinstance(line_object, CounterCoordinateLine):
+                continue
+            requested_scope = SymbolScopeType.get_symbol_scope(
+                line_object.label,
+            )
+            if (
+                not reset_by_layout_boundary
+                or requested_scope.value <= line_object.symbol_scope.type.value
+            ):
+                continue
+            self._error(
+                line_object,
+                f"coordinate '{line_object.label}' is too low of scope for "
+                'available scopes at this line',
+            )
+
+    def _prepare_entries(self) -> None:
+        """Validate grouped ``#entry`` declarations and attach their labels."""
+        index = 0
+        while index < len(self._line_objects):
+            if not isinstance(self._line_objects[index], FlowEntryLine):
+                index += 1
+                continue
+            group_start = index
+            entries = []
+            while index < len(self._line_objects):
+                candidate = self._line_objects[index]
+                if isinstance(candidate, FlowEntryLine):
+                    entries.append(candidate)
+                    self._entry_lines.add(index)
+                    index += 1
+                    continue
+                if type(candidate) is LineObject:
+                    index += 1
+                    continue
+                break
+            if (
+                index >= len(self._line_objects)
+                or not isinstance(self._line_objects[index], LabelLine)
+                or self._line_objects[index].is_constant
+            ):
+                self._error(
+                    self._line_objects[group_start],
+                    '#entry must be followed by the next compilable address label',
+                )
+                return
+            seen = set()
+            for entry in entries:
+                if entry.counter_name in seen:
+                    self._error(
+                        entry,
+                        f'duplicate #entry declaration for flow counter '
+                        f'"{entry.counter_name}"',
+                    )
+                    return
+                seen.add(entry.counter_name)
+                region = self._memberships[index].get(entry.counter_name)
+                if region is None:
+                    self._error(
+                        entry,
+                        f'#entry references inactive flow counter '
+                        f'"{entry.counter_name}"',
+                    )
+                    return
+            self._entries_by_label[index] = tuple(entries)
+
+    def _node_for_line(self, line_index: int) -> ControlFlowNode:
+        """Return the structural node anchored to one significant source line."""
+        node = next(
+            (
+                node
+                for node in self._graph.nodes
+                if node.line_index == line_index
+            ),
+            None,
+        )
+        if node is None:
+            raise RuntimeError(
+                f'no control-flow node exists for source line index {line_index}'
+            )
+        return node
+
+    @staticmethod
+    def _graph_flow_values(
+        states: dict[str, _LinearCounterState],
+    ) -> dict[str, object]:
+        """Return display values for one graph input or output state."""
+        return {
+            name: (
+                '?'
+                if state.suspended
+                else state.value
+            )
+            for name, state in states.items()
+        }
+
+    def _state_description(self, state: _LinearCounterState) -> str:
+        """Render a scalar or suspended state for a path diagnostic."""
+        if state.suspended:
+            return 'suspended'
+        return str(state.value)
+
+    def _merge_state(
+        self,
+        node: ControlFlowNode,
+        existing: _LinearCounterState,
+        incoming: _LinearCounterState,
+        existing_source,
+        incoming_source,
+    ) -> tuple[_LinearCounterState, bool]:
+        """Require equal scalar inputs and conservatively merge slot liveness."""
+        if (
+            existing.suspended != incoming.suspended
+            or (
+                not existing.suspended
+                and existing.value != incoming.value
+            )
+        ):
+            self._error(
+                node.line_object,
+                f'flow counter "{existing.name}" join mismatch: '
+                f'{self._state_description(existing)} from '
+                f'{existing_source.line_id} versus '
+                f'{self._state_description(incoming)} from '
+                f'{incoming_source.line_id}',
+            )
+
+        merged = self._clone_state(existing)
+        existing_coordinates = {
+            id(coordinate): coordinate
+            for coordinate in existing.coordinates
+        }
+        incoming_coordinates = {
+            id(coordinate): coordinate
+            for coordinate in incoming.coordinates
+        }
+        merged.coordinates = list({
+            **existing_coordinates,
+            **incoming_coordinates,
+        }.values())
+        merged_invalid = (
+            existing.invalid_coordinate_ids
+            | incoming.invalid_coordinate_ids
+            | (existing_coordinates.keys() ^ incoming_coordinates.keys())
+        )
+        merged_provenance = {
+            branch_id: provenance
+            for branch_id, provenance in existing.branch_provenance.items()
+            if incoming.branch_provenance.get(branch_id) == provenance
+        }
+        changed = (
+            merged_invalid != existing.invalid_coordinate_ids
+            or merged_provenance != existing.branch_provenance
+        )
+        merged.invalid_coordinate_ids = set(merged_invalid)
+        merged.branch_provenance = merged_provenance
+        return merged, changed
+
+    def _validate_boundary(
+        self,
+        source: ControlFlowNode | None,
+        target: ControlFlowNode,
+        states: dict[str, _LinearCounterState],
+    ) -> bool:
+        """Reject an edge that enters or leaves a lexical tracking region."""
+        target_regions = self._memberships[target.line_index]
+        for state in states.values():
+            region = target_regions.get(state.name)
+            if (
+                region is not None
+                and target.line_index == region.track_index
+                and state.region_id == region.region_id
+            ):
+                self._error(
+                    source.line_object if source is not None else target.line_object,
+                    f'control flow reaches #track {region.counter_class} while '
+                    f'flow counter "{state.name}" is already active; end the '
+                    f'region with #endtrack {state.name} before this transfer',
+                )
+                return False
+            if region is None or region.region_id != state.region_id:
+                transfer = (
+                    source.record.semantics.get('flow_transfer')
+                    if source is not None and source.record is not None
+                    else None
+                )
+                guidance = (
+                    f'; end the region with #endtrack {state.name} before '
+                    'this transfer'
+                    if transfer in {'unconditional', 'call'}
+                    else ''
+                )
+                self._error(
+                    source.line_object if source is not None else target.line_object,
+                    f'control flow leaves flow counter region "{state.name}" '
+                    f'before its terminal or #endtrack{guidance}',
+                )
+                return False
+        for name, region in target_regions.items():
+            if name in states:
+                continue
+            if target.line_index == region.track_index:
+                continue
+            self._error(
+                source.line_object if source is not None else target.line_object,
+                f'control flow enters flow counter region "{name}" after '
+                f'#track {region.counter_class}',
+            )
+            return False
+        return True
+
+    def _enqueue(
+        self,
+        node: ControlFlowNode,
+        states: dict[str, _LinearCounterState],
+        sources: dict[str, object],
+        *,
+        source_node: ControlFlowNode | None = None,
+    ) -> None:
+        """Merge an incoming state at a node and schedule changed work."""
+        if node is None:
+            return
+        if not self._validate_boundary(source_node, node, states):
+            return
+        incoming_states = self._clone_states(states)
+        existing = self._inputs.get(node.node_id)
+        if existing is None:
+            self._inputs[node.node_id] = _GraphInput(
+                incoming_states,
+                dict(sources),
+            )
+            self._queue.append(node.node_id)
+            return
+        if existing.states.keys() != incoming_states.keys():
+            self._error(
+                node.line_object,
+                'control-flow paths cross a flow-counter region boundary',
+            )
+            return
+        changed = False
+        merged_states = {}
+        for name, current in existing.states.items():
+            merged, state_changed = self._merge_state(
+                node,
+                current,
+                incoming_states[name],
+                existing.sources[name],
+                sources[name],
+            )
+            merged_states[name] = merged
+            changed = changed or state_changed
+        if changed:
+            existing.states = merged_states
+            self._queue.append(node.node_id)
+
+    def _resolve_expressions(
+        self,
+        line_object,
+        nodes: tuple[ExpressionNode, ...],
+    ) -> None:
+        """Resolve deferred flow operands against one graph input state."""
+        for node in nodes:
+            if node.token_type == TokenType.T_OFFSET:
+                label = self._coordinate_name(line_object, node)
+                if label is None:
+                    continue
+                coordinate = self._lookup_coordinate(line_object, label)
+                if coordinate is None:
+                    self._expression_error_once(
+                        line_object,
+                        node,
+                        f'OFFSET({label}) requires a symbol declared with :=',
+                    )
+                    continue
+                state = self._active.get(coordinate.counter_name)
+                if (
+                    state is not None
+                    and not isinstance(state.value, int)
+                ):
+                    self._error(
+                        line_object,
+                        f'OFFSET({label}) cannot be resolved after call to '
+                        f'"{state.value.callee}" because no caller-visible '
+                        f'summary is declared for "{state.counter_class}"',
+                    )
+                    continue
+                self._resolve_offset(line_object, node)
+                continue
+            counter_name = self._counter_name(line_object, node)
+            if counter_name is None:
+                continue
+            state = self._require_live_state(
+                line_object,
+                counter_name,
+                f'COUNTER({counter_name})',
+            )
+            if state is None:
+                continue
+            if state.suspended:
+                self._error(
+                    line_object,
+                    f'COUNTER({counter_name}) cannot be resolved while flow '
+                    f'counter "{counter_name}" is suspended',
+                )
+                continue
+            if not isinstance(state.value, int):
+                self._error(
+                    line_object,
+                    f'COUNTER({counter_name}) cannot be resolved after call to '
+                    f'"{state.value.callee}" because no caller-visible summary '
+                    f'is declared for "{state.counter_class}"',
+                )
+                continue
+            node.resolve_flow_value(state.value)
+
+    def _assert(self, line_object: AssertLine) -> None:
+        """Reject bare-counter assertions whose call effect is unresolved."""
+        if line_object.counter_name is not None:
+            state = self._active.get(line_object.counter_name)
+            if state is not None and not isinstance(state.value, int):
+                self._error(
+                    line_object,
+                    f'#assert cannot resolve flow counter "{state.name}" after '
+                    f'call to "{state.value.callee}" because no caller-visible '
+                    f'summary is declared for "{state.counter_class}"',
+                )
+                return
+        super()._assert(line_object)
+
+    def _check_exit(
+        self,
+        line_object,
+        state: _LinearCounterState,
+        expected: int | None = None,
+    ) -> None:
+        """Reject an exit check whose caller-visible value is unresolved."""
+        if not isinstance(state.value, int):
+            self._error(
+                line_object,
+                f'flow counter "{state.name}" has an unresolved caller-visible '
+                f'effect after call to "{state.value.callee}"',
+            )
+            return
+        if expected is None:
+            expected = state.expected_exit
+        if expected is None or state.value == expected:
+            return
+        provenance = (
+            state.branch_provenance[max(state.branch_provenance)]
+            if state.branch_provenance
+            else None
+        )
+        branch_suffix = (
+            f'; path distinguished by branch at {provenance[0]} '
+            f'({provenance[1]})'
+            if provenance is not None
+            else ''
+        )
+        self._error(
+            line_object,
+            f'flow counter "{state.name}" exit mismatch: '
+            f'expected {expected}, actual {state.value}{branch_suffix}',
+        )
+
+    def _declare_coordinate(self, line_object: CounterCoordinateLine) -> None:
+        """Declare a coordinate once and attach it to every reaching path."""
+        line_index = self._line_objects.index(line_object)
+        existing = self._coordinates_by_line.get(line_index)
+        if existing is not None:
+            state = self._active.get(existing.counter_name)
+            if state is not None and all(
+                coordinate is not existing
+                for coordinate in state.coordinates
+            ):
+                state.coordinates.append(existing)
+            return
+        super()._declare_coordinate(line_object)
+        coordinate = self._lookup_coordinate(line_object, line_object.label)
+        if coordinate is not None:
+            self._coordinates_by_line[line_index] = coordinate
+            self._coordinate_line_index[id(coordinate)] = line_index
+
+    def _apply_graph_delta(
+        self,
+        node: ControlFlowNode,
+        state: _LinearCounterState,
+        delta=None,
+    ) -> None:
+        """Apply one instruction or call-summary delta to a graph path."""
+        if state.suspended:
+            return
+        resolved = (
+            self._instruction_delta(node.line_object, node.record, state)
+            if delta is None
+            else self._resolve_delta(node.line_object, node.record, delta, state)
+        )
+        if resolved is None or not isinstance(state.value, int):
+            return
+        state.value += resolved
+        for coordinate in state.coordinates:
+            if (
+                id(coordinate) not in state.invalid_coordinate_ids
+                and not self._coordinate_is_live(state, coordinate)
+            ):
+                state.invalid_coordinate_ids.add(id(coordinate))
+                coordinate.is_valid = False
+        self._check_bounds(node.line_object, state)
+
+    def _target_resolution(
+        self,
+        node: ControlFlowNode,
+        target_address: int,
+    ):
+        """Resolve a known direct-target value without reporting diagnostics."""
+        target_index = node.record.semantics['flow_target_operand']
+        operand = node.record.operands[target_index]
+        expression = operand.expression
+        if (
+            expression is not None
+            and expression.token_type in {
+                TokenType.T_LABEL,
+                TokenType.T_LABEL_OR_NUM,
+            }
+            and expression.left is None
+            and expression.right is None
+        ):
+            resolution = self._graph.label_named(
+                str(expression.value),
+                target_address,
+            )
+            if (
+                resolution.node is None
+                and expression.token_type == TokenType.T_LABEL_OR_NUM
+                and is_unprefixed_numeric_string(
+                    str(expression.value),
+                    self._model.default_numeric_base,
+                )
+            ):
+                # LABEL_OR_NUM evaluation gives an existing label precedence
+                # over its numeric fallback; target identity must do likewise.
+                resolution = self._graph.direct_target_at(target_address)
+        else:
+            resolution = self._graph.direct_target_at(target_address)
+        return resolution
+
+    def _target_node(self, node: ControlFlowNode) -> ControlFlowNode | None:
+        """Resolve a direct target by exact label identity or unique address."""
+        target_index = node.record.semantics.get('flow_target_operand')
+        target_address = self._operand_semantic_value(
+            node.line_object,
+            node.record,
+            target_index,
+        )
+        resolution = self._target_resolution(node, target_address)
+        if resolution.node is None:
+            self._error(
+                node.line_object,
+                f'instruction "{node.record.source_mnemonic}" target '
+                f'{target_address:#x} is invalid: {resolution.error}',
+            )
+            return None
+        return resolution.node
+
+    def _fallthrough_node(
+        self,
+        node: ControlFlowNode,
+    ) -> ControlFlowNode | None:
+        """Resolve physical fall-through at the instruction's end address."""
+        source_successor = self._graph.source_successor(node)
+        if (
+            source_successor.node is not None
+            and source_successor.node.kind == 'boundary'
+        ):
+            return source_successor.node
+        resolution = self._graph.fallthrough_at(node.end_address)
+        if resolution.node is None:
+            if self._graph.is_source_end(node):
+                names = ', '.join(sorted(self._active))
+                self._error(
+                    node.line_object,
+                    f'flow counter(s) {names} reaches EOF without a flow '
+                    'terminal or #endtrack',
+                )
+                return None
+            self._error(
+                node.line_object,
+                f'instruction "{node.record.source_mnemonic}" has no valid '
+                f'physical fall-through: {resolution.error}',
+            )
+            return None
+        return resolution.node
+
+    def _source_successor(
+        self,
+        node: ControlFlowNode,
+    ) -> ControlFlowNode | None:
+        """Resolve the next structural node after a zero-width source item."""
+        resolution = self._graph.source_successor(node)
+        if resolution.node is None:
+            if self._graph.is_source_end(node):
+                names = ', '.join(sorted(self._active))
+                self._error(
+                    node.line_object,
+                    f'flow counter(s) {names} reaches EOF without a flow '
+                    'terminal or #endtrack',
+                )
+                return None
+            self._error(node.line_object, resolution.error)
+            return None
+        return resolution.node
+
+    def _process_instruction(
+        self,
+        node: ControlFlowNode,
+    ) -> tuple[ControlFlowNode, ...]:
+        """Apply instruction semantics and return its structural successors."""
+        self._resolve_expressions(node.line_object, node.expression_nodes)
+        if not self._active:
+            return ()
+        transfer = node.record.semantics.get('flow_transfer')
+        if transfer is None:
+            self._error(
+                node.line_object,
+                f'instruction "{node.record.source_mnemonic}" is missing '
+                'required flow_transfer metadata',
+            )
+            return ()
+        terminals = node.record.semantics.get('flow_terminal', {})
+        mapped = [
+            state
+            for state in self._active.values()
+            if isinstance(terminals, Mapping)
+            and state.counter_class in terminals
+        ]
+        if mapped:
+            if transfer == 'conditional':
+                self._error(
+                    node.line_object,
+                    'conditional terminals are not yet supported',
+                )
+                return ()
+            if transfer != 'return':
+                self._error(
+                    node.line_object,
+                    f'instruction "{node.record.source_mnemonic}" is a flow '
+                    f'terminal but its flow_transfer is "{transfer}"',
+                )
+                return ()
+            for state in self._active.values():
+                order = terminals.get(state.counter_class)
+                if order is None:
+                    self._error(
+                        node.line_object,
+                        f'instruction "{node.record.source_mnemonic}" returns '
+                        f'while flow counter "{state.name}" is still active; '
+                        f'end the region with #endtrack {state.name} before '
+                        'this transfer',
+                    )
+                    continue
+                if state.suspended:
+                    self._error(
+                        node.line_object,
+                        f'flow terminal "{node.record.source_mnemonic}" cannot '
+                        f'reconcile suspended flow counter "{state.name}"',
+                    )
+                    continue
+                if order == 'after_effect':
+                    self._apply_graph_delta(node, state)
+                self._check_exit(node.line_object, state)
+            return ()
+
+        if transfer == 'return':
+            names = ', '.join(sorted(self._active))
+            self._error(
+                node.line_object,
+                f'instruction "{node.record.source_mnemonic}" returns while '
+                f'flow counter(s) {names} remain active',
+            )
+            return ()
+        if transfer == 'indirect':
+            self._error(
+                node.line_object,
+                f'indirect control transfer "{node.record.source_mnemonic}" '
+                'cannot be analyzed inside an active flow-counter region',
+            )
+            return ()
+        if transfer == 'multiway':
+            self._error(
+                node.line_object,
+                'multiway control transfers are not available in M5',
+            )
+            return ()
+
+        if transfer == 'call':
+            if self._target_node(node) is None:
+                return ()
+            call_effects = node.record.semantics.get('flow_call_effects', {})
+            for state in self._active.values():
+                if state.suspended:
+                    continue
+                delta = (
+                    call_effects.get(state.counter_class)
+                    if isinstance(call_effects, Mapping)
+                    else None
+                )
+                if delta is None:
+                    operand_index = node.record.semantics['flow_target_operand']
+                    state.value = _UnresolvedCall(
+                        node.record.operands[operand_index].source_text,
+                        state.counter_class,
+                    )
+                else:
+                    self._apply_graph_delta(node, state, delta)
+            fallthrough = self._fallthrough_node(node)
+            return (fallthrough,) if fallthrough is not None else ()
+
+        for state in self._active.values():
+            self._apply_graph_delta(node, state)
+        if transfer == 'none':
+            fallthrough = self._fallthrough_node(node)
+            return (fallthrough,) if fallthrough is not None else ()
+        if transfer == 'conditional':
+            target = self._target_node(node)
+            fallthrough = self._fallthrough_node(node)
+            return tuple(
+                successor
+                for successor in (target, fallthrough)
+                if successor is not None
+            )
+        if transfer == 'unconditional':
+            target = self._target_node(node)
+            return (target,) if target is not None else ()
+        self._error(
+            node.line_object,
+            f'instruction "{node.record.source_mnemonic}" has unsupported '
+            f'flow_transfer "{transfer}"',
+        )
+        return ()
+
+    def _process_node(self, node: ControlFlowNode) -> None:
+        """Transfer one merged input state through a structural program point."""
+        incoming = self._inputs[node.node_id]
+        self._active = self._clone_states(incoming.states)
+        before = self._graph_flow_values(self._active)
+        line_object = node.line_object
+
+        if isinstance(line_object, FlowTrackLine):
+            region = self._region_by_track_index.get(node.line_index)
+            if region is None:
+                return
+            self._open(line_object)
+            state = self._active.get(line_object.counter_name)
+            if (
+                state is None
+                or state.opened_by is not line_object
+            ):
+                return
+            state.region_id = region.region_id
+            self._templates[region.region_id] = self._clone_state(state)
+            successor = self._source_successor(node)
+            successors = (successor,) if successor is not None else ()
+        elif isinstance(line_object, FlowEndTrackLine):
+            self._close(line_object)
+            successor = (
+                self._source_successor(node)
+                if self._active
+                else None
+            )
+            successors = (successor,) if successor is not None else ()
+        elif isinstance(line_object, FlowEntryLine | LabelLine):
+            successor = self._source_successor(node)
+            successors = (successor,) if successor is not None else ()
+        elif isinstance(line_object, AssertLine):
+            self._assert(line_object)
+            successor = self._source_successor(node)
+            successors = (successor,) if successor is not None else ()
+        elif isinstance(line_object, FlowSetLine):
+            self._set_counter(line_object)
+            successor = self._source_successor(node)
+            successors = (successor,) if successor is not None else ()
+        elif isinstance(line_object, FlowSuspendLine):
+            self._suspend_counter(line_object)
+            successor = self._source_successor(node)
+            successors = (successor,) if successor is not None else ()
+        elif isinstance(line_object, FlowResumeLine):
+            self._resume_counter(line_object)
+            successor = self._source_successor(node)
+            successors = (successor,) if successor is not None else ()
+        elif isinstance(line_object, CounterCoordinateLine):
+            self._declare_coordinate(line_object)
+            successor = self._source_successor(node)
+            successors = (successor,) if successor is not None else ()
+        elif isinstance(line_object, SetMemoryZoneLine):
+            for state in self._active.values():
+                self._check_exit(line_object, state)
+                self._diagnostic_reporter.warn(
+                    line_object.line_id,
+                    f'{line_object.instruction.split()[0]} auto-closes flow '
+                    f'counter region "{state.name}" at a physical layout '
+                    'boundary',
+                    category='flow',
+                )
+            self._active.clear()
+            successors = ()
+        elif node.kind in {'data', 'observation'}:
+            self._resolve_expressions(line_object, node.expression_nodes)
+            successor = self._source_successor(node)
+            successors = (successor,) if successor is not None else ()
+        elif node.kind == 'instruction':
+            successors = self._process_instruction(node)
+        else:
+            successors = ()
+
+        is_terminal = (
+            node.record is not None
+            and node.record.semantics.get('flow_transfer') == 'return'
+        )
+        is_composite_instruction = (
+            isinstance(line_object, InstructionLine)
+            and len(line_object.analysis_units) > 1
+        )
+        exits_source_line = (
+            not successors
+            or any(
+                successor.line_object is not line_object
+                for successor in successors
+            )
+        )
+        if not is_composite_instruction or exits_source_line:
+            annotation_before = before
+            if is_composite_instruction:
+                first_node = next(
+                    candidate
+                    for candidate in self._graph.nodes
+                    if candidate.line_object is line_object
+                )
+                first_input = self._inputs.get(first_node.node_id)
+                if first_input is not None:
+                    annotation_before = self._graph_flow_values(
+                        first_input.states,
+                    )
+            line_object.record_flow_transition(
+                annotation_before,
+                (
+                    {}
+                    if is_terminal
+                    else self._graph_flow_values(self._active)
+                ),
+            )
+        sources = {
+            name: line_object
+            for name in self._active
+        }
+        transfer = (
+            node.record.semantics.get('flow_transfer')
+            if node.record is not None
+            else None
+        )
+        for successor_index, successor in enumerate(successors):
+            outgoing_states = self._active
+            if transfer == 'conditional':
+                outgoing_states = self._clone_states(self._active)
+                outcome = (
+                    'taken'
+                    if successor_index == 0
+                    else 'fall-through'
+                )
+                for state in outgoing_states.values():
+                    state.branch_provenance[node.node_id] = (
+                        line_object.line_id,
+                        outcome,
+                    )
+            self._enqueue(
+                successor,
+                outgoing_states,
+                sources,
+                source_node=node,
+            )
+
+    def _drain(self) -> None:
+        """Process scheduled nodes until the scalar fixed point is reached."""
+        while self._queue:
+            node_id = self._queue.popleft()
+            self._process_node(self._graph.nodes[node_id])
+
+    def _add_entry_roots(self) -> None:
+        """Add explicit roots, then resolve value-less roots to a fixed point."""
+        pending = dict(self._entries_by_label)
+        while pending:
+            ready = []
+            for label_index, entries in pending.items():
+                label_node = self._node_for_line(label_index)
+                ordinary = self._inputs.get(label_node.node_id)
+                if all(
+                    entry.value_expression is not None
+                    or (
+                        ordinary is not None
+                        and entry.counter_name in ordinary.states
+                    )
+                    for entry in entries
+                ):
+                    ready.append((label_index, label_node, entries, ordinary))
+            if not ready:
+                label_index, entries = next(iter(pending.items()))
+                entry = next(
+                    (
+                        candidate
+                        for candidate in entries
+                        if candidate.value_expression is None
+                    ),
+                    entries[0],
+                )
+                self._error(
+                    entry,
+                    f'#entry {entry.counter_name} is unreachable; '
+                    'value= is required',
+                )
+                return
+
+            for label_index, label_node, entries, ordinary in ready:
+                root_states = {}
+                root_sources = {}
+                for entry in entries:
+                    region = self._memberships[label_index][entry.counter_name]
+                    template = self._templates.get(region.region_id)
+                    if template is None:
+                        self._error(
+                            entry,
+                            f'#entry cannot resolve flow counter '
+                            f'"{entry.counter_name}" because its #track root '
+                            'is unreachable',
+                        )
+                        return
+                    state = self._clone_state(template)
+                    if entry.value_expression is None:
+                        state = self._clone_state(
+                            ordinary.states[entry.counter_name]
+                        )
+                    else:
+                        try:
+                            value = entry.evaluate_parameter('value')
+                        except (
+                            ArithmeticError,
+                            RuntimeError,
+                            SyntaxError,
+                            SystemExit,
+                            ValueError,
+                        ) as error:
+                            self._error(entry, str(error))
+                            return
+                        state.value = value
+                        state.suspended = False
+                        prior_coordinates = [
+                            coordinate
+                            for coordinate_index, coordinate
+                            in self._coordinates_by_line.items()
+                            if coordinate_index < label_index
+                            and coordinate.counter_name == state.name
+                            and self._memberships[coordinate_index].get(
+                                state.name
+                            ) is region
+                        ]
+                        state.coordinates.extend(
+                            coordinate
+                            for coordinate in prior_coordinates
+                            if coordinate not in state.coordinates
+                        )
+                        if value != state.initial_value:
+                            state.invalid_coordinate_ids.update(
+                                id(coordinate)
+                                for coordinate in prior_coordinates
+                            )
+                        self._check_bounds(entry, state)
+                    root_states[entry.counter_name] = state
+                    root_sources[entry.counter_name] = entry
+                self._enqueue(
+                    label_node,
+                    root_states,
+                    root_sources,
+                )
+                del pending[label_index]
+            self._drain()
+
+    def _is_declared_region_entry(
+        self,
+        target_line_index: int,
+        region: _LexicalRegion,
+    ) -> bool:
+        """Return whether a call target is an initial or explicit region root."""
+        if any(
+            entry.counter_name == region.name
+            for entry in self._entries_by_label.get(target_line_index, ())
+        ):
+            return True
+        return all(
+            type(line_object) is LineObject
+            or isinstance(line_object, FlowTrackLine)
+            for line_object in self._line_objects[
+                region.track_index + 1:target_line_index
+            ]
+        )
+
+    def _validate_static_transfer_entries(self) -> None:
+        """Reject direct transfers that enter tracked regions illegally."""
+        for node in self._graph.nodes:
+            if node.record is None:
+                continue
+            transfer = node.record.semantics.get('flow_transfer')
+            if transfer not in {'conditional', 'unconditional', 'call'}:
+                continue
+            target_index = node.record.semantics['flow_target_operand']
+            operand = node.record.operands[target_index]
+            if (
+                operand.semantic_kind
+                is not OperandSemanticKind.COMPILE_TIME_EXPRESSION
+                or operand.expression is None
+                or operand.expression.contains_flow_value()
+            ):
+                continue
+            try:
+                target_address = operand.expression.to_node().get_value(
+                    node.line_object.symbol_scope,
+                    node.line_object.active_named_scopes,
+                    node.line_object.line_id,
+                )
+            except (
+                ArithmeticError,
+                RuntimeError,
+                SyntaxError,
+                SystemExit,
+                ValueError,
+            ):
+                # Ordinary bytecode generation owns diagnostics for branches
+                # unrelated to a tracked region. This pre-scan exists only to
+                # catch otherwise-unreachable edges entering a region.
+                continue
+            resolution = self._target_resolution(node, target_address)
+            if resolution.node is None:
+                continue
+            target = resolution.node
+            source_regions = self._memberships[node.line_index]
+            target_regions = self._memberships[target.line_index]
+            for name, target_region in target_regions.items():
+                source_region = source_regions.get(name)
+                if transfer == 'call':
+                    if (
+                        source_region is target_region
+                        or self._is_declared_region_entry(
+                            target.line_index,
+                            target_region,
+                        )
+                    ):
+                        continue
+                    self._error(
+                        node.line_object,
+                        f'call target enters flow counter region "{name}" '
+                        'at non-entry label; target the region entry or '
+                        f'declare #entry {name}',
+                    )
+                    continue
+                if (
+                    source_region is target_region
+                    or target.line_index == target_region.track_index
+                ):
+                    continue
+                self._error(
+                    node.line_object,
+                    f'control flow enters flow counter region "{name}" after '
+                    f'#track {target_region.counter_class}',
+                )
+
+    def _warn_external_labels(self) -> None:
+        """Warn about public labels that expose an undeclared entry state."""
+        for node in self._graph.nodes:
+            if node.kind != 'label':
+                continue
+            label = node.line_object.get_label()
+            if label.startswith('.'):
+                continue
+            incoming = self._inputs.get(node.node_id)
+            entries = {
+                entry.counter_name
+                for entry in self._entries_by_label.get(node.line_index, ())
+            }
+            for name, region in self._memberships[node.line_index].items():
+                if name in entries:
+                    continue
+                state = (
+                    incoming.states.get(name)
+                    if incoming is not None
+                    else None
+                )
+                template = self._templates.get(region.region_id)
+                if state is None:
+                    self._diagnostic_reporter.warn(
+                        node.line_object.line_id,
+                        f'label "{label}" is an unreachable potential entry '
+                        f'inside flow counter region "{name}"; add '
+                        f'#entry {name} value=<expression> or a lexical '
+                        f'#endtrack {name}',
+                        category='flow',
+                    )
+                elif (
+                    template is not None
+                    and (
+                        state.suspended
+                        or state.value != template.initial_value
+                    )
+                ):
+                    self._diagnostic_reporter.warn(
+                        node.line_object.line_id,
+                        f'label "{label}" is a potential external entry where '
+                        f'flow counter "{name}" has value '
+                        f'{self._state_description(state)}, not entry value '
+                        f'{template.initial_value}; add #entry {name}',
+                        category='flow',
+                    )
+
+    def _check_unreached_flow_constructs(self) -> None:
+        """Diagnose flow constructs that no propagated graph state reached."""
+        for node in self._graph.nodes:
+            if node.node_id in self._inputs:
+                continue
+            memberships = self._memberships[node.line_index]
+            if memberships:
+                if not node.expression_nodes:
+                    continue
+                self._active = {}
+                for name, region in memberships.items():
+                    template = self._templates.get(region.region_id)
+                    if template is None:
+                        continue
+                    state = self._clone_state(template)
+                    state.path_live = False
+                    self._active[name] = state
+                self._resolve_expressions(
+                    node.line_object,
+                    node.expression_nodes,
+                )
+                continue
+
+            self._active = {}
+            line_object = node.line_object
+            if node.expression_nodes:
+                self._active = {}
+                self._resolve_expressions(
+                    line_object,
+                    node.expression_nodes,
+                )
+            elif (
+                isinstance(line_object, AssertLine)
+                and line_object.is_flow_dependent
+            ):
+                self._assert(line_object)
+            elif isinstance(line_object, FlowSetLine):
+                self._set_counter(line_object)
+            elif isinstance(line_object, FlowSuspendLine):
+                self._suspend_counter(line_object)
+            elif isinstance(line_object, FlowResumeLine):
+                self._resume_counter(line_object)
+            elif isinstance(line_object, CounterCoordinateLine):
+                self._declare_coordinate(line_object)
+
+    def run(self, line_objects) -> None:
+        """Build the structural CFG and propagate scalar states to a fixed point."""
+        self._line_objects = tuple(line_objects)
+        self._graph = ControlFlowGraph.from_line_objects(self._line_objects)
+        self._validate_coordinate_scopes()
+        self._prepare_regions()
+        self._prepare_entries()
+        self._validate_static_transfer_entries()
+
+        for node in self._graph.nodes:
+            if not isinstance(node.line_object, FlowTrackLine):
+                continue
+            enclosing = {
+                name: region
+                for name, region in self._memberships[node.line_index].items()
+                if region.track_index != node.line_index
+            }
+            if not enclosing:
+                self._enqueue(node, {}, {})
+        self._drain()
+        self._add_entry_roots()
+        self._check_unreached_flow_constructs()
+        self._warn_external_labels()

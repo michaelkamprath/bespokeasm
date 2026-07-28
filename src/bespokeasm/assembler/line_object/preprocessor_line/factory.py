@@ -8,6 +8,7 @@ from bespokeasm.assembler.line_object.preprocessor_line.deactivate_scope import 
 from bespokeasm.assembler.line_object.preprocessor_line.define_symbol import DefineSymbolLine
 from bespokeasm.assembler.line_object.preprocessor_line.error_line import ErrorLine
 from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowEndTrackLine
+from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowEntryLine
 from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowResumeLine
 from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowSetLine
 from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowSuspendLine
@@ -57,6 +58,15 @@ class PreprocessorLineFactory:
                 )
             case ('#endtrack', _):
                 line_object = FlowEndTrackLine(
+                    line_id,
+                    instruction,
+                    comment,
+                    current_memzone,
+                    isa_model,
+                    preprocessor,
+                )
+            case ('#entry', _):
+                line_object = FlowEntryLine(
                     line_id,
                     instruction,
                     comment,

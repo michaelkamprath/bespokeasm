@@ -193,6 +193,12 @@ class ExpressionNode:
         if self.token_type in [TokenType.T_COUNTER, TokenType.T_OFFSET]:
             if hasattr(self, '_resolved_flow_value'):
                 return self._resolved_flow_value
+            # DiagnosticReporter is fail-fast, so ordinary compilation never
+            # reaches this backstop after analysis reports an unresolved flow
+            # operand. If reporting becomes accumulating, the assembler must
+            # skip byte generation whenever recorded errors remain; this
+            # RuntimeError intentionally continues to guard against emitting a
+            # guessed value in the meantime.
             raise RuntimeError(
                 'deferred flow expression reached numeric evaluation before '
                 'the static-analysis pass resolved it'

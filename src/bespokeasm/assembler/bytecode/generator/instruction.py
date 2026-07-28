@@ -1,3 +1,4 @@
+import math
 import sys
 
 from bespokeasm.assembler.analysis import AnalysisOperand
@@ -20,6 +21,16 @@ from bespokeasm.assembler.parsing import split_operands
 
 
 class InstructionBytecodeGenerator:
+
+    @staticmethod
+    def _word_count(machine_code, word_size: int) -> int:
+        """Return the emitted word count for one real selected instruction."""
+        total_bits = 0
+        for part in machine_code:
+            if part.word_align and total_bits % word_size != 0:
+                total_bits += word_size - total_bits % word_size
+            total_bits += part.value_size
+        return math.ceil(total_bits / word_size)
 
     @classmethod
     def generate_bytecode_parts(
@@ -181,6 +192,7 @@ class InstructionBytecodeGenerator:
                 canonical_mnemonic=mnemonic,
                 semantics=freeze_analysis_value(variant.semantic_config),
                 operands=tuple(analysis_operands),
+                word_count=cls._word_count(machine_code, isa_model.word_size),
             )
 
         return AssembledInstruction(

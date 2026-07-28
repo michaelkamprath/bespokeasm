@@ -554,9 +554,9 @@ def test_m2_numeric_fallback_takes_precedence_over_coordinate_indexes(tmp_path):
         '#track stack\n'
         'push\n'
         'face := COORDINATE(stack, 1)\n'
-        '.byte face & $ff\n'
         'pop\n'
         '#endtrack stack\n'
+        '.byte face & $ff\n'
     )
     _, enabled_bytes = _assemble(
         tmp_path,
@@ -564,7 +564,7 @@ def test_m2_numeric_fallback_takes_precedence_over_coordinate_indexes(tmp_path):
         config_path=config_path,
         output_name='enabled.bin',
     )
-    assert enabled_bytes == bytes([0x10, 0xCE, 0x11])
+    assert enabled_bytes == bytes([0x10, 0x11, 0xCE])
 
 
 def test_m2_indirect_register_operand_record_keeps_selector_and_expression_apart(tmp_path):

@@ -5,6 +5,7 @@ from bespokeasm.assembler.analysis import AnalysisSourceIndex
 from bespokeasm.assembler.assembly_file import AssemblyFile
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
+from bespokeasm.assembler.flow_analysis import FlowGraphAnalyzer
 from bespokeasm.assembler.flow_analysis import FlowLinearAnalyzer
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
@@ -222,7 +223,7 @@ class Assembler:
             self._model.analysis_records_enabled
             and FlowLinearAnalyzer.source_uses_flow(compilable_line_obs)
         ):
-            FlowLinearAnalyzer(
+            FlowGraphAnalyzer(
                 self._model,
                 diagnostic_reporter,
             ).run(compilable_line_obs)
