@@ -10,14 +10,17 @@ def build_hover_docs(assembler_model: AssemblerModel, verbose: int = 0) -> dict:
     """Build editor hover data filtered to capabilities enabled by the ISA."""
     doc_model = build_documentation_model(assembler_model, verbose)
     markdown_generator = MarkdownGenerator(doc_model, verbose)
-    instruction_docs = {
-        name.upper(): markdown_generator.generate_instruction_markdown(
+    instruction_docs = {}
+    for name, doc in doc_model.instruction_docs.items():
+        markdown = markdown_generator.generate_instruction_markdown(
             name,
             doc,
             add_header_rule=True
         )
-        for name, doc in doc_model.instruction_docs.items()
-    }
+        instruction_docs[name.upper()] = markdown
+        if assembler_model.flow_counters_enabled:
+            for alias in doc.get('aliases', []):
+                instruction_docs[alias.upper()] = markdown
     macro_docs = {
         name.upper(): markdown_generator.generate_instruction_markdown(
             name,

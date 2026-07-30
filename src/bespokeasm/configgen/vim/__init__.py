@@ -467,7 +467,10 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         if expr_funcs_alt:
             lines.append(fr'syn match {lang_group}Operator /\<' + expr_funcs_alt + r'\>/')
         # Operators
-        lines.append(rf'syn match {lang_group}Operator /==\|!=\|>=\|<=\|>>\|<<\|[+\-*/&|^]/')
+        lines.append(
+            rf'syn match {lang_group}Operator '
+            r'/==\|!=\|>=\|<=\|>>\|<<\|>\|<\|[+\-*/&|^]/'
+        )
         lines.append(
             f'syn keyword {lang_group}FlowOperator COORDINATE COUNTER OFFSET'
         )

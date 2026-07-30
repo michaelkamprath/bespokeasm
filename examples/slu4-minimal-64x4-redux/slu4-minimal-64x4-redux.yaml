@@ -24,10 +24,77 @@ general:
     name: slu4-min64x4-redux-asm
     version: 1.4.0
     extension: min64x4r
-  min_version: 0.7.0
+  min_version: '0.8.0'
   allow_embedded_strings: true
   documentation:
     addressing_modes: {}
+
+# Flow Counters (assembly-time static analysis; see the BespokeASM wiki's
+# "Flow Counters" documentation). This section only enables analysis of
+# source that opts in with `#track` -- it does not change the assembled
+# byte code of any program.
+flow_counters:
+  stack:
+    documentation:
+      title: Hardware Stack Depth
+      description: >-
+        Tracks the number of bytes of routine-owned data on the MinOS
+        hardware stack, in bytes pushed relative to the tracking region's
+        entry. The stack lives in the 0xFF00 page and is addressed
+        stack-pointer-relative by `lds`/`sds` as `*(0xff00 + SP + offset)`.
+    min_value: 0
+    # `spinit` initializes SP to 0xFE (`mib 0xfe,0xffff`), and the stack
+    # occupies the single 0xFF00 page, so at most 254 bytes can be pushed.
+    max_value: 254
+    # Writing the memory-mapped stack-pointer register replaces the physical
+    # anchor wholesale. Every instruction that writes memory through a
+    # compile-time absolute-address operand (including the 8-bit zero-page
+    # forms) declares that operand with `flow_write_operands`; a write whose
+    # resolved target is 0xffff makes this counter indeterminate until source
+    # explicitly re-anchors it with `#resume stack = <value>`. Two deliberate
+    # gaps in that watch:
+    #   * Register-indirect/pointer stores (the `**Z` / `**addr` forms such
+    #     as sdt/sdr/mit/mir, the `szp` page-indexed store, and SP-relative
+    #     `sds`/`phs`) are NOT watched -- annotating them would either
+    #     mis-match the pointer's own location or conservatively invalidate
+    #     on every use. A program that rewrites the SP cell through a
+    #     pointer must bracket that code with #suspend/#resume itself.
+    #   * Matching is exact on the write's START address, so a multi-word
+    #     write beginning below 0xffff (e.g. `miw imm,0xfffe`, whose second
+    #     byte lands on 0xffff) is not detected.
+    invalidate_on_write: [0xffff]
+    # The first live stack byte is at sp+1: MinOS passes the first caller
+    # argument at sp+3, behind the 2-byte return address at sp+1..sp+2
+    # (see the calling-convention comments in software/math32lib.min64x4r).
+    # Live positions are therefore sp+N with N >= 1, so only positive
+    # coordinate offsets are physical and offset zero is not a live slot.
+    coordinate_offsets: positive
+    allow_zero_offset: false
+    # Every instruction in this ISA declares an explicit stack effect, so an
+    # undeclared effect inside a tracked region is an error rather than a
+    # silent gap.
+    unknown_instructions: error
+    default_init: 0
+    exit_policy: balanced
+    entry_modes:
+      called:
+        init: 0
+        exit: 0
+        description: >-
+          A subroutine entered via `jps` or `jas` with the 2-byte return address on
+          the stack. The counter measures only the routine's own stack
+          movement, which must return to zero before `rts` consumes the
+          caller-owned return address. Caller arguments sit behind the
+          return address and are named with `COORDINATE(stack, N)` for
+          N >= 3.
+      jumped:
+        init: 0
+        description: >-
+          Code entered via a jump with no return address on the stack, such
+          as a program started from the MinOS prompt, a dispatcher target,
+          or a tail-call destination. There is no terminal instruction on
+          this path, so close the region with `#endtrack` before the
+          transfer out.
 
 operand_sets:
   immediate_8bit:
@@ -383,6 +450,9 @@ predefined:
       description: Address of command line input buffer
 instructions:
   nop:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x00
       size: 8
@@ -391,6 +461,9 @@ instructions:
       title: No operation
       cycles: 16
   out:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x01
       size: 8
@@ -406,6 +479,9 @@ instructions:
       - flag: Z
         description: Set to 0
   int:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x02
       size: 8
@@ -423,6 +499,9 @@ instructions:
       - flag: Z
         description: Undefined
   ink:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x03
       size: 8
@@ -440,6 +519,9 @@ instructions:
       - flag: Z
         description: Undefined
   win:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x04
       size: 8
@@ -455,6 +537,9 @@ instructions:
       - flag: Z
         description: Undefined
   ll0:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x05
       size: 8
@@ -463,6 +548,9 @@ instructions:
       title: Logical left-shift A 0 steps (C=0)
       cycles: 2
   ll1:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x06
       size: 8
@@ -480,6 +568,9 @@ instructions:
       - flag: Z
         description: Reflects result
   ll2:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x07
       size: 8
@@ -497,6 +588,9 @@ instructions:
       - flag: Z
         description: Reflects result
   ll3:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x08
       size: 8
@@ -514,6 +608,9 @@ instructions:
       - flag: Z
         description: Reflects result
   ll4:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x09
       size: 8
@@ -531,6 +628,9 @@ instructions:
       - flag: Z
         description: Reflects result
   ll5:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x0a
       size: 8
@@ -548,6 +648,9 @@ instructions:
       - flag: Z
         description: Reflects result
   ll6:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x0b
       size: 8
@@ -565,6 +668,9 @@ instructions:
       - flag: Z
         description: Reflects result
   ll7:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x0c
       size: 8
@@ -582,6 +688,9 @@ instructions:
       - flag: Z
         description: Reflects result
   rl0:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x0d
       size: 8
@@ -590,6 +699,9 @@ instructions:
       title: Rotate left A 0 steps via C (= RR9)
       cycles: 2
   rl1:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x0e
       size: 8
@@ -607,6 +719,9 @@ instructions:
       - flag: Z
         description: Reflects result
   rl2:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x0f
       size: 8
@@ -624,6 +739,9 @@ instructions:
       - flag: Z
         description: Reflects result
   rl3:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x10
       size: 8
@@ -641,6 +759,9 @@ instructions:
       - flag: Z
         description: Reflects result
   rl4:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x11
       size: 8
@@ -658,6 +779,9 @@ instructions:
       - flag: Z
         description: Reflects result
   rl5:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x12
       size: 8
@@ -675,6 +799,9 @@ instructions:
       - flag: Z
         description: Reflects result
   rl6:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x13
       size: 8
@@ -692,6 +819,9 @@ instructions:
       - flag: Z
         description: Reflects result
   rl7:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x14
       size: 8
@@ -709,6 +839,9 @@ instructions:
       - flag: Z
         description: Reflects result
   rr1:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x15
       size: 8
@@ -726,6 +859,9 @@ instructions:
       - flag: Z
         description: Reflects result
   lr0:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x16
       size: 8
@@ -734,6 +870,9 @@ instructions:
       title: Logical right-shift A 0 steps (C=0) (= RR0, RL9)
       cycles: 2
   lr1:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x17
       size: 8
@@ -751,6 +890,9 @@ instructions:
       - flag: Z
         description: Reflects result
   lr2:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x18
       size: 8
@@ -768,6 +910,9 @@ instructions:
       - flag: Z
         description: Reflects result
   lr3:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x19
       size: 8
@@ -785,6 +930,9 @@ instructions:
       - flag: Z
         description: Reflects result
   lr4:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x1a
       size: 8
@@ -802,6 +950,9 @@ instructions:
       - flag: Z
         description: Reflects result
   lr5:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x1b
       size: 8
@@ -819,6 +970,9 @@ instructions:
       - flag: Z
         description: Reflects result
   lr6:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x1c
       size: 8
@@ -836,6 +990,9 @@ instructions:
       - flag: Z
         description: Reflects result
   lr7:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x1d
       size: 8
@@ -853,6 +1010,10 @@ instructions:
       - flag: Z
         description: Reflects result
   llz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x1e
       size: 8
@@ -875,6 +1036,10 @@ instructions:
       - flag: Z
         description: Reflects result
   llb:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x1f
       size: 8
@@ -897,6 +1062,10 @@ instructions:
       - flag: Z
         description: Reflects result
   llv:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x20
       size: 8
@@ -919,6 +1088,10 @@ instructions:
       - flag: Z
         description: Set based on MSB of result
   llw:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x21
       size: 8
@@ -941,6 +1114,10 @@ instructions:
       - flag: Z
         description: Set based on MSB of result
   llq:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x22
       size: 8
@@ -963,6 +1140,10 @@ instructions:
       - flag: Z
         description: Set based on MSB of result
   lll:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x23
       size: 8
@@ -985,6 +1166,10 @@ instructions:
       - flag: Z
         description: Set based on MSB of result
   lrz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x24
       size: 8
@@ -1007,6 +1192,10 @@ instructions:
       - flag: Z
         description: Reflects result
   lrb:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x25
       size: 8
@@ -1029,6 +1218,10 @@ instructions:
       - flag: Z
         description: Reflects result
   rlz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x26
       size: 8
@@ -1051,6 +1244,10 @@ instructions:
       - flag: Z
         description: Reflects result
   rlb:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x27
       size: 8
@@ -1073,6 +1270,10 @@ instructions:
       - flag: Z
         description: Reflects result
   rlv:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x28
       size: 8
@@ -1095,6 +1296,10 @@ instructions:
       - flag: Z
         description: Set based on MSB of result
   rlw:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x29
       size: 8
@@ -1117,6 +1322,10 @@ instructions:
       - flag: Z
         description: Set based on MSB of result
   rlq:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x2a
       size: 8
@@ -1139,6 +1348,10 @@ instructions:
       - flag: Z
         description: Set based on MSB of result
   rll:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x2b
       size: 8
@@ -1161,6 +1374,10 @@ instructions:
       - flag: Z
         description: Set based on MSB of result
   rrz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x2c
       size: 8
@@ -1183,6 +1400,10 @@ instructions:
       - flag: Z
         description: Reflects result
   rrb:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x2d
       size: 8
@@ -1205,6 +1426,9 @@ instructions:
       - flag: Z
         description: Reflects result
   not:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x2e
       size: 8
@@ -1216,6 +1440,10 @@ instructions:
       - register: A
         description: Updated
   noz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x2f
       size: 8
@@ -1232,6 +1460,10 @@ instructions:
       - register: A
         description: Updated
   nob:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x30
       size: 8
@@ -1248,6 +1480,10 @@ instructions:
       - register: A
         description: Updated
   nov:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x31
       size: 8
@@ -1264,6 +1500,10 @@ instructions:
       - register: A
         description: Set to MSB of result
   now:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x32
       size: 8
@@ -1280,6 +1520,10 @@ instructions:
       - register: A
         description: Set to MSB of result
   noq:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x33
       size: 8
@@ -1296,6 +1540,9 @@ instructions:
       - register: A
         description: Set to MSB of result
   neg:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x34
       size: 8
@@ -1313,6 +1560,10 @@ instructions:
       - flag: Z
         description: Reflects result
   nez:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x35
       size: 8
@@ -1335,6 +1586,10 @@ instructions:
       - flag: Z
         description: Reflects result
   neb:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x36
       size: 8
@@ -1357,6 +1612,10 @@ instructions:
       - flag: Z
         description: Reflects result
   nev:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x37
       size: 8
@@ -1379,6 +1638,10 @@ instructions:
       - flag: Z
         description: Set based on MSB of result
   new:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x38
       size: 8
@@ -1401,6 +1664,10 @@ instructions:
       - flag: Z
         description: Set based on MSB of result
   neq:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x39
       size: 8
@@ -1423,6 +1690,9 @@ instructions:
       - flag: Z
         description: Set based on MSB of result
   ani:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x3a
       size: 8
@@ -1439,6 +1709,9 @@ instructions:
       - register: A
         description: Updated
   anz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x3b
       size: 8
@@ -1455,6 +1728,9 @@ instructions:
       - register: A
         description: Updated
   anb:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x3c
       size: 8
@@ -1471,6 +1747,9 @@ instructions:
       - register: A
         description: Updated
   ant:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x3d
       size: 8
@@ -1487,6 +1766,9 @@ instructions:
       - register: A
         description: Updated
   anr:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x3e
       size: 8
@@ -1503,6 +1785,10 @@ instructions:
       - register: A
         description: Updated
   an.z:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x3f
       size: 8
@@ -1519,6 +1805,10 @@ instructions:
       - register: A
         description: Updated
   an.b:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x40
       size: 8
@@ -1535,6 +1825,9 @@ instructions:
       - register: A
         description: Updated
   an.t:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x41
       size: 8
@@ -1551,6 +1844,9 @@ instructions:
       - register: A
         description: Updated
   an.r:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x42
       size: 8
@@ -1567,6 +1863,9 @@ instructions:
       - register: A
         description: Updated
   ori:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x43
       size: 8
@@ -1583,6 +1882,9 @@ instructions:
       - register: A
         description: Updated
   orz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x44
       size: 8
@@ -1599,6 +1901,9 @@ instructions:
       - register: A
         description: Updated
   orb:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x45
       size: 8
@@ -1615,6 +1920,9 @@ instructions:
       - register: A
         description: Updated
   ort:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x46
       size: 8
@@ -1631,6 +1939,9 @@ instructions:
       - register: A
         description: Updated
   orr:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x47
       size: 8
@@ -1647,6 +1958,10 @@ instructions:
       - register: A
         description: Updated
   or.z:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x48
       size: 8
@@ -1663,6 +1978,10 @@ instructions:
       - register: A
         description: Updated
   or.b:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x49
       size: 8
@@ -1679,6 +1998,9 @@ instructions:
       - register: A
         description: Updated
   or.t:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x4a
       size: 8
@@ -1695,6 +2017,9 @@ instructions:
       - register: A
         description: Updated
   or.r:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x4b
       size: 8
@@ -1711,6 +2036,9 @@ instructions:
       - register: A
         description: Updated
   xri:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x4c
       size: 8
@@ -1727,6 +2055,9 @@ instructions:
       - register: A
         description: Updated
   xrz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x4d
       size: 8
@@ -1743,6 +2074,9 @@ instructions:
       - register: A
         description: Updated
   xrb:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x4e
       size: 8
@@ -1759,6 +2093,9 @@ instructions:
       - register: A
         description: Updated
   xrt:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x4f
       size: 8
@@ -1775,6 +2112,9 @@ instructions:
       - register: A
         description: Updated
   xrr:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x50
       size: 8
@@ -1791,6 +2131,10 @@ instructions:
       - register: A
         description: Updated
   xr.z:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x51
       size: 8
@@ -1807,6 +2151,10 @@ instructions:
       - register: A
         description: Updated
   xr.b:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x52
       size: 8
@@ -1823,6 +2171,9 @@ instructions:
       - register: A
         description: Updated
   xr.t:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x53
       size: 8
@@ -1839,6 +2190,9 @@ instructions:
       - register: A
         description: Updated
   xr.r:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x54
       size: 8
@@ -1855,6 +2209,10 @@ instructions:
       - register: A
         description: Updated
   fne:
+    flow_effects:
+      stack: 0
+    flow_transfer: conditional
+    flow_target_operand: 0
     bytecode:
       value: 0x55
       size: 8
@@ -1868,6 +2226,10 @@ instructions:
       title: Fast branch on non-zero
       cycles: 2
   feq:
+    flow_effects:
+      stack: 0
+    flow_transfer: conditional
+    flow_target_operand: 0
     bytecode:
       value: 0x56
       size: 8
@@ -1881,6 +2243,10 @@ instructions:
       title: Fast branch on zero
       cycles: 2
   fcc:
+    flow_effects:
+      stack: 0
+    flow_transfer: conditional
+    flow_target_operand: 0
     bytecode:
       value: 0x57
       size: 8
@@ -1894,6 +2260,10 @@ instructions:
       title: Fast branch on carry clear
       cycles: 2
   fcs:
+    flow_effects:
+      stack: 0
+    flow_transfer: conditional
+    flow_target_operand: 0
     bytecode:
       value: 0x58
       size: 8
@@ -1907,6 +2277,10 @@ instructions:
       title: Fast branch on carry set
       cycles: 2
   fpl:
+    flow_effects:
+      stack: 0
+    flow_transfer: conditional
+    flow_target_operand: 0
     bytecode:
       value: 0x59
       size: 8
@@ -1920,6 +2294,10 @@ instructions:
       title: Fast branch on plus
       cycles: 2
   fmi:
+    flow_effects:
+      stack: 0
+    flow_transfer: conditional
+    flow_target_operand: 0
     bytecode:
       value: 0x5a
       size: 8
@@ -1933,6 +2311,10 @@ instructions:
       title: Fast branch on minus
       cycles: 2
   fgt:
+    flow_effects:
+      stack: 0
+    flow_transfer: conditional
+    flow_target_operand: 0
     bytecode:
       value: 0x5b
       size: 8
@@ -1946,6 +2328,10 @@ instructions:
       title: Fast branch on greater
       cycles: 2
   fle:
+    flow_effects:
+      stack: 0
+    flow_transfer: conditional
+    flow_target_operand: 0
     bytecode:
       value: 0x5c
       size: 8
@@ -1959,6 +2345,10 @@ instructions:
       title: Fast branch on less or equal
       cycles: 2
   fpa:
+    flow_effects:
+      stack: 0
+    flow_transfer: unconditional
+    flow_target_operand: 0
     bytecode:
       value: 0x5d
       size: 8
@@ -1972,6 +2362,10 @@ instructions:
       title: Fast jump to lsb addr
       cycles: 2
   bne:
+    flow_effects:
+      stack: 0
+    flow_transfer: conditional
+    flow_target_operand: 0
     bytecode:
       value: 0x5e
       size: 8
@@ -1985,6 +2379,10 @@ instructions:
       title: Branch on non-zero
       cycles: 4
   beq:
+    flow_effects:
+      stack: 0
+    flow_transfer: conditional
+    flow_target_operand: 0
     bytecode:
       value: 0x5f
       size: 8
@@ -1998,6 +2396,10 @@ instructions:
       title: Branch on zero
       cycles: 4
   bcc:
+    flow_effects:
+      stack: 0
+    flow_transfer: conditional
+    flow_target_operand: 0
     bytecode:
       value: 0x60
       size: 8
@@ -2011,6 +2413,10 @@ instructions:
       title: Branch on carry clear
       cycles: 4
   bcs:
+    flow_effects:
+      stack: 0
+    flow_transfer: conditional
+    flow_target_operand: 0
     bytecode:
       value: 0x61
       size: 8
@@ -2024,6 +2430,10 @@ instructions:
       title: Branch on carry set
       cycles: 4
   bpl:
+    flow_effects:
+      stack: 0
+    flow_transfer: conditional
+    flow_target_operand: 0
     bytecode:
       value: 0x62
       size: 8
@@ -2037,6 +2447,10 @@ instructions:
       title: Branch on plus
       cycles: 4
   bmi:
+    flow_effects:
+      stack: 0
+    flow_transfer: conditional
+    flow_target_operand: 0
     bytecode:
       value: 0x63
       size: 8
@@ -2050,6 +2464,10 @@ instructions:
       title: Branch on minus
       cycles: 4
   bgt:
+    flow_effects:
+      stack: 0
+    flow_transfer: conditional
+    flow_target_operand: 0
     bytecode:
       value: 0x64
       size: 8
@@ -2063,6 +2481,10 @@ instructions:
       title: Branch on greater
       cycles: 4
   ble:
+    flow_effects:
+      stack: 0
+    flow_transfer: conditional
+    flow_target_operand: 0
     bytecode:
       value: 0x65
       size: 8
@@ -2076,6 +2498,10 @@ instructions:
       title: Branch on less or equal
       cycles: 4
   jpa:
+    flow_effects:
+      stack: 0
+    flow_transfer: unconditional
+    flow_target_operand: 0
     bytecode:
       value: 0x66
       size: 8
@@ -2089,6 +2515,13 @@ instructions:
       title: 'Jump to address: PC = addr'
       cycles: 4
   jpr:
+    flow_effects:
+      stack: 0
+    # Computed transfer: the operand names the memory location that holds
+    # the real jump target, so the destination is unknowable at assembly
+    # time. Inside a tracked region this is an error; close the region
+    # with #endtrack first.
+    flow_transfer: indirect
     bytecode:
       value: 0x67
       size: 8
@@ -2102,6 +2535,13 @@ instructions:
       title: 'Jump to rel address: PC = *addr'
       cycles: 7
   jar:
+    flow_effects:
+      stack: 0
+    # Computed transfer: the operand names the memory location that holds
+    # the real jump target, so the destination is unknowable at assembly
+    # time. Inside a tracked region this is an error; close the region
+    # with #endtrack first.
+    flow_transfer: indirect
     bytecode:
       value: 0x68
       size: 8
@@ -2122,6 +2562,19 @@ instructions:
       - flag: Z
         description: Set to LSB of result
   jps:
+    flow_effects:
+      # physical effect: pushes the 2-byte return address, which is why a
+      # callee sees its first caller argument at sp+3 (return address at
+      # sp+1..sp+2 per the MinOS calling convention).
+      stack: 2
+    flow_transfer: call
+    flow_target_operand: 0
+    flow_call_effects:
+      # caller-visible net effect: a conventional callee returns through
+      # rts, which consumes exactly the pushed return address. Caller
+      # argument pushes/pops are separate caller code, not part of the
+      # call summary.
+      stack: 0
     bytecode:
       value: 0x69
       size: 8
@@ -2138,6 +2591,17 @@ instructions:
       - register: A
         description: Undefined
   jas:
+    # `jas` is `jps` with the A register preserved across the call. A is
+    # conserved without stack involvement, so its stack behavior is
+    # identical to `jps`: the 2-byte return address is pushed, and a
+    # conventional callee returning through `rts` leaves the caller's
+    # depth unchanged.
+    flow_effects:
+      stack: 2
+    flow_transfer: call
+    flow_target_operand: 0
+    flow_call_effects:
+      stack: 0
     bytecode:
       value: 0x6a
       size: 8
@@ -2151,6 +2615,14 @@ instructions:
       title: "Jump to subroutine conserving A \xA7"
       cycles: 14
   rts:
+    flow_effects:
+      # physical effect: pops the 2-byte return address
+      stack: -2
+    flow_terminal:
+      # a callee must reconcile its own stack movement to the exit value
+      # before rts consumes the caller-owned return address
+      stack: before_effect
+    flow_transfer: return
     bytecode:
       value: 0x6b
       size: 8
@@ -2159,6 +2631,9 @@ instructions:
       title: Return from subroutine
       cycles: 10
   phs:
+    flow_effects:
+      stack: 1
+    flow_transfer: none
     bytecode:
       value: 0x6c
       size: 8
@@ -2167,6 +2642,9 @@ instructions:
       title: Push A onto stack
       cycles: 8
   pls:
+    flow_effects:
+      stack: -1
+    flow_transfer: none
     bytecode:
       value: 0x6d
       size: 8
@@ -2178,6 +2656,9 @@ instructions:
       - register: A
         description: Updated
   lds:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x6e
       size: 8
@@ -2194,6 +2675,9 @@ instructions:
       - register: A
         description: Updated
   sds:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x6f
       size: 8
@@ -2207,6 +2691,9 @@ instructions:
       title: 'Store on stack: *(0xff00 + SP + off) = A'
       cycles: 11
   rdb:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x70
       size: 8
@@ -2224,6 +2711,9 @@ instructions:
       - register: A
         description: Updated
   rdr:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x71
       size: 8
@@ -2240,6 +2730,9 @@ instructions:
       - register: A
         description: Updated
   rap:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x72
       size: 8
@@ -2257,6 +2750,9 @@ instructions:
       - register: A
         description: Updated
   rzp:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x73
       size: 8
@@ -2275,6 +2771,12 @@ instructions:
       - register: A
         description: Updated
   wdb:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    # Writes the FLASH address space, not the RAM/IO space that memory-maps
+    # the stack pointer at 0xffff, so it declares no flow_write_operands:
+    # `wdb 0xffff,bank` cannot touch the watched SP cell.
     bytecode:
       value: 0x74
       size: 8
@@ -2289,6 +2791,9 @@ instructions:
       title: "Write FLASH data to abs 3-byte address \xA7"
       cycles: 14
   wdr:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x75
       size: 8
@@ -2302,6 +2807,9 @@ instructions:
       title: "Write FLASH data to rel 3-byte address \xA7"
       cycles: 16
   ldi:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x76
       size: 8
@@ -2318,6 +2826,9 @@ instructions:
       - register: A
         description: Updated
   ldz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x77
       size: 8
@@ -2334,6 +2845,9 @@ instructions:
       - register: A
         description: Updated
   ldb:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x78
       size: 8
@@ -2350,6 +2864,9 @@ instructions:
       - register: A
         description: Updated
   ldt:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x79
       size: 8
@@ -2366,6 +2883,9 @@ instructions:
       - register: A
         description: Updated
   ldr:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x7a
       size: 8
@@ -2382,6 +2902,9 @@ instructions:
       - register: A
         description: Updated
   lap:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x7b
       size: 8
@@ -2398,6 +2921,9 @@ instructions:
       - register: A
         description: Updated
   lab:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x7c
       size: 8
@@ -2420,6 +2946,9 @@ instructions:
       - flag: Z
         description: Set to LSB of result
   lzp:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x7d
       size: 8
@@ -2437,6 +2966,9 @@ instructions:
       - register: A
         description: Updated
   lzb:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x7e
       size: 8
@@ -2460,6 +2992,10 @@ instructions:
       - flag: Z
         description: Set to LSB of result
   sdz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x7f
       size: 8
@@ -2473,6 +3009,10 @@ instructions:
       title: 'Store A to Z: *Z = A'
       cycles: 3
   sdb:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x80
       size: 8
@@ -2486,6 +3026,9 @@ instructions:
       title: 'Store A to address: *addr = A'
       cycles: 5
   sdt:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x81
       size: 8
@@ -2499,6 +3042,9 @@ instructions:
       title: 'Store A at rel address in zero page: **Z = A'
       cycles: 6
   sdr:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x82
       size: 8
@@ -2512,6 +3058,9 @@ instructions:
       title: 'Store A at relative address: **addr = A'
       cycles: 8
   szp:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x83
       size: 8
@@ -2526,6 +3075,10 @@ instructions:
       title: 'Store A Z-indexed to page: *(page<<8 + *Z) = A'
       cycles: 6
   miz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0x84
       size: 8
@@ -2543,6 +3096,13 @@ instructions:
       - register: A
         description: Updated
   mib:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    # Source operand index 1 (the second operand) is the absolute memory-write
+    # address. A write to the stack class's watched 0xffff address makes it
+    # indeterminate, including when mib is produced by the spinit macro.
+    flow_write_operands: [1]
     bytecode:
       value: 0x85
       size: 8
@@ -2560,6 +3120,9 @@ instructions:
       - register: A
         description: Updated
   mit:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x86
       size: 8
@@ -2577,6 +3140,9 @@ instructions:
       - register: A
         description: Updated
   mir:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x87
       size: 8
@@ -2594,6 +3160,10 @@ instructions:
       - register: A
         description: Updated
   miv:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0x88
       size: 8
@@ -2611,6 +3181,13 @@ instructions:
       - register: A
         description: Set to MSB of result
   miw:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    # Exact-address matching flags a multi-word write only when its START
+    # address equals a watched address: `miw imm,0xfffe` also touches 0xffff
+    # but is not detected (see the flow_counters class-level comment).
+    flow_write_operands: [1]
     bytecode:
       value: 0x89
       size: 8
@@ -2628,6 +3205,10 @@ instructions:
       - register: A
         description: Set to MSB of result
   mzz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0x8a
       size: 8
@@ -2645,6 +3226,10 @@ instructions:
       - register: A
         description: Updated
   mzb:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0x8b
       size: 8
@@ -2662,6 +3247,9 @@ instructions:
       - register: A
         description: Updated
   mzt:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x8c
       size: 8
@@ -2679,6 +3267,9 @@ instructions:
       - register: A
         description: Updated
   mzr:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x8d
       size: 8
@@ -2696,6 +3287,10 @@ instructions:
       - register: A
         description: Updated
   mbz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0x8e
       size: 8
@@ -2713,6 +3308,10 @@ instructions:
       - register: A
         description: Updated
   mbb:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0x8f
       size: 8
@@ -2730,6 +3329,9 @@ instructions:
       - register: A
         description: Updated
   mbt:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x90
       size: 8
@@ -2747,6 +3349,9 @@ instructions:
       - register: A
         description: Updated
   mbr:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x91
       size: 8
@@ -2764,6 +3369,10 @@ instructions:
       - register: A
         description: Updated
   mtz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0x92
       size: 8
@@ -2781,6 +3390,10 @@ instructions:
       - register: A
         description: Updated
   mtb:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0x93
       size: 8
@@ -2798,6 +3411,9 @@ instructions:
       - register: A
         description: Updated
   mtt:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x94
       size: 8
@@ -2815,6 +3431,9 @@ instructions:
       - register: A
         description: Updated
   mtr:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x95
       size: 8
@@ -2832,6 +3451,10 @@ instructions:
       - register: A
         description: Updated
   mrz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0x96
       size: 8
@@ -2849,6 +3472,13 @@ instructions:
       - register: A
         description: Updated
   mrb:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    # The doc title says `*adr2 = **adr1`, a direct write to adr2, but this
+    # config declares both operands as 8-bit immediates rather than address
+    # operands, so the write target cannot be established here. Left without
+    # flow_write_operands rather than guessing (see mbr/mrr, likewise).
     bytecode:
       value: 0x97
       size: 8
@@ -2866,6 +3496,9 @@ instructions:
       - register: A
         description: Updated
   mrt:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x98
       size: 8
@@ -2883,6 +3516,9 @@ instructions:
       - register: A
         description: Updated
   mrr:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x99
       size: 8
@@ -2900,6 +3536,10 @@ instructions:
       - register: A
         description: Updated
   mvv:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0x9a
       size: 8
@@ -2917,6 +3557,10 @@ instructions:
       - register: A
         description: Set to MSB of result
   mwv:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0x9b
       size: 8
@@ -2934,6 +3578,9 @@ instructions:
       - register: A
         description: Set to MSB of result
   cld:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0x9c
       size: 8
@@ -2945,6 +3592,10 @@ instructions:
       - register: A
         description: Set to 0
   clz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x9d
       size: 8
@@ -2958,6 +3609,10 @@ instructions:
       title: 'Clear byte at zero-page addr: *Z = 0x00'
       cycles: 4
   clb:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x9e
       size: 8
@@ -2971,6 +3626,10 @@ instructions:
       title: 'Clear byte at addr: *addr = 0x00'
       cycles: 6
   clv:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0x9f
       size: 8
@@ -2987,6 +3646,10 @@ instructions:
       - register: A
         description: Set to 0
   clw:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0xa0
       size: 8
@@ -3003,6 +3666,10 @@ instructions:
       - register: A
         description: Set to 0
   clq:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0xa1
       size: 8
@@ -3019,6 +3686,10 @@ instructions:
       - register: A
         description: Set to 0
   cll:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0xa2
       size: 8
@@ -3035,6 +3706,14 @@ instructions:
       - register: A
         description: Set to 0
   cl5:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    # Operand 0 is the compile-time zero-page address of the pointer word,
+    # which cl5 itself increments (*Z += 5) -- that direct write is the
+    # declared target. The **Z indirect clear goes through the runtime
+    # pointer value and is deliberately not watched.
+    flow_write_operands: [0]
     bytecode:
       value: 0xa3
       size: 8
@@ -3057,6 +3736,9 @@ instructions:
       - flag: Z
         description: Undefined
   inc:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xa4
       size: 8
@@ -3074,6 +3756,10 @@ instructions:
       - flag: Z
         description: Reflects result
   inz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0xa5
       size: 8
@@ -3096,6 +3782,10 @@ instructions:
       - flag: Z
         description: Reflects result
   inb:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0xa6
       size: 8
@@ -3118,6 +3808,10 @@ instructions:
       - flag: Z
         description: Reflects result
   inv:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0xa7
       size: 8
@@ -3140,6 +3834,10 @@ instructions:
       - flag: Z
         description: Set based on MSB of result
   inw:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0xa8
       size: 8
@@ -3162,6 +3860,10 @@ instructions:
       - flag: Z
         description: Set based on MSB of result
   inq:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0xa9
       size: 8
@@ -3184,6 +3886,9 @@ instructions:
       - flag: Z
         description: Undefined
   dec:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xaa
       size: 8
@@ -3201,6 +3906,10 @@ instructions:
       - flag: Z
         description: Reflects result
   dez:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0xab
       size: 8
@@ -3223,6 +3932,10 @@ instructions:
       - flag: Z
         description: Reflects result
   deb:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0xac
       size: 8
@@ -3245,6 +3958,10 @@ instructions:
       - flag: Z
         description: Reflects result
   dev:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0xad
       size: 8
@@ -3267,6 +3984,10 @@ instructions:
       - flag: Z
         description: Set based on MSB of result
   dew:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0xae
       size: 8
@@ -3289,6 +4010,10 @@ instructions:
       - flag: Z
         description: Set based on MSB of result
   deq:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0xaf
       size: 8
@@ -3311,6 +4036,9 @@ instructions:
       - flag: Z
         description: Undefined
   adi:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xb0
       size: 8
@@ -3333,6 +4061,9 @@ instructions:
       - flag: Z
         description: Reflects result
   adz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xb1
       size: 8
@@ -3355,6 +4086,9 @@ instructions:
       - flag: Z
         description: Reflects result
   adb:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xb2
       size: 8
@@ -3377,6 +4111,9 @@ instructions:
       - flag: Z
         description: Reflects result
   adt:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xb3
       size: 8
@@ -3399,6 +4136,9 @@ instructions:
       - flag: Z
         description: Reflects result
   adr:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xb4
       size: 8
@@ -3421,6 +4161,10 @@ instructions:
       - flag: Z
         description: Reflects result
   ad.z:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0xb5
       size: 8
@@ -3443,6 +4187,10 @@ instructions:
       - flag: Z
         description: Reflects result
   ad.b:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0xb6
       size: 8
@@ -3465,6 +4213,9 @@ instructions:
       - flag: Z
         description: Reflects result
   ad.t:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xb7
       size: 8
@@ -3487,6 +4238,9 @@ instructions:
       - flag: Z
         description: Reflects result
   ad.r:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xb8
       size: 8
@@ -3509,6 +4263,10 @@ instructions:
       - flag: Z
         description: Reflects result
   adv:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0xb9
       size: 8
@@ -3531,6 +4289,10 @@ instructions:
       - flag: Z
         description: Set based on MSB of result
   adw:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0xba
       size: 8
@@ -3553,6 +4315,10 @@ instructions:
       - flag: Z
         description: Set based on MSB of result
   adq:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0xbb
       size: 8
@@ -3575,6 +4341,10 @@ instructions:
       - flag: Z
         description: Undefined
   aiz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0xbc
       size: 8
@@ -3598,6 +4368,10 @@ instructions:
       - flag: Z
         description: Reflects result
   aib:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0xbd
       size: 8
@@ -3621,6 +4395,9 @@ instructions:
       - flag: Z
         description: Reflects result
   ait:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xbe
       size: 8
@@ -3644,6 +4421,9 @@ instructions:
       - flag: Z
         description: Reflects result
   air:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xbf
       size: 8
@@ -3667,6 +4447,10 @@ instructions:
       - flag: Z
         description: Reflects result
   aiv:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0xc0
       size: 8
@@ -3690,6 +4474,10 @@ instructions:
       - flag: Z
         description: Reflects result
   aiw:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0xc1
       size: 8
@@ -3713,6 +4501,10 @@ instructions:
       - flag: Z
         description: Set based on MSB of result
   aiq:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0xc2
       size: 8
@@ -3736,6 +4528,10 @@ instructions:
       - flag: Z
         description: Undefined
   azz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0xc3
       size: 8
@@ -3759,6 +4555,9 @@ instructions:
       - flag: Z
         description: Reflects result
   azt:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xc4
       size: 8
@@ -3782,6 +4581,10 @@ instructions:
       - flag: Z
         description: Reflects result
   azv:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0xc5
       size: 8
@@ -3805,6 +4608,10 @@ instructions:
       - flag: Z
         description: Reflects result
   azq:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0xc6
       size: 8
@@ -3828,6 +4635,10 @@ instructions:
       - flag: Z
         description: Undefined
   abb:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0xc7
       size: 8
@@ -3851,6 +4662,10 @@ instructions:
       - flag: Z
         description: Reflects result
   abw:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0xc8
       size: 8
@@ -3874,6 +4689,10 @@ instructions:
       - flag: Z
         description: Set based on MSB of result
   atz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0xc9
       size: 8
@@ -3897,6 +4716,9 @@ instructions:
       - flag: Z
         description: Reflects result
   att:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xca
       size: 8
@@ -3920,6 +4742,10 @@ instructions:
       - flag: Z
         description: Reflects result
   avv:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0xcb
       size: 8
@@ -3943,6 +4769,9 @@ instructions:
       - flag: Z
         description: Reflects result
   sui:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xcc
       size: 8
@@ -3965,6 +4794,9 @@ instructions:
       - flag: Z
         description: Reflects result
   suz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xcd
       size: 8
@@ -3987,6 +4819,9 @@ instructions:
       - flag: Z
         description: Reflects result
   sub:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xce
       size: 8
@@ -4009,6 +4844,9 @@ instructions:
       - flag: Z
         description: Reflects result
   sut:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xcf
       size: 8
@@ -4031,6 +4869,9 @@ instructions:
       - flag: Z
         description: Reflects result
   sur:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xd0
       size: 8
@@ -4053,6 +4894,10 @@ instructions:
       - flag: Z
         description: Reflects result
   su.z:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0xd1
       size: 8
@@ -4075,6 +4920,10 @@ instructions:
       - flag: Z
         description: Reflects result
   su.b:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0xd2
       size: 8
@@ -4097,6 +4946,9 @@ instructions:
       - flag: Z
         description: Reflects result
   su.t:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xd3
       size: 8
@@ -4119,6 +4971,9 @@ instructions:
       - flag: Z
         description: Reflects result
   su.r:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xd4
       size: 8
@@ -4141,6 +4996,10 @@ instructions:
       - flag: Z
         description: Reflects result
   suv:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0xd5
       size: 8
@@ -4163,6 +5022,10 @@ instructions:
       - flag: Z
         description: Set based on MSB of result
   suw:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0xd6
       size: 8
@@ -4185,6 +5048,10 @@ instructions:
       - flag: Z
         description: Set based on MSB of result
   suq:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0xd7
       size: 8
@@ -4207,6 +5074,10 @@ instructions:
       - flag: Z
         description: Undefined
   siz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0xd8
       size: 8
@@ -4230,6 +5101,10 @@ instructions:
       - flag: Z
         description: Reflects result
   sib:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0xd9
       size: 8
@@ -4253,6 +5128,9 @@ instructions:
       - flag: Z
         description: Reflects result
   sit:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xda
       size: 8
@@ -4276,6 +5154,9 @@ instructions:
       - flag: Z
         description: Reflects result
   sir:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xdb
       size: 8
@@ -4299,6 +5180,10 @@ instructions:
       - flag: Z
         description: Reflects result
   siv:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0xdc
       size: 8
@@ -4322,6 +5207,10 @@ instructions:
       - flag: Z
         description: Reflects result
   siw:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0xdd
       size: 8
@@ -4345,6 +5234,10 @@ instructions:
       - flag: Z
         description: Set based on MSB of result
   siq:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0xde
       size: 8
@@ -4368,6 +5261,10 @@ instructions:
       - flag: Z
         description: Undefined
   szz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0xdf
       size: 8
@@ -4391,6 +5288,9 @@ instructions:
       - flag: Z
         description: Reflects result
   szt:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xe0
       size: 8
@@ -4414,6 +5314,10 @@ instructions:
       - flag: Z
         description: Reflects result
   szv:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0xe1
       size: 8
@@ -4437,6 +5341,10 @@ instructions:
       - flag: Z
         description: Reflects result
   szq:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0xe2
       size: 8
@@ -4460,6 +5368,10 @@ instructions:
       - flag: Z
         description: Undefined
   sbb:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0xe3
       size: 8
@@ -4483,6 +5395,10 @@ instructions:
       - flag: Z
         description: Reflects result
   sbw:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0xe4
       size: 8
@@ -4506,6 +5422,10 @@ instructions:
       - flag: Z
         description: Set based on MSB of result
   stz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0xe5
       size: 8
@@ -4529,6 +5449,9 @@ instructions:
       - flag: Z
         description: Reflects result
   stt:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xe6
       size: 8
@@ -4552,6 +5475,10 @@ instructions:
       - flag: Z
         description: Reflects result
   svv:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [1]
     bytecode:
       value: 0xe7
       size: 8
@@ -4575,6 +5502,9 @@ instructions:
       - flag: Z
         description: Reflects result
   cpi:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xe8
       size: 8
@@ -4595,6 +5525,9 @@ instructions:
       - flag: Z
         description: Reflects result
   cpz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xe9
       size: 8
@@ -4615,6 +5548,9 @@ instructions:
       - flag: Z
         description: Reflects result
   cpb:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xea
       size: 8
@@ -4635,6 +5571,9 @@ instructions:
       - flag: Z
         description: Reflects result
   cpt:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xeb
       size: 8
@@ -4655,6 +5594,9 @@ instructions:
       - flag: Z
         description: Reflects result
   cpr:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xec
       size: 8
@@ -4675,6 +5617,9 @@ instructions:
       - flag: Z
         description: Reflects result
   ciz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xed
       size: 8
@@ -4698,6 +5643,9 @@ instructions:
       - flag: Z
         description: Reflects result
   cib:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xee
       size: 8
@@ -4721,6 +5669,9 @@ instructions:
       - flag: Z
         description: Reflects result
   cit:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xef
       size: 8
@@ -4744,6 +5695,9 @@ instructions:
       - flag: Z
         description: Reflects result
   cir:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xf0
       size: 8
@@ -4767,6 +5721,9 @@ instructions:
       - flag: Z
         description: Reflects result
   civ:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xf1
       size: 8
@@ -4790,6 +5747,9 @@ instructions:
       - flag: Z
         description: Reflects result
   ciw:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xf2
       size: 8
@@ -4813,6 +5773,9 @@ instructions:
       - flag: Z
         description: Reflects result
   czz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xf3
       size: 8
@@ -4836,6 +5799,9 @@ instructions:
       - flag: Z
         description: Reflects result
   czt:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xf4
       size: 8
@@ -4859,6 +5825,9 @@ instructions:
       - flag: Z
         description: Reflects result
   cbb:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xf5
       size: 8
@@ -4882,6 +5851,9 @@ instructions:
       - flag: Z
         description: Reflects result
   ctz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xf6
       size: 8
@@ -4905,6 +5877,9 @@ instructions:
       - flag: Z
         description: Reflects result
   ctt:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xf7
       size: 8
@@ -4928,6 +5903,9 @@ instructions:
       - flag: Z
         description: Reflects result
   cvv:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xf8
       size: 8
@@ -4951,6 +5929,9 @@ instructions:
       - flag: Z
         description: Reflects result
   aci:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xf9
       size: 8
@@ -4973,6 +5954,9 @@ instructions:
       - flag: Z
         description: Reflects result
   acz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xfa
       size: 8
@@ -4995,6 +5979,10 @@ instructions:
       - flag: Z
         description: Reflects result
   ac.z:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0xfb
       size: 8
@@ -5017,6 +6005,9 @@ instructions:
       - flag: Z
         description: Reflects result
   sci:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xfc
       size: 8
@@ -5039,6 +6030,9 @@ instructions:
       - flag: Z
         description: Reflects result
   scz:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
     bytecode:
       value: 0xfd
       size: 8
@@ -5061,6 +6055,10 @@ instructions:
       - flag: Z
         description: Reflects result
   sc.z:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands: [0]
     bytecode:
       value: 0xfe
       size: 8
@@ -5083,6 +6081,10 @@ instructions:
       - flag: Z
         description: Reflects result
 macros:
+  # spinit expands to `mib 0xfe,0xffff`. `mib` identifies its absolute-address
+  # operand as a memory-write target, and the stack counter watches 0xffff, so
+  # using spinit in an active region makes that counter indeterminate. Follow
+  # it with `#resume stack = 0` to explicitly anchor the newly empty stack.
   spinit:
     variants:
       - operands:

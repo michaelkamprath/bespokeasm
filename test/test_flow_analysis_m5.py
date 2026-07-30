@@ -1,18 +1,22 @@
 import copy
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 from bespokeasm.assembler.control_flow import ControlFlowGraph
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.engine import Assembler
+from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.symbol_scope import SymbolScope
 from ruamel.yaml import YAML
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 M5_CONFIG = PROJECT_ROOT / 'dev' / 'flow-counters-m5' / 'flow-counters-m5.yaml'
+INTEL_8085_CONFIG = PROJECT_ROOT / 'examples' / 'intel-8085' / 'intel-8085.yaml'
 
 
 @pytest.fixture(autouse=True)
@@ -1137,6 +1141,28 @@ def test_m5_graph_error_paths_survive_a_nonfatal_diagnostic_reporter(
             '.byte $ee\n'
             '#endtrack stack\n',
         ),
+        (
+            # Acceptance 94: contradictory effective instance bounds error
+            # directly on the #track line and must guard-and-return without
+            # opening a half-initialized region.
+            'contradictory-instance-bounds',
+            '#track stack min=10 max=5\n'
+            'nop\n'
+            '#endtrack stack\n',
+        ),
+        (
+            # Acceptance 95: a precise read after a watched write reports
+            # the invalidation and analysis continues to the #resume.
+            'read-after-watched-write',
+            '#track stack\n'
+            'push\n'
+            'write_addr 255\n'
+            '#assert stack == 1\n'
+            '#resume stack = 1\n'
+            'pop\n'
+            'rts\n'
+            '#endtrack stack\n',
+        ),
     ]
     for name, source in scenarios:
         SymbolScope._global_scope = None
@@ -1201,6 +1227,849 @@ def test_m5_nonfatal_worklist_reports_unresolved_offset_once(
         if 'OFFSET(.ghost)' in diagnostic.message
     ]
     assert len(diagnostics) == 1
+
+
+def test_watched_write_address_makes_counter_indeterminate(tmp_path, capsys):
+    """A real instruction selected through a macro invalidates its counter."""
+    _, bytecode = _assemble(
+        tmp_path,
+        '#track stack\n'
+        'routine:\n'
+        'push\n'
+        '.slot := COORDINATE(stack, 1)\n'
+        'reset_stack\n'
+        '#resume stack = 0\n'
+        '#assert stack == 0\n'
+        '#endtrack stack\n',
+        pretty=True,
+    )
+    listing = capsys.readouterr().out
+
+    assert bytecode == bytes([0x10, 0x13, 0xff])
+    reset_row = next(
+        row
+        for row in listing.splitlines()
+        if 'reset_stack' in row
+    )
+    assert 'stack=1 → ?' in reset_row
+
+
+def test_nonwatched_write_address_keeps_counter_precise(tmp_path):
+    """A compile-time write proven not to alias the anchor changes no state."""
+    _, bytecode = _assemble(
+        tmp_path,
+        '#track stack\n'
+        'push\n'
+        'write_addr 254\n'
+        '#assert stack == 1\n'
+        'pop\n'
+        '#endtrack stack\n',
+    )
+    assert bytecode == bytes([0x10, 0x13, 0xfe, 0x11])
+
+
+def test_runtime_write_address_conservatively_invalidates_counter(tmp_path):
+    """A run-time write target may alias the watched anchor address."""
+    _, bytecode = _assemble(
+        tmp_path,
+        '#track stack\n'
+        'push\n'
+        'write_runtime_addr pointer\n'
+        '#resume stack = 0\n'
+        '#endtrack stack\n',
+    )
+    assert bytecode == bytes([0x10, 0x14, 0x00])
+
+
+def test_direct_instruction_invalidation_requires_explicit_resume(
+    tmp_path,
+    capsys,
+):
+    """An instruction can replace an anchor without a memory-write target."""
+    _, bytecode = _assemble(
+        tmp_path,
+        '#track stack\n'
+        'routine:\n'
+        'push\n'
+        '.slot := COORDINATE(stack, 1)\n'
+        'reset_stack_direct\n'
+        '#resume stack = 0\n'
+        '#assert stack == 0\n'
+        '#endtrack stack\n',
+        pretty=True,
+    )
+    listing = capsys.readouterr().out
+
+    assert bytecode == bytes([0x10, 0x15])
+    reset_row = next(
+        row
+        for row in listing.splitlines()
+        if 'reset_stack_direct' in row
+    )
+    assert 'stack=1 → ?' in reset_row
+
+
+def test_direct_instruction_invalidation_blocks_precise_read(tmp_path):
+    """Acceptance 95/99: the direct form blocks reads and names its cause."""
+    _flow_error(
+        tmp_path,
+        '#track stack\n'
+        'push\n'
+        'replace_stack_anchor\n'
+        '#assert stack == 1\n'
+        '#endtrack stack\n',
+        'indeterminate since instruction "replace_stack_anchor" at file .*, '
+        'line 3',
+    )
+
+
+def test_direct_invalidation_counts_as_counter_metadata_producer(tmp_path):
+    """A class used only by ``flow_invalidates`` is not falsely inert."""
+    yaml = YAML(typ='safe')
+    with M5_CONFIG.open() as config_file:
+        config = copy.deepcopy(yaml.load(config_file))
+    config['flow_counters']['reset_only'] = {
+        'unknown_instructions': 'error',
+        'exit_policy': 'balanced',
+    }
+    config['instructions']['replace_stack_anchor']['flow_invalidates'].append(
+        'reset_only'
+    )
+    config_path = tmp_path / 'direct-producer.yaml'
+    writer = YAML()
+    with config_path.open('w') as config_file:
+        writer.dump(config, config_file)
+
+    _, bytecode = _assemble(
+        tmp_path,
+        '#track reset_only\n'
+        'replace_stack_anchor\n'
+        '#endtrack reset_only\n',
+        config_path=config_path,
+    )
+    assert bytecode == bytes([0x15])
+
+
+@pytest.mark.parametrize(
+    ('instruction', 'expected_bytes'),
+    [
+        ('lxi sp, 0xf000', bytes([0xc5, 0x31, 0x00, 0xf0])),
+        ('sphl', bytes([0xc5, 0xf9])),
+    ],
+)
+def test_intel_8085_stack_pointer_replacement_can_be_reanchored(
+    tmp_path,
+    capsys,
+    instruction,
+    expected_bytes,
+):
+    """The real 8085 SP-replacement forms implement direct invalidation."""
+    _, bytecode = _assemble(
+        tmp_path,
+        '#track stack\n'
+        'probe:\n'
+        'push b\n'
+        f'{instruction}\n'
+        '#resume stack = 0\n'
+        '#endtrack stack\n',
+        config_path=INTEL_8085_CONFIG,
+        pretty=True,
+    )
+    listing = capsys.readouterr().out
+
+    assert bytecode == expected_bytes
+    instruction_row = next(
+        row
+        for row in listing.splitlines()
+        if instruction in row
+    )
+    assert 'stack=2 → ?' in instruction_row
+
+
+def test_watched_write_requires_resume_before_precise_read(tmp_path):
+    """Acceptance 95: a read after a watched write names the write as cause."""
+    _flow_error(
+        tmp_path,
+        '#track stack\n'
+        'push\n'
+        'reset_stack\n'
+        '#assert stack == 1\n'
+        '#endtrack stack\n',
+        'indeterminate since the write to 0xff at file .*, line 3; '
+        '#resume with a known value is required',
+    )
+
+
+def test_watched_write_permanently_invalidates_existing_coordinates(tmp_path):
+    """Re-anchoring cannot resurrect slots from before a watched write."""
+    _flow_error(
+        tmp_path,
+        '#track stack\n'
+        'routine:\n'
+        'push\n'
+        '.slot := COORDINATE(stack, 1)\n'
+        'reset_stack\n'
+        '#resume stack = 0\n'
+        'observe OFFSET(.slot)\n'
+        '#endtrack stack\n',
+        'counter coordinate ".slot" is invalid',
+    )
+
+
+def test_graph_invalidation_on_one_branch_is_a_join_mismatch(tmp_path):
+    """Acceptance 95: a diamond invalidated on one arm cannot join cleanly.
+
+    The invalidated arm arrives suspended while the clean arm arrives with a
+    precise value, which is exactly a join mismatch.
+    """
+    assembler = _assembler(
+        tmp_path,
+        '#track stack\n'
+        'routine:\n'
+        'jz .alternate\n'
+        'write_addr 255\n'
+        'jmp .join\n'
+        '.alternate:\n'
+        'nop\n'
+        '.join:\n'
+        'rts\n'
+        '#endtrack stack\n',
+    )
+    with pytest.raises(SystemExit, match='join mismatch'):
+        assembler.assemble_bytecode()
+    message = assembler.model.diagnostic_reporter.diagnostics[-1].message
+    assert 'suspended' in message
+    assert '0' in message
+
+
+def test_graph_invalidation_on_both_branches_joins_cleanly(tmp_path):
+    """Acceptance 95: both arms invalidated join cleanly; #resume then works.
+
+    The two arms carry different invalidation provenance (different source
+    lines); the join must still be clean and pick one deterministically.
+    """
+    _, bytecode = _assemble(
+        tmp_path,
+        '#track stack\n'
+        'routine:\n'
+        'push\n'
+        'jz .alternate\n'
+        'write_addr 255\n'
+        'jmp .join\n'
+        '.alternate:\n'
+        'write_addr 255\n'
+        '.join:\n'
+        '#resume stack = 1\n'
+        'pop\n'
+        'rts\n'
+        '#endtrack stack\n',
+    )
+    assert bytecode == bytes([
+        0x10,
+        0x30, 0x07,
+        0x13, 0xff,
+        0x31, 0x09,
+        0x13, 0xff,
+        0x11,
+        0x69,
+    ])
+
+
+def test_graph_macro_watched_write_invalidates_inside_branch(tmp_path):
+    """Acceptance 95/97: a macro-expanded watched write invalidates one arm.
+
+    The macro carries no flow metadata of its own; its constituent watched
+    write must have the same graph-mode result as writing the instruction
+    directly, observed here as a join mismatch against the clean arm.
+    """
+    assembler = _assembler(
+        tmp_path,
+        '#track stack\n'
+        'routine:\n'
+        'jz .alternate\n'
+        'reset_stack\n'
+        'jmp .join\n'
+        '.alternate:\n'
+        'nop\n'
+        '.join:\n'
+        'rts\n'
+        '#endtrack stack\n',
+    )
+    with pytest.raises(SystemExit, match='join mismatch'):
+        assembler.assemble_bytecode()
+
+
+def test_graph_resume_then_redeclared_coordinate_resolves(tmp_path):
+    """Acceptance 95: after #resume a fresh coordinate declaration works."""
+    _, bytecode = _assemble(
+        tmp_path,
+        '#track stack\n'
+        'routine:\n'
+        'push\n'
+        '.old := COORDINATE(stack, 1)\n'
+        'write_addr 255\n'
+        '#resume stack = 1\n'
+        '.new := COORDINATE(stack, 1)\n'
+        'depth OFFSET(.new)\n'
+        'pop\n'
+        'rts\n'
+        '#endtrack stack\n',
+    )
+    assert bytecode == bytes([0x10, 0x13, 0xff, 0x20, 0x01, 0x11, 0x69])
+
+
+def test_graph_resume_then_redeclaration_leaves_old_coordinate_dead(tmp_path):
+    """Acceptance 95: redeclaring at the same depth resurrects nothing."""
+    _flow_error(
+        tmp_path,
+        '#track stack\n'
+        'routine:\n'
+        'push\n'
+        '.old := COORDINATE(stack, 1)\n'
+        'write_addr 255\n'
+        '#resume stack = 1\n'
+        '.new := COORDINATE(stack, 1)\n'
+        'observe OFFSET(.old)\n'
+        'pop\n'
+        'rts\n'
+        '#endtrack stack\n',
+        'counter coordinate ".old" is invalid',
+    )
+
+
+def test_case_99_invalidates_every_active_instance_of_the_class(
+    tmp_path,
+    capsys,
+):
+    """Acceptance 99: both ``as=`` instances of the class become indeterminate.
+
+    An active instance of a different class tracked over the same
+    instructions stays precise through the invalidation.
+    """
+    assembler, bytecode = _assemble(
+        tmp_path,
+        '#track stack as=first\n'
+        '#track stack as=second\n'
+        '#track cycles\n'
+        'routine:\n'
+        'push\n'
+        'replace_stack_anchor\n'
+        '#assert cycles == 4\n'
+        '#resume first = 0\n'
+        '#resume second = 0\n'
+        'nop\n'
+        '#endtrack cycles\n'
+        '#endtrack second\n'
+        '#endtrack first\n',
+        pretty=True,
+    )
+    listing = capsys.readouterr().out
+
+    assert bytecode == bytes([0x10, 0x15, 0x00])
+    assert 'first=1 → ?' in listing
+    assert 'second=1 → ?' in listing
+    assert 'cycles=2 → 4' in listing
+    assert not [
+        diagnostic
+        for diagnostic in assembler.model.diagnostic_reporter.diagnostics
+        if diagnostic.category == 'flow'
+    ]
+
+
+def test_operations_on_invalidated_counter_report_provenance(tmp_path):
+    """Acceptance 95: every indeterminate-state diagnostic names the cause.
+
+    ``#suspend`` keeps its explicit-suspension wording; these sites fire only
+    when the indeterminacy was caused by invalidation, so each diagnostic
+    must identify the invalidating write (or instruction) and its line.
+    """
+    provenance = 'indeterminate since the write to 0xff at file .*, line 3'
+    scenarios = [
+        (
+            'counter-read',
+            'depth COUNTER(stack)\n',
+            f'COUNTER\\(stack\\) cannot be resolved while flow counter '
+            f'"stack" is {provenance}',
+        ),
+        (
+            'coordinate-declaration',
+            '.slot := COORDINATE(stack, 1)\n',
+            f'COORDINATE\\(stack, ...\\) cannot declare a coordinate while '
+            f'the counter is {provenance}',
+        ),
+        (
+            'set-directive',
+            '#set stack = 0\n',
+            f'flow counter "stack" is {provenance}; '
+            '#resume with a known value is required',
+        ),
+        (
+            'terminal',
+            'rts\n',
+            f'flow terminal "rts" cannot reconcile flow counter "stack": '
+            f'{provenance}',
+        ),
+    ]
+    for name, operation, expected in scenarios:
+        SymbolScope._global_scope = None
+        _flow_error(
+            tmp_path,
+            '#track stack\n'
+            'routine:\n'
+            'reset_stack\n'
+            + operation
+            + '#resume stack = 0\n'
+            'rts\n'
+            '#endtrack stack\n',
+            expected,
+        ), f'scenario {name}'
+
+
+def test_suspend_on_invalidated_counter_reports_already_indeterminate(
+    tmp_path,
+):
+    """Acceptance 95: ``#suspend`` after invalidation names the true cause."""
+    _flow_error(
+        tmp_path,
+        '#track stack\n'
+        'routine:\n'
+        'push\n'
+        'reset_stack\n'
+        '#suspend stack\n'
+        '#resume stack = 0\n'
+        'rts\n'
+        '#endtrack stack\n',
+        'flow counter "stack" is already indeterminate since the write to '
+        '0xff at file .*, line 4',
+    )
+
+
+def test_endtrack_without_exit_on_invalidated_counter_warns(tmp_path):
+    """Invalidation-caused indeterminacy at ``#endtrack`` is surfaced.
+
+    An explicit ``#suspend`` before ``#endtrack`` is a deliberate programmer
+    acknowledgement and stays silent, but a counter left indeterminate by an
+    anchor invalidation has an unchecked exit contract the programmer never
+    acknowledged, so the close receives a ``flow`` warning naming the cause.
+    """
+    assembler, bytecode = _assemble(
+        tmp_path,
+        '#track stack\n'
+        'push\n'
+        'reset_stack\n'
+        '#endtrack stack\n',
+    )
+    assert bytecode == bytes([0x10, 0x13, 0xff])
+    warnings = [
+        diagnostic
+        for diagnostic in assembler.model.diagnostic_reporter.diagnostics
+        if diagnostic.level == 'warning' and diagnostic.category == 'flow'
+    ]
+    assert len(warnings) == 1
+    assert re.search(
+        'exit contract not checked: flow counter "stack" indeterminate '
+        'since the write to 0xff at file .*, line 3',
+        warnings[0].message,
+    )
+
+
+def test_endtrack_warning_on_invalidated_counter_escalates(tmp_path):
+    """The invalidated-``#endtrack`` warning escalates under -w."""
+    assembler = _assembler(
+        tmp_path,
+        '#track stack\n'
+        'push\n'
+        'reset_stack\n'
+        '#endtrack stack\n',
+        warnings_as_errors=True,
+    )
+    with pytest.raises(
+        SystemExit,
+        match='exit contract not checked: flow counter "stack" indeterminate',
+    ):
+        assembler.assemble_bytecode()
+    assert assembler.model.diagnostic_reporter.diagnostics[-1].category == 'flow'
+
+
+def test_endtrack_after_explicit_suspend_stays_silent(tmp_path):
+    """A deliberate ``#suspend`` before ``#endtrack`` produces no warning."""
+    assembler, bytecode = _assemble(
+        tmp_path,
+        '#track stack\n'
+        'push\n'
+        '#suspend stack\n'
+        '#endtrack stack\n',
+    )
+    assert bytecode == bytes([0x10])
+    assert not [
+        diagnostic
+        for diagnostic in assembler.model.diagnostic_reporter.diagnostics
+        if diagnostic.category == 'flow'
+    ]
+
+
+def test_endtrack_with_exit_on_invalidated_counter_still_errors(tmp_path):
+    """``exit=`` on an indeterminate counter remains a hard error."""
+    _flow_error(
+        tmp_path,
+        '#track stack\n'
+        'push\n'
+        'reset_stack\n'
+        '#endtrack stack exit=0\n',
+        'cannot check exit= while the counter is suspended',
+    )
+
+
+def test_watched_write_during_explicit_suspend_still_invalidates(tmp_path):
+    """Acceptance 95: a watched write inside a ``#suspend`` span still counts.
+
+    The counter is already indeterminate, so the write changes nothing the
+    programmer can read immediately — but the invalidation must still be
+    recorded (permanently invalid coordinates plus provenance) rather than
+    early-returned past. The observable pinned here is the diagnostic for a
+    read between the write and ``#resume``: it must identify the watched
+    write as the cause instead of reporting only the explicit suspension.
+    """
+    _flow_error(
+        tmp_path,
+        '#track stack\n'
+        'routine:\n'
+        'push\n'
+        '.x := COORDINATE(stack, 1)\n'
+        '#suspend stack\n'
+        'write_addr 255\n'
+        'depth OFFSET(.x)\n'
+        '#resume stack = 1\n'
+        'pop\n'
+        'rts\n'
+        '#endtrack stack\n',
+        'indeterminate since the write to 0xff at file',
+    )
+
+
+def test_watched_write_during_explicit_suspend_kills_coordinates_forever(
+    tmp_path,
+):
+    """Acceptance 95: coordinates crossed by a suspended-span watched write die.
+
+    Today this scenario also fails because ``#resume`` itself permanently
+    invalidates every coordinate, so the test cannot distinguish the two
+    paths end-to-end. It is pinned anyway as future-proofing: if ``#resume``
+    ever gains a stronger slot-preservation contract that keeps coordinates
+    alive, a watched write during the explicit suspension must still have
+    marked them permanently invalid before that contract could apply.
+    """
+    _flow_error(
+        tmp_path,
+        '#track stack\n'
+        'routine:\n'
+        'push\n'
+        '.x := COORDINATE(stack, 1)\n'
+        '#suspend stack\n'
+        'write_addr 255\n'
+        '#resume stack = 1\n'
+        'depth OFFSET(.x)\n'
+        'pop\n'
+        'rts\n'
+        '#endtrack stack\n',
+        'counter coordinate ".x" is invalid',
+    )
+
+
+@pytest.mark.parametrize(
+    ('mutation', 'expected'),
+    [
+        (
+            lambda config: config['flow_counters']['stack'].__setitem__(
+                'invalidate_on_write',
+                '255',
+            ),
+            'invalidate_on_write must be a list of addresses',
+        ),
+        (
+            lambda config: config['flow_counters']['stack'].__setitem__(
+                'invalidate_on_write',
+                [256],
+            ),
+            'invalidate_on_write address 256 is outside',
+        ),
+        (
+            lambda config: config['flow_counters']['stack'].__setitem__(
+                'invalidate_on_write',
+                [255, 255],
+            ),
+            'invalidate_on_write contains duplicate address 255',
+        ),
+        (
+            lambda config: config['instructions']['write_addr'].__setitem__(
+                'flow_write_operands',
+                [1],
+            ),
+            'flow_write_operands index 1 is outside',
+        ),
+        (
+            lambda config: config['instructions']['write_addr'].__setitem__(
+                'flow_write_operands',
+                [0, 0],
+            ),
+            'flow_write_operands contains duplicate index 0',
+        ),
+        (
+            lambda config: config['instructions']['replace_stack_anchor'].__setitem__(
+                'flow_invalidates',
+                'stack',
+            ),
+            'flow_invalidates must be a list of counter classes',
+        ),
+        (
+            lambda config: config['instructions']['replace_stack_anchor'].__setitem__(
+                'flow_invalidates',
+                ['missing'],
+            ),
+            'flow_invalidates names undeclared counter "missing"',
+        ),
+        (
+            lambda config: config['instructions']['replace_stack_anchor'].__setitem__(
+                'flow_invalidates',
+                ['stack', 'stack'],
+            ),
+            'flow_invalidates contains duplicate counter "stack"',
+        ),
+    ],
+)
+def test_watched_write_configuration_validation(
+    tmp_path,
+    mutation,
+    expected,
+):
+    """Malformed watched-address metadata fails at configuration load."""
+    yaml = YAML(typ='safe')
+    with M5_CONFIG.open() as config_file:
+        config = copy.deepcopy(yaml.load(config_file))
+    mutation(config)
+    config_path = tmp_path / 'invalid-write-watch.yaml'
+    writer = YAML()
+    with config_path.open('w') as config_file:
+        writer.dump(config, config_file)
+
+    with pytest.raises(SystemExit, match=expected):
+        _assembler(tmp_path, 'nop\n', config_path=config_path)
+
+
+def test_watched_write_configuration_is_ignored_without_analysis(tmp_path):
+    """Analysis-only watched-write metadata is not interpreted under ``-A``."""
+    yaml = YAML(typ='safe')
+    with M5_CONFIG.open() as config_file:
+        config = copy.deepcopy(yaml.load(config_file))
+    config['flow_counters']['stack']['invalidate_on_write'] = 'not a list'
+    config['instructions']['write_addr']['flow_write_operands'] = 'not a list'
+    config['instructions']['replace_stack_anchor']['flow_invalidates'] = 'not a list'
+    config_path = tmp_path / 'ignored-write-watch.yaml'
+    writer = YAML()
+    with config_path.open('w') as config_file:
+        writer.dump(config, config_file)
+
+    _, bytecode = _assemble(
+        tmp_path,
+        'nop\n',
+        config_path=config_path,
+        static_analysis=False,
+    )
+    assert bytecode == bytes([0])
+
+
+_WRITE_OPERAND_MUTATIONS = [
+    (
+        'non-list',
+        lambda config: config['instructions']['write_addr'].__setitem__(
+            'flow_write_operands',
+            'not a list',
+        ),
+        'flow_write_operands must be a list of source operand indexes',
+    ),
+    (
+        'negative-index',
+        lambda config: config['instructions']['write_addr'].__setitem__(
+            'flow_write_operands',
+            [-1],
+        ),
+        'flow_write_operands index -1 is outside',
+    ),
+    (
+        'boolean-entry',
+        lambda config: config['instructions']['write_addr'].__setitem__(
+            'flow_write_operands',
+            [True],
+        ),
+        'flow_write_operands entries must be integer source operand indexes',
+    ),
+    (
+        'operandless-instruction',
+        lambda config: config['instructions']['push'].__setitem__(
+            'flow_write_operands',
+            [0],
+        ),
+        'flow_write_operands index 0 is outside',
+    ),
+]
+
+
+def _mutated_m5_config(tmp_path: Path, mutation, name: str) -> Path:
+    yaml = YAML(typ='safe')
+    with M5_CONFIG.open() as config_file:
+        config = copy.deepcopy(yaml.load(config_file))
+    mutation(config)
+    config_path = tmp_path / name
+    writer = YAML()
+    with config_path.open('w') as config_file:
+        writer.dump(config, config_file)
+    return config_path
+
+
+@pytest.mark.parametrize(
+    ('mutation', 'expected'),
+    [
+        (mutation, expected)
+        for _, mutation, expected in _WRITE_OPERAND_MUTATIONS
+    ],
+    ids=[name for name, _, _ in _WRITE_OPERAND_MUTATIONS],
+)
+def test_flow_write_operand_validation_fails_config_load_as_flow(
+    tmp_path,
+    monkeypatch,
+    mutation,
+    expected,
+):
+    """Acceptance 98: malformed ``flow_write_operands`` is a flow config error."""
+    diagnostics = []
+
+    def nonfatal_error(
+        self,
+        line_id,
+        message,
+        category='user',
+        color=None,
+    ):
+        diagnostics.append((message, category))
+
+    monkeypatch.setattr(DiagnosticReporter, 'error', nonfatal_error)
+    config_path = _mutated_m5_config(tmp_path, mutation, 'invalid.yaml')
+
+    AssemblerModel(str(config_path), 0, DiagnosticReporter())
+
+    assert any(
+        expected in message and category == 'flow'
+        for message, category in diagnostics
+    ), diagnostics
+
+
+@pytest.mark.parametrize(
+    'mutation',
+    [mutation for _, mutation, _ in _WRITE_OPERAND_MUTATIONS],
+    ids=[name for name, _, _ in _WRITE_OPERAND_MUTATIONS],
+)
+def test_flow_write_operand_validation_is_uninterpreted_without_analysis(
+    tmp_path,
+    mutation,
+):
+    """Acceptance 98: the same malformed metadata compiles under ``-A``."""
+    config_path = _mutated_m5_config(tmp_path, mutation, 'ignored.yaml')
+
+    _, bytecode = _assemble(
+        tmp_path,
+        'nop\n',
+        config_path=config_path,
+        static_analysis=False,
+    )
+    assert bytecode == bytes([0])
+
+
+def test_watched_class_with_write_operand_producer_is_not_inert(tmp_path):
+    """Acceptance 53/95: watched addresses plus any write-operand producer.
+
+    A class whose only producer is its ``invalidate_on_write`` addresses
+    paired with some instruction's ``flow_write_operands`` can genuinely be
+    invalidated, so it is trackable rather than declared-but-inert.
+    """
+    config_path = _mutated_m5_config(
+        tmp_path,
+        lambda config: config['flow_counters'].__setitem__(
+            'watch_only',
+            {
+                'invalidate_on_write': [254],
+                'unknown_instructions': 'ignore',
+                'exit_policy': 'balanced',
+            },
+        ),
+        'watch-only.yaml',
+    )
+
+    _, bytecode = _assemble(
+        tmp_path,
+        '#track watch_only\n'
+        'nop\n'
+        '#endtrack watch_only\n',
+        config_path=config_path,
+    )
+    assert bytecode == bytes([0])
+
+
+def test_watched_class_without_any_write_operand_producer_is_inert(tmp_path):
+    """Acceptance 53: watched addresses alone cannot make a class trackable.
+
+    With no instruction anywhere declaring ``flow_write_operands``, the
+    watched addresses can never match a write, so the class has no producer
+    and ``#track`` reports the declared-but-inert error.
+    """
+    def mutation(config):
+        config['flow_counters']['watch_only'] = {
+            'invalidate_on_write': [254],
+            'unknown_instructions': 'ignore',
+            'exit_policy': 'balanced',
+        }
+        for instruction_config in config['instructions'].values():
+            instruction_config.pop('flow_write_operands', None)
+
+    config_path = _mutated_m5_config(tmp_path, mutation, 'inert-watch.yaml')
+    assembler = _assembler(
+        tmp_path,
+        '#track watch_only\n'
+        'nop\n'
+        '#endtrack watch_only\n',
+        config_path=config_path,
+    )
+
+    with pytest.raises(
+        SystemExit,
+        match='flow counter class "watch_only" is inert',
+    ):
+        assembler.assemble_bytecode()
+    assert assembler.model.diagnostic_reporter.diagnostics[-1].category == 'flow'
+
+
+@pytest.mark.parametrize('metadata_key', ['flow_write_operands', 'flow_invalidates'])
+def test_instruction_macro_cannot_declare_invalidation_metadata(
+    tmp_path,
+    metadata_key,
+):
+    """Macros derive invalidation only from their concrete expansion."""
+    yaml = YAML(typ='safe')
+    with M5_CONFIG.open() as config_file:
+        config = copy.deepcopy(yaml.load(config_file))
+    config['macros']['reset_stack'][metadata_key] = [0]
+    config_path = tmp_path / 'macro-write-watch.yaml'
+    writer = YAML()
+    with config_path.open('w') as config_file:
+        writer.dump(config, config_file)
+
+    with pytest.raises(
+        SystemExit,
+        match=(
+            'macros.reset_stack may not declare instruction flow metadata '
+            f'"{metadata_key}"'
+        ),
+    ):
+        _assembler(tmp_path, 'nop\n', config_path=config_path)
 
 
 def test_m5_harness_is_runnable():

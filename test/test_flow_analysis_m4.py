@@ -11,6 +11,7 @@ from ruamel.yaml import YAML
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 M4_HARNESS_DIR = PROJECT_ROOT / 'dev' / 'flow-counters-m4'
 M4_CONFIG_PATH = M4_HARNESS_DIR / 'flow-counters-m4.yaml'
+M5_CONFIG_PATH = PROJECT_ROOT / 'dev' / 'flow-counters-m5' / 'flow-counters-m5.yaml'
 
 
 def _load_config() -> dict:
@@ -494,6 +495,14 @@ def test_m4_error_paths_survive_a_nonfatal_diagnostic_reporter(tmp_path, monkeyp
             'suspended-terminal',
             '#track stack\n#suspend stack\nrts\n',
         ),
+        (
+            'instance-bound-looser-than-class',
+            '#track stack max=100\nnop\n#endtrack stack\n',
+        ),
+        (
+            'init-beyond-instance-bound',
+            '#track stack init=6 max=4\nnop\n#endtrack stack\n',
+        ),
     ]
     for name, source in scenarios:
         SymbolScope._global_scope = None
@@ -917,3 +926,347 @@ def test_m4_long_macro_chains_keep_flow_name_protection(tmp_path):
         predefined=['CHAIN_101=COUNTER(stack)'],
     )
     assert bytecode == bytes([0x00])
+
+
+# ---------------------------------------------------------------------------
+# `#track min=`/`max=` instance bounds (0.8.0 release, cases 90-93)
+# ---------------------------------------------------------------------------
+
+
+def test_instance_max_errors_on_the_offending_instruction(tmp_path):
+    """Case 90: ``#track stack max=2`` errors on the third push's line the
+    moment the state exceeds the instance bound, exactly as a class
+    ``max_value`` would.
+    """
+    _assert_flow_error(
+        tmp_path,
+        '#track stack max=2\n'
+        'push\n'
+        'push\n'
+        'push\n'
+        'pop\npop\npop\n'
+        '#endtrack stack\n',
+        'flow counter "stack" overflow: value 3 exceeds maximum 2',
+        expected_line=4,
+    )
+
+
+def test_instance_min_errors_on_the_offending_instruction(tmp_path):
+    """Case 90: ``min=`` is symmetric — starting high via ``init=`` and
+    popping below the instance minimum errors on the offending pop's line.
+    """
+    _assert_flow_error(
+        tmp_path,
+        '#track stack init=4 min=2 exit=4\n'
+        'pop\n'
+        'pop\n'
+        'pop\n'
+        'push\npush\npush\n'
+        '#endtrack stack\n',
+        'flow counter "stack" underflow: value 1 is below minimum 2',
+        expected_line=4,
+    )
+
+
+def test_instance_bound_accepts_address_label_expression(tmp_path):
+    """Case 90: bound values accept every compile-time constant kind,
+    including a memory-map-derived address-label expression resolved once at
+    the ``#track``. The labels are address labels (not ``=`` constants), so
+    resolution proves the analysis pass sees post-address-assignment values.
+    """
+    # positive half: lead_b - lead_a resolves to 2 and two pushes fit exactly
+    _, bytecode = _assemble(
+        tmp_path,
+        'lead_a:\n'
+        'nop\n'
+        'nop\n'
+        'lead_b:\n'
+        '#track stack max=lead_b - lead_a\n'
+        'push\n'
+        'push\n'
+        '#assert stack == 2\n'
+        'pop\n'
+        'pop\n'
+        '#endtrack stack\n',
+    )
+    assert bytecode == bytes([0x00, 0x00, 0x10, 0x10, 0x11, 0x11])
+
+    # negative half: a third push exceeds the label-derived bound of 2
+    SymbolScope._global_scope = None
+    _assert_flow_error(
+        tmp_path,
+        'lead_a:\n'
+        'nop\n'
+        'nop\n'
+        'lead_b:\n'
+        '#track stack max=lead_b - lead_a\n'
+        'push\n'
+        'push\n'
+        'push\n'
+        'pop\npop\npop\n'
+        '#endtrack stack\n',
+        'flow counter "stack" overflow: value 3 exceeds maximum 2',
+        expected_line=8,
+    )
+
+
+def test_instance_max_tightens_class_max(tmp_path):
+    """Case 91: with the class ``max_value`` of 32, ``#track stack max=8``
+    enforces 8 — the ninth push errors against the instance bound, not the
+    class bound.
+    """
+    pushes = 'push\n' * 9
+    _assert_flow_error(
+        tmp_path,
+        '#track stack max=8\n'
+        f'{pushes}'
+        '#endtrack stack\n',
+        'flow counter "stack" overflow: value 9 exceeds maximum 8',
+        expected_line=10,
+    )
+
+
+def test_instance_max_looser_than_class_max_errors_on_track_line(tmp_path):
+    """Case 91: an instance bound looser than the class bound is an error on
+    the ``#track`` line naming both the instance and class bounds
+    (tighten-only: a program must not claim more than the hardware provides).
+    """
+    _assert_flow_error(
+        tmp_path,
+        '#track stack max=100\n'
+        'nop\n'
+        '#endtrack stack\n',
+        r'instance bound max=100 is looser than the class maximum 32',
+        expected_line=1,
+    )
+
+
+def test_instance_min_looser_than_class_min_errors_on_track_line(tmp_path):
+    """Case 91: symmetric for ``min=`` below the class ``min_value``."""
+    _assert_flow_error(
+        tmp_path,
+        '#track stack min=-1\n'
+        'nop\n'
+        '#endtrack stack\n',
+        r'instance bound min=-1 is looser than the class minimum 0',
+        expected_line=1,
+    )
+
+
+def test_contradictory_instance_bounds_error_on_track_line(tmp_path):
+    """An impossible effective interval is rejected directly on ``#track``."""
+    _assert_flow_error(
+        tmp_path,
+        '#track stack init=4 min=5 max=4\n'
+        'nop\n'
+        '#endtrack stack\n',
+        (
+            'flow counter instance bounds are contradictory: '
+            'effective minimum 5 exceeds effective maximum 4'
+        ),
+        expected_line=1,
+    )
+
+
+def test_instance_bound_contradicting_class_bound_errors_on_track_line(tmp_path):
+    """A tightened instance minimum may not cross the class maximum."""
+    _assert_flow_error(
+        tmp_path,
+        '#track stack init=33 min=33\n'
+        'nop\n'
+        '#endtrack stack\n',
+        (
+            'flow counter instance bounds are contradictory: '
+            'effective minimum 33 exceeds effective maximum 32'
+        ),
+        expected_line=1,
+    )
+
+
+def test_instance_max_enforced_alone_on_class_without_max(tmp_path):
+    """Case 91: on a class with no declared bound (``cycles`` has no
+    ``max_value``), the instance bound is simply enforced.
+    """
+    _assert_flow_error(
+        tmp_path,
+        '#track cycles max=3\n'
+        'push\n'
+        'push\n'
+        '#endtrack cycles\n',
+        'flow counter "cycles" overflow: value 4 exceeds maximum 3',
+        expected_line=3,
+    )
+
+
+def test_instance_bounds_enforced_at_set(tmp_path):
+    """Case 92: ``#set`` beyond the instance bound errors even though the
+    value is within the class bound.
+    """
+    _assert_flow_error(
+        tmp_path,
+        '#track stack max=4\n'
+        '#set stack = 5\n'
+        'nop\n'
+        '#endtrack stack\n',
+        'flow counter "stack" overflow: value 5 exceeds maximum 4',
+        expected_line=2,
+    )
+
+
+def test_instance_bounds_enforced_at_resume(tmp_path):
+    """Case 92: ``#resume`` beyond the instance bound errors even though the
+    value is within the class bound.
+    """
+    _assert_flow_error(
+        tmp_path,
+        '#track stack max=4\n'
+        '#suspend stack\n'
+        'nop\n'
+        '#resume stack = 5\n'
+        'nop\n'
+        '#endtrack stack\n',
+        'flow counter "stack" overflow: value 5 exceeds maximum 4',
+        expected_line=4,
+    )
+
+
+def test_instance_bounds_enforced_at_entry_root(tmp_path):
+    """Case 92: an ``#entry`` root value beyond the instance bound errors at
+    the ``#entry`` line (graph-mode root creation), even though the value is
+    within the class bound.
+    """
+    _assert_flow_error(
+        tmp_path,
+        '#track stack max=4\n'
+        'jmp main\n'
+        '#entry stack value=6\n'
+        'alternate:\n'
+        'pop\n'
+        'rts\n'
+        'main:\n'
+        'rts\n'
+        '#endtrack stack\n',
+        'flow counter "stack" overflow: value 6 exceeds maximum 4',
+        config_path=M5_CONFIG_PATH,
+        expected_line=3,
+    )
+
+
+def test_instance_bounds_enforced_at_resolved_init(tmp_path):
+    """Case 92: a resolved ``init=`` beyond the instance bound errors at the
+    ``#track`` line itself.
+    """
+    _assert_flow_error(
+        tmp_path,
+        '#track stack init=6 max=4\n'
+        'nop\n'
+        '#endtrack stack\n',
+        'flow counter "stack" overflow: value 6 exceeds maximum 4',
+        expected_line=1,
+    )
+
+
+def test_concurrent_instances_report_against_their_own_bounds(tmp_path):
+    """Case 92: two concurrent instances of one class with different ``max=``
+    values each report against their own bound — the third push overflows only
+    the narrow instance while the wide one (at the same value) stays legal.
+    """
+    _assert_flow_error(
+        tmp_path,
+        '#track stack as=wide max=6\n'
+        '#track stack as=narrow max=2\n'
+        'push\n'
+        'push\n'
+        'push\n'
+        'pop\npop\npop\n'
+        '#endtrack narrow\n'
+        '#endtrack wide\n',
+        'flow counter "narrow" overflow: value 3 exceeds maximum 2',
+        expected_line=5,
+    )
+
+    # positive half: after the narrow window closes, the wide instance may use
+    # the depth the narrow bound forbade
+    SymbolScope._global_scope = None
+    _, bytecode = _assemble(
+        tmp_path,
+        '#track stack as=wide max=6\n'
+        '#track stack as=narrow max=2\n'
+        'push\n'
+        'push\n'
+        'pop\n'
+        'pop\n'
+        '#endtrack narrow\n'
+        'push\npush\npush\n'
+        'pop\npop\npop\n'
+        '#endtrack wide\n',
+    )
+    assert bytecode == bytes(
+        [0x10, 0x10, 0x11, 0x11, 0x10, 0x10, 0x10, 0x11, 0x11, 0x11]
+    )
+
+
+def test_instance_bound_violated_on_one_branch_of_a_diamond(tmp_path):
+    """Cases 90/92 (graph mode): an instance ``max=`` violated on one branch
+    of a diamond errors at the offending line, through the graph analyzer's
+    per-path state handling. The identical source without the instance bound
+    assembles cleanly against the class bound of 32.
+    """
+    diamond = (
+        '#track stack{bound}\n'
+        'routine:\n'
+        'push\n'
+        'jz .else_path\n'
+        'push\n'
+        'push\n'
+        'pop\n'
+        'pop\n'
+        '.else_path:\n'
+        'pop\n'
+        '#endtrack stack\n'
+    )
+    _assert_flow_error(
+        tmp_path,
+        diamond.format(bound=' max=2'),
+        'flow counter "stack" overflow: value 3 exceeds maximum 2',
+        config_path=M5_CONFIG_PATH,
+        expected_line=6,
+    )
+
+    SymbolScope._global_scope = None
+    _, bytecode = _assemble(
+        tmp_path,
+        diamond.format(bound=''),
+        config_path=M5_CONFIG_PATH,
+    )
+    assert bytecode
+
+
+def test_disabled_analysis_ignores_instance_bounds(tmp_path):
+    """Case 93: under ``--no-static-analysis`` the parameters are ignored like
+    every other analysis-only parameter — even with unresolvable values —
+    assembling byte-identically to the stripped source with zero flow
+    diagnostics.
+    """
+    annotated, bytecode = _assemble(
+        tmp_path,
+        '#track stack min=UNDEFINED_LOW max=UNDEFINED_HIGH - ALSO_UNDEFINED\n'
+        'push\n'
+        'pop\n'
+        '#endtrack stack\n',
+        static_analysis=False,
+        output_name='annotated-bounds.bin',
+    )
+    SymbolScope._global_scope = None
+    _, stripped = _assemble(
+        tmp_path,
+        'push\n'
+        'pop\n',
+        static_analysis=False,
+        output_name='stripped-bounds.bin',
+    )
+    assert bytecode == stripped == bytes([0x10, 0x11])
+    assert not any(
+        diagnostic.category == 'flow'
+        for diagnostic in annotated.model.diagnostic_reporter.diagnostics
+    )

@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -113,13 +114,18 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
             f'{FLOW_COORDINATE_SCOPE} {FLOW_COORDINATE_USAGE_SCOPE}'
         )
         counter_usage = grammar['repository']['flow_counter_usages']
-        assert counter_usage['captures']['1']['name'] == FLOW_OPERATOR_SCOPE
-        assert counter_usage['captures']['5']['name'].endswith(
+        assert counter_usage['beginCaptures']['1']['name'] == FLOW_OPERATOR_SCOPE
+        assert counter_usage['beginCaptures']['5']['name'].endswith(
             FLOW_COUNTER_USAGE_SCOPE
         )
         assert all(
-            token in counter_usage['match']
+            token in counter_usage['begin']
             for token in ('COORDINATE', 'COUNTER')
+        )
+        assert counter_usage['end'] == r'\)'
+        assert (
+            counter_usage['endCaptures']['0']['name']
+            == 'punctuation.section.parens.end'
         )
         directive_patterns = grammar['repository']['flow_counter_directives'][
             'patterns'
@@ -150,6 +156,23 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
             token in grammar['repository']['flow_operators']['match']
             for token in ('COORDINATE', 'COUNTER', 'OFFSET')
         )
+        operator_patterns = grammar['repository']['operators']['patterns']
+        comparison_index = next(
+            index
+            for index, pattern in enumerate(operator_patterns)
+            if pattern.get('name') == 'keyword.operator.comparison'
+        )
+        bitwise_index = next(
+            index
+            for index, pattern in enumerate(operator_patterns)
+            if pattern.get('name') == 'keyword.operator.bitwise'
+        )
+        comparison_pattern = operator_patterns[comparison_index]['match']
+        assert bitwise_index < comparison_index
+        assert all(
+            re.match(comparison_pattern, operator).group(0) == operator
+            for operator in ('==', '!=', '>=', '>', '<=', '<')
+        )
     elif generator_class is SublimeConfigGenerator:
         syntax_path = next(generated_dir.rglob('*.sublime-syntax'))
         syntax = YAML().load(syntax_path)
@@ -165,6 +188,17 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
             token in counter_usage['match']
             for token in ('COORDINATE', 'COUNTER')
         )
+        closing_parenthesis = next(
+            rule
+            for rule in counter_usage['push']
+            if rule.get('match') == r'\)'
+        )
+        assert closing_parenthesis == {
+            'match': r'\)',
+            'scope': 'punctuation.section.parens.end',
+            'pop': True,
+        }
+        assert {'include': 'numerical_expressions'} in counter_usage['push']
         directive_patterns = syntax['contexts']['flow_counter_directives']
         track = next(pattern for pattern in directive_patterns if '(track)' in pattern['match'])
         usages = next(
@@ -190,6 +224,21 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
             token in syntax['contexts']['flow_operators'][0]['match']
             for token in ('COORDINATE', 'COUNTER', 'OFFSET')
         )
+        numerical_expressions = syntax['contexts']['numerical_expressions']
+        comparison_index = numerical_expressions.index(
+            {'include': 'comparison_operators'},
+        )
+        bitwise_index = next(
+            index
+            for index, pattern in enumerate(numerical_expressions)
+            if pattern.get('scope') == 'keyword.operator.bitwise'
+        )
+        comparison_pattern = syntax['contexts']['comparison_operators'][0]['match']
+        assert bitwise_index < comparison_index
+        assert all(
+            re.match(comparison_pattern, operator).group(0) == operator
+            for operator in ('==', '!=', '>=', '>', '<=', '<')
+        )
     else:
         assert 'syn match flowm1testassemblyFlowCoordinateUsage' in generated
         assert r'#\%(endtrack\|entry\|resume\|set\|suspend\)' in generated
@@ -198,6 +247,10 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
             'syn keyword flowm1testassemblyFlowOperator '
             'COORDINATE COUNTER OFFSET'
         ) in generated
+        assert (
+            r'Operator /==\|!=\|>=\|<=\|>>\|<<\|>\|<\|[+\-*/&|^]/'
+            in generated
+        )
 
     if generator_class is not VimConfigGenerator:
         assert {'track', 'endtrack', 'entry', 'assert', *M4_FLOW_DIRECTIVES} <= set(
@@ -213,6 +266,7 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
             'never controls conditional compilation'
             in hover_docs['directives']['preprocessor']['assert']
         )
+        assert '| Counter | stack | +1' in hover_docs['instructions']['PUSH']
     else:
         assert '#track' in generated
         assert '#endtrack' in generated
@@ -277,3 +331,7 @@ def test_flow_tokens_are_absent_from_non_enabled_isa(
         assert 'COORDINATE' not in hover_docs['expression_functions']
         assert 'OFFSET' not in hover_docs['expression_functions']
         assert not hover_docs['directives']['counter_coordinate']
+        assert all(
+            '| Counter |' not in documentation
+            for documentation in hover_docs['instructions'].values()
+        )

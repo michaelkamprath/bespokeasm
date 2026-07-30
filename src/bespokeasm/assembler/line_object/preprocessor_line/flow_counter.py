@@ -396,7 +396,7 @@ class FlowTrackLine(FlowCounterDirectiveLine):
             self._error(f'invalid flow counter class name "{self._counter_class}"')
         self._parameters = self._parse_parameters(
             match.group(2) or '',
-            {'as', 'mode', 'init', 'exit'},
+            {'as', 'mode', 'init', 'exit', 'min', 'max'},
             identifier_names=frozenset({'as', 'mode'}),
         )
         instance_name = self.identifier_parameter('as')

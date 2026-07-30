@@ -17,6 +17,9 @@ counters:
   control-flow graph;
 - a scalar `cycles` class verifies that both sides of a branch take the same
   number of configured clock cycles.
+- an instruction may identify memory-write target operands; writing an
+  address watched by a counter makes that counter indeterminate even through
+  a macro expansion, until source explicitly re-anchors it with `#resume`.
 
 The primary sample retains the practical stack-parameter use case. It declares
 a caller-owned parameter at `sp+3`, pushes a common local value before
@@ -30,6 +33,18 @@ Additional fixtures demonstrate a leaked push on only one return path, an
 explicit unreachable entry, a suspended runtime-length loop, an indirect
 transfer error, fall-through into emitted data, a balanced tail call, and the
 warning produced by an externally visible label after all known paths return.
+
+`watched-address-reset.asm` invokes the `reset_stack` macro, which expands to
+`write_addr 255`. The `stack` class declares address 255 in
+`invalidate_on_write`, while `write_addr` declares operand zero in
+`flow_write_operands`; analysis therefore sees the expanded real instruction,
+changes `stack` to indeterminate, invalidates its old coordinates, and requires
+the explicit `#resume stack = 0` before precise tracking continues.
+
+`direct-reset.asm` demonstrates the complementary `flow_invalidates`
+instruction contract for an anchor replacement that is not a memory write.
+The fixture reaches that instruction through a macro expansion and explicitly
+re-anchors the new stack with `#resume`, just like the watched-write case.
 
 `concurrent-counters.asm` tracks routine-owned stack depth and completed memory
 writes at the same time. Because a stack push also writes memory, its listing

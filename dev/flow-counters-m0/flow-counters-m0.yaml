@@ -1,6 +1,6 @@
 description: Flow analysis M0 development acceptance harness
 general:
-  min_version: "0.7.4a0"
+  min_version: "0.8.0"
   address_size: 8
   multi_word_endian: little
   registers:
@@ -14,6 +14,8 @@ flow_counters:
     join: require-equal
     min_value: 0
     max_value: 16
+    invalidate_on_write:
+      - 255
     unknown_instructions: error
     default_init: 0
     exit_policy: balanced
@@ -87,6 +89,27 @@ instructions:
       operand_sets:
         list:
           - target
+  store:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    flow_write_operands:
+      - 0
+    bytecode:
+      value: 0xa0
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - target
+  reset_stack:
+    flow_invalidates:
+      - stack
+    flow_transfer: none
+    bytecode:
+      value: 0xb0
+      size: 8
 macros:
   load_and_nop:
     - instructions:

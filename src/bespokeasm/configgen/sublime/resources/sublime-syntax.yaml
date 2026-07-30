@@ -55,6 +55,16 @@ contexts:
         1: keyword.operator.flow
         3: punctuation.section.parens.begin
         5: variable.other.flow.counter variable.other.flow.counter.usage
+      push:
+        - meta_scope: expression.group
+        - match: \)
+          scope: punctuation.section.parens.end
+          pop: true
+        - include: numerical_expressions
+        - match: \,
+          scope: punctuation.separator
+        - match: $
+          pop: true
 
   flow_counter_directives:
     - match: (?i)\b(track)(\s+)(##SYMBOL_PATTERN##)
@@ -147,7 +157,7 @@ contexts:
       scope: constant.numeric.character
 
   comparison_operators:
-    - match: (?:==|!=|>|>=|<|<=)
+    - match: (?:==|!=|>=|>|<=|<)
       scope: keyword.operator.logical
 
   numerical_expressions:
@@ -162,9 +172,9 @@ contexts:
       scope: keyword.operator.arithmetic
     - match: "[\\&\\|\\^]{1}"
       scope: keyword.operator.logical
-    - include: comparison_operators
     - match: (?:>>|<<)
       scope: keyword.operator.bitwise
+    - include: comparison_operators
     - match: \b(?:##EXPRESSION_FUNCTIONS##)\b
       scope: keyword.operator.word
     - include: operands_variables

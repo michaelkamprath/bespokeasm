@@ -54,7 +54,8 @@
       "match": "(?i)\\b(OFFSET)(\\s*)(\\()(\\s*)(##SYMBOL_PATTERN##)(\\s*)(\\))"
     },
     "flow_counter_usages": {
-      "captures": {
+      "begin": "(?i)\\b(COORDINATE|COUNTER)(\\s*)(\\()(\\s*)(##SYMBOL_PATTERN##)",
+      "beginCaptures": {
         "1": {
           "name": "keyword.operator.flow"
         },
@@ -65,7 +66,40 @@
           "name": "variable.other.flow.counter variable.other.flow.counter.usage"
         }
       },
-      "match": "(?i)\\b(COORDINATE|COUNTER)(\\s*)(\\()(\\s*)(##SYMBOL_PATTERN##)"
+      "contentName": "expression.group",
+      "end": "\\)",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.section.parens.end"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#numeric-values"
+        },
+        {
+          "include": "#operand_label_definitions"
+        },
+        {
+          "include": "#compiler_labels"
+        },
+        {
+          "include": "#label_usages"
+        },
+        {
+          "include": "#operands_variables"
+        },
+        {
+          "include": "#operators"
+        },
+        {
+          "include": "#expressions"
+        },
+        {
+          "match": ",",
+          "name": "punctuation.separator"
+        }
+      ]
     },
     "flow_counter_directives": {
       "patterns": [
@@ -573,7 +607,7 @@
           "name": "keyword.operator.word"
         },
         {
-          "match": "(?:==|!=|>|>=|<|<=)",
+          "match": "(?:==|!=|>=|>|<=|<)",
           "name": "keyword.operator.comparison"
         }
       ]

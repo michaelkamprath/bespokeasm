@@ -40,10 +40,22 @@ class _LinearCounterState:
     expected_exit: int | None
     config: dict
     opened_by: FlowTrackLine
+    # Effective bounds are computed once at ``#track``: the more restrictive
+    # of the class's declared ``min_value``/``max_value`` and the instance's
+    # ``min=``/``max=`` parameters (tighten-only). Every bounds check reads
+    # these, so instance bounds are enforced everywhere class bounds are.
+    effective_min: int | None = None
+    effective_max: int | None = None
     coordinates: list[CounterCoordinate] = field(default_factory=list)
     invalid_coordinate_ids: set[int] = field(default_factory=set)
     path_live: bool = True
     suspended: bool = False
+    # When indeterminacy was caused by anchor invalidation rather than an
+    # explicit ``#suspend``, this names the cause (watched write or direct
+    # ``flow_invalidates`` instruction, with its source line) so downstream
+    # diagnostics can identify it. ``None`` means explicitly suspended or
+    # not indeterminate at all. Cleared by a successful re-anchor.
+    invalidated_since: str | None = None
     region_id: int | None = None
     branch_provenance: dict[int, tuple[object, str]] = field(
         default_factory=dict,
@@ -100,8 +112,8 @@ class FlowLinearAnalyzer:
         state: _LinearCounterState,
     ) -> None:
         """Report a bound violation for one counter at this source line."""
-        minimum = state.config.get('min_value')
-        maximum = state.config.get('max_value')
+        minimum = state.effective_min
+        maximum = state.effective_max
         if minimum is not None and state.value < minimum:
             self._error(
                 line_object,
@@ -165,6 +177,11 @@ class FlowLinearAnalyzer:
                 )
                 return
 
+        effective_bounds = self._effective_bounds(line_object, counter_config)
+        if effective_bounds is None:
+            return
+        effective_min, effective_max = effective_bounds
+
         initial = line_object.evaluate_parameter('init')
         if initial is None:
             initial = mode_config.get(
@@ -188,10 +205,72 @@ class FlowLinearAnalyzer:
             expected_exit=expected_exit,
             config=counter_config,
             opened_by=line_object,
+            effective_min=effective_min,
+            effective_max=effective_max,
         )
         self._active[counter_name] = state
         self._next_instance_id += 1
         self._check_bounds(line_object, state)
+
+    def _effective_bounds(
+        self,
+        line_object: FlowTrackLine,
+        counter_config: dict,
+    ) -> tuple[int | None, int | None] | None:
+        """Merge class bounds with ``#track`` instance bounds (tighten-only).
+
+        Instance bounds exist because on RAM-stack machines the depth limit is
+        a property of the program's memory map, not the ISA. They may only
+        tighten the class's declared bounds — a program must not claim more
+        than the hardware provides — so an instance bound looser than a
+        declared class bound is an error on the ``#track`` line and ``None``
+        is returned for the guard-and-return convention.
+        """
+        class_min = counter_config.get('min_value')
+        class_max = counter_config.get('max_value')
+        instance_min = line_object.evaluate_parameter('min')
+        instance_max = line_object.evaluate_parameter('max')
+        if (
+            instance_min is not None
+            and class_min is not None
+            and instance_min < class_min
+        ):
+            self._error(
+                line_object,
+                f'flow counter instance bound min={instance_min} is looser '
+                f'than the class minimum {class_min}; instance bounds may '
+                'only tighten class bounds',
+            )
+            return None
+        if (
+            instance_max is not None
+            and class_max is not None
+            and instance_max > class_max
+        ):
+            self._error(
+                line_object,
+                f'flow counter instance bound max={instance_max} is looser '
+                f'than the class maximum {class_max}; instance bounds may '
+                'only tighten class bounds',
+            )
+            return None
+        minimums = [bound for bound in (class_min, instance_min) if bound is not None]
+        maximums = [bound for bound in (class_max, instance_max) if bound is not None]
+        effective_min = max(minimums) if minimums else None
+        effective_max = min(maximums) if maximums else None
+        if (
+            effective_min is not None
+            and effective_max is not None
+            and effective_min > effective_max
+        ):
+            self._error(
+                line_object,
+                f'flow counter instance bounds are contradictory: '
+                f'effective minimum {effective_min} exceeds effective maximum '
+                f'{effective_max}',
+            )
+            return None
+        return effective_min, effective_max
 
     def _close(self, line_object: FlowEndTrackLine) -> None:
         """Apply the exit contract and close the active tracking region."""
@@ -210,6 +289,20 @@ class FlowLinearAnalyzer:
                     'counter is suspended',
                 )
                 return
+            if (
+                state.invalidated_since is not None
+                and state.expected_exit is not None
+            ):
+                # Closing over an explicit #suspend is a deliberate
+                # programmer acknowledgement and stays silent. Indeterminacy
+                # caused by anchor invalidation was never acknowledged, so
+                # the skipped exit contract is surfaced with its provenance.
+                self._diagnostic_reporter.warn(
+                    line_object.line_id,
+                    f'exit contract not checked: flow counter "{state.name}" '
+                    f'indeterminate since {state.invalidated_since}',
+                    category='flow',
+                )
             del self._active[state.name]
             return
         if not state.path_live:
@@ -328,7 +421,7 @@ class FlowLinearAnalyzer:
             self._error(
                 line_object,
                 f'OFFSET({label}) cannot be resolved while flow counter '
-                f'"{state.name}" is suspended',
+                f'"{state.name}" is {self._indeterminate_tail(state)}',
             )
             return
         if coordinate.counter_instance_id != state.instance_id:
@@ -369,7 +462,7 @@ class FlowLinearAnalyzer:
                 self._error(
                     line_object,
                     f'COUNTER({counter_name}) cannot be resolved while flow counter '
-                    f'"{counter_name}" is suspended',
+                    f'"{counter_name}" is {self._indeterminate_tail(state)}',
                 )
                 continue
             node.resolve_flow_value(state.value)
@@ -397,7 +490,7 @@ class FlowLinearAnalyzer:
             self._error(
                 line_object,
                 f'COORDINATE({counter_name}, ...) cannot declare a coordinate '
-                'while the counter is suspended',
+                f'while the counter is {self._indeterminate_tail(state)}',
             )
             return
 
@@ -541,6 +634,145 @@ class FlowLinearAnalyzer:
             )
             return 0
 
+    @staticmethod
+    def _write_target_values(line_object, record) -> tuple[int | None, ...]:
+        """Resolve configured memory-write operands conservatively.
+
+        A concrete integer is returned for a compile-time target. ``None``
+        means the target is runtime-valued or otherwise cannot be proven, so
+        it may alias any address watched by an active counter.
+        """
+        targets = []
+        for index in record.semantics.get('flow_write_operands', ()):
+            if index < 0 or index >= len(record.operands):
+                # Config-load validation normally makes this unreachable. Keep
+                # analysis guarded for a future accumulating reporter.
+                targets.append(None)
+                continue
+            operand = record.operands[index]
+            if (
+                operand.semantic_kind
+                is not OperandSemanticKind.COMPILE_TIME_EXPRESSION
+                or operand.expression is None
+                or operand.expression.contains_flow_value()
+            ):
+                targets.append(None)
+                continue
+            try:
+                targets.append(
+                    operand.expression.to_node().get_value(
+                        line_object.symbol_scope,
+                        line_object.active_named_scopes,
+                        line_object.line_id,
+                    )
+                )
+            except (
+                ArithmeticError,
+                RuntimeError,
+                SyntaxError,
+                SystemExit,
+                ValueError,
+            ):
+                targets.append(None)
+        return tuple(targets)
+
+    @staticmethod
+    def _indeterminate_tail(state: _LinearCounterState) -> str:
+        """Describe why a counter has no value, naming invalidation causes.
+
+        Explicit ``#suspend`` keeps its established one-word description;
+        an invalidation-caused indeterminacy identifies the invalidating
+        write or instruction and points at the required ``#resume``.
+        """
+        if state.invalidated_since is None:
+            return 'suspended'
+        return (
+            f'indeterminate since {state.invalidated_since}; '
+            '#resume with a known value is required'
+        )
+
+    def _suspended_terminal_message(
+        self,
+        record,
+        state: _LinearCounterState,
+    ) -> str:
+        """Explain why a terminal cannot reconcile one indeterminate counter."""
+        if state.invalidated_since is None:
+            return (
+                f'flow terminal "{record.source_mnemonic}" cannot reconcile '
+                f'suspended flow counter "{state.name}"'
+            )
+        return (
+            f'flow terminal "{record.source_mnemonic}" cannot reconcile '
+            f'flow counter "{state.name}": {self._indeterminate_tail(state)}'
+        )
+
+    @staticmethod
+    def _invalidate_state(state: _LinearCounterState, provenance: str) -> None:
+        """Make one counter indeterminate and invalidate all its coordinates.
+
+        An already-indeterminate counter — explicitly suspended or hit by an
+        earlier invalidation — is deliberately not early-returned: the
+        coordinates alive at this invalidation must still be permanently
+        invalidated (a future slot-preservation contract on ``#resume`` must
+        never resurrect them), and the provenance must be recorded. The
+        first invalidation's provenance is retained.
+        """
+        if state.invalidated_since is None:
+            state.invalidated_since = provenance
+        state.suspended = True
+        for coordinate in state.coordinates:
+            state.invalid_coordinate_ids.add(id(coordinate))
+            coordinate.is_valid = False
+
+    def _apply_instruction_invalidations(self, line_object, record) -> None:
+        """Apply direct and watched-write invalidation metadata.
+
+        ``flow_invalidates`` unconditionally invalidates every active instance
+        of the named classes. ``flow_write_operands`` works with each class's
+        ``invalidate_on_write`` addresses and invalidates only a possible
+        matching write. Both forms use the same indeterminate state as
+        ``#suspend``, additionally recording the invalidation provenance;
+        ``#resume`` is the explicit re-anchoring operation.
+        """
+        invalidated_classes = record.semantics.get('flow_invalidates', ())
+        for state in self._active.values():
+            if state.counter_class in invalidated_classes:
+                self._invalidate_state(
+                    state,
+                    f'instruction "{record.source_mnemonic}" '
+                    f'at {line_object.line_id}',
+                )
+
+        targets = self._write_target_values(line_object, record)
+        if not targets:
+            return
+        for state in self._active.values():
+            watched_addresses = state.config.get('invalidate_on_write', ())
+            if (
+                not watched_addresses
+                or not any(
+                    target is None or target in watched_addresses
+                    for target in targets
+                )
+            ):
+                continue
+            matched_address = next(
+                (
+                    target
+                    for target in targets
+                    if target is not None and target in watched_addresses
+                ),
+                # A runtime target conservatively aliases every watched
+                # address; the class's first declared address names the
+                # anchor in that case.
+                watched_addresses[0],
+            )
+            self._invalidate_state(
+                state,
+                f'the write to {matched_address:#x} at {line_object.line_id}',
+            )
+
     def _resolve_delta(
         self,
         line_object,
@@ -675,6 +907,7 @@ class FlowLinearAnalyzer:
                 f'instruction "{record.source_mnemonic}" is missing required flow_transfer metadata',
             )
             return
+        self._apply_instruction_invalidations(line_object, record)
         terminals = record.semantics.get('flow_terminal', {})
         mapped_states = [
             state for state in live_states
@@ -716,8 +949,7 @@ class FlowLinearAnalyzer:
                 if state.suspended:
                     self._error(
                         line_object,
-                        f'flow terminal "{record.source_mnemonic}" cannot reconcile '
-                        f'suspended flow counter "{state.name}"',
+                        self._suspended_terminal_message(record, state),
                     )
                     continue
                 if reconciliation_order == 'after_effect':
@@ -864,10 +1096,15 @@ class FlowLinearAnalyzer:
             if state is None:
                 return
             if state.suspended:
-                self._error(
-                    line_object,
-                    f'#assert cannot read suspended flow counter "{state.name}"',
+                message = (
+                    f'#assert cannot read suspended flow counter "{state.name}"'
+                    if state.invalidated_since is None
+                    else (
+                        f'#assert cannot read flow counter "{state.name}": '
+                        f'{self._indeterminate_tail(state)}'
+                    )
                 )
+                self._error(line_object, message)
                 return
             lhs_value = state.value
             rhs_value = self._evaluate_directive_expression(
@@ -910,11 +1147,16 @@ class FlowLinearAnalyzer:
         if state is None:
             return
         if state.suspended:
-            self._error(
-                line_object,
+            message = (
                 f'flow counter "{state.name}" is suspended; use #resume to '
-                'restore a known value',
+                'restore a known value'
+                if state.invalidated_since is None
+                else (
+                    f'flow counter "{state.name}" is '
+                    f'{self._indeterminate_tail(state)}'
+                )
             )
+            self._error(line_object, message)
             return
         value = self._evaluate_directive_expression(
             line_object,
@@ -941,10 +1183,15 @@ class FlowLinearAnalyzer:
         if state is None:
             return
         if state.suspended:
-            self._error(
-                line_object,
-                f'flow counter "{state.name}" is already suspended',
+            message = (
+                f'flow counter "{state.name}" is already suspended'
+                if state.invalidated_since is None
+                else (
+                    f'flow counter "{state.name}" is already indeterminate '
+                    f'since {state.invalidated_since}'
+                )
             )
+            self._error(line_object, message)
             return
         state.suspended = True
 
@@ -972,6 +1219,9 @@ class FlowLinearAnalyzer:
             return
         state.value = value
         state.suspended = False
+        # The explicit re-anchor resolves the indeterminacy, so a later
+        # diagnostic must not cite this (cured) invalidation as its cause.
+        state.invalidated_since = None
         for coordinate in state.coordinates:
             state.invalid_coordinate_ids.add(id(coordinate))
             coordinate.is_valid = False
@@ -1367,12 +1617,29 @@ class FlowGraphAnalyzer(FlowLinearAnalyzer):
             for branch_id, provenance in existing.branch_provenance.items()
             if incoming.branch_provenance.get(branch_id) == provenance
         }
+        # Two invalidated paths may carry different invalidation provenance
+        # (e.g. one watched write per branch); the join keeps one of them
+        # deterministically — the lexicographically first — independent of
+        # worklist arrival order.
+        invalidation_candidates = [
+            provenance
+            for provenance in (
+                existing.invalidated_since,
+                incoming.invalidated_since,
+            )
+            if provenance is not None
+        ]
+        merged_invalidated_since = (
+            min(invalidation_candidates) if invalidation_candidates else None
+        )
         changed = (
             merged_invalid != existing.invalid_coordinate_ids
             or merged_provenance != existing.branch_provenance
+            or merged_invalidated_since != existing.invalidated_since
         )
         merged.invalid_coordinate_ids = set(merged_invalid)
         merged.branch_provenance = merged_provenance
+        merged.invalidated_since = merged_invalidated_since
         return merged, changed
 
     def _validate_boundary(
@@ -1519,7 +1786,8 @@ class FlowGraphAnalyzer(FlowLinearAnalyzer):
                 self._error(
                     line_object,
                     f'COUNTER({counter_name}) cannot be resolved while flow '
-                    f'counter "{counter_name}" is suspended',
+                    f'counter "{counter_name}" is '
+                    f'{self._indeterminate_tail(state)}',
                 )
                 continue
             if not isinstance(state.value, int):
@@ -1744,6 +2012,7 @@ class FlowGraphAnalyzer(FlowLinearAnalyzer):
                 'required flow_transfer metadata',
             )
             return ()
+        self._apply_instruction_invalidations(node.line_object, node.record)
         terminals = node.record.semantics.get('flow_terminal', {})
         mapped = [
             state
@@ -1779,8 +2048,7 @@ class FlowGraphAnalyzer(FlowLinearAnalyzer):
                 if state.suspended:
                     self._error(
                         node.line_object,
-                        f'flow terminal "{node.record.source_mnemonic}" cannot '
-                        f'reconcile suspended flow counter "{state.name}"',
+                        self._suspended_terminal_message(node.record, state),
                     )
                     continue
                 if order == 'after_effect':
@@ -2069,6 +2337,7 @@ class FlowGraphAnalyzer(FlowLinearAnalyzer):
                             return
                         state.value = value
                         state.suspended = False
+                        state.invalidated_since = None
                         prior_coordinates = [
                             coordinate
                             for coordinate_index, coordinate

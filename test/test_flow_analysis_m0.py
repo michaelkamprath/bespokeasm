@@ -95,6 +95,8 @@ def _without_flow_metadata(config: dict) -> dict:
             'flow_transfer',
             'flow_target_operand',
             'flow_call_effects',
+            'flow_invalidates',
+            'flow_write_operands',
         ):
             instruction.pop(key, None)
         for variant in instruction.get('variants', []):
@@ -104,6 +106,8 @@ def _without_flow_metadata(config: dict) -> dict:
                 'flow_transfer',
                 'flow_target_operand',
                 'flow_call_effects',
+                'flow_invalidates',
+                'flow_write_operands',
             ):
                 variant.pop(key, None)
     return config

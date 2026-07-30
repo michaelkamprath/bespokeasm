@@ -29,6 +29,7 @@ class DocumentationModel:
         self.predefined_constants = self._parse_predefined_constants()
         self.predefined_data = self._parse_predefined_data()
         self.operand_sets = self._parse_operand_sets_documentation()
+        self.flow_counters = self._parse_flow_counter_documentation()
         self.instruction_docs = self._parse_instruction_documentation()
         self.macro_docs = self._parse_macro_documentation()
 
@@ -891,15 +892,48 @@ class DocumentationModel:
                 instr_config,
                 operand_sets_config
             )
+            effective_configs = self.isa_model._effective_instruction_configs(
+                instr_config,
+            )
+            has_multiple_versions = len(versions) > 1
+            if (
+                self.flow_counters
+                and has_multiple_versions
+                and effective_configs
+                and len(effective_configs) <= len(versions)
+            ):
+                for version, effective_config in zip(
+                    versions[-len(effective_configs):],
+                    effective_configs,
+                ):
+                    version['flow_modifies'] = (
+                        self._derive_flow_counter_modifies(effective_config)
+                    )
 
             instruction_docs[instr_name] = {
                 'category': category,
                 'title': doc_config.get('title') if documented else None,
                 'description': doc_config.get('description') if documented else None,
-                'modifies': self._parse_modifies(doc_config.get('modifies', [])) if documented else [],
+                'modifies': (
+                    self._parse_modifies(
+                        doc_config.get('modifies', []),
+                    )
+                    + (
+                        self._derive_flow_counter_modifies(
+                            effective_configs[0],
+                        )
+                        if (
+                            self.flow_counters
+                            and not has_multiple_versions
+                            and effective_configs
+                        )
+                        else []
+                    )
+                ),
                 'examples': self._parse_examples(doc_config.get('examples', [])) if documented else [],
                 'documented': documented,
-                'versions': versions
+                'versions': versions,
+                'aliases': instr_config.get('aliases', []),
             }
 
             if not documented and self.verbose >= 2:
@@ -917,6 +951,268 @@ class DocumentationModel:
             click.echo(f"Categories found: {', '.join(sorted(categories))}")
 
         return instruction_docs
+
+    def _parse_flow_counter_documentation(self) -> list[dict[str, Any]]:
+        """Build public documentation data for configured counter classes."""
+        counters = self._config.get('flow_counters')
+        if not isinstance(counters, dict):
+            return []
+
+        terminal_instructions: dict[str, list[dict[str, str]]] = {
+            counter_name: []
+            for counter_name in counters
+        }
+        for mnemonic, instruction_config in self._config.get(
+            'instructions',
+            {},
+        ).items():
+            for effective_config in self.isa_model._effective_instruction_configs(
+                instruction_config,
+            ):
+                terminals = effective_config.get('flow_terminal', {})
+                if not isinstance(terminals, dict):
+                    continue
+                for counter_name, order in terminals.items():
+                    if counter_name not in terminal_instructions:
+                        continue
+                    terminal = {
+                        'instruction': mnemonic,
+                        'order': self._terminal_order_label(order),
+                    }
+                    if terminal not in terminal_instructions[counter_name]:
+                        terminal_instructions[counter_name].append(terminal)
+
+        docs: list[dict[str, Any]] = []
+        for counter_name, counter_config in counters.items():
+            documentation = counter_config.get('documentation', {})
+            entry_modes = [
+                {
+                    'name': mode_name,
+                    'init': mode_config['init'],
+                    'exit': (
+                        mode_config['exit']
+                        if 'exit' in mode_config
+                        else (
+                            mode_config['init']
+                            if counter_config.get(
+                                'exit_policy',
+                                'balanced',
+                            ) == 'balanced'
+                            else 'No implicit contract'
+                        )
+                    ),
+                    'description': mode_config.get('description', ''),
+                }
+                for mode_name, mode_config in counter_config.get(
+                    'entry_modes',
+                    {},
+                ).items()
+            ]
+            docs.append({
+                'name': counter_name,
+                'title': documentation.get('title', counter_name),
+                'description': documentation.get('description'),
+                'properties': [
+                    (
+                        'Source',
+                        f"`{counter_config.get('source', f'flow_effects.{counter_name}')}`",
+                    ),
+                    ('Minimum Value', counter_config.get('min_value', 'Not set')),
+                    ('Maximum Value', counter_config.get('max_value', 'Not set')),
+                    (
+                        'Default Initial Value',
+                        counter_config.get('default_init', 0),
+                    ),
+                    (
+                        'Exit Policy',
+                        f"`{counter_config.get('exit_policy', 'balanced')}`",
+                    ),
+                    (
+                        'Coordinate Offsets',
+                        f"`{counter_config.get('coordinate_offsets', 'both')}`",
+                    ),
+                    (
+                        'Allow Zero Offset',
+                        (
+                            'Yes'
+                            if counter_config.get('allow_zero_offset', True)
+                            else 'No'
+                        ),
+                    ),
+                    (
+                        'Unknown Instructions',
+                        f"`{counter_config.get('unknown_instructions', 'warn')}`",
+                    ),
+                    (
+                        'Invalidated By Writes To',
+                        (
+                            ', '.join(
+                                f'`{address:#x}`'
+                                for address in counter_config.get(
+                                    'invalidate_on_write',
+                                    [],
+                                )
+                            )
+                            or 'Not set'
+                        ),
+                    ),
+                    (
+                        'Join Policy',
+                        f"`{counter_config.get('join', 'require-equal')}`",
+                    ),
+                ],
+                'entry_modes': entry_modes,
+                'terminal_instructions': terminal_instructions[counter_name],
+            })
+        return docs
+
+    def _derive_flow_counter_modifies(
+        self,
+        effective_config: dict[str, Any],
+    ) -> list[dict[str, str]]:
+        """Derive counter-effect rows from one effective instruction variant."""
+        rows: list[dict[str, str]] = []
+        terminals = effective_config.get('flow_terminal', {})
+        call_effects = effective_config.get('flow_call_effects')
+        invalidated_classes = effective_config.get('flow_invalidates', [])
+        for counter_name, counter_config in self._config.get(
+            'flow_counters',
+            {},
+        ).items():
+            source = counter_config.get(
+                'source',
+                f'flow_effects.{counter_name}',
+            )
+            delta = self._config_path_value(effective_config, source)
+            if delta is not None and not self._is_zero_delta(delta):
+                rows.append({
+                    'type': 'counter',
+                    'target': counter_name,
+                    'description': (
+                        f'{self._format_flow_delta(delta)} physical effect.'
+                    ),
+                })
+
+            if counter_name in invalidated_classes:
+                rows.append({
+                    'type': 'counter',
+                    'target': counter_name,
+                    'description': 'Unconditionally becomes indeterminate.',
+                })
+
+            write_operands = effective_config.get('flow_write_operands', [])
+            invalidating_addresses = counter_config.get(
+                'invalidate_on_write',
+                [],
+            )
+            if write_operands and invalidating_addresses:
+                # Zero-based, matching the ARG(0) presentation of
+                # operand-dependent delta rows, and saying so.
+                operand_text = ', '.join(
+                    str(index)
+                    for index in write_operands
+                )
+                address_text = ', '.join(
+                    f'{address:#x}'
+                    for address in invalidating_addresses
+                )
+                rows.append({
+                    'type': 'counter',
+                    'target': counter_name,
+                    'description': (
+                        f'Becomes indeterminate when zero-based write-target '
+                        f'operand(s) {operand_text} may address '
+                        f'{address_text}.'
+                    ),
+                })
+
+            if isinstance(terminals, dict) and counter_name in terminals:
+                order = terminals[counter_name]
+                order_words = self._terminal_order_words(order)
+                rows.append({
+                    'type': 'counter',
+                    'target': counter_name,
+                    'description': (
+                        f'This terminates the flow path and reconciles the counter '
+                        f'{order_words}.'
+                    ),
+                })
+
+            if (
+                isinstance(call_effects, dict)
+                and counter_name in call_effects
+            ):
+                rows.append({
+                    'type': 'counter',
+                    'target': counter_name,
+                    'description': (
+                        'The caller-visible net effect after return: '
+                        f'{self._format_flow_delta(call_effects[counter_name])}.'
+                    ),
+                })
+        return rows
+
+    @staticmethod
+    def _config_path_value(config: dict[str, Any], path: str) -> Any:
+        """Return a nested configuration value addressed by a dotted path."""
+        value: Any = config
+        for component in path.split('.'):
+            if not isinstance(value, dict) or component not in value:
+                return None
+            value = value[component]
+        return value
+
+    @staticmethod
+    def _is_zero_delta(delta: Any) -> bool:
+        """Return whether a configured flow delta is statically zero."""
+        if isinstance(delta, dict):
+            return all(
+                DocumentationModel._is_zero_delta(edge_delta)
+                for edge_delta in delta.values()
+            )
+        return (
+            not isinstance(delta, bool)
+            and (
+                delta == 0
+                or (
+                    isinstance(delta, str)
+                    and delta.strip() in {'0', '+0', '-0'}
+                )
+            )
+        )
+
+    @staticmethod
+    def _format_flow_delta(delta: Any) -> str:
+        """Format a counter delta using an explicit sign for integers."""
+        if isinstance(delta, dict):
+            return ' / '.join(
+                (
+                    f"{str(edge_name).replace('_', '-')} "
+                    f'{DocumentationModel._format_flow_delta(edge_delta)}'
+                )
+                for edge_name, edge_delta in delta.items()
+            )
+        if isinstance(delta, int) and not isinstance(delta, bool):
+            return f'{delta:+d}'
+        return str(delta)
+
+    @staticmethod
+    def _terminal_order_label(order: str) -> str:
+        """Return the compact terminal-order label used in class summaries."""
+        return (
+            'Before effect'
+            if order == 'before_effect'
+            else 'After effect'
+        )
+
+    @staticmethod
+    def _terminal_order_words(order: str) -> str:
+        """Return terminal-order prose used in derived instruction rows."""
+        return (
+            'before the instruction effect'
+            if order == 'before_effect'
+            else 'after the instruction effect'
+        )
 
     def _parse_macro_documentation(self) -> dict[str, Any]:
         """

@@ -1,0 +1,2 @@
+    push
+    reset_stack

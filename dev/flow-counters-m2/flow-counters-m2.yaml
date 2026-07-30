@@ -1,6 +1,6 @@
 description: Flow analysis M2 development acceptance harness
 general:
-  min_version: "0.7.4a0"
+  min_version: "0.8.0"
   address_size: 8
   multi_word_endian: little
   registers:

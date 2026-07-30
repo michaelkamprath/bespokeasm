@@ -197,6 +197,34 @@ def main() -> None:
             'enters emitted data',
         )
         _assemble('tail-call.asm', tmp_dir / 'tail-call.bin')
+        _assemble(
+            'watched-address-reset.asm',
+            tmp_dir / 'watched-address-reset.bin',
+            listing=True,
+        )
+        _assemble(
+            'watched-address-reset-stripped.asm',
+            tmp_dir / 'watched-address-reset-stripped.bin',
+        )
+        assert (
+            tmp_dir / 'watched-address-reset.bin'
+        ).read_bytes() == (
+            tmp_dir / 'watched-address-reset-stripped.bin'
+        ).read_bytes()
+        _assemble(
+            'direct-reset.asm',
+            tmp_dir / 'direct-reset.bin',
+            listing=True,
+        )
+        _assemble(
+            'direct-reset-stripped.asm',
+            tmp_dir / 'direct-reset-stripped.bin',
+        )
+        assert (
+            tmp_dir / 'direct-reset.bin'
+        ).read_bytes() == (
+            tmp_dir / 'direct-reset-stripped.bin'
+        ).read_bytes()
         warning_assembler = _assemble(
             'trailing-label-warning.asm',
             tmp_dir / 'trailing-warning.bin',
@@ -220,6 +248,8 @@ def main() -> None:
         print('Explicit #entry root and suspended loop: PASS')
         print('Indirect transfer and fall-through diagnostics: PASS')
         print('Balanced tail call and external-entry warning: PASS')
+        print('Watched-address macro invalidation and re-anchor: PASS')
+        print('Direct instruction invalidation and re-anchor: PASS')
         print('Annotated listing flow column: PASS')
         print('Generated editor syntax and hover docs: PASS')
         print('M5 development acceptance: PASS')

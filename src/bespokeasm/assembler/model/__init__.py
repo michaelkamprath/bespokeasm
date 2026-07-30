@@ -135,6 +135,8 @@ class AssemblerModel:
         'flow_transfer',
         'flow_target_operand',
         'flow_call_effects',
+        'flow_invalidates',
+        'flow_write_operands',
     }
 
     def _validate_config(self, is_verbose: int) -> None:
@@ -285,6 +287,15 @@ class AssemblerModel:
         context = f'flow_counters.{counter_name}'
         if not isinstance(counter_config, dict):
             self._flow_config_error(f'{context} must be a dictionary')
+            return
+        if (
+            'documentation' in counter_config
+            and not isinstance(counter_config['documentation'], dict)
+        ):
+            self._flow_config_error(
+                f'{context}.documentation must be a dictionary'
+            )
+            return
         if counter_config.get('operation', 'add') != 'add':
             self._flow_config_error(f'{context}.operation must be "add"')
         if counter_config.get('join', 'require-equal') not in {'require-equal', 'interval'}:
@@ -323,9 +334,37 @@ class AssemblerModel:
                 or not isinstance(counter_config[option], int)
             ):
                 self._flow_config_error(f'{context}.{option} must be an integer')
+        invalidate_on_write = counter_config.get('invalidate_on_write')
+        if invalidate_on_write is not None:
+            if not isinstance(invalidate_on_write, list):
+                self._flow_config_error(
+                    f'{context}.invalidate_on_write must be a list of addresses'
+                )
+            else:
+                address_limit = (1 << self.address_size) - 1
+                seen_addresses = set()
+                for address in invalidate_on_write:
+                    if isinstance(address, bool) or not isinstance(address, int):
+                        self._flow_config_error(
+                            f'{context}.invalidate_on_write entries must be integer addresses'
+                        )
+                        continue
+                    elif address < 0 or address > address_limit:
+                        self._flow_config_error(
+                            f'{context}.invalidate_on_write address {address} is outside '
+                            f'the configured address range 0..{address_limit}'
+                        )
+                        continue
+                    elif address in seen_addresses:
+                        self._flow_config_error(
+                            f'{context}.invalidate_on_write contains duplicate address {address}'
+                        )
+                        continue
+                    seen_addresses.add(address)
         entry_modes = counter_config.get('entry_modes', {})
         if not isinstance(entry_modes, dict):
             self._flow_config_error(f'{context}.entry_modes must be a dictionary')
+            return
         for mode_name, mode_config in entry_modes.items():
             mode_context = f'{context}.entry_modes.{mode_name}'
             if not isinstance(mode_name, str) or not is_valid_label(mode_name):
@@ -334,12 +373,25 @@ class AssemblerModel:
                 )
             if not isinstance(mode_config, dict) or 'init' not in mode_config:
                 self._flow_config_error(f'{mode_context} must be a dictionary containing integer init')
-            unexpected_options = set(mode_config) - {'init', 'exit'}
+                continue
+            unexpected_options = set(mode_config) - {
+                'init',
+                'exit',
+                'description',
+            }
             if unexpected_options:
                 option = sorted(unexpected_options)[0]
                 self._flow_config_error(
                     f'{mode_context} has unsupported option "{option}"'
                 )
+            if (
+                'description' in mode_config
+                and not isinstance(mode_config['description'], str)
+            ):
+                self._flow_config_error(
+                    f'{mode_context}.description must be a string'
+                )
+                continue
             for option in ('init', 'exit'):
                 if option in mode_config and (
                     isinstance(mode_config[option], bool)
@@ -410,6 +462,32 @@ class AssemblerModel:
                         f'{context}.flow_call_effects names undeclared counter "{counter_name}"'
                     )
                 self._validate_flow_delta(delta, f'{context}.flow_call_effects.{counter_name}')
+
+        invalidates = config.get('flow_invalidates')
+        if invalidates is not None:
+            if not isinstance(invalidates, list):
+                self._flow_config_error(
+                    f'{context}.flow_invalidates must be a list of counter classes'
+                )
+            else:
+                seen_counters = set()
+                for counter_name in invalidates:
+                    if not isinstance(counter_name, str):
+                        self._flow_config_error(
+                            f'{context}.flow_invalidates entries must be counter class names'
+                        )
+                        continue
+                    if counter_name not in counter_names:
+                        self._flow_config_error(
+                            f'{context}.flow_invalidates names undeclared counter '
+                            f'"{counter_name}"'
+                        )
+                    if counter_name in seen_counters:
+                        self._flow_config_error(
+                            f'{context}.flow_invalidates contains duplicate counter '
+                            f'"{counter_name}"'
+                        )
+                    seen_counters.add(counter_name)
 
     def _validate_effective_transfer_config(self, config: dict, context: str) -> None:
         transfer = config.get('flow_transfer')
@@ -512,6 +590,44 @@ class AssemblerModel:
                 operand_counts = self._configured_source_operand_counts(
                     effective_config.get('operands', {}),
                 )
+                write_operands = effective_config.get('flow_write_operands')
+                if write_operands is not None:
+                    if not isinstance(write_operands, list):
+                        self._flow_config_error(
+                            f'{effective_context}.flow_write_operands must be '
+                            'a list of source operand indexes'
+                        )
+                    else:
+                        seen_indexes = set()
+                        for operand_index in write_operands:
+                            if (
+                                isinstance(operand_index, bool)
+                                or not isinstance(operand_index, int)
+                            ):
+                                self._flow_config_error(
+                                    f'{effective_context}.flow_write_operands '
+                                    'entries must be integer source operand indexes'
+                                )
+                                continue
+                            if not operand_counts or operand_index < 0 or any(
+                                operand_index >= count
+                                for count in operand_counts
+                            ):
+                                counts_text = ', '.join(
+                                    str(count)
+                                    for count in sorted(operand_counts)
+                                )
+                                self._flow_config_error(
+                                    f'{effective_context}.flow_write_operands index '
+                                    f'{operand_index} is outside the configured '
+                                    f'source-written operand count(s): {counts_text}'
+                                )
+                            if operand_index in seen_indexes:
+                                self._flow_config_error(
+                                    f'{effective_context}.flow_write_operands '
+                                    f'contains duplicate index {operand_index}'
+                                )
+                            seen_indexes.add(operand_index)
                 for metadata_key in ('flow_effects', 'flow_call_effects'):
                     for counter_name, delta in effective_config.get(
                         metadata_key,
@@ -778,19 +894,30 @@ class AssemblerModel:
         """Return, with per-model memoization, whether a class has any producer.
 
         A producer is an effective instruction variant containing the class's
-        configured source field or naming the class in ``flow_terminal``.
+        configured source field, naming the class in ``flow_terminal`` or
+        ``flow_invalidates``, or declaring a write operand while the class
+        watches invalidating addresses.
         """
-        cached_result = self._flow_effect_metadata_cache.get(counter_name)
-        if cached_result is not None:
-            return cached_result
+        if counter_name in self._flow_effect_metadata_cache:
+            return self._flow_effect_metadata_cache[counter_name]
         counter_config = self._config.get('flow_counters', {}).get(counter_name, {})
         source = counter_config.get('source', f'flow_effects.{counter_name}')
+        invalidating_addresses = counter_config.get('invalidate_on_write', [])
         for instruction_config in self._config['instructions'].values():
             for effective_config in self._effective_instruction_configs(instruction_config):
                 if self._config_path_value(effective_config, source) is not None:
                     self._flow_effect_metadata_cache[counter_name] = True
                     return True
                 if counter_name in effective_config.get('flow_terminal', []):
+                    self._flow_effect_metadata_cache[counter_name] = True
+                    return True
+                if counter_name in effective_config.get('flow_invalidates', []):
+                    self._flow_effect_metadata_cache[counter_name] = True
+                    return True
+                if (
+                    invalidating_addresses
+                    and effective_config.get('flow_write_operands')
+                ):
                     self._flow_effect_metadata_cache[counter_name] = True
                     return True
         self._flow_effect_metadata_cache[counter_name] = False

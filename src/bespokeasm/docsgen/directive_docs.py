@@ -385,12 +385,18 @@ PREPROCESSOR_DIRECTIVE_DOCS: dict[str, str] = {
         '```\n'
         '#track <counter-class>\n'
         '#track <counter-class> as=<counter-name> mode=<entry-mode> '
-        'init=<expression> exit=<expression>\n'
+        'init=<expression> exit=<expression> '
+        'min=<expression> max=<expression>\n'
         '```\n\n'
         '`as=` gives the instance a distinct name so multiple counters may '
         'overlap; otherwise the class name is used. '
         '`mode=` selects an entry convention configured by the counter class. '
         'Explicit `init=` and `exit=` values override the selected mode. '
+        '`min=` and `max=` declare per-instance bounds enforced everywhere '
+        'the class bounds are; they may only tighten (never loosen) the '
+        "class's `min_value`/`max_value`, and accept compile-time constant "
+        'expressions including memory-map-derived label expressions such as '
+        '`max=STACK_TOP - heap_end`. '
         'The directive does not emit bytecode or consume an address.'
     ),
     'endtrack': (

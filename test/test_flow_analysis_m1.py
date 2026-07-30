@@ -49,6 +49,8 @@ def _without_flow_metadata(config: dict) -> dict:
             'flow_transfer',
             'flow_target_operand',
             'flow_call_effects',
+            'flow_invalidates',
+            'flow_write_operands',
         ):
             instruction.pop(key, None)
         for variant in instruction.get('variants', []):
@@ -58,6 +60,8 @@ def _without_flow_metadata(config: dict) -> dict:
                 'flow_transfer',
                 'flow_target_operand',
                 'flow_call_effects',
+                'flow_invalidates',
+                'flow_write_operands',
             ):
                 variant.pop(key, None)
     return config
@@ -393,6 +397,12 @@ def test_m1_effect_metadata_lookup_is_memoized(tmp_path, monkeypatch):
     assert first_scan_count > 0
     assert model.flow_counter_has_effect_metadata('stack')
     assert scans == first_scan_count
+
+    assert not model.flow_counter_has_effect_metadata('missing')
+    negative_scan_count = scans
+    assert negative_scan_count > first_scan_count
+    assert not model.flow_counter_has_effect_metadata('missing')
+    assert scans == negative_scan_count
 
 
 def test_m1_feature_enablement_and_inactive_condition_are_usage_gated(tmp_path):
