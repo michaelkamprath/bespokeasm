@@ -28,13 +28,17 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         )
         self._word_size = model.word_size
         self._word_segment_size = model.word_segment_size
-        self._flow_width = max(
-            (
-                len(annotation)
-                for line_object in line_objs
-                for annotation in line_object.flow_annotation_lines
-            ),
-            default=0,
+        self._flow_width = (
+            max(
+                (
+                    len(annotation)
+                    for line_object in line_objs
+                    for annotation in line_object.flow_annotation_lines
+                ),
+                default=0,
+            )
+            if model.flow_checks_enabled
+            else 0
         )
         if self._flow_width:
             self._flow_width = max(self._flow_width, len('flow'))
@@ -190,7 +194,11 @@ class ListingPrettyPrinter(PrettyPrinterBase):
             instruction_str = lobj.instruction
         output.write(f'{instruction_str: <{self.max_instruction_width}} | ')
 
-        flow_annotations = lobj.flow_annotation_lines
+        flow_annotations = (
+            lobj.flow_annotation_lines
+            if self._flow_width
+            else ()
+        )
         if self._flow_width:
             first_flow_annotation = (
                 flow_annotations[0]

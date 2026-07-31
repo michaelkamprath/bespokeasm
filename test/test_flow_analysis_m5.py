@@ -17,6 +17,12 @@ from ruamel.yaml import YAML
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 M5_CONFIG = PROJECT_ROOT / 'dev' / 'flow-counters-m5' / 'flow-counters-m5.yaml'
 INTEL_8085_CONFIG = PROJECT_ROOT / 'examples' / 'intel-8085' / 'intel-8085.yaml'
+MINIMAL_64X4_CONFIG = (
+    PROJECT_ROOT
+    / 'examples'
+    / 'slu4-minimal-64x4'
+    / 'slu4-minimal-64x4.yaml'
+)
 
 
 @pytest.fixture(autouse=True)
@@ -33,7 +39,7 @@ def _assembler(
     config_path: Path = M5_CONFIG,
     pretty: bool = False,
     warnings_as_errors: bool = False,
-    static_analysis: bool = True,
+    flow_checks: bool = True,
 ) -> Assembler:
     source_path = tmp_path / 'm5.asm'
     source_path.write_text(source)
@@ -52,7 +58,7 @@ def _assembler(
         include_paths=[str(tmp_path)],
         predefined=[],
         warnings_as_errors=warnings_as_errors,
-        static_analysis=static_analysis,
+        flow_checks=flow_checks,
     )
 
 
@@ -88,9 +94,49 @@ def test_m5_branching_sample_has_separate_balanced_exits():
         is_verbose=0,
         include_paths=[],
         predefined=[],
-        static_analysis=True,
+        flow_checks=True,
     )
     assembler.assemble_bytecode()
+
+
+def test_no_flow_checks_resolves_offset_without_listing_column(
+    tmp_path,
+    capsys,
+):
+    _, bytecode = _assemble(
+        tmp_path,
+        'function:\n'
+        '#track stack\n'
+        'push\n'
+        '.slot := COORDINATE(stack, 1)\n'
+        '.byte OFFSET(.slot)\n'
+        'pop\n'
+        '#endtrack stack\n',
+        pretty=True,
+        flow_checks=False,
+    )
+    listing = capsys.readouterr().out
+
+    assert bytecode == bytes([0x10, 0x01, 0x11])
+    assert '| flow ' not in listing
+    assert 'stack=' not in listing
+
+
+def test_no_flow_checks_suppresses_assertion_and_exit_verification(
+    tmp_path,
+):
+    _, bytecode = _assemble(
+        tmp_path,
+        'function:\n'
+        '#track stack exit=0\n'
+        'push\n'
+        '.byte COUNTER(stack)\n'
+        '#assert stack == 999 "verification-only failure"\n'
+        '#endtrack stack\n',
+        flow_checks=False,
+    )
+
+    assert bytecode == bytes([0x10, 0x01])
 
 
 def test_m5_sample_tracks_different_counter_classes_concurrently(
@@ -480,7 +526,7 @@ def test_m5_disabled_analysis_strips_entry_declarations(tmp_path):
         'alternate:\n'
         'nop\n'
         '#endtrack stack\n',
-        static_analysis=False,
+        flow_checks=False,
     )
     assembler.assemble_bytecode()
     assert (tmp_path / 'm5.bin').read_bytes() == bytes([0])
@@ -1004,6 +1050,31 @@ def test_m5_listing_shows_transitions_and_omits_unchanged_state(
     assert not nop_row[4].strip()
 
 
+def test_m5_listing_omits_flow_column_when_analysis_is_disabled(
+    tmp_path,
+    capsys,
+):
+    assembler = _assembler(
+        tmp_path,
+        '#track stack\n'
+        'push\n'
+        'pop\n'
+        '#endtrack stack\n',
+        pretty=True,
+        flow_checks=False,
+    )
+    assembler.assemble_bytecode()
+    listing = capsys.readouterr().out
+
+    header = next(
+        line
+        for line in listing.splitlines()
+        if 'line' in line and 'instruction' in line and 'comment' in line
+    )
+    assert 'flow' not in header
+    assert 'stack=' not in listing
+
+
 def test_m5_listing_shows_declared_and_resolved_coordinate_offsets(
     tmp_path,
     capsys,
@@ -1384,6 +1455,60 @@ def test_intel_8085_stack_pointer_replacement_can_be_reanchored(
         if instruction in row
     )
     assert 'stack=2 → ?' in instruction_row
+
+
+def test_minimal_64x4_flow_stack_demo_compiles():
+    """The original Minimal 64x4 example exercises its real stack contract."""
+    assembler = Assembler(
+        source_file=str(
+            PROJECT_ROOT
+            / 'examples'
+            / 'slu4-minimal-64x4'
+            / 'software'
+            / 'flow-stack-demo.min64x4'
+        ),
+        config_file=str(MINIMAL_64X4_CONFIG),
+        generate_binary=False,
+        output_file=None,
+        binary_start=0,
+        binary_end=None,
+        binary_fill_value=0,
+        enable_pretty_print=False,
+        pretty_print_format=None,
+        pretty_print_output=None,
+        is_verbose=0,
+        include_paths=[],
+        predefined=[],
+        flow_checks=True,
+    )
+
+    assembler.assemble_bytecode()
+
+
+def test_minimal_64x4_spinit_macro_invalidates_and_can_be_reanchored(
+    tmp_path,
+    capsys,
+):
+    """The SP-initialization macro inherits its concrete watched write."""
+    _, bytecode = _assemble(
+        tmp_path,
+        '#track stack\n'
+        'phs\n'
+        'spinit\n'
+        '#resume stack = 0\n'
+        '#endtrack stack\n',
+        config_path=MINIMAL_64X4_CONFIG,
+        pretty=True,
+    )
+    listing = capsys.readouterr().out
+
+    assert bytecode == bytes([0x6a, 0x83, 0xfe, 0xff, 0xff])
+    spinit_row = next(
+        row
+        for row in listing.splitlines()
+        if '|' in row and 'spinit' in row
+    )
+    assert 'stack=1 → ?' in spinit_row
 
 
 def test_watched_write_requires_resume_before_precise_read(tmp_path):
@@ -1856,8 +1981,8 @@ def test_watched_write_configuration_validation(
         _assembler(tmp_path, 'nop\n', config_path=config_path)
 
 
-def test_watched_write_configuration_is_ignored_without_analysis(tmp_path):
-    """Analysis-only watched-write metadata is not interpreted under ``-A``."""
+def test_watched_write_configuration_is_validated_without_checks(tmp_path):
+    """Disabling checks does not make an invalid ISA configuration valid."""
     yaml = YAML(typ='safe')
     with M5_CONFIG.open() as config_file:
         config = copy.deepcopy(yaml.load(config_file))
@@ -1869,13 +1994,13 @@ def test_watched_write_configuration_is_ignored_without_analysis(tmp_path):
     with config_path.open('w') as config_file:
         writer.dump(config, config_file)
 
-    _, bytecode = _assemble(
-        tmp_path,
-        'nop\n',
-        config_path=config_path,
-        static_analysis=False,
-    )
-    assert bytecode == bytes([0])
+    with pytest.raises(SystemExit, match='must be a list of addresses'):
+        _assembler(
+            tmp_path,
+            'nop\n',
+            config_path=config_path,
+            flow_checks=False,
+        )
 
 
 _WRITE_OPERAND_MUTATIONS = [
@@ -1968,20 +2093,20 @@ def test_flow_write_operand_validation_fails_config_load_as_flow(
     [mutation for _, mutation, _ in _WRITE_OPERAND_MUTATIONS],
     ids=[name for name, _, _ in _WRITE_OPERAND_MUTATIONS],
 )
-def test_flow_write_operand_validation_is_uninterpreted_without_analysis(
+def test_flow_write_operand_validation_remains_active_without_checks(
     tmp_path,
     mutation,
 ):
-    """Acceptance 98: the same malformed metadata compiles under ``-A``."""
+    """Disabling checks does not suppress flow metadata validation."""
     config_path = _mutated_m5_config(tmp_path, mutation, 'ignored.yaml')
 
-    _, bytecode = _assemble(
-        tmp_path,
-        'nop\n',
-        config_path=config_path,
-        static_analysis=False,
-    )
-    assert bytecode == bytes([0])
+    with pytest.raises(SystemExit, match='flow_write_operands'):
+        _assembler(
+            tmp_path,
+            'nop\n',
+            config_path=config_path,
+            flow_checks=False,
+        )
 
 
 def test_watched_class_with_write_operand_producer_is_not_inert(tmp_path):

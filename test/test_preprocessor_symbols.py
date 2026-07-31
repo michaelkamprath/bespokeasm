@@ -599,6 +599,10 @@ nop
             preprocessor.get_symbol('__BESPOKEASM_VERSION__'),
             '__BESPOKEASM_VERSION__ should be defined'
         )
+        self.assertIsNotNone(
+            preprocessor.get_symbol('__FLOW_COUNTERS_AVAILABLE__'),
+            '__FLOW_COUNTERS_AVAILABLE__ should be defined',
+        )
 
         # Test symbol values (test config uses filename as language name and defaults to 0.0.1)
         self.assertEqual(
@@ -614,6 +618,11 @@ nop
             preprocessor.get_symbol('__BESPOKEASM_VERSION__').value,
             BESPOKEASM_VERSION_STR,
             'BespokeASM version should match package version'
+        )
+        self.assertEqual(
+            preprocessor.get_symbol('__FLOW_COUNTERS_AVAILABLE__').value,
+            '0',
+            'An ISA without flow_counters should report capability value 0',
         )
 
     def test_language_version_symbols_in_conditions(self):

@@ -40,7 +40,7 @@ def _assembler(
     source: str,
     *,
     config_path: Path = M4_CONFIG_PATH,
-    static_analysis: bool = True,
+    flow_checks: bool = True,
     output_name: str = 'out.bin',
     predefined: list[str] | None = None,
 ) -> Assembler:
@@ -61,7 +61,7 @@ def _assembler(
         is_verbose=0,
         include_paths=[str(tmp_path)],
         predefined=predefined or [],
-        static_analysis=static_analysis,
+        flow_checks=flow_checks,
     )
 
 
@@ -77,14 +77,14 @@ def _assert_flow_error(
     expected: str,
     *,
     config_path: Path = M4_CONFIG_PATH,
-    static_analysis: bool = True,
+    flow_checks: bool = True,
     expected_line: int | None = None,
 ) -> Assembler:
     assembler = _assembler(
         tmp_path,
         source,
         config_path=config_path,
-        static_analysis=static_analysis,
+        flow_checks=flow_checks,
     )
     with pytest.raises(SystemExit, match=expected):
         assembler.assemble_bytecode()
@@ -582,14 +582,14 @@ def test_m4_disabled_analysis_ignores_valid_manual_control_but_not_bad_syntax(
         '#resume window = 0\n'
         '#endtrack window exit=99\n'
         'nop\n',
-        static_analysis=False,
+        flow_checks=False,
         output_name='annotated.bin',
     )
     SymbolScope._global_scope = None
     _, stripped = _assemble(
         tmp_path,
         'nop\n',
-        static_analysis=False,
+        flow_checks=False,
         output_name='stripped.bin',
     )
     assert annotated == stripped == bytes([0])
@@ -599,7 +599,7 @@ def test_m4_disabled_analysis_ignores_valid_manual_control_but_not_bad_syntax(
         tmp_path,
         '#resume cycles\nnop\n',
         'invalid #resume directive syntax',
-        static_analysis=False,
+        flow_checks=False,
         expected_line=1,
     )
 
@@ -851,17 +851,9 @@ def test_m4_protection_sentinel_cannot_be_hijacked_by_user_macros(tmp_path):
     assert bytecode == bytes([0x10, 0x20, 0x01, 0x11])
 
 
-def test_m4_disabled_analysis_does_not_resolve_ignored_directive_values(tmp_path):
-    """Ignored flow-directive values must not be macro-resolved under -A.
-
-    Bug: value macro resolution ran even with static analysis disabled, so a
-    pathological macro pair referenced only by an *ignored* ``#set``/flow
-    ``#assert`` failed the compile — but the spec requires ignored analysis
-    constructs to behave as if stripped from the source. Value resolution is
-    now gated on analysis being enabled; source-level directive syntax
-    remains validated either way.
-    """
-    disabled, bytecode = _assemble(
+def test_m4_disabled_checks_still_reject_invalid_directive_values(tmp_path):
+    """Disabling flow checks does not suppress invalid source values."""
+    assembler = _assembler(
         tmp_path,
         '#define LOOP_A LOOP_B\n'
         '#define LOOP_B LOOP_A\n'
@@ -870,13 +862,10 @@ def test_m4_disabled_analysis_does_not_resolve_ignored_directive_values(tmp_path
         '#assert stack == LOOP_A\n'
         'nop\n'
         '#endtrack stack\n',
-        static_analysis=False,
+        flow_checks=False,
     )
-    assert bytecode == bytes([0x00])
-    assert not any(
-        diagnostic.category == 'flow'
-        for diagnostic in disabled.model.diagnostic_reporter.diagnostics
-    )
+    with pytest.raises(SystemExit, match='indirectly referring to itself'):
+        assembler.assemble_bytecode()
 
 
 def test_m4_macro_cycle_in_directive_value_errors_without_blowup(tmp_path):
@@ -1242,11 +1231,11 @@ def test_instance_bound_violated_on_one_branch_of_a_diamond(tmp_path):
     assert bytecode
 
 
-def test_disabled_analysis_ignores_instance_bounds(tmp_path):
-    """Case 93: under ``--no-static-analysis`` the parameters are ignored like
-    every other analysis-only parameter — even with unresolvable values —
-    assembling byte-identically to the stripped source with zero flow
-    diagnostics.
+def test_disabled_checks_do_not_enforce_instance_bounds(tmp_path):
+    """Case 93: under ``--no-flow-checks`` instance bounds are not enforced.
+
+    Even unresolvable values remain unused in annotation-only source, which
+    assembles byte-identically to the stripped source with no flow diagnostics.
     """
     annotated, bytecode = _assemble(
         tmp_path,
@@ -1254,7 +1243,7 @@ def test_disabled_analysis_ignores_instance_bounds(tmp_path):
         'push\n'
         'pop\n'
         '#endtrack stack\n',
-        static_analysis=False,
+        flow_checks=False,
         output_name='annotated-bounds.bin',
     )
     SymbolScope._global_scope = None
@@ -1262,7 +1251,7 @@ def test_disabled_analysis_ignores_instance_bounds(tmp_path):
         tmp_path,
         'push\n'
         'pop\n',
-        static_analysis=False,
+        flow_checks=False,
         output_name='stripped-bounds.bin',
     )
     assert bytecode == stripped == bytes([0x10, 0x11])

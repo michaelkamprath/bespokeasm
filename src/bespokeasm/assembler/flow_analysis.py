@@ -10,6 +10,7 @@ from bespokeasm.assembler.analysis import OperandSemanticKind
 from bespokeasm.assembler.control_flow import ControlFlowGraph
 from bespokeasm.assembler.control_flow import ControlFlowNode
 from bespokeasm.assembler.line_object import LineObject
+from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.assembler.line_object.counter_coordinate_line import CounterCoordinateLine
 from bespokeasm.assembler.line_object.directive_line.memzone import SetMemoryZoneLine
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
@@ -96,6 +97,15 @@ class FlowLinearAnalyzer:
             for line_object in line_objects
         )
 
+    @staticmethod
+    def source_requires_flow_values(line_objects) -> bool:
+        """Return whether emitted words depend on resolved flow expressions."""
+        return any(
+            isinstance(line_object, LineWithWords)
+            and bool(line_object.flow_expression_nodes)
+            for line_object in line_objects
+        )
+
     def _error(self, line_object, message: str) -> None:
         # The reporter is fail-fast today (error() exits), but every call site
         # still guards-and-returns afterward so an accumulate-and-continue
@@ -112,6 +122,8 @@ class FlowLinearAnalyzer:
         state: _LinearCounterState,
     ) -> None:
         """Report a bound violation for one counter at this source line."""
+        if not self._model.flow_checks_enabled:
+            return
         minimum = state.effective_min
         maximum = state.effective_max
         if minimum is not None and state.value < minimum:
@@ -157,7 +169,12 @@ class FlowLinearAnalyzer:
                 'interval analysis is not available in M4',
             )
             return
-        if not self._model.flow_counter_has_effect_metadata(line_object.counter_class):
+        if (
+            self._model.flow_checks_enabled
+            and not self._model.flow_counter_has_effect_metadata(
+                line_object.counter_class,
+            )
+        ):
             self._error(
                 line_object,
                 f'flow counter class "{line_object.counter_class}" is inert: '
@@ -177,10 +194,16 @@ class FlowLinearAnalyzer:
                 )
                 return
 
-        effective_bounds = self._effective_bounds(line_object, counter_config)
-        if effective_bounds is None:
-            return
-        effective_min, effective_max = effective_bounds
+        if self._model.flow_checks_enabled:
+            effective_bounds = self._effective_bounds(
+                line_object,
+                counter_config,
+            )
+            if effective_bounds is None:
+                return
+            effective_min, effective_max = effective_bounds
+        else:
+            effective_min, effective_max = None, None
 
         initial = line_object.evaluate_parameter('init')
         if initial is None:
@@ -282,7 +305,10 @@ class FlowLinearAnalyzer:
             )
             return
         if state.suspended:
-            if line_object.evaluate_parameter('exit') is not None:
+            if (
+                self._model.flow_checks_enabled
+                and line_object.evaluate_parameter('exit') is not None
+            ):
                 self._error(
                     line_object,
                     f'#endtrack {state.name} cannot check exit= while the '
@@ -290,7 +316,8 @@ class FlowLinearAnalyzer:
                 )
                 return
             if (
-                state.invalidated_since is not None
+                self._model.flow_checks_enabled
+                and state.invalidated_since is not None
                 and state.expected_exit is not None
             ):
                 # Closing over an explicit #suspend is a deliberate
@@ -321,6 +348,8 @@ class FlowLinearAnalyzer:
         expected: int | None = None,
     ) -> None:
         """Check one active path against an exact exit contract when present."""
+        if not self._model.flow_checks_enabled:
+            return
         if expected is None:
             expected = state.expected_exit
         if expected is not None and state.value != expected:
@@ -858,7 +887,10 @@ class FlowLinearAnalyzer:
             f'instruction "{record.source_mnemonic}" has no effect metadata '
             f'for flow counter class "{state.counter_class}"'
         )
-        if unknown_policy == 'warn':
+        if (
+            unknown_policy == 'warn'
+            and self._model.flow_checks_enabled
+        ):
             self._diagnostic_reporter.warn(
                 line_object.line_id,
                 message,
@@ -1039,7 +1071,11 @@ class FlowLinearAnalyzer:
                         f'to flow counter "{getattr(coordinate_state, "name", "")}"',
                     )
                     return None
-                if id(coordinate) in coordinate_state.invalid_coordinate_ids:
+                if (
+                    self._model.flow_checks_enabled
+                    and id(coordinate)
+                    in coordinate_state.invalid_coordinate_ids
+                ):
                     # Re-anchoring to a coordinate the analysis already proved
                     # crossed is accepted on faith, but deserves a warning.
                     self._diagnostic_reporter.warn(
@@ -1072,10 +1108,13 @@ class FlowLinearAnalyzer:
 
         General assertions were already enforced once at parse time by the
         ``AssertLine`` constructor (which is also what keeps them active under
-        ``--no-static-analysis``); re-enforcing them here would double-report
+        ``--no-flow-checks``); re-enforcing them here would double-report
         under an accumulate-and-continue reporter.
         """
-        if not line_object.is_flow_dependent:
+        if (
+            not self._model.flow_checks_enabled
+            or not line_object.is_flow_dependent
+        ):
             return
 
         comparison = {
@@ -1237,6 +1276,8 @@ class FlowLinearAnalyzer:
 
     def _warn_external_label(self, line_object: LabelLine) -> None:
         """Warn when a non-local label exposes a non-entry tracked state."""
+        if not self._model.flow_checks_enabled:
+            return
         label = line_object.get_label()
         if label.startswith('.'):
             return
@@ -1294,15 +1335,20 @@ class FlowLinearAnalyzer:
                     self._apply_instruction(line_object, record, expression_nodes)
             elif line_object.flow_expression_nodes:
                 self._resolve_expressions(line_object, line_object.flow_expression_nodes)
-            line_object.record_flow_transition(before, self._flow_values())
+            if self._model.flow_checks_enabled:
+                line_object.record_flow_transition(
+                    before,
+                    self._flow_values(),
+                )
 
         for state in self._active.values():
             if state.path_live:
-                self._error(
-                    last_line or state.opened_by,
-                    f'flow counter "{state.name}" reaches EOF without '
-                    'a flow terminal or #endtrack',
-                )
+                if self._model.flow_checks_enabled:
+                    self._error(
+                        last_line or state.opened_by,
+                        f'flow counter "{state.name}" reaches EOF without '
+                        'a flow terminal or #endtrack',
+                    )
 
 
 @dataclass(frozen=True)
@@ -1802,6 +1848,8 @@ class FlowGraphAnalyzer(FlowLinearAnalyzer):
 
     def _assert(self, line_object: AssertLine) -> None:
         """Reject bare-counter assertions whose call effect is unresolved."""
+        if not self._model.flow_checks_enabled:
+            return
         if line_object.counter_name is not None:
             state = self._active.get(line_object.counter_name)
             if state is not None and not isinstance(state.value, int):
@@ -1821,6 +1869,8 @@ class FlowGraphAnalyzer(FlowLinearAnalyzer):
         expected: int | None = None,
     ) -> None:
         """Reject an exit check whose caller-visible value is unresolved."""
+        if not self._model.flow_checks_enabled:
+            return
         if not isinstance(state.value, int):
             self._error(
                 line_object,
@@ -1962,6 +2012,8 @@ class FlowGraphAnalyzer(FlowLinearAnalyzer):
         resolution = self._graph.fallthrough_at(node.end_address)
         if resolution.node is None:
             if self._graph.is_source_end(node):
+                if not self._model.flow_checks_enabled:
+                    return None
                 names = ', '.join(sorted(self._active))
                 self._error(
                     node.line_object,
@@ -1985,6 +2037,8 @@ class FlowGraphAnalyzer(FlowLinearAnalyzer):
         resolution = self._graph.source_successor(node)
         if resolution.node is None:
             if self._graph.is_source_end(node):
+                if not self._model.flow_checks_enabled:
+                    return None
                 names = ', '.join(sorted(self._active))
                 self._error(
                     node.line_object,
@@ -2022,12 +2076,16 @@ class FlowGraphAnalyzer(FlowLinearAnalyzer):
         ]
         if mapped:
             if transfer == 'conditional':
+                if not self._model.flow_checks_enabled:
+                    return ()
                 self._error(
                     node.line_object,
                     'conditional terminals are not yet supported',
                 )
                 return ()
             if transfer != 'return':
+                if not self._model.flow_checks_enabled:
+                    return ()
                 self._error(
                     node.line_object,
                     f'instruction "{node.record.source_mnemonic}" is a flow '
@@ -2037,19 +2095,25 @@ class FlowGraphAnalyzer(FlowLinearAnalyzer):
             for state in self._active.values():
                 order = terminals.get(state.counter_class)
                 if order is None:
-                    self._error(
-                        node.line_object,
-                        f'instruction "{node.record.source_mnemonic}" returns '
-                        f'while flow counter "{state.name}" is still active; '
-                        f'end the region with #endtrack {state.name} before '
-                        'this transfer',
-                    )
+                    if self._model.flow_checks_enabled:
+                        self._error(
+                            node.line_object,
+                            f'instruction '
+                            f'"{node.record.source_mnemonic}" returns while '
+                            f'flow counter "{state.name}" is still active; '
+                            f'end the region with #endtrack {state.name} '
+                            'before this transfer',
+                        )
                     continue
                 if state.suspended:
-                    self._error(
-                        node.line_object,
-                        self._suspended_terminal_message(node.record, state),
-                    )
+                    if self._model.flow_checks_enabled:
+                        self._error(
+                            node.line_object,
+                            self._suspended_terminal_message(
+                                node.record,
+                                state,
+                            ),
+                        )
                     continue
                 if order == 'after_effect':
                     self._apply_graph_delta(node, state)
@@ -2057,14 +2121,17 @@ class FlowGraphAnalyzer(FlowLinearAnalyzer):
             return ()
 
         if transfer == 'return':
-            names = ', '.join(sorted(self._active))
-            self._error(
-                node.line_object,
-                f'instruction "{node.record.source_mnemonic}" returns while '
-                f'flow counter(s) {names} remain active',
-            )
+            if self._model.flow_checks_enabled:
+                names = ', '.join(sorted(self._active))
+                self._error(
+                    node.line_object,
+                    f'instruction "{node.record.source_mnemonic}" returns '
+                    f'while flow counter(s) {names} remain active',
+                )
             return ()
         if transfer == 'indirect':
+            if not self._model.flow_checks_enabled:
+                return ()
             self._error(
                 node.line_object,
                 f'indirect control transfer "{node.record.source_mnemonic}" '
@@ -2072,6 +2139,8 @@ class FlowGraphAnalyzer(FlowLinearAnalyzer):
             )
             return ()
         if transfer == 'multiway':
+            if not self._model.flow_checks_enabled:
+                return ()
             self._error(
                 node.line_object,
                 'multiway control transfers are not available in M5',
@@ -2180,13 +2249,14 @@ class FlowGraphAnalyzer(FlowLinearAnalyzer):
         elif isinstance(line_object, SetMemoryZoneLine):
             for state in self._active.values():
                 self._check_exit(line_object, state)
-                self._diagnostic_reporter.warn(
-                    line_object.line_id,
-                    f'{line_object.instruction.split()[0]} auto-closes flow '
-                    f'counter region "{state.name}" at a physical layout '
-                    'boundary',
-                    category='flow',
-                )
+                if self._model.flow_checks_enabled:
+                    self._diagnostic_reporter.warn(
+                        line_object.line_id,
+                        f'{line_object.instruction.split()[0]} auto-closes '
+                        f'flow counter region "{state.name}" at a physical '
+                        'layout boundary',
+                        category='flow',
+                    )
             self._active.clear()
             successors = ()
         elif node.kind in {'data', 'observation'}:
@@ -2226,14 +2296,15 @@ class FlowGraphAnalyzer(FlowLinearAnalyzer):
                     annotation_before = self._graph_flow_values(
                         first_input.states,
                     )
-            line_object.record_flow_transition(
-                annotation_before,
-                (
-                    {}
-                    if is_terminal
-                    else self._graph_flow_values(self._active)
-                ),
-            )
+            if self._model.flow_checks_enabled:
+                line_object.record_flow_transition(
+                    annotation_before,
+                    (
+                        {}
+                        if is_terminal
+                        else self._graph_flow_values(self._active)
+                    ),
+                )
         sources = {
             name: line_object
             for name in self._active
@@ -2390,6 +2461,8 @@ class FlowGraphAnalyzer(FlowLinearAnalyzer):
 
     def _validate_static_transfer_entries(self) -> None:
         """Reject direct transfers that enter tracked regions illegally."""
+        if not self._model.flow_checks_enabled:
+            return
         for node in self._graph.nodes:
             if node.record is None:
                 continue
@@ -2459,6 +2532,8 @@ class FlowGraphAnalyzer(FlowLinearAnalyzer):
 
     def _warn_external_labels(self) -> None:
         """Warn about public labels that expose an undeclared entry state."""
+        if not self._model.flow_checks_enabled:
+            return
         for node in self._graph.nodes:
             if node.kind != 'label':
                 continue
@@ -2539,7 +2614,8 @@ class FlowGraphAnalyzer(FlowLinearAnalyzer):
                 isinstance(line_object, AssertLine)
                 and line_object.is_flow_dependent
             ):
-                self._assert(line_object)
+                if self._model.flow_checks_enabled:
+                    self._assert(line_object)
             elif isinstance(line_object, FlowSetLine):
                 self._set_counter(line_object)
             elif isinstance(line_object, FlowSuspendLine):
@@ -2571,4 +2647,5 @@ class FlowGraphAnalyzer(FlowLinearAnalyzer):
         self._drain()
         self._add_entry_roots()
         self._check_unreached_flow_constructs()
-        self._warn_external_labels()
+        if self._model.flow_checks_enabled:
+            self._warn_external_labels()

@@ -32,10 +32,10 @@ class AssemblerModel:
         config_file_path: str,
         is_verbose: int,
         diagnostic_reporter: DiagnosticReporter,
-        static_analysis: bool = True,
+        flow_checks: bool = True,
     ):
         self._config_file = config_file_path
-        self._static_analysis_enabled = static_analysis
+        self._flow_checks_enabled = flow_checks
         if diagnostic_reporter is None:
             raise ValueError('DiagnosticReporter is required for AssemblerModel')
         self._diagnostic_reporter = diagnostic_reporter
@@ -182,8 +182,7 @@ class AssemblerModel:
                 'octal/base8, binary/base2.'
             )
         self._validate_ambiguous_source_identifiers()
-        if self._static_analysis_enabled:
-            self._validate_flow_analysis_config()
+        self._validate_flow_analysis_config()
 
         # check for min required BespokeASM version
         if 'min_version' in self._config['general']:
@@ -860,13 +859,12 @@ class AssemblerModel:
         return self._instructions
 
     @property
-    def static_analysis_enabled(self) -> bool:
-        return self._static_analysis_enabled
+    def flow_checks_enabled(self) -> bool:
+        """Return whether optional flow verification and annotations are enabled."""
+        return self._flow_checks_enabled
 
     @property
     def analysis_features(self) -> frozenset[str]:
-        if not self._static_analysis_enabled:
-            return frozenset()
         return frozenset({'flow_counters'}) if 'flow_counters' in self._config else frozenset()
 
     @property
@@ -885,9 +883,7 @@ class AssemblerModel:
 
     @property
     def flow_counters(self) -> dict:
-        """Return configured counter classes when static analysis is enabled."""
-        if not self._static_analysis_enabled:
-            return {}
+        """Return the configured counter classes."""
         return self._config.get('flow_counters', {})
 
     def flow_counter_has_effect_metadata(self, counter_name: str) -> bool:

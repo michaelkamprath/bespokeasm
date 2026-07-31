@@ -10,9 +10,10 @@ It proves that a flow-enabled compile retains immutable records for:
 - two instructions on one source line, and
 - both constituents of an instruction macro.
 
-It then repeats the compile with static analysis disabled and with all flow
-metadata removed, proving that both dormant modes retain no records and emit
-the same bytes.
+It then repeats the compile with flow checks disabled and with all flow
+metadata removed. The flow-capable compile retains records in both check modes
+so emitted dependencies can be discovered after parsing; the non-flow ISA
+retains none. All three emit the same bytes.
 
 From the repository root, with the project virtual environment active:
 

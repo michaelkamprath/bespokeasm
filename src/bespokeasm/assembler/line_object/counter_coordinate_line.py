@@ -60,10 +60,7 @@ class CounterCoordinateLine(LineObject):
                 raise SyntaxError(
                     f'ERROR: {line_id} - invalid flow-counter name: {counter_name}'
                 )
-            # The offset must be an ordinary compile-time scalar expression. A
-            # flow expression inside it is a source error when analysis runs;
-            # with analysis disabled the whole declaration is ignored syntax,
-            # so the offset is dropped rather than diagnosed.
+            # The offset must be an ordinary compile-time scalar expression.
             try:
                 offset_expression = parse_expression(
                     line_id,
@@ -72,21 +69,19 @@ class CounterCoordinateLine(LineObject):
                     context=ExpressionUseContext.DATA_VALUE,
                 )
             except SyntaxError as error:
-                if model.static_analysis_enabled:
-                    cls._offset_error(line_id, model, str(error))
+                cls._offset_error(line_id, model, str(error))
                 offset_expression = None
             if (
                 offset_expression is not None
                 and offset_expression.deferred_flow_nodes()
             ):
-                if model.static_analysis_enabled:
-                    cls._offset_error(
-                        line_id,
-                        model,
-                        'the offset of a coordinate declaration must be an '
-                        'ordinary compile-time expression and cannot contain '
-                        'COUNTER(), OFFSET(), or COORDINATE()',
-                    )
+                cls._offset_error(
+                    line_id,
+                    model,
+                    'the offset of a coordinate declaration must be an '
+                    'ordinary compile-time expression and cannot contain '
+                    'COUNTER(), OFFSET(), or COORDINATE()',
+                )
                 offset_expression = None
         return cls(
             line_id,

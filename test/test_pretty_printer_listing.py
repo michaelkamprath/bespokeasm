@@ -30,11 +30,11 @@ class DummyLineWithWords(LineWithWords):
 
 class TestListingPrettyPrinter(unittest.TestCase):
     def setUp(self):
-        config_path = os.path.join(
+        self.config_path = os.path.join(
             os.path.dirname(__file__), 'config_files', 'test_instruction_list_creation_isa.json'
         )
         self.diagnostic_reporter = DiagnosticReporter()
-        self.model = AssemblerModel(config_path, 0, self.diagnostic_reporter)
+        self.model = AssemblerModel(self.config_path, 0, self.diagnostic_reporter)
         self.memzone = MemoryZone(4, 0, 15, 'GLOBAL')
 
     def test_pretty_print_basic_ordered(self):
@@ -68,6 +68,30 @@ class TestListingPrettyPrinter(unittest.TestCase):
         other_data = [line for line in lines if 'other file' in line][0]
         self.assertTrue(main_data.startswith('    1 | 0 |'))
         self.assertTrue(other_data.startswith('    2 | 1 |'))
+
+    def test_flow_checks_disabled_never_prints_flow_column(self):
+        """The listing obeys ``-A`` even if a line carries stale annotations."""
+        model = AssemblerModel(
+            self.config_path,
+            0,
+            self.diagnostic_reporter,
+            flow_checks=False,
+        )
+        line = LineObject(
+            LineIdentifier(1, 'main.asm'),
+            'nop',
+            'no analysis',
+            self.memzone,
+        )
+        line.set_start_address(0)
+        line.record_flow_transition({}, {'stack': 0})
+        line.record_flow_transition({'stack': 0}, {'stack': 1})
+
+        output = ListingPrettyPrinter([line], model, 'main.asm').pretty_print()
+
+        self.assertNotIn('flow', output)
+        self.assertNotIn('stack=', output)
+        self.assertEqual(output.count('nop'), 1)
 
     def test_pretty_print_machine_code_multiline(self):
         line_id = LineIdentifier(1, 'main.asm')

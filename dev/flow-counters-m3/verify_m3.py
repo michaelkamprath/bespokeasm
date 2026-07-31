@@ -31,7 +31,7 @@ def _assemble(source_path: Path, output_path: Path) -> bytes:
         is_verbose=0,
         include_paths=[str(HARNESS_DIR)],
         predefined=[],
-        static_analysis=True,
+        flow_checks=True,
     )
     assembler.assemble_bytecode()
     return output_path.read_bytes()

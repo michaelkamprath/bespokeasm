@@ -7,7 +7,7 @@ This harness exercises the first user-visible flow-counter milestone:
 - constant instruction deltas,
 - balanced exits and configured bounds,
 - byte identity with a hand-stripped source, and
-- disabled-analysis annotation stripping and dependency rejection, and
+- disabled-check value resolution without verification output, and
 - ISA-gated generated editor syntax and hover documentation.
 
 From the repository root:

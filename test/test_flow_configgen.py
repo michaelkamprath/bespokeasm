@@ -88,6 +88,8 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
     for token in FLOW_TOKENS:
         assert token in generated
     assert '#entry' in generated
+    assert '__FLOW_COUNTERS_AVAILABLE__' in generated
+    assert 'Flow-Counter Capability' in generated
 
     if generator_class is VimConfigGenerator:
         assert 'FlowCoordinateName' in generated
@@ -253,6 +255,10 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
         )
 
     if generator_class is not VimConfigGenerator:
+        assert (
+            '__FLOW_COUNTERS_AVAILABLE__'
+            in hover_docs['predefined']['constants']
+        )
         assert {'track', 'endtrack', 'entry', 'assert', *M4_FLOW_DIRECTIVES} <= set(
             hover_docs['directives']['preprocessor'],
         )
@@ -292,8 +298,11 @@ def test_flow_tokens_are_absent_from_non_enabled_isa(
         PLAIN_CONFIG,
         tmp_path / generator_class.__name__,
     )
-    for token in FLOW_TOKENS[:-1]:
+    for token in ('track', 'endtrack', 'COORDINATE', 'OFFSET'):
         assert token not in generated, f'flow token {token!r} leaked into non-flow extension'
+    assert 'COUNTER(' not in generated
+    assert '__FLOW_COUNTERS_AVAILABLE__' in generated
+    assert 'Flow-Counter Capability' in generated
     assert '#entry' not in generated
     # ':=' cannot be asserted as a bare substring — ordinary regex syntax such
     # as the non-capturing group in `(?:=|\bEQU\b)` contains it. The only
@@ -315,6 +324,10 @@ def test_flow_tokens_are_absent_from_non_enabled_isa(
     assert FLOW_OPERATOR_SCOPE not in generated
 
     if generator_class is not VimConfigGenerator:
+        assert (
+            '__FLOW_COUNTERS_AVAILABLE__'
+            in hover_docs['predefined']['constants']
+        )
         assert 'track' not in hover_docs['directives']['preprocessor']
         assert 'endtrack' not in hover_docs['directives']['preprocessor']
         assert 'entry' not in hover_docs['directives']['preprocessor']

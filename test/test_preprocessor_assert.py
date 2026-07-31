@@ -22,7 +22,7 @@ def _assembler(
     source: str,
     *,
     config: Path = NO_FLOW_CONFIG,
-    static_analysis: bool = True,
+    flow_checks: bool = True,
     predefined: list[str] | None = None,
 ) -> Assembler:
     source_path = tmp_path / 'assert.asm'
@@ -42,7 +42,7 @@ def _assembler(
         is_verbose=0,
         include_paths=[str(tmp_path)],
         predefined=predefined or [],
-        static_analysis=static_analysis,
+        flow_checks=flow_checks,
     )
 
 
@@ -127,7 +127,7 @@ def test_assert_distinguishes_a_string_rhs_from_an_optional_message(tmp_path):
     )
 
 
-def test_general_assert_remains_active_when_static_analysis_is_disabled(
+def test_general_assert_remains_active_when_flow_checks_is_disabled(
     tmp_path,
 ):
     assembler = _assembler(
@@ -135,7 +135,7 @@ def test_general_assert_remains_active_when_static_analysis_is_disabled(
         '#define VALUE 1\n'
         '#assert VALUE == 2 "general assertion still runs"\n'
         'push a\n',
-        static_analysis=False,
+        flow_checks=False,
     )
     with pytest.raises(SystemExit, match='general assertion still runs'):
         assembler.assemble_bytecode()
@@ -243,7 +243,7 @@ def test_general_assert_failure_reports_exactly_once(tmp_path, monkeypatch):
     would emit the same diagnostic twice. The analyzer must not re-enforce
     general asserts; the parse-time evaluation is the single enforcement
     point (which is also what keeps general asserts active under
-    ``--no-static-analysis``).
+    ``--no-flow-checks``).
     """
     from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 
@@ -303,7 +303,7 @@ def test_macro_introduced_flow_assert_is_ignored_when_analysis_disabled(tmp_path
     """The reclassified flow assertion is analysis-only under -A.
 
     Bug companion: the same macro-introduced flow assertion failed under
-    ``--no-static-analysis`` instead of being ignored like a directly written
+    ``--no-flow-checks`` instead of being ignored like a directly written
     flow assertion.
     """
     assembler = _assemble(
@@ -311,7 +311,7 @@ def test_macro_introduced_flow_assert_is_ignored_when_analysis_disabled(tmp_path
         '#assert FLOW_VALUE == 0\n'
         'nop\n',
         config=FLOW_CONFIG,
-        static_analysis=False,
+        flow_checks=False,
         predefined=['FLOW_VALUE=COUNTER(stack)'],
     )
     assert not any(
@@ -338,7 +338,7 @@ def test_macro_introduced_flow_assert_tolerates_cyclic_sibling_operand(tmp_path)
     Bug: flow dependence was determined by *resolving* both operands, so a
     macro cycle in the sibling operand of a macro-introduced flow reference
     (``#assert FLOW_VALUE == LOOP_A`` with cyclic ``LOOP_A``/``LOOP_B``)
-    failed under ``--no-static-analysis`` even though the assertion is
+    failed under ``--no-flow-checks`` even though the assertion is
     flow-dependent and must be ignored. Classification now uses a
     cycle-tolerant dependency scan over macro values — no expansion — so an
     ignored assertion never evaluates its operands, whichever side carries
@@ -365,13 +365,13 @@ def test_macro_introduced_flow_assert_tolerates_cyclic_sibling_operand(tmp_path)
             tmp_path,
             source,
             config=FLOW_CONFIG,
-            static_analysis=False,
+            flow_checks=False,
             predefined=['FLOW_VALUE=COUNTER(stack)'],
         )
         assert not any(
             diagnostic.level == 'error'
             for diagnostic in assembler.model.diagnostic_reporter.diagnostics
-        ), f'{name} was not ignored under --no-static-analysis'
+        ), f'{name} was not ignored under --no-flow-checks'
 
     SymbolScope._global_scope = None
     enabled = _assembler(
@@ -398,13 +398,13 @@ def test_macro_expanding_to_bare_flow_operator_name(tmp_path):
     context). The dependency scan saw neither fragment as a flow operator, so
     the assertion was classified general and failed with the misleading
     "flow expressions are not allowed in preprocessor condition expressions"
-    — even under ``--no-static-analysis``.
+    — even under ``--no-flow-checks``.
 
     Rule (2026-07): flow operator names must be written literally as complete
     calls; a macro value may *be* a complete flow expression, but a macro
     that expands to a bare operator name is rejected at its point of use with
     a dedicated diagnostic. For classification the bare name counts as flow
-    dependence, so under ``--no-static-analysis`` the assertion is ignored
+    dependence, so under ``--no-flow-checks`` the assertion is ignored
     like any other flow assertion.
     """
     assembler = _assemble(
@@ -413,7 +413,7 @@ def test_macro_expanding_to_bare_flow_operator_name(tmp_path):
         '#assert FLOW_FN(stack) == 0\n'
         'nop\n',
         config=FLOW_CONFIG,
-        static_analysis=False,
+        flow_checks=False,
     )
     assert not any(
         diagnostic.level == 'error'

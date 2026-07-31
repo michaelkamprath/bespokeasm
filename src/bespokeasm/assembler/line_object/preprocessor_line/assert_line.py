@@ -90,7 +90,7 @@ class AssertLine(PreprocessorLine):
         # predefined symbol whose value is COUNTER(stack)), so flow dependence
         # is also determined from the operands' macro dependencies. This is a
         # cycle-tolerant scan, not a resolution: a flow-dependent assertion
-        # may be ignored under --no-static-analysis, in which case its
+        # may be ignored under --no-flow-checks, in which case its
         # operands — including a sibling operand carrying a macro cycle —
         # must never be evaluated during classification.
         if not self._is_flow_dependent and (
@@ -102,7 +102,6 @@ class AssertLine(PreprocessorLine):
 
         if (
             self._uses_explicit_flow
-            and isa_model.static_analysis_enabled
             and not isa_model.flow_counters_enabled
         ):
             self._error(
@@ -171,11 +170,11 @@ class AssertLine(PreprocessorLine):
         """Resolve macros while preserving names passed to flow operators.
 
         The resolved text feeds only flow-dependent evaluation, which is
-        skipped entirely under ``--no-static-analysis`` — so resolution is
+        skipped entirely under ``--no-flow-checks`` — so resolution is
         skipped too, keeping ignored flow assertions strip-equivalent even
         when resolution itself would fail (e.g. a macro cycle).
         """
-        if not self._isa_model.static_analysis_enabled:
+        if not self._isa_model.flow_checks_enabled:
             return expression
         return resolve_symbols_protecting_flow_names(
             preprocessor,

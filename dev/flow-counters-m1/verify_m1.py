@@ -12,7 +12,7 @@ HARNESS_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = HARNESS_DIR / 'flow-counters-m1.yaml'
 
 
-def _assemble(source_path: Path, output_path: Path, static_analysis: bool = True) -> bytes:
+def _assemble(source_path: Path, output_path: Path, flow_checks: bool = True) -> bytes:
     """Assemble one fixture and return its emitted bytes."""
     SymbolScope._global_scope = None
     assembler = Assembler(
@@ -29,22 +29,38 @@ def _assemble(source_path: Path, output_path: Path, static_analysis: bool = True
         is_verbose=0,
         include_paths=[str(HARNESS_DIR)],
         predefined=[],
-        static_analysis=static_analysis,
+        flow_checks=flow_checks,
     )
     assembler.assemble_bytecode()
     return output_path.read_bytes()
 
 
-def _assert_failure(tmp_dir: Path, name: str, source: str, expected: str, static_analysis=True):
+def _assert_failure(tmp_dir: Path, name: str, source: str, expected: str, flow_checks=True):
     """Assert that generated source fails with the expected diagnostic text."""
     source_path = tmp_dir / f'{name}.asm'
     source_path.write_text(source)
     try:
-        _assemble(source_path, tmp_dir / f'{name}.bin', static_analysis)
+        _assemble(source_path, tmp_dir / f'{name}.bin', flow_checks)
     except SystemExit as error:
         assert expected in str(error), str(error)
     else:
         raise AssertionError(f'{name} unexpectedly assembled successfully')
+
+
+def _assemble_source(
+    tmp_dir: Path,
+    name: str,
+    source: str,
+    flow_checks: bool = True,
+) -> bytes:
+    """Write and assemble an inline source fixture."""
+    source_path = tmp_dir / f'{name}.asm'
+    source_path.write_text(source)
+    return _assemble(
+        source_path,
+        tmp_dir / f'{name}.bin',
+        flow_checks,
+    )
 
 
 def _verify_editor_extension(tmp_dir: Path) -> None:
@@ -79,7 +95,7 @@ def main() -> None:
         annotation_only = _assemble(
             HARNESS_DIR / 'annotation-only.asm',
             tmp_dir / 'annotation-only.bin',
-            static_analysis=False,
+            flow_checks=False,
         )
         assert tracked == stripped == annotation_only
         assert tracked == bytes([0x10, 0x80, 0x01, 0x01, 0x11])
@@ -102,13 +118,13 @@ def main() -> None:
             '#track stack\n.org COUNTER(stack)\n#endtrack stack\n',
             'not allowed in layout expressions',
         )
-        _assert_failure(
+        resolved_without_checks = _assemble_source(
             tmp_dir,
-            'disabled-dependency',
+            'resolved-without-checks',
             '#track stack\ndepth COUNTER(stack)\n#endtrack stack\n',
-            'static analysis is disabled',
-            static_analysis=False,
+            flow_checks=False,
         )
+        assert resolved_without_checks == bytes([0x80, 0x00])
         _verify_editor_extension(tmp_dir / 'editor')
 
         print(f'Byte-identical output: {tracked.hex(" ")}')

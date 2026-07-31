@@ -40,7 +40,7 @@ class Assembler:
                 include_paths: list[str],
                 predefined: list[str],
                 warnings_as_errors: bool = False,
-                static_analysis: bool = True,
+                flow_checks: bool = True,
             ):
         self._source_file = source_file
         self._output_file = output_file
@@ -56,7 +56,7 @@ class Assembler:
         self._include_paths = include_paths
         self._predefined_symbols = predefined
         self._warnings_as_errors = warnings_as_errors
-        self._static_analysis = static_analysis
+        self._flow_checks = flow_checks
         self._diagnostic_reporter = DiagnosticReporter(
             warnings_as_errors=self._warnings_as_errors,
             verbosity=self._verbose,
@@ -65,7 +65,7 @@ class Assembler:
             self._config_file,
             self._verbose,
             self._diagnostic_reporter,
-            static_analysis=self._static_analysis,
+            flow_checks=self._flow_checks,
         )
 
     @property
@@ -219,9 +219,23 @@ class Assembler:
                         lobj.line_id,
                     )
 
+        source_requires_flow_values = (
+            self._model.analysis_records_enabled
+            and FlowLinearAnalyzer.source_requires_flow_values(
+                compilable_line_obs,
+            )
+        )
         if (
             self._model.analysis_records_enabled
-            and FlowLinearAnalyzer.source_uses_flow(compilable_line_obs)
+            and (
+                (
+                    self._model.flow_checks_enabled
+                    and FlowLinearAnalyzer.source_uses_flow(
+                        compilable_line_obs,
+                    )
+                )
+                or source_requires_flow_values
+            )
         ):
             FlowGraphAnalyzer(
                 self._model,

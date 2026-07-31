@@ -72,7 +72,7 @@ def _assembler(
     source: str,
     *,
     config_path: Path = M1_CONFIG_PATH,
-    static_analysis: bool = True,
+    flow_checks: bool = True,
     output_name: str = 'out.bin',
 ) -> Assembler:
     source_path = tmp_path / f'{output_name}.asm'
@@ -92,7 +92,7 @@ def _assembler(
         is_verbose=0,
         include_paths=[str(tmp_path)],
         predefined=[],
-        static_analysis=static_analysis,
+        flow_checks=flow_checks,
     )
     return assembler
 
@@ -109,14 +109,14 @@ def _assert_flow_error(
     expected: str,
     *,
     config_path: Path = M1_CONFIG_PATH,
-    static_analysis: bool = True,
+    flow_checks: bool = True,
     expected_line: int | None = None,
 ) -> Assembler:
     assembler = _assembler(
         tmp_path,
         source,
         config_path=config_path,
-        static_analysis=static_analysis,
+        flow_checks=flow_checks,
     )
     with pytest.raises(SystemExit, match=expected):
         assembler.assemble_bytecode()
@@ -133,7 +133,6 @@ def _assert_flow_error(
 def test_m1_counter_operand_data_and_strip_equivalence(tmp_path):
     tracked = (M1_HARNESS_DIR / 'tracked.asm').read_text()
     stripped = (M1_HARNESS_DIR / 'stripped.asm').read_text()
-    annotation_only = (M1_HARNESS_DIR / 'annotation-only.asm').read_text()
 
     _, tracked_bytes = _assemble(tmp_path, tracked, output_name='tracked.bin')
     SymbolScope._global_scope = None
@@ -141,14 +140,14 @@ def test_m1_counter_operand_data_and_strip_equivalence(tmp_path):
     SymbolScope._global_scope = None
     disabled, disabled_bytes = _assemble(
         tmp_path,
-        annotation_only,
-        static_analysis=False,
+        tracked,
+        flow_checks=False,
         output_name='disabled.bin',
     )
 
     assert tracked_bytes == stripped_bytes == disabled_bytes
     assert tracked_bytes == bytes([0x10, 0x80, 0x01, 0x01, 0x11])
-    assert disabled.analysis_source_index is None
+    assert disabled.analysis_source_index is not None
     assert not any(
         diagnostic.category == 'flow'
         for diagnostic in disabled.model.diagnostic_reporter.diagnostics
@@ -280,18 +279,18 @@ def test_m1_track_init_and_exit_parameters(tmp_path):
         ('#track stack mode=called mode=jumped', 'duplicate flow directive parameter'),
     ],
 )
-@pytest.mark.parametrize('static_analysis', [True, False])
+@pytest.mark.parametrize('flow_checks', [True, False])
 def test_m1_malformed_flow_directive_always_reports_syntax_error(
     tmp_path,
     directive,
     message,
-    static_analysis,
+    flow_checks,
 ):
     _assert_flow_error(
         tmp_path,
         f'{directive}\n',
         message,
-        static_analysis=static_analysis,
+        flow_checks=flow_checks,
     )
 
 
@@ -491,48 +490,49 @@ def test_m1_flow_keywords_are_reserved_only_for_enabled_isas(tmp_path):
     with pytest.raises(SystemExit, match='also a BespokeASM keyword'):
         _assembler(tmp_path, 'nop\n', config_path=flow_path)
 
-    for static_analysis in (True, False):
+    for flow_checks in (True, False):
         with pytest.raises(SystemExit, match='used an assembler keyword'):
             _assemble(
                 tmp_path,
                 'track:\nnop\n',
-                static_analysis=static_analysis,
-                output_name=f'flow-label-{static_analysis}.bin',
+                flow_checks=flow_checks,
+                output_name=f'flow-label-{flow_checks}.bin',
             )
 
 
-def test_m1_disabled_analysis_ignores_annotations_but_rejects_dependency(tmp_path):
-    no_flow_path = _write_config(tmp_path, _without_flow_metadata(_load_config()))
+def test_m1_disabled_checks_resolve_dependencies_but_require_capability(tmp_path):
     annotated = '#track stack\npush\npop\n#endtrack stack\n'
     _, annotated_bytes = _assemble(
         tmp_path,
         annotated,
-        config_path=no_flow_path,
-        static_analysis=False,
+        flow_checks=False,
     )
     SymbolScope._global_scope = None
     _, stripped_bytes = _assemble(
         tmp_path,
         'push\npop\n',
-        config_path=no_flow_path,
-        static_analysis=False,
+        flow_checks=False,
         output_name='stripped.bin',
     )
     assert annotated_bytes == stripped_bytes
 
     SymbolScope._global_scope = None
-    _assert_flow_error(
+    _, counter_bytes = _assemble(
         tmp_path,
-        'depth COUNTER(stack)\n',
-        'static analysis is disabled',
-        static_analysis=False,
+        '#track stack\npush\ndepth COUNTER(stack)\npop\n#endtrack stack\n',
+        flow_checks=False,
+        output_name='counter.bin',
     )
+    assert counter_bytes == bytes([0x10, 0x80, 0x01, 0x11])
+
+    no_flow_path = _write_config(tmp_path, _without_flow_metadata(_load_config()))
     SymbolScope._global_scope = None
     _assert_flow_error(
         tmp_path,
-        '.byte COUNTER(stack)\n',
-        'static analysis is disabled',
-        static_analysis=False,
+        '#track stack\npush\npop\n#endtrack stack\n',
+        'does not enable flow counters',
+        config_path=no_flow_path,
+        flow_checks=False,
     )
 
 
@@ -619,7 +619,7 @@ def test_m1_labels_starting_with_layout_directive_names_are_not_layout_contexts(
 def test_m1_disabled_mode_ignores_analysis_directive_parameters(tmp_path):
     """Disabled analysis strips valid parameters without checking their modes.
 
-    ``#track stack mode=called`` compiled with ``--no-static-analysis`` errored
+    ``#track stack mode=called`` compiled with ``--no-flow-checks`` errored
     with 'flow directive parameter "mode" is not available in M1', even though
     ``mode=`` is well-formed syntax. The requirements
     (Static-Analysis Execution Control; acceptance case 76) say disabled mode
@@ -632,7 +632,7 @@ def test_m1_disabled_mode_ignores_analysis_directive_parameters(tmp_path):
     disabled, annotated_bytes = _assemble(
         tmp_path,
         annotated,
-        static_analysis=False,
+        flow_checks=False,
     )
     assert not any(
         diagnostic.category == 'flow'
@@ -642,7 +642,7 @@ def test_m1_disabled_mode_ignores_analysis_directive_parameters(tmp_path):
     _, stripped_bytes = _assemble(
         tmp_path,
         'push\npop\n',
-        static_analysis=False,
+        flow_checks=False,
         output_name='stripped.bin',
     )
     assert annotated_bytes == stripped_bytes == bytes([0x10, 0x11])
@@ -693,10 +693,10 @@ def test_m1_retrack_of_active_counter_errors_with_endtrack_guidance(tmp_path):
     )
 
 
-def test_m1_explicit_static_analysis_flag_matches_default(tmp_path):
-    """Coverage for acceptance case 75: ``--static-analysis`` equals the default.
+def test_m1_explicit_flow_checks_flag_matches_default(tmp_path):
+    """Coverage for acceptance case 75: ``--flow-checks`` equals the default.
 
-    With no flag and with explicit ``--static-analysis``, the same flow-enabled
+    With no flag and with explicit ``--flow-checks``, the same flow-enabled
     source must produce identical bytes and identical diagnostics — enabled is
     the default. The CLI-forwarding unit test only checked the boolean reaching
     the handler; this test drives the real compile handler through the real CLI
@@ -729,7 +729,7 @@ def test_m1_explicit_static_analysis_flag_matches_default(tmp_path):
         return None
 
     results = {}
-    for label, extra_args in (('default', []), ('explicit', ['--static-analysis'])):
+    for label, extra_args in (('default', []), ('explicit', ['--flow-checks'])):
         run_dir = tmp_path / label
         run_dir.mkdir()
         source_path = run_dir / 'prog.asm'

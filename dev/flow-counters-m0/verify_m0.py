@@ -41,7 +41,7 @@ def _without_flow_metadata(config: dict) -> dict:
     return config
 
 
-def _assemble(config_path: Path, output_path: Path, static_analysis: bool) -> Assembler:
+def _assemble(config_path: Path, output_path: Path, flow_checks: bool) -> Assembler:
     SymbolScope._global_scope = None
     assembler = Assembler(
         source_file=str(SOURCE_PATH),
@@ -57,7 +57,7 @@ def _assemble(config_path: Path, output_path: Path, static_analysis: bool) -> As
         is_verbose=0,
         include_paths=[str(DEV_HARNESS_DIR)],
         predefined=[],
-        static_analysis=static_analysis,
+        flow_checks=flow_checks,
     )
     assembler.assemble_bytecode()
     return assembler
@@ -94,7 +94,7 @@ def main() -> None:
         assert macro_load.source_identity.macro_path == (('load_and_nop', 0),)
         assert macro_nop.source_identity.macro_path == (('load_and_nop', 1),)
         assert target_nop.source_identity.line_object_ordinal == 1
-        assert disabled.analysis_source_index is None
+        assert disabled.analysis_source_index is not None
         assert no_feature.analysis_source_index is None
         assert (tmp_dir / 'enabled.bin').read_bytes() == (
             tmp_dir / 'disabled.bin'

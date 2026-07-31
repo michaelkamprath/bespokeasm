@@ -1,3 +1,7 @@
 function:
-.field := COORDINATE(stack, 0)
-.byte .field
+#track stack
+push
+.field := COORDINATE(stack, 1)
+.byte OFFSET(.field)
+pop
+#endtrack stack

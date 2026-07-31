@@ -94,7 +94,6 @@ class SymbolScope:
         )
         self._labels = {}
         self._counter_coordinates: dict[str, CounterCoordinate] = {}
-        self._ignored_counter_coordinates: dict[str, LineIdentifier] = {}
         self._defined_symbol_names: set[str] = set()
 
     def __repr__(self) -> str:
@@ -161,30 +160,6 @@ class SymbolScope:
             raise ValueError(
                 f"coordinate '{coordinate.label}' is too low of scope for available scopes at this line"
             )
-
-    def record_ignored_counter_coordinate(
-        self,
-        label: str,
-        line_id: LineIdentifier,
-    ) -> None:
-        """Record a disabled declaration without reserving the normal namespace."""
-        symbol_scope = SymbolScopeType.get_symbol_scope(label)
-        if symbol_scope.value < self.type.value:
-            self.parent.record_ignored_counter_coordinate(label, line_id)
-        elif symbol_scope == self.type:
-            self._ignored_counter_coordinates[label] = line_id
-        else:
-            # A disabled local declaration has no valid local scope, but retaining
-            # it here still permits a precise diagnostic at a dependent use.
-            self._ignored_counter_coordinates[label] = line_id
-
-    def ignored_counter_coordinate_site(self, label: str) -> LineIdentifier | None:
-        """Return the declaration site from the disabled-analysis-only index."""
-        if label in self._ignored_counter_coordinates:
-            return self._ignored_counter_coordinates[label]
-        if self.parent is not None:
-            return self.parent.ignored_counter_coordinate_site(label)
-        return None
 
     def set_label_value(self, label: str, value: int, line_id: LineIdentifier, scope: SymbolScopeType = None) -> None:
         symbol_scope = SymbolScopeType.get_symbol_scope(label) if scope is None else scope

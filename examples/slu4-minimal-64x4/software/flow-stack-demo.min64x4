@@ -1,0 +1,102 @@
+; Flow Counter Stack Demo
+;   Demonstrates BespokeASM's assembly-time flow counters on the original
+;   Minimal 64x4. A `stack` flow counter tracks how many bytes a routine has
+;   pushed onto the MinOS hardware stack, entirely at assembly time:
+;
+;     * `#track stack ...` opens a tracking region; `#endtrack stack`
+;       closes it and checks that the stack is balanced.
+;     * `.name := COORDINATE(stack, N)` names the value currently stored
+;       at stack position sp+N, and `OFFSET(.name)` later resolves to that
+;       value's *current* sp-relative offset -- so inserting or removing a
+;       `phs` does not require hand-fixing every `lds`/`sts` offset below it.
+;     * Every path through a region is checked: a `phs` that is not matched
+;       by a `pls` on some path is an assembly error, as is reaching `rts`
+;       with routine-owned bytes still on the stack.
+;
+;   None of this changes the emitted byte code. A hand-stripped equivalent
+;   (flow directives/declarations removed and each OFFSET() replaced by its
+;   resolved literal) produces the same bytes. This exact source requires
+;   static analysis because its emitted LDS/STS operands depend on OFFSET().
+;
+;   MinOS stack refresher (see math32lib.min64x4 for the same convention):
+;   the stack lives in the 0xFF00 page and `lds`/`sts` address it as
+;   *(0xff00 + SP + offset), with the top of stack at sp+1. `jps` pushes a
+;   2-byte return address, so inside a callee the last argument byte the
+;   caller pushed sits at sp+3.
+;
+#require __LANGUAGE_NAME__ == slu4-min64x4-asm
+#require __LANGUAGE_VERSION__ >= 1.1.0
+
+; Zero Page Usage
+.memzone ZERO_PAGE_APPS
+#mute
+_temp_y:                .byte 0
+_result:                .byte 0
+
+#emit
+.org 0 "USER_APPS"
+init:
+    spinit                              ; SP := 0xFE (empty stack). spinit writes the
+                                        ; watched SP address 0xffff, so placing it in
+                                        ; an active region would make stack
+                                        ; indeterminate until `#resume stack = 0`.
+#track stack mode=jumped                ; `main` is entered by a jump from the MinOS
+                                        ; prompt: no return address on the stack, so
+                                        ; the region starts at 0 and must be closed
+                                        ; with #endtrack before jumping back out.
+main:
+    ; Push the two byte-sized arguments for max8, naming each slot as it
+    ; is pushed. COORDINATE(stack, 1) always names the current top of stack.
+    phsi 25                             ; push X               (stack: 0 -> 1)
+.x_slot := COORDINATE(stack, 1)         ; X is on top: sp+1
+    phsi 17                             ; push Y               (stack: 1 -> 2)
+.y_slot := COORDINATE(stack, 1)         ; Y is on top now; .x_slot shifted to sp+2
+#assert COUNTER(stack) == 2 "both max8 arguments must be on the stack"
+    jps max8                            ; net stack effect 0 (declared call summary):
+                                        ; max8's rts consumes the return address jps
+                                        ; pushed, and its result overwrites the X slot
+    lds OFFSET(.x_slot)                 ; A = result. Resolves to `lds 2` here -- and
+                                        ; keeps resolving correctly if pushes are added
+    stz _result
+    pls2                                ; discard both argument bytes (stack: 2 -> 0)
+#endtrack stack                         ; balanced-exit check: counter is back at 0
+    jps _Print "max8(25, 17) = 0x"
+    ldz _result
+    jas _PrintHex                       ; jas conserves A (jps would clobber it)
+    jps _Print "\n"
+end:
+    jpa _Prompt                         ; hand control back to the MinOS prompt
+
+; max8
+;   Returns the larger of two caller-pushed byte values.
+;
+;   Arguments
+;       sp+3 : value Y (pushed last by the caller)
+;       sp+4 : value X (pushed first by the caller)
+;
+;   Returns
+;       sp+4 : max(X, Y), overwriting the X argument slot
+;
+#track stack mode=called                ; called-routine contract: the counter starts
+                                        ; at 0, tracks only max8's own pushes, and
+                                        ; must be back at 0 when rts is reached.
+max8:
+.arg_y := COORDINATE(stack, 3)          ; caller's Y, just behind the return address
+.arg_x := COORDINATE(stack, 4)          ; caller's X, behind Y
+    lds OFFSET(.arg_y)                  ; A = Y (resolves to `lds 3`: nothing pushed yet)
+    stz _temp_y                         ; stash Y in zero page for the compare below
+    phs                                 ; keep Y as a stack local too  (stack: 0 -> 1)
+.local_y := COORDINATE(stack, 1)        ;   ...and name the local slot (top of stack)
+    lds OFFSET(.arg_x)                  ; A = X. The local push shifted every caller
+                                        ; coordinate: this now resolves to `lds 5`,
+                                        ; not `lds 4` -- the assembler did the +1.
+    cpz _temp_y                         ; evaluate X - Y
+    bgt .use_x                          ; X > Y: A already holds the answer
+    lds OFFSET(.local_y)                ; X <= Y: A = Y from the local slot (`lds 1`)
+.use_x:                                 ; join point: both paths arrive with the
+                                        ; counter at 1, so the analyzer is satisfied
+    sts OFFSET(.arg_x)                  ; write the result into the caller's X slot
+    pls                                 ; drop the local copy of Y   (stack: 1 -> 0)
+    rts                                 ; terminal: checks the counter is 0 *before*
+                                        ; popping the caller-owned return address
+#endtrack stack                         ; lexical delimiter; every path ended at rts

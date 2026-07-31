@@ -26,7 +26,7 @@ when a subroutine manipulates its local stack.
 - `OFFSET()` is exercised as the stack-position operand to `LDS` and `STS`;
 - permanent invalidation after a slot is popped,
 - scalar elapsed-cycle coordinates,
-- disabled-analysis stripping and dependency diagnostics, and
+- disabled-check `OFFSET()` resolution without verification output, and
 - ISA-gated syntax and hover documentation for VS Code, Sublime Text, and Vim.
 
 M2 analyzes straight-line instruction effects only. It demonstrates the

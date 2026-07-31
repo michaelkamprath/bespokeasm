@@ -24,6 +24,13 @@ class TestConfigurationGeneration(unittest.TestCase):
         if not pl.Path(path).resolve().is_file():
             raise AssertionError('File does not exist: %s' % str(path))
 
+    def _assert_flow_capability_hover_doc(self, constants: dict[str, str]) -> None:
+        self.assertIn('__FLOW_COUNTERS_AVAILABLE__', constants)
+        self.assertIn(
+            'always-defined numeric preprocessor symbol',
+            constants['__FLOW_COUNTERS_AVAILABLE__'],
+        )
+
     def _assert_constant_definition_pattern(self, pattern: str, source_name: str) -> None:
         compiled = re.compile(pattern)
         cases = {
@@ -368,7 +375,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIn('constants', docs_json['predefined'])
         self.assertIn('data', docs_json['predefined'])
         self.assertIn('memory_zones', docs_json['predefined'])
-        self.assertEqual({}, docs_json['predefined']['constants'])
+        self._assert_flow_capability_hover_doc(docs_json['predefined']['constants'])
         self.assertEqual({}, docs_json['predefined']['data'])
         self.assertEqual({}, docs_json['predefined']['memory_zones'])
         self.assertIn('LDA', docs_json['instructions'])
@@ -475,7 +482,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIn('constants', docs_json['predefined'])
         self.assertIn('data', docs_json['predefined'])
         self.assertIn('memory_zones', docs_json['predefined'])
-        self.assertEqual({}, docs_json['predefined']['constants'])
+        self._assert_flow_capability_hover_doc(docs_json['predefined']['constants'])
         self.assertEqual({}, docs_json['predefined']['data'])
         self.assertEqual({}, docs_json['predefined']['memory_zones'])
         self.assertIn('NOP', docs_json['instructions'])
@@ -511,7 +518,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIn('PUSH2', docs_json['macros'])
         self.assertIn('### `PUSH2`', docs_json['macros']['PUSH2'])
         self.assertNotIn('Documentation not provided.', docs_json['macros']['PUSH2'])
-        self.assertEqual({}, docs_json['predefined']['constants'])
+        self._assert_flow_capability_hover_doc(docs_json['predefined']['constants'])
         self.assertEqual({}, docs_json['predefined']['data'])
         self.assertEqual({}, docs_json['predefined']['memory_zones'])
 
@@ -538,6 +545,7 @@ class TestConfigurationGeneration(unittest.TestCase):
             docs_json = json.load(json_file)
 
         self.assertIn('predefined', docs_json)
+        self._assert_flow_capability_hover_doc(docs_json['predefined']['constants'])
         self.assertIn('VAR_BUF', docs_json['predefined']['constants'])
         self.assertIn('SCREEN', docs_json['predefined']['data'])
         self.assertIn('USER_RAM', docs_json['predefined']['memory_zones'])
@@ -562,6 +570,9 @@ class TestConfigurationGeneration(unittest.TestCase):
         with open(sublime_docs_fp) as json_file:
             sublime_docs_json = json.load(json_file)
 
+        self._assert_flow_capability_hover_doc(
+            sublime_docs_json['predefined']['constants'],
+        )
         self.assertIn('VAR_BUF', sublime_docs_json['predefined']['constants'])
         self.assertIn('| **Size** | 2 words |', sublime_docs_json['predefined']['constants']['VAR_BUF'])
         self.assertIn('SCREEN', sublime_docs_json['predefined']['data'])
@@ -674,7 +685,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIn('constants', docs_json['predefined'])
         self.assertIn('data', docs_json['predefined'])
         self.assertIn('memory_zones', docs_json['predefined'])
-        self.assertEqual({}, docs_json['predefined']['constants'])
+        self._assert_flow_capability_hover_doc(docs_json['predefined']['constants'])
         self.assertEqual({}, docs_json['predefined']['data'])
         self.assertEqual({}, docs_json['predefined']['memory_zones'])
         self.assertIn('LDA', docs_json['instructions'])
@@ -797,7 +808,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIn('constants', docs_json['predefined'])
         self.assertIn('data', docs_json['predefined'])
         self.assertIn('memory_zones', docs_json['predefined'])
-        self.assertEqual({}, docs_json['predefined']['constants'])
+        self._assert_flow_capability_hover_doc(docs_json['predefined']['constants'])
         self.assertEqual({}, docs_json['predefined']['data'])
         self.assertEqual({}, docs_json['predefined']['memory_zones'])
         self.assertIn('NOP', docs_json['instructions'])

@@ -3,6 +3,8 @@
 ;
 #require __LANGUAGE_NAME__ == slu4-min64x4-asm
 #require __LANGUAGE_VERSION__ >= 1.1.0
+#require __BESPOKEASM_VERSION__ >= 0.8.0
+
 ; Zero Page Usage
 .memzone ZERO_PAGE_LIBS
 #mute
@@ -29,11 +31,16 @@ _counter:               .byte 0
 ;
 .align
 compare_uint32ss:
+#track stack mode=called
+    .arg_y := COORDINATE(stack, 3)
+    .arg_x := COORDINATE(stack, 7)
+
     ; load values into zero page and then use _compare_uint32_XY
-    ms4q 7,_argX4
-    ms4q 3,_argY4
+    ms4q OFFSET(.arg_x),_argX4
+    ms4q OFFSET(.arg_y),_argY4
     jps _compare_uint32_XY
     rts
+#endtrack stack
 
 ;   compares high and low longs (4 byte) in _argX4 and _argY4.
 ;       X ? Y
@@ -45,12 +52,14 @@ compare_uint32ss:
 ;  Returns
 ;     flags will be set per comparison
 _compare_uint32_XY:
+#track stack mode=called
     czz _argY4+3,_argX4+3 fne .done
     czz _argY4+2,_argX4+2 fne .done
     czz _argY4+1,_argX4+1 fne .done
     czz _argY4+0,_argX4+0
 .done:
     rts
+#endtrack stack
 
 ; multiply_uint32
 ;   multiply unsigned 4 byte values X*Y, producing an 8 byte unsigned results
@@ -72,19 +81,24 @@ _compare_uint32_XY:
 ;  _counter - 1 byte counter
 
 multiply_uint32:
+#track stack mode=called
+    _multiply_arg_x := COORDINATE(stack, 3)
+    _multiply_arg_y := COORDINATE(stack, 7)
+
     ; return is always positive
     clz _multiply_sign_byte
     ; set up 8 byte results memory block
     clq _working_mem8+4                 ; high long inialized to 0
-    ms4q 3,_working_mem8+0              ; multiplier in low word
-    ms4q 7,_argY4                       ; multiplicand in zero page variable
+    ms4q OFFSET(_multiply_arg_x),_working_mem8+0     ; multiplier in low word
+    ms4q OFFSET(_multiply_arg_y),_argY4              ; multiplicand in zero page variable
     jpa _multiply
 
+#entry stack value=0                    ; alternate called entry into the same tracking region
 multiply_int32:
     ; set up 8 byte results memory block
     clq _working_mem8+4                 ; high long inialized to 0
-    ms4q 3,_working_mem8+0              ; multiplier in low word
-    ms4q 7,_argY4                      ; multiplicand in zero page variable
+    ms4q OFFSET(_multiply_arg_x),_working_mem8+0     ; multiplier in low word
+    ms4q OFFSET(_multiply_arg_y),_argY4              ; multiplicand in zero page variable
     ; determine if result is going to be negative
     ldz _working_mem8+3 ani %10000000 stz _multiply_sign_byte cpi 0 beq .check_multiplicand
     ; negate mutiplier (stack is big endian)
@@ -129,9 +143,10 @@ _multiply:
     inw _working_mem8+6
 .copy_results:
     ; the entire working memory is the 64-bit results
-    mqs4 _working_mem8+4,3+0
-    mqs4 _working_mem8+0,3+4
+    mqs4 _working_mem8+4,OFFSET(_multiply_arg_x)+0
+    mqs4 _working_mem8+0,OFFSET(_multiply_arg_x)+4
     rts
+#endtrack stack
 
 ; divide32
 ;   Divides X by Y (note, unsigned only)

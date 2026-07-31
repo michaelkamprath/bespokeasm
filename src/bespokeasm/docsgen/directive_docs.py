@@ -1,9 +1,23 @@
 """
 Hover documentation strings for BespokeASM directives.
 
-Each entry maps a directive name (without prefix) to a short markdown
-description suitable for display in an editor hover popup.
+The mappings provide short markdown descriptions suitable for display in
+editor hover popups.
 """
+BUILTIN_CONSTANT_DOCS: dict[str, str] = {
+    '__FLOW_COUNTERS_AVAILABLE__': (
+        '### `__FLOW_COUNTERS_AVAILABLE__` : Flow-Counter Capability\n\n'
+        '---\n\n'
+        'An always-defined numeric preprocessor symbol. Its value is `1` '
+        'when the selected ISA configuration declares a `flow_counters` '
+        'section and `0` otherwise.\n\n'
+        'Use it with `#if` or `#elif` to select source for flow-capable '
+        'ISAs. Do not use `#ifdef` as the availability test because the '
+        'symbol is defined in both capability states. Its value is '
+        'independent of `--flow-checks` / `--no-flow-checks`.'
+    ),
+}
+
 # Compiler directives (prefixed with '.' in source code)
 COMPILER_DIRECTIVE_DOCS: dict[str, str] = {
     'org': (
@@ -213,7 +227,8 @@ PREPROCESSOR_DIRECTIVE_DOCS: dict[str, str] = {
         '#if <expr>\n'
         '```\n\n'
         'The single-expression form implies `!= 0`. Expressions may use '
-        'preprocessor macros and built-in version symbols. '
+        'preprocessor macros, built-in version symbols, and the '
+        '`__FLOW_COUNTERS_AVAILABLE__` ISA-capability symbol. '
         'Static-analysis values are not allowed because this directive '
         'selects which source is compiled. '
         'Must be closed with `#endif`.'
@@ -442,8 +457,8 @@ PREPROCESSOR_DIRECTIVE_DOCS: dict[str, str] = {
         '```\n\n'
         'The condition has the same semantics as `#if`: the one-expression '
         'form implies `!= 0`, comparisons may be `==`, `!=`, `<`, `<=`, '
-        '`>`, or `>=`, and preprocessor macros and built-in version symbols '
-        'are resolved. Unlike `#if`, an assertion only validates; it never '
+        '`>`, or `>=`, and preprocessor macros and built-in symbols are '
+        'resolved. Unlike `#if`, an assertion only validates; it never '
         'selects which source is compiled. The optional colors are the same '
         'as for `#print`.\n\n'
         'Unlike `#require`, which declares language or tool version '

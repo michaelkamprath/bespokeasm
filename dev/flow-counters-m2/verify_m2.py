@@ -14,7 +14,7 @@ HARNESS_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = HARNESS_DIR / 'flow-counters-m2.yaml'
 
 
-def _assemble(source_path: Path, output_path: Path, static_analysis: bool = True) -> bytes:
+def _assemble(source_path: Path, output_path: Path, flow_checks: bool = True) -> bytes:
     """Assemble one fixture and return its emitted bytes."""
     SymbolScope._global_scope = None
     assembler = Assembler(
@@ -31,7 +31,7 @@ def _assemble(source_path: Path, output_path: Path, static_analysis: bool = True
         is_verbose=0,
         include_paths=[str(HARNESS_DIR)],
         predefined=[],
-        static_analysis=static_analysis,
+        flow_checks=flow_checks,
     )
     assembler.assemble_bytecode()
     return output_path.read_bytes()
@@ -42,14 +42,14 @@ def _assert_failure(
     name: str,
     source_path: Path,
     expected: str,
-    static_analysis: bool = True,
+    flow_checks: bool = True,
 ) -> None:
     """Assert that one fixture fails with the expected diagnostic text."""
     try:
         _assemble(
             source_path,
             tmp_dir / f'{name}.bin',
-            static_analysis=static_analysis,
+            flow_checks=flow_checks,
         )
     except SystemExit as error:
         assert expected in str(error), str(error)
@@ -134,7 +134,7 @@ def main() -> None:
         disabled = _assemble(
             HARNESS_DIR / 'disabled-unused.asm',
             tmp_dir / 'disabled.bin',
-            static_analysis=False,
+            flow_checks=False,
         )
 
         assert parameters == parameters_stripped
@@ -160,13 +160,12 @@ def main() -> None:
             HARNESS_DIR / 'zero-offset-invalid.asm',
             'does not permit zero coordinate offsets',
         )
-        _assert_failure(
-            tmp_dir,
-            'disabled-dependent',
+        resolved_without_checks = _assemble(
             HARNESS_DIR / 'disabled-dependent.asm',
-            'static analysis is disabled; cannot resolve .field',
-            static_analysis=False,
+            tmp_dir / 'resolved-without-checks.bin',
+            flow_checks=False,
         )
+        assert resolved_without_checks == bytes([0x10, 1, 0x11])
         _verify_editor_extensions(tmp_dir / 'editors')
 
         print('Caller parameter offsets at entry: candidate=3, return-value=7')

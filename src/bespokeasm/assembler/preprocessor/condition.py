@@ -16,7 +16,7 @@ from bespokeasm.expression import parse_expression
 # NOTE: the order of the RHS expressions is important, as it determines the order of evaluation. Need to parse the
 #       quoted strings first, then the expressions.
 PREPROCESSOR_CONDITION_IF_PATTERN = re.compile(
-    f'^(?:#if)\\s+({INSTRUCTION_EXPRESSION_PATTERN})\\s+(==|!=|>|>=|<|<=)\\s+'
+    f'^(?:#if)\\s+({INSTRUCTION_EXPRESSION_PATTERN})\\s+(==|!=|>=|<=|>|<)\\s+'
     f"(?:(?:\\\')(.+)(?:\\\')|(?:\\\")(.+)(?:\\\")|({INSTRUCTION_EXPRESSION_PATTERN}))"
 )
 
@@ -25,7 +25,7 @@ PREPROCESSOR_CONDITION_IMPLIED_IF_PATTERN = re.compile(
 )
 
 PREPROCESSOR_CONDITION_ELIF_PATTERN = re.compile(
-    f'^(?:#elif)\\s+({INSTRUCTION_EXPRESSION_PATTERN})\\s+(==|!=|>|>=|<|<=)\\s+'
+    f'^(?:#elif)\\s+({INSTRUCTION_EXPRESSION_PATTERN})\\s+(==|!=|>=|<=|>|<)\\s+'
     f"(?:(?:\\\')(.+)(?:\\\')|(?:\\\")(.+)(?:\\\")|({INSTRUCTION_EXPRESSION_PATTERN}))"
 )
 
@@ -35,6 +35,10 @@ PREPROCESSOR_CONDITION_IMPLIED_ELIF_PATTERN = re.compile(
 
 PREPROCESSOR_CONDITION_IFDEF_PATTERN = re.compile(
     fr'^(#ifdef|#ifndef)\s+({SYMBOL_PATTERN})\b'
+)
+
+PREPROCESSOR_COMPARISON_OPERATOR_PATTERN = re.compile(
+    r'\s+(?:==|!=|>=|<=|>|<)\s+',
 )
 
 
@@ -95,9 +99,14 @@ class IfPreprocessorCondition(PreprocessorCondition):
                 compare_pattern: re.Pattern[str],
                 implied_pattern: re.Pattern[str],
             ) -> None:
-        match = compare_pattern.match(line_str.strip())
+        stripped_line = line_str.strip()
+        match = (
+            compare_pattern.match(stripped_line)
+            if PREPROCESSOR_COMPARISON_OPERATOR_PATTERN.search(stripped_line)
+            else None
+        )
         if match is None:
-            match2 = implied_pattern.match(line_str.strip())
+            match2 = implied_pattern.match(stripped_line)
             if match2 is None:
                 raise ValueError(f'Invalid preprocessor condition at line: {line_str}')
             self._matched_length = match2.end()

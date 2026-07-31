@@ -172,10 +172,6 @@ class ExpressionNode:
                     raise FlowSymbolError(
                         f'counter coordinate "{self.value}" may only be used through OFFSET()'
                     )
-                if symbol_scope.ignored_counter_coordinate_site(self.value) is not None:
-                    raise FlowSymbolError(
-                        f'static analysis is disabled; cannot resolve {self.value}'
-                    )
                 sys.exit(f'ERROR: {line_id} - Label {self.value} resolves to NONE = {self}')
             return val
         else:

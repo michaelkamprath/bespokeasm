@@ -43,10 +43,12 @@ def build_hover_docs(assembler_model: AssemblerModel, verbose: int = 0) -> dict:
     }
     if assembler_model.flow_counters_enabled:
         preprocessor_docs['assert'] += directive_docs.FLOW_ASSERT_DOC_SUFFIX
+    predefined_docs = markdown_generator.generate_predefined_hover_docs()
+    predefined_docs['constants'].update(directive_docs.BUILTIN_CONSTANT_DOCS)
     return {
         'instructions': instruction_docs,
         'macros': macro_docs,
-        'predefined': markdown_generator.generate_predefined_hover_docs(),
+        'predefined': predefined_docs,
         'directives': {
             'compiler': directive_docs.COMPILER_DIRECTIVE_DOCS,
             'data_type': directive_docs.BYTECODE_DIRECTIVE_DOCS,

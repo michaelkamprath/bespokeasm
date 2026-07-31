@@ -59,7 +59,7 @@ def _assembler(
     config_path: Path,
     source: str,
     *,
-    static_analysis: bool = True,
+    flow_checks: bool = True,
     output_name: str = 'out.bin',
 ) -> Assembler:
     source_path = tmp_path / f'{output_name}.asm'
@@ -79,7 +79,7 @@ def _assembler(
         is_verbose=0,
         include_paths=[str(tmp_path)],
         predefined=[],
-        static_analysis=static_analysis,
+        flow_checks=flow_checks,
     )
     assembler.assemble_bytecode()
     return assembler
@@ -157,7 +157,7 @@ def test_m0_records_variants_operands_expressions_ordinals_and_macro_constituent
     assert target_nop.source_identity.line_object_ordinal == 1
 
 
-def test_m0_records_are_gated_and_bytecode_is_invariant(tmp_path):
+def test_m0_records_follow_isa_capability_and_bytecode_is_invariant(tmp_path):
     source = FLOW_SOURCE_PATH.read_text()
     enabled = _assembler(
         tmp_path,
@@ -170,7 +170,7 @@ def test_m0_records_are_gated_and_bytecode_is_invariant(tmp_path):
         tmp_path,
         FLOW_CONFIG_PATH,
         source,
-        static_analysis=False,
+        flow_checks=False,
         output_name='disabled.bin',
     )
     SymbolScope._global_scope = None
@@ -187,13 +187,99 @@ def test_m0_records_are_gated_and_bytecode_is_invariant(tmp_path):
     )
 
     assert enabled.analysis_source_index is not None
-    assert disabled.analysis_source_index is None
+    assert disabled.analysis_source_index is not None
     assert no_feature.analysis_source_index is None
     assert enabled.model.instructions.get('load').variants[0].analysis_semantics_retained
-    assert not disabled.model.instructions.get('load').variants[0].analysis_semantics_retained
+    assert disabled.model.instructions.get('load').variants[0].analysis_semantics_retained
     assert not no_feature.model.instructions.get('load').variants[0].analysis_semantics_retained
     assert (tmp_path / 'enabled.bin').read_bytes() == (tmp_path / 'disabled.bin').read_bytes()
     assert (tmp_path / 'enabled.bin').read_bytes() == (tmp_path / 'no-feature.bin').read_bytes()
+
+
+def test_flow_counter_availability_symbol_reports_isa_capability(tmp_path):
+    """The built-in reports the ISA feature, never the analysis CLI switch."""
+    source = (
+        '#if __FLOW_COUNTERS_AVAILABLE__\n'
+        '#track stack\n'
+        '#endtrack stack\n'
+        'nop\n'
+        '#else\n'
+        'reset_stack\n'
+        '#endif\n'
+    )
+    enabled = _assembler(
+        tmp_path,
+        FLOW_CONFIG_PATH,
+        source,
+        output_name='flow-capability-enabled.bin',
+    )
+    SymbolScope._global_scope = None
+    analysis_disabled = _assembler(
+        tmp_path,
+        FLOW_CONFIG_PATH,
+        source,
+        flow_checks=False,
+        output_name='flow-capability-analysis-disabled.bin',
+    )
+    SymbolScope._global_scope = None
+    no_flow_config = _write_config(
+        tmp_path,
+        _without_flow_metadata(_load_flow_config()),
+        'flow-capability-unavailable.yaml',
+    )
+    unavailable = _assembler(
+        tmp_path,
+        no_flow_config,
+        source,
+        output_name='flow-capability-unavailable.bin',
+    )
+
+    assert enabled.model.flow_counters_enabled
+    assert analysis_disabled.model.flow_counters_enabled
+    assert not unavailable.model.flow_counters_enabled
+    assert (tmp_path / 'flow-capability-enabled.bin').read_bytes() == bytes([0])
+    assert (
+        tmp_path / 'flow-capability-analysis-disabled.bin'
+    ).read_bytes() == bytes([0])
+    assert (
+        tmp_path / 'flow-capability-unavailable.bin'
+    ).read_bytes() == bytes([0xb0])
+
+
+def test_flow_counter_availability_symbol_works_with_elif(tmp_path):
+    """Both conditional-compilation forms resolve the numeric built-in."""
+    source = (
+        '#if __FLOW_COUNTERS_AVAILABLE__ == 0\n'
+        'reset_stack\n'
+        '#elif __FLOW_COUNTERS_AVAILABLE__\n'
+        'nop\n'
+        '#endif\n'
+    )
+    _assembler(
+        tmp_path,
+        FLOW_CONFIG_PATH,
+        source,
+        output_name='flow-capability-elif-enabled.bin',
+    )
+    SymbolScope._global_scope = None
+    no_flow_config = _write_config(
+        tmp_path,
+        _without_flow_metadata(_load_flow_config()),
+        'flow-capability-elif-unavailable.yaml',
+    )
+    _assembler(
+        tmp_path,
+        no_flow_config,
+        source,
+        output_name='flow-capability-elif-unavailable.bin',
+    )
+
+    assert (
+        tmp_path / 'flow-capability-elif-enabled.bin'
+    ).read_bytes() == bytes([0])
+    assert (
+        tmp_path / 'flow-capability-elif-unavailable.bin'
+    ).read_bytes() == bytes([0xb0])
 
 
 @pytest.mark.parametrize('context', list(ExpressionUseContext))
@@ -219,23 +305,11 @@ def test_m0_deferred_flow_expressions_are_recognized_and_context_tagged(context)
         parse_expression(line_id, expression)
 
 
-@pytest.mark.parametrize(
-    ('static_analysis', 'remove_flow_metadata'),
-    [
-        (False, False),
-        (True, True),
-    ],
-    ids=['analysis-disabled', 'isa-has-no-analysis-feature'],
-)
-def test_m0_large_dormant_compile_has_no_analysis_allocations_or_traversal(
+def test_m0_large_nonflow_compile_has_no_analysis_allocations_or_traversal(
     tmp_path,
     monkeypatch,
-    static_analysis,
-    remove_flow_metadata,
 ):
-    config = _load_flow_config()
-    if remove_flow_metadata:
-        config = _without_flow_metadata(config)
+    config = _without_flow_metadata(_load_flow_config())
     config['general']['address_size'] = 16
     config_path = _write_config(tmp_path, config, 'large-dormant.yaml')
 
@@ -293,7 +367,6 @@ def test_m0_large_dormant_compile_has_no_analysis_allocations_or_traversal(
         tmp_path,
         config_path,
         source,
-        static_analysis=static_analysis,
         output_name='large-dormant.bin',
     )
 
@@ -324,13 +397,13 @@ def test_m0_development_acceptance_harness_is_runnable():
     ('flag', 'expected'),
     [
         (None, True),
-        ('--static-analysis', True),
-        ('--no-static-analysis', False),
+        ('--flow-checks', True),
+        ('--no-flow-checks', False),
         ('-a', True),
         ('-A', False),
     ],
 )
-def test_m0_static_analysis_cli_flag_defaults_on_and_forwards_value(flag, expected):
+def test_m0_flow_checks_cli_flag_defaults_on_and_forwards_value(flag, expected):
     compile_calls = []
 
     def compile_handler(*args):
@@ -347,6 +420,33 @@ def test_m0_static_analysis_cli_flag_defaults_on_and_forwards_value(flag, expect
 
     assert result.exit_code == 0, result.output
     assert compile_calls[0][-1] is expected
+
+
+@pytest.mark.parametrize(
+    'removed_option',
+    ['--static-analysis', '--no-static-analysis'],
+)
+def test_m0_unreleased_static_analysis_option_names_are_removed(
+    removed_option,
+):
+    def noop(*_args):
+        return None
+
+    cli = build_cli(CommandHandlers(noop, noop, noop, noop, noop))
+    result = CliRunner().invoke(
+        cli,
+        [
+            'compile',
+            'program.asm',
+            '--config-file',
+            str(FLOW_CONFIG_PATH),
+            '--no-binary',
+            removed_option,
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert 'No such option' in result.output
 
 
 def test_m0_flow_warning_category_is_elevated_by_warnings_as_errors():
@@ -442,25 +542,29 @@ def test_m0_flow_warning_category_is_elevated_by_warnings_as_errors():
         ),
     ],
 )
-def test_m0_flow_config_validation_is_analysis_gated(tmp_path, mutate, message):
+def test_m0_flow_config_validation_is_independent_of_checks(
+    tmp_path,
+    mutate,
+    message,
+):
     config = _load_flow_config()
     mutate(config)
     config_path = _write_config(tmp_path, config)
 
     reporter = DiagnosticReporter()
     with pytest.raises(SystemExit, match=message):
-        AssemblerModel(str(config_path), 0, reporter, static_analysis=True)
+        AssemblerModel(str(config_path), 0, reporter, flow_checks=True)
     assert reporter.diagnostics[-1].category == 'flow'
 
     disabled_reporter = DiagnosticReporter()
-    model = AssemblerModel(
-        str(config_path),
-        0,
-        disabled_reporter,
-        static_analysis=False,
-    )
-    assert not model.analysis_records_enabled
-    assert disabled_reporter.diagnostics == ()
+    with pytest.raises(SystemExit, match=message):
+        AssemblerModel(
+            str(config_path),
+            0,
+            disabled_reporter,
+            flow_checks=False,
+        )
+    assert disabled_reporter.diagnostics[-1].category == 'flow'
 
 
 def test_m0_variant_semantics_merge_is_deep_for_metadata(tmp_path):
@@ -511,7 +615,7 @@ def test_m0_variant_semantics_merge_is_deep_for_metadata(tmp_path):
         }],
     }
     config_path = _write_config(tmp_path, config, 'deep-merge.yaml')
-    model = AssemblerModel(str(config_path), 0, DiagnosticReporter(), static_analysis=True)
+    model = AssemblerModel(str(config_path), 0, DiagnosticReporter(), flow_checks=True)
 
     load_semantics = model.instructions.get('load').variants[0].semantic_config
     # variant overrides merge into root nested metadata instead of replacing it
@@ -543,8 +647,8 @@ def test_m0_variant_semantics_merge_is_deep_for_metadata(tmp_path):
 def test_m0_flow_metadata_is_validated_even_without_flow_counters_section(tmp_path):
     """Pins a deliberate design decision about flow validation and enablement.
 
-    With static analysis enabled, per-instruction flow metadata is validated
-    at config load for *every* ISA, whether or not it declares a
+    Per-instruction flow metadata is validated at config load for *every* ISA
+    and under either flow-check setting, whether or not it declares a
     ``flow_counters`` section: an instruction set must either carry a proper
     section or carry only valid (or no) flow keys. An invalid
     ``flow_transfer`` value, or ``flow_effects`` naming a counter class that
@@ -552,16 +656,14 @@ def test_m0_flow_metadata_is_validated_even_without_flow_counters_section(tmp_pa
     feature. This is deliberately stricter than "a no-section ISA assembles
     exactly as today" for a configuration that coincidentally carries a
     malformed flow key: silently ignoring malformed flow metadata would let a
-    typo'd configuration masquerade as valid. (Under ``--no-static-analysis``
-    all of these checks are skipped — covered by the analysis-gating test
-    above.)
+    typo'd configuration masquerade as valid.
     """
     config = _without_flow_metadata(_load_flow_config())
     config['instructions']['nop']['flow_transfer'] = 'garbage'
     config_path = _write_config(tmp_path, config, 'no-section-bad-transfer.yaml')
     reporter = DiagnosticReporter()
     with pytest.raises(SystemExit, match='flow_transfer has invalid value "garbage"'):
-        AssemblerModel(str(config_path), 0, reporter, static_analysis=True)
+        AssemblerModel(str(config_path), 0, reporter, flow_checks=True)
     assert reporter.diagnostics[-1].category == 'flow'
 
     config = _without_flow_metadata(_load_flow_config())
@@ -569,7 +671,7 @@ def test_m0_flow_metadata_is_validated_even_without_flow_counters_section(tmp_pa
     config_path = _write_config(tmp_path, config, 'no-section-effects.yaml')
     reporter = DiagnosticReporter()
     with pytest.raises(SystemExit, match='names undeclared counter "stack"'):
-        AssemblerModel(str(config_path), 0, reporter, static_analysis=True)
+        AssemblerModel(str(config_path), 0, reporter, flow_checks=True)
     assert reporter.diagnostics[-1].category == 'flow'
 
     # a *valid* flow_transfer classification on a no-section ISA is acceptable
@@ -581,6 +683,6 @@ def test_m0_flow_metadata_is_validated_even_without_flow_counters_section(tmp_pa
         str(config_path),
         0,
         DiagnosticReporter(),
-        static_analysis=True,
+        flow_checks=True,
     )
     assert not model.flow_counters_enabled

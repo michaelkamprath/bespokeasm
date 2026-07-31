@@ -186,25 +186,13 @@ class AssemblyFile:
                                 lobj.active_named_scopes = active_named_scopes
                                 lobj.diagnostic_reporter = self._diagnostic_reporter
                                 if isinstance(lobj, CounterCoordinateLine):
-                                    if not isa_model.static_analysis_enabled:
-                                        lobj.symbol_scope.record_ignored_counter_coordinate(
-                                            lobj.label,
-                                            lobj.line_id,
-                                        )
-                                    elif not isa_model.flow_counters_enabled:
+                                    if not isa_model.flow_counters_enabled:
                                         self._diagnostic_reporter.error(
                                             lobj.line_id,
                                             'this instruction set does not enable flow counters',
                                             category='flow',
                                         )
                                 elif lobj.flow_expression_nodes:
-                                    if not isa_model.static_analysis_enabled:
-                                        function_name = lobj.flow_expression_nodes[0].value.rstrip('(')
-                                        self._diagnostic_reporter.error(
-                                            lobj.line_id,
-                                            f'static analysis is disabled; cannot resolve {function_name}()',
-                                            category='flow',
-                                        )
                                     if not isa_model.flow_counters_enabled:
                                         self._diagnostic_reporter.error(
                                             lobj.line_id,

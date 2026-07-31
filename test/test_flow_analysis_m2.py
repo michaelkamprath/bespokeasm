@@ -26,7 +26,7 @@ def _assembler(
     source: str,
     *,
     config_path: Path = M2_CONFIG,
-    static_analysis: bool = True,
+    flow_checks: bool = True,
     output_name: str = 'out.bin',
 ) -> Assembler:
     source_path = tmp_path / f'{output_name}.asm'
@@ -46,7 +46,7 @@ def _assembler(
         is_verbose=0,
         include_paths=[str(tmp_path)],
         predefined=[],
-        static_analysis=static_analysis,
+        flow_checks=flow_checks,
     )
 
 
@@ -62,14 +62,14 @@ def _assert_flow_error(
     expected: str,
     *,
     config_path: Path = M2_CONFIG,
-    static_analysis: bool = True,
+    flow_checks: bool = True,
     expected_line: int | None = None,
 ) -> Assembler:
     assembler = _assembler(
         tmp_path,
         source,
         config_path=config_path,
-        static_analysis=static_analysis,
+        flow_checks=flow_checks,
     )
     with pytest.raises(SystemExit, match=expected):
         assembler.assemble_bytecode()
@@ -494,27 +494,14 @@ def test_m2_coordinate_offset_with_flow_content_reports_flow_error(tmp_path, off
     )
 
 
-def test_m2_disabled_coordinate_with_flow_offset_is_ignored(tmp_path):
-    """Bug: the same flow-in-offset form also crashed under --no-static-analysis.
-
-    The requirements state that with analysis disabled, "a flow construct used
-    only by another ignored flow construct does not prevent compilation": the
-    entire ``:=`` declaration is ignored analysis-only syntax, so flow content
-    inside its offset must be ignored along with it, not crash the assembler.
-
-    Expected behavior: the declaration is ignored (recorded only in the
-    diagnostic-only spelling index), no flow diagnostics are produced, and the
-    rest of the source assembles normally.
-    """
-    disabled, bytecode = _assemble(
+def test_m2_coordinate_with_flow_offset_is_always_malformed(tmp_path):
+    """Disabling checks does not suppress source-syntax diagnostics."""
+    _assert_flow_error(
         tmp_path,
         'slot := COORDINATE(stack, COUNTER(stack))\nnop\n',
-        static_analysis=False,
-    )
-    assert bytecode == bytes([0x00])
-    assert not any(
-        diagnostic.category == 'flow'
-        for diagnostic in disabled.model.diagnostic_reporter.diagnostics
+        'ordinary compile-time expression',
+        flow_checks=False,
+        expected_line=1,
     )
 
 
@@ -523,14 +510,10 @@ def test_m2_numeric_fallback_takes_precedence_over_coordinate_indexes(tmp_path):
 
     Pre-flow-counters, an unresolved label-or-number token (e.g. ``face`` under
     ``default_numeric_base: hex``) fell back to numeric interpretation. The M2
-    symbol resolution consulted the coordinate record and the disabled-mode
-    ignored-declaration index *before* that fallback, so with hex as the
-    default base, ``face := COORDINATE(stack, 1)`` followed by
-    ``.byte face & $ff`` failed ('static analysis is disabled; cannot resolve
-    face') under --no-static-analysis while its stripped twin assembled the
-    byte 0xCE — violating strip-equivalence (acceptance cases 76/78, which
-    require the index to be consulted only for *otherwise-unresolved*
-    references).
+    symbol resolution once consulted flow-coordinate bookkeeping *before* that
+    fallback, so with hex as the default base, ``face :=
+    COORDINATE(stack, 1)`` followed by ``.byte face & $ff`` could fail instead
+    of assembling byte 0xCE.
 
     Expected behavior: the numeric fallback wins first in both disabled and
     enabled modes; coordinate-specific diagnostics apply only to references
@@ -545,7 +528,7 @@ def test_m2_numeric_fallback_takes_precedence_over_coordinate_indexes(tmp_path):
         tmp_path,
         disabled_source,
         config_path=config_path,
-        static_analysis=False,
+        flow_checks=False,
     )
     assert disabled_bytes == bytes([0xCE])
 
@@ -650,21 +633,29 @@ def test_m2_disabled_unused_declaration_is_ignored(tmp_path):
     assembler, bytecode = _assemble(
         tmp_path,
         (M2_DIR / 'disabled-unused.asm').read_text(),
-        static_analysis=False,
+        flow_checks=False,
     )
     assert bytecode == bytes([0])
-    assert assembler.analysis_source_index is None
+    assert assembler.analysis_source_index is not None
 
 
-def test_m2_disabled_coordinate_dependency_has_dedicated_diagnostic(tmp_path):
-    source = 'function:\n.field := COORDINATE(stack, 0)\n.byte .field\n'
-    _assert_flow_error(
+def test_m2_no_flow_checks_still_resolves_offset_dependency(tmp_path):
+    source = (
+        'function:\n'
+        '#track stack\n'
+        'push\n'
+        '.field := COORDINATE(stack, 1)\n'
+        '.byte OFFSET(.field)\n'
+        'pop\n'
+        '#endtrack stack\n'
+    )
+    _, bytecode = _assemble(
         tmp_path,
         source,
-        r'static analysis is disabled; cannot resolve \.field',
-        static_analysis=False,
-        expected_line=3,
+        flow_checks=False,
+        output_name='resolved-without-checks.bin',
     )
+    assert bytecode == bytes([0x10, 0x01, 0x11])
 
 
 def test_m2_disabled_declaration_does_not_reserve_or_shadow_symbol(tmp_path):
@@ -674,7 +665,7 @@ def test_m2_disabled_declaration_does_not_reserve_or_shadow_symbol(tmp_path):
         '.field:\n'
         '.byte .field\n'
     )
-    _, bytecode = _assemble(tmp_path, source, static_analysis=False)
+    _, bytecode = _assemble(tmp_path, source, flow_checks=False)
     assert bytecode == bytes([0])
 
 
@@ -693,11 +684,11 @@ def test_m2_coordinate_construct_requires_flow_capability(tmp_path):
         expected_line=2,
     )
     SymbolScope._global_scope = None
-    _, bytecode = _assemble(
+    _assert_flow_error(
         tmp_path,
         'function:\n.x := COORDINATE(stack, 0)\nnop\n',
+        'does not enable flow counters',
         config_path=config_path,
-        static_analysis=False,
-        output_name='disabled-no-feature.bin',
+        flow_checks=False,
+        expected_line=2,
     )
-    assert bytecode == bytes([0])

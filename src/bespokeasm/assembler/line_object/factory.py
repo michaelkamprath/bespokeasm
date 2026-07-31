@@ -54,9 +54,7 @@ class LineOjectFactory:
         context: str,
     ) -> None:
         """Report the capability-appropriate diagnostic for a forbidden use."""
-        if not model.static_analysis_enabled:
-            message = f'static analysis is disabled; cannot use a flow expression in {context}'
-        elif not model.flow_counters_enabled:
+        if not model.flow_counters_enabled:
             message = 'this instruction set does not enable flow counters'
         else:
             message = f'flow expressions are not allowed in {context}'

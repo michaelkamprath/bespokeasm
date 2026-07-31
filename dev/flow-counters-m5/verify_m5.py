@@ -36,7 +36,7 @@ def _assembler(
         is_verbose=0,
         include_paths=[str(HARNESS_DIR)],
         predefined=[],
-        static_analysis=True,
+        flow_checks=True,
     )
 
 

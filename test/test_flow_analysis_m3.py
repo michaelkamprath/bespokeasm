@@ -40,7 +40,7 @@ def _assembler(
     source: str,
     *,
     config_path: Path = M3_CONFIG_PATH,
-    static_analysis: bool = True,
+    flow_checks: bool = True,
     output_name: str = 'out.bin',
 ) -> Assembler:
     source_path = tmp_path / f'{output_name}.asm'
@@ -60,7 +60,7 @@ def _assembler(
         is_verbose=0,
         include_paths=[str(tmp_path)],
         predefined=[],
-        static_analysis=static_analysis,
+        flow_checks=flow_checks,
     )
 
 

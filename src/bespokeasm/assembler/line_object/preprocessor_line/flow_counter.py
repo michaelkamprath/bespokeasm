@@ -50,7 +50,7 @@ def macro_expansion_introduces_flow_operator(
     breadth-first with a visited set, so it tolerates definition cycles and
     never grows any text. It exists for classification — deciding whether a
     general-looking construct is actually flow-dependent — without evaluating
-    operands that an ignored (``--no-static-analysis``) construct must never
+    operands that an ignored (``--no-flow-checks``) construct must never
     evaluate.
     """
     seen: set[str] = set()
@@ -227,15 +227,10 @@ class FlowCounterDirectiveLine(PreprocessorLine):
     def _resolve_value_text(self, text: str) -> str:
         """Resolve preprocessor macros in one directive value expression.
 
-        With static analysis disabled these directives are ignored as if
-        stripped from the source, so their values must not be macro-resolved
-        (resolution could itself fail, e.g. on a macro cycle only they
-        reference); source-level syntax validation still runs on the raw text.
+        Values are resolved during parsing so a later dependency-driven flow
+        pass can use them even when optional flow checks are disabled.
         """
-        if (
-            self._preprocessor is None
-            or not self._isa_model.static_analysis_enabled
-        ):
+        if self._preprocessor is None:
             return text
         return resolve_symbols_protecting_flow_names(
             self._preprocessor,
@@ -259,17 +254,11 @@ class FlowCounterDirectiveLine(PreprocessorLine):
     ) -> dict[str, ExpressionNode]:
         """Parse whitespace-separated ``name=expression`` directive parameters.
 
-        With static analysis disabled, flow directives are analysis-only syntax
-        that must be ignored as if stripped from the source. Syntactic
-        validation still runs, while well-formed parameters belonging to a
-        future milestone are ignored until their analysis is available.
-
         Values are ordinary compile-time expressions and receive preprocessor
         macro resolution — except the ``identifier_names`` parameters (such as
         ``as=`` and ``mode=``), whose values name flow entities and must stay
         literal.
         """
-        enforce = self._isa_model.static_analysis_enabled
         if not text.strip():
             return {}
         matches = list(self._PARAMETER_PATTERN.finditer(text))
@@ -305,10 +294,9 @@ class FlowCounterDirectiveLine(PreprocessorLine):
         parameters = {}
         for name, value_expression in parsed_parameters.items():
             if name not in allowed:
-                if enforce:
-                    self._error(
-                        f'flow directive parameter "{name}" is not supported'
-                    )
+                self._error(
+                    f'flow directive parameter "{name}" is not supported'
+                )
                 continue
             parameters[name] = value_expression
         return parameters
@@ -361,10 +349,7 @@ class FlowCounterDirectiveLine(PreprocessorLine):
 
     def _validate_feature_enabled(self) -> None:
         """Reject active flow syntax when the selected ISA lacks the feature."""
-        if (
-            self._isa_model.static_analysis_enabled
-            and not self._isa_model.flow_counters_enabled
-        ):
+        if not self._isa_model.flow_counters_enabled:
             self._error('this instruction set does not enable flow counters')
 
 
