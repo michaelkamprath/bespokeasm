@@ -52,6 +52,10 @@ class TestVSCodeLabelHover(unittest.TestCase):
 const helper = require('{label_helper_path.as_posix()}');
 const constants = require('{constants_helper_path.as_posix()}');
 const lines = ['start:', '  jmp start', '.local:', '  jmp .local', '_file:', '  jmp _file'];
+const coordLine = '_arg_dividend := COORDINATE(stack, 3)';
+const coordDefs = helper.findLabelDefinitions(coordLine);
+const coordMap = helper.buildLabelDefinitionMap(lines.concat([coordLine]));
+const coordLoc = helper.getLabelLocation(coordMap, '_arg_dividend') || null;
 const map = helper.buildLabelDefinitionMap(lines);
 const start = helper.getLabelLocation(map, 'start');
 const usage = helper.isDefinitionAtLocation(map, 'start', 0, start.character);
@@ -103,7 +107,9 @@ console.log(JSON.stringify({{
   secondLoc,
   firstIsDef,
   secondIsDef,
-  opDefs
+  opDefs,
+  coordDefs,
+  coordLoc
 }}));
 """
         result = subprocess.run(
@@ -132,6 +138,10 @@ console.log(JSON.stringify({{
         self.assertTrue(payload['firstIsDef'])
         self.assertTrue(payload['secondIsDef'])
         self.assertEqual([item['name'] for item in payload['opDefs']], ['first', 'second'])
+        # a flow-coordinate `:=` definition is not a label definition, so
+        # semantic tokens never override its flow-coordinate scope
+        self.assertEqual(payload['coordDefs'], [])
+        self.assertIsNone(payload['coordLoc'])
         self.assertEqual(payload['opDefs'][0]['character'], payload['firstLoc']['character'])
         self.assertEqual(payload['opDefs'][1]['character'], payload['secondLoc']['character'])
         shutil.rmtree(temp_dir)

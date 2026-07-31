@@ -5,7 +5,7 @@ is_prime32:
 .return_value := COORDINATE(stack, 7) ; caller's result slot is at sp+7
 
 push4                               ; like the 4-byte divisor pushed at primes line 58
-lds OFFSET(.candidate)              ; unchanged source; now equivalent to `lds 7`
-sts OFFSET(.return_value)           ; unchanged source; now equivalent to `sts 11`
+lds .candidate              ; unchanged source; now equivalent to `lds 7`
+sts .return_value           ; unchanged source; now equivalent to `sts 11`
 pop4
 #endtrack stack

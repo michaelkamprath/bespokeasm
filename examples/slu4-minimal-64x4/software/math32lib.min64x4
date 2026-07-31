@@ -36,8 +36,8 @@ compare_uint32ss:
     .arg_x := COORDINATE(stack, 7)
 
     ; load values into zero page and then use _compare_uint32_XY
-    ms4q OFFSET(.arg_x),_argX4
-    ms4q OFFSET(.arg_y),_argY4
+    ms4q .arg_x,_argX4
+    ms4q .arg_y,_argY4
     jps _compare_uint32_XY
     rts
 #endtrack stack
@@ -89,16 +89,16 @@ multiply_uint32:
     clz _multiply_sign_byte
     ; set up 8 byte results memory block
     clq _working_mem8+4                 ; high long inialized to 0
-    ms4q OFFSET(_multiply_arg_x),_working_mem8+0     ; multiplier in low word
-    ms4q OFFSET(_multiply_arg_y),_argY4              ; multiplicand in zero page variable
+    ms4q _multiply_arg_x,_working_mem8+0     ; multiplier in low word
+    ms4q _multiply_arg_y,_argY4              ; multiplicand in zero page variable
     jpa _multiply
 
 #entry stack value=0                    ; alternate called entry into the same tracking region
 multiply_int32:
     ; set up 8 byte results memory block
     clq _working_mem8+4                 ; high long inialized to 0
-    ms4q OFFSET(_multiply_arg_x),_working_mem8+0     ; multiplier in low word
-    ms4q OFFSET(_multiply_arg_y),_argY4              ; multiplicand in zero page variable
+    ms4q _multiply_arg_x,_working_mem8+0     ; multiplier in low word
+    ms4q _multiply_arg_y,_argY4              ; multiplicand in zero page variable
     ; determine if result is going to be negative
     ldz _working_mem8+3 ani %10000000 stz _multiply_sign_byte cpi 0 beq .check_multiplicand
     ; negate mutiplier (stack is big endian)
@@ -143,8 +143,8 @@ _multiply:
     inw _working_mem8+6
 .copy_results:
     ; the entire working memory is the 64-bit results
-    mqs4 _working_mem8+4,OFFSET(_multiply_arg_x)+0
-    mqs4 _working_mem8+0,OFFSET(_multiply_arg_x)+4
+    mqs4 _working_mem8+4,_multiply_arg_x+0
+    mqs4 _working_mem8+0,_multiply_arg_x+4
     rts
 #endtrack stack
 
@@ -160,18 +160,21 @@ _multiply:
 ;       sp+7 : the remainder (replaces Y)
 ;
 divide32:
+#track stack mode=called
+    _arg_dividend := COORDINATE(stack, 3)
+    _arg_divisor := COORDINATE(stack, 7)
     ; first check divisor is not 0
-    ms4q 7,_argX4
+    ms4q _arg_divisor,_argX4
     clq _argY4
     jps _compare_uint32_XY
     beq .divide_by_zero
     ; check if dividend is 0
-    ms4q 3,_argX4
+    ms4q _arg_dividend,_argX4
     jps _compare_uint32_XY
     beq .return_zero
     ; check if divisor > dividend
-    ms4q 7,_argX4        ; get divisor
-    ms4q 3,_argY4        ; get dividend
+    ms4q _arg_divisor,_argX4        ; get divisor
+    ms4q _arg_dividend,_argY4        ; get dividend
     jps _compare_uint32_XY
     bgt .divisor_too_large
 .start_division:
@@ -182,9 +185,9 @@ divide32:
     ;   _temp_long1     : divisor
     ;   _temp_byte1     : carry bit
     clz _temp_byte1             ; init carry bit
-    ms4q 3,_working_mem8+0      ; init low word with dividend
+    ms4q _arg_dividend,_working_mem8+0      ; init low word with dividend
     clq _working_mem8+4         ; init high word
-    ms4q 7,_temp_long1          ; divisor
+    ms4q _arg_divisor,_temp_long1          ; divisor
     miz 32,_counter             ; init loop counter
 
 .div_loop:
@@ -209,12 +212,12 @@ divide32:
 
 .division_done:
     ; at this point we have the remainder in the high word, save it
-    mqs4 _working_mem8+4,7
+    mqs4 _working_mem8+4,_arg_dividend+4
     ; and then we left shift one more time to get the quotient
     jps .div_lsl64
     azz _temp_byte1,_working_mem8+0     ; add carry bit to low byte
     ; the quotient is in _working_mem8+0
-    mqs4 _working_mem8+0,3
+    mqs4 _working_mem8+0,_arg_dividend
     rts
 .divisor_too_large:
     ; quotient = 0, remander = dividend
@@ -229,6 +232,8 @@ divide32:
 .return_zero:
     mqs4 _argY4,3               ; _argY4 is already 0
     rts
+#endtrack stack
+
 ; .div_lsl64
 ;
 ;   local method for shifting _working_mem8 left 1 bit

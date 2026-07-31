@@ -4,6 +4,6 @@ push
 .field := COORDINATE(stack, 1)
 pop
 push
-load [sp + OFFSET(.field)]
+load [sp + .field]
 pop
 #endtrack stack

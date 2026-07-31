@@ -109,7 +109,7 @@ def test_no_flow_checks_resolves_offset_without_listing_column(
         '#track stack\n'
         'push\n'
         '.slot := COORDINATE(stack, 1)\n'
-        '.byte OFFSET(.slot)\n'
+        '.byte .slot\n'
         'pop\n'
         '#endtrack stack\n',
         pretty=True,
@@ -351,7 +351,7 @@ def test_m5_call_summary_preserves_caller_visible_depth(tmp_path):
         'routine:\n'
         '.argument := COORDINATE(stack, 3)\n'
         'call callee\n'
-        'depth OFFSET(.argument)\n'
+        'depth .argument\n'
         'rts\n'
         '#endtrack stack\n'
         'callee:\n'
@@ -490,7 +490,7 @@ def test_m5_initial_value_entry_preserves_entry_coordinates(tmp_path):
         'jmp main\n'
         '#entry stack value=0\n'
         'alternate:\n'
-        'depth OFFSET(argument)\n'
+        'depth argument\n'
         'rts\n'
         'main:\n'
         'rts\n'
@@ -508,7 +508,7 @@ def test_m5_noninitial_entry_invalidates_prior_coordinates(tmp_path):
         'jmp main\n'
         '#entry stack value=1\n'
         'alternate:\n'
-        'depth OFFSET(argument)\n'
+        'depth argument\n'
         'pop\n'
         'rts\n'
         'main:\n'
@@ -684,7 +684,7 @@ def test_m5_coordinate_invalid_on_one_path_stays_invalid_after_join(tmp_path):
         '.preserve:\n'
         'nop\n'
         '.join:\n'
-        'depth OFFSET(.slot)\n'
+        'depth .slot\n'
         'pop\n'
         'rts\n'
         '#endtrack stack\n',
@@ -1085,7 +1085,7 @@ def test_m5_listing_shows_declared_and_resolved_coordinate_offsets(
         'routine:\n'
         '.argument := COORDINATE(stack, 3)\n'
         'push\n'
-        'depth OFFSET(.argument)\n'
+        'depth .argument\n'
         'pop\n'
         'rts\n'
         '#endtrack stack\n',
@@ -1104,7 +1104,7 @@ def test_m5_listing_shows_declared_and_resolved_coordinate_offsets(
     )
     offset_row = next(
         row for row in listing_rows
-        if 'OFFSET(.argument)' in row[3]
+        if 'depth .argument' in row[3]
     )
     assert declaration_row[4].strip() == '.argument=3'
     assert offset_row[4].strip() == '.argument=4'
@@ -1250,7 +1250,7 @@ def test_m5_nonfatal_worklist_reports_unresolved_offset_once(
     tmp_path,
     monkeypatch,
 ):
-    """A revisited expression records one diagnostic before emission stops."""
+    """A revisited coordinate reference records one diagnostic, not one per path."""
     from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 
     original_error = DiagnosticReporter.error
@@ -1274,28 +1274,35 @@ def test_m5_nonfatal_worklist_reports_unresolved_offset_once(
             pass
 
     monkeypatch.setattr(DiagnosticReporter, 'error', nonfatal_error)
+    # `ghost` belongs to the first, ended tracking instance; the reference at
+    # the join is reached from both branch paths, so the worklist visits the
+    # node twice and must still report the stale-instance error once.
     assembler = _assembler(
         tmp_path,
         '#track stack\n'
+        'first:\n'
+        'push\n'
+        'ghost := COORDINATE(stack, 1)\n'
+        'pop\n'
+        'rts\n'
+        '#endtrack stack\n'
+        '#track stack\n'
+        'routine:\n'
         'jz alternate\n'
         'jmp join\n'
         'alternate:\n'
         'nop\n'
         'join:\n'
-        'depth OFFSET(.ghost)\n'
+        'depth ghost\n'
         'rts\n'
         '#endtrack stack\n',
     )
 
-    with pytest.raises(
-        RuntimeError,
-        match='deferred flow expression reached numeric evaluation',
-    ):
-        assembler.assemble_bytecode()
+    assembler.assemble_bytecode()
     diagnostics = [
         diagnostic
         for diagnostic in assembler.model.diagnostic_reporter.diagnostics
-        if 'OFFSET(.ghost)' in diagnostic.message
+        if 'earlier tracking instance' in diagnostic.message
     ]
     assert len(diagnostics) == 1
 
@@ -1535,7 +1542,7 @@ def test_watched_write_permanently_invalidates_existing_coordinates(tmp_path):
         '.slot := COORDINATE(stack, 1)\n'
         'reset_stack\n'
         '#resume stack = 0\n'
-        'observe OFFSET(.slot)\n'
+        'observe .slot\n'
         '#endtrack stack\n',
         'counter coordinate ".slot" is invalid',
     )
@@ -1635,7 +1642,7 @@ def test_graph_resume_then_redeclared_coordinate_resolves(tmp_path):
         'write_addr 255\n'
         '#resume stack = 1\n'
         '.new := COORDINATE(stack, 1)\n'
-        'depth OFFSET(.new)\n'
+        'depth .new\n'
         'pop\n'
         'rts\n'
         '#endtrack stack\n',
@@ -1654,7 +1661,7 @@ def test_graph_resume_then_redeclaration_leaves_old_coordinate_dead(tmp_path):
         'write_addr 255\n'
         '#resume stack = 1\n'
         '.new := COORDINATE(stack, 1)\n'
-        'observe OFFSET(.old)\n'
+        'observe .old\n'
         'pop\n'
         'rts\n'
         '#endtrack stack\n',
@@ -1863,7 +1870,7 @@ def test_watched_write_during_explicit_suspend_still_invalidates(tmp_path):
         '.x := COORDINATE(stack, 1)\n'
         '#suspend stack\n'
         'write_addr 255\n'
-        'depth OFFSET(.x)\n'
+        'depth .x\n'
         '#resume stack = 1\n'
         'pop\n'
         'rts\n'
@@ -1893,7 +1900,7 @@ def test_watched_write_during_explicit_suspend_kills_coordinates_forever(
         '#suspend stack\n'
         'write_addr 255\n'
         '#resume stack = 1\n'
-        'depth OFFSET(.x)\n'
+        'depth .x\n'
         'pop\n'
         'rts\n'
         '#endtrack stack\n',

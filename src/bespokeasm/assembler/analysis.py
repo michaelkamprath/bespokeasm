@@ -69,8 +69,13 @@ class FrozenExpression:
         return node
 
     def contains_flow_value(self) -> bool:
-        """Return whether the snapshot contains ``COUNTER`` or ``OFFSET``."""
-        if self.token_type in {TokenType.T_COUNTER, TokenType.T_OFFSET}:
+        """Return whether the snapshot contains a ``COUNTER`` operator.
+
+        Bare counter-coordinate references are not detectable here — they are
+        ordinary labels until scope lookup; consumers that must reject them
+        rely on the ``FlowSymbolError`` raised at evaluation instead.
+        """
+        if self.token_type == TokenType.T_COUNTER:
             return True
         return (
             self.left is not None

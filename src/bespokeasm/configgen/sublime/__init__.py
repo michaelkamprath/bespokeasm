@@ -81,11 +81,6 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
                 'Flow Coordinates - Definitions',
             ),
             (
-                SyntaxElement.FLOW_COORDINATE_USAGE,
-                'variable.other.flow.coordinate.usage',
-                'Flow Coordinates - Usages',
-            ),
-            (
                 SyntaxElement.FLOW_COUNTER_NAME,
                 'variable.other.flow.counter',
                 'Flow Counters',
@@ -157,6 +152,22 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             'background': f'color({constant_usage_color} alpha(0.05))',
         })
 
+        if self.model.flow_counters_enabled:
+            # Bare coordinate usages are tagged contextually by the hover
+            # plugin's semantic-region pass. The explicit low-alpha background
+            # matters: Sublime fills an add_regions region with the scope's
+            # background when one is defined, and falls back to an opaque
+            # foreground fill (inverse video) when it is not.
+            coordinate_usage_color = DEFAULT_COLOR_SCHEME.get_color(
+                SyntaxElement.FLOW_COORDINATE_USAGE,
+            )
+            rules.append({
+                'foreground': coordinate_usage_color,
+                'name': 'Flow Coordinates - Usages',
+                'scope': 'variable.other.flow.coordinate.usage',
+                'background': f'color({coordinate_usage_color} alpha(0.05))',
+            })
+
         bracket_color = DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.BRACKET)
         rules.append({
             'font_style': 'bold',
@@ -215,7 +226,6 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         self._replace_symbol_pattern_tokens(syntax_dict)
         if not self.model.flow_counters_enabled:
             del syntax_dict['contexts']['counter_coordinates']
-            del syntax_dict['contexts']['flow_coordinate_usages']
             del syntax_dict['contexts']['flow_counter_usages']
             del syntax_dict['contexts']['flow_counter_directives']
             del syntax_dict['contexts']['flow_operators']
@@ -228,7 +238,6 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
                 rule
                 for rule in syntax_dict['contexts']['numerical_expressions']
                 if rule.get('include') not in {
-                    'flow_coordinate_usages',
                     'flow_counter_usages',
                     'flow_operators',
                 }
@@ -421,6 +430,11 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             hover_plugin_fp,
             '##DECLARATION_OPERATOR##',
             ':=' if self.model.flow_counters_enabled else '',
+        )
+        self._replace_token_in_file(
+            hover_plugin_fp,
+            '##COORDINATE_USAGE_SCOPE##',
+            'variable.other.flow.coordinate.usage' if self.model.flow_counters_enabled else '',
         )
         self._replace_token_in_file(hover_plugin_fp, '##PACKAGE_NAME##', self.language_name)
         self._replace_token_in_file(hover_plugin_fp, '##LABEL_PATTERN##', self._label_pattern())

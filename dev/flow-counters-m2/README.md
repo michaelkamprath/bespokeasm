@@ -1,6 +1,6 @@
 # Flow Counters M2 Development Acceptance Harness
 
-This harness demonstrates the original motivation for `OFFSET()`: naming
+This harness demonstrates the original motivation for counter coordinates: naming
 caller-owned parameters on the stack so their source expressions do not change
 when a subroutine manipulates its local stack.
 
@@ -23,10 +23,10 @@ when a subroutine manipulates its local stack.
 - the stack class uses `coordinate_offsets: positive` and
   `allow_zero_offset: false`, rejecting both `sp-N` and `sp+0`; other ISAs may
   select `negative` or `both` and may independently allow zero;
-- `OFFSET()` is exercised as the stack-position operand to `LDS` and `STS`;
+- bare coordinate references are exercised as the stack-position operands to `LDS` and `STS`;
 - permanent invalidation after a slot is popped,
 - scalar elapsed-cycle coordinates,
-- disabled-check `OFFSET()` resolution without verification output, and
+- disabled-check coordinate-reference resolution without verification output, and
 - ISA-gated syntax and hover documentation for VS Code, Sublime Text, and Vim.
 
 M2 analyzes straight-line instruction effects only. It demonstrates the

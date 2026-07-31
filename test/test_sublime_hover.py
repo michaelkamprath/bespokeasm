@@ -27,7 +27,7 @@ def _install_label_patterns(hover):
         pattern = pattern[1:]
     if pattern.endswith('$'):
         pattern = pattern[:-1]
-    hover.LABEL_DEFINITION_PATTERN = re.compile(rf'^\s*(?P<name>{pattern})\s*:')
+    hover.LABEL_DEFINITION_PATTERN = re.compile(rf'^\s*(?P<name>{pattern})\s*:(?!=)')
     hover.OPERAND_LABEL_DEFINITION_PATTERN = re.compile(rf'@(?P<name>{pattern}):\s*')
     hover.CONSTANT_DEFINITION_PATTERN = re.compile(rf'^\s*(?P<name>{pattern})\s*(?:=|\bEQU\b)')
     hover.CONSTANT_VALUE_PATTERN = re.compile(rf'^\s*{pattern}\s*(?:=|\bEQU\b)\s*(?P<value>.+?)(?:\s*;.*)?$')
@@ -147,6 +147,23 @@ def test_sublime_label_definition_map_detects_operand_labels():
     assert defs['second']['line'] == 1
     assert 'skip' not in defs
     assert 'ignore' not in defs
+
+
+def test_sublime_coordinate_definition_is_not_a_label():
+    # a flow-coordinate `:=` definition must not enter the label map,
+    # so label hover never claims a coordinate name
+    hover = _load_sublime_hover_module()
+    _install_label_patterns(hover)
+    entries = [{
+        'path': '/tmp/main.asm',
+        'lines': [
+            'divide32:',
+            '_arg_dividend := COORDINATE(stack, 3)',
+        ],
+    }]
+    defs = hover._build_definition_map(entries, 'label')
+    assert defs['divide32']['line'] == 0
+    assert '_arg_dividend' not in defs
 
 
 def test_sublime_is_definition_at_point_handles_operand_labels():
@@ -778,3 +795,44 @@ def test_handle_hover_navigate_no_window_is_safe():
     hover = _load_sublime_hover_module()
     view = _MockView(window=None)
     hover._handle_hover_navigate(view, 'https://example.com')
+
+
+def test_sublime_coordinate_definitions_feed_semantic_map():
+    """Bare coordinate usages are tagged contextually: the `:=` declaration
+    scan must find coordinate symbols so the semantic-region pass can scope
+    their usages, while label/constant maps stay unaffected."""
+    hover = _load_sublime_hover_module()
+    _install_label_patterns(hover)
+    pattern = PATTERN_ALLOWED_LABELS.pattern
+    if pattern.startswith('^'):
+        pattern = pattern[1:]
+    if pattern.endswith('$'):
+        pattern = pattern[:-1]
+    hover.DECLARATION_OPERATOR = ':='
+    hover.COORD_DEFINITION_PATTERN = re.compile(rf'^\s*(?P<name>{pattern})\s*:=')
+
+    entries = [{'path': '/tmp/test.asm', 'lines': [
+        'routine:',
+        '.arg := COORDINATE(stack, 3)',
+        '  lds .arg',
+        'other = 5',
+        '; .ghost := COORDINATE(stack, 1)',
+    ]}]
+    coordinate_map = hover._build_definition_map(entries, 'coordinate')
+    assert '.arg' in coordinate_map
+    assert coordinate_map['.arg']['line'] == 1
+    # a commented-out declaration is not a definition
+    assert '.ghost' not in coordinate_map
+    # the declaration does not leak into label or constant maps
+    assert '.arg' not in hover._build_definition_map(entries, 'label')
+    assert '.arg' not in hover._build_definition_map(entries, 'constant')
+
+
+def test_sublime_coordinate_scan_disabled_without_flow_operator():
+    """A non-flow extension (empty declaration operator) finds no coordinates."""
+    hover = _load_sublime_hover_module()
+    _install_label_patterns(hover)
+    hover.DECLARATION_OPERATOR = ''
+    hover.COORD_DEFINITION_PATTERN = None
+    entries = [{'path': '/tmp/test.asm', 'lines': ['.arg := COORDINATE(stack, 3)']}]
+    assert hover._build_definition_map(entries, 'coordinate') == {}

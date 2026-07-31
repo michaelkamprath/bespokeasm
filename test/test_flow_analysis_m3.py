@@ -274,7 +274,7 @@ def test_m3_arg_delta_uses_immediate_constant_and_updates_offset(tmp_path):
         '#track stack init=4 exit=0\n'
         '.arg := COORDINATE(stack, 3)\n'
         'addsp 2\n'
-        'lds OFFSET(.arg)\n'
+        'lds .arg\n'
         'addsp FRAME_SIZE\n'
         'rts\n'
         '#endtrack stack\n'
@@ -380,7 +380,7 @@ def test_m3_frozen_operand_preserves_non_decimal_default_base(tmp_path):
             'is unreachable after flow counter "stack" terminated',
         ),
         (
-            'lds OFFSET(.slot)',
+            'lds .slot',
             'is unreachable after the flow counter path terminated',
         ),
     ],
@@ -394,7 +394,7 @@ def test_m3_unreachable_lines_have_no_counter_state(
 
     "Unreachable instructions receive no counter state and are not subjected
     to effect/transfer completeness checks until declared as an entry ...
-    ``COUNTER()``/``OFFSET()`` use on any unreachable line remains an error."
+    ``COUNTER()``/coordinate use on any unreachable line remains an error."
     The error half was probe-verified during the M3 review but had no test.
     """
     _assert_flow_error(

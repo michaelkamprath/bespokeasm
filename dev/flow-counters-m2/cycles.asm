@@ -3,5 +3,5 @@ timing:
 .start := COORDINATE(cycles, 0)
 nop
 nop
-.byte OFFSET(.start)
+.byte .start
 #endtrack cycles

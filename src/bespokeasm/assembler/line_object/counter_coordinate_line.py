@@ -80,7 +80,7 @@ class CounterCoordinateLine(LineObject):
                     model,
                     'the offset of a coordinate declaration must be an '
                     'ordinary compile-time expression and cannot contain '
-                    'COUNTER(), OFFSET(), or COORDINATE()',
+                    'COUNTER() or COORDINATE()',
                 )
                 offset_expression = None
         return cls(

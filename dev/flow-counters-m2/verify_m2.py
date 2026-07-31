@@ -91,12 +91,12 @@ def _verify_editor_extensions(tmp_dir: Path) -> None:
         )
         assert all(
             token in generated
-            for token in ('COORDINATE', 'COUNTER', 'OFFSET', ':=')
+            for token in ('COORDINATE', 'COUNTER', ':=')
         )
         docs_path = next(generated_root.rglob('instruction-docs.json'), None)
         if docs_path is not None:
             hover_docs = json.loads(docs_path.read_text())
-            assert {'COORDINATE', 'COUNTER', 'OFFSET'} <= set(
+            assert {'COORDINATE', 'COUNTER'} <= set(
                 hover_docs['expression_functions'],
             )
             assert ':=' in hover_docs['directives']['counter_coordinate']
@@ -173,7 +173,7 @@ def main() -> None:
         print('Called entry 0 -> balanced locals 0 -> #endtrack -> RTS: PASS')
         print('ISA-configured zero-offset rejection: PASS')
         print('Crossed-and-replaced coordinate invalidation: PASS')
-        print('Elapsed cycle OFFSET: 2')
+        print('Elapsed cycle offset: 2')
         print('Generated editor syntax and hover docs: PASS')
         print('M2 development acceptance: PASS')
 

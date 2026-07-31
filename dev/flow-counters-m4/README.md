@@ -16,10 +16,10 @@ instances to overlap:
 
 The stack instance retains the practical caller-parameter use case: a
 coordinate declared at `sp+3` is accessed as `sp+4` after a one-byte local
-push, without changing its `LDS OFFSET(...)` source expression.
+push, without changing its `LDS .candidate` source expression.
 
 The harness compares the annotated program with a hand-stripped twin, checks
-the emitted bytes (including an `OFFSET()`-derived stack position), and proves
+the emitted bytes (including a coordinate-derived stack position), and proves
 that reading a suspended counter is rejected.
 
 From the repository root:

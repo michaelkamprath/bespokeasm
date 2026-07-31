@@ -24,7 +24,7 @@ counters:
 The primary sample retains the practical stack-parameter use case. It declares
 a caller-owned parameter at `sp+3`, pushes a common local value before
 branching, and gives each arm its own return. One arm pushes an additional
-path-local value. The unchanged `OFFSET(.candidate)` expression consequently
+path-local value. The unchanged `.candidate` reference consequently
 emits `sp+5` on that arm and `sp+4` on the other; both exits independently
 restore the routine-owned stack depth. The harness compares its bytes with a
 hand-resolved twin and prints its annotated listing.

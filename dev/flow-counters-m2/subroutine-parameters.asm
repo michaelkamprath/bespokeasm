@@ -6,6 +6,6 @@ is_prime32:
 .candidate := COORDINATE(stack, 3)    ; caller's uint32 candidate is at sp+3
 .return_value := COORDINATE(stack, 7) ; caller's result slot is at sp+7
 
-lds OFFSET(.candidate)    ; like `lds 3`: load from caller's candidate
-sts OFFSET(.return_value) ; like `sts 7`: store into caller's result slot
+lds .candidate    ; like `lds 3`: load from caller's candidate
+sts .return_value ; like `sts 7`: store into caller's result slot
 #endtrack stack

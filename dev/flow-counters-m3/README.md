@@ -6,7 +6,7 @@ region. The region tracks only stack movement owned by the routine:
 - `#track stack mode=called` selects the ISA's `0 -> 0` entry contract;
 - `.candidate := COORDINATE(stack, 3)` directly means the caller's value is at
   `sp+3`; the mode's initial value is not added to that physical coordinate;
-- a four-byte local push changes `OFFSET(.candidate)` from 3 to 7 and the
+- a four-byte local push changes the `.candidate` reference from 3 to 7 and the
   return-value slot from 7 to 11;
 - `addsp 4` uses the configured `-ARG(0)` effect to restore the routine-owned
   counter to zero;

@@ -244,7 +244,7 @@ def test_m4_suspend_pauses_only_the_named_counter(tmp_path):
             '#track stack\n'
             '.slot := COORDINATE(stack, 0)\n'
             '#suspend stack\n'
-            'depth OFFSET(.slot)\n',
+            'depth .slot\n',
             'cannot be resolved while flow counter "stack" is suspended',
             5,
         ),
@@ -287,7 +287,7 @@ def test_m4_resume_from_coordinate_invalidates_presuspension_slots(tmp_path):
         '#suspend stack\n'
         'push\n'
         '#resume stack = .saved\n'
-        'depth OFFSET(.saved)\n',
+        'depth .saved\n',
         'counter coordinate ".saved" is invalid',
         expected_line=7,
     )
@@ -361,7 +361,7 @@ def test_m4_set_invalidates_prior_coordinates(tmp_path):
     unless a future explicit preservation contract says otherwise." ``#set``
     exists precisely because the effect model could not express what happened
     to the counter, so no prior slot's survival is provable. The old behavior
-    only ran the crossing-based liveness check, so ``OFFSET(.x)`` after a
+    only ran the crossing-based liveness check, so ``.x`` after a
     ``#set`` happily emitted an offset from a stale slot.
     """
     _assert_flow_error(
@@ -371,7 +371,7 @@ def test_m4_set_invalidates_prior_coordinates(tmp_path):
         'push\n'
         '.x := COORDINATE(stack, 1)\n'
         '#set stack = 5\n'
-        'depth OFFSET(.x)\n'
+        'depth .x\n'
         '#endtrack stack exit=5\n',
         r'counter coordinate "\.x" is invalid',
         expected_line=6,
@@ -400,7 +400,7 @@ def test_m4_set_checks_bounds_after_reanchor(tmp_path):
 def test_m4_resume_to_invalidated_coordinate_warns(tmp_path):
     """Decision (2026-07): ``#resume <counter> = <coordinate>`` naming a
     coordinate the analyzer already invalidated is accepted on faith — the
-    spec only forbids ``OFFSET()`` on invalid coordinates — but re-anchoring
+    spec only forbids reading invalid coordinates — but re-anchoring
     to a position that was provably crossed deserves a flow warning.
     """
     source = (
@@ -716,7 +716,7 @@ def test_m4_ordinary_line_macro_resolution_protects_flow_names(tmp_path):
     ``.x := COORDINATE(stack, 1)`` became ``COORDINATE(5, 1)`` — while the
     same names in ``#assert``/``#set`` values were protected. The
     name-vs-value rule is context-universal: the names passed to
-    ``COUNTER()``, ``OFFSET()``, and ``COORDINATE()`` stay literal wherever
+    ``COUNTER()`` and ``COORDINATE()`` stay literal wherever
     they appear; only value expressions are macro-resolved.
     """
     _, counter_bytes = _assemble(
@@ -739,7 +739,7 @@ def test_m4_ordinary_line_macro_resolution_protects_flow_names(tmp_path):
         '#track stack\n'
         'push\n'
         '.x := COORDINATE(stack, 1)\n'
-        'depth OFFSET(.x)\n'
+        'depth .x\n'
         'pop\n'
         '#endtrack stack\n',
         output_name='coordinate.bin',
@@ -755,7 +755,7 @@ def test_m4_ordinary_line_macro_resolution_protects_flow_names(tmp_path):
         '#track stack\n'
         'push\n'
         '.x := COORDINATE(stack, FRAMEOFF)\n'
-        'depth OFFSET(.x)\n'
+        'depth .x\n'
         'pop\n'
         '#endtrack stack\n',
         output_name='offset.bin',

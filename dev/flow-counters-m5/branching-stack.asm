@@ -7,12 +7,12 @@ is_nonzero:
     push                            ; common one-byte local: candidate is sp+4
     jz .is_zero
     push                            ; path-only local: candidate is now sp+5
-    depth OFFSET(.candidate)        ; emits 5
+    depth .candidate        ; emits 5
     pop
     pop
     rts                             ; nonzero path exit
 .is_zero:
-    depth OFFSET(.candidate)        ; emits 4
+    depth .candidate        ; emits 4
     pop
     rts                             ; zero path exit
 #endtrack stack

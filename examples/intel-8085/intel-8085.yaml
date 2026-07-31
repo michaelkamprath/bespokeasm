@@ -35,7 +35,7 @@ flow_counters:
         `call`/`ret` move the 2-byte return address. Coordinates use a 1-based
         convention: `COORDINATE(stack, 1)` names the byte the stack pointer
         physically addresses, so the byte at physical address `sp + N` is
-        coordinate `N + 1`, and an `OFFSET()` value converts to a `dad sp`
+        coordinate `N + 1`, and a coordinate offset value converts to a `dad sp`
         displacement by subtracting 1. `unknown_instructions` is `error`, so
         every ordinary instruction declares an explicit `stack: 0` effect and
         any instruction without one fails loudly inside a tracked region

@@ -73,6 +73,8 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
                 'variable.other.flow.coordinate.definition',
                 'Flow Coordinates - Definitions',
             ),
+            # Bare coordinate usages are tagged contextually by the semantic
+            # token provider in extension.js, not by the static grammar.
             (
                 SyntaxElement.FLOW_COORDINATE_USAGE,
                 'variable.other.flow.coordinate.usage',
@@ -223,6 +225,17 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             for entry in package_json['contributes']['semanticTokenScopes']:
                 if isinstance(entry, dict) and entry.get('language') == '##LANGUAGE_ID##':
                     entry['language'] = self.language_id
+        if not self.model.flow_counters_enabled:
+            # The flowCoordinate semantic token exists only for flow-enabled
+            # ISAs; a non-flow extension ships no flow scopes at all.
+            package_json['contributes']['semanticTokenTypes'] = [
+                token_type
+                for token_type in package_json['contributes'].get('semanticTokenTypes', [])
+                if token_type.get('id') != 'flowCoordinate'
+            ]
+            for entry in package_json['contributes'].get('semanticTokenScopes', []):
+                if isinstance(entry, dict):
+                    entry.get('scopes', {}).pop('flowCoordinate', None)
         package_json['contributes']['themes'][0]['label'] = \
             package_json['contributes']['themes'][0]['label'].replace('##LANGUAGE_ID##', self.language_name)
         package_json['contributes']['themes'][0]['path'] = './' + theme_filename
@@ -250,7 +263,6 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
         grammar_json['scopeName'] = scope_name
         if not self.model.flow_counters_enabled:
             del grammar_json['repository']['counter_coordinates']
-            del grammar_json['repository']['flow_coordinate_usages']
             del grammar_json['repository']['flow_counter_usages']
             del grammar_json['repository']['flow_counter_directives']
             del grammar_json['repository']['flow_operators']
@@ -263,7 +275,6 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
                 pattern
                 for pattern in grammar_json['repository']['operators']['patterns']
                 if pattern.get('include') not in {
-                    '#flow_coordinate_usages',
                     '#flow_counter_usages',
                     '#flow_operators',
                 }

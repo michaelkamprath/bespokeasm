@@ -239,7 +239,7 @@ def main() -> None:
         _verify_editor_extensions(tmp_dir / 'editors')
 
         print('Branch propagation and separate balanced exits: PASS')
-        print('Stack parameter OFFSET() and stripped byte identity: PASS')
+        print('Stack parameter coordinate references and stripped byte identity: PASS')
         print('Concurrent-counter listing continuation rows: PASS')
         print('Macro aggregate stack transition and expanded byte identity: PASS')
         print('Shared byte/flow macro continuation row: PASS')

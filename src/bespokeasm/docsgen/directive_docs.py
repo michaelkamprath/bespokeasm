@@ -503,12 +503,13 @@ PREPROCESSOR_DIRECTIVE_DOCS: dict[str, str] = {
 }
 
 FLOW_ASSERT_DOC_SUFFIX = (
-    '\n\nIn a flow-enabled ISA, `COUNTER(name)` and `OFFSET(coordinate)` may '
-    'be used in either operand. An otherwise undefined bare left operand is '
-    'retained as shorthand for an active scalar counter, such as '
-    '`#assert stack == 0`. Prefer `COUNTER(stack)` when an explicit flow '
-    'reference is clearer. This does not extend `#if` or `#elif`; static '
-    'analysis never controls conditional compilation.'
+    '\n\nIn a flow-enabled ISA, `COUNTER(name)` and bare counter-coordinate '
+    'references may be used in either operand. An otherwise undefined bare '
+    'left operand is retained as shorthand for an active scalar counter, '
+    'such as `#assert stack == 0`; a bare coordinate name instead compares '
+    "the coordinate's current offset. Prefer `COUNTER(stack)` when an "
+    'explicit flow reference is clearer. This does not extend `#if` or '
+    '`#elif`; static analysis never controls conditional compilation.'
 )
 
 # Expression functions used in numeric expressions
@@ -553,19 +554,6 @@ EXPRESSION_FUNCTION_DOCS: dict[str, str] = {
         '`allow_zero_offset` controls zero independently. '
         '`COORDINATE()` is valid only on the right side of a `:=` declaration.'
     ),
-    'OFFSET': (
-        '### `OFFSET()` : Counter-Coordinate Offset\n\n'
-        '---\n\n'
-        'Returns the active scalar counter value minus a coordinate saved '
-        'with `:=`.\n\n'
-        '**Usage:**\n\n'
-        '```\n'
-        'OFFSET(.coordinate)\n'
-        '```\n\n'
-        'The argument must be a counter-coordinate symbol, not an ordinary '
-        'constant or address label. Referencing a coordinate invalidated by '
-        'crossing its saved position is an error.'
-    ),
 }
 
 COUNTER_COORDINATE_DOCS: dict[str, str] = {
@@ -578,7 +566,12 @@ COUNTER_COORDINATE_DOCS: dict[str, str] = {
         '```\n'
         '.slot := COORDINATE(stack, 0)\n'
         '.arg := COORDINATE(stack, 3)\n'
-        '```'
+        '```\n\n'
+        'A later bare reference to the declared symbol (for example '
+        '`lds .arg`) resolves to the current counter value minus the saved '
+        'coordinate — the position’s current offset at that program '
+        'point. Referencing a coordinate invalidated by crossing its saved '
+        'position is an error.'
     ),
 }
 # Generate BYTEx docs for BYTE0 through BYTE9

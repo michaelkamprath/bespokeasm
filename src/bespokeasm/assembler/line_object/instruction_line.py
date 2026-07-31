@@ -180,6 +180,11 @@ class InstructionLine(LineWithWords):
         """Expose deferred flow expressions retained by instruction operands."""
         return self._assembled_instruction.flow_expression_nodes
 
+    @property
+    def flow_candidate_nodes(self):
+        """Expose operand label leaves that may name counter coordinates."""
+        return self._assembled_instruction.flow_candidate_nodes
+
     def get_operand_label_addresses(self) -> list[tuple[str, int]]:
         return self._assembled_instruction.get_operand_label_addresses(self.address)
 

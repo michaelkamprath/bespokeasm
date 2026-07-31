@@ -18,6 +18,7 @@ from bespokeasm.assembler.preprocessor.condition import IfPreprocessorCondition
 from bespokeasm.expression import ExpressionNode
 from bespokeasm.expression import ExpressionUseContext
 from bespokeasm.expression import parse_expression
+from bespokeasm.utilities import is_unprefixed_numeric_string
 from bespokeasm.utilities import is_valid_label
 
 
@@ -25,9 +26,11 @@ class AssertLine(PreprocessorLine):
     """A general compile-time assertion, optionally backed by flow analysis."""
 
     _FLOW_OPERATOR_PATTERN = re.compile(
-        r'\b(?:COUNTER|OFFSET)\s*\(',
+        r'\bCOUNTER\s*\(',
         flags=re.IGNORECASE,
     )
+    _SYMBOL_TOKEN_PATTERN = re.compile(r'[A-Za-z_\.][A-Za-z0-9_\.]*')
+    _CHARACTER_ORDINAL_PATTERN = re.compile(r"'(?:\\.|[^'\\])'")
 
     def __init__(
         self,
@@ -100,6 +103,21 @@ class AssertLine(PreprocessorLine):
             self._uses_explicit_flow = True
             self._is_flow_dependent = True
 
+        # A bare counter-coordinate reference is an ordinary identifier at
+        # parse time; coordinates exist only after flow analysis. Any operand
+        # name that neither the preprocessor nor numeric parsing can settle
+        # therefore defers the whole assertion to the flow pass, which
+        # resolves coordinates and reports unknown names.
+        if (
+            not self._is_flow_dependent
+            and isa_model.flow_counters_enabled
+            and (
+                self._contains_unresolved_symbol(self._lhs_text, preprocessor)
+                or self._contains_unresolved_symbol(self._rhs_text, preprocessor)
+            )
+        ):
+            self._is_flow_dependent = True
+
         if (
             self._uses_explicit_flow
             and not isa_model.flow_counters_enabled
@@ -129,6 +147,36 @@ class AssertLine(PreprocessorLine):
         self._flow_lhs_expression = None
         self._flow_rhs_expression = None
         self.enforce_general()
+
+    def _contains_unresolved_symbol(
+        self,
+        text: str,
+        preprocessor: Preprocessor,
+    ) -> bool:
+        """Return whether an operand names a symbol only analysis can settle."""
+        stripped = self._CHARACTER_ORDINAL_PATTERN.sub('0', text)
+        if '"' in stripped:
+            # A quoted operand selects string comparison; coordinates cannot
+            # appear inside it.
+            return False
+        for token in self._SYMBOL_TOKEN_PATTERN.findall(stripped):
+            if not is_valid_label(token):
+                continue
+            if token == 'COUNTER' or token == 'LSB' or re.fullmatch(r'BYTE\d', token):
+                continue
+            if is_unprefixed_numeric_string(
+                token,
+                self._isa_model.default_numeric_base,
+            ):
+                continue
+            if token.startswith('__') and token.endswith('__'):
+                # Built-in capability/version symbols resolve outside the
+                # preprocessor's user-symbol table.
+                continue
+            if preprocessor.get_symbol(token) is not None:
+                continue
+            return True
+        return False
 
     def _try_condition(
         self,

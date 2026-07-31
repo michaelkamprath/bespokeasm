@@ -17,7 +17,6 @@ FLOW_TOKENS = (
     'endtrack',
     'COORDINATE',
     'COUNTER',
-    'OFFSET',
     ':=',
 )
 M4_FLOW_DIRECTIVES = {'resume', 'set', 'suspend'}
@@ -94,13 +93,17 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
     if generator_class is VimConfigGenerator:
         assert 'FlowCoordinateName' in generated
         assert 'FlowCoordinateDefinition' in generated
-        assert 'FlowCoordinateUsage' in generated
         assert 'FlowCounterName' in generated
         assert 'FlowCounterUsage' in generated
         assert 'FlowOperator' in generated
     else:
         assert FLOW_COORDINATE_SCOPE in generated
         assert FLOW_COORDINATE_DEFINITION_SCOPE in generated
+        # bare coordinate references are lexically indistinguishable from
+        # ordinary labels, so the static grammar has no usage rule; the
+        # contextual highlighter (Sublime semantic regions / VSCode semantic
+        # tokens) tags usages with this scope instead, and the theme keeps a
+        # color for it
         assert FLOW_COORDINATE_USAGE_SCOPE in generated
         assert FLOW_COUNTER_SCOPE in generated
         assert FLOW_COUNTER_USAGE_SCOPE in generated
@@ -110,11 +113,16 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
     if generator_class is VSCodeConfigGenerator:
         grammar_path = next(generated_dir.rglob('tmGrammar.json'))
         grammar = json.loads(grammar_path.read_text())
-        usage = grammar['repository']['flow_coordinate_usages']
-        assert usage['captures']['1']['name'] == FLOW_OPERATOR_SCOPE
-        assert usage['captures']['5']['name'] == (
-            f'{FLOW_COORDINATE_SCOPE} {FLOW_COORDINATE_USAGE_SCOPE}'
+        assert 'flow_coordinate_usages' not in grammar['repository']
+        package_path = next(generated_dir.rglob('package.json'))
+        package = json.loads(package_path.read_text())
+        assert any(
+            token_type.get('id') == 'flowCoordinate'
+            for token_type in package['contributes']['semanticTokenTypes']
         )
+        assert package['contributes']['semanticTokenScopes'][0]['scopes'][
+            'flowCoordinate'
+        ] == [FLOW_COORDINATE_USAGE_SCOPE]
         counter_usage = grammar['repository']['flow_counter_usages']
         assert counter_usage['beginCaptures']['1']['name'] == FLOW_OPERATOR_SCOPE
         assert counter_usage['beginCaptures']['5']['name'].endswith(
@@ -141,10 +149,17 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
         instance_name = next(
             pattern
             for pattern in directive_patterns
-            if '(as)' in pattern['match']
+            if '(as|mode)' in pattern['match']
+        )
+        numeric_params = next(
+            pattern
+            for pattern in directive_patterns
+            if '(init|exit|min|max)' in pattern['match']
         )
         assert track['captures']['3']['name'] == FLOW_COUNTER_SCOPE
+        assert instance_name['captures']['1']['name'] == 'keyword.other.flow.parameter'
         assert instance_name['captures']['3']['name'] == FLOW_COUNTER_SCOPE
+        assert numeric_params['captures']['1']['name'] == 'keyword.other.flow.parameter'
         assert usages['captures']['3']['name'] == (
             f'{FLOW_COUNTER_SCOPE} {FLOW_COUNTER_USAGE_SCOPE}'
         )
@@ -156,8 +171,9 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
         assert preprocessor['patterns'][0]['include'] == '#flow_counter_directives'
         assert all(
             token in grammar['repository']['flow_operators']['match']
-            for token in ('COORDINATE', 'COUNTER', 'OFFSET')
+            for token in ('COORDINATE', 'COUNTER')
         )
+        assert 'OFFSET' not in grammar['repository']['flow_operators']['match']
         operator_patterns = grammar['repository']['operators']['patterns']
         comparison_index = next(
             index
@@ -178,11 +194,36 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
     elif generator_class is SublimeConfigGenerator:
         syntax_path = next(generated_dir.rglob('*.sublime-syntax'))
         syntax = YAML().load(syntax_path)
-        usage = syntax['contexts']['flow_coordinate_usages'][0]
-        assert usage['captures'][1] == FLOW_OPERATOR_SCOPE
-        assert usage['captures'][5] == (
-            f'{FLOW_COORDINATE_SCOPE} {FLOW_COORDINATE_USAGE_SCOPE}'
+        assert 'flow_coordinate_usages' not in syntax['contexts']
+        hover_plugin_path = next(generated_dir.rglob('bespokeasm_hover_*.py'))
+        hover_plugin = hover_plugin_path.read_text()
+        assert 'bespokeasm_coordinate_usages' in hover_plugin
+        assert (
+            f"COORD_USAGE_SCOPE = '{FLOW_COORDINATE_USAGE_SCOPE}'"
+            in hover_plugin
         )
+        # The coordinate-usage rule must define a low-alpha background:
+        # Sublime fills an add_regions region with the scope's background
+        # when one is defined and falls back to an opaque foreground fill
+        # (inverse video) when it is not. Same contract as label/constant
+        # usage rules.
+        scheme_path = next(generated_dir.rglob('*.sublime-color-scheme'))
+        scheme = json.loads(scheme_path.read_text())
+        semantic_region_scopes = [
+            'variable.other.label.usage',
+            'variable.other.constant.usage',
+            FLOW_COORDINATE_USAGE_SCOPE,
+        ]
+        for region_scope in semantic_region_scopes:
+            rule = next(
+                rule for rule in scheme['rules']
+                if rule.get('scope') == region_scope
+            )
+            foreground = rule['foreground']
+            assert rule.get('background') == f'color({foreground} alpha(0.05))', (
+                f'rule for {region_scope} must carry a low-alpha background '
+                'so semantic regions do not render as an opaque fill'
+            )
         counter_usage = syntax['contexts']['flow_counter_usages'][0]
         assert counter_usage['captures'][1] == FLOW_OPERATOR_SCOPE
         assert counter_usage['captures'][5].endswith(FLOW_COUNTER_USAGE_SCOPE)
@@ -211,10 +252,17 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
         instance_name = next(
             pattern
             for pattern in directive_patterns
-            if '(as)' in pattern['match']
+            if '(as|mode)' in pattern['match']
+        )
+        numeric_params = next(
+            pattern
+            for pattern in directive_patterns
+            if '(init|exit|min|max)' in pattern['match']
         )
         assert track['captures'][3] == FLOW_COUNTER_SCOPE
+        assert instance_name['captures'][1] == 'keyword.other.flow.parameter'
         assert instance_name['captures'][3] == FLOW_COUNTER_SCOPE
+        assert numeric_params['captures'][1] == 'keyword.other.flow.parameter'
         assert usages['captures'][3] == (
             f'{FLOW_COUNTER_SCOPE} {FLOW_COUNTER_USAGE_SCOPE}'
         )
@@ -224,8 +272,9 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
         )
         assert all(
             token in syntax['contexts']['flow_operators'][0]['match']
-            for token in ('COORDINATE', 'COUNTER', 'OFFSET')
+            for token in ('COORDINATE', 'COUNTER')
         )
+        assert 'OFFSET' not in syntax['contexts']['flow_operators'][0]['match']
         numerical_expressions = syntax['contexts']['numerical_expressions']
         comparison_index = numerical_expressions.index(
             {'include': 'comparison_operators'},
@@ -242,12 +291,13 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
             for operator in ('==', '!=', '>=', '>', '<=', '<')
         )
     else:
-        assert 'syn match flowm1testassemblyFlowCoordinateUsage' in generated
+        assert 'FlowCoordinateUsage' not in generated
         assert r'#\%(endtrack\|entry\|resume\|set\|suspend\)' in generated
         assert r'\<as\s*=\s*\zs' in generated
+        assert r'\<mode\s*=\s*\zs' in generated
         assert (
             'syn keyword flowm1testassemblyFlowOperator '
-            'COORDINATE COUNTER OFFSET'
+            'COORDINATE COUNTER'
         ) in generated
         assert (
             r'Operator /==\|!=\|>=\|<=\|>>\|<<\|>\|<\|[+\-*/&|^]/'
@@ -262,12 +312,13 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
         assert {'track', 'endtrack', 'entry', 'assert', *M4_FLOW_DIRECTIVES} <= set(
             hover_docs['directives']['preprocessor'],
         )
-        assert {'COORDINATE', 'COUNTER', 'OFFSET'} <= set(
+        assert {'COORDINATE', 'COUNTER'} <= set(
             hover_docs['expression_functions'],
         )
+        assert 'OFFSET' not in hover_docs['expression_functions']
         assert ':=' in hover_docs['directives']['counter_coordinate']
         # a flow-enabled ISA's #assert hover carries the flow-form suffix
-        # (FLOW_ASSERT_DOC_SUFFIX) describing COUNTER()/OFFSET() operands
+        # (FLOW_ASSERT_DOC_SUFFIX) describing COUNTER()/coordinate operands
         assert (
             'never controls conditional compilation'
             in hover_docs['directives']['preprocessor']['assert']
@@ -281,7 +332,6 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
             assert f'`#{directive}`' in generated
         assert '`COUNTER()`' in generated
         assert '`COORDINATE()`' in generated
-        assert '`OFFSET()`' in generated
         assert '`:=`' in generated
 
 

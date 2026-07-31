@@ -128,6 +128,16 @@ class LineObject:
         """Flow-expression nodes emitted or consumed by this source object."""
         return ()
 
+    @property
+    def flow_candidate_nodes(self) -> tuple:
+        """Label leaves that may reference counter coordinates.
+
+        Unlike ``flow_expression_nodes``, a non-empty result carries no
+        flow-usage signal: candidacy is settled by scope lookup during the
+        analysis pass, and non-coordinate labels resolve as ordinary symbols.
+        """
+        return ()
+
     def record_flow_transition(
         self,
         before: dict[str, object],

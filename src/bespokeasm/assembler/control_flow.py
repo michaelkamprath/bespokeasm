@@ -16,6 +16,43 @@ from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import (
 from bespokeasm.expression import ExpressionNode
 
 
+def declared_coordinate_labels(line_objects) -> frozenset[str]:
+    """Collect the exact spellings of every ``:=`` coordinate declaration."""
+    return frozenset(
+        line_object.label
+        for line_object in line_objects
+        if isinstance(line_object, CounterCoordinateLine)
+    )
+
+
+def references_declared_coordinate(
+    line_object,
+    declared_labels: frozenset[str],
+) -> bool:
+    """Return whether a line's expressions reference a declared coordinate.
+
+    Ordinary labels outrank coordinates at evaluation, so a candidate that an
+    already-registered label satisfies is not a coordinate reference even
+    when a coordinate shares its spelling.
+    """
+    if not declared_labels:
+        return False
+    for node in line_object.flow_candidate_nodes:
+        name = str(node.value)
+        if name not in declared_labels:
+            continue
+        try:
+            label_value = line_object.symbol_scope.get_label_value(
+                name,
+                line_object.line_id,
+            )
+        except (SystemExit, ValueError):
+            label_value = None
+        if label_value is None:
+            return True
+    return False
+
+
 @dataclass(frozen=True)
 class ControlFlowNode:
     """One structurally relevant program point in source and address space."""
@@ -92,6 +129,7 @@ class ControlFlowGraph:
         """Build immutable program points after first-pass address assignment."""
         nodes = []
         source_order = 0
+        declared_labels = declared_coordinate_labels(line_objects)
         for line_index, line_object in enumerate(line_objects):
             if isinstance(line_object, InstructionLine):
                 address = line_object.address
@@ -122,7 +160,10 @@ class ControlFlowGraph:
                 kind = 'coordinate'
             elif isinstance(line_object, SetMemoryZoneLine):
                 kind = 'boundary'
-            elif line_object.flow_expression_nodes:
+            elif line_object.flow_expression_nodes or references_declared_coordinate(
+                line_object,
+                declared_labels,
+            ):
                 kind = 'observation'
             elif (
                 isinstance(line_object, LineWithWords)
@@ -145,7 +186,10 @@ class ControlFlowGraph:
                         else 0
                     ),
                     kind=kind,
-                    expression_nodes=line_object.flow_expression_nodes,
+                    expression_nodes=(
+                        line_object.flow_expression_nodes
+                        + line_object.flow_candidate_nodes
+                    ),
                 )
             )
             source_order += 1

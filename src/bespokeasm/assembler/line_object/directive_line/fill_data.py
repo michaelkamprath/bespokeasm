@@ -58,6 +58,11 @@ class FillDataLine(LineWithWords):
         """Return deferred flow expressions from the fixed-width fill value."""
         return self._value_expr.deferred_flow_nodes()
 
+    @property
+    def flow_candidate_nodes(self) -> tuple:
+        """Return label leaves in the fill value that may name coordinates."""
+        return self._value_expr.coordinate_candidate_nodes()
+
     def generate_words(self):
         if self._count is None:
             self._count = self._count_expr.get_value(self.symbol_scope, self.active_named_scopes, self.line_id)

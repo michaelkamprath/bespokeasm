@@ -136,7 +136,6 @@ class VimConfigGenerator(LanguageConfigGenerator):
                 f'{lang_group}FlowCoordinateDefinition',
                 SyntaxElement.FLOW_COORDINATE_DEFINITION,
             ),
-            (f'{lang_group}FlowCoordinateUsage', SyntaxElement.FLOW_COORDINATE_USAGE),
             (f'{lang_group}FlowCounterName', SyntaxElement.FLOW_COUNTER_NAME),
             (f'{lang_group}FlowCounterUsage', SyntaxElement.FLOW_COUNTER_USAGE),
             (f'{lang_group}FlowOperator', SyntaxElement.FLOW_OPERATOR),
@@ -292,7 +291,6 @@ ctermbg=NONE gui=bold cterm=bold')
         lang_group = vim_filetype
         flow_contains = (
             [
-                f'{lang_group}FlowCoordinateUsage',
                 f'{lang_group}FlowCounterUsage',
                 f'{lang_group}FlowOperator',
             ]
@@ -415,10 +413,6 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
             fr'/^\s*\zs{symbol_pattern}\ze\s*:=/'
         )
         lines.append(
-            fr'syn match {lang_group}FlowCoordinateUsage '
-            fr'/\<OFFSET\s*(\s*\zs{symbol_pattern}\ze\s*)/'
-        )
-        lines.append(
             fr'syn match {lang_group}FlowCounterUsage '
             fr'/\<\%(COORDINATE\|COUNTER\)\s*(\s*\zs{symbol_pattern}\ze/'
         )
@@ -429,6 +423,10 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         lines.append(
             fr'syn match {lang_group}FlowCounterName '
             fr'/^#track.\{{-}}\<as\s*=\s*\zs{symbol_pattern}/'
+        )
+        lines.append(
+            fr'syn match {lang_group}FlowCounterName '
+            fr'/^#track.\{{-}}\<mode\s*=\s*\zs{symbol_pattern}/'
         )
         lines.append(
             fr'syn match {lang_group}FlowCounterUsage '
@@ -472,7 +470,7 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
             r'/==\|!=\|>=\|<=\|>>\|<<\|>\|<\|[+\-*/&|^]/'
         )
         lines.append(
-            f'syn keyword {lang_group}FlowOperator COORDINATE COUNTER OFFSET'
+            f'syn keyword {lang_group}FlowOperator COORDINATE COUNTER'
         )
         # Registers
         if registers_kw:
@@ -544,7 +542,6 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         lines.append(f'hi def link {lang_group}ConstName Constant')
         lines.append(f'hi def link {lang_group}FlowCoordinateName Identifier')
         lines.append(f'hi def link {lang_group}FlowCoordinateDefinition Identifier')
-        lines.append(f'hi def link {lang_group}FlowCoordinateUsage Identifier')
         lines.append(f'hi def link {lang_group}FlowCounterName Identifier')
         lines.append(f'hi def link {lang_group}FlowCounterUsage Identifier')
         lines.append(f'hi def link {lang_group}FlowOperator Operator')

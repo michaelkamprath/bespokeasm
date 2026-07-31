@@ -7,7 +7,7 @@ routine:
 #track cycles as=outer init=0
 .candidate := COORDINATE(stack, 3) ; caller parameter beyond the return address
 push
-lds OFFSET(.candidate)             ; emits sp+4 after the one-byte local push
+lds .candidate             ; emits sp+4 after the one-byte local push
 
 #track cycles as=inner init=0
 nop

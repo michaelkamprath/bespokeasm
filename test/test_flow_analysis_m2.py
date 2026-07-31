@@ -131,7 +131,7 @@ def test_m2_offset_is_accepted_in_indirect_register_operand(tmp_path):
         'push\n'
         '.slot := COORDINATE(stack, 1)\n'
         'push\n'
-        'load [sp + OFFSET(.slot)]\n'
+        'load [sp + .slot]\n'
         'pop\n'
         'pop\n'
         '#endtrack stack\n'
@@ -147,7 +147,7 @@ def test_m2_coordinate_data_and_strip_equivalence(tmp_path):
         'push\n'
         '.slot := COORDINATE(stack, 1)\n'
         'push\n'
-        '.byte OFFSET(.slot)\n'
+        '.byte .slot\n'
         'pop\n'
         'pop\n'
         '#endtrack stack\n'
@@ -177,7 +177,7 @@ def test_m2_coordinate_with_scalar_baseline_and_elapsed_cycles(tmp_path):
         '.start := COORDINATE(cycles, 2)\n'
         'nop\n'
         'nop\n'
-        '.byte OFFSET(.start)\n'
+        '.byte .start\n'
         '#endtrack cycles\n'
     )
 
@@ -191,7 +191,7 @@ def test_m2_coordinate_offset_accepts_compile_time_expression(tmp_path):
         'function:\n'
         '#track stack init=3\n'
         '.parameter := COORDINATE(stack, PARAM_OFFSET + 1 - 1)\n'
-        '.byte OFFSET(.parameter)\n'
+        '.byte .parameter\n'
         '#endtrack stack\n'
     )
     _, bytecode = _assemble(tmp_path, source)
@@ -230,7 +230,7 @@ def test_m2_zero_coordinate_policy_defaults_to_allow(tmp_path):
         'function:\n'
         '#track stack\n'
         '.slot := COORDINATE(stack, 0)\n'
-        '.byte OFFSET(.slot)\n'
+        '.byte .slot\n'
         '#endtrack stack\n'
     )
     _, bytecode = _assemble(tmp_path, source, config_path=config_path)
@@ -245,7 +245,7 @@ def test_m2_negative_and_both_coordinate_policies(tmp_path):
         'function:\n'
         '#track stack\n'
         '.below := COORDINATE(stack, -3)\n'
-        '.byte OFFSET(.below)\n'
+        '.byte .below\n'
         '#endtrack stack\n'
     )
     _, bytecode = _assemble(tmp_path, source, config_path=negative_config)
@@ -259,7 +259,7 @@ def test_m2_negative_and_both_coordinate_policies(tmp_path):
         '#track stack init=3\n'
         '.above := COORDINATE(stack, 3)\n'
         '.below := COORDINATE(stack, -3)\n'
-        '.byte OFFSET(.above), OFFSET(.below)\n'
+        '.byte .above, .below\n'
         '#endtrack stack\n'
     )
     _, bytecode = _assemble(tmp_path, source, config_path=both_config)
@@ -273,11 +273,11 @@ def test_m2_allow_zero_offset_keeps_reached_coordinate_live(tmp_path):
     false``, the counter merely *reaching* a coordinate's saved position
     invalidates it (the position is no longer addressable); with it enabled
     (the default), the coordinate stays live at the reached position — where
-    ``OFFSET()`` legitimately resolves to zero — and only *crossing beyond*
+    a coordinate reference legitimately resolves to zero — and only *crossing beyond*
     kills it. Only the reach-invalidates half had test coverage.
 
     Expected behavior: with allow_zero_offset enabled, popping down to exactly
-    the saved position keeps the coordinate valid (OFFSET = 0), and pushing
+    the saved position keeps the coordinate valid (offset = 0), and pushing
     back above it keeps it valid too.
     """
     config = _load_config()
@@ -288,11 +288,11 @@ def test_m2_allow_zero_offset_keeps_reached_coordinate_live(tmp_path):
         '#track stack\n'
         'push\n'
         '.slot := COORDINATE(stack, 1)\n'
-        '.byte OFFSET(.slot)\n'
+        '.byte .slot\n'
         'pop\n'
-        '.byte OFFSET(.slot)\n'
+        '.byte .slot\n'
         'push\n'
-        '.byte OFFSET(.slot)\n'
+        '.byte .slot\n'
         'pop\n'
         '#endtrack stack\n'
     )
@@ -321,7 +321,7 @@ def test_m2_allow_zero_offset_coordinate_dies_only_when_crossed(tmp_path):
         'pop\n'
         'pop\n'
         'push\n'
-        '.byte OFFSET(.slot)\n'
+        '.byte .slot\n'
         'push\n'
         '#endtrack stack exit=2\n'
     )
@@ -380,7 +380,7 @@ def test_m2_negative_coordinate_is_never_resurrected_after_crossing(tmp_path):
         'push\n'
         'push\n'
         'pop\n'
-        '.byte OFFSET(.slot)\n'
+        '.byte .slot\n'
         '#endtrack stack\n'
     )
     _assert_flow_error(
@@ -399,7 +399,7 @@ def test_m2_coordinate_cannot_cross_tracking_instances(tmp_path):
         '.slot := COORDINATE(stack, 1)\n'
         '#endtrack stack\n'
         '#track stack\n'
-        '.byte OFFSET(.slot)\n'
+        '.byte .slot\n'
         '#endtrack stack\n'
     )
     _assert_flow_error(tmp_path, source, 'earlier tracking instance', expected_line=6)
@@ -414,7 +414,7 @@ def test_m2_local_and_global_coordinate_identity_are_distinct(tmp_path):
         'push\n'
         '.x := COORDINATE(stack, 1)\n'
         'push\n'
-        '.byte OFFSET(.x), OFFSET(x)\n'
+        '.byte .x, x\n'
         'pop\n'
         'pop\n'
         'pop\n'
@@ -455,22 +455,36 @@ def test_m2_local_coordinate_requires_active_local_scope(tmp_path, source):
 
 
 @pytest.mark.parametrize(
-    'ordinary_symbol',
-    ['value = 0', 'value:'],
+    ('ordinary_symbol', 'expected'),
+    [('value = 5', 5), ('value:', 0)],
 )
-def test_m2_offset_rejects_ordinary_symbols(tmp_path, ordinary_symbol):
+def test_m2_ordinary_symbols_resolve_normally_inside_regions(
+    tmp_path,
+    ordinary_symbol,
+    expected,
+):
+    """A bare name that is not a coordinate stays an ordinary symbol.
+
+    Coordinate references share the ordinary label namespace, so the
+    analysis pass must leave a constant or address label untouched rather
+    than hijacking it with coordinate diagnostics.
+    """
     source = (
         f'{ordinary_symbol}\n'
+        'function:\n'
         '#track stack\n'
-        '.byte OFFSET(value)\n'
+        'push\n'
+        f'load [sp + value]\n'
+        'pop\n'
         '#endtrack stack\n'
     )
-    _assert_flow_error(tmp_path, source, 'requires a symbol declared with :=')
+    _, bytecode = _assemble(tmp_path, source)
+    assert bytecode == bytes([0x10, 0x90, expected, 0x11])
 
 
 @pytest.mark.parametrize(
     'offset',
-    ['COUNTER(stack)', 'OFFSET(slot)', '1 + COUNTER(stack)'],
+    ['COUNTER(stack)', '1 + COUNTER(stack)'],
 )
 def test_m2_coordinate_offset_with_flow_content_reports_flow_error(tmp_path, offset):
     """Bug: a flow expression inside a COORDINATE() offset crashed the assembler.
@@ -502,6 +516,25 @@ def test_m2_coordinate_with_flow_offset_is_always_malformed(tmp_path):
         'ordinary compile-time expression',
         flow_checks=False,
         expected_line=1,
+    )
+
+
+def test_m2_coordinate_offset_cannot_reference_another_coordinate(tmp_path):
+    """A bare coordinate reference is a flow-derived value in offsets too."""
+    source = (
+        'function:\n'
+        '#track stack\n'
+        'push\n'
+        '.first := COORDINATE(stack, 1)\n'
+        '.second := COORDINATE(stack, .first)\n'
+        'pop\n'
+        '#endtrack stack\n'
+    )
+    _assert_flow_error(
+        tmp_path,
+        source,
+        'cannot contain counter coordinate',
+        expected_line=5,
     )
 
 
@@ -645,7 +678,7 @@ def test_m2_no_flow_checks_still_resolves_offset_dependency(tmp_path):
         '#track stack\n'
         'push\n'
         '.field := COORDINATE(stack, 1)\n'
-        '.byte OFFSET(.field)\n'
+        '.byte .field\n'
         'pop\n'
         '#endtrack stack\n'
     )

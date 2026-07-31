@@ -36,23 +36,6 @@
       },
       "match": "^\\s*(##SYMBOL_PATTERN##)\\s*(:=)"
     },
-    "flow_coordinate_usages": {
-      "captures": {
-        "1": {
-          "name": "keyword.operator.flow"
-        },
-        "3": {
-          "name": "punctuation.section.parens.begin"
-        },
-        "5": {
-          "name": "variable.other.flow.coordinate variable.other.flow.coordinate.usage"
-        },
-        "7": {
-          "name": "punctuation.section.parens.end"
-        }
-      },
-      "match": "(?i)\\b(OFFSET)(\\s*)(\\()(\\s*)(##SYMBOL_PATTERN##)(\\s*)(\\))"
-    },
     "flow_counter_usages": {
       "begin": "(?i)\\b(COORDINATE|COUNTER)(\\s*)(\\()(\\s*)(##SYMBOL_PATTERN##)",
       "beginCaptures": {
@@ -123,7 +106,15 @@
               "name": "variable.other.flow.counter"
             }
           },
-          "match": "(?i)\\b(as)(\\s*=\\s*)(##SYMBOL_PATTERN##)"
+          "match": "(?i)\\b(as|mode)(\\s*=\\s*)(##SYMBOL_PATTERN##)"
+        },
+        {
+          "captures": {
+            "1": {
+              "name": "keyword.other.flow.parameter"
+            }
+          },
+          "match": "(?i)\\b(init|exit|min|max)(\\s*=)"
         },
         {
           "captures": {
@@ -139,7 +130,7 @@
       ]
     },
     "flow_operators": {
-      "match": "(?i)\\b(?:COORDINATE|COUNTER|OFFSET)\\b",
+      "match": "(?i)\\b(?:COORDINATE|COUNTER)\\b",
       "name": "keyword.operator.flow"
     },
     "deferred-addressing": {
@@ -581,9 +572,6 @@
     },
     "operators": {
       "patterns": [
-        {
-          "include": "#flow_coordinate_usages"
-        },
         {
           "include": "#flow_counter_usages"
         },

@@ -5,14 +5,14 @@
 ; The `stack` flow-counter class declared in intel-8085.yaml tracks BYTES of
 ; 8085 hardware stack depth at assembly time. Nothing here changes the
 ; emitted bytecode: the directives and `:=` declarations are emission-inert,
-; and every OFFSET() below resolves to the same numeric literal a programmer
+; and every coordinate reference below resolves to the same numeric literal a programmer
 ; would otherwise compute (and re-compute after every edit) by hand.
 ;
 ; Stack coordinate convention (declared by the ISA configuration):
 ;   * coordinates are 1-based — COORDINATE(stack, 1) names the byte the
 ;     stack pointer physically addresses, so the byte at physical address
 ;     sp+N is coordinate N+1;
-;   * an OFFSET() value therefore converts to a `dad sp` displacement by
+;   * a coordinate offset value therefore converts to a `dad sp` displacement by
 ;     subtracting 1.
 ; In a `mode=called` region the caller's 2-byte return address occupies
 ; coordinates 1-2, so caller-pushed data starts at coordinate 3.
@@ -72,8 +72,8 @@ main:
 ;   coordinate 3-4 : .arg1            (pushed last by the caller)
 ;   coordinate 5-6 : .arg2            (pushed first by the caller)
 ;
-; The whole point of OFFSET(): after the `push b` prologue the same
-; coordinates are two bytes further from SP, and every OFFSET() below
+; The whole point of coordinate references: after the `push b` prologue the same
+; coordinates are two bytes further from SP, and every offset below
 ; updates automatically. Inserting another push would require no edits.
 ; ----------------------------------------------------------------------------
 #track stack mode=called        ; routine-owned movement: init 0, exit 0
@@ -81,19 +81,19 @@ sum16:
 .arg1 := COORDINATE(stack, 3)   ; first argument, just above the return address
 .arg2 := COORDINATE(stack, 5)   ; second argument
     push b                      ; preserve caller's BC: stack 0 -> 2
-                                ;   ...shifting every OFFSET() below by +2
+                                ;   ...shifting every coordinate offset below by +2
 
-    ; load .arg1 into DE. OFFSET(.arg1) is now 3 + 2 = 5; coordinates are
-    ; 1-based, so the dad sp displacement is OFFSET(.arg1) - 1 (= 4).
-    lxi h, OFFSET(.arg1) - 1
+    ; load .arg1 into DE. .arg1 is now 3 + 2 = 5; coordinates are
+    ; 1-based, so the dad sp displacement is .arg1 - 1 (= 4).
+    lxi h, .arg1 - 1
     dad sp                      ; HL -> low byte of .arg1
     mov e, m
     inx h
     mov d, m                    ; DE = .arg1
 
     ; load .arg2 into BC (caller's BC is already saved on the stack).
-    ; OFFSET(.arg2) is now 5 + 2 = 7, so the displacement is 6.
-    lxi h, OFFSET(.arg2) - 1
+    ; .arg2 is now 5 + 2 = 7, so the displacement is 6.
+    lxi h, .arg2 - 1
     dad sp                      ; HL -> low byte of .arg2
     mov c, m
     inx h

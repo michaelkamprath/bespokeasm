@@ -24,7 +24,7 @@ from bespokeasm.utilities import PATTERN_CHARACTER_ORDINAL
 from bespokeasm.utilities import PATTERN_HEX
 
 EXPRESSION_PARTS_PATTERN = \
-    r'(?:(?:\%|b)[01]+|{}|[\+\-\*\/\&\|\^\(\)]|>>|<<|%|COUNTER\(|OFFSET\(|LSB\(|BYTE\d\(|(?:\.|_)?\w+|{}|[><])'.format(
+    r'(?:(?:\%|b)[01]+|{}|[\+\-\*\/\&\|\^\(\)]|>>|<<|%|COUNTER\(|LSB\(|BYTE\d\(|(?:\.|_)?\w+|{}|[><])'.format(
         PATTERN_HEX,
         PATTERN_CHARACTER_ORDINAL,
     )
@@ -62,7 +62,6 @@ class TokenType(enum.Enum):
     T_RPAR = 17
     T_END = 18
     T_COUNTER = 19
-    T_OFFSET = 20
 
 
 class ExpressionNode:
@@ -90,7 +89,6 @@ class ExpressionNode:
             TokenType.T_BYTE,
             TokenType.T_LSB,
             TokenType.T_COUNTER,
-            TokenType.T_OFFSET,
         ]
 
     def __repr__(self):
@@ -105,7 +103,6 @@ class ExpressionNode:
             TokenType.T_BYTE,
             TokenType.T_LSB,
             TokenType.T_COUNTER,
-            TokenType.T_OFFSET,
             TokenType.T_NEGATION,
         ]
 
@@ -117,7 +114,7 @@ class ExpressionNode:
     def deferred_flow_nodes(self) -> tuple:
         """Return deferred flow-expression nodes in source-tree order."""
         nodes = []
-        if self.token_type in [TokenType.T_COUNTER, TokenType.T_OFFSET]:
+        if self.token_type == TokenType.T_COUNTER:
             nodes.append(self)
         if self.left_child is not None:
             nodes.extend(self.left_child.deferred_flow_nodes())
@@ -125,9 +122,34 @@ class ExpressionNode:
             nodes.extend(self.right_child.deferred_flow_nodes())
         return tuple(nodes)
 
+    def coordinate_candidate_nodes(self) -> tuple:
+        """Return label leaves that may name counter coordinates.
+
+        A bare counter-coordinate reference is lexically indistinguishable
+        from an ordinary label, so candidacy is decided by the analysis pass
+        via scope lookup; non-coordinate labels pass through untouched.
+        ``T_LABEL_OR_NUM`` tokens are excluded because their numeric fallback
+        outranks any coordinate interpretation.
+        """
+        if self.token_type == TokenType.T_COUNTER:
+            # The argument is a counter name operand, never a value.
+            return ()
+        nodes = []
+        if (
+            self.token_type == TokenType.T_LABEL
+            and self.left_child is None
+            and self.right_child is None
+        ):
+            nodes.append(self)
+        if self.left_child is not None:
+            nodes.extend(self.left_child.coordinate_candidate_nodes())
+        if not self.is_unary and self.right_child is not None:
+            nodes.extend(self.right_child.coordinate_candidate_nodes())
+        return tuple(nodes)
+
     def resolve_flow_value(self, value: int) -> None:
         """Attach the value computed by the static-analysis pass."""
-        if self.token_type not in [TokenType.T_COUNTER, TokenType.T_OFFSET]:
+        if self.token_type not in [TokenType.T_COUNTER, TokenType.T_LABEL]:
             raise TypeError('only flow-expression nodes can receive a flow value')
         self._resolved_flow_value = value
 
@@ -159,6 +181,8 @@ class ExpressionNode:
                 # diagnostics apply only to otherwise-unresolvable references.
                 if self.token_type == TokenType.T_LABEL_OR_NUM:
                     return parse_numeric_string(self.value, self.default_numeric_base)
+                if hasattr(self, '_resolved_flow_value'):
+                    return self._resolved_flow_value
                 coordinate = (
                     active_named_scopes.named_scope_manager.get_counter_coordinate(
                         self.value,
@@ -170,7 +194,9 @@ class ExpressionNode:
                 )
                 if coordinate is not None:
                     raise FlowSymbolError(
-                        f'counter coordinate "{self.value}" may only be used through OFFSET()'
+                        f'counter coordinate "{self.value}" resolves only in '
+                        'instruction operand values, data values, and flow '
+                        'directives'
                     )
                 sys.exit(f'ERROR: {line_id} - Label {self.value} resolves to NONE = {self}')
             return val
@@ -186,7 +212,7 @@ class ExpressionNode:
     ) -> int:
         if self.token_type in [TokenType.T_NUM, TokenType.T_LABEL, TokenType.T_LABEL_OR_NUM]:
             return self._numeric_value(symbol_scope, active_named_scopes, line_id)
-        if self.token_type in [TokenType.T_COUNTER, TokenType.T_OFFSET]:
+        if self.token_type == TokenType.T_COUNTER:
             if hasattr(self, '_resolved_flow_value'):
                 return self._resolved_flow_value
             # DiagnosticReporter is fail-fast, so ordinary compilation never
@@ -245,7 +271,7 @@ class ExpressionNode:
         return int(calculated_value)
 
     def contains_register_labels(self, register_labels: set[str]) -> bool:
-        if self.token_type in [TokenType.T_COUNTER, TokenType.T_OFFSET]:
+        if self.token_type == TokenType.T_COUNTER:
             return False
         if self.token_type in [TokenType.T_LABEL, TokenType.T_LABEL_OR_NUM]:
             return self.value in register_labels
@@ -258,7 +284,7 @@ class ExpressionNode:
         return False
 
     def contained_labels(self) -> set[str]:
-        if self.token_type in [TokenType.T_COUNTER, TokenType.T_OFFSET]:
+        if self.token_type == TokenType.T_COUNTER:
             return set()
         if self.token_type == TokenType.T_LABEL:
             return {self.value}
@@ -345,7 +371,6 @@ TOKEN_MAPPINGS = {
     ')': TokenType.T_RPAR,
     'LSB(': TokenType.T_LSB,
     'COUNTER(': TokenType.T_COUNTER,
-    'OFFSET(': TokenType.T_OFFSET,
 }
 
 
@@ -512,7 +537,6 @@ def _parse_e4(line_id: LineIdentifier, tokens: list[ExpressionNode]) -> Expressi
         TokenType.T_LSB,
         TokenType.T_BYTE,
         TokenType.T_COUNTER,
-        TokenType.T_OFFSET,
     ]:
         node = tokens.pop(0)
         node.left_child = _parse_e(line_id, tokens)

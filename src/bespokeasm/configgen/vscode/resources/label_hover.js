@@ -51,7 +51,7 @@ function isOffsetInCodeRegion(line, offset) {
 }
 
 function findLineLabelDefinition(line) {
-  const match = line.match(/^\s*(##LABEL_PATTERN##)\s*:/);
+  const match = line.match(/^\s*(##LABEL_PATTERN##)\s*:(?!=)/);
   if (!match) {
     return null;
   }

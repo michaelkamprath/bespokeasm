@@ -14,7 +14,7 @@ from bespokeasm.expression import TokenType
 from bespokeasm.utilities import is_valid_label
 
 _FLOW_OPERATOR_PATTERN = re.compile(
-    r'\b(?:COUNTER|OFFSET)\s*\(',
+    r'\bCOUNTER\s*\(',
     flags=re.IGNORECASE,
 )
 # A flow operator call may not be assembled from separate expansion fragments
@@ -25,7 +25,7 @@ _FLOW_OPERATOR_PATTERN = re.compile(
 # therefore couples a trailing operator name in one fragment with an opening
 # parenthesis in the adjoining fragment.
 _TRAILING_FLOW_OPERATOR_PATTERN = re.compile(
-    r'\b(?:COUNTER|OFFSET|COORDINATE)\s*$',
+    r'\b(?:COUNTER|COORDINATE)\s*$',
     flags=re.IGNORECASE,
 )
 _TRAILING_SYMBOL_PATTERN = re.compile(rf'\b({SYMBOL_PATTERN})\s*$')
@@ -34,7 +34,7 @@ _OPEN_CALL_PATTERN = re.compile(r'\s*\(')
 # COORDINATE(counter, offset) the offset is a value expression and remains
 # macro-resolvable.
 _FLOW_ARGUMENT_PATTERN = re.compile(
-    r'(\b(?:COUNTER|OFFSET|COORDINATE)\s*\(\s*)((?:[A-Za-z][A-Za-z0-9_]*|'
+    r'(\b(?:COUNTER|COORDINATE)\s*\(\s*)((?:[A-Za-z][A-Za-z0-9_]*|'
     r'_(?!_)[A-Za-z0-9_]+|\.[A-Za-z0-9_]+))',
     flags=re.IGNORECASE,
 )
@@ -116,8 +116,11 @@ def resolve_symbols_protecting_flow_names(
 
     Value expressions accept every compile-time constant kind, including
     preprocessor macros — but the counter/coordinate names passed to
-    ``COUNTER()``, ``OFFSET()``, and ``COORDINATE()`` identify flow entities
-    and must never be macro-substituted, in any context.
+    ``COUNTER()`` and ``COORDINATE()`` identify flow entities and must never
+    be macro-substituted, in any context. A bare counter-coordinate reference
+    lives in the ordinary symbol namespace, so it receives no such
+    protection; coordinate names must simply not collide with ``#define``
+    macros.
 
     The algorithm mirrors ``Preprocessor.resolve_symbols``: each symbol's
     value is resolved recursively with the active expansion chain tracked, so

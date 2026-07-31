@@ -211,6 +211,14 @@ class DataLine(LineWithWords):
         )
 
     @property
+    def flow_candidate_nodes(self) -> tuple:
+        """Return label leaves in data values that may name coordinates."""
+        return tuple(
+            node for item in self._arg_value_list if isinstance(item, ExpressionNode)
+            for node in item.coordinate_candidate_nodes()
+        )
+
+    @property
     def byte_size(self) -> int:
         """Returns the number of bytes this data line will generate"""
         return len(self._arg_value_list)*DataLine.DIRECTIVE_VALUE_BYTE_SIZE[self._directive]

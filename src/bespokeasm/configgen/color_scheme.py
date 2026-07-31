@@ -139,11 +139,11 @@ DEFAULT_COLOR_SCHEME = ColorScheme(
         SyntaxElement.CONSTANT_NAME: '#abd7ed',
         SyntaxElement.CONSTANT_DEFINITION: '#29e768',
         SyntaxElement.CONSTANT_USAGE: '#6fe797',
-        SyntaxElement.FLOW_COUNTER_NAME: '#abd7ed',
-        SyntaxElement.FLOW_COUNTER_USAGE: '#6fe797',
-        SyntaxElement.FLOW_COORDINATE_NAME: '#abd7ed',
-        SyntaxElement.FLOW_COORDINATE_DEFINITION: '#29e768',
-        SyntaxElement.FLOW_COORDINATE_USAGE: '#6fe797',
+        SyntaxElement.FLOW_COUNTER_NAME: '#f2a58f',
+        SyntaxElement.FLOW_COUNTER_USAGE: '#f2a58f',
+        SyntaxElement.FLOW_COORDINATE_NAME: '#f4b49e',
+        SyntaxElement.FLOW_COORDINATE_DEFINITION: '#fbd7c9',
+        SyntaxElement.FLOW_COORDINATE_USAGE: '#fbd7c9',
         SyntaxElement.COMPILER_LABEL: '#abedc1',
         SyntaxElement.PARAMETER: '#abd7ed',
 
@@ -154,7 +154,7 @@ DEFAULT_COLOR_SCHEME = ColorScheme(
 
         # Operators
         SyntaxElement.OPERATOR: '#cc99ff',
-        SyntaxElement.FLOW_OPERATOR: '#e06cff',
+        SyntaxElement.FLOW_OPERATOR: '#e08ae4',
 
         # Punctuation
         SyntaxElement.PUNCTUATION_SEPARATOR: '#ed80a2',

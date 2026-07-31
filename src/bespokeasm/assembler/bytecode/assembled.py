@@ -96,12 +96,30 @@ class AssembledInstruction:
         )
 
     @property
+    def flow_candidate_nodes(self) -> tuple[ExpressionNode, ...]:
+        """Return operand label leaves that may name counter coordinates."""
+        return tuple(
+            node
+            for part in self._parts
+            if hasattr(part, 'parsed_expression')
+            for node in part.parsed_expression.coordinate_candidate_nodes()
+        )
+
+    @property
     def analysis_units(self) -> tuple:
-        """Pair this instruction's semantic record with its live expression nodes."""
+        """Pair this instruction's semantic record with its live expression nodes.
+
+        Coordinate candidates ride along with the definite flow nodes so the
+        analysis pass can settle bare coordinate references; they carry no
+        flow-usage signal on their own.
+        """
         analysis_record = self.analysis_record
         if analysis_record is None:
             return ()
-        return ((analysis_record, self.flow_expression_nodes),)
+        return ((
+            analysis_record,
+            self.flow_expression_nodes + self.flow_candidate_nodes,
+        ),)
 
     @property
     def has_operand_labels(self) -> bool:

@@ -6,8 +6,8 @@ is_prime32:
 .return_value := COORDINATE(stack, 7)
 
 push4
-lds OFFSET(.candidate)              ; emits 7 after the four-byte local push
-sts OFFSET(.return_value)           ; emits 11 after the local push
+lds .candidate              ; emits 7 after the four-byte local push
+sts .return_value           ; emits 11 after the local push
 addsp 4                             ; operand-dependent teardown: stack 4 -> 0
 rts                                 ; checks 0 == 0 before its physical -2 effect
 #endtrack stack                     ; lexical-only delimiter after the terminal

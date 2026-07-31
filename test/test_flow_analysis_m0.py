@@ -285,21 +285,23 @@ def test_flow_counter_availability_symbol_works_with_elif(tmp_path):
 @pytest.mark.parametrize('context', list(ExpressionUseContext))
 def test_m0_deferred_flow_expressions_are_recognized_and_context_tagged(context):
     line_id = LineIdentifier(7, 'deferred-flow.asm')
-    expression = 'COUNTER(stack) + OFFSET(.slot)'
+    expression = 'COUNTER(stack) + .slot'
 
     parsed = parse_deferred_flow_expression(line_id, expression, context)
     deferred_nodes = parsed.deferred_flow_nodes()
 
     assert tuple(node.token_type for node in deferred_nodes) == (
         TokenType.T_COUNTER,
-        TokenType.T_OFFSET,
     )
-    assert tuple(node.left_child.value for node in deferred_nodes) == ('stack', '.slot')
+    assert tuple(node.left_child.value for node in deferred_nodes) == ('stack',)
+    # The bare coordinate reference is an ordinary label leaf reported as a
+    # coordinate candidate, not a definite flow node.
+    candidates = parsed.coordinate_candidate_nodes()
+    assert tuple(node.value for node in candidates) == ('.slot',)
     assert all(node.expression_context is context for node in deferred_nodes)
     frozen = FrozenExpression.from_node(parsed)
     assert frozen is not None
     assert frozen.left.expression_context is context
-    assert frozen.right.expression_context is context
 
     with pytest.raises(SyntaxError, match='flow expression has no tagged use context'):
         parse_expression(line_id, expression)

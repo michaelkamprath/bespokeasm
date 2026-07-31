@@ -25,7 +25,7 @@ from bespokeasm.utilities import PATTERN_SYMBOL
 
 class LineOjectFactory:
     _FLOW_EXPRESSION_PATTERN = re.compile(
-        r'\b(?:COORDINATE|COUNTER|OFFSET)\s*\(',
+        r'\b(?:COORDINATE|COUNTER)\s*\(',
         flags=re.IGNORECASE,
     )
     _COORDINATE_EXPRESSION_PATTERN = re.compile(

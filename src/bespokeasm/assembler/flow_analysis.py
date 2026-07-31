@@ -9,6 +9,8 @@ from dataclasses import replace
 from bespokeasm.assembler.analysis import OperandSemanticKind
 from bespokeasm.assembler.control_flow import ControlFlowGraph
 from bespokeasm.assembler.control_flow import ControlFlowNode
+from bespokeasm.assembler.control_flow import declared_coordinate_labels
+from bespokeasm.assembler.control_flow import references_declared_coordinate
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.assembler.line_object.counter_coordinate_line import CounterCoordinateLine
@@ -99,10 +101,19 @@ class FlowLinearAnalyzer:
 
     @staticmethod
     def source_requires_flow_values(line_objects) -> bool:
-        """Return whether emitted words depend on resolved flow expressions."""
+        """Return whether emitted words depend on resolved flow expressions.
+
+        Bare coordinate references are ordinary labels until scope lookup, so
+        they count only when their spelling matches a ``:=`` declaration
+        somewhere in the compiled source.
+        """
+        declared_labels = declared_coordinate_labels(line_objects)
         return any(
             isinstance(line_object, LineWithWords)
-            and bool(line_object.flow_expression_nodes)
+            and (
+                bool(line_object.flow_expression_nodes)
+                or references_declared_coordinate(line_object, declared_labels)
+            )
             for line_object in line_objects
         )
 
@@ -396,20 +407,6 @@ class FlowLinearAnalyzer:
             return None
         return str(argument.value)
 
-    def _coordinate_name(self, line_object, node: ExpressionNode) -> str | None:
-        """Extract the exact coordinate spelling supplied to ``OFFSET()``."""
-        argument = node.left_child
-        if (
-            node.token_type != TokenType.T_OFFSET
-            or argument is None
-            or argument.token_type not in {TokenType.T_LABEL, TokenType.T_LABEL_OR_NUM}
-            or argument.left_child is not None
-            or argument.right_child is not None
-        ):
-            self._error(line_object, 'OFFSET() requires one counter-coordinate symbol')
-            return None
-        return str(argument.value)
-
     @staticmethod
     def _lookup_coordinate(line_object, label: str) -> CounterCoordinate | None:
         """Resolve a coordinate using the declaration line's active namespaces."""
@@ -421,61 +418,84 @@ class FlowLinearAnalyzer:
             )
         return line_object.symbol_scope.get_counter_coordinate(label)
 
-    def _resolve_offset(self, line_object, node: ExpressionNode) -> None:
-        """Resolve and annotate ``OFFSET(coordinate)`` at the pre-line state."""
-        label = self._coordinate_name(line_object, node)
-        if label is None:
-            return
+    def _resolve_coordinate_reference(self, line_object, node: ExpressionNode) -> None:
+        """Resolve one bare coordinate reference at the pre-line state.
+
+        The node is an ordinary label leaf; a name that does not resolve to a
+        declared coordinate is silently left for ordinary symbol resolution.
+        """
+        label = str(node.value)
         coordinate = self._lookup_coordinate(line_object, label)
         if coordinate is None:
-            self._error(
-                line_object,
-                f'OFFSET({label}) requires a symbol declared with :=',
-            )
             return
         state = self._active.get(coordinate.counter_name)
         if state is None:
-            self._error(
+            self._coordinate_reference_error(
                 line_object,
-                f'OFFSET({label}) references inactive flow counter "{coordinate.counter_name}"',
+                node,
+                f'counter coordinate "{label}" references inactive flow counter '
+                f'"{coordinate.counter_name}"',
             )
             return
         if not state.path_live:
-            self._error(
+            self._coordinate_reference_error(
                 line_object,
-                f'OFFSET({label}) is unreachable after the flow counter path terminated',
+                node,
+                f'counter coordinate "{label}" is unreachable after the flow '
+                'counter path terminated',
             )
             return
         if state.suspended:
-            self._error(
+            self._coordinate_reference_error(
                 line_object,
-                f'OFFSET({label}) cannot be resolved while flow counter '
-                f'"{state.name}" is {self._indeterminate_tail(state)}',
+                node,
+                f'counter coordinate "{label}" cannot be resolved while flow '
+                f'counter "{state.name}" is {self._indeterminate_tail(state)}',
             )
             return
         if coordinate.counter_instance_id != state.instance_id:
-            self._error(
+            self._coordinate_reference_error(
                 line_object,
-                f'OFFSET({label}) belongs to an earlier tracking instance of '
-                f'counter "{coordinate.counter_name}"',
+                node,
+                f'counter coordinate "{label}" belongs to an earlier tracking '
+                f'instance of counter "{coordinate.counter_name}"',
             )
             return
         if id(coordinate) in state.invalid_coordinate_ids:
-            self._error(
+            self._coordinate_reference_error(
                 line_object,
+                node,
                 f'counter coordinate "{label}" is invalid because its saved position '
                 'was crossed and is no longer live',
+            )
+            return
+        if not isinstance(state.value, int):
+            self._coordinate_reference_error(
+                line_object,
+                node,
+                f'counter coordinate "{label}" cannot be resolved after call to '
+                f'"{state.value.callee}" because no caller-visible summary is '
+                f'declared for "{state.counter_class}"',
             )
             return
         resolved_offset = state.value - coordinate.value
         node.resolve_flow_value(resolved_offset)
         line_object.record_flow_observation(label, resolved_offset)
 
+    def _coordinate_reference_error(
+        self,
+        line_object,
+        node: ExpressionNode,
+        message: str,
+    ) -> None:
+        """Report one coordinate-reference failure; graph analysis dedups."""
+        self._error(line_object, message)
+
     def _resolve_expressions(self, line_object, nodes: tuple[ExpressionNode, ...]) -> None:
         """Deposit the active pre-instruction value into deferred expressions."""
         for node in nodes:
-            if node.token_type == TokenType.T_OFFSET:
-                self._resolve_offset(line_object, node)
+            if node.token_type == TokenType.T_LABEL:
+                self._resolve_coordinate_reference(line_object, node)
                 continue
             counter_name = self._counter_name(line_object, node)
             if counter_name is None:
@@ -593,7 +613,7 @@ class FlowLinearAnalyzer:
     @classmethod
     def _expression_labels(cls, node: ExpressionNode) -> set[str]:
         """Collect scalar symbol tokens while excluding flow-function arguments."""
-        if node.token_type in {TokenType.T_COUNTER, TokenType.T_OFFSET}:
+        if node.token_type == TokenType.T_COUNTER:
             return set()
         if node.token_type in {TokenType.T_LABEL, TokenType.T_LABEL_OR_NUM}:
             return {str(node.value)}
@@ -640,7 +660,7 @@ class FlowLinearAnalyzer:
             self._error(
                 line_object,
                 f'instruction "{record.source_mnemonic}" effect ARG({index}) cannot '
-                'depend on COUNTER() or OFFSET()',
+                'depend on COUNTER()',
             )
             return 0
         try:
@@ -1047,28 +1067,32 @@ class FlowLinearAnalyzer:
         *,
         coordinate_state: _LinearCounterState | None = None,
     ) -> int | None:
-        """Evaluate a directive expression after resolving its flow operands."""
+        """Evaluate a directive expression after resolving its flow operands.
+
+        With ``coordinate_state`` set (the ``#resume`` anchor form), a
+        top-level coordinate symbol evaluates to its saved counter position;
+        everywhere else a bare coordinate reference evaluates to its current
+        offset, exactly like an instruction operand.
+        """
         if expression is None:
             return None
-        self._resolve_expressions(
-            line_object,
-            expression.deferred_flow_nodes(),
-        )
-        if expression.token_type in {TokenType.T_LABEL, TokenType.T_LABEL_OR_NUM}:
+        if (
+            coordinate_state is not None
+            and expression.token_type in {TokenType.T_LABEL, TokenType.T_LABEL_OR_NUM}
+        ):
             coordinate = self._lookup_coordinate(
                 line_object,
                 str(expression.value),
             )
             if coordinate is not None:
                 if (
-                    coordinate_state is None
-                    or coordinate.counter_name != coordinate_state.name
+                    coordinate.counter_name != coordinate_state.name
                     or coordinate.counter_instance_id != coordinate_state.instance_id
                 ):
                     self._error(
                         line_object,
                         f'counter coordinate "{expression.value}" does not belong '
-                        f'to flow counter "{getattr(coordinate_state, "name", "")}"',
+                        f'to flow counter "{coordinate_state.name}"',
                     )
                     return None
                 if (
@@ -1086,6 +1110,11 @@ class FlowLinearAnalyzer:
                         category='flow',
                     )
                 return coordinate.value
+        self._resolve_expressions(
+            line_object,
+            expression.deferred_flow_nodes()
+            + expression.coordinate_candidate_nodes(),
+        )
         try:
             return expression.get_value(
                 line_object.symbol_scope,
@@ -1126,7 +1155,19 @@ class FlowLinearAnalyzer:
             '>=': operator.ge,
         }[line_object.comparison]
 
-        if line_object.counter_name is not None:
+        if (
+            line_object.counter_name is not None
+            and line_object.counter_name not in self._active
+            and self._lookup_coordinate(
+                line_object,
+                line_object.counter_name,
+            ) is not None
+        ):
+            # The bare-name shorthand resolved to a counter coordinate, not a
+            # counter instance: fall through to generic expression evaluation,
+            # which compares the coordinate's current offset.
+            pass
+        elif line_object.counter_name is not None:
             state = self._require_live_state(
                 line_object,
                 line_object.counter_name,
@@ -1333,8 +1374,15 @@ class FlowLinearAnalyzer:
             elif isinstance(line_object, InstructionLine):
                 for record, expression_nodes in line_object.analysis_units:
                     self._apply_instruction(line_object, record, expression_nodes)
-            elif line_object.flow_expression_nodes:
-                self._resolve_expressions(line_object, line_object.flow_expression_nodes)
+            elif (
+                line_object.flow_expression_nodes
+                or line_object.flow_candidate_nodes
+            ):
+                self._resolve_expressions(
+                    line_object,
+                    line_object.flow_expression_nodes
+                    + line_object.flow_candidate_nodes,
+                )
             if self._model.flow_checks_enabled:
                 line_object.record_flow_transition(
                     before,
@@ -1407,6 +1455,15 @@ class FlowGraphAnalyzer(FlowLinearAnalyzer):
             return
         self._reported_expression_errors.add(diagnostic_key)
         self._error(line_object, message)
+
+    def _coordinate_reference_error(
+        self,
+        line_object,
+        node: ExpressionNode,
+        message: str,
+    ) -> None:
+        """Report a coordinate failure once across worklist revisits."""
+        self._expression_error_once(line_object, node, message)
 
     @staticmethod
     def _clone_state(state: _LinearCounterState) -> _LinearCounterState:
@@ -1792,31 +1849,8 @@ class FlowGraphAnalyzer(FlowLinearAnalyzer):
     ) -> None:
         """Resolve deferred flow operands against one graph input state."""
         for node in nodes:
-            if node.token_type == TokenType.T_OFFSET:
-                label = self._coordinate_name(line_object, node)
-                if label is None:
-                    continue
-                coordinate = self._lookup_coordinate(line_object, label)
-                if coordinate is None:
-                    self._expression_error_once(
-                        line_object,
-                        node,
-                        f'OFFSET({label}) requires a symbol declared with :=',
-                    )
-                    continue
-                state = self._active.get(coordinate.counter_name)
-                if (
-                    state is not None
-                    and not isinstance(state.value, int)
-                ):
-                    self._error(
-                        line_object,
-                        f'OFFSET({label}) cannot be resolved after call to '
-                        f'"{state.value.callee}" because no caller-visible '
-                        f'summary is declared for "{state.counter_class}"',
-                    )
-                    continue
-                self._resolve_offset(line_object, node)
+            if node.token_type == TokenType.T_LABEL:
+                self._resolve_coordinate_reference(line_object, node)
                 continue
             counter_name = self._counter_name(line_object, node)
             if counter_name is None:

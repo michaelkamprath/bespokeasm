@@ -7,8 +7,8 @@ is_prime32:
 .return_value := COORDINATE(stack, 7) ; caller's result slot is at sp+7
 
 push4                               ; local uint32: counter 0 -> 4
-lds OFFSET(.candidate)              ; candidate moved from sp+3 to sp+7
-sts OFFSET(.return_value)           ; result slot moved from sp+7 to sp+11
+lds .candidate              ; candidate moved from sp+3 to sp+7
+sts .return_value           ; result slot moved from sp+7 to sp+11
 pop4                                ; discard local: counter 4 -> 0
 #endtrack stack                     ; reconcile routine-owned movement before RTS
 rts                                 ; physical -2 return-address pull is outside the region
