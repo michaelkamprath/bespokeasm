@@ -28,7 +28,7 @@ from click.testing import CliRunner
 from ruamel.yaml import YAML
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-M0_DEV_HARNESS_DIR = PROJECT_ROOT / 'dev' / 'flow-counters-m0'
+M0_DEV_HARNESS_DIR = PROJECT_ROOT / 'test' / 'flow_harnesses' / 'm0'
 FLOW_CONFIG_PATH = M0_DEV_HARNESS_DIR / 'flow-counters-m0.yaml'
 FLOW_SOURCE_PATH = M0_DEV_HARNESS_DIR / 'analysis-records.asm'
 

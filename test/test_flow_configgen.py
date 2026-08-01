@@ -10,7 +10,7 @@ from ruamel.yaml import YAML
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-FLOW_CONFIG = PROJECT_ROOT / 'dev' / 'flow-counters-m2' / 'flow-counters-m2.yaml'
+FLOW_CONFIG = PROJECT_ROOT / 'test' / 'flow_harnesses' / 'm2' / 'flow-counters-m2.yaml'
 PLAIN_CONFIG = PROJECT_ROOT / 'test' / 'config_files' / 'eater-sap1-isa.yaml'
 FLOW_TOKENS = (
     'track',

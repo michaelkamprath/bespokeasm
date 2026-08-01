@@ -641,8 +641,9 @@ def test_m5_1_harness_is_runnable():
             sys.executable,
             str(
                 PROJECT_ROOT
-                / 'dev'
-                / 'flow-counters-m5.1'
+                / 'test'
+                / 'flow_harnesses'
+                / 'm5.1'
                 / 'verify_m5_1.py'
             ),
         ],

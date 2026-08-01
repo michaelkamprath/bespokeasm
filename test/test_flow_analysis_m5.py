@@ -15,7 +15,8 @@ from ruamel.yaml import YAML
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-M5_CONFIG = PROJECT_ROOT / 'dev' / 'flow-counters-m5' / 'flow-counters-m5.yaml'
+M5_DIR = PROJECT_ROOT / 'test' / 'flow_harnesses' / 'm5'
+M5_CONFIG = M5_DIR / 'flow-counters-m5.yaml'
 INTEL_8085_CONFIG = PROJECT_ROOT / 'examples' / 'intel-8085' / 'intel-8085.yaml'
 MINIMAL_64X4_CONFIG = (
     PROJECT_ROOT
@@ -81,7 +82,7 @@ def _flow_error(tmp_path: Path, source: str, expected: str):
 
 def test_m5_branching_sample_has_separate_balanced_exits():
     assembler = Assembler(
-        source_file=str(PROJECT_ROOT / 'dev' / 'flow-counters-m5' / 'branching-stack.asm'),
+        source_file=str(M5_DIR / 'branching-stack.asm'),
         config_file=str(M5_CONFIG),
         generate_binary=False,
         output_file=None,
@@ -144,9 +145,7 @@ def test_m5_sample_tracks_different_counter_classes_concurrently(
     capsys,
 ):
     source = (
-        PROJECT_ROOT
-        / 'dev'
-        / 'flow-counters-m5'
+        M5_DIR
         / 'concurrent-counters.asm'
     ).read_text()
     assembler = _assembler(tmp_path, source, pretty=True)
@@ -177,9 +176,7 @@ def test_m5_sample_aggregates_macro_constituent_transitions(
     capsys,
 ):
     source = (
-        PROJECT_ROOT
-        / 'dev'
-        / 'flow-counters-m5'
+        M5_DIR
         / 'macro-stack.asm'
     ).read_text()
     assembler = _assembler(tmp_path, source, pretty=True)
@@ -208,9 +205,7 @@ def test_m5_listing_shares_byte_and_flow_continuation_row(
     capsys,
 ):
     source = (
-        PROJECT_ROOT
-        / 'dev'
-        / 'flow-counters-m5'
+        M5_DIR
         / 'macro-shared-continuation.asm'
     ).read_text()
     assembler = _assembler(tmp_path, source, pretty=True)
@@ -239,9 +234,7 @@ def test_m5_listing_shares_byte_and_flow_continuation_row(
 
 def test_m5_sample_counts_equal_clock_cycles_across_branch(tmp_path):
     source = (
-        PROJECT_ROOT
-        / 'dev'
-        / 'flow-counters-m5'
+        M5_DIR
         / 'cycle-counting.asm'
     ).read_text()
     _, bytecode = _assemble(tmp_path, source)
@@ -2362,9 +2355,7 @@ def test_m5_harness_is_runnable():
         [
             sys.executable,
             str(
-                PROJECT_ROOT
-                / 'dev'
-                / 'flow-counters-m5'
+                M5_DIR
                 / 'verify_m5.py'
             ),
         ],

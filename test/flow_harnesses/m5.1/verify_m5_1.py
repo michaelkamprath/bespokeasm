@@ -6,7 +6,7 @@ from tempfile import TemporaryDirectory
 from bespokeasm.docsgen import DocumentationGenerator
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 HARNESS_CONFIG = Path(__file__).with_name('flow-counters-m5.1.yaml')
 NON_FLOW_CONFIG = (
     PROJECT_ROOT / 'test' / 'config_files' / 'eater-sap1-isa.yaml'

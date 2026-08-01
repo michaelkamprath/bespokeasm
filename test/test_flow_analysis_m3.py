@@ -10,7 +10,7 @@ from ruamel.yaml import YAML
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-M3_HARNESS_DIR = PROJECT_ROOT / 'dev' / 'flow-counters-m3'
+M3_HARNESS_DIR = PROJECT_ROOT / 'test' / 'flow_harnesses' / 'm3'
 M3_CONFIG_PATH = M3_HARNESS_DIR / 'flow-counters-m3.yaml'
 
 

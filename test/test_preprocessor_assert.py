@@ -7,7 +7,7 @@ from bespokeasm.assembler.symbol_scope import SymbolScope
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 NO_FLOW_CONFIG = PROJECT_ROOT / 'test' / 'config_files' / 'test_compilation_control.yaml'
-FLOW_CONFIG = PROJECT_ROOT / 'dev' / 'flow-counters-m4' / 'flow-counters-m4.yaml'
+FLOW_CONFIG = PROJECT_ROOT / 'test' / 'flow_harnesses' / 'm4' / 'flow-counters-m4.yaml'
 
 
 @pytest.fixture(autouse=True)

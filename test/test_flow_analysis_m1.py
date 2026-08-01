@@ -14,7 +14,7 @@ from ruamel.yaml import YAML
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-M1_HARNESS_DIR = PROJECT_ROOT / 'dev' / 'flow-counters-m1'
+M1_HARNESS_DIR = PROJECT_ROOT / 'test' / 'flow_harnesses' / 'm1'
 M1_CONFIG_PATH = M1_HARNESS_DIR / 'flow-counters-m1.yaml'
 
 

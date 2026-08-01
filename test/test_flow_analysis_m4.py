@@ -9,9 +9,9 @@ from ruamel.yaml import YAML
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-M4_HARNESS_DIR = PROJECT_ROOT / 'dev' / 'flow-counters-m4'
+M4_HARNESS_DIR = PROJECT_ROOT / 'test' / 'flow_harnesses' / 'm4'
 M4_CONFIG_PATH = M4_HARNESS_DIR / 'flow-counters-m4.yaml'
-M5_CONFIG_PATH = PROJECT_ROOT / 'dev' / 'flow-counters-m5' / 'flow-counters-m5.yaml'
+M5_CONFIG_PATH = PROJECT_ROOT / 'test' / 'flow_harnesses' / 'm5' / 'flow-counters-m5.yaml'
 
 
 def _load_config() -> dict:
