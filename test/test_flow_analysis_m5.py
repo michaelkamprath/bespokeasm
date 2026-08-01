@@ -388,6 +388,62 @@ def test_m5_nonzero_target_independent_call_summary_is_applied(tmp_path):
     assert bytecode
 
 
+def test_m5_call_to_external_address_uses_declared_summary(tmp_path):
+    """A call target outside the assembled program is a legitimate external
+    callee (e.g. a ROM routine named by a predefined constant): the declared
+    ``flow_call_effects`` summary governs the caller-visible effect, and the
+    callee body is not the analyzer's to verify."""
+    _, bytecode = _assemble(
+        tmp_path,
+        'ROM_PRINT = $c0\n'
+        '#track stack\n'
+        'routine:\n'
+        '.argument := COORDINATE(stack, 3)\n'
+        'call ROM_PRINT\n'
+        'depth .argument\n'
+        'rts\n'
+        '#endtrack stack\n',
+    )
+    assert bytecode[3] == 3
+
+
+def test_m5_call_to_hard_coded_in_program_address_is_valid(tmp_path):
+    """A numeric call target inside the assembled program resolves to the
+    instruction at that address exactly like a label target would — code
+    lined up at a fixed address (an interrupt vector, say) may be called by
+    its number. Layout: call(2) + depth(2) + rts(1) puts ``callee`` at 5."""
+    _, bytecode = _assemble(
+        tmp_path,
+        '#track stack\n'
+        'routine:\n'
+        '.argument := COORDINATE(stack, 3)\n'
+        'call 5\n'
+        'depth .argument\n'
+        'rts\n'
+        '#endtrack stack\n'
+        'callee:\n'
+        'rts\n',
+    )
+    assert bytecode[1] == 5
+    assert bytecode[3] == 3
+
+
+def test_m5_call_into_emitted_data_is_still_an_error(tmp_path):
+    """An address the program does emit — but as data — remains an invalid
+    call target; only content-free addresses are treated as external."""
+    _flow_error(
+        tmp_path,
+        '#track stack\n'
+        'routine:\n'
+        'call table\n'
+        'rts\n'
+        '#endtrack stack\n'
+        'table:\n'
+        '.byte 1, 2, 3\n',
+        'enters emitted data',
+    )
+
+
 def test_m5_call_may_target_region_entry_but_not_its_interior(tmp_path):
     _, bytecode = _assemble(
         tmp_path,

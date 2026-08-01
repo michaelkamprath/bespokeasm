@@ -2182,7 +2182,27 @@ class FlowGraphAnalyzer(FlowLinearAnalyzer):
             return ()
 
         if transfer == 'call':
-            if self._target_node(node) is None:
+            target_index = node.record.semantics.get('flow_target_operand')
+            target_address = self._operand_semantic_value(
+                node.line_object,
+                node.record,
+                target_index,
+            )
+            resolution = self._target_resolution(node, target_address)
+            if resolution.node is None and self._graph.has_program_content_at(
+                target_address,
+            ):
+                # The address holds program content that cannot be entered
+                # (emitted data, an ambiguous overlap): a real target error.
+                # An address with no content at all is an external callee —
+                # a ROM routine named by a predefined constant, for example —
+                # whose declared call summary governs the caller-visible
+                # effect; the callee body is not the analyzer's to verify.
+                self._error(
+                    node.line_object,
+                    f'instruction "{node.record.source_mnemonic}" target '
+                    f'{target_address:#x} is invalid: {resolution.error}',
+                )
                 return ()
             call_effects = node.record.semantics.get('flow_call_effects', {})
             for state in self._active.values():

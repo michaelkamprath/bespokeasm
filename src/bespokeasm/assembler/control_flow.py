@@ -200,6 +200,19 @@ class ControlFlowGraph:
         """Return the exact source node representing an address label."""
         return self._label_nodes_by_object.get(id(label_line))
 
+    def has_program_content_at(self, address: int) -> bool:
+        """Return whether the program emits anything at an address.
+
+        An address with no content at all is outside the assembled program —
+        the distinguishing mark of an external target such as a ROM routine
+        named by a predefined constant.
+        """
+        return bool(
+            self._instruction_nodes_by_address.get(address)
+            or self._data_nodes_by_address.get(address)
+            or self._observation_nodes_by_address.get(address)
+        )
+
     def label_named(
         self,
         label: str,
