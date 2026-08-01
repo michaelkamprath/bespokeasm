@@ -418,19 +418,19 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         )
         lines.append(
             fr'syn match {lang_group}FlowCounterName '
-            fr'/^#track\s\+\zs{symbol_pattern}/'
+            fr'/^\s*#track\s\+\zs{symbol_pattern}/'
         )
         lines.append(
             fr'syn match {lang_group}FlowCounterName '
-            fr'/^#track.\{{-}}\<as\s*=\s*\zs{symbol_pattern}/'
+            fr'/^\s*#track.\{{-}}\<as\s*=\s*\zs{symbol_pattern}/'
         )
         lines.append(
             fr'syn match {lang_group}FlowCounterName '
-            fr'/^#track.\{{-}}\<mode\s*=\s*\zs{symbol_pattern}/'
+            fr'/^\s*#track.\{{-}}\<mode\s*=\s*\zs{symbol_pattern}/'
         )
         lines.append(
             fr'syn match {lang_group}FlowCounterUsage '
-            fr'/^#\%(endtrack\|entry\|resume\|set\|suspend\)'
+            fr'/^\s*#\%(endtrack\|entry\|resume\|set\|suspend\)'
             fr'\s\+\zs{symbol_pattern}/'
         )
         lines.append(
@@ -457,7 +457,7 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         # Preprocessor
         if preproc_alt:
             # Highlight the leading '#' separately as punctuation and chain to macro name
-            lines.append(fr'syn match {lang_group}PreProcPunc /^#/ nextgroup={lang_group}PreProc skipwhite')
+            lines.append(fr'syn match {lang_group}PreProcPunc /^\s*\zs#/ nextgroup={lang_group}PreProc skipwhite')
             # Highlight the macro name as a contained match following '#'
             for w in preproc_directives:
                 lines.append(fr'syn match {lang_group}PreProc /\<' + self._vim_escape(w) + r'\>/ contained')

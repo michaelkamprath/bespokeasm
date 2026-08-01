@@ -3,6 +3,7 @@
 ;
 #require __LANGUAGE_NAME__ == slu4-min64x4-asm
 #require __LANGUAGE_VERSION__ >= 1.1.0
+#require __BESPOKEASM_VERSION__ >= 0.8.0
 ; Zero Page Usage
 .memzone ZERO_PAGE_LIBS
 #mute

@@ -1372,8 +1372,23 @@ class FlowLinearAnalyzer:
             ):
                 self._warn_external_label(line_object)
             elif isinstance(line_object, InstructionLine):
-                for record, expression_nodes in line_object.analysis_units:
-                    self._apply_instruction(line_object, record, expression_nodes)
+                units = line_object.analysis_units
+                if len(units) > 1:
+                    # A macro invocation behaves like a single instruction:
+                    # operand flow values observe the invocation-entry state
+                    # for every constituent, not the state between the
+                    # constituents' own effects.
+                    for _record, expression_nodes in units:
+                        self._resolve_expressions(line_object, expression_nodes)
+                    for record, _nodes in units:
+                        self._apply_instruction(line_object, record, ())
+                else:
+                    for record, expression_nodes in units:
+                        self._apply_instruction(
+                            line_object,
+                            record,
+                            expression_nodes,
+                        )
             elif (
                 line_object.flow_expression_nodes
                 or line_object.flow_candidate_nodes
@@ -2089,7 +2104,21 @@ class FlowGraphAnalyzer(FlowLinearAnalyzer):
         node: ControlFlowNode,
     ) -> tuple[ControlFlowNode, ...]:
         """Apply instruction semantics and return its structural successors."""
-        self._resolve_expressions(node.line_object, node.expression_nodes)
+        units = node.line_object.analysis_units
+        if len(units) > 1:
+            # A macro invocation behaves like a single instruction: operand
+            # flow values observe the invocation-entry state for every
+            # constituent. The first constituent's input is that entry
+            # state, so all constituents resolve there; later constituent
+            # nodes skip resolution rather than re-observing mid-macro state.
+            if node.record is units[0][0]:
+                for _record, expression_nodes in units:
+                    self._resolve_expressions(
+                        node.line_object,
+                        expression_nodes,
+                    )
+        else:
+            self._resolve_expressions(node.line_object, node.expression_nodes)
         if not self._active:
             return ()
         transfer = node.record.semantics.get('flow_transfer')

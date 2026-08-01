@@ -241,8 +241,11 @@ contexts:
           pop: true
 
   preprocessor_directives:
-    - match: '^\#'
-      scope: punctuation.definition.preprocessor
+    # Directives may be indented (e.g. nested #if blocks); the assembler
+    # strips leading whitespace before recognizing them.
+    - match: '^\s*(\#)'
+      captures:
+        1: punctuation.definition.preprocessor
       push:
         - meta_scope: meta.preprocessor
         - include: flow_counter_directives

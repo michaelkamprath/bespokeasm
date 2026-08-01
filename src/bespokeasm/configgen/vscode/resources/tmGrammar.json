@@ -215,7 +215,7 @@
           "name": "storage.type"
         },
         {
-          "begin": "^(\\#)",
+          "begin": "^\\s*(\\#)",
           "beginCaptures": {
             "1": {
               "name": "punctuation.definition.preprocessor"

@@ -316,6 +316,14 @@ class TestConfigurationGeneration(unittest.TestCase):
             ['\\blda\\b', '\\badd\\b', '\\bset\\b', '\\bbig\\b', '\\bhlt\\b'],
             'instructions'
         )
+        # directives may be indented (nested #if blocks), so the preprocessor
+        # rule must tolerate leading whitespace
+        preprocessor_rule = next(
+            pattern
+            for pattern in grammar_json['repository']['directives']['patterns']
+            if pattern.get('name') == 'meta.preprocessor'
+        )
+        self.assertEqual(preprocessor_rule['begin'], '^\\s*(\\#)')
         instructions_patterns = grammar_json['repository']['instructions']['patterns']
         pattern_includes = [
             entry['include']
@@ -636,6 +644,12 @@ class TestConfigurationGeneration(unittest.TestCase):
                 '\\.4byte', '\\.8byte', '\\.16byte', '\\.cstr', '\\.asciiz',
             ],
             'data type directives'
+        )
+        # directives may be indented (nested #if blocks), so the hash match
+        # must tolerate leading whitespace
+        self.assertEqual(
+            syntax_dict['contexts']['preprocessor_directives'][0]['match'],
+            r'^\s*(\#)',
         )
         item_match_str = 'fail'
         for item in syntax_dict['contexts']['preprocessor_directives'][0]['push']:
@@ -1028,7 +1042,9 @@ class TestConfigurationGeneration(unittest.TestCase):
         # Punctuation hash is highlighted separately and chains to macro group
         m = re.search(rf'^syn\s+match\s+{re.escape(vim_ft)}PreProcPunc\s+/(.+)$', syn, re.MULTILINE)
         self.assertIsNotNone(m, 'PreProcPunc match line should exist')
-        self.assertIn('^#/', m.group(1))
+        # directives may be indented (nested #if blocks), so the hash match
+        # must tolerate leading whitespace
+        self.assertIn(r'^\s*\zs#/', m.group(1))
         self.assertIn(f'nextgroup={vim_ft}PreProc', m.group(1))
         for pp in [
             'include', 'require',

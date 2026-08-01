@@ -407,6 +407,65 @@ def test_m5_call_to_external_address_uses_declared_summary(tmp_path):
     assert bytecode[3] == 3
 
 
+def test_m5_macro_argument_coordinate_resolves_at_invocation_entry(tmp_path):
+    """A macro invocation behaves like a single instruction: a coordinate
+    passed as a macro argument observes the stack as it stood at the call,
+    for every constituent — even when the macro's own constituents move the
+    counter in between (the ``phs4s``-style push-compensation pattern). The
+    coordinate spelling must therefore emit exactly the bytes of the
+    equivalent hand-written constant spelling."""
+    yaml = YAML(typ='safe')
+    with M5_CONFIG.open() as config_file:
+        config = copy.deepcopy(yaml.load(config_file))
+    # Mirrors a real stack-copy macro: read a stack byte, push it, then read
+    # the next byte whose spelled offset pre-compensates for that push.
+    config['macros']['probe_pair'] = {
+        'variants': [{
+            'operands': {'count': 1, 'operand_sets': {'list': ['value']}},
+            'instructions': [
+                'depth @ARG(0)+1+0',
+                'push',
+                'depth @ARG(0)+0+1',
+                'push',
+            ],
+        }],
+    }
+    config_path = tmp_path / 'macro-coordinate.yaml'
+    writer = YAML()
+    with config_path.open('w') as config_file:
+        writer.dump(config, config_file)
+
+    source_template = (
+        '#track stack mode=called\n'
+        'routine:\n'
+        '.argument := COORDINATE(stack, 3)\n'
+        'push\n'
+        'probe_pair {operand}\n'
+        'pop\n'
+        'pop\n'
+        'pop\n'
+        'rts\n'
+        '#endtrack stack\n'
+    )
+    _, coordinate_bytes = _assemble(
+        tmp_path,
+        source_template.format(operand='.argument'),
+        config_path=config_path,
+    )
+    SymbolScope._global_scope = None
+    _, constant_bytes = _assemble(
+        tmp_path,
+        source_template.format(operand='(3+1)'),
+        config_path=config_path,
+    )
+    assert coordinate_bytes == constant_bytes
+    # both depth constituents observe the invocation-entry offset (4) plus
+    # the macro's own +1 compensation arithmetic; layout is
+    # push, depth, operand, push, depth, operand, ...
+    assert coordinate_bytes[2] == 5
+    assert coordinate_bytes[5] == 5
+
+
 def test_m5_call_to_hard_coded_in_program_address_is_valid(tmp_path):
     """A numeric call target inside the assembled program resolves to the
     instruction at that address exactly like a label target would — code
