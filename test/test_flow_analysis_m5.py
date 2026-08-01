@@ -1190,6 +1190,42 @@ def test_m5_listing_omits_flow_column_when_analysis_is_disabled(
     assert 'stack=' not in listing
 
 
+def test_m5_listing_omits_flow_column_for_source_without_flow_use(
+    tmp_path,
+    capsys,
+    monkeypatch,
+):
+    """A flow-capable ISA compiling source that never uses flow counters
+    behaves like --no-flow-checks: the analysis pass does not run at all and
+    the listing retains the pre-feature layout with no flow column."""
+    from bespokeasm.assembler.flow_analysis import FlowGraphAnalyzer
+
+    def unexpected_run(self, line_objects):
+        raise AssertionError(
+            'flow analysis ran for source with no flow constructs'
+        )
+
+    monkeypatch.setattr(FlowGraphAnalyzer, 'run', unexpected_run)
+    assembler = _assembler(
+        tmp_path,
+        'routine:\n'
+        'push\n'
+        'pop\n'
+        'rts\n',
+        pretty=True,
+    )
+    assembler.assemble_bytecode()
+    listing = capsys.readouterr().out
+
+    header = next(
+        line
+        for line in listing.splitlines()
+        if 'line' in line and 'instruction' in line and 'comment' in line
+    )
+    assert 'flow' not in header
+    assert 'stack=' not in listing
+
+
 def test_m5_listing_shows_declared_and_resolved_coordinate_offsets(
     tmp_path,
     capsys,

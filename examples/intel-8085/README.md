@@ -24,6 +24,56 @@ Some instructions are **deliberately left unannotated** because the current anal
 * `rst` and `rstv` — the transfer target is the vector index times 8 (or fixed `0x0040`), not the operand's value, which `flow_target_operand` cannot yet express.
 * The conditional returns (`rz`/`rnz`/`rc`/`rnc`/`rpe`/`rpo`/`rm`/`rp`) — conditional path terminals are not yet supported by the analyzer. Use an unconditional `ret` (behind a conditional jump if needed) inside tracked regions.
 
+### Working around unannotated instructions
+
+The unannotated instructions can still be used — the tracked region just has to be arranged so they execute outside it. Three validated patterns:
+
+**Invert a conditional return into a conditional jump over `ret`.** This keeps the entire routine under analysis (both paths get the terminal's balance check), at the cost of one extra jump:
+
+```asm
+my_routine:
+#track stack mode=called
+    push b
+    ; ... routine body ...
+    pop b
+    jnz .continue           ; instead of `rnz`
+    ret                     ; unconditional terminal: fully checked
+.continue:
+    ; ... rest of routine ...
+    ret
+#endtrack stack
+```
+
+**End the region before a conditional-return tail.** Close the region with an explicit exit check once the routine-owned stack movement is reconciled, and let the conditional returns run unanalyzed after it. Remember that in a `mode=called` region the counter tracks only *routine-owned* movement: at `exit=0` the physical stack still holds the caller's 2-byte return address (coordinates 1–2), which is exactly what the conditional `ret` pops:
+
+```asm
+my_routine:
+#track stack mode=called
+    push b
+    ; ... routine body ...
+    pop b
+#endtrack stack exit=0      ; routine-owned movement verified balanced here
+    rz                      ; conditional returns execute outside the region
+    ; ... alternate exit path ...
+    ret
+```
+
+**Split the region around an `rst`.** `rst` is a call whose target the analyzer cannot follow, so close the region at a known depth before it and open a fresh region after it. Note the two regions are independent tracking instances: coordinates declared in the first are dead in the second, so re-declare any argument coordinates you still need:
+
+```asm
+my_routine:
+#track stack mode=called
+    ; ... balanced prologue ...
+#endtrack stack exit=0      ; close analysis at a known depth
+    rst 5                   ; vectored call runs outside the region
+#track stack mode=called    ; resume tracking; handler left the stack balanced
+    ; ... rest of routine ...
+    ret
+#endtrack stack
+```
+
+If the `rst` handler has a known *nonzero* net stack effect, open the second region with an explicit `init=` reflecting it instead of `mode=called`'s zero. (`#suspend`/`#resume` does not help here: these instructions carry no `flow_transfer` metadata at all, so they are rejected inside a region even while its counter is suspended.)
+
 A complete worked example lives at [`software/flow-stack-demo.a85`](software/flow-stack-demo.a85): a `mode=called` subroutine that addresses two caller-pushed 16-bit arguments through `COORDINATE(stack, 3)`/`COORDINATE(stack, 5)`, shows coordinate offsets shifting automatically across a `push`/`pop` prologue, joins a balanced conditional branch, is called with the declared net-zero call summary, and bounds the caller's region with a memory-map-derived `max=STACK_TOP - DATA_CEILING - 1` instance bound. Assemble it (static analysis is on by default) with:
 
 ```sh
