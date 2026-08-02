@@ -666,9 +666,21 @@ class AssemblerModel:
                     )
 
     def _configured_register_names(self) -> list[str]:
+        """Return register names that are functionally reserved.
+
+        A dict-form register entry may set ``reserved: false`` to document a
+        register in generated ISA documentation without reserving its name —
+        for architectures whose instructions never take register operands and
+        whose source conventionally reuses short register-like names (e.g.
+        ``a``/``b``) as ordinary symbols.
+        """
         registers_config = self._config['general'].get('registers')
         if isinstance(registers_config, dict):
-            return list(registers_config.keys())
+            return [
+                name
+                for name, info in registers_config.items()
+                if not isinstance(info, dict) or info.get('reserved', True)
+            ]
         elif registers_config is None:
             return []
         else:

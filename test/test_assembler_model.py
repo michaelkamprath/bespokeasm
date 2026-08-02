@@ -1,4 +1,5 @@
 import importlib.resources as pkg_resources
+import os
 import unittest
 
 import bespokeasm.assembler.model.operand_set as AS
@@ -399,6 +400,66 @@ class TestConfigObject(unittest.TestCase):
 
         self.assertSetEqual(set(model.predefined_labels), {'CONST1', 'CONST2', 'buffer'}, 'label set should equal')
         self.assertSetEqual(model.registers, {'a', 'b', 'x'}, 'registers should include documented names')
+
+    def test_documented_only_registers_are_not_reserved(self):
+        """A register entry with `reserved: false` stays in generated ISA
+        documentation but does not reserve its name as a keyword, so source
+        may still use the name for ordinary symbols."""
+        import tempfile
+
+        yaml_loader = YAML(typ='safe')
+        config = yaml_loader.load(
+            pkg_resources.files(config_files)
+            .joinpath('test_compiler_features.yaml')
+            .read_text()
+        )
+        config['general']['registers']['status'] = {
+            'title': 'Status Flags',
+            'reserved': False,
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = os.path.join(temp_dir, 'documented-registers.yaml')
+            writer = YAML()
+            with open(config_path, 'w', encoding='utf-8') as config_file:
+                writer.dump(config, config_file)
+            model = AssemblerModel(config_path, 0, self.diagnostic_reporter)
+
+        self.assertNotIn('status', model.registers, 'reserved: false name must not be functionally reserved')
+        self.assertSetEqual(
+            model.registers,
+            {'a', 'b', 'x'},
+            'default entries remain reserved',
+        )
+
+        from bespokeasm.docsgen.documentation_model import DocumentationModel
+        documented = {
+            register['name']
+            for register in DocumentationModel(model).general_docs['registers']
+        }
+        self.assertIn('status', documented, 'non-reserved register remains documented')
+
+    def test_register_operand_may_not_reference_non_reserved_register(self):
+        """A register-typed operand depends on its register name being
+        functionally reserved; marking that register `reserved: false` is a
+        configuration error, not a silent downgrade."""
+        import tempfile
+
+        yaml_loader = YAML(typ='safe')
+        config = yaml_loader.load(
+            pkg_resources.files(config_files)
+            .joinpath('test_compiler_features.yaml')
+            .read_text()
+        )
+        # register `a` is referenced by the fixture's register_a operand
+        config['general']['registers']['a']['reserved'] = False
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = os.path.join(temp_dir, 'unreserved-operand-register.yaml')
+            writer = YAML()
+            with open(config_path, 'w', encoding='utf-8') as config_file:
+                writer.dump(config, config_file)
+            with self.assertRaises(SystemExit) as config_error:
+                AssemblerModel(config_path, 0, self.diagnostic_reporter)
+        self.assertIn('is not a declared register', str(config_error.exception))
 
     def test_mnemonic_lists(self):
         fp = pkg_resources.files(config_files).joinpath('test_instruction_macros.yaml')

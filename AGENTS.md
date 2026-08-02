@@ -65,6 +65,11 @@ When updating the release version, the version numbers in the following files sh
 
 Furthermore, the `CHANGELOG.md` file should be updated to reflect the changes made.
 
+CHANGELOG and version discipline:
+- Released version sections in `CHANGELOG.md` are immutable: work done after a release ships goes under `## [Unreleased]`, never into the released section. The one exception is documenting behavior that genuinely shipped in that release but was not written up at the time.
+- Prefix bullets for compatibility-affecting changes with **Behavior change:** or **Breaking change:** so they stand out. Keep entries concise — one to two sentences stating what changed and what a user must do about it.
+- Immediately after a release ships, bump the version to the next patch pre-release (e.g. `0.8.0` → `0.8.1a1`) in both version files so in-development builds are distinguishable from the release.
+
 Release checklist:
 - Update versions in `src/bespokeasm/__init__.py` and `pyproject.toml`
 - Update `CHANGELOG.md`
@@ -84,3 +89,13 @@ Release checklist:
 - Keep shell completion paths lightweight by avoiding heavy imports at CLI import time; route completion invocations to `completion_cli.entry_point()` and lazily import heavy modules inside command handlers.
 - If helpers move between modules, update tests to import from the new module rather than re-exporting unused symbols just for tests.
 - Always run `pre-commit run --all-files` and `pytest -q` after changes to properly lint and test the code. Ensure the Python virtual environment is active before running them.
+- Flow-counter metadata, directives, and coordinate declarations must be emission-inert. When changing flow analysis or adding flow annotations to example programs, byte-compare the assembled output against a pre-change baseline (compile the prior source from git history and `cmp` the binaries). The test suite alone has missed emission bugs that byte-comparison caught, and byte identity is the feature's core guarantee.
+
+### Test Resource Boundaries
+- Unit tests may only depend on files under `test/` and `src/`. Test fixtures belong in `test/config_files/` or `test/flow_harnesses/`; when a test needs a config variation, load an existing fixture, modify the dict in memory, and write it to a pytest temp directory rather than adding a near-duplicate fixture file.
+- Never reference `dev/` from tests, the Makefile, or CI: the `dev/flow-counters-m*` directories are untracked private scaffolding (see `dev/.gitignore`) and do not exist in a fresh clone.
+- Do not add new test dependencies on `examples/`. A few legacy tests compile example ISAs as integration checks; treat those as grandfathered, not as a pattern to extend.
+
+### Example ISA Configurations
+- Example configs must be able to assemble conventional source code for their platform, not just the shipped example programs. Reserving a name has a real cost: only reserve what the ISA functionally requires.
+- A register that no `register`-typed operand references should be declared with `reserved: false` so it appears in generated ISA documentation without blocking source code from using its name as a label or constant.

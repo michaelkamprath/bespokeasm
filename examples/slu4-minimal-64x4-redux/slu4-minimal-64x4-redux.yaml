@@ -3,11 +3,18 @@ general:
   address_size: 16
   page_size: 256
   multi_word_endian: little
+  # NOTE: no instruction in this ISA takes a register as an operand, so
+  # register entries exist for generated ISA documentation. `a` and `b` are
+  # declared `reserved: false` because conventional Minimal 64x4 source
+  # (including SLU4's own demos) uses those names for zero-page variables;
+  # reserving them as keywords would break such programs.
   registers:
     a:
       title: Accumulator
+      reserved: false
     b:
       title: Temporary
+      reserved: false
     bank:
       title: Memory Bank
     sp:
