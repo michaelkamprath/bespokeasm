@@ -28,6 +28,8 @@ Changes that are planned but not implemented yet:
 * Added hover-equivalent documentation in Vim: pressing `K` over a mnemonic, register, directive, expression function, or predefined symbol opens its documentation in a preview window. An optional auto-popup variant (vim 8.2+ / Neovim) is available via `g:bespokeasm_<ft>_auto_hover`.
 * Improved unit test coverage
 * Fixed an `IndexError` crash when compiling a source file with no compilable lines; a clear diagnostic error is now reported instead.
+* **Behavior change:** a generated binary image now ends at the last *emitted* word. Previously the image extended to the address of the final line object even when that line emitted nothing, so a source ending with a zero-width line (such as a trailing label marking a runtime buffer) produced one extra byte of fill. Use `--binary-max-address` / `-e` if a specific image extent is required.
+* **Breaking change:** `assert` is now a reserved assembler keyword in every instruction set, because `#assert` is a base preprocessor directive that does not require flow counters. Source that previously used `assert` as a label, constant, or mnemonic name must rename it. All other flow-counter keywords (`track`, `endtrack`, `entry`, `set`, `suspend`, `resume`, `COUNTER`, `COORDINATE`) remain reserved only for ISAs that declare a `flow_counters` section.
 
 ## [0.7.3]
 * Added configurable mnemonic decorators (`+`, `-`, `++`, `--`, `!`, `@`) so instruction variants can use prefixed or suffixed decorated mnemonics such as `m+`, `m-`, and `++inc`.

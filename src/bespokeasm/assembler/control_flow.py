@@ -41,14 +41,7 @@ def references_declared_coordinate(
         name = str(node.value)
         if name not in declared_labels:
             continue
-        try:
-            label_value = line_object.symbol_scope.get_label_value(
-                name,
-                line_object.line_id,
-            )
-        except (SystemExit, ValueError):
-            label_value = None
-        if label_value is None:
+        if not line_object.symbol_scope.has_label(name):
             return True
     return False
 

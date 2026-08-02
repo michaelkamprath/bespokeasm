@@ -642,3 +642,43 @@ class TestAssemblerEngine(unittest.TestCase):
         with self.assertRaises(SystemExit) as duplicate_error:
             second.register_operand_labels(named_scope_manager)
         self.assertIn('defined multiple times', str(duplicate_error.exception))
+
+    def test_binary_image_ends_at_last_emitted_word(self):
+        """A trailing zero-width line (e.g. a label marking a runtime buffer)
+        does not extend the binary image: the image ends at the last emitted
+        word, not at the last line object's address. Locks the behavior
+        introduced when max_generated_address switched from the last line
+        object's address to the last emitted word."""
+        fp = pkg_resources.files(config_files).joinpath('eater-sap1-isa.yaml')
+
+        def _assemble(source_text: str, temp_dir: str, name: str) -> bytes:
+            SymbolScope._global_scope = None
+            source_path = os.path.join(temp_dir, f'{name}.asm')
+            output_path = os.path.join(temp_dir, f'{name}.bin')
+            with open(source_path, 'w', encoding='utf-8') as source_file:
+                source_file.write(source_text)
+            assembler = Assembler(
+                source_file=source_path,
+                config_file=str(fp),
+                generate_binary=True,
+                output_file=output_path,
+                binary_start=0,
+                binary_end=None,
+                binary_fill_value=0,
+                enable_pretty_print=False,
+                pretty_print_format=None,
+                pretty_print_output=None,
+                is_verbose=0,
+                include_paths=[],
+                predefined=[],
+            )
+            assembler.assemble_bytecode()
+            with open(output_path, 'rb') as output_file:
+                return output_file.read()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            without_label = _assemble('lda 1\nhlt\n', temp_dir, 'plain')
+            with_label = _assemble('lda 1\nhlt\nBUFFER:\n', temp_dir, 'labeled')
+
+        self.assertTrue(len(without_label) > 0)
+        self.assertEqual(with_label, without_label)

@@ -66,7 +66,14 @@ class _LinearCounterState:
 
 
 class FlowLinearAnalyzer:
-    """Source-order analyzer for scalar, straight-line flow counters."""
+    """Shared state and directive semantics for flow-counter analysis.
+
+    This class is not a production entry point: the engine always runs
+    ``FlowGraphAnalyzer``, which subclasses it for counter state, expression
+    resolution, coordinate declaration, and the flow-directive handlers. The
+    standalone source-order ``run()`` it once provided was removed as dead
+    code once the CFG analyzer became the sole analysis path.
+    """
 
     def __init__(self, model, diagnostic_reporter) -> None:
         """Create an analyzer bound to one immutable ISA model and reporter."""
@@ -920,123 +927,6 @@ class FlowLinearAnalyzer:
             self._error(line_object, message)
         return None
 
-    def _apply_delta(
-        self,
-        line_object,
-        record,
-        state: _LinearCounterState,
-    ) -> None:
-        """Apply one selected instruction effect and update coordinate liveness."""
-        if state.suspended:
-            return
-        delta = self._instruction_delta(line_object, record, state)
-        if delta is None:
-            return
-        state.value += delta
-        for coordinate in state.coordinates:
-            if (
-                id(coordinate) not in state.invalid_coordinate_ids
-                and not self._coordinate_is_live(state, coordinate)
-            ):
-                state.invalid_coordinate_ids.add(id(coordinate))
-                coordinate.is_valid = False
-        self._check_bounds(line_object, state)
-
-    def _apply_instruction(self, line_object, record, expression_nodes) -> None:
-        """Resolve operand uses, validate transfer metadata, and apply one delta."""
-        self._resolve_expressions(line_object, expression_nodes)
-        live_states = [
-            state for state in self._active.values()
-            if state.path_live
-        ]
-        if not live_states:
-            return
-
-        transfer = record.semantics.get('flow_transfer')
-        if transfer is None:
-            self._error(
-                line_object,
-                f'instruction "{record.source_mnemonic}" is missing required flow_transfer metadata',
-            )
-            return
-        self._apply_instruction_invalidations(line_object, record)
-        terminals = record.semantics.get('flow_terminal', {})
-        mapped_states = [
-            state for state in live_states
-            if isinstance(terminals, Mapping)
-            and state.counter_class in terminals
-        ]
-        if mapped_states:
-            if transfer != 'return':
-                terminal_classes = ', '.join(sorted({
-                    state.counter_class for state in mapped_states
-                }))
-                self._error(
-                    line_object,
-                    f'instruction "{record.source_mnemonic}" is a flow terminal for '
-                    f'"{terminal_classes}", but its flow_transfer "{transfer}" '
-                    'is not an unconditional return',
-                )
-                return
-            for state in live_states:
-                reconciliation_order = (
-                    terminals.get(state.counter_class)
-                    if isinstance(terminals, Mapping)
-                    else None
-                )
-                if reconciliation_order is None:
-                    # A live counter not mapped on this terminal has no way
-                    # across a return: there is no fall-through successor, so
-                    # its region has no reachable end — the same rule as a
-                    # bare return with no terminal at all. The path is closed
-                    # so following lines are uniformly unreachable.
-                    self._error(
-                        line_object,
-                        f'instruction "{record.source_mnemonic}" returns while '
-                        f'flow counter "{state.name}" is still active; end the '
-                        f'region with #endtrack {state.name} before this transfer',
-                    )
-                    state.path_live = False
-                    continue
-                if state.suspended:
-                    self._error(
-                        line_object,
-                        self._suspended_terminal_message(record, state),
-                    )
-                    continue
-                if reconciliation_order == 'after_effect':
-                    self._apply_delta(line_object, record, state)
-                self._check_exit(line_object, state)
-                state.path_live = False
-            return
-
-        if transfer != 'none':
-            if len(live_states) == 1:
-                end_action = (
-                    f'end the region with #endtrack {live_states[0].name} '
-                    'before this transfer'
-                )
-            else:
-                end_directives = ', '.join(
-                    f'#endtrack {state.name}' for state in live_states
-                )
-                end_action = (
-                    f'end all active regions ({end_directives}) before this transfer'
-                )
-            corrective_action = (
-                end_action
-                if transfer in {'unconditional', 'call'}
-                else 'path analysis is not yet available in M4'
-            )
-            self._error(
-                line_object,
-                f'instruction "{record.source_mnemonic}" uses flow_transfer "{transfer}"; '
-                f'{corrective_action}',
-            )
-            return
-        for state in live_states:
-            self._apply_delta(line_object, record, state)
-
     @staticmethod
     def _coordinate_is_live(
         state: _LinearCounterState,
@@ -1306,112 +1196,6 @@ class FlowLinearAnalyzer:
             state.invalid_coordinate_ids.add(id(coordinate))
             coordinate.is_valid = False
         self._check_bounds(line_object, state)
-
-    def _flow_values(self) -> dict[str, object]:
-        """Return the live scalar values used by listing annotations."""
-        return {
-            state.name: '?' if state.suspended else state.value
-            for state in self._active.values()
-            if state.path_live
-        }
-
-    def _warn_external_label(self, line_object: LabelLine) -> None:
-        """Warn when a non-local label exposes a non-entry tracked state."""
-        if not self._model.flow_checks_enabled:
-            return
-        label = line_object.get_label()
-        if label.startswith('.'):
-            return
-        for state in self._active.values():
-            if not state.path_live:
-                self._diagnostic_reporter.warn(
-                    line_object.line_id,
-                    f'label "{label}" is an unreachable potential entry '
-                    f'inside flow counter region "{state.name}"; add '
-                    f'#entry {state.name} value=<expression> or a lexical '
-                    f'#endtrack {state.name}',
-                    category='flow',
-                )
-            elif (
-                state.suspended
-                or state.value != state.initial_value
-            ):
-                self._diagnostic_reporter.warn(
-                    line_object.line_id,
-                    f'label "{label}" is a potential external entry where '
-                    f'flow counter "{state.name}" has value '
-                    f'{"suspended" if state.suspended else state.value}, not '
-                    f'entry value {state.initial_value}; add '
-                    f'#entry {state.name}',
-                    category='flow',
-                )
-
-    def run(self, line_objects) -> None:
-        """Analyze compiled line objects once in physical source order."""
-        last_line = None
-        for line_object in line_objects:
-            last_line = line_object
-            before = self._flow_values()
-            if isinstance(line_object, FlowTrackLine):
-                self._open(line_object)
-            elif isinstance(line_object, FlowEndTrackLine):
-                self._close(line_object)
-            elif isinstance(line_object, AssertLine):
-                self._assert(line_object)
-            elif isinstance(line_object, FlowSetLine):
-                self._set_counter(line_object)
-            elif isinstance(line_object, FlowSuspendLine):
-                self._suspend_counter(line_object)
-            elif isinstance(line_object, FlowResumeLine):
-                self._resume_counter(line_object)
-            elif isinstance(line_object, CounterCoordinateLine):
-                self._declare_coordinate(line_object)
-            elif (
-                isinstance(line_object, LabelLine)
-                and not line_object.is_constant
-            ):
-                self._warn_external_label(line_object)
-            elif isinstance(line_object, InstructionLine):
-                units = line_object.analysis_units
-                if len(units) > 1:
-                    # A macro invocation behaves like a single instruction:
-                    # operand flow values observe the invocation-entry state
-                    # for every constituent, not the state between the
-                    # constituents' own effects.
-                    for _record, expression_nodes in units:
-                        self._resolve_expressions(line_object, expression_nodes)
-                    for record, _nodes in units:
-                        self._apply_instruction(line_object, record, ())
-                else:
-                    for record, expression_nodes in units:
-                        self._apply_instruction(
-                            line_object,
-                            record,
-                            expression_nodes,
-                        )
-            elif (
-                line_object.flow_expression_nodes
-                or line_object.flow_candidate_nodes
-            ):
-                self._resolve_expressions(
-                    line_object,
-                    line_object.flow_expression_nodes
-                    + line_object.flow_candidate_nodes,
-                )
-            if self._model.flow_checks_enabled:
-                line_object.record_flow_transition(
-                    before,
-                    self._flow_values(),
-                )
-
-        for state in self._active.values():
-            if state.path_live:
-                if self._model.flow_checks_enabled:
-                    self._error(
-                        last_line or state.opened_by,
-                        f'flow counter "{state.name}" reaches EOF without '
-                        'a flow terminal or #endtrack',
-                    )
 
 
 @dataclass(frozen=True)
@@ -1711,6 +1495,16 @@ class FlowGraphAnalyzer(FlowLinearAnalyzer):
                 f'{self._state_description(incoming)} from '
                 f'{incoming_source.line_id}',
             )
+            # Under an accumulate-and-continue reporter the merge must still
+            # produce a deterministic surviving state: keep the value carried
+            # by the source that sorts first, independent of worklist
+            # arrival order (same policy as invalidation provenance below).
+            if str(incoming_source.line_id) < str(existing_source.line_id):
+                existing, incoming = incoming, existing
+                existing_source, incoming_source = (
+                    incoming_source,
+                    existing_source,
+                )
 
         merged = self._clone_state(existing)
         existing_coordinates = {

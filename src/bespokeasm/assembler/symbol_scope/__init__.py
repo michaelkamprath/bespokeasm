@@ -127,6 +127,19 @@ class SymbolScope:
         else:
             return None
 
+    def has_label(self, label: str) -> bool:
+        """Return whether the lexical hierarchy defines this ordinary label.
+
+        A pure membership probe: unlike ``get_label_value`` it never exits on
+        register-name collisions, so callers can test label precedence
+        without treating an interpreter-exit as a lookup miss.
+        """
+        if label in self._labels:
+            return True
+        if self.parent is not None:
+            return self.parent.has_label(label)
+        return False
+
     def get_counter_coordinate(self, label: str) -> CounterCoordinate | None:
         """Resolve a coordinate through the same lexical hierarchy as labels."""
         if label in self._counter_coordinates:
