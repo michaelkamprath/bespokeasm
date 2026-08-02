@@ -1,4 +1,5 @@
 import os
+import re
 from pathlib import Path
 
 from bespokeasm.assembler.keywords import BYTECODE_DIRECTIVES_SET
@@ -241,13 +242,16 @@ ctermbg=NONE gui=bold cterm=bold')
     @staticmethod
     def _vim_symbol_pattern(pattern: str) -> str:
         """Translate a canonical Python/TextMate symbol pattern to Vim regex."""
-        return (
+        translated = (
             pattern
             .replace('(?!_)', r'\%(_\)\@!')
             .replace('(?:', r'\%(')
             .replace('|', r'\|')
             .replace('+', r'\+')
         )
+        # a group opened with \%( must be closed with \) — a bare ')' is a
+        # literal in Vim regex and leaves the group unbalanced (E54)
+        return re.sub(r'(?<!\\)\)', r'\\)', translated)
 
     def _build_syntax_vim(self, vim_filetype: str) -> str:
         # Collect token groups
