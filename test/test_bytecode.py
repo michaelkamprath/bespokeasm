@@ -6,10 +6,10 @@ from bespokeasm.assembler.bytecode.parts import ExpressionByteCodePart
 from bespokeasm.assembler.bytecode.parts import NumericByteCodePart
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
-from bespokeasm.assembler.label_scope import GlobalLabelScope
-from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
-from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.symbol_scope import GlobalSymbolScope
+from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
+from bespokeasm.assembler.symbol_scope.named_scope_manager import NamedScopeManager
 
 
 class TestBytecodeObjects(unittest.TestCase):
@@ -20,7 +20,7 @@ class TestBytecodeObjects(unittest.TestCase):
     def test_bytecode_assembly(self):
         test_line_id = LineIdentifier(88, 'test_bytecode_assembly')
         register_labels = {'a', 'i'}
-        label_values = GlobalLabelScope(register_labels)
+        label_values = GlobalSymbolScope(register_labels)
         label_values.set_label_value('var1', 2, 1)
         label_values.set_label_value('var2', 0xF0, 2)
 
@@ -64,7 +64,7 @@ class TestBytecodeObjects(unittest.TestCase):
     def test_composite_bytecode_part(self):
         test_line_id = LineIdentifier(88, 'test_composite_bytecode_part')
         register_labels = {'a', 'i'}
-        label_values = GlobalLabelScope(register_labels)
+        label_values = GlobalSymbolScope(register_labels)
         label_values.set_label_value('var1', 2, 1)
         label_values.set_label_value('var2', 0xF0, 2)
 
@@ -127,7 +127,7 @@ class TestBytecodeObjects(unittest.TestCase):
     def test_compact_parts_to_words(self):
         test_line_id = LineIdentifier(1, 'test_compact_parts_to_words')
         register_labels = {'a', 'i'}
-        label_values = GlobalLabelScope(register_labels)
+        label_values = GlobalSymbolScope(register_labels)
 
         parts = [
             NumericByteCodePart(1, 4, False, 'big', 'big', test_line_id, 8, 8),
@@ -199,7 +199,7 @@ class TestBytecodeObjects(unittest.TestCase):
 
     def test_bytecode_assembly_16bit_word(self):
         register_labels = {'a', 'i'}
-        label_values = GlobalLabelScope(register_labels)
+        label_values = GlobalSymbolScope(register_labels)
         label_values.set_label_value('var1', 2, 1)
         label_values.set_label_value('var2', 0xF0, 2)
 

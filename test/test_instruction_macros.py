@@ -3,11 +3,6 @@ import unittest
 
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
-from bespokeasm.assembler.label_scope import GlobalLabelScope
-from bespokeasm.assembler.label_scope import LabelScope
-from bespokeasm.assembler.label_scope import LabelScopeType
-from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
-from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.assembler.line_object.factory import LineOjectFactory
@@ -15,6 +10,11 @@ from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.preprocessor import Preprocessor
+from bespokeasm.assembler.symbol_scope import GlobalSymbolScope
+from bespokeasm.assembler.symbol_scope import SymbolScope
+from bespokeasm.assembler.symbol_scope import SymbolScopeType
+from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
+from bespokeasm.assembler.symbol_scope.named_scope_manager import NamedScopeManager
 
 from test import config_files
 
@@ -30,11 +30,11 @@ class TestInstructionMacros(unittest.TestCase):
         fp = pkg_resources.files(config_files).joinpath('test_instruction_macros.yaml')
         cls.isa_model = AssemblerModel(str(fp), 0, DiagnosticReporter())
 
-        global_scope = cls.isa_model.global_label_scope
+        global_scope = cls.isa_model.global_symbol_scope
         global_scope.set_label_value('var1', 0x4589, 1)
         global_scope.set_label_value('my_val', 8, 2)
         global_scope.set_label_value('the_two', 2, 3)
-        local_scope = LabelScope(LabelScopeType.LOCAL, global_scope, 'TestInstructionParsing')
+        local_scope = SymbolScope(SymbolScopeType.LOCAL, global_scope, 'TestInstructionParsing')
         local_scope.set_label_value('.local_var', 10, 3)
         cls.label_values = local_scope
         cls.memory_zone_manager = MemoryZoneManager(
@@ -90,7 +90,7 @@ class TestInstructionMacros(unittest.TestCase):
         ins0.set_start_address(1212)
         self.assertIsInstance(ins0, InstructionLine)
         self.assertEqual(ins0.word_count, 4, 'has 4 words')
-        ins0.label_scope = TestInstructionMacros.label_values
+        ins0.symbol_scope = TestInstructionMacros.label_values
         ins0.generate_words()
         self.assertEqual(
             ins0.get_words(),
@@ -107,7 +107,7 @@ class TestInstructionMacros(unittest.TestCase):
         ins1.set_start_address(1212)
         self.assertIsInstance(ins1, InstructionLine)
         self.assertEqual(ins1.word_count, 10, 'has 10 words')
-        ins1.label_scope = TestInstructionMacros.label_values
+        ins1.symbol_scope = TestInstructionMacros.label_values
         ins1.generate_words()
         self.assertEqual(
             ins1.get_words(),
@@ -130,7 +130,7 @@ class TestInstructionMacros(unittest.TestCase):
         ins2.set_start_address(1212)
         self.assertIsInstance(ins2, InstructionLine)
         self.assertEqual(ins2.word_count, 16, 'has 16 words')
-        ins2.label_scope = TestInstructionMacros.label_values
+        ins2.symbol_scope = TestInstructionMacros.label_values
         ins2.generate_words()
         self.assertEqual(
             ins2.get_words(),
@@ -159,7 +159,7 @@ class TestInstructionMacros(unittest.TestCase):
         ins3.set_start_address(1212)
         self.assertIsInstance(ins3, InstructionLine)
         self.assertEqual(ins3.word_count, 18, 'has 18 words')
-        ins3.label_scope = TestInstructionMacros.label_values
+        ins3.symbol_scope = TestInstructionMacros.label_values
         ins3.generate_words()
         self.assertEqual(
             ins3.get_words(),
@@ -222,7 +222,7 @@ class TestInstructionMacros(unittest.TestCase):
         ins4.set_start_address(1212)
         self.assertIsInstance(ins4, InstructionLine)
         self.assertEqual(ins4.word_count, 4, 'has 4 words')
-        ins4.label_scope = TestInstructionMacros.label_values
+        ins4.symbol_scope = TestInstructionMacros.label_values
         ins4.generate_words()
         self.assertEqual(
             ins4.get_words(),
@@ -241,7 +241,7 @@ class TestInstructionMacros(unittest.TestCase):
         ins5.set_start_address(1212)
         self.assertIsInstance(ins5, InstructionLine)
         self.assertEqual(ins5.word_count, 4, 'has 4 words')
-        ins5.label_scope = TestInstructionMacros.label_values
+        ins5.symbol_scope = TestInstructionMacros.label_values
         ins5.generate_words()
         self.assertEqual(
             ins5.get_words(),
@@ -265,7 +265,7 @@ class TestInstructionMacros(unittest.TestCase):
         ins1.set_start_address(1212)
         self.assertIsInstance(ins1, InstructionLine)
         self.assertEqual(ins1.word_count, 3, 'has 3 words')
-        ins1.label_scope = TestInstructionMacros.label_values
+        ins1.symbol_scope = TestInstructionMacros.label_values
         ins1.generate_words()
         self.assertEqual(
             ins1.get_words(),
@@ -281,7 +281,7 @@ class TestInstructionMacros(unittest.TestCase):
         ins2.set_start_address(1212)
         self.assertIsInstance(ins2, InstructionLine)
         self.assertEqual(ins2.word_count, 3, 'has 3 words')
-        ins2.label_scope = TestInstructionMacros.label_values
+        ins2.symbol_scope = TestInstructionMacros.label_values
         ins2.generate_words()
         self.assertEqual(
             ins2.get_words(),
@@ -299,7 +299,7 @@ class TestInstructionMacros(unittest.TestCase):
         ins3.set_start_address(1212)
         self.assertIsInstance(ins3, InstructionLine)
         self.assertEqual(ins3.word_count, 5, 'has 5 words')
-        ins3.label_scope = TestInstructionMacros.label_values
+        ins3.symbol_scope = TestInstructionMacros.label_values
         ins3.generate_words()
         self.assertEqual(
             ins3.get_words(),
@@ -319,7 +319,7 @@ class TestInstructionMacros(unittest.TestCase):
         ins4.set_start_address(1212)
         self.assertIsInstance(ins4, InstructionLine)
         self.assertEqual(ins4.word_count, 7, 'has 7 words')
-        ins4.label_scope = TestInstructionMacros.label_values
+        ins4.symbol_scope = TestInstructionMacros.label_values
         ins4.generate_words()
         self.assertEqual(
             ins4.get_words(),
@@ -344,7 +344,7 @@ class TestInstructionMacros(unittest.TestCase):
         ins5.set_start_address(1212)
         self.assertIsInstance(ins5, InstructionLine)
         self.assertEqual(ins5.word_count, 7, 'has 7 words')
-        ins5.label_scope = TestInstructionMacros.label_values
+        ins5.symbol_scope = TestInstructionMacros.label_values
         ins5.generate_words()
         self.assertEqual(
             ins5.get_words(),
@@ -366,7 +366,7 @@ class TestInstructionMacros(unittest.TestCase):
         ins6.set_start_address(1212)
         self.assertIsInstance(ins6, InstructionLine)
         self.assertEqual(ins6.word_count, 8, 'has 8 words')
-        ins6.label_scope = TestInstructionMacros.label_values
+        ins6.symbol_scope = TestInstructionMacros.label_values
         ins6.generate_words()
         self.assertEqual(
             ins6.get_words(),
@@ -394,7 +394,7 @@ class TestInstructionMacros(unittest.TestCase):
         ins1.set_start_address(1212)
         self.assertIsInstance(ins1, InstructionLine)
         self.assertEqual(ins1.word_count, 1, 'has 1 words')
-        ins1.label_scope = TestInstructionMacros.label_values
+        ins1.symbol_scope = TestInstructionMacros.label_values
         ins1.generate_words()
         self.assertEqual(
             ins1.get_words(),
@@ -408,7 +408,7 @@ class TestInstructionMacros(unittest.TestCase):
         ins2.set_start_address(1212)
         self.assertIsInstance(ins2, InstructionLine)
         self.assertEqual(ins2.word_count, 1, 'has 1 words')
-        ins2.label_scope = TestInstructionMacros.label_values
+        ins2.symbol_scope = TestInstructionMacros.label_values
         ins2.generate_words()
         self.assertEqual(
             ins2.get_words(),
@@ -428,13 +428,13 @@ class TestInstructionMacros(unittest.TestCase):
             isa_model.predefined_memory_zones if hasattr(isa_model, 'predefined_memory_zones') else [],
         )
         preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
-        label_scope = GlobalLabelScope(set())
+        symbol_scope = GlobalSymbolScope(set())
         # Assemble a line that uses the macro
         macro_line_obj = LineOjectFactory.parse_line(
             line_id=LineIdentifier(1, 'test_macro_expansion_with_alias_mnemonic'),
             line_str='my_macro',
             model=isa_model,
-            label_scope=None,
+            symbol_scope=None,
             active_named_scopes=ActiveNamedScopeList(named_scope_manager),
             current_memzone=memzone_mngr.global_zone,
             memzone_manager=memzone_mngr,
@@ -443,14 +443,14 @@ class TestInstructionMacros(unittest.TestCase):
             log_verbosity=0,
         )[0]
         macro_line_obj.set_start_address(0x3000)
-        macro_line_obj.label_scope = label_scope
+        macro_line_obj.symbol_scope = symbol_scope
         macro_line_obj.generate_words()
         # Assemble a line that uses the alias directly
         alias_line_obj = LineOjectFactory.parse_line(
             line_id=2,
             line_str='call',
             model=isa_model,
-            label_scope=None,
+            symbol_scope=None,
             active_named_scopes=ActiveNamedScopeList(named_scope_manager),
             current_memzone=memzone_mngr.global_zone,
             memzone_manager=memzone_mngr,
@@ -459,7 +459,7 @@ class TestInstructionMacros(unittest.TestCase):
             log_verbosity=0,
         )[0]
         alias_line_obj.set_start_address(0x3001)
-        alias_line_obj.label_scope = label_scope
+        alias_line_obj.symbol_scope = symbol_scope
         alias_line_obj.generate_words()
         # Both should generate the same machine code
         self.assertEqual(

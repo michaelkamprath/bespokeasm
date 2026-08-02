@@ -24,6 +24,13 @@ class TestConfigurationGeneration(unittest.TestCase):
         if not pl.Path(path).resolve().is_file():
             raise AssertionError('File does not exist: %s' % str(path))
 
+    def _assert_flow_capability_hover_doc(self, constants: dict[str, str]) -> None:
+        self.assertIn('__FLOW_COUNTERS_AVAILABLE__', constants)
+        self.assertIn(
+            'always-defined numeric preprocessor symbol',
+            constants['__FLOW_COUNTERS_AVAILABLE__'],
+        )
+
     def _assert_constant_definition_pattern(self, pattern: str, source_name: str) -> None:
         compiled = re.compile(pattern)
         cases = {
@@ -105,6 +112,12 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIn(SyntaxElement.OPERAND_LABEL_AT, DEFAULT_COLOR_SCHEME.colors)
         self.assertIn(SyntaxElement.OPERAND_LABEL_NAME, DEFAULT_COLOR_SCHEME.colors)
         self.assertIn(SyntaxElement.OPERAND_LABEL_COLON, DEFAULT_COLOR_SCHEME.colors)
+        self.assertIn(SyntaxElement.FLOW_COORDINATE_NAME, DEFAULT_COLOR_SCHEME.colors)
+        self.assertIn(SyntaxElement.FLOW_COORDINATE_DEFINITION, DEFAULT_COLOR_SCHEME.colors)
+        self.assertIn(SyntaxElement.FLOW_COORDINATE_USAGE, DEFAULT_COLOR_SCHEME.colors)
+        self.assertIn(SyntaxElement.FLOW_COUNTER_NAME, DEFAULT_COLOR_SCHEME.colors)
+        self.assertIn(SyntaxElement.FLOW_COUNTER_USAGE, DEFAULT_COLOR_SCHEME.colors)
+        self.assertIn(SyntaxElement.FLOW_OPERATOR, DEFAULT_COLOR_SCHEME.colors)
 
         test_dir = tempfile.mkdtemp()
         config_file = pkg_resources.files(config_files).joinpath('test_operand_labels.yaml')
@@ -303,6 +316,14 @@ class TestConfigurationGeneration(unittest.TestCase):
             ['\\blda\\b', '\\badd\\b', '\\bset\\b', '\\bbig\\b', '\\bhlt\\b'],
             'instructions'
         )
+        # directives may be indented (nested #if blocks), so the preprocessor
+        # rule must tolerate leading whitespace
+        preprocessor_rule = next(
+            pattern
+            for pattern in grammar_json['repository']['directives']['patterns']
+            if pattern.get('name') == 'meta.preprocessor'
+        )
+        self.assertEqual(preprocessor_rule['begin'], '^\\s*(\\#)')
         instructions_patterns = grammar_json['repository']['instructions']['patterns']
         pattern_includes = [
             entry['include']
@@ -318,7 +339,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertNotIn('#label_usages', pattern_includes)
         self.assertEqual(
             grammar_json['repository']['operands_variables']['match'],
-            '(?<!\\w)([A-Za-z][\\w\\d_]*)\\b',
+            '(?<![.\\w])([a-zA-Z][a-zA-Z0-9_]*)(?!\\w)',
             'operand variables should not match dot/underscore-prefixed labels'
         )
         # there should be no macros for this ISA
@@ -362,7 +383,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIn('constants', docs_json['predefined'])
         self.assertIn('data', docs_json['predefined'])
         self.assertIn('memory_zones', docs_json['predefined'])
-        self.assertEqual({}, docs_json['predefined']['constants'])
+        self._assert_flow_capability_hover_doc(docs_json['predefined']['constants'])
         self.assertEqual({}, docs_json['predefined']['data'])
         self.assertEqual({}, docs_json['predefined']['memory_zones'])
         self.assertIn('LDA', docs_json['instructions'])
@@ -469,7 +490,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIn('constants', docs_json['predefined'])
         self.assertIn('data', docs_json['predefined'])
         self.assertIn('memory_zones', docs_json['predefined'])
-        self.assertEqual({}, docs_json['predefined']['constants'])
+        self._assert_flow_capability_hover_doc(docs_json['predefined']['constants'])
         self.assertEqual({}, docs_json['predefined']['data'])
         self.assertEqual({}, docs_json['predefined']['memory_zones'])
         self.assertIn('NOP', docs_json['instructions'])
@@ -505,7 +526,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIn('PUSH2', docs_json['macros'])
         self.assertIn('### `PUSH2`', docs_json['macros']['PUSH2'])
         self.assertNotIn('Documentation not provided.', docs_json['macros']['PUSH2'])
-        self.assertEqual({}, docs_json['predefined']['constants'])
+        self._assert_flow_capability_hover_doc(docs_json['predefined']['constants'])
         self.assertEqual({}, docs_json['predefined']['data'])
         self.assertEqual({}, docs_json['predefined']['memory_zones'])
 
@@ -532,6 +553,7 @@ class TestConfigurationGeneration(unittest.TestCase):
             docs_json = json.load(json_file)
 
         self.assertIn('predefined', docs_json)
+        self._assert_flow_capability_hover_doc(docs_json['predefined']['constants'])
         self.assertIn('VAR_BUF', docs_json['predefined']['constants'])
         self.assertIn('SCREEN', docs_json['predefined']['data'])
         self.assertIn('USER_RAM', docs_json['predefined']['memory_zones'])
@@ -556,6 +578,9 @@ class TestConfigurationGeneration(unittest.TestCase):
         with open(sublime_docs_fp) as json_file:
             sublime_docs_json = json.load(json_file)
 
+        self._assert_flow_capability_hover_doc(
+            sublime_docs_json['predefined']['constants'],
+        )
         self.assertIn('VAR_BUF', sublime_docs_json['predefined']['constants'])
         self.assertIn('| **Size** | 2 words |', sublime_docs_json['predefined']['constants']['VAR_BUF'])
         self.assertIn('SCREEN', sublime_docs_json['predefined']['data'])
@@ -620,6 +645,12 @@ class TestConfigurationGeneration(unittest.TestCase):
             ],
             'data type directives'
         )
+        # directives may be indented (nested #if blocks), so the hash match
+        # must tolerate leading whitespace
+        self.assertEqual(
+            syntax_dict['contexts']['preprocessor_directives'][0]['match'],
+            r'^\s*(\#)',
+        )
         item_match_str = 'fail'
         for item in syntax_dict['contexts']['preprocessor_directives'][0]['push']:
             if 'scope' in item and item['scope'] == 'keyword.control.preprocessor':
@@ -627,7 +658,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         self._assert_grouped_item_list(
             item_match_str,
             [
-                'include', 'require', 'error', 'create_memzone', 'print', 'define', 'if',
+                'include', 'require', 'error', 'create_memzone', 'print', 'assert', 'define', 'if',
                 'elif', 'else', 'endif', 'ifdef', 'ifndef',
                 'mute', 'unmute', 'emit',
                 'create-scope', 'use-scope', 'deactivate-scope',
@@ -668,7 +699,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIn('constants', docs_json['predefined'])
         self.assertIn('data', docs_json['predefined'])
         self.assertIn('memory_zones', docs_json['predefined'])
-        self.assertEqual({}, docs_json['predefined']['constants'])
+        self._assert_flow_capability_hover_doc(docs_json['predefined']['constants'])
         self.assertEqual({}, docs_json['predefined']['data'])
         self.assertEqual({}, docs_json['predefined']['memory_zones'])
         self.assertIn('LDA', docs_json['instructions'])
@@ -750,7 +781,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         self._assert_grouped_item_list(
             item_match_str,
             [
-                'include', 'require', 'error', 'create_memzone', 'print', 'define',
+                'include', 'require', 'error', 'create_memzone', 'print', 'assert', 'define',
                 'if', 'elif', 'else', 'endif', 'ifdef', 'ifndef',
                 'mute', 'unmute', 'emit',
                 'create-scope', 'use-scope', 'deactivate-scope',
@@ -791,7 +822,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIn('constants', docs_json['predefined'])
         self.assertIn('data', docs_json['predefined'])
         self.assertIn('memory_zones', docs_json['predefined'])
-        self.assertEqual({}, docs_json['predefined']['constants'])
+        self._assert_flow_capability_hover_doc(docs_json['predefined']['constants'])
         self.assertEqual({}, docs_json['predefined']['data'])
         self.assertEqual({}, docs_json['predefined']['memory_zones'])
         self.assertIn('NOP', docs_json['instructions'])
@@ -1011,7 +1042,9 @@ class TestConfigurationGeneration(unittest.TestCase):
         # Punctuation hash is highlighted separately and chains to macro group
         m = re.search(rf'^syn\s+match\s+{re.escape(vim_ft)}PreProcPunc\s+/(.+)$', syn, re.MULTILINE)
         self.assertIsNotNone(m, 'PreProcPunc match line should exist')
-        self.assertIn('^#/', m.group(1))
+        # directives may be indented (nested #if blocks), so the hash match
+        # must tolerate leading whitespace
+        self.assertIn(r'^\s*\zs#/', m.group(1))
         self.assertIn(f'nextgroup={vim_ft}PreProc', m.group(1))
         for pp in [
             'include', 'require',

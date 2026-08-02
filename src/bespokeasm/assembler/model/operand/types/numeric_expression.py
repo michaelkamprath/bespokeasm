@@ -10,6 +10,7 @@ from bespokeasm.assembler.model.operand import OperandWithArgument
 from bespokeasm.assembler.model.operand import ParsedOperand
 from bespokeasm.assembler.model.operand.operand_label import parse_operand_label_annotation
 from bespokeasm.utilities import PATTERN_CHARACTER_ORDINAL
+from bespokeasm.utilities import PATTERN_SYMBOL
 
 
 class NumericExpressionOperand(OperandWithArgument):
@@ -45,7 +46,7 @@ class NumericExpressionOperand(OperandWithArgument):
     @property
     def match_pattern(self) -> str:
         base_pattern = r'(?:[\$\%\w\(\)\+\-\s]*[\w\)])'
-        return fr'(?:@(?:[._a-zA-Z][a-zA-Z0-9_]*):\s*)?{base_pattern}'
+        return fr'(?:@(?:{PATTERN_SYMBOL}):\s*)?{base_pattern}'
 
     @property
     def enforce_argument_valid_address(self) -> bool:

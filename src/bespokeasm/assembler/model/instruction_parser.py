@@ -1,5 +1,6 @@
 import sys
 
+from bespokeasm.assembler.analysis import SourceIdentity
 from bespokeasm.assembler.bytecode.assembled import AssembledInstruction
 from bespokeasm.assembler.bytecode.generator import BytecodeGenerator
 from bespokeasm.assembler.line_identifier import LineIdentifier
@@ -17,6 +18,7 @@ class InstructioParser(InstructioParserBase):
         line_id: LineIdentifier,
         instruction: str,
         memzone_manager: MemoryZoneManager,
+        source_identity: SourceIdentity | None = None,
     ) -> AssembledInstruction:
         instr_parts = instruction.strip().split(' ', 1)
         source_mnemonic = instr_parts[0].lower()
@@ -41,4 +43,5 @@ class InstructioParser(InstructioParserBase):
             memzone_manager,
             InstructioParser,
             source_mnemonic=source_mnemonic,
+            source_identity=source_identity,
         )

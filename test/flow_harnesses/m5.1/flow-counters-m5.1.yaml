@@ -1,0 +1,182 @@
+description: Flow-counter documentation M5.1 development acceptance harness
+general:
+  min_version: "0.8.0"
+  address_size: 8
+  multi_word_endian: little
+  identifier:
+    name: flow-documentation-m5-1
+    version: "0.5.1"
+flow_counters:
+  stack:
+    documentation:
+      title: Data Stack Depth
+      description: Tracks routine-owned bytes on the data stack.
+    min_value: 0
+    max_value: 32
+    invalidate_on_write: [255]
+    unknown_instructions: error
+    default_init: 0
+    exit_policy: balanced
+    coordinate_offsets: positive
+    allow_zero_offset: true
+    entry_modes:
+      called:
+        init: 0
+        exit: 0
+        description: A subroutine entered with a stack-saved return address.
+  cycles:
+    documentation:
+      title: Cycle Count
+      description: Counts instruction execution cycles.
+    min_value: 0
+    unknown_instructions: error
+    default_init: 0
+    exit_policy: none
+    source: flow_effects.cycles
+  writes:
+    documentation:
+      title: Memory Writes
+      description: Counts writes to memory.
+    min_value: 0
+    unknown_instructions: error
+    default_init: 0
+    exit_policy: none
+    source: flow_effects.writes
+operand_sets:
+  value:
+    operand_values:
+      immediate:
+        type: numeric
+        argument:
+          size: 8
+          word_align: true
+instructions:
+  push:
+    flow_effects: {stack: 1, cycles: 2, writes: 1}
+    flow_transfer: none
+    bytecode: {value: 0x10, size: 8}
+  pop:
+    flow_effects: {stack: -1, cycles: 2, writes: 0}
+    flow_transfer: none
+    bytecode: {value: 0x11, size: 8}
+  nop:
+    flow_effects: {stack: 0, cycles: 1, writes: 0}
+    flow_transfer: none
+    bytecode: {value: 0x00, size: 8}
+  depth:
+    flow_effects: {stack: 0, cycles: 1, writes: 0}
+    flow_transfer: none
+    bytecode: {value: 0x20, size: 8}
+    operands:
+      count: 1
+      operand_sets: {list: [value]}
+  observe:
+    flow_effects: {stack: 0, cycles: 1, writes: 0}
+    flow_transfer: none
+    bytecode: {value: 0x21, size: 8}
+    operands:
+      count: 1
+      operand_sets: {list: [value]}
+  store:
+    flow_effects: {stack: 0, cycles: 2, writes: 1}
+    flow_transfer: none
+    bytecode: {value: 0x12, size: 8}
+  write_addr:
+    documentation:
+      title: Write memory address
+    flow_effects: {stack: 0, cycles: 2, writes: 1}
+    flow_transfer: none
+    flow_write_operands: [0]
+    bytecode: {value: 0x14, size: 8}
+    operands:
+      count: 1
+      operand_sets: {list: [value]}
+  replace_stack_anchor:
+    documentation:
+      title: Replace stack anchor
+    flow_effects: {cycles: 2, writes: 0}
+    flow_invalidates: [stack]
+    flow_transfer: none
+    bytecode: {value: 0x15, size: 8}
+  adjust:
+    flow_effects: {stack: "-ARG(0)", cycles: 1, writes: 0}
+    flow_transfer: none
+    bytecode: {value: 0x13, size: 8}
+    operands:
+      count: 1
+      operand_sets: {list: [value]}
+  jz:
+    flow_effects: {stack: 0, cycles: 2, writes: 0}
+    flow_transfer: conditional
+    flow_target_operand: 0
+    bytecode: {value: 0x30, size: 8}
+    operands:
+      count: 1
+      operand_sets: {list: [value]}
+  jmp:
+    flow_effects: {stack: 0, cycles: 2, writes: 0}
+    flow_transfer: unconditional
+    flow_target_operand: 0
+    bytecode: {value: 0x31, size: 8}
+    operands:
+      count: 1
+      operand_sets: {list: [value]}
+  call:
+    flow_effects: {stack: 2, cycles: 4, writes: 0}
+    flow_transfer: call
+    flow_target_operand: 0
+    flow_call_effects: {stack: 0}
+    bytecode: {value: 0x32, size: 8}
+    operands:
+      count: 1
+      operand_sets: {list: [value]}
+  call_unknown:
+    flow_effects: {stack: 2, cycles: 4, writes: 0}
+    flow_transfer: call
+    flow_target_operand: 0
+    bytecode: {value: 0x34, size: 8}
+    operands:
+      count: 1
+      operand_sets: {list: [value]}
+  call_net_minus_one:
+    flow_effects: {stack: 2, cycles: 4, writes: 0}
+    flow_transfer: call
+    flow_target_operand: 0
+    flow_call_effects: {stack: -1}
+    bytecode: {value: 0x35, size: 8}
+    operands:
+      count: 1
+      operand_sets: {list: [value]}
+  ijmp:
+    flow_effects: {stack: 0, cycles: 2, writes: 0}
+    flow_transfer: indirect
+    bytecode: {value: 0x33, size: 8}
+  rts:
+    flow_effects: {stack: -2, cycles: 3, writes: 0}
+    flow_terminal:
+      stack: before_effect
+      cycles: after_effect
+      writes: before_effect
+    flow_transfer: return
+    bytecode: {value: 0x69, size: 8}
+macros:
+  push_three:
+    variants:
+      - operands:
+          count: 0
+        instructions:
+          - push
+          - push
+          - push
+  push_seven:
+    variants:
+      - operands:
+          count: 0
+        instructions:
+          - push
+          - push
+          - push
+          - push
+          - push
+          - push
+          - push

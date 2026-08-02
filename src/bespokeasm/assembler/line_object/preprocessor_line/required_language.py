@@ -58,7 +58,9 @@ class RequiredLanguageLine(PreprocessorLine):
             raise ValueError('AssemblerModel is required for RequiredLanguageLine')
 
         # First, check if it's legacy string format (has quotes)
-        require_match = re.search(RequiredLanguageLine.PATTERN_REQUIRE_LANGUAGE, instruction)
+        require_match = RequiredLanguageLine.PATTERN_REQUIRE_LANGUAGE.fullmatch(
+            instruction.strip()
+        )
         if require_match is not None:
             # Handle legacy format
             self._handle_legacy_format(require_match, isa_model, line_id)
@@ -132,6 +134,22 @@ class RequiredLanguageLine(PreprocessorLine):
                 'Use legacy format: #require "language-name >= version" or '
                 'use built-in version symbols: #require __LANGUAGE_VERSION_MAJOR__ >= 1 or '
                 '#require __BESPOKEASM_VERSION__ >= 0.7.2',
+            )
+        if not LanguageVersionEvaluator.is_pure_language_version_expression(expression):
+            isa_model.diagnostic_reporter.error(
+                line_id,
+                '#require only accepts a built-in language/BespokeASM version '
+                'symbol by itself or in one comparison with another built-in '
+                'version symbol or literal',
+            )
+        if LanguageVersionEvaluator.contains_custom_preprocessor_symbols(
+            expression,
+            preprocessor,
+        ):
+            isa_model.diagnostic_reporter.error(
+                line_id,
+                '#require does not accept user-defined preprocessor macros; '
+                'use built-in language/BespokeASM version symbols and literals',
             )
 
         # Evaluate the language version expression

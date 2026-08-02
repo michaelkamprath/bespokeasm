@@ -3,6 +3,7 @@
 ;
 #require __LANGUAGE_NAME__ == slu4-min64x4-asm
 #require __LANGUAGE_VERSION__ >= 1.1.0
+#require __BESPOKEASM_VERSION__ >= 0.8.0
 ; Zero Page Usage
 .memzone ZERO_PAGE_LIBS
 #mute
@@ -29,10 +30,17 @@ _working_mem5:          .zero 5
 ;
 .align
 cstr_reverse:
-    lds 3+0 stz _tmp_Ptr1+1
-    lds 3+1 stz _tmp_Ptr1+0
+#track stack mode=called
+    .arg_strptr := COORDINATE(stack, 3)
+    lds .arg_strptr+0 stz _tmp_Ptr1+1
+    lds .arg_strptr+1 stz _tmp_Ptr1+0
     mvv _tmp_Ptr1,_tmp_Ptr2
     clz _counter
+; The push/pop loops move a runtime-dependent number of bytes (one per string
+; character), so the stack depth at the loop headers has no static value.
+; Suspend tracking across the span; the loops are balanced by _counter, so
+; the depth is known to be back at 0 when they complete.
+#suspend stack
 .push_loop:
     cit 0,_tmp_Ptr1 feq .init_pop_loop
     ldt _tmp_Ptr1 phs
@@ -47,8 +55,9 @@ cstr_reverse:
     dez _counter
     fpa .pop_loop
 .end:
+#resume stack = 0
     rts
-
+#endtrack stack
 
 ; uint32_to_decimal_cstr
 ;
@@ -66,6 +75,10 @@ cstr_reverse:
 ;
 
 uint32_to_decimal_cstr:
+#track stack mode=called
+    .arg_uint32 := COORDINATE(stack, 3)
+    .arg_buffptr := COORDINATE(stack, 7)
+    .arg_buffsize := COORDINATE(stack, 9)
     ; set up working stack:
     ;   little endian
     ;   0 : low word (4 bytes)  --> value
@@ -73,12 +86,12 @@ uint32_to_decimal_cstr:
     ; init carry bit
     clz _carry_bit
     ; init working memory
-    ms4q 3,_working_mem5+0
+    ms4q .arg_uint32,_working_mem5+0
     clz _working_mem5+4
     ; init digit counter
     miz 0,_digit_counter
     ; init buffer pointer
-    ms2v 7,_tmp_Ptr1
+    ms2v .arg_buffptr,_tmp_Ptr1
 .outer_loop:
     ; first check to see if we are done
     ciz 0,_working_mem5+3 bne .greater_than_10
@@ -133,18 +146,18 @@ uint32_to_decimal_cstr:
     ; set null character
     inv _tmp_Ptr1
     mit 0,_tmp_Ptr1
-    ; save charastring endcter position to stack
+    ; save string end character position to stack
     ldz _tmp_Ptr1+0 phs
     ldz _tmp_Ptr1+1 phs
     ; finally need to reverse digits
-    phs2s 7+2               ; get original buffer address
+    phs2s .arg_buffptr                          ; get original buffer address
     jps cstr_reverse
     pls2
     ; write string end position to return buffer address
     ms2v 1,_tmp_Ptr1
     pls2
-    mvs2 _tmp_Ptr1,7
-    ldz _digit_counter sts 9            ; move character count to return size
+    mvs2 _tmp_Ptr1,.arg_buffptr
+    ldz _digit_counter sts .arg_buffsize         ; move character count to return size
     rts
 ; .div_lsl40
 ;
@@ -157,10 +170,15 @@ uint32_to_decimal_cstr:
     rlz _working_mem5+4
     rts
 .err_buffer_size:
+; The error path abandons this call frame and never returns: it hands
+; control to the MinOS prompt. End the tracked region here (the branches
+; arrive at routine-owned depth 0), keeping the inline-string _Print
+; convention -- whose physical fall-through lands in the string data --
+; outside of flow analysis.
+#endtrack stack
     ; print error message
     jps _Print "\nERROR: 32-bit digit conversion overflowed\n\n"
     jpa _Prompt
-
 
 ; print_uint32
 ;   prints the passed unsigned 4 byte integer in decimal format
@@ -170,9 +188,11 @@ uint32_to_decimal_cstr:
 ;
 BUFFER_SIZE = 32
 print_uint32:
+#track stack mode=called
+    .arg_uint32 := COORDINATE(stack, 3)
     phsi BUFFER_SIZE
     phsptr .buffer
-    phs4s (3+3)
+    phs4s .arg_uint32
     jps uint32_to_decimal_cstr
     pls4
     pls2
@@ -180,7 +200,7 @@ print_uint32:
     phs2i .buffer jps _PrintPtr pls2
     rts
 .buffer: .zero BUFFER_SIZE
-
+#endtrack stack
 
 _print_working_memory:
     jps _Print "working mem = "

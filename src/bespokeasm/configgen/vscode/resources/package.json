@@ -57,6 +57,10 @@
       {
         "id": "constant",
         "superType": "variable"
+      },
+      {
+        "id": "flowCoordinate",
+        "superType": "variable"
       }
     ],
     "semanticTokenModifiers": [
@@ -80,6 +84,9 @@
           ],
           "constant.definition": [
             "variable.other.constant.definition"
+          ],
+          "flowCoordinate": [
+            "variable.other.flow.coordinate.usage"
           ]
         }
       }

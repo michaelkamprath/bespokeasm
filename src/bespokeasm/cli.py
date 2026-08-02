@@ -198,6 +198,15 @@ def build_cli(handlers: CommandHandlers):
             default=False,
             help='Treat warnings as errors and stop compilation.'
         )
+    @click.option(
+            '--flow-checks/--no-flow-checks', '-a/-A',
+            default=True,
+            help=(
+                'Enable or disable flow-counter verification and listing annotations '
+                '(enabled by default). Flow values required by emitted bytecode are '
+                'still resolved when checks are disabled.'
+            )
+        )
     def compile(
                 asm_file,
                 config_file,
@@ -213,6 +222,7 @@ def build_cli(handlers: CommandHandlers):
                 include_path,
                 macro_symbol,
                 warnings_as_errors,
+                flow_checks,
             ):
         return handlers.compile(
             asm_file,
@@ -229,6 +239,7 @@ def build_cli(handlers: CommandHandlers):
             include_path,
             macro_symbol,
             warnings_as_errors,
+            flow_checks,
         )
 
     @main.command(cls=OptionForwardingCommand, short_help='generate markdown documentation for an ISA')

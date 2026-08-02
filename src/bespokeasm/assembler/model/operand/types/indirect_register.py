@@ -13,7 +13,7 @@ from .register import RegisterOperand
 
 
 class IndirectRegisterOperand(RegisterOperand):
-    _BASE_PATTERN_TEMPLATE = r'\[\s*({0})\s*(?:(\+|\-)\s*([\s\w\+\-\*\/\&\|\^\(\)\$\%]+)\s*)?\]'
+    _BASE_PATTERN_TEMPLATE = r'\[\s*({0})\s*(?:(\+|\-)\s*([\s\w\.\+\-\*\/\&\|\^\(\)\$\%]+)\s*)?\]'
 
     def __init__(
         self,

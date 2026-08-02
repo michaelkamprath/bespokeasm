@@ -58,6 +58,11 @@ class MarkdownGenerator:
             if operand_sets_section:
                 sections.append(operand_sets_section)
 
+        # Flow counters section
+        flow_counters = getattr(self.doc_model, 'flow_counters', None)
+        if isinstance(flow_counters, list) and flow_counters:
+            sections.append(self._generate_flow_counters_section())
+
         # Instructions section
         if self.doc_model.instruction_docs:
             sections.append(self._generate_instructions_section())
@@ -74,7 +79,86 @@ class MarkdownGenerator:
         if general_examples:
             sections.append(self._generate_examples_section(general_examples))
 
-        return '\n\n'.join(filter(None, sections))
+        content = '\n\n'.join(filter(None, sections))
+        return f'{content}\n' if content else ''
+
+    def _generate_flow_counters_section(self) -> str:
+        """Generate the flow-counter classes and their public contracts."""
+        sections = [
+            '# Flow Counters',
+            (
+                'See [Flow Counters]'
+                '(https://github.com/michaelkamprath/bespokeasm/wiki/'
+                'Assembly-Language-Syntax#flow-counters) '
+                'for the assembly-language syntax and general feature '
+                'documentation.'
+            ),
+        ]
+        for counter in self.doc_model.flow_counters:
+            name = counter['name']
+            title = counter.get('title') or name
+            heading = (
+                f'## {title} (`{name}`)'
+                if title != name
+                else f'## {name}'
+            )
+            counter_sections = [heading]
+            if counter.get('description'):
+                counter_sections.append(str(counter['description']))
+
+            properties = self._generate_markdown_table(
+                ['Property', 'Value'],
+                [
+                    [str(property_name), str(value)]
+                    for property_name, value in counter.get(
+                        'properties',
+                        [],
+                    )
+                ],
+            )
+            if properties:
+                counter_sections.append(properties)
+
+            entry_modes = counter.get('entry_modes', [])
+            if entry_modes:
+                mode_table = self._generate_markdown_table(
+                    [
+                        'Mode',
+                        'Initial Value',
+                        'Exit Value',
+                        'Description',
+                    ],
+                    [
+                        [
+                            f"`{mode['name']}`",
+                            str(mode['init']),
+                            str(mode['exit']),
+                            str(mode.get('description', '')),
+                        ]
+                        for mode in entry_modes
+                    ],
+                )
+                counter_sections.extend(['### Entry Modes', mode_table])
+
+            terminals = counter.get('terminal_instructions', [])
+            if terminals:
+                terminal_table = self._generate_markdown_table(
+                    ['Instruction', 'Reconciliation'],
+                    [
+                        [
+                            f"`{terminal['instruction']}`",
+                            terminal['order'],
+                        ]
+                        for terminal in terminals
+                    ],
+                )
+                counter_sections.extend([
+                    '### Terminal Instructions',
+                    terminal_table,
+                ])
+
+            sections.append('\n\n'.join(counter_sections))
+        return '\n\n'.join(sections)
 
     def generate_instruction_markdown(
         self,
@@ -1192,6 +1276,23 @@ class MarkdownGenerator:
                 table_style=table_style
             ))
 
+        # Effective flow metadata can differ per version. Keep these derived
+        # tables after every hand-authored modifies table so generated rows
+        # never reorder or duplicate authored documentation.
+        if multi_version:
+            for version in versions:
+                flow_modifies = version.get('flow_modifies', [])
+                if not flow_modifies:
+                    continue
+                sections.append(self._generate_modifies_table(
+                    flow_modifies,
+                    table_style=table_style,
+                    heading=(
+                        f"Modifies — Version {version.get('index')} "
+                        'Counter Effects'
+                    ),
+                ))
+
         # Examples
         if instruction_doc.get('examples'):
             sections.append(self._generate_instruction_examples(instruction_doc['examples']))
@@ -1339,12 +1440,17 @@ class MarkdownGenerator:
             return self._generate_ascii_table(headers, rows)
         return self._generate_markdown_table(headers, rows, column_alignments=alignments)
 
-    def _generate_modifies_table(self, modifies: list[dict[str, str]], table_style: str = 'markdown') -> str:
+    def _generate_modifies_table(
+        self,
+        modifies: list[dict[str, str]],
+        table_style: str = 'markdown',
+        heading: str = 'Modifies',
+    ) -> str:
         """Generate a table of what the instruction modifies."""
         if not modifies:
             return ''
 
-        sections = ['#### Modifies']
+        sections = [f'#### {heading}']
 
         # Prepare table data
         headers = ['Type', 'Target', 'Description']

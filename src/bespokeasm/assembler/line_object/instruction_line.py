@@ -1,7 +1,7 @@
 import re
 import sys
 
-from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
+from bespokeasm.assembler.analysis import SourceIdentity
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.assembler.line_object.emdedded_string import EMBEDDED_STRING_PATTERN
@@ -13,6 +13,7 @@ from bespokeasm.assembler.model.decorators import MNEMONIC_TOKEN_PATTERN
 from bespokeasm.assembler.model.decorators import split_decorated_mnemonic
 from bespokeasm.assembler.model.instruction_parser import InstructioParser
 from bespokeasm.assembler.parsing import split_line_comment
+from bespokeasm.assembler.symbol_scope.named_scope_manager import NamedScopeManager
 
 
 class InstructionLine(LineWithWords):
@@ -71,6 +72,7 @@ class InstructionLine(LineWithWords):
             isa_model: AssemblerModel,
             current_memzone: MemoryZone,
             memzone_manager: MemoryZoneManager,
+            source_ordinal: int = 0,
     ) -> LineWithWords | None:
         """Tries to contruct a instruction line object from the passed instruction line"""
         instruction_content, _ = split_line_comment(line_str)
@@ -105,6 +107,7 @@ class InstructionLine(LineWithWords):
                     instruction_str,
                     comment,
                     current_memzone,
+                    source_ordinal,
                 )
             except SystemExit as exc:
                 last_error = exc
@@ -123,6 +126,7 @@ class InstructionLine(LineWithWords):
             instruction: str,
             comment: str,
             current_memzone: MemoryZone,
+            source_ordinal: int = 0,
     ):
         super().__init__(
             line_id, instruction, comment, current_memzone,
@@ -134,8 +138,16 @@ class InstructionLine(LineWithWords):
         self._command = command_str
         self._argument_str = argument_str
         self._isa_model = isa_model
+        source_identity = None
+        if isa_model.analysis_records_enabled:
+            source_identity = SourceIdentity.from_line_id(line_id, source_ordinal)
+            self._source_identity = source_identity
         self._assembled_instruction = InstructioParser.parse_instruction(
-            self._isa_model, line_id, instruction, memzone_manager,
+            self._isa_model,
+            line_id,
+            instruction,
+            memzone_manager,
+            source_identity=source_identity,
         )
 
     def __str__(self):
@@ -150,6 +162,29 @@ class InstructionLine(LineWithWords):
     def has_operand_labels(self) -> bool:
         return self._assembled_instruction.has_operand_labels
 
+    @property
+    def source_identity(self) -> SourceIdentity | None:
+        return getattr(self, '_source_identity', None)
+
+    @property
+    def analysis_records(self):
+        return self._assembled_instruction.analysis_records
+
+    @property
+    def analysis_units(self):
+        """Expose semantic records and flow nodes for each real instruction."""
+        return self._assembled_instruction.analysis_units
+
+    @property
+    def flow_expression_nodes(self):
+        """Expose deferred flow expressions retained by instruction operands."""
+        return self._assembled_instruction.flow_expression_nodes
+
+    @property
+    def flow_candidate_nodes(self):
+        """Expose operand label leaves that may name counter coordinates."""
+        return self._assembled_instruction.flow_candidate_nodes
+
     def get_operand_label_addresses(self) -> list[tuple[str, int]]:
         return self._assembled_instruction.get_operand_label_addresses(self.address)
 
@@ -161,13 +196,13 @@ class InstructionLine(LineWithWords):
                 self.line_id,
                 self.active_named_scopes,
             ):
-                self.label_scope.set_label_value(label, value, self.line_id)
+                self.symbol_scope.set_label_value(label, value, self.line_id)
 
     def generate_words(self) -> bytearray:
         """Finalize the bytes for this line with the label assignemnts"""
         self._words.extend(
             self._assembled_instruction.get_words(
-                self.label_scope,
+                self.symbol_scope,
                 self.active_named_scopes,
                 self.address,
                 self.word_count,

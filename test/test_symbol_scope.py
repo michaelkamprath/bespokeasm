@@ -7,28 +7,29 @@ from collections import defaultdict
 from bespokeasm.assembler.assembly_file import AssemblyFile
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.engine import Assembler
-from bespokeasm.assembler.label_scope import GlobalLabelScope
-from bespokeasm.assembler.label_scope import LabelScope
-from bespokeasm.assembler.label_scope import LabelScopeType
-from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.preprocessor import Preprocessor
+from bespokeasm.assembler.symbol_scope import GlobalSymbolScope
+from bespokeasm.assembler.symbol_scope import SymbolScope
+from bespokeasm.assembler.symbol_scope import SymbolScopeType
+from bespokeasm.assembler.symbol_scope.flow_symbols import CounterCoordinate
+from bespokeasm.assembler.symbol_scope.named_scope_manager import NamedScopeManager
 
 from test import config_files
 from test import test_code
 
 
-class TestLabelScope(unittest.TestCase):
+class TestSymbolScope(unittest.TestCase):
     def setUp(self):
         InstructionLine._INSTRUCTUION_EXTRACTION_PATTERN = None
         self.diagnostic_reporter = DiagnosticReporter()
 
     def test_single_layer_scope(self):
-        ls1 = GlobalLabelScope(set())
+        ls1 = GlobalSymbolScope(set())
 
         ls1.set_label_value('test1', 12, 777)
         ls1.set_label_value('test2', 42, 888)
@@ -40,11 +41,31 @@ class TestLabelScope(unittest.TestCase):
         with self.assertRaises(SystemExit, msg='label cannot be defined multiple times'):
             ls1.set_label_value('test1', 666, 1234)
 
+    def test_symbol_kinds_share_duplicate_definition_namespace(self):
+        line_id = LineIdentifier(1, 'symbols.asm')
+        coordinate = CounterCoordinate(
+            label='slot',
+            value=0,
+            counter_name='stack',
+            counter_instance_id=0,
+            declared_offset=1,
+            line_id=line_id,
+        )
+        coordinate_first = GlobalSymbolScope(set())
+        coordinate_first.set_counter_coordinate(coordinate)
+        with self.assertRaises(SystemExit, msg='label cannot shadow a coordinate'):
+            coordinate_first.set_label_value('slot', 1, line_id)
+
+        label_first = GlobalSymbolScope(set())
+        label_first.set_label_value('slot', 1, line_id)
+        with self.assertRaises(ValueError, msg='coordinate cannot shadow a label'):
+            label_first.set_counter_coordinate(coordinate)
+
     def test_multilayer_scopes(self):
-        ls1 = GlobalLabelScope(set())
-        ls2 = LabelScope(LabelScopeType.FILE, ls1, 'mycode.py')
-        ls3 = LabelScope(LabelScopeType.LOCAL, ls2, 'my_label')
-        ls4 = LabelScope(LabelScopeType.LOCAL, ls2, 'your_label')
+        ls1 = GlobalSymbolScope(set())
+        ls2 = SymbolScope(SymbolScopeType.FILE, ls1, 'mycode.py')
+        ls3 = SymbolScope(SymbolScopeType.LOCAL, ls2, 'my_label')
+        ls4 = SymbolScope(SymbolScopeType.LOCAL, ls2, 'your_label')
 
         ls3.set_label_value('global1', 12, 1)
         ls3.set_label_value('_file1', 24, 2)
@@ -53,7 +74,7 @@ class TestLabelScope(unittest.TestCase):
         ls4.set_label_value('_file2', 14, 5)
         ls4.set_label_value('.local2', 88, 6)
         ls2.set_label_value('_file3', 66, 7)
-        ls1.set_label_value('_required_global', 77, 8, scope=LabelScopeType.GLOBAL)
+        ls1.set_label_value('_required_global', 77, 8, scope=SymbolScopeType.GLOBAL)
 
         self.assertEqual(ls3.get_label_value('global1', 1), 12)
         self.assertEqual(ls2.get_label_value('global1', 2), 12)
@@ -90,9 +111,9 @@ class TestLabelScope(unittest.TestCase):
         )
 
     def test_illegal_labels(self):
-        global_scope = GlobalLabelScope({'a', 'b'})
-        file_scope = LabelScope(LabelScopeType.FILE, global_scope, 'mycode.py')
-        local_scope = LabelScope(LabelScopeType.LOCAL, file_scope, 'my_label')
+        global_scope = GlobalSymbolScope({'a', 'b'})
+        file_scope = SymbolScope(SymbolScopeType.FILE, global_scope, 'mycode.py')
+        local_scope = SymbolScope(SymbolScopeType.LOCAL, file_scope, 'my_label')
         lineid = LineIdentifier(42, 'test_illegal_labels')
 
         local_scope.set_label_value('var1', 12, lineid)
@@ -117,7 +138,7 @@ class TestLabelScope(unittest.TestCase):
     def test_line_object_scope_assignment(self):
         fp = pkg_resources.files(config_files).joinpath('test_memory_zones.yaml')
         isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
-        label_scope = GlobalLabelScope(isa_model.registers)
+        symbol_scope = GlobalSymbolScope(isa_model.registers)
         memzone_manager = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -126,7 +147,7 @@ class TestLabelScope(unittest.TestCase):
         preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
         named_scope_manager = NamedScopeManager(self.diagnostic_reporter)
         asm_fp = pkg_resources.files(test_code).joinpath('test_line_object_scope_assignment.asm')
-        asm_obj = AssemblyFile(asm_fp, label_scope, named_scope_manager, named_scope_manager.diagnostic_reporter)
+        asm_obj = AssemblyFile(asm_fp, symbol_scope, named_scope_manager, named_scope_manager.diagnostic_reporter)
 
         try:
             line_objs: list[LineObject] = asm_obj.load_line_objects(
@@ -146,33 +167,33 @@ class TestLabelScope(unittest.TestCase):
         # the memzone manager should have created memzone
         self.assertIsNotNone(memzone_manager.zone('zone1'), 'zone1 memory zone should exist')
         # label scope should have 1 file and 3 local scopes assigned to lines
-        label_scope_dict: dict[LabelScopeType, set[LabelScope]] = defaultdict(set)
+        symbol_scope_dict: dict[SymbolScopeType, set[SymbolScope]] = defaultdict(set)
         for lo in line_objs:
-            label_scope_dict[lo.label_scope.type].add(lo.label_scope)
-        self.assertEqual(len(label_scope_dict[LabelScopeType.GLOBAL]), 0, '0 global label scope assigned to lines')
-        self.assertEqual(len(label_scope_dict[LabelScopeType.FILE]), 1, '1 file label scope')
-        self.assertEqual(len(label_scope_dict[LabelScopeType.LOCAL]), 3, '3 local label scopes')
+            symbol_scope_dict[lo.symbol_scope.type].add(lo.symbol_scope)
+        self.assertEqual(len(symbol_scope_dict[SymbolScopeType.GLOBAL]), 0, '0 global label scope assigned to lines')
+        self.assertEqual(len(symbol_scope_dict[SymbolScopeType.FILE]), 1, '1 file label scope')
+        self.assertEqual(len(symbol_scope_dict[SymbolScopeType.LOCAL]), 3, '3 local label scopes')
         # validate each line's label scope
-        self.assertEqual(line_objs[0].label_scope.type, LabelScopeType.FILE)
-        self.assertEqual(line_objs[1].label_scope.type, LabelScopeType.FILE)
-        self.assertEqual(line_objs[2].label_scope.type, LabelScopeType.LOCAL)
-        self.assertEqual(line_objs[2].label_scope.reference, 'label1')
-        self.assertEqual(line_objs[3].label_scope.type, LabelScopeType.LOCAL)
-        self.assertEqual(line_objs[3].label_scope.reference, 'label1')
-        self.assertEqual(line_objs[4].label_scope.type, LabelScopeType.LOCAL)
-        self.assertEqual(line_objs[4].label_scope.reference, 'label1')
-        self.assertEqual(line_objs[5].label_scope.type, LabelScopeType.LOCAL)
-        self.assertEqual(line_objs[5].label_scope.reference, 'label2')
-        self.assertEqual(line_objs[6].label_scope.type, LabelScopeType.LOCAL)
-        self.assertEqual(line_objs[6].label_scope.reference, 'label2')
-        self.assertEqual(line_objs[7].label_scope.type, LabelScopeType.FILE, '.org should reset label scope to FILE')
-        self.assertEqual(line_objs[8].label_scope.type, LabelScopeType.FILE)
-        self.assertEqual(line_objs[9].label_scope.type, LabelScopeType.LOCAL)
-        self.assertEqual(line_objs[9].label_scope.reference, 'label3')
-        self.assertEqual(line_objs[10].label_scope.type, LabelScopeType.LOCAL)
-        self.assertEqual(line_objs[10].label_scope.reference, 'label3')
-        self.assertEqual(line_objs[11].label_scope.type, LabelScopeType.FILE, '.memzone should reset label scope to FILE')
-        self.assertEqual(line_objs[12].label_scope.type, LabelScopeType.FILE)
+        self.assertEqual(line_objs[0].symbol_scope.type, SymbolScopeType.FILE)
+        self.assertEqual(line_objs[1].symbol_scope.type, SymbolScopeType.FILE)
+        self.assertEqual(line_objs[2].symbol_scope.type, SymbolScopeType.LOCAL)
+        self.assertEqual(line_objs[2].symbol_scope.reference, 'label1')
+        self.assertEqual(line_objs[3].symbol_scope.type, SymbolScopeType.LOCAL)
+        self.assertEqual(line_objs[3].symbol_scope.reference, 'label1')
+        self.assertEqual(line_objs[4].symbol_scope.type, SymbolScopeType.LOCAL)
+        self.assertEqual(line_objs[4].symbol_scope.reference, 'label1')
+        self.assertEqual(line_objs[5].symbol_scope.type, SymbolScopeType.LOCAL)
+        self.assertEqual(line_objs[5].symbol_scope.reference, 'label2')
+        self.assertEqual(line_objs[6].symbol_scope.type, SymbolScopeType.LOCAL)
+        self.assertEqual(line_objs[6].symbol_scope.reference, 'label2')
+        self.assertEqual(line_objs[7].symbol_scope.type, SymbolScopeType.FILE, '.org should reset label scope to FILE')
+        self.assertEqual(line_objs[8].symbol_scope.type, SymbolScopeType.FILE)
+        self.assertEqual(line_objs[9].symbol_scope.type, SymbolScopeType.LOCAL)
+        self.assertEqual(line_objs[9].symbol_scope.reference, 'label3')
+        self.assertEqual(line_objs[10].symbol_scope.type, SymbolScopeType.LOCAL)
+        self.assertEqual(line_objs[10].symbol_scope.reference, 'label3')
+        self.assertEqual(line_objs[11].symbol_scope.type, SymbolScopeType.FILE, '.memzone should reset label scope to FILE')
+        self.assertEqual(line_objs[12].symbol_scope.type, SymbolScopeType.FILE)
 
     def test_local_label_before_any_non_local_is_error(self):
         """Doc: Labels > Label Scope > Local - locals cannot appear before first non-local label."""

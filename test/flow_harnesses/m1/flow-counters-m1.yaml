@@ -1,0 +1,57 @@
+description: Flow analysis M1 development acceptance harness
+general:
+  min_version: "0.8.0"
+  address_size: 8
+  multi_word_endian: little
+  identifier:
+    name: flow-analysis-m1
+    version: "0.1.0"
+flow_counters:
+  stack:
+    min_value: 0
+    max_value: 2
+    unknown_instructions: error
+    default_init: 0
+    exit_policy: balanced
+operand_sets:
+  depth:
+    operand_values:
+      immediate:
+        type: numeric
+        argument:
+          size: 8
+          word_align: true
+instructions:
+  push:
+    flow_effects:
+      stack: 1
+    flow_transfer: none
+    bytecode:
+      value: 0x10
+      size: 8
+  pop:
+    flow_effects:
+      stack: -1
+    flow_transfer: none
+    bytecode:
+      value: 0x11
+      size: 8
+  depth:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    bytecode:
+      value: 0x80
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - depth
+  nop:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    bytecode:
+      value: 0
+      size: 8

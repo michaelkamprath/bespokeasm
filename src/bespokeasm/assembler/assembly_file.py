@@ -4,19 +4,16 @@
 # assembly file that is loaded. It is responsible for:
 #
 #    * providing a list of lines
-#    * having a single file label scope
+#    * having a single file symbol scope
 from __future__ import annotations
 
 import os
 import re
 
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
-from bespokeasm.assembler.label_scope import LabelScope
-from bespokeasm.assembler.label_scope import LabelScopeType
-from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
-from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
+from bespokeasm.assembler.line_object.counter_coordinate_line import CounterCoordinateLine
 from bespokeasm.assembler.line_object.directive_line.address import AddressOrgLine
 from bespokeasm.assembler.line_object.directive_line.factory import SetMemoryZoneLine
 from bespokeasm.assembler.line_object.factory import LineOjectFactory
@@ -32,13 +29,17 @@ from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.parsing import split_line_comment
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
+from bespokeasm.assembler.symbol_scope import SymbolScope
+from bespokeasm.assembler.symbol_scope import SymbolScopeType
+from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
+from bespokeasm.assembler.symbol_scope.named_scope_manager import NamedScopeManager
 
 
 class AssemblyFile:
     def __init__(
                 self,
                 filename: str,
-                parent_label_scope: LabelScope,
+                parent_symbol_scope: SymbolScope,
                 named_scope_manager: NamedScopeManager,
                 diagnostic_reporter: DiagnosticReporter,
             ) -> None:
@@ -49,9 +50,9 @@ class AssemblyFile:
         self._diagnostic_reporter = diagnostic_reporter
         self._used_named_scopes: list[tuple[str, LineIdentifier]] = []
         self._defined_named_scopes: set[str] = set()
-        self._label_scope = LabelScope(
-                LabelScopeType.FILE,
-                parent_label_scope,
+        self._symbol_scope = SymbolScope(
+                SymbolScopeType.FILE,
+                parent_symbol_scope,
                 self._filename,
             )
 
@@ -60,8 +61,8 @@ class AssemblyFile:
         return self._filename
 
     @property
-    def label_scope(self) -> LabelScope:
-        return self._label_scope
+    def symbol_scope(self) -> SymbolScope:
+        return self._symbol_scope
 
     def load_line_objects(
                 self,
@@ -78,7 +79,7 @@ class AssemblyFile:
             with open(self.filename) as f:
                 assembly_files_used.add(self.filename)
                 line_num = 0
-                current_scope = self.label_scope
+                current_scope = self.symbol_scope
                 current_memzone = memzone_manager.global_zone
                 condition_stack = ConditionStack(self._diagnostic_reporter)
                 active_named_scopes = ActiveNamedScopeList(self._named_scope_manager)
@@ -161,9 +162,9 @@ class AssemblyFile:
                                         )
                                 if isinstance(lobj, LabelLine):
                                     if not lobj.is_constant \
-                                            and LabelScopeType.get_label_scope(lobj.get_label()) != LabelScopeType.LOCAL:
-                                        current_scope = LabelScope(LabelScopeType.LOCAL, self.label_scope, lobj.get_label())
-                                # both .org and .memzone directive should reset label scope to FILE and current memzone
+                                            and SymbolScopeType.get_symbol_scope(lobj.get_label()) != SymbolScopeType.LOCAL:
+                                        current_scope = SymbolScope(SymbolScopeType.LOCAL, self.symbol_scope, lobj.get_label())
+                                # Both .org and .memzone reset symbol scope to FILE.
                                 elif isinstance(lobj, SetMemoryZoneLine):
                                     if (
                                         isinstance(lobj, AddressOrgLine)
@@ -175,15 +176,29 @@ class AssemblyFile:
                                             f'.org without a memzone name uses an absolute address; '
                                             f'current memzone is "{current_memzone.name}"',
                                         )
-                                    current_scope = self.label_scope
+                                    current_scope = self.symbol_scope
                                     current_memzone = lobj.memory_zone
                                 elif isinstance(lobj, UseScopeLine) or isinstance(lobj, CreateScopeLine):
                                     active_named_scopes.activate_named_scope(lobj.scope_name)
                                 elif isinstance(lobj, DeactivateScopeLine):
                                     active_named_scopes.deactivate_named_scope(lobj.scope_name)
-                                lobj.label_scope = current_scope
+                                lobj.symbol_scope = current_scope
                                 lobj.active_named_scopes = active_named_scopes
                                 lobj.diagnostic_reporter = self._diagnostic_reporter
+                                if isinstance(lobj, CounterCoordinateLine):
+                                    if not isa_model.flow_counters_enabled:
+                                        self._diagnostic_reporter.error(
+                                            lobj.line_id,
+                                            'this instruction set does not enable flow counters',
+                                            category='flow',
+                                        )
+                                elif lobj.flow_expression_nodes:
+                                    if not isa_model.flow_counters_enabled:
+                                        self._diagnostic_reporter.error(
+                                            lobj.line_id,
+                                            'this instruction set does not enable flow counters',
+                                            category='flow',
+                                        )
                                 # setting constants now so they can be used when evaluating lines later.
                                 if isinstance(lobj, LabelLine) and lobj.is_constant:
                                     # first check if label belongs to an active named scope
@@ -195,7 +210,7 @@ class AssemblyFile:
                                         is_constant=True
                                     ):
                                         # if not in an active named scope, set to the current scope
-                                        lobj.label_scope.set_label_value(lobj.get_label(), lobj.get_value(), lobj.line_id)
+                                        lobj.symbol_scope.set_label_value(lobj.get_label(), lobj.get_value(), lobj.line_id)
                             line_objects.append(lobj)
         except FileNotFoundError:
             self._diagnostic_reporter.error(
@@ -249,7 +264,7 @@ class AssemblyFile:
                 )
             file_obj = AssemblyFile(
                 new_filepath,
-                self.label_scope.parent,
+                self.symbol_scope.parent,
                 self._named_scope_manager,
                 self._diagnostic_reporter,
             )

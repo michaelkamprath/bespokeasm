@@ -1,11 +1,11 @@
 import re
 import sys
 
-from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.assembler.symbol_scope.named_scope_manager import NamedScopeManager
 
 
 class CreateScopeLine(PreprocessorLine):

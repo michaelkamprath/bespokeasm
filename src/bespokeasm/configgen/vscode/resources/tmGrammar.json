@@ -23,7 +23,115 @@
           "name": "keyword.operator.assignment"
         }
       },
-      "match": "^\\s*(\\w*)(?:\\s*)?(\\=|EQU)"
+      "match": "^\\s*(##CONSTANT_PATTERN##)(?:\\s*)?(\\=|EQU)"
+    },
+    "counter_coordinates": {
+      "captures": {
+        "1": {
+          "name": "variable.other.flow.coordinate variable.other.flow.coordinate.definition"
+        },
+        "2": {
+          "name": "keyword.operator.assignment"
+        }
+      },
+      "match": "^\\s*(##SYMBOL_PATTERN##)\\s*(:=)"
+    },
+    "flow_counter_usages": {
+      "begin": "(?i)\\b(COORDINATE|COUNTER)(\\s*)(\\()(\\s*)(##SYMBOL_PATTERN##)",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.operator.flow"
+        },
+        "3": {
+          "name": "punctuation.section.parens.begin"
+        },
+        "5": {
+          "name": "variable.other.flow.counter variable.other.flow.counter.usage"
+        }
+      },
+      "contentName": "expression.group",
+      "end": "\\)",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.section.parens.end"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#numeric-values"
+        },
+        {
+          "include": "#operand_label_definitions"
+        },
+        {
+          "include": "#compiler_labels"
+        },
+        {
+          "include": "#label_usages"
+        },
+        {
+          "include": "#operands_variables"
+        },
+        {
+          "include": "#operators"
+        },
+        {
+          "include": "#expressions"
+        },
+        {
+          "match": ",",
+          "name": "punctuation.separator"
+        }
+      ]
+    },
+    "flow_counter_directives": {
+      "patterns": [
+        {
+          "captures": {
+            "1": {
+              "name": "keyword.control.preprocessor"
+            },
+            "3": {
+              "name": "variable.other.flow.counter"
+            }
+          },
+          "match": "(?i)\\b(track)(\\s+)(##SYMBOL_PATTERN##)"
+        },
+        {
+          "captures": {
+            "1": {
+              "name": "keyword.other.flow.parameter"
+            },
+            "3": {
+              "name": "variable.other.flow.counter"
+            }
+          },
+          "match": "(?i)\\b(as|mode)(\\s*=\\s*)(##SYMBOL_PATTERN##)"
+        },
+        {
+          "captures": {
+            "1": {
+              "name": "keyword.other.flow.parameter"
+            }
+          },
+          "match": "(?i)\\b(init|exit|min|max)(\\s*=)"
+        },
+        {
+          "captures": {
+            "1": {
+              "name": "keyword.control.preprocessor"
+            },
+            "3": {
+              "name": "variable.other.flow.counter variable.other.flow.counter.usage"
+            }
+          },
+          "match": "(?i)\\b(endtrack|entry|resume|set|suspend)(\\s+)(##SYMBOL_PATTERN##)"
+        }
+      ]
+    },
+    "flow_operators": {
+      "match": "(?i)\\b(?:COORDINATE|COUNTER)\\b",
+      "name": "keyword.operator.flow"
     },
     "deferred-addressing": {
       "begin": "(?<!\\[)([\\[]{2})\\b",
@@ -107,7 +215,7 @@
           "name": "storage.type"
         },
         {
-          "begin": "^(\\#)",
+          "begin": "^\\s*(\\#)",
           "beginCaptures": {
             "1": {
               "name": "punctuation.definition.preprocessor"
@@ -116,6 +224,9 @@
           "end": "(?=(?:\\s*\\;|\\s*$))",
           "name": "meta.preprocessor",
           "patterns": [
+            {
+              "include": "#flow_counter_directives"
+            },
             {
               "match": "(?<=\\#)(?:##PREPROCESSOR##)\\b",
               "name": "keyword.control.preprocessor"
@@ -280,7 +391,7 @@
               "name": "punctuation.definition.variable.colon.label"
             }
           },
-          "match": "([a-zA-Z]{1}[\\w\\d_]*)(\\:)"
+          "match": "^\\s*(##GLOBAL_SYMBOL_PATTERN##)\\s*(\\:)"
         },
         {
           "captures": {
@@ -291,7 +402,7 @@
               "name": "punctuation.definition.variable.colon.label"
             }
           },
-          "match": "(\\.{1}[\\w\\d_]*)(\\:)"
+          "match": "^\\s*(##LOCAL_SYMBOL_PATTERN##)\\s*(\\:)"
         },
         {
           "captures": {
@@ -302,22 +413,22 @@
               "name": "punctuation.definition.variable.colon.label"
             }
           },
-          "match": "(_{1}[\\w\\d_]*)(\\:)"
+          "match": "^\\s*(##FILE_SYMBOL_PATTERN##)\\s*(\\:)"
         }
       ]
     },
     "label_usages": {
       "patterns": [
         {
-          "match": "\\b[a-zA-Z][\\w\\d_]*\\b",
+          "match": "(?<![.\\w])##GLOBAL_SYMBOL_PATTERN##(?!\\w)",
           "name": "variable.other.label.usage"
         },
         {
-          "match": "\\.[\\w\\d_]+\\b",
+          "match": "(?<!\\w)##LOCAL_SYMBOL_PATTERN##(?!\\w)",
           "name": "variable.other.label.usage"
         },
         {
-          "match": "_[\\w\\d_]+\\b",
+          "match": "(?<!\\w)##FILE_SYMBOL_PATTERN##(?!\\w)",
           "name": "variable.other.label.usage"
         }
       ]
@@ -386,6 +497,9 @@
     "main": {
       "patterns": [
         {
+          "include": "#counter_coordinates"
+        },
+        {
           "include": "#instructions"
         },
         {
@@ -453,11 +567,17 @@
       ]
     },
     "operands_variables": {
-      "match": "(?<!\\w)([A-Za-z][\\w\\d_]*)\\b",
+      "match": "(?<![.\\w])(##GLOBAL_SYMBOL_PATTERN##)(?!\\w)",
       "name": "variable.parameter.instruction"
     },
     "operators": {
       "patterns": [
+        {
+          "include": "#flow_counter_usages"
+        },
+        {
+          "include": "#flow_operators"
+        },
         {
           "match": "[\\+\\-\\*\\/]{1}",
           "name": "keyword.operator.arithmetic"
@@ -475,7 +595,7 @@
           "name": "keyword.operator.word"
         },
         {
-          "match": "(?:==|!=|>|>=|<|<=)",
+          "match": "(?:==|!=|>=|>|<=|<)",
           "name": "keyword.operator.comparison"
         }
       ]

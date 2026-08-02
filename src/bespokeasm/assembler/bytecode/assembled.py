@@ -2,11 +2,13 @@ import math
 from dataclasses import dataclass
 from typing import Literal
 
+from bespokeasm.assembler.analysis import InstructionAnalysisRecord
 from bespokeasm.assembler.bytecode.parts import ByteCodePart
 from bespokeasm.assembler.bytecode.word import Word
-from bespokeasm.assembler.label_scope import LabelScope
-from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.symbol_scope import SymbolScope
+from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
+from bespokeasm.expression import ExpressionNode
 
 
 class AssembledInstruction:
@@ -24,6 +26,7 @@ class AssembledInstruction:
         multi_word_endian: Literal['little', 'big'],
         intra_word_endian: Literal['little', 'big'],
         operand_label_bindings: list[tuple[str, ByteCodePart]] | None = None,
+        analysis_record: InstructionAnalysisRecord | None = None,
     ):
         self._parts = parts
         self._line_id = line_id
@@ -35,6 +38,8 @@ class AssembledInstruction:
             AssembledInstruction.OperandLabelBinding(label, part)
             for label, part in (operand_label_bindings or [])
         ]
+        if analysis_record is not None:
+            self._analysis_record = analysis_record
         # calculate word count
         total_bits = 0
         for bcp in self._parts:
@@ -62,6 +67,59 @@ class AssembledInstruction:
     @property
     def parts(self):
         return self._parts
+
+    @property
+    def analysis_record(self) -> InstructionAnalysisRecord | None:
+        return getattr(self, '_analysis_record', None)
+
+    @property
+    def analysis_records(self) -> tuple[InstructionAnalysisRecord, ...]:
+        analysis_record = self.analysis_record
+        if analysis_record is None:
+            return ()
+        return (analysis_record,)
+
+    @property
+    def flow_expression_nodes(self) -> tuple[ExpressionNode, ...]:
+        """Return deferred flow nodes retained by emitted expression parts.
+
+        Top-level parts are exhaustive here because CompositeByteCodePart is
+        only ever built from fixed opcode/register-selector bits, never from
+        expression-bearing parts; an operand type that changes that must make
+        this walk (and the flow-usage gating scan built on it) recursive.
+        """
+        return tuple(
+            node
+            for part in self._parts
+            if hasattr(part, 'parsed_expression')
+            for node in part.parsed_expression.deferred_flow_nodes()
+        )
+
+    @property
+    def flow_candidate_nodes(self) -> tuple[ExpressionNode, ...]:
+        """Return operand label leaves that may name counter coordinates."""
+        return tuple(
+            node
+            for part in self._parts
+            if hasattr(part, 'parsed_expression')
+            for node in part.parsed_expression.coordinate_candidate_nodes()
+        )
+
+    @property
+    def analysis_units(self) -> tuple:
+        """Pair this instruction's semantic record with its live expression nodes.
+
+        Coordinate candidates ride along with the definite flow nodes so the
+        analysis pass can settle bare coordinate references; they carry no
+        flow-usage signal on their own.
+        """
+        analysis_record = self.analysis_record
+        if analysis_record is None:
+            return ()
+        return ((
+            analysis_record,
+            self.flow_expression_nodes + self.flow_candidate_nodes,
+        ),)
 
     @property
     def has_operand_labels(self) -> bool:
@@ -108,7 +166,7 @@ class AssembledInstruction:
 
     def get_words(
             self,
-            label_scope: LabelScope,
+            symbol_scope: SymbolScope,
             active_named_scopes: ActiveNamedScopeList,
             instruction_address: int,
             instruction_size: int,
@@ -116,7 +174,7 @@ class AssembledInstruction:
         '''
         Returns a list of words that represent the assembled instruction.
 
-        :param label_scope: The label scope to use for resolving label values.
+        :param symbol_scope: The lexical symbol scope used to resolve label values.
         :param instruction_address: The address of the instruction.
         :param instruction_size: The size of the instruction in words.
         :returns: A list of words that represent the assembled instruction.
@@ -126,7 +184,7 @@ class AssembledInstruction:
             word_size=self._word_size,
             segment_size=self._segment_size,
             multi_word_endianness=self._multi_word_endian,
-            label_scope=label_scope,
+            symbol_scope=symbol_scope,
             active_named_scopes=active_named_scopes,
             instruction_address=instruction_address,
             instruction_size=instruction_size,
@@ -155,3 +213,20 @@ class CompositeAssembledInstruction(AssembledInstruction):
     @property
     def instructions(self):
         return self._instructions
+
+    @property
+    def analysis_records(self) -> tuple[InstructionAnalysisRecord, ...]:
+        return tuple(
+            record
+            for instruction in self._instructions
+            for record in instruction.analysis_records
+        )
+
+    @property
+    def analysis_units(self) -> tuple:
+        """Flatten analysis units from each real macro constituent in order."""
+        return tuple(
+            unit
+            for instruction in self._instructions
+            for unit in instruction.analysis_units
+        )

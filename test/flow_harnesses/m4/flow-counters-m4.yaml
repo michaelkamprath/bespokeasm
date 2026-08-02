@@ -1,0 +1,102 @@
+description: Flow analysis M4 development acceptance harness
+general:
+  min_version: "0.8.0"
+  address_size: 8
+  multi_word_endian: little
+  identifier:
+    name: flow-analysis-m4
+    version: "0.4.0"
+flow_counters:
+  stack:
+    min_value: 0
+    max_value: 32
+    unknown_instructions: error
+    default_init: 0
+    exit_policy: balanced
+    coordinate_offsets: positive
+    allow_zero_offset: true
+    entry_modes:
+      called:
+        init: 0
+        exit: 0
+  cycles:
+    source: documentation.cycles
+    min_value: 0
+    unknown_instructions: error
+    default_init: 0
+    exit_policy: none
+operand_sets:
+  value:
+    operand_values:
+      immediate:
+        type: numeric
+        argument:
+          size: 8
+          word_align: true
+instructions:
+  push:
+    flow_effects:
+      stack: 1
+    flow_transfer: none
+    documentation:
+      cycles: 2
+    bytecode:
+      value: 0x10
+      size: 8
+  pop:
+    flow_effects:
+      stack: -1
+    flow_transfer: none
+    documentation:
+      cycles: 2
+    bytecode:
+      value: 0x11
+      size: 8
+  nop:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    documentation:
+      cycles: 1
+    bytecode:
+      value: 0
+      size: 8
+  depth:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    documentation:
+      cycles: 1
+    bytecode:
+      value: 0x20
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - value
+  lds:
+    flow_effects:
+      stack: 0
+    flow_transfer: none
+    documentation:
+      cycles: 1
+    bytecode:
+      value: 0x20
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - value
+  rts:
+    flow_effects:
+      stack: -2
+    flow_terminal:
+      stack: before_effect
+    flow_transfer: return
+    documentation:
+      cycles: 3
+    bytecode:
+      value: 0x69
+      size: 8

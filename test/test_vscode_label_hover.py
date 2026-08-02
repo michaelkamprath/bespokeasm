@@ -42,7 +42,9 @@ class TestVSCodeLabelHover(unittest.TestCase):
             encoding='utf-8'
         )
         constants_helper_path.write_text(
-            (helper_path.parent / 'constants_hover.js').read_text().replace('##LABEL_PATTERN##', label_pattern),
+            (helper_path.parent / 'constants_hover.js').read_text()
+            .replace('##LABEL_PATTERN##', label_pattern)
+            .replace('##CONSTANT_PATTERN##', label_pattern),
             encoding='utf-8'
         )
 
@@ -50,6 +52,10 @@ class TestVSCodeLabelHover(unittest.TestCase):
 const helper = require('{label_helper_path.as_posix()}');
 const constants = require('{constants_helper_path.as_posix()}');
 const lines = ['start:', '  jmp start', '.local:', '  jmp .local', '_file:', '  jmp _file'];
+const coordLine = '_arg_dividend := COORDINATE(stack, 3)';
+const coordDefs = helper.findLabelDefinitions(coordLine);
+const coordMap = helper.buildLabelDefinitionMap(lines.concat([coordLine]));
+const coordLoc = helper.getLabelLocation(coordMap, '_arg_dividend') || null;
 const map = helper.buildLabelDefinitionMap(lines);
 const start = helper.getLabelLocation(map, 'start');
 const usage = helper.isDefinitionAtLocation(map, 'start', 0, start.character);
@@ -101,7 +107,9 @@ console.log(JSON.stringify({{
   secondLoc,
   firstIsDef,
   secondIsDef,
-  opDefs
+  opDefs,
+  coordDefs,
+  coordLoc
 }}));
 """
         result = subprocess.run(
@@ -130,6 +138,10 @@ console.log(JSON.stringify({{
         self.assertTrue(payload['firstIsDef'])
         self.assertTrue(payload['secondIsDef'])
         self.assertEqual([item['name'] for item in payload['opDefs']], ['first', 'second'])
+        # a flow-coordinate `:=` definition is not a label definition, so
+        # semantic tokens never override its flow-coordinate scope
+        self.assertEqual(payload['coordDefs'], [])
+        self.assertIsNone(payload['coordLoc'])
         self.assertEqual(payload['opDefs'][0]['character'], payload['firstLoc']['character'])
         self.assertEqual(payload['opDefs'][1]['character'], payload['secondLoc']['character'])
         shutil.rmtree(temp_dir)
@@ -214,7 +226,9 @@ console.log(JSON.stringify({{
             encoding='utf-8'
         )
         (temp_path / 'constants_hover.js').write_text(
-            constants_helper_path.read_text().replace('##LABEL_PATTERN##', label_pattern),
+            constants_helper_path.read_text()
+            .replace('##LABEL_PATTERN##', label_pattern)
+            .replace('##CONSTANT_PATTERN##', label_pattern),
             encoding='utf-8'
         )
         shutil.copy(str(include_files_path), str(temp_path / 'include_files.js'))
@@ -222,6 +236,7 @@ console.log(JSON.stringify({{
         # Read extension.js and extract just the functions we need
         ext_src = extension_path.read_text()
         ext_src = ext_src.replace('##LABEL_PATTERN##', label_pattern)
+        ext_src = ext_src.replace('##CONSTANT_PATTERN##', label_pattern)
         ext_src = ext_src.replace('##MNEMONIC_PATTERN##', r'\bLDA\b|\bJMP\b|\bNOP\b')
         ext_src = ext_src.replace('##REGISTERS##', r'\ba\b|\bb\b')
 
@@ -268,8 +283,9 @@ m.require = function(id) {{
 }};
 
 const extSource = fs.readFileSync('{extension_path.as_posix()}', 'utf8')
-  .replace(/##LABEL_PATTERN##/g, '{label_pattern}')
-  .replace(/##MNEMONIC_PATTERN##/g, '\\\\bLDA\\\\b|\\\\bJMP\\\\b|\\\\bNOP\\\\b')
+      .replace(/##LABEL_PATTERN##/g, '{label_pattern}')
+      .replace(/##CONSTANT_PATTERN##/g, '{label_pattern}')
+      .replace(/##MNEMONIC_PATTERN##/g, '\\\\bLDA\\\\b|\\\\bJMP\\\\b|\\\\bNOP\\\\b')
   .replace(/##REGISTERS##/g, '\\\\ba\\\\b|\\\\bb\\\\b');
 m._compile(extSource, 'extension.js');
 

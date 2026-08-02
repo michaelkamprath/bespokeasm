@@ -1,13 +1,14 @@
 from typing import Literal
 
 from bespokeasm.assembler.bytecode.word import Word
-from bespokeasm.assembler.label_scope import LabelScope
-from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone import MemoryZone
+from bespokeasm.assembler.symbol_scope import SymbolScope
+from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.expression import EXPRESSION_PARTS_PATTERN
+from bespokeasm.utilities import PATTERN_SYMBOL
 
-PATTERN_LABEL_DEFINITION = r'\s*(?:\.?\w+:)'
+PATTERN_LABEL_DEFINITION = fr'\s*(?:{PATTERN_SYMBOL}:)'
 INSTRUCTION_EXPRESSION_PATTERN = r'(?:{}|(?:[ \t]*)(?!(?:[ \t]*\;|[ \t]*\v)|{}))+'.format(
     EXPRESSION_PARTS_PATTERN,
     PATTERN_LABEL_DEFINITION,
@@ -20,12 +21,14 @@ class LineObject:
         self._instruction = instruction.strip()
         self._comment = comment.strip()
         self._address = None
-        self._label_scope = None
+        self._symbol_scope = None
         self._memzone = memzone
         self._compilable = True
         self._is_muted = False
         self._active_named_scopes = None
         self._diagnostic_reporter = None
+        self._flow_observations: list[tuple[str, str]] = []
+        self._flow_transitions: list[tuple[tuple[str, str, str], ...]] = []
 
     def __repr__(self):
         return str(self)
@@ -71,12 +74,12 @@ class LineObject:
         return self._comment
 
     @property
-    def label_scope(self) -> LabelScope:
-        return self._label_scope
+    def symbol_scope(self) -> SymbolScope:
+        return self._symbol_scope
 
-    @label_scope.setter
-    def label_scope(self, value):
-        self._label_scope = value
+    @symbol_scope.setter
+    def symbol_scope(self, value):
+        self._symbol_scope = value
 
     @property
     def active_named_scopes(self) -> ActiveNamedScopeList:
@@ -119,6 +122,68 @@ class LineObject:
     def is_muted(self, value: bool):
         """Sets the muted state of this line object"""
         self._is_muted = value
+
+    @property
+    def flow_expression_nodes(self) -> tuple:
+        """Flow-expression nodes emitted or consumed by this source object."""
+        return ()
+
+    @property
+    def flow_candidate_nodes(self) -> tuple:
+        """Label leaves that may reference counter coordinates.
+
+        Unlike ``flow_expression_nodes``, a non-empty result carries no
+        flow-usage signal: candidacy is settled by scope lookup during the
+        analysis pass, and non-coordinate labels resolve as ordinary symbols.
+        """
+        return ()
+
+    def record_flow_transition(
+        self,
+        before: dict[str, object],
+        after: dict[str, object],
+    ) -> None:
+        """Record changed flow values for one path through this source line."""
+        transition = tuple(
+            (
+                name,
+                str(before[name]) if name in before else 'entry',
+                str(after[name]) if name in after else 'exit',
+            )
+            for name in sorted(before.keys() | after.keys())
+            if (
+                name not in before
+                or name not in after
+                or before[name] != after[name]
+            )
+        )
+        if transition and transition not in self._flow_transitions:
+            self._flow_transitions.append(transition)
+
+    def record_flow_observation(self, name: str, value: object) -> None:
+        """Record a flow-derived value evaluated on this source line."""
+        observation = (name, str(value))
+        if observation not in self._flow_observations:
+            self._flow_observations.append(observation)
+
+    @property
+    def flow_annotation_lines(self) -> tuple[str, ...]:
+        """Return one printable row for each observed or changed flow value."""
+        observations = tuple(
+            f'{name}={value}'
+            for name, value in self._flow_observations
+        )
+        transitions = tuple(
+            f'{name}={before} → {after}'
+            for transition in self._flow_transitions
+            for name, before, after in transition
+        )
+        return observations + transitions
+
+    @property
+    def flow_annotation(self) -> str:
+        """Return a compact single-string representation of flow annotations."""
+        return ' | '.join(self.flow_annotation_lines)
 
 
 class LineWithWords(LineObject):

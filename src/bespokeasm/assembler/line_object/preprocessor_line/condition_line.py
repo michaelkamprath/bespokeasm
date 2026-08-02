@@ -40,6 +40,18 @@ class ConditionLine(PreprocessorLine):
         else:
             raise ValueError(f'Invalid condition line: {instruction}')
 
+        if (
+            isinstance(
+                self._condition,
+                (condition.IfPreprocessorCondition, condition.ElifPreprocessorCondition),
+            )
+            and not self._condition.is_complete
+        ):
+            preprocessor.diagnostic_reporter.error(
+                line_id,
+                f'invalid conditional-compilation directive syntax: {instruction}',
+            )
+
         try:
             condition_stack.process_condition(self._condition, preprocessor)
         except IndexError:

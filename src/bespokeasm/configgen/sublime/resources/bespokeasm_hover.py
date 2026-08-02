@@ -12,10 +12,24 @@ import sublime_plugin
 
 
 WORD_PATTERN = re.compile(r'(?:##MNEMONIC_PATTERN##|##LABEL_PATTERN##)', re.IGNORECASE)
-LABEL_DEFINITION_PATTERN = re.compile(r'^\s*(?P<name>##LABEL_PATTERN##)\s*:')
+LABEL_DEFINITION_PATTERN = re.compile(r'^\s*(?P<name>##LABEL_PATTERN##)\s*:(?!=)')
 OPERAND_LABEL_DEFINITION_PATTERN = re.compile(r'@(?P<name>##LABEL_PATTERN##):\s*')
-CONSTANT_DEFINITION_PATTERN = re.compile(r'^\s*(?P<name>##LABEL_PATTERN##)\s*(?:=|\bEQU\b)')
-CONSTANT_VALUE_PATTERN = re.compile(r'^\s*##LABEL_PATTERN##\s*(?:=|\bEQU\b)\s*(?P<value>.+?)(?:\s*;.*)?$')
+CONSTANT_DEFINITION_PATTERN = re.compile(r'^\s*(?P<name>##CONSTANT_PATTERN##)\s*(?:=|\bEQU\b)')
+CONSTANT_VALUE_PATTERN = re.compile(r'^\s*##CONSTANT_PATTERN##\s*(?:=|\bEQU\b)\s*(?P<value>.+?)(?:\s*;.*)?$')
+# Replaced at generation time: the coordinate operator spelling for a
+# flow-counter-enabled ISA, or the empty string when the feature is disabled
+# (so no flow spelling ships in a non-flow extension).
+DECLARATION_OPERATOR = '##DECLARATION_OPERATOR##'
+# Bare coordinate references are lexically indistinguishable from labels, so
+# the static grammar cannot scope them; this contextual pass tags usages of
+# symbols declared with the coordinate operator instead.
+COORD_DEFINITION_PATTERN = (
+    re.compile(
+        r'^\s*(?P<name>##LABEL_PATTERN##)\s*' + re.escape(DECLARATION_OPERATOR)
+    )
+    if DECLARATION_OPERATOR
+    else None
+)
 COMPILER_DIRECTIVE_PATTERN = re.compile(r'\.(\w+)\b', re.IGNORECASE)
 PREPROCESSOR_DIRECTIVE_PATTERN = re.compile(r'#(\S+)\b', re.IGNORECASE)
 REGISTER_PATTERN = re.compile(r'(?i)(?:##REGISTERS##)')
@@ -24,6 +38,9 @@ PACKAGE_NAME = '##PACKAGE_NAME##'
 
 LABEL_USAGE_SCOPE = 'variable.other.label.usage'
 CONSTANT_USAGE_SCOPE = 'variable.other.constant.usage'
+# Replaced at generation time: the coordinate-usage scope for a flow-enabled
+# ISA, or the empty string so no flow scope ships in a non-flow extension.
+COORD_USAGE_SCOPE = '##COORDINATE_USAGE_SCOPE##'
 TABLE_CELL_BOUNDARY_PIXELS = 2
 TABLE_ROW_VERT_MARGIN_PIXELS = 1
 TABLE_MAX_COLUMN_CHARS = 32
@@ -295,6 +312,19 @@ def _iter_constant_definitions(text):
     return [(name, col)]
 
 
+def _iter_coordinate_definitions(text):
+    if COORD_DEFINITION_PATTERN is None:
+        return []
+    match = COORD_DEFINITION_PATTERN.match(text)
+    if match is None:
+        return []
+    name = match.group('name')
+    col = match.start('name')
+    if not _is_offset_in_code_region(text, col):
+        return []
+    return [(name, col)]
+
+
 def _build_definition_map(entries, definition_kind):
     definitions = {}
     for entry in entries:
@@ -302,6 +332,8 @@ def _build_definition_map(entries, definition_kind):
         for line_index, text in enumerate(entry.get('lines', [])):
             if definition_kind == 'label':
                 line_definitions = _iter_label_definitions(text)
+            elif definition_kind == 'coordinate':
+                line_definitions = _iter_coordinate_definitions(text)
             else:
                 line_definitions = _iter_constant_definitions(text)
             for name, col in line_definitions:
@@ -330,11 +362,13 @@ def _get_view_state(view):
 
     label_map = _build_definition_map(entries, 'label')
     constant_map = _build_definition_map(entries, 'constant')
+    coordinate_map = _build_definition_map(entries, 'coordinate')
     state = {
         'change_count': change_count,
         'lines': lines,
         'label_map': label_map,
         'constant_map': constant_map,
+        'coordinate_map': coordinate_map,
         'current_path': view.file_name(),
         'included_entries': entries[1:] if len(entries) > 1 else [],
     }
@@ -510,6 +544,13 @@ def _get_directive_at_point(view, point):
     line_region = view.line(point)
     line_text = view.substr(line_region)
     column = point - line_region.begin()
+    coordinate_operator = line_text.find(DECLARATION_OPERATOR) if DECLARATION_OPERATOR else -1
+    if (
+        coordinate_operator >= 0
+        and coordinate_operator <= column < coordinate_operator + len(DECLARATION_OPERATOR)
+    ):
+        if _is_offset_in_code_region(line_text, coordinate_operator):
+            return DECLARATION_OPERATOR
     for match in COMPILER_DIRECTIVE_PATTERN.finditer(line_text):
         dir_start = match.start(1) - 1  # include the dot
         dir_end = match.end(1)
@@ -1046,12 +1087,15 @@ def _update_semantic_regions(view):
     if not _get_semantic_setting(view):
         view.erase_regions('bespokeasm_label_usages')
         view.erase_regions('bespokeasm_constant_usages')
+        view.erase_regions('bespokeasm_coordinate_usages')
         return
     state = _get_view_state(view)
     labels = set(state['label_map'].keys())
     constants = set(state['constant_map'].keys())
+    coordinates = set(state.get('coordinate_map', {}).keys())
     label_regions = []
     constant_regions = []
+    coordinate_regions = []
 
     # Compute line start offsets once instead of
     # calling view.text_point() per match.
@@ -1070,6 +1114,7 @@ def _update_semantic_regions(view):
 
         label_definition_starts = set(_iter_label_definitions(text))
         constant_definition_starts = set(_iter_constant_definitions(text))
+        coordinate_definition_starts = set(_iter_coordinate_definitions(text))
         base_offset = line_offsets[line_index]
 
         for region_start, region_end in code_regions:
@@ -1088,6 +1133,15 @@ def _update_semantic_regions(view):
                         continue
                     start = base_offset + col
                     label_regions.append(sublime.Region(start, start + len(word)))
+                    continue
+                # Coordinates come last: the assembler resolves ordinary
+                # labels and constants ahead of a coordinate sharing their
+                # spelling, so the tag order mirrors evaluation precedence.
+                if word in coordinates:
+                    if (word, col) in coordinate_definition_starts:
+                        continue
+                    start = base_offset + col
+                    coordinate_regions.append(sublime.Region(start, start + len(word)))
 
     view.add_regions(
         'bespokeasm_label_usages',
@@ -1101,6 +1155,13 @@ def _update_semantic_regions(view):
         scope=CONSTANT_USAGE_SCOPE,
         flags=sublime.DRAW_SOLID_UNDERLINE
     )
+    if COORD_USAGE_SCOPE:
+        view.add_regions(
+            'bespokeasm_coordinate_usages',
+            coordinate_regions,
+            scope=COORD_USAGE_SCOPE,
+            flags=sublime.DRAW_SOLID_UNDERLINE
+        )
 
 
 class BespokeAsmHoverListener(sublime_plugin.EventListener):
@@ -1124,6 +1185,7 @@ class BespokeAsmHoverListener(sublime_plugin.EventListener):
                     ('preprocessor', 'preprocessor', 'punctuation_preprocessor'),
                     ('data_type', 'data_type', None),
                     ('compiler', 'directive', None),
+                    ('counter_coordinate', 'operator', None),
                 ]
                 for category_key, color_key, prefix_color_key in directive_categories:
                     category_docs = all_directives.get(category_key, {})

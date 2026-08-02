@@ -1,5 +1,6 @@
 import sys
 
+from bespokeasm.assembler.analysis import SourceIdentity
 from bespokeasm.assembler.bytecode.assembled import AssembledInstruction
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
@@ -15,5 +16,6 @@ class InstructioParserBase:
         line_id: LineIdentifier,
         instruction: str,
         memzone_manager: MemoryZoneManager,
+        source_identity: SourceIdentity | None = None,
     ) -> AssembledInstruction:
         sys.exit('ERROR: INTERNAL - called InstructioParserBase.parse_instruction')

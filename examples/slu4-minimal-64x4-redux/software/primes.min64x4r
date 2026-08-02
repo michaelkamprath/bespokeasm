@@ -4,6 +4,7 @@
 ;
 #require __LANGUAGE_NAME__ == slu4-min64x4-redux-asm
 #require __LANGUAGE_VERSION__ >= 1.4.0
+#require __BESPOKEASM_VERSION__ >= 0.8.0
 
 .memzone ZERO_PAGE_APPS
 #mute
@@ -44,19 +45,22 @@ start:
 ;   returns
 ;       sp+7 : 0 or 1 depending on whether N  is prime
 is_prime32:
+#track stack mode=called
+    .arg_value := COORDINATE(stack, 3)
+    .arg_result := COORDINATE(stack, 7)
     ; first check for 2 or 3
-    lds 3 cpi 0 bne .modulo_two        ; check top byte of N for 0
-    lds 4 cpi 0 bne .modulo_two        ; check top byte of N for 0
-    lds 5 cpi 0 bne .modulo_two        ; check top byte of N for 0
-    lds 6 cpi 3 beq .is_prime          ; check N==3
+    lds .arg_value+0 cpi 0 bne .modulo_two        ; check top byte of N for 0
+    lds .arg_value+1 cpi 0 bne .modulo_two        ; check top byte of N for 0
+    lds .arg_value+2 cpi 0 bne .modulo_two        ; check top byte of N for 0
+    lds .arg_value+3 cpi 3 beq .is_prime          ; check N==3
     cpi 2 beq .is_prime                ; check N==2
     cpi 1 beq .is_not_prime            ; check N==1
     cpi 0 beq .is_not_prime            ; check N==0
 .modulo_two:
-    lds 6 lr1 bcc .is_not_prime        ; see if N's least signficant bit is even or odd
+    lds .arg_value+3 lr1 bcc .is_not_prime        ; see if N's least signficant bit is even or odd
 .modulo_three:
     phs4i 3                           ; place divisor on stack
-    phs4s (3+4)                       ; place dividend on stack (from stack)
+    phs4s .arg_value                  ; place dividend on stack (from stack)
     jps divide32
     pls4
     ; check if remainder is 0
@@ -79,14 +83,14 @@ is_prime32:
     pls4
     ms4l 1,_isquared
     pls4
-    phs4a _isquared phs4s 3+4 jps compare_uint32ss pls4 pls4
+    phs4a _isquared phs4s .arg_value jps compare_uint32ss pls4 pls4
     ; if I*I > N, we are done
     bgt .loop_done_is_prime
 .n_gte_i_squared:
     ; now check various modulos.
     ; check N % I == 0
     phs4a _current_i_val   ; I
-    phs4s (3+4)            ; N
+    phs4s .arg_value       ; N
     jps divide32
     pls4                   ; quotient
     phs4i 0
@@ -98,7 +102,7 @@ is_prime32:
     mll _current_i_val,_temp_val
     aiq 2, _temp_val
     phs4a _temp_val
-    phs4s (3+4)
+    phs4s .arg_value
     jps divide32
     pls4                   ; quotient
     phs4i 0
@@ -115,11 +119,13 @@ is_prime32:
     pls4
 .loop_done_is_prime:
 .is_prime:
-    ldi 1 sds 7
+    ldi 1 sds .arg_result
     rts
 .loop_done_is_not_prime:
 .is_not_prime:
-    ldi 0 sds 7
+    ldi 0 sds .arg_result
     rts
+#endtrack stack
+
 #include "math32lib.min64x4r"
 #include "stringlib.min64x4r"

@@ -4,8 +4,6 @@ from functools import cached_property
 
 from bespokeasm.assembler.bytecode.parts import ExpressionByteCodePartInMemoryZone
 from bespokeasm.assembler.bytecode.parts import NumericByteCodePart
-from bespokeasm.assembler.label_scope import LabelScope
-from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
@@ -13,7 +11,10 @@ from bespokeasm.assembler.model.operand import OperandType
 from bespokeasm.assembler.model.operand import OperandWithArgument
 from bespokeasm.assembler.model.operand import ParsedOperand
 from bespokeasm.assembler.model.operand.operand_label import parse_operand_label_annotation
+from bespokeasm.assembler.symbol_scope import SymbolScope
+from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.expression import EXPRESSION_PARTS_PATTERN
+from bespokeasm.utilities import PATTERN_SYMBOL
 
 
 class RelativeAddressByteCodePart(ExpressionByteCodePartInMemoryZone):
@@ -49,7 +50,7 @@ class RelativeAddressByteCodePart(ExpressionByteCodePartInMemoryZone):
 
     def get_value(
         self,
-        label_scope: LabelScope,
+        symbol_scope: SymbolScope,
         active_named_scopes: ActiveNamedScopeList,
         instruction_address: int,
         instruction_size: int,
@@ -58,7 +59,7 @@ class RelativeAddressByteCodePart(ExpressionByteCodePartInMemoryZone):
         if instruction_address is None:
             raise ValueError('RelativeAddressByteCodePart.get_value had no instruction_address passed')
         expression_value = super().get_value(
-            label_scope,
+            symbol_scope,
             active_named_scopes,
             instruction_address,
             instruction_size,
@@ -115,7 +116,7 @@ class RelativeAddressOperand(OperandWithArgument):
     def match_pattern(self) -> str:
         base_match_str = (
             r'(?P<operand_expression>'
-            r'(?:@(?:[._a-zA-Z][a-zA-Z0-9_]*):\s*)?'
+            fr'(?:@(?:{PATTERN_SYMBOL}):\s*)?'
             fr'(?:{EXPRESSION_PARTS_PATTERN}|\s)+'
             r')'
         )

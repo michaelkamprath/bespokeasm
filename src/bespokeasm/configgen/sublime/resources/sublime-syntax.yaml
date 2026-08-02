@@ -7,25 +7,26 @@ version: 2
 
 contexts:
   main:
+    - include: counter_coordinates
     - include: directives
     - include: instructions
     - include: numbers
     - include: strings
     - include: operand_label_definitions
     - include: compiler_labels
-    - match: ^\s*(\w*)(?:\s*)?(\=|EQU)
+    - match: ^\s*(##CONSTANT_PATTERN##)(?:\s*)?(\=|EQU)
       captures:
         1: variable.other.constant variable.other.constant.definition
         2: keyword.operator.assignment
-    - match: ([a-zA-Z]{1}[\w\d_]*)(\:)
+    - match: ^\s*(##GLOBAL_SYMBOL_PATTERN##)\s*(\:)
       captures:
         1: variable.other.label.global variable.other.label.definition
         2: punctuation.definition.variable.colon.label
-    - match: (\.{1}[\w\d_]*)(\:)
+    - match: ^\s*(##LOCAL_SYMBOL_PATTERN##)\s*(\:)
       captures:
         1: variable.other.label.local variable.other.label.definition
         2: punctuation.definition.variable.colon.label
-    - match: (_{1}[\w\d_]*)(\:)
+    - match: ^\s*(##FILE_SYMBOL_PATTERN##)\s*(\:)
       captures:
         1: variable.other.label.file variable.other.label.definition
         2: punctuation.definition.variable.colon.label
@@ -33,6 +34,50 @@ contexts:
       scope: punctuation.definition.comment
       push: line_comment
     - include: numerical_expressions
+
+  counter_coordinates:
+    - match: ^\s*(##SYMBOL_PATTERN##)\s*(:=)
+      captures:
+        1: variable.other.flow.coordinate variable.other.flow.coordinate.definition
+        2: keyword.operator.assignment
+
+  flow_counter_usages:
+    - match: (?i)\b(COORDINATE|COUNTER)(\s*)(\()(\s*)(##SYMBOL_PATTERN##)
+      captures:
+        1: keyword.operator.flow
+        3: punctuation.section.parens.begin
+        5: variable.other.flow.counter variable.other.flow.counter.usage
+      push:
+        - meta_scope: expression.group
+        - match: \)
+          scope: punctuation.section.parens.end
+          pop: true
+        - include: numerical_expressions
+        - match: \,
+          scope: punctuation.separator
+        - match: $
+          pop: true
+
+  flow_counter_directives:
+    - match: (?i)\b(track)(\s+)(##SYMBOL_PATTERN##)
+      captures:
+        1: keyword.control.preprocessor
+        3: variable.other.flow.counter
+    - match: (?i)\b(as|mode)(\s*=\s*)(##SYMBOL_PATTERN##)
+      captures:
+        1: keyword.other.flow.parameter
+        3: variable.other.flow.counter
+    - match: (?i)\b(init|exit|min|max)(\s*=)
+      captures:
+        1: keyword.other.flow.parameter
+    - match: (?i)\b(endtrack|entry|resume|set|suspend)(\s+)(##SYMBOL_PATTERN##)
+      captures:
+        1: keyword.control.preprocessor
+        3: variable.other.flow.counter variable.other.flow.counter.usage
+
+  flow_operators:
+    - match: (?i)\b(?:COORDINATE|COUNTER)\b
+      scope: keyword.operator.flow
 
   instructions:
     - match: (?i)(?:##INSTRUCTIONS##)
@@ -67,7 +112,7 @@ contexts:
           scope: punctuation.separator
 
   operands_variables:
-    - match: (?<!\w)((?:\.|_|\w){1}[\w\d_]*)\b
+    - match: (?<!\w)(##SYMBOL_PATTERN##)(?!\w)
       scope: variable.parameter.instruction
 
   registers:
@@ -107,10 +152,12 @@ contexts:
       scope: constant.numeric.character
 
   comparison_operators:
-    - match: (?:==|!=|>|>=|<|<=)
+    - match: (?:==|!=|>=|>|<=|<)
       scope: keyword.operator.logical
 
   numerical_expressions:
+    - include: flow_counter_usages
+    - include: flow_operators
     - include: numbers
     - include: registers
     - include: operand_label_definitions
@@ -119,9 +166,9 @@ contexts:
       scope: keyword.operator.arithmetic
     - match: "[\\&\\|\\^]{1}"
       scope: keyword.operator.logical
-    - include: comparison_operators
     - match: (?:>>|<<)
       scope: keyword.operator.bitwise
+    - include: comparison_operators
     - match: \b(?:##EXPRESSION_FUNCTIONS##)\b
       scope: keyword.operator.word
     - include: operands_variables
@@ -194,10 +241,14 @@ contexts:
           pop: true
 
   preprocessor_directives:
-    - match: '^\#'
-      scope: punctuation.definition.preprocessor
+    # Directives may be indented (e.g. nested #if blocks); the assembler
+    # strips leading whitespace before recognizing them.
+    - match: '^\s*(\#)'
+      captures:
+        1: punctuation.definition.preprocessor
       push:
         - meta_scope: meta.preprocessor
+        - include: flow_counter_directives
         - match: (?<=\#)(?:##PREPROCESSOR##)\b
           scope: keyword.control.preprocessor
         - include: strings
@@ -215,6 +266,6 @@ contexts:
     - match: (?i)(?=(?:\s*\;|\s*$|##INSTRUCTIONS##))
       pop: true
       name: instructions
-    - match: (?=^\s*(?:\.|_|\w){1}[\w\d_]*:)
+    - match: (?=^\s*(?:##SYMBOL_PATTERN##)\s*:)
       pop: true
       name: label

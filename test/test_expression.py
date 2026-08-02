@@ -1,10 +1,10 @@
 import unittest
 
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
-from bespokeasm.assembler.label_scope import GlobalLabelScope
-from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
-from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.symbol_scope import GlobalSymbolScope
+from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
+from bespokeasm.assembler.symbol_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.expression import parse_expression
 
 
@@ -13,7 +13,7 @@ class TestExpression(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.label_values = GlobalLabelScope(set())
+        cls.label_values = GlobalSymbolScope(set())
         line = LineIdentifier(0, 'setUpClass')
         cls.label_values.set_label_value('value_1', 12, line)
         cls.label_values.set_label_value('the_8_ball', 8, line)
@@ -281,9 +281,9 @@ class TestExpression(unittest.TestCase):
 
     def test_default_numeric_base_modes(self):
         line_id = LineIdentifier(999, 'test_default_numeric_base_modes')
-        labels = GlobalLabelScope(set())
+        labels = GlobalSymbolScope(set())
         labels.set_label_value('face', 9, line_id)
-        numeric_only_labels = GlobalLabelScope(set())
+        numeric_only_labels = GlobalSymbolScope(set())
         scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
 
         self.assertEqual(

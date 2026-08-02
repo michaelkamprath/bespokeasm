@@ -1,11 +1,12 @@
 import os
 
 import click
+from bespokeasm.assembler.analysis import AnalysisSourceIndex
 from bespokeasm.assembler.assembly_file import AssemblyFile
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
-from bespokeasm.assembler.label_scope import LabelScopeType
-from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
+from bespokeasm.assembler.flow_analysis import FlowGraphAnalyzer
+from bespokeasm.assembler.flow_analysis import FlowLinearAnalyzer
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object import LineWithWords
@@ -17,6 +18,9 @@ from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.pretty_printer.factory import PrettyPrinterFactory
+from bespokeasm.assembler.symbol_scope import SymbolScopeType
+from bespokeasm.assembler.symbol_scope.flow_symbols import FlowSymbolError
+from bespokeasm.assembler.symbol_scope.named_scope_manager import NamedScopeManager
 
 
 class Assembler:
@@ -36,6 +40,7 @@ class Assembler:
                 include_paths: list[str],
                 predefined: list[str],
                 warnings_as_errors: bool = False,
+                flow_checks: bool = True,
             ):
         self._source_file = source_file
         self._output_file = output_file
@@ -51,18 +56,35 @@ class Assembler:
         self._include_paths = include_paths
         self._predefined_symbols = predefined
         self._warnings_as_errors = warnings_as_errors
+        self._flow_checks = flow_checks
         self._diagnostic_reporter = DiagnosticReporter(
             warnings_as_errors=self._warnings_as_errors,
             verbosity=self._verbose,
         )
-        self._model = AssemblerModel(self._config_file, self._verbose, self._diagnostic_reporter)
+        self._model = AssemblerModel(
+            self._config_file,
+            self._verbose,
+            self._diagnostic_reporter,
+            flow_checks=self._flow_checks,
+        )
+
+    @property
+    def model(self) -> AssemblerModel:
+        return self._model
+
+    @property
+    def analysis_source_index(self) -> AnalysisSourceIndex | None:
+        return getattr(self, '_analysis_source_index', None)
 
     def assemble_bytecode(self):
         # Create the named scope manager for this assembly session
         diagnostic_reporter = self._diagnostic_reporter
-        named_scope_manager = NamedScopeManager(diagnostic_reporter)
+        named_scope_manager = NamedScopeManager(
+            diagnostic_reporter,
+            self._model.reserved_keywords,
+        )
 
-        global_label_scope = self._model.global_label_scope
+        global_symbol_scope = self._model.global_symbol_scope
         memzone_manager = MemoryZoneManager(
             self._model.address_size,
             self._model.default_origin,
@@ -101,11 +123,11 @@ class Assembler:
             data_obj.set_start_address(address)
             predefined_line_obs.append(data_obj)
             # set data object's label
-            global_label_scope.set_label_value(
+            global_symbol_scope.set_label_value(
                 label,
                 address,
                 predefines_lineid,
-                scope=LabelScopeType.GLOBAL,
+                scope=SymbolScopeType.GLOBAL,
             )
 
             # add its label to the global scope
@@ -133,7 +155,7 @@ class Assembler:
                 min_verbosity=2,
             )
 
-        asm_file = AssemblyFile(self._source_file, global_label_scope, named_scope_manager, diagnostic_reporter)
+        asm_file = AssemblyFile(self._source_file, global_symbol_scope, named_scope_manager, diagnostic_reporter)
         line_obs: list[LineObject] = asm_file.load_line_objects(
             self._model,
             include_dirs,
@@ -150,6 +172,12 @@ class Assembler:
             )
 
         compilable_line_obs: list[LineObject] = [lobj for lobj in line_obs if lobj.compilable]
+        if self._model.analysis_records_enabled:
+            self._analysis_source_index = AnalysisSourceIndex.from_line_objects(
+                lobj
+                for lobj in compilable_line_obs
+                if isinstance(lobj, InstructionLine)
+            )
         # First pass: assign addresses to labels
         for lobj in compilable_line_obs:
             lobj.set_start_address(lobj.memory_zone.current_address)
@@ -185,12 +213,34 @@ class Assembler:
                     lobj.active_named_scopes
                 ):
                     # if not in an active named scope, set to the current scope
-                    lobj.label_scope.set_label_value(
+                    lobj.symbol_scope.set_label_value(
                         lobj.get_label(),
                         lobj.get_value(),
                         lobj.line_id,
                     )
 
+        source_requires_flow_values = (
+            self._model.analysis_records_enabled
+            and FlowLinearAnalyzer.source_requires_flow_values(
+                compilable_line_obs,
+            )
+        )
+        if (
+            self._model.analysis_records_enabled
+            and (
+                (
+                    self._model.flow_checks_enabled
+                    and FlowLinearAnalyzer.source_uses_flow(
+                        compilable_line_obs,
+                    )
+                )
+                or source_requires_flow_values
+            )
+        ):
+            FlowGraphAnalyzer(
+                self._model,
+                diagnostic_reporter,
+            ).run(compilable_line_obs)
         # now merge prefined line objects and parsed line objects
         compilable_line_obs.extend(predefined_line_obs)
 
@@ -201,7 +251,20 @@ class Assembler:
                 'source file contains no compilable lines',
             )
         compilable_line_obs.sort(key=lambda x: x.address)
-        max_generated_address = compilable_line_obs[-1].address
+        emitted_line_objects = [
+            line_object
+            for line_object in compilable_line_obs
+            if isinstance(line_object, LineWithWords)
+            and line_object.word_count > 0
+            and not line_object.is_muted
+        ]
+        max_generated_address = max(
+            (
+                line_object.address + line_object.word_count - 1
+                for line_object in emitted_line_objects
+            ),
+            default=0,
+        )
         line_dict = {
             lobj.address: lobj
             for lobj in compilable_line_obs
@@ -222,6 +285,12 @@ class Assembler:
             if isinstance(lobj, LineWithWords):
                 try:
                     lobj.generate_words()
+                except FlowSymbolError as error:
+                    diagnostic_reporter.error(
+                        lobj.line_id,
+                        str(error),
+                        category='flow',
+                    )
                 except ValueError as e:
                     diagnostic_reporter.error(
                         lobj.line_id,

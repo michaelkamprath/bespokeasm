@@ -19,11 +19,17 @@ Changes that are planned but not implemented yet:
 
 
 ## [Unreleased]
+
+## [0.8.0]
+* Added a general-purpose `#assert` preprocessor directive with the same comparison and symbol-resolution semantics as `#if`. Failed assertions may include an optional user message and `#print`-style color; flow-enabled assertions may also compare `COUNTER()` values and counter-coordinate offsets.
+* Added optional flow-counter static analysis. Flow-enabled instruction sets can declare instruction effects, bounds, direct control-flow transfers, caller-visible call summaries, named entry conventions, compile-time operand-dependent deltas, return-terminal reconciliation, and physical-anchor replacement through either direct instruction invalidation or watched memory-mapped writes. Assembly source can detect support with the always-defined `__FLOW_COUNTERS_AVAILABLE__` preprocessor symbol, track concurrent named instances across branches and net-zero loops, tighten class bounds per program with `#track` `min=`/`max=` instance bounds (including memory-map-derived label expressions), declare additional roots with `#entry`, detect path-join and per-return imbalances, inspect input-to-output flow transitions in listing output, check or re-anchor values with `#assert` / `#set`, explicitly suspend and resume indeterminate spans, verify routine-owned stack balance before returning through a stack-saved execution address, emit the current `COUNTER()` value, and label stack or other counter-relative positions with `:= COORDINATE()` declarations whose bare references resolve to their current offsets. Flow checks and listing annotations are enabled by default and can be disabled with `--no-flow-checks` / `-A`; emitted `COUNTER()` and counter-coordinate values are still resolved automatically. Generated ISA documentation summarizes counter-class contracts and derives each instruction's counter effects and invalidations from the validated metadata, while generated editor extensions include syntax highlighting and hover documentation. Capability-gated flow directives and operators are reserved only when the selected ISA declares `flow_counters`, so existing non-flow instruction sets retain their prior symbol and mnemonic namespace.
 * Improved Vim syntax highlighting with context-aware operand coloring on par with the VS Code and Sublime Text extensions, including correct scoping for multiple instructions/macros on the same line. The user's editor-wide colorscheme is no longer overridden.
 * Added semantic label-usage highlighting in Vim: references to labels defined in the buffer are highlighted distinctly from arbitrary identifiers.
 * Added hover-equivalent documentation in Vim: pressing `K` over a mnemonic, register, directive, expression function, or predefined symbol opens its documentation in a preview window. An optional auto-popup variant (vim 8.2+ / Neovim) is available via `g:bespokeasm_<ft>_auto_hover`.
 * Improved unit test coverage
 * Fixed an `IndexError` crash when compiling a source file with no compilable lines; a clear diagnostic error is now reported instead.
+* **Behavior change:** a generated binary image now ends at the last *emitted* word. Previously the image extended to the address of the final line object even when that line emitted nothing, so a source ending with a zero-width line (such as a trailing label marking a runtime buffer) produced one extra byte of fill. Use `--binary-max-address` / `-e` if a specific image extent is required.
+* **Breaking change:** `assert` is now a reserved assembler keyword in every instruction set, because `#assert` is a base preprocessor directive that does not require flow counters. Source that previously used `assert` as a label, constant, or mnemonic name must rename it. All other flow-counter keywords (`track`, `endtrack`, `entry`, `set`, `suspend`, `resume`, `COUNTER`, `COORDINATE`) remain reserved only for ISAs that declare a `flow_counters` section.
 
 ## [0.7.3]
 * Added configurable mnemonic decorators (`+`, `-`, `++`, `--`, `!`, `@`) so instruction variants can use prefixed or suffixed decorated mnemonics such as `m+`, `m-`, and `++inc`.
@@ -235,7 +241,8 @@ First tracked released
 * Enabled the `reverse_argument_order` instruction option be applied to a specific operand configuration. This slightly changed the configuration file format.
 * Added ability for instructions with operands to have a single "empty operand" variant, e.g., `pop`
 
-[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.7.3...HEAD
+[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.7.3...v0.8.0
 [0.7.3]: https://github.com/michaelkamprath/bespokeasm/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/michaelkamprath/bespokeasm/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/michaelkamprath/bespokeasm/compare/v0.7.0...v0.7.1

@@ -8,6 +8,7 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.expression import ExpressionNode
+from bespokeasm.expression import ExpressionUseContext
 from bespokeasm.expression import parse_expression
 
 
@@ -187,14 +188,35 @@ class DataLine(LineWithWords):
         if diagnostic_reporter is None:
             raise ValueError('DiagnosticReporter is required for DataLine')
         self.diagnostic_reporter = diagnostic_reporter
-        self._arg_value_list = value_list
+        self._arg_value_list = [
+            parse_expression(
+                line_id, item, default_numeric_base,
+                context=ExpressionUseContext.DATA_VALUE,
+            ) if isinstance(item, str) else item
+            for item in value_list
+        ]
         self._directive = directive_str
-        self._default_numeric_base = default_numeric_base
         self._string_byte_packing = string_byte_packing
         self._string_byte_packing_fill = string_byte_packing_fill
 
     def __str__(self):
         return f'DataLine<{self._directive}: {self._arg_value_list}>'
+
+    @property
+    def flow_expression_nodes(self) -> tuple:
+        """Return deferred flow expressions from fixed-size numeric data values."""
+        return tuple(
+            node for item in self._arg_value_list if isinstance(item, ExpressionNode)
+            for node in item.deferred_flow_nodes()
+        )
+
+    @property
+    def flow_candidate_nodes(self) -> tuple:
+        """Return label leaves in data values that may name coordinates."""
+        return tuple(
+            node for item in self._arg_value_list if isinstance(item, ExpressionNode)
+            for node in item.coordinate_candidate_nodes()
+        )
 
     @property
     def byte_size(self) -> int:
@@ -247,13 +269,12 @@ class DataLine(LineWithWords):
         for arg_item in self._arg_value_list:
             if isinstance(arg_item, int):
                 arg_val = arg_item
-            elif isinstance(arg_item, str):
-                e: ExpressionNode = parse_expression(
+            elif isinstance(arg_item, ExpressionNode):
+                arg_val = arg_item.get_value(
+                    self.symbol_scope,
+                    self.active_named_scopes,
                     self.line_id,
-                    arg_item,
-                    self._default_numeric_base,
                 )
-                arg_val = e.get_value(self.label_scope, self.active_named_scopes, self.line_id)
             else:
                 sys.exit(f'ERROR: line {self.line_id} - unknown data item "{arg_item}"')
             value_size = DataLine.DIRECTIVE_VALUE_BYTE_SIZE[self._directive]

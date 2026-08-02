@@ -10,8 +10,8 @@ from zipfile import ZipFile
 import bespokeasm.configgen.sublime.resources as resources
 from bespokeasm.assembler.keywords import BYTECODE_DIRECTIVES_SET
 from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET
-from bespokeasm.assembler.keywords import EXPRESSION_FUNCTIONS_SET
-from bespokeasm.assembler.keywords import PREPROCESSOR_DIRECTIVES_SET
+from bespokeasm.assembler.keywords import expression_functions_for_isa
+from bespokeasm.assembler.keywords import preprocessor_directives_for_isa
 from bespokeasm.configgen import LanguageConfigGenerator
 from bespokeasm.configgen.color_scheme import build_hover_color_map
 from bespokeasm.configgen.color_scheme import DEFAULT_COLOR_SCHEME
@@ -75,15 +75,54 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.CONSTANT_DEFINITION, 'variable.other.constant.definition', 'Constants - Definitions'),
             # (SyntaxElement.CONSTANT_USAGE, 'variable.other.constant.usage', 'Constants - Usages'),
             (SyntaxElement.CONSTANT_NAME, 'variable.other.constant', 'Variables - Constant'),
+            (
+                SyntaxElement.FLOW_COORDINATE_DEFINITION,
+                'variable.other.flow.coordinate.definition',
+                'Flow Coordinates - Definitions',
+            ),
+            (
+                SyntaxElement.FLOW_COUNTER_NAME,
+                'variable.other.flow.counter',
+                'Flow Counters',
+            ),
+            (
+                SyntaxElement.FLOW_COUNTER_USAGE,
+                'variable.other.flow.counter.usage',
+                'Flow Counters - Usages',
+            ),
+            (
+                SyntaxElement.FLOW_COORDINATE_NAME,
+                'variable.other.flow.coordinate',
+                'Flow Coordinates',
+            ),
             (SyntaxElement.COMPILER_LABEL, 'constant.language', 'Variables - Language Defined'),
             (SyntaxElement.PREPROCESSOR, 'keyword.control.preprocessor', 'Keyword - Preprocessor'),
             (SyntaxElement.DATA_TYPE, 'storage.type', 'Data Types'),
             (SyntaxElement.OPERATOR, 'keyword.operator', 'Keyword - Operators'),
+            (
+                SyntaxElement.FLOW_OPERATOR,
+                'keyword.operator.flow',
+                'Keyword - Flow Operators',
+            ),
             (SyntaxElement.DIRECTIVE, 'keyword.other', 'Keyword - Other'),
             (SyntaxElement.PUNCTUATION_PREPROCESSOR, 'punctuation.definition.preprocessor', 'Punctuation - Preprocessor'),
             (SyntaxElement.PUNCTUATION_SEPARATOR, 'punctuation.separator', 'Punctuation - Separator'),
             (SyntaxElement.PUNCTUATION_VARIABLE, 'punctuation.definition.variable', 'Punctuation - Variable'),
         ]
+        if not self.model.flow_counters_enabled:
+            flow_coordinate_elements = {
+                SyntaxElement.FLOW_COORDINATE_NAME,
+                SyntaxElement.FLOW_COORDINATE_DEFINITION,
+                SyntaxElement.FLOW_COORDINATE_USAGE,
+                SyntaxElement.FLOW_COUNTER_NAME,
+                SyntaxElement.FLOW_COUNTER_USAGE,
+                SyntaxElement.FLOW_OPERATOR,
+            }
+            scope_mappings = [
+                mapping
+                for mapping in scope_mappings
+                if mapping[0] not in flow_coordinate_elements
+            ]
 
         rules = []
 
@@ -112,6 +151,22 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             'scope': 'variable.other.constant.usage',
             'background': f'color({constant_usage_color} alpha(0.05))',
         })
+
+        if self.model.flow_counters_enabled:
+            # Bare coordinate usages are tagged contextually by the hover
+            # plugin's semantic-region pass. The explicit low-alpha background
+            # matters: Sublime fills an add_regions region with the scope's
+            # background when one is defined, and falls back to an opaque
+            # foreground fill (inverse video) when it is not.
+            coordinate_usage_color = DEFAULT_COLOR_SCHEME.get_color(
+                SyntaxElement.FLOW_COORDINATE_USAGE,
+            )
+            rules.append({
+                'foreground': coordinate_usage_color,
+                'name': 'Flow Coordinates - Usages',
+                'scope': 'variable.other.flow.coordinate.usage',
+                'background': f'color({coordinate_usage_color} alpha(0.05))',
+            })
 
         bracket_color = DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.BRACKET)
         rules.append({
@@ -168,6 +223,30 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             syntax_dict = yaml_loader.load(fp)
         except Exception as exc:
             sys.exit(f'ERROR: {exc}')
+        self._replace_symbol_pattern_tokens(syntax_dict)
+        if not self.model.flow_counters_enabled:
+            del syntax_dict['contexts']['counter_coordinates']
+            del syntax_dict['contexts']['flow_counter_usages']
+            del syntax_dict['contexts']['flow_counter_directives']
+            del syntax_dict['contexts']['flow_operators']
+            syntax_dict['contexts']['main'] = [
+                rule
+                for rule in syntax_dict['contexts']['main']
+                if rule.get('include') != 'counter_coordinates'
+            ]
+            syntax_dict['contexts']['numerical_expressions'] = [
+                rule
+                for rule in syntax_dict['contexts']['numerical_expressions']
+                if rule.get('include') not in {
+                    'flow_counter_usages',
+                    'flow_operators',
+                }
+            ]
+            syntax_dict['contexts']['preprocessor_directives'][0]['push'] = [
+                rule
+                for rule in syntax_dict['contexts']['preprocessor_directives'][0]['push']
+                if rule.get('include') != 'flow_counter_directives'
+            ]
 
         # handle instructions
         update_instructions = False
@@ -229,13 +308,6 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             # remove the registers syntax
             del syntax_dict['contexts']['registers']
 
-        if 'operand_label_definitions' in syntax_dict['contexts']:
-            syntax_dict['contexts']['operand_label_definitions'][0]['match'] = \
-                syntax_dict['contexts']['operand_label_definitions'][0]['match'].replace(
-                    '##LABEL_PATTERN##',
-                    self._label_pattern(),
-                )
-
         # handle compiler predefined labels and built-in constants
         from bespokeasm.assembler.keywords import BUILTIN_CONSTANTS_SET
         predefined_labels = self.model.predefined_labels
@@ -266,7 +338,11 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
 
         # preprocessor directives
         # Sort by length (desc) to avoid prefix matches like 'if' matching 'ifdef'
-        preprocessor_regex = '|'.join(sorted(PREPROCESSOR_DIRECTIVES_SET, key=len, reverse=True))
+        preprocessor_regex = '|'.join(sorted(
+            preprocessor_directives_for_isa(self.model.flow_counters_enabled),
+            key=len,
+            reverse=True,
+        ))
         updated = False
         for rule in syntax_dict['contexts']['preprocessor_directives'][0]['push']:
             if 'match' in rule and '##PREPROCESSOR##' in rule['match']:
@@ -278,7 +354,7 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             sys.exit('ERROR - INTERNAL - did not find correct preprocessor rule for Sublime systax file.')
 
         # expression functions
-        func_regex = '|'.join([d for d in EXPRESSION_FUNCTIONS_SET])
+        func_regex = '|'.join(expression_functions_for_isa(self.model.flow_counters_enabled))
         updated = False
         for rule in syntax_dict['contexts']['numerical_expressions']:
             if 'scope' in rule and rule['scope'] == 'keyword.operator.word':
@@ -350,8 +426,23 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         hover_plugin = self._hover_plugin_filename()
         hover_plugin_fp = os.path.join(destination_dir, hover_plugin)
         shutil.copy(str(fp), hover_plugin_fp)
+        self._replace_token_in_file(
+            hover_plugin_fp,
+            '##DECLARATION_OPERATOR##',
+            ':=' if self.model.flow_counters_enabled else '',
+        )
+        self._replace_token_in_file(
+            hover_plugin_fp,
+            '##COORDINATE_USAGE_SCOPE##',
+            'variable.other.flow.coordinate.usage' if self.model.flow_counters_enabled else '',
+        )
         self._replace_token_in_file(hover_plugin_fp, '##PACKAGE_NAME##', self.language_name)
         self._replace_token_in_file(hover_plugin_fp, '##LABEL_PATTERN##', self._label_pattern())
+        self._replace_token_in_file(
+            hover_plugin_fp,
+            '##CONSTANT_PATTERN##',
+            self._constant_pattern(),
+        )
         self._replace_token_in_file(hover_plugin_fp, '##MNEMONIC_PATTERN##', self._mnemonic_pattern())
         if self.model.registers:
             register_regex = self._replace_token_with_regex_list(

@@ -8,24 +8,29 @@ and __BESPOKEASM_VERSION__.
 The evaluator is used by #if, #elif, and #require preprocessor directives when they
 encounter language version symbols.
 """
+import re
 import sys
 
-from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.preprocessor.symbol import SYMBOL_PATTERN
+from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
+from packaging import version
+from packaging.version import InvalidVersion
 
 
 class LanguageVersionEvaluator:
     """Evaluates language version expressions to boolean values."""
 
-    # Built-in version symbols
+    SEMANTIC_VERSION_SYMBOLS = {
+        '__LANGUAGE_VERSION__',
+        '__BESPOKEASM_VERSION__',
+    }
     LANGUAGE_VERSION_SYMBOLS = {
         '__LANGUAGE_NAME__',
-        '__LANGUAGE_VERSION__',
         '__LANGUAGE_VERSION_MAJOR__',
         '__LANGUAGE_VERSION_MINOR__',
         '__LANGUAGE_VERSION_PATCH__',
-        '__BESPOKEASM_VERSION__',
-    }
+    }.union(SEMANTIC_VERSION_SYMBOLS)
 
     @classmethod
     def contains_language_version_symbols(cls, expression: str) -> bool:
@@ -81,6 +86,20 @@ class LanguageVersionEvaluator:
         return cls._is_valid_language_version_token(lhs_expr) and cls._is_valid_language_version_token(rhs_expr)
 
     @classmethod
+    def contains_custom_preprocessor_symbols(
+        cls,
+        expression: str,
+        preprocessor,
+    ) -> bool:
+        """Return whether a compatibility expression references a user macro."""
+        symbol_names = re.findall(rf'\b({SYMBOL_PATTERN})\b', expression)
+        return any(
+            name not in cls.LANGUAGE_VERSION_SYMBOLS
+            and preprocessor.get_symbol(name) is not None
+            for name in symbol_names
+        )
+
+    @classmethod
     def _is_valid_language_version_token(cls, token: str) -> bool:
         """Check if a token is valid in a pure language version expression."""
         token = token.strip()
@@ -89,12 +108,18 @@ class LanguageVersionEvaluator:
         if token in cls.LANGUAGE_VERSION_SYMBOLS:
             return True
 
-        # Numeric literal (integer or float)
+        if (
+            len(token) >= 2
+            and token[0] == token[-1]
+            and token[0] in {'"', "'"}
+        ):
+            token = token[1:-1]
+
+        # Numeric, semantic-version, or language-name literal
         if token.replace('.', '').replace('-', '').isdigit():
             return True
 
-        # String literal (simple identifier without spaces or special chars)
-        # This allows things like "eater-sap1" or version strings like "1.0.0"
+        # This allows names such as "eater-sap1".
         if token.replace('-', '').replace('.', '').replace('_', '').isalnum():
             return True
 
@@ -195,6 +220,20 @@ class LanguageVersionEvaluator:
                     f'Version symbol {symbol} is not defined',
                 )
 
+        if (
+            lhs_expr in cls.SEMANTIC_VERSION_SYMBOLS
+            or rhs_expr in cls.SEMANTIC_VERSION_SYMBOLS
+        ):
+            try:
+                lhs_value = version.parse(lhs_resolved.strip('\'"'))
+                rhs_value = version.parse(rhs_resolved.strip('\'"'))
+            except InvalidVersion as error:
+                preprocessor.diagnostic_reporter.error(
+                    line_id,
+                    f'Invalid version in compatibility comparison: {error}',
+                )
+            return cls._compare(lhs_value, operator, rhs_value, line_id)
+
         # Try to parse both sides as expressions
         try:
             lhs_expression = parse_expression(line_id, lhs_resolved, preprocessor.default_numeric_base)
@@ -215,7 +254,11 @@ class LanguageVersionEvaluator:
             lhs_value = lhs_resolved
             rhs_value = rhs_resolved
 
-        # Perform the comparison
+        return cls._compare(lhs_value, operator, rhs_value, line_id)
+
+    @staticmethod
+    def _compare(lhs_value, operator: str, rhs_value, line_id: LineIdentifier) -> bool:
+        """Apply one supported comparison to already normalized values."""
         if operator == '==':
             return lhs_value == rhs_value
         elif operator == '!=':

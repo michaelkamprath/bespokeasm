@@ -1,23 +1,26 @@
 import re
 import sys
 
-from bespokeasm.assembler.label_scope import LabelScope
-from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import INSTRUCTION_EXPRESSION_PATTERN
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.memory_zone import MemoryZone
+from bespokeasm.assembler.symbol_scope import SymbolScope
+from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.expression import parse_expression
 from bespokeasm.utilities import is_valid_label
+from bespokeasm.utilities import PATTERN_CONSTANT_SYMBOL
+from bespokeasm.utilities import PATTERN_SYMBOL
 
 
 class LabelLine(LineObject):
     PATTERN_LABEL = re.compile(
-        r'^\s*((\.?\w+):)(?:\s*([^;]*))?\;?',
+        fr'^\s*(({PATTERN_SYMBOL}):)(?:\s*([^;]*))?\;?',
         flags=re.IGNORECASE | re.MULTILINE
     )
     PATTERN_CONSTANT = re.compile(
-        fr'^\s*(\w+)(?:\s*\=\s*|\s+EQU\s+)({INSTRUCTION_EXPRESSION_PATTERN}|)',
+        fr'^\s*({PATTERN_CONSTANT_SYMBOL})(?:\s*\=\s*|\s+EQU\s+)'
+        fr'({INSTRUCTION_EXPRESSION_PATTERN}|)',
         flags=re.IGNORECASE | re.MULTILINE
     )
 
@@ -28,7 +31,7 @@ class LabelLine(LineObject):
                 line_str: str,
                 comment: str,
                 registers: set[str],
-                label_scope: LabelScope,
+                symbol_scope: SymbolScope,
                 active_named_scopes: ActiveNamedScopeList,
                 current_memzone: MemoryZone,
                 default_numeric_base: str = 'decimal',
@@ -66,7 +69,7 @@ class LabelLine(LineObject):
                 line_obj = LabelLine(
                     line_id,
                     constant_label,
-                    value_expr.get_value(label_scope, active_named_scopes, line_id),
+                    value_expr.get_value(symbol_scope, active_named_scopes, line_id),
                     line_str,
                     comment,
                     current_memzone,

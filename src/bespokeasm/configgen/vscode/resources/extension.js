@@ -5,7 +5,7 @@ const vscode = require('vscode');
 const labelHover = require('./label_hover');
 const constantsHover = require('./constants_hover');
 const includeFiles = require('./include_files');
-const tokenTypes = new Map([['label', 0], ['constant', 1]]);
+const tokenTypes = new Map([['label', 0], ['constant', 1], ['flowCoordinate', 2]]);
 const tokenModifiers = new Map([['definition', 0]]);
 const semanticLegend = new vscode.SemanticTokensLegend(
   Array.from(tokenTypes.keys()),
@@ -172,11 +172,57 @@ function isOffsetInCodeRegion(text, offset) {
   return false;
 }
 
+// Bare coordinate references are lexically indistinguishable from labels, so
+// the static grammar cannot scope them; the semantic pass tags usages of
+// symbols declared with the coordinate operator instead.
+function findCoordinateDefinition(text) {
+  if (!DECLARATION_OPERATOR) {
+    return null;
+  }
+  const match = COORD_DEFINITION_RE.exec(text);
+  if (!match) {
+    return null;
+  }
+  const character = text.indexOf(match[1]);
+  if (!isOffsetInCodeRegion(text, character)) {
+    return null;
+  }
+  return { name: match[1], character };
+}
+
+function buildCoordinateDefinitionSet(document) {
+  const coordinates = new Set();
+  if (!DECLARATION_OPERATOR) {
+    return coordinates;
+  }
+  const lines = [];
+  for (let i = 0; i < document.lineCount; i += 1) {
+    lines.push(document.lineAt(i).text);
+  }
+  const entries = [{ lines }];
+  const baseDir = document.uri.fsPath ? path.dirname(document.uri.fsPath) : null;
+  if (baseDir) {
+    entries.push(...includeFiles.collectIncludedFiles(lines, baseDir).map((entry) => ({
+      lines: entry.lines
+    })));
+  }
+  for (const entry of entries) {
+    for (const text of entry.lines) {
+      const definition = findCoordinateDefinition(text);
+      if (definition) {
+        coordinates.add(definition.name);
+      }
+    }
+  }
+  return coordinates;
+}
+
 function buildSemanticTokens(document) {
   const labelMap = buildLabelDefinitionMap(document);
   const labels = new Set(labelMap.keys());
   const constantMap = buildConstantDefinitionMap(document);
   const constants = new Set(constantMap.keys());
+  const coordinates = buildCoordinateDefinitionSet(document);
   const lines = [];
 
   for (let i = 0; i < document.lineCount; i += 1) {
@@ -187,6 +233,7 @@ function buildSemanticTokens(document) {
   const builder = new vscode.SemanticTokensBuilder(semanticLegend);
   const labelType = tokenTypes.get('label');
   const constantType = tokenTypes.get('constant');
+  const coordinateType = tokenTypes.get('flowCoordinate');
   const definitionModifier = 1 << tokenModifiers.get('definition');
 
   for (let line = 0; line < lines.length; line += 1) {
@@ -223,6 +270,21 @@ function buildSemanticTokens(document) {
             continue;
           }
           builder.push(line, offset, word.length, labelType, 0);
+          continue;
+        }
+        // Coordinates come last: the assembler resolves ordinary labels and
+        // constants ahead of a coordinate sharing their spelling, so the tag
+        // order mirrors evaluation precedence.
+        if (coordinates.has(word)) {
+          const coordinateDefinition = findCoordinateDefinition(text);
+          if (
+            coordinateDefinition
+            && coordinateDefinition.name === word
+            && coordinateDefinition.character === offset
+          ) {
+            continue;
+          }
+          builder.push(line, offset, word.length, coordinateType, 0);
         }
       }
     }
@@ -249,11 +311,29 @@ function buildMarkdownHover(doc) {
 const COMPILER_DIRECTIVE_RE = /\.(\w+)\b/gi;
 const PREPROCESSOR_DIRECTIVE_RE = /#(\S+)\b/gi;
 const REGISTER_RE = /(?:##REGISTERS##)/gi;
-const CONSTANT_VALUE_RE = /^\s*##LABEL_PATTERN##\s*(?:=|\bEQU\b)\s*(.+?)(?:\s*;.*)?$/;
+const CONSTANT_VALUE_RE = /^\s*##CONSTANT_PATTERN##\s*(?:=|\bEQU\b)\s*(.+?)(?:\s*;.*)?$/;
+// Replaced at generation time: the coordinate operator spelling for a
+// flow-counter-enabled ISA, or the empty string when the feature is disabled
+// (so no flow spelling ships in a non-flow extension).
+const DECLARATION_OPERATOR = '##DECLARATION_OPERATOR##';
+const COORD_DEFINITION_RE = DECLARATION_OPERATOR
+  ? new RegExp(
+    String.raw`^\s*(##LABEL_PATTERN##)\s*`
+    + DECLARATION_OPERATOR.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  )
+  : null;
 
 function getDirectiveAtPosition(lineText, character) {
   if (!isOffsetInCodeRegion(lineText, character)) {
     return null;
+  }
+  const coordinateOperator = DECLARATION_OPERATOR ? lineText.indexOf(DECLARATION_OPERATOR) : -1;
+  if (
+    coordinateOperator >= 0
+    && character >= coordinateOperator
+    && character < coordinateOperator + DECLARATION_OPERATOR.length
+  ) {
+    return DECLARATION_OPERATOR;
   }
   COMPILER_DIRECTIVE_RE.lastIndex = 0;
   let match;
@@ -458,7 +538,8 @@ function activate(context) {
   const directiveCategories = [
     directiveDocsAll.preprocessor || {},
     directiveDocsAll.data_type || {},
-    directiveDocsAll.compiler || {}
+    directiveDocsAll.compiler || {},
+    directiveDocsAll.counter_coordinate || {}
   ];
   const registerDocs = hoverDocs.registers || {};
   const exprFuncDocs = hoverDocs.expression_functions || {};

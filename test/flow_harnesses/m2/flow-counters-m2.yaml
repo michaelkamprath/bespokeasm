@@ -1,0 +1,137 @@
+description: Flow analysis M2 development acceptance harness
+general:
+  min_version: "0.8.0"
+  address_size: 8
+  multi_word_endian: little
+  registers:
+    - sp
+  identifier:
+    name: flow-analysis-m2
+    version: "0.2.0"
+flow_counters:
+  stack:
+    min_value: 0
+    max_value: 16
+    unknown_instructions: error
+    default_init: 0
+    exit_policy: balanced
+    coordinate_offsets: positive
+    allow_zero_offset: false
+  cycles:
+    min_value: 0
+    max_value: 20
+    unknown_instructions: error
+    default_init: 0
+    exit_policy: none
+    coordinate_offsets: positive
+operand_sets:
+  stack_position:
+    operand_values:
+      offset:
+        type: numeric
+        argument:
+          size: 8
+          word_align: true
+  stack_value:
+    operand_values:
+      indirect_sp:
+        type: indirect_register
+        register: sp
+        bytecode:
+          value: 0
+          size: 3
+        offset:
+          min: 0
+          max: 255
+          size: 8
+          word_align: true
+instructions:
+  push:
+    flow_effects:
+      stack: 1
+      cycles: 2
+    flow_transfer: none
+    bytecode:
+      value: 0x10
+      size: 8
+  pop:
+    flow_effects:
+      stack: -1
+      cycles: 2
+    flow_transfer: none
+    bytecode:
+      value: 0x11
+      size: 8
+  push4:
+    flow_effects:
+      stack: 4
+      cycles: 2
+    flow_transfer: none
+    bytecode:
+      value: 0x14
+      size: 8
+  pop4:
+    flow_effects:
+      stack: -4
+      cycles: 2
+    flow_transfer: none
+    bytecode:
+      value: 0x15
+      size: 8
+  rts:
+    # M2 closes tracking before RTS. M3 will configure this as a terminal
+    # that reconciles the stack counter before applying this physical effect.
+    flow_effects:
+      stack: -2
+      cycles: 2
+    flow_transfer: none
+    bytecode:
+      value: 0x69
+      size: 8
+  load:
+    flow_effects:
+      stack: 0
+      cycles: 3
+    flow_transfer: none
+    bytecode:
+      value: 0x12
+      size: 5
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - stack_value
+  lds:
+    flow_effects:
+      stack: 0
+      cycles: 6
+    flow_transfer: none
+    bytecode:
+      value: 0x6c
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - stack_position
+  sts:
+    flow_effects:
+      stack: 0
+      cycles: 11
+    flow_transfer: none
+    bytecode:
+      value: 0x6d
+      size: 8
+    operands:
+      count: 1
+      operand_sets:
+        list:
+          - stack_position
+  nop:
+    flow_effects:
+      stack: 0
+      cycles: 1
+    flow_transfer: none
+    bytecode:
+      value: 0
+      size: 8

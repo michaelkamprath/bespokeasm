@@ -1,5 +1,6 @@
 import sys
 
+from bespokeasm.assembler.analysis import SourceIdentity
 from bespokeasm.assembler.bytecode.assembled import AssembledInstruction
 from bespokeasm.assembler.bytecode.assembled import CompositeAssembledInstruction
 from bespokeasm.assembler.line_identifier import LineIdentifier
@@ -27,6 +28,7 @@ class MacroBytecodeGenerator:
         isa_model: AssemblerModel,
         memzone_manager: MemoryZoneManager,
         parser_class: type[InstructioParserBase],
+        source_identity: SourceIdentity | None,
     ) -> AssembledInstruction:
         if mnemonic != macro.mnemonic:
             # this shouldn't happen
@@ -43,6 +45,7 @@ class MacroBytecodeGenerator:
                     isa_model,
                     memzone_manager,
                     parser_class,
+                    source_identity,
                 )
             except OperandLabelError as e:
                 if operand_label_error is None:
@@ -72,6 +75,7 @@ class MacroBytecodeGenerator:
         isa_model: AssemblerModel,
         memzone_manager: MemoryZoneManager,
         parser_class: type[InstructioParserBase],
+        source_identity: SourceIdentity | None,
     ) -> AssembledInstruction:
         if mnemonic != variant.mnemonic:
             # this shouldn't happen
@@ -155,7 +159,18 @@ class MacroBytecodeGenerator:
         assembled_instructions: list[AssembledInstruction] = []
         for step_num, instruction_str in enumerate(instruction_lines):
             macro_line_id = MacroLineIdentifier(variant.mnemonic, step_num, line_id)
-            instruction = parser_class.parse_instruction(isa_model, macro_line_id, instruction_str, memzone_manager)
+            constituent_identity = (
+                source_identity.macro_constituent(variant.mnemonic, step_num)
+                if source_identity is not None
+                else None
+            )
+            instruction = parser_class.parse_instruction(
+                isa_model,
+                macro_line_id,
+                instruction_str,
+                memzone_manager,
+                source_identity=constituent_identity,
+            )
             assembled_instructions.append(instruction)
 
         # finally, pack it all together into one assembled instruction

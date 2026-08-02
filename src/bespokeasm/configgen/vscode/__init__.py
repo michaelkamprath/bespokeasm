@@ -7,8 +7,8 @@ from pathlib import Path
 import bespokeasm.configgen.vscode.resources as resources
 from bespokeasm.assembler.keywords import BYTECODE_DIRECTIVES_SET
 from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET
-from bespokeasm.assembler.keywords import EXPRESSION_FUNCTIONS_SET
-from bespokeasm.assembler.keywords import PREPROCESSOR_DIRECTIVES_SET
+from bespokeasm.assembler.keywords import expression_functions_for_isa
+from bespokeasm.assembler.keywords import preprocessor_directives_for_isa
 from bespokeasm.configgen import LanguageConfigGenerator
 from bespokeasm.configgen.color_scheme import DEFAULT_COLOR_SCHEME
 from bespokeasm.configgen.color_scheme import SyntaxElement
@@ -68,15 +68,61 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.REGISTER, 'variable.language', 'Variables - Language'),
             (SyntaxElement.CONSTANT_DEFINITION, 'variable.other.constant.definition', 'Constants - Definition'),
             (SyntaxElement.CONSTANT_USAGE, 'variable.other.constant.usage', 'Constants - Usage'),
+            (
+                SyntaxElement.FLOW_COORDINATE_DEFINITION,
+                'variable.other.flow.coordinate.definition',
+                'Flow Coordinates - Definitions',
+            ),
+            # Bare coordinate usages are tagged contextually by the semantic
+            # token provider in extension.js, not by the static grammar.
+            (
+                SyntaxElement.FLOW_COORDINATE_USAGE,
+                'variable.other.flow.coordinate.usage',
+                'Flow Coordinates - Usages',
+            ),
+            (
+                SyntaxElement.FLOW_COUNTER_NAME,
+                'variable.other.flow.counter',
+                'Flow Counters',
+            ),
+            (
+                SyntaxElement.FLOW_COUNTER_USAGE,
+                'variable.other.flow.counter.usage',
+                'Flow Counters - Usages',
+            ),
+            (
+                SyntaxElement.FLOW_COORDINATE_NAME,
+                'variable.other.flow.coordinate',
+                'Flow Coordinates',
+            ),
             (SyntaxElement.COMPILER_LABEL, 'constant.language', 'Variables - Language Defined'),
             (SyntaxElement.PREPROCESSOR, 'keyword.control.preprocessor', 'Keyword - Preprocessor'),
             (SyntaxElement.DATA_TYPE, 'storage.type', 'Data Types'),
             (SyntaxElement.OPERATOR, 'keyword.operator', 'Keyword - Operators'),
+            (
+                SyntaxElement.FLOW_OPERATOR,
+                'keyword.operator.flow',
+                'Keyword - Flow Operators',
+            ),
             (SyntaxElement.DIRECTIVE, 'keyword.other', 'Keyword - Other'),
             (SyntaxElement.PUNCTUATION_PREPROCESSOR, 'punctuation.definition.preprocessor', 'Punctuation - Preprocessor'),
             (SyntaxElement.PUNCTUATION_SEPARATOR, 'punctuation.separator', 'Punctuation - Separator'),
             (SyntaxElement.PUNCTUATION_VARIABLE, 'punctuation.definition.variable', 'Punctuation - Variable'),
         ]
+        if not self.model.flow_counters_enabled:
+            flow_coordinate_elements = {
+                SyntaxElement.FLOW_COORDINATE_NAME,
+                SyntaxElement.FLOW_COORDINATE_DEFINITION,
+                SyntaxElement.FLOW_COORDINATE_USAGE,
+                SyntaxElement.FLOW_COUNTER_NAME,
+                SyntaxElement.FLOW_COUNTER_USAGE,
+                SyntaxElement.FLOW_OPERATOR,
+            }
+            scope_mappings = [
+                mapping
+                for mapping in scope_mappings
+                if mapping[0] not in flow_coordinate_elements
+            ]
 
         rules = []
 
@@ -179,6 +225,17 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             for entry in package_json['contributes']['semanticTokenScopes']:
                 if isinstance(entry, dict) and entry.get('language') == '##LANGUAGE_ID##':
                     entry['language'] = self.language_id
+        if not self.model.flow_counters_enabled:
+            # The flowCoordinate semantic token exists only for flow-enabled
+            # ISAs; a non-flow extension ships no flow scopes at all.
+            package_json['contributes']['semanticTokenTypes'] = [
+                token_type
+                for token_type in package_json['contributes'].get('semanticTokenTypes', [])
+                if token_type.get('id') != 'flowCoordinate'
+            ]
+            for entry in package_json['contributes'].get('semanticTokenScopes', []):
+                if isinstance(entry, dict):
+                    entry.get('scopes', {}).pop('flowCoordinate', None)
         package_json['contributes']['themes'][0]['label'] = \
             package_json['contributes']['themes'][0]['label'].replace('##LANGUAGE_ID##', self.language_name)
         package_json['contributes']['themes'][0]['path'] = './' + theme_filename
@@ -202,7 +259,36 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
         with open(fp) as json_file:
             grammar_json = json.load(json_file)
 
+        self._replace_symbol_pattern_tokens(grammar_json)
         grammar_json['scopeName'] = scope_name
+        if not self.model.flow_counters_enabled:
+            del grammar_json['repository']['counter_coordinates']
+            del grammar_json['repository']['flow_counter_usages']
+            del grammar_json['repository']['flow_counter_directives']
+            del grammar_json['repository']['flow_operators']
+            grammar_json['repository']['main']['patterns'] = [
+                pattern
+                for pattern in grammar_json['repository']['main']['patterns']
+                if pattern.get('include') != '#counter_coordinates'
+            ]
+            grammar_json['repository']['operators']['patterns'] = [
+                pattern
+                for pattern in grammar_json['repository']['operators']['patterns']
+                if pattern.get('include') not in {
+                    '#flow_counter_usages',
+                    '#flow_operators',
+                }
+            ]
+            preprocessor = next(
+                pattern
+                for pattern in grammar_json['repository']['directives']['patterns']
+                if pattern.get('name') == 'meta.preprocessor'
+            )
+            preprocessor['patterns'] = [
+                pattern
+                for pattern in preprocessor['patterns']
+                if pattern.get('include') != '#flow_counter_directives'
+            ]
         # handle instructions
         grammar_json['repository']['instructions']['begin'] = self._replace_token_with_regex_list(
             grammar_json['repository']['instructions']['begin'],
@@ -277,22 +363,20 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
                 for pattern in item['patterns']:
                     if 'name' in pattern and 'keyword.control.preprocessor' == pattern['name']:
                         # Sort by length (desc) to avoid prefix matches like 'if' matching 'ifdef'
-                        preprocessor_regex = '|'.join(sorted(PREPROCESSOR_DIRECTIVES_SET, key=len, reverse=True))
+                        preprocessor_regex = '|'.join(sorted(
+                            preprocessor_directives_for_isa(self.model.flow_counters_enabled),
+                            key=len,
+                            reverse=True,
+                        ))
                         preprocesspr_str = pattern['match']
                         pattern['match'] = preprocesspr_str.replace('##PREPROCESSOR##', preprocessor_regex)
 
         # handle expresion functions
         for item in grammar_json['repository']['operators']['patterns']:
-            if 'keyword.operator.word' == item['name']:
-                func_regex = '|'.join([d for d in EXPRESSION_FUNCTIONS_SET])
+            if 'keyword.operator.word' == item.get('name'):
+                func_regex = '|'.join(expression_functions_for_isa(self.model.flow_counters_enabled))
                 func_str = item['match']
                 item['match'] = func_str.replace('##EXPRESSION_FUNCTIONS##', func_regex)
-
-        operand_label_defs = grammar_json['repository'].get('operand_label_definitions')
-        if operand_label_defs:
-            for pattern in operand_label_defs.get('patterns', []):
-                if isinstance(pattern, dict) and 'match' in pattern:
-                    pattern['match'] = pattern['match'].replace('##LABEL_PATTERN##', self._label_pattern())
 
         tmGrammar_fp = os.path.join(extension_dir_path, 'syntaxes', 'tmGrammar.json')
         with open(tmGrammar_fp, 'w', encoding='utf-8') as f:
@@ -342,11 +426,26 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             )
         else:
             register_pattern = '(?!)'
+        self._replace_token_in_file(
+            extension_fp,
+            '##DECLARATION_OPERATOR##',
+            ':=' if self.model.flow_counters_enabled else '',
+        )
         self._replace_token_in_file(extension_fp, '##LABEL_PATTERN##', label_pattern)
+        self._replace_token_in_file(
+            extension_fp,
+            '##CONSTANT_PATTERN##',
+            self._constant_pattern(),
+        )
         self._replace_token_in_file(extension_fp, '##MNEMONIC_PATTERN##', mnemonic_pattern)
         self._replace_token_in_file(extension_fp, '##REGISTERS##', register_pattern)
         self._replace_token_in_file(label_hover_fp, '##LABEL_PATTERN##', label_pattern)
         self._replace_token_in_file(constants_hover_fp, '##LABEL_PATTERN##', label_pattern)
+        self._replace_token_in_file(
+            constants_hover_fp,
+            '##CONSTANT_PATTERN##',
+            self._constant_pattern(),
+        )
 
         # Generate theme file from central color configuration
         theme_json = self._generate_theme_json(self.language_id)

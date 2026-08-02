@@ -6,11 +6,6 @@ import unittest
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.engine import Assembler
-from bespokeasm.assembler.label_scope import GlobalLabelScope
-from bespokeasm.assembler.label_scope import LabelScope
-from bespokeasm.assembler.label_scope import LabelScopeType
-from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
-from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object import LineWithWords
@@ -21,6 +16,11 @@ from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
+from bespokeasm.assembler.symbol_scope import GlobalSymbolScope
+from bespokeasm.assembler.symbol_scope import SymbolScope
+from bespokeasm.assembler.symbol_scope import SymbolScopeType
+from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
+from bespokeasm.assembler.symbol_scope.named_scope_manager import NamedScopeManager
 
 from test import config_files
 
@@ -39,7 +39,7 @@ class TestAssemblerEngine(unittest.TestCase):
             isa_model.predefined_memory_zones,
         )
 
-        label_values = GlobalLabelScope(isa_model.registers)
+        label_values = GlobalSymbolScope(isa_model.registers)
         label_values.set_label_value('a_const', 40, 1)
         preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
         condition_stack = ConditionStack(self.diagnostic_reporter)
@@ -100,10 +100,10 @@ class TestAssemblerEngine(unittest.TestCase):
         for lobj in line_objects:
             lobj.set_start_address(lobj.memory_zone.current_address)
             lobj.memory_zone.current_address = lobj.address + lobj.word_count
-            lobj.label_scope = label_values
+            lobj.symbol_scope = label_values
             lobj.active_named_scopes = active_named_scopes
             if isinstance(lobj, LabelLine) and not lobj.is_constant:
-                lobj.label_scope.set_label_value(lobj.get_label(), lobj.get_value(), lobj.line_id)
+                lobj.symbol_scope.set_label_value(lobj.get_label(), lobj.get_value(), lobj.line_id)
             line_dict[lobj.address] = lobj
 
         line_objects.sort(key=lambda x: x.address)
@@ -138,7 +138,7 @@ class TestAssemblerEngine(unittest.TestCase):
             isa_model.predefined_memory_zones,
         )
 
-        label_values = GlobalLabelScope(isa_model.registers)
+        label_values = GlobalSymbolScope(isa_model.registers)
         label_values.set_label_value('a_const', 40, 1)
         preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
         condition_stack = ConditionStack(self.diagnostic_reporter)
@@ -210,10 +210,10 @@ class TestAssemblerEngine(unittest.TestCase):
         for lobj in line_objects:
             lobj.set_start_address(lobj.memory_zone.current_address)
             lobj.memory_zone.current_address = lobj.address + lobj.word_count
-            lobj.label_scope = label_values
+            lobj.symbol_scope = label_values
             lobj.active_named_scopes = active_named_scopes
             if isinstance(lobj, LabelLine) and not lobj.is_constant:
-                lobj.label_scope.set_label_value(lobj.get_label(), lobj.get_value(), lobj.line_id)
+                lobj.symbol_scope.set_label_value(lobj.get_label(), lobj.get_value(), lobj.line_id)
             line_dict[lobj.address] = lobj
 
         line_objects.sort(key=lambda x: x.address)
@@ -379,6 +379,90 @@ class TestAssemblerEngine(unittest.TestCase):
         self.assertIn('target address 0x29fa', error_text)
         self.assertIn('line 2', str(ctx.exception))
 
+    def _assemble_to_binary(self, asm_source: str, fill_value: int) -> bytes:
+        """Assemble a source string with eater-sap1-isa.yaml and return the binary image."""
+        fp = pkg_resources.files(config_files).joinpath('eater-sap1-isa.yaml')
+        with tempfile.TemporaryDirectory() as temp_dir:
+            asm_path = os.path.join(temp_dir, 'image.asm')
+            out_path = os.path.join(temp_dir, 'image.bin')
+            with open(asm_path, 'w') as handle:
+                handle.write(asm_source)
+            assembler = Assembler(
+                source_file=asm_path,
+                config_file=str(fp),
+                generate_binary=True,
+                output_file=out_path,
+                binary_start=0,
+                binary_end=None,
+                binary_fill_value=fill_value,
+                enable_pretty_print=False,
+                pretty_print_format=None,
+                pretty_print_output=None,
+                is_verbose=0,
+                include_paths=[temp_dir],
+                predefined=[],
+            )
+            assembler.assemble_bytecode()
+            with open(out_path, 'rb') as handle:
+                return handle.read()
+
+    def test_trailing_muted_lines_do_not_extend_binary_image(self):
+        """Bug: trailing #mute'd content silently extended the binary image with fill words.
+
+        The flow-counters M0 image-extent rewrite sized the binary from lines that
+        emit words (``word_count > 0``) but did not exclude muted lines, while the
+        emission ``line_dict`` right below it does exclude them. The result was
+        inconsistent in both directions: ``nop / #mute / .byte 1,2,3`` produced a
+        4-byte image (the nop plus three *fill* bytes standing in for the muted
+        data) even though #mute suppresses emission entirely.
+
+        Expected behavior: muted lines occupy address space (so later unmuted code
+        keeps its layout) but never contribute to the image's emission extent. A
+        muted region *between* unmuted lines is still covered by fill because the
+        later unmuted line extends the image past it; a muted region at the *end*
+        of the image simply does not extend it.
+        """
+        # trailing muted content: image ends at the last unmuted emitted word
+        trailing = self._assemble_to_binary(
+            '    nop\n'
+            '#mute\n'
+            '    .byte 1,2,3\n',
+            fill_value=0xAA,
+        )
+        self.assertEqual(trailing, bytes([0x00]))
+
+        # interior muted content: address space is preserved and filled
+        interior = self._assemble_to_binary(
+            '    nop\n'
+            '#mute\n'
+            '    .byte 1,2,3\n'
+            '#unmute\n'
+            '    nop\n',
+            fill_value=0xAA,
+        )
+        self.assertEqual(interior, bytes([0x00, 0xAA, 0xAA, 0xAA, 0x00]))
+
+    def test_trailing_zero_width_lines_do_not_pad_binary_image(self):
+        """Pins a deliberate behavior change introduced with the flow-counters work.
+
+        Through v0.7.x the binary image extent was computed from the *last sorted
+        line object's address*, so a trailing zero-width line — a label, a ``.org``,
+        or now a flow directive such as ``#endtrack`` — padded the image with a
+        fill word at its address (``nop / nop / end:`` emitted 3 bytes, the last
+        being fill). The image extent is now computed from emitted words only,
+        which is required so that trailing analysis-only lines cannot change the
+        image and is the more sensible behavior in its own right. This test pins
+        the new behavior; if it ever needs to change again, that must be a
+        deliberate, documented decision.
+        """
+        image = self._assemble_to_binary(
+            '    nop\n'
+            '    nop\n'
+            'end_of_code:\n',
+            fill_value=0xAA,
+        )
+        self.assertEqual(image, bytes([0x00, 0x00]))
+
     def test_generate_bytes_from_line_objects_4bit_words_with_fill(self):
         # Simulate a 4-bit word ISA with a gap, so fill_word is used and must be packed
         class DummyLineWithWords(LineWithWords):
@@ -416,7 +500,7 @@ class TestAssemblerEngine(unittest.TestCase):
         )
         self.assertEqual(bytecode, bytearray([0xAF, 0xB0]), 'fill_word should be packed with real words correctly')
 
-    def test_operand_label_scope_prefix_behavior(self):
+    def test_operand_symbol_scope_prefix_behavior(self):
         fp = pkg_resources.files(config_files).joinpath('test_operand_labels.yaml')
         isa_model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
@@ -425,9 +509,9 @@ class TestAssemblerEngine(unittest.TestCase):
             isa_model.predefined_memory_zones,
         )
 
-        global_scope = GlobalLabelScope(isa_model.registers)
-        file_scope = LabelScope(LabelScopeType.FILE, global_scope, 'scope_test.asm')
-        local_scope = LabelScope(LabelScopeType.LOCAL, file_scope, 'anchor')
+        global_scope = GlobalSymbolScope(isa_model.registers)
+        file_scope = SymbolScope(SymbolScopeType.FILE, global_scope, 'scope_test.asm')
+        local_scope = SymbolScope(SymbolScopeType.LOCAL, file_scope, 'anchor')
 
         named_scope_manager = NamedScopeManager(self.diagnostic_reporter)
         named_scope_manager.create_scope('lib', 'lib_', LineIdentifier(1, 'scope_test.asm'))
@@ -444,7 +528,7 @@ class TestAssemblerEngine(unittest.TestCase):
         )
         self.assertIsInstance(local_instr, InstructionLine)
         local_instr.set_start_address(0)
-        local_instr.label_scope = local_scope
+        local_instr.symbol_scope = local_scope
         local_instr.active_named_scopes = active_named_scopes
         local_instr.register_operand_labels(named_scope_manager)
         self.assertEqual(
@@ -463,7 +547,7 @@ class TestAssemblerEngine(unittest.TestCase):
         )
         self.assertIsInstance(file_instr, InstructionLine)
         file_instr.set_start_address(2)
-        file_instr.label_scope = local_scope
+        file_instr.symbol_scope = local_scope
         file_instr.active_named_scopes = active_named_scopes
         file_instr.register_operand_labels(named_scope_manager)
         self.assertEqual(
@@ -482,7 +566,7 @@ class TestAssemblerEngine(unittest.TestCase):
         )
         self.assertIsInstance(global_instr, InstructionLine)
         global_instr.set_start_address(4)
-        global_instr.label_scope = local_scope
+        global_instr.symbol_scope = local_scope
         global_instr.active_named_scopes = active_named_scopes
         global_instr.register_operand_labels(named_scope_manager)
         self.assertEqual(
@@ -501,7 +585,7 @@ class TestAssemblerEngine(unittest.TestCase):
         )
         self.assertIsInstance(named_instr, InstructionLine)
         named_instr.set_start_address(6)
-        named_instr.label_scope = local_scope
+        named_instr.symbol_scope = local_scope
         named_instr.active_named_scopes = active_named_scopes
         named_instr.register_operand_labels(named_scope_manager)
 
@@ -524,9 +608,9 @@ class TestAssemblerEngine(unittest.TestCase):
 
         named_scope_manager = NamedScopeManager(self.diagnostic_reporter)
         active_named_scopes = ActiveNamedScopeList(named_scope_manager)
-        global_scope = GlobalLabelScope(isa_model.registers)
-        file_scope = LabelScope(LabelScopeType.FILE, global_scope, 'dupe.asm')
-        local_scope = LabelScope(LabelScopeType.LOCAL, file_scope, 'anchor')
+        global_scope = GlobalSymbolScope(isa_model.registers)
+        file_scope = SymbolScope(SymbolScopeType.FILE, global_scope, 'dupe.asm')
+        local_scope = SymbolScope(SymbolScopeType.LOCAL, file_scope, 'anchor')
 
         first = InstructionLine.factory(
             LineIdentifier(1, 'dupe.asm'),
@@ -538,7 +622,7 @@ class TestAssemblerEngine(unittest.TestCase):
         )
         self.assertIsInstance(first, InstructionLine)
         first.set_start_address(0)
-        first.label_scope = local_scope
+        first.symbol_scope = local_scope
         first.active_named_scopes = active_named_scopes
         first.register_operand_labels(named_scope_manager)
 
@@ -552,9 +636,49 @@ class TestAssemblerEngine(unittest.TestCase):
         )
         self.assertIsInstance(second, InstructionLine)
         second.set_start_address(2)
-        second.label_scope = local_scope
+        second.symbol_scope = local_scope
         second.active_named_scopes = active_named_scopes
 
         with self.assertRaises(SystemExit) as duplicate_error:
             second.register_operand_labels(named_scope_manager)
         self.assertIn('defined multiple times', str(duplicate_error.exception))
+
+    def test_binary_image_ends_at_last_emitted_word(self):
+        """A trailing zero-width line (e.g. a label marking a runtime buffer)
+        does not extend the binary image: the image ends at the last emitted
+        word, not at the last line object's address. Locks the behavior
+        introduced when max_generated_address switched from the last line
+        object's address to the last emitted word."""
+        fp = pkg_resources.files(config_files).joinpath('eater-sap1-isa.yaml')
+
+        def _assemble(source_text: str, temp_dir: str, name: str) -> bytes:
+            SymbolScope._global_scope = None
+            source_path = os.path.join(temp_dir, f'{name}.asm')
+            output_path = os.path.join(temp_dir, f'{name}.bin')
+            with open(source_path, 'w', encoding='utf-8') as source_file:
+                source_file.write(source_text)
+            assembler = Assembler(
+                source_file=source_path,
+                config_file=str(fp),
+                generate_binary=True,
+                output_file=output_path,
+                binary_start=0,
+                binary_end=None,
+                binary_fill_value=0,
+                enable_pretty_print=False,
+                pretty_print_format=None,
+                pretty_print_output=None,
+                is_verbose=0,
+                include_paths=[],
+                predefined=[],
+            )
+            assembler.assemble_bytecode()
+            with open(output_path, 'rb') as output_file:
+                return output_file.read()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            without_label = _assemble('lda 1\nhlt\n', temp_dir, 'plain')
+            with_label = _assemble('lda 1\nhlt\nBUFFER:\n', temp_dir, 'labeled')
+
+        self.assertTrue(len(without_label) > 0)
+        self.assertEqual(with_label, without_label)

@@ -11,9 +11,10 @@ import operator
 import re
 import sys
 
-from bespokeasm.assembler.label_scope import LabelScope
-from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.symbol_scope import SymbolScope
+from bespokeasm.assembler.symbol_scope.flow_symbols import FlowSymbolError
+from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.utilities import is_explicit_numeric_string
 from bespokeasm.utilities import is_unprefixed_numeric_string
 from bespokeasm.utilities import is_valid_label
@@ -23,10 +24,21 @@ from bespokeasm.utilities import PATTERN_CHARACTER_ORDINAL
 from bespokeasm.utilities import PATTERN_HEX
 
 EXPRESSION_PARTS_PATTERN = \
-    r'(?:(?:\%|b)[01]+|{}|[\+\-\*\/\&\|\^\(\)]|>>|<<|%|LSB\(|BYTE\d\(|(?:\.|_)?\w+|{}|[><])'.format(
+    r'(?:(?:\%|b)[01]+|{}|[\+\-\*\/\&\|\^\(\)]|>>|<<|%|COUNTER\(|LSB\(|BYTE\d\(|(?:\.|_)?\w+|{}|[><])'.format(
         PATTERN_HEX,
         PATTERN_CHARACTER_ORDINAL,
     )
+
+
+class ExpressionUseContext(enum.Enum):
+    """The assembly context in which an expression is consumed."""
+
+    OPERAND_VALUE = 'operand_value'
+    DATA_VALUE = 'data_value'
+    FLOW_DIRECTIVE = 'flow_directive'
+    LAYOUT = 'layout'
+    PREPROCESSOR_CONDITION = 'preprocessor_condition'
+    INSTRUCTION_SELECTION = 'instruction_selection'
 
 
 class TokenType(enum.Enum):
@@ -49,6 +61,7 @@ class TokenType(enum.Enum):
     T_LPAR = 16
     T_RPAR = 17
     T_END = 18
+    T_COUNTER = 19
 
 
 class ExpressionNode:
@@ -72,7 +85,11 @@ class ExpressionNode:
         self.default_numeric_base = normalize_default_numeric_base(default_numeric_base)
         self.left_child: ExpressionNode = None
         self.right_child: ExpressionNode = None
-        self._is_unary = token_type in [TokenType.T_BYTE, TokenType.T_LSB]
+        self._is_unary = token_type in [
+            TokenType.T_BYTE,
+            TokenType.T_LSB,
+            TokenType.T_COUNTER,
+        ]
 
     def __repr__(self):
         return str(self)
@@ -85,32 +102,102 @@ class ExpressionNode:
         return self.token_type in [
             TokenType.T_BYTE,
             TokenType.T_LSB,
+            TokenType.T_COUNTER,
             TokenType.T_NEGATION,
         ]
 
+    @property
+    def expression_context(self) -> ExpressionUseContext | None:
+        """Return the use context attached by deferred analysis parsing."""
+        return getattr(self, '_expression_context', None)
+
+    def deferred_flow_nodes(self) -> tuple:
+        """Return deferred flow-expression nodes in source-tree order."""
+        nodes = []
+        if self.token_type == TokenType.T_COUNTER:
+            nodes.append(self)
+        if self.left_child is not None:
+            nodes.extend(self.left_child.deferred_flow_nodes())
+        if not self.is_unary and self.right_child is not None:
+            nodes.extend(self.right_child.deferred_flow_nodes())
+        return tuple(nodes)
+
+    def coordinate_candidate_nodes(self) -> tuple:
+        """Return label leaves that may name counter coordinates.
+
+        A bare counter-coordinate reference is lexically indistinguishable
+        from an ordinary label, so candidacy is decided by the analysis pass
+        via scope lookup; non-coordinate labels pass through untouched.
+        ``T_LABEL_OR_NUM`` tokens are excluded because their numeric fallback
+        outranks any coordinate interpretation.
+        """
+        if self.token_type == TokenType.T_COUNTER:
+            # The argument is a counter name operand, never a value.
+            return ()
+        nodes = []
+        if (
+            self.token_type == TokenType.T_LABEL
+            and self.left_child is None
+            and self.right_child is None
+        ):
+            nodes.append(self)
+        if self.left_child is not None:
+            nodes.extend(self.left_child.coordinate_candidate_nodes())
+        if not self.is_unary and self.right_child is not None:
+            nodes.extend(self.right_child.coordinate_candidate_nodes())
+        return tuple(nodes)
+
+    def resolve_flow_value(self, value: int) -> None:
+        """Attach the value computed by the static-analysis pass."""
+        if self.token_type not in [TokenType.T_COUNTER, TokenType.T_LABEL]:
+            raise TypeError('only flow-expression nodes can receive a flow value')
+        self._resolved_flow_value = value
+
     def _numeric_value(
         self,
-        label_scope: LabelScope | None,
+        symbol_scope: SymbolScope | None,
         active_named_scopes: ActiveNamedScopeList,
         line_id: LineIdentifier,
     ) -> int:
         if self.token_type == TokenType.T_NUM:
             return self.value
         elif self.token_type in [TokenType.T_LABEL, TokenType.T_LABEL_OR_NUM]:
-            if label_scope is None:
+            if symbol_scope is None:
                 if self.token_type == TokenType.T_LABEL_OR_NUM:
                     return parse_numeric_string(self.value, self.default_numeric_base)
-                sys.exit(f'ERROR - INTERNAL: {line_id} - Label {self.value} has no label scope = {self}')
+                sys.exit(f'ERROR - INTERNAL: {line_id} - Label {self.value} has no symbol scope = {self}')
             # in ths case value is a label
             if active_named_scopes is not None:
                 val = active_named_scopes.named_scope_manager.get_label_value(
-                    self.value, label_scope, active_named_scopes, line_id
+                    self.value, symbol_scope, active_named_scopes, line_id
                 )
             else:
-                val = label_scope.get_label_value(self.value, line_id)
-            if val is None and self.token_type == TokenType.T_LABEL_OR_NUM:
-                return parse_numeric_string(self.value, self.default_numeric_base)
+                val = symbol_scope.get_label_value(self.value, line_id)
             if val is None:
+                # The numeric fallback must win before any coordinate lookup:
+                # a token that is a valid numeral in the default base resolved
+                # numerically before flow counters existed, and strip
+                # equivalence requires it to keep doing so. Coordinate
+                # diagnostics apply only to otherwise-unresolvable references.
+                if self.token_type == TokenType.T_LABEL_OR_NUM:
+                    return parse_numeric_string(self.value, self.default_numeric_base)
+                if hasattr(self, '_resolved_flow_value'):
+                    return self._resolved_flow_value
+                coordinate = (
+                    active_named_scopes.named_scope_manager.get_counter_coordinate(
+                        self.value,
+                        symbol_scope,
+                        active_named_scopes,
+                    )
+                    if active_named_scopes is not None
+                    else symbol_scope.get_counter_coordinate(self.value)
+                )
+                if coordinate is not None:
+                    raise FlowSymbolError(
+                        f'counter coordinate "{self.value}" resolves only in '
+                        'instruction operand values, data values, and flow '
+                        'directives'
+                    )
                 sys.exit(f'ERROR: {line_id} - Label {self.value} resolves to NONE = {self}')
             return val
         else:
@@ -119,17 +206,30 @@ class ExpressionNode:
 
     def _compute(
         self,
-        label_scope: LabelScope,
+        symbol_scope: SymbolScope,
         active_named_scopes: ActiveNamedScopeList,
         line_id: LineIdentifier
     ) -> int:
         if self.token_type in [TokenType.T_NUM, TokenType.T_LABEL, TokenType.T_LABEL_OR_NUM]:
-            return self._numeric_value(label_scope, active_named_scopes, line_id)
+            return self._numeric_value(symbol_scope, active_named_scopes, line_id)
+        if self.token_type == TokenType.T_COUNTER:
+            if hasattr(self, '_resolved_flow_value'):
+                return self._resolved_flow_value
+            # DiagnosticReporter is fail-fast, so ordinary compilation never
+            # reaches this backstop after analysis reports an unresolved flow
+            # operand. If reporting becomes accumulating, the assembler must
+            # skip byte generation whenever recorded errors remain; this
+            # RuntimeError intentionally continues to guard against emitting a
+            # guessed value in the meantime.
+            raise RuntimeError(
+                'deferred flow expression reached numeric evaluation before '
+                'the static-analysis pass resolved it'
+            )
         if self.token_type in [TokenType.T_LSB, TokenType.T_BYTE]:
             byte_idx = 0
             if self.token_type == TokenType.T_BYTE:
                 byte_idx = int(self.value[4])
-            arg_value = int(self.left_child._compute(label_scope, active_named_scopes, line_id))
+            arg_value = int(self.left_child._compute(symbol_scope, active_named_scopes, line_id))
             byte_count = max(((abs(arg_value).bit_length() + 7) // 8), byte_idx+1)
             masked_arg = arg_value & (2**(8 * byte_count) - 1)
             try:
@@ -140,12 +240,12 @@ class ExpressionNode:
                 )
             return arg_value_bytes[byte_idx]
         elif self.token_type == TokenType.T_NEGATION:
-            arg_value = self.left_child._compute(label_scope, active_named_scopes, line_id)
+            arg_value = self.left_child._compute(symbol_scope, active_named_scopes, line_id)
             operation = ExpressionNode._operations[self.token_type]
             return operation(arg_value)
         else:
-            left_result = self.left_child._compute(label_scope, active_named_scopes, line_id)
-            right_result = self.right_child._compute(label_scope, active_named_scopes, line_id)
+            left_result = self.left_child._compute(symbol_scope, active_named_scopes, line_id)
+            right_result = self.right_child._compute(symbol_scope, active_named_scopes, line_id)
             operation = ExpressionNode._operations[self.token_type]
             if self.token_type in [
                         TokenType.T_AND,
@@ -163,14 +263,16 @@ class ExpressionNode:
 
     def get_value(
         self,
-        label_scope: LabelScope,
+        symbol_scope: SymbolScope,
         active_named_scopes: ActiveNamedScopeList,
         line_id: LineIdentifier
     ) -> int:
-        calculated_value = self._compute(label_scope, active_named_scopes, line_id)
+        calculated_value = self._compute(symbol_scope, active_named_scopes, line_id)
         return int(calculated_value)
 
     def contains_register_labels(self, register_labels: set[str]) -> bool:
+        if self.token_type == TokenType.T_COUNTER:
+            return False
         if self.token_type in [TokenType.T_LABEL, TokenType.T_LABEL_OR_NUM]:
             return self.value in register_labels
         if self.token_type == TokenType.T_NUM:
@@ -182,6 +284,8 @@ class ExpressionNode:
         return False
 
     def contained_labels(self) -> set[str]:
+        if self.token_type == TokenType.T_COUNTER:
+            return set()
         if self.token_type == TokenType.T_LABEL:
             return {self.value}
         elif self.token_type in [TokenType.T_NUM, TokenType.T_LABEL_OR_NUM]:
@@ -197,6 +301,54 @@ def parse_expression(
     line_id: LineIdentifier,
     expression: str,
     default_numeric_base: str = 'decimal',
+    *,
+    context: ExpressionUseContext | None = None,
+) -> ExpressionNode:
+    """Parse a source numeric expression with deferred flow-value support."""
+    ast = _parse_expression_ast(line_id, expression, default_numeric_base)
+    flow_nodes = ast.deferred_flow_nodes()
+    if flow_nodes and context is None:
+        raise SyntaxError(
+            f'ERROR: {line_id} - flow expression has no tagged use context'
+        )
+    if flow_nodes and context not in {
+        ExpressionUseContext.OPERAND_VALUE,
+        ExpressionUseContext.DATA_VALUE,
+        ExpressionUseContext.FLOW_DIRECTIVE,
+    }:
+        raise SyntaxError(
+            f'ERROR: {line_id} - flow expressions are not allowed in '
+            f'{context.value.replace("_", " ")} expressions'
+        )
+    for node in flow_nodes:
+        node._expression_context = context
+    return ast
+
+
+def parse_deferred_flow_expression(
+    line_id: LineIdentifier,
+    expression: str,
+    context: ExpressionUseContext,
+    default_numeric_base: str = 'decimal',
+) -> ExpressionNode:
+    """Parse and context-tag flow operators without evaluating or exposing them.
+
+    This analysis-only M0 entry point gives later milestones a stable parsed
+    representation. Normal source parsing continues through ``parse_expression``
+    and rejects these operators until their semantics ship.
+    """
+    if not isinstance(context, ExpressionUseContext):
+        raise TypeError('context must be an ExpressionUseContext')
+    ast = _parse_expression_ast(line_id, expression, default_numeric_base)
+    for node in ast.deferred_flow_nodes():
+        node._expression_context = context
+    return ast
+
+
+def _parse_expression_ast(
+    line_id: LineIdentifier,
+    expression: str,
+    default_numeric_base: str,
 ) -> ExpressionNode:
     tokens = _lexical_analysis(line_id, expression, default_numeric_base)
     ast = _parse_e(line_id, tokens)
@@ -218,6 +370,7 @@ TOKEN_MAPPINGS = {
     '(': TokenType.T_LPAR,
     ')': TokenType.T_RPAR,
     'LSB(': TokenType.T_LSB,
+    'COUNTER(': TokenType.T_COUNTER,
 }
 
 
@@ -380,7 +533,11 @@ def _parse_e4(line_id: LineIdentifier, tokens: list[ExpressionNode]) -> Expressi
     if tokens[0].token_type in [TokenType.T_NUM, TokenType.T_LABEL, TokenType.T_LABEL_OR_NUM]:
         return tokens.pop(0)
 
-    if tokens[0].token_type in [TokenType.T_LSB, TokenType.T_BYTE]:
+    if tokens[0].token_type in [
+        TokenType.T_LSB,
+        TokenType.T_BYTE,
+        TokenType.T_COUNTER,
+    ]:
         node = tokens.pop(0)
         node.left_child = _parse_e(line_id, tokens)
         _match(line_id, tokens, TokenType.T_RPAR)

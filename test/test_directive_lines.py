@@ -4,11 +4,6 @@ import unittest
 
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
-from bespokeasm.assembler.label_scope import GlobalLabelScope
-from bespokeasm.assembler.label_scope import LabelScope
-from bespokeasm.assembler.label_scope import LabelScopeType
-from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
-from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object import LineWithWords
@@ -19,6 +14,11 @@ from bespokeasm.assembler.line_object.directive_line.fill_data import FillUntilD
 from bespokeasm.assembler.line_object.directive_line.page_align import PageAlignLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.assembler.symbol_scope import GlobalSymbolScope
+from bespokeasm.assembler.symbol_scope import SymbolScope
+from bespokeasm.assembler.symbol_scope import SymbolScopeType
+from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
+from bespokeasm.assembler.symbol_scope.named_scope_manager import NamedScopeManager
 
 from test import config_files
 
@@ -44,7 +44,7 @@ class TestDirectiveLines(unittest.TestCase):
         self.diagnostic_reporter = DiagnosticReporter()
 
     def test_org_directive(self):
-        label_values = GlobalLabelScope(['a', 'b', 'sp', 'mar'])
+        label_values = GlobalSymbolScope(['a', 'b', 'sp', 'mar'])
         label_values.set_label_value('a_const', 12, 1)
 
         o1: LineObject = DirectiveLine.factory(
@@ -102,7 +102,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.memory_zone_manager,
             TestDirectiveLines.isa_model,
         )
-        o5.label_scope = label_values
+        o5.symbol_scope = label_values
         o5.active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         self.assertIsInstance(o5, AddressOrgLine)
         self.assertEqual(o5.address, 12)
@@ -116,7 +116,7 @@ class TestDirectiveLines(unittest.TestCase):
                 TestDirectiveLines.memory_zone_manager,
                 TestDirectiveLines.isa_model,
             )
-            e1.label_scope = label_values
+            e1.symbol_scope = label_values
             e1.active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
             e1.address
 
@@ -129,7 +129,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.memory_zone_manager,
             TestDirectiveLines.isa_model,
         )
-        o6.label_scope = label_values
+        o6.symbol_scope = label_values
         o6.active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         self.assertIsInstance(o6, AddressOrgLine)
         self.assertEqual(o6.address, 14)
@@ -142,14 +142,14 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.memory_zone_manager,
             TestDirectiveLines.isa_model,
         )
-        o7.label_scope = label_values
+        o7.symbol_scope = label_values
         o7.active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         self.assertIsInstance(o7, AddressOrgLine)
         self.assertEqual(o7.address, 15)
 
     def test_fill_directive(self):
 
-        label_values = GlobalLabelScope(['a', 'b', 'sp', 'mar'])
+        label_values = GlobalSymbolScope(['a', 'b', 'sp', 'mar'])
         label_values.set_label_value('forty', 40, 1)
         label_values.set_label_value('eff', 0x0F, 1)
         label_values.set_label_value('high_de', 0xde00, 1)
@@ -164,7 +164,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o1, FillDataLine)
-        o1.label_scope = label_values
+        o1.symbol_scope = label_values
         o1.active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         self.assertEqual(o1.word_count, 32, 'has 32 words')
         o1.generate_words()
@@ -188,7 +188,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o2, FillDataLine)
-        o2.label_scope = label_values
+        o2.symbol_scope = label_values
         o2.active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         self.assertEqual(o2.word_count, 255, 'has 255 words')
         o2.generate_words()
@@ -210,7 +210,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o2b, FillDataLine)
-        o2b.label_scope = label_values
+        o2b.symbol_scope = label_values
         o2b.active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         self.assertEqual(o2b.word_count, 161, 'has 161 words')
         o2b.generate_words()
@@ -232,7 +232,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o3, FillDataLine)
-        o3.label_scope = label_values
+        o3.symbol_scope = label_values
         o3.active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         self.assertEqual(o3.word_count, 4, 'has 4 words')
         o3.generate_words()
@@ -255,7 +255,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o4, FillDataLine)
-        o4.label_scope = label_values
+        o4.symbol_scope = label_values
         o4.active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         self.assertEqual(o4.word_count, 40, 'has 40 words')
         o4.generate_words()
@@ -277,7 +277,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o5, FillDataLine)
-        o5.label_scope = label_values
+        o5.symbol_scope = label_values
         o5.active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         self.assertEqual(o5.word_count, 15, 'has 15 words')
         o5.generate_words()
@@ -299,7 +299,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o6, FillDataLine)
-        o6.label_scope = label_values
+        o6.symbol_scope = label_values
         o6.active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         self.assertEqual(o6.word_count, 30, 'has 30 words')
         o6.generate_words()
@@ -321,7 +321,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o6, FillDataLine)
-        o6.label_scope = label_values
+        o6.symbol_scope = label_values
         o6.active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         self.assertEqual(o6.word_count, 42, 'has 42 words')
         o6.generate_words()
@@ -343,7 +343,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.isa_model,
         )
         self.assertIsInstance(o7, FillDataLine)
-        o7.label_scope = label_values
+        o7.symbol_scope = label_values
         o7.active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         self.assertEqual(o7.word_count, 168, 'has 168 words')
         o7.generate_words()
@@ -357,7 +357,7 @@ class TestDirectiveLines(unittest.TestCase):
         ], 'truncated values')
 
     def test_filluntil_directive(self):
-        label_values = LabelScope(LabelScopeType.GLOBAL, None, 'global')
+        label_values = SymbolScope(SymbolScopeType.GLOBAL, None, 'global')
         label_values.set_label_value('my_label', 0x80, 1)
 
         o1 = DirectiveLine.factory(
@@ -370,7 +370,7 @@ class TestDirectiveLines(unittest.TestCase):
         )
         self.assertIsInstance(o1, FillUntilDataLine)
         o1.set_start_address(0x42)
-        o1.label_scope = label_values
+        o1.symbol_scope = label_values
         o1.active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         self.assertEqual(o1.word_count, (0x100-0x42+1), 'must have the right number of words')
         o1.generate_words()
@@ -394,7 +394,7 @@ class TestDirectiveLines(unittest.TestCase):
         )
         self.assertIsInstance(o2, FillUntilDataLine)
         o2.set_start_address(0xF)
-        o2.label_scope = label_values
+        o2.symbol_scope = label_values
         o2.active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         self.assertEqual(o2.word_count, 1, 'must have the right number of words')
         o2.generate_words()
@@ -417,7 +417,7 @@ class TestDirectiveLines(unittest.TestCase):
         )
         self.assertIsInstance(o3, FillUntilDataLine)
         o3.set_start_address(0xF)
-        o3.label_scope = label_values
+        o3.symbol_scope = label_values
         o3.active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         self.assertEqual(o3.word_count, 0x81, 'must have the right number of words')
         o3.generate_words()
@@ -431,7 +431,7 @@ class TestDirectiveLines(unittest.TestCase):
         ], 'must have all the bytes')
 
     def test_cstr_directive(self):
-        label_values = LabelScope(LabelScopeType.GLOBAL, None, 'global')
+        label_values = SymbolScope(SymbolScopeType.GLOBAL, None, 'global')
         label_values.set_label_value('my_label', 0x80, 1)
         local_isa_model = copy.deepcopy(TestDirectiveLines.isa_model)
 
@@ -446,7 +446,7 @@ class TestDirectiveLines(unittest.TestCase):
         )
         self.assertIsInstance(t1, LineWithWords)
         t1.set_start_address(0xF)
-        t1.label_scope = label_values
+        t1.symbol_scope = label_values
         t1.active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         self.assertEqual(t1.byte_size, 15, 'must have the right number of bytes')
         self.assertEqual(t1.word_count, 15, 'must have the right number of words for 8-bit words')
@@ -464,7 +464,7 @@ class TestDirectiveLines(unittest.TestCase):
         )
         self.assertIsInstance(t1, LineWithWords)
         t2.set_start_address(0xF)
-        t2.label_scope = label_values
+        t2.symbol_scope = label_values
         t2.active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         self.assertEqual(t2.byte_size, 15, 'must have the right number of bytes')
         self.assertEqual(t2.word_count, 15, 'must have the right number of words for 8-bit words')
@@ -511,7 +511,7 @@ class TestDirectiveLines(unittest.TestCase):
         self.assertEqual(t3.address, 8)
 
         # test using an expression for the page size
-        label_values = GlobalLabelScope(['a', 'b', 'sp', 'mar'])
+        label_values = GlobalSymbolScope(['a', 'b', 'sp', 'mar'])
         label_values.set_label_value('eight', 8, LineIdentifier(1))
         t4: LineObject = DirectiveLine.factory(
             1234,
@@ -521,7 +521,7 @@ class TestDirectiveLines(unittest.TestCase):
             TestDirectiveLines.memory_zone_manager,
             local_isa_model
         )
-        t4.label_scope = label_values
+        t4.symbol_scope = label_values
         t4.active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         self.assertIsInstance(t4, PageAlignLine)
         t4.set_start_address(3)

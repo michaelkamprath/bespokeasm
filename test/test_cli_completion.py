@@ -45,6 +45,24 @@ def test_compile_flag_pair_shows_enable_disable():
         assert '[disable]' in text
 
 
+def test_flow_checks_short_flag_pair_shows_enable_disable():
+    items = _zsh_completions(['compile'], '-')
+    enabled_help = {
+        item.value: (item.help or '')
+        for item in items
+        if item.value in {'--flow-checks', '-a'}
+    }
+    disabled_help = {
+        item.value: (item.help or '')
+        for item in items
+        if item.value in {'--no-flow-checks', '-A'}
+    }
+    assert set(enabled_help) == {'--flow-checks', '-a'}
+    assert set(disabled_help) == {'--no-flow-checks', '-A'}
+    assert all('[enable]' in text for text in enabled_help.values())
+    assert all('[disable]' in text for text in disabled_help.values())
+
+
 def test_docs_options_surface_without_dash():
     items = _zsh_completions(['docs'], '')
     values = {item.value for item in items}

@@ -30,6 +30,7 @@ class Preprocessor:
         if isa_model is not None:
             self._default_numeric_base = getattr(isa_model, 'default_numeric_base', 'decimal')
             self._add_language_version_symbols(isa_model)
+            self._add_flow_counter_availability_symbol(isa_model)
 
         for symbol_def in predefined_symbols:
             if 'name' not in symbol_def:
@@ -165,3 +166,10 @@ class Preprocessor:
                 '__LANGUAGE_VERSION_PATCH__',
                 '0'
             )
+
+    def _add_flow_counter_availability_symbol(self, isa_model) -> None:
+        """Expose ISA flow-counter capability independently of analysis execution."""
+        self._symbols['__FLOW_COUNTERS_AVAILABLE__'] = PreprocessorSymbol(
+            '__FLOW_COUNTERS_AVAILABLE__',
+            '1' if getattr(isa_model, 'flow_counters_enabled', False) else '0',
+        )

@@ -1,9 +1,23 @@
 """
 Hover documentation strings for BespokeASM directives.
 
-Each entry maps a directive name (without prefix) to a short markdown
-description suitable for display in an editor hover popup.
+The mappings provide short markdown descriptions suitable for display in
+editor hover popups.
 """
+BUILTIN_CONSTANT_DOCS: dict[str, str] = {
+    '__FLOW_COUNTERS_AVAILABLE__': (
+        '### `__FLOW_COUNTERS_AVAILABLE__` : Flow-Counter Capability\n\n'
+        '---\n\n'
+        'An always-defined numeric preprocessor symbol. Its value is `1` '
+        'when the selected ISA configuration declares a `flow_counters` '
+        'section and `0` otherwise.\n\n'
+        'Use it with `#if` or `#elif` to select source for flow-capable '
+        'ISAs. Do not use `#ifdef` as the availability test because the '
+        'symbol is defined in both capability states. Its value is '
+        'independent of `--flow-checks` / `--no-flow-checks`.'
+    ),
+}
+
 # Compiler directives (prefixed with '.' in source code)
 COMPILER_DIRECTIVE_DOCS: dict[str, str] = {
     'org': (
@@ -186,7 +200,9 @@ PREPROCESSOR_DIRECTIVE_DOCS: dict[str, str] = {
         '#require __BESPOKEASM_VERSION__ >= 0.7.2\n'
         '```\n\n'
         'Supports both the legacy quoted-string format and symbol-based '
-        'comparisons with built-in version constants.'
+        'comparisons restricted to built-in language/BespokeASM version '
+        'symbols and literals. Complete versions use semantic-version '
+        'ordering. Use `#assert` for invariants involving user macros.'
     ),
     'define': (
         '### `#define` : Define Preprocessor Macro\n\n'
@@ -211,7 +227,10 @@ PREPROCESSOR_DIRECTIVE_DOCS: dict[str, str] = {
         '#if <expr>\n'
         '```\n\n'
         'The single-expression form implies `!= 0`. Expressions may use '
-        'preprocessor macros and built-in version symbols. '
+        'preprocessor macros, built-in version symbols, and the '
+        '`__FLOW_COUNTERS_AVAILABLE__` ISA-capability symbol. '
+        'Static-analysis values are not allowed because this directive '
+        'selects which source is compiled. '
         'Must be closed with `#endif`.'
     ),
     'elif': (
@@ -223,7 +242,8 @@ PREPROCESSOR_DIRECTIVE_DOCS: dict[str, str] = {
         '#elif <expr> <comparison> <expr>\n'
         '#elif <expr>\n'
         '```\n\n'
-        'Must follow a `#if` or another `#elif`.'
+        'Must follow a `#if` or another `#elif`. Static-analysis values are '
+        'not allowed because this directive selects which source is compiled.'
     ),
     'else': (
         '### `#else` : Else Block\n\n'
@@ -371,7 +391,126 @@ PREPROCESSOR_DIRECTIVE_DOCS: dict[str, str] = {
         '```\n\n'
         'Labels from the scope are no longer resolved on subsequent lines.'
     ),
+    'track': (
+        '### `#track` : Begin Flow-Counter Tracking\n\n'
+        '---\n\n'
+        'Begins a control-flow-aware static-analysis region for a configured '
+        'flow-counter class.\n\n'
+        '**Usage:**\n\n'
+        '```\n'
+        '#track <counter-class>\n'
+        '#track <counter-class> as=<counter-name> mode=<entry-mode> '
+        'init=<expression> exit=<expression> '
+        'min=<expression> max=<expression>\n'
+        '```\n\n'
+        '`as=` gives the instance a distinct name so multiple counters may '
+        'overlap; otherwise the class name is used. '
+        '`mode=` selects an entry convention configured by the counter class. '
+        'Explicit `init=` and `exit=` values override the selected mode. '
+        '`min=` and `max=` declare per-instance bounds enforced everywhere '
+        'the class bounds are; they may only tighten (never loosen) the '
+        "class's `min_value`/`max_value`, and accept compile-time constant "
+        'expressions including memory-map-derived label expressions such as '
+        '`max=STACK_TOP - heap_end`. '
+        'The directive does not emit bytecode or consume an address.'
+    ),
+    'endtrack': (
+        '### `#endtrack` : End Flow-Counter Tracking\n\n'
+        '---\n\n'
+        'Closes the active flow-counter region lexically and applies its exit '
+        'check when the execution path is still live.\n\n'
+        '**Usage:**\n\n'
+        '```\n'
+        '#endtrack <counter-name>\n'
+        '#endtrack <counter-name> exit=<expression>\n'
+        '```\n\n'
+        'With `exit_policy: balanced`, omitting `exit=` requires the final '
+        'value to equal the initial value. With `exit_policy: none`, an '
+        'omitted exit check simply closes the region. After a terminal has '
+        'already reconciled the path, `#endtrack` is a lexical-only delimiter.'
+    ),
+    'entry': (
+        '### `#entry` : Declare an Alternate Flow Entry\n\n'
+        '---\n\n'
+        'Attaches an intentional control-flow entry to the next address '
+        'label inside an active tracking region.\n\n'
+        '**Usage:**\n\n'
+        '```\n'
+        '#entry <counter-name>\n'
+        '#entry <counter-name> value=<expression>\n'
+        '```\n\n'
+        'An unreachable label requires `value=`. A reachable label may omit '
+        'it and reuse its unique incoming value. Consecutive `#entry` '
+        'directives for different active counters attach to the same label. '
+        'The directive emits no bytecode.'
+    ),
+    'assert': (
+        '### `#assert` : Require a Compile-Time Condition\n\n'
+        '---\n\n'
+        'Stops assembly when a compile-time condition is false.\n\n'
+        '**Usage:**\n\n'
+        '```\n'
+        '#assert <expression>\n'
+        '#assert <expression> <comparison> <expression-or-string>\n'
+        '#assert <condition> "message"\n'
+        '#assert <condition> <color> "message"\n'
+        '```\n\n'
+        'The condition has the same semantics as `#if`: the one-expression '
+        'form implies `!= 0`, comparisons may be `==`, `!=`, `<`, `<=`, '
+        '`>`, or `>=`, and preprocessor macros and built-in symbols are '
+        'resolved. Unlike `#if`, an assertion only validates; it never '
+        'selects which source is compiled. The optional colors are the same '
+        'as for `#print`.\n\n'
+        'Unlike `#require`, which declares language or tool version '
+        'compatibility, `#assert` states an arbitrary compile-time invariant.'
+    ),
+    'set': (
+        '### `#set` : Re-anchor a Flow Counter\n\n'
+        '---\n\n'
+        'Assigns a programmer-supplied value to an active scalar counter.\n\n'
+        '**Usage:**\n\n'
+        '```\n'
+        '#set <counter-name> = <expression>\n'
+        '```\n\n'
+        'Only the named instance changes; other active counters continue '
+        'independently.'
+    ),
+    'suspend': (
+        '### `#suspend` : Suspend Flow-Counter Tracking\n\n'
+        '---\n\n'
+        'Marks one scalar counter indeterminate across a span, including '
+        'run-time-length loops.\n\n'
+        '**Usage:**\n\n'
+        '```\n'
+        '#suspend <counter-name>\n'
+        '```\n\n'
+        'Instruction effects are ignored for that instance until it is '
+        'resumed. Its value and coordinates cannot be used while suspended.'
+    ),
+    'resume': (
+        '### `#resume` : Resume Flow-Counter Tracking\n\n'
+        '---\n\n'
+        'Restores a known value to a suspended scalar counter.\n\n'
+        '**Usage:**\n\n'
+        '```\n'
+        '#resume <counter-name> = <expression>\n'
+        '```\n\n'
+        'A coordinate from the same instance may be named directly to restore '
+        'its saved scalar anchor. Resumption is a programmer assertion, and '
+        'coordinates created before the suspended span are permanently '
+        'invalidated.'
+    ),
 }
+
+FLOW_ASSERT_DOC_SUFFIX = (
+    '\n\nIn a flow-enabled ISA, `COUNTER(name)` and bare counter-coordinate '
+    'references may be used in either operand. An otherwise undefined bare '
+    'left operand is retained as shorthand for an active scalar counter, '
+    'such as `#assert stack == 0`; a bare coordinate name instead compares '
+    "the coordinate's current offset. Prefer `COUNTER(stack)` when an "
+    'explicit flow reference is clearer. This does not extend `#if` or '
+    '`#elif`; static analysis never controls conditional compilation.'
+)
 
 # Expression functions used in numeric expressions
 EXPRESSION_FUNCTION_DOCS: dict[str, str] = {
@@ -385,6 +524,54 @@ EXPRESSION_FUNCTION_DOCS: dict[str, str] = {
         '```\n\n'
         'Equivalent to `BYTE0(expression)`. Extracts bits 7\u20130 '
         'of the evaluated value.'
+    ),
+    'COUNTER': (
+        '### `COUNTER()` : Current Flow-Counter Value\n\n'
+        '---\n\n'
+        'Returns the current scalar value of an active flow counter during '
+        'static analysis.\n\n'
+        '**Usage:**\n\n'
+        '```\n'
+        'COUNTER(counter-name)\n'
+        '```\n\n'
+        'This function is valid in fixed-width instruction operands, '
+        'fixed-size data values, and flow directives such as `#assert`, '
+        '`#set`, and `#resume`. It is rejected in layout, conditional '
+        'preprocessor, and instruction-selection expressions.'
+    ),
+    'COORDINATE': (
+        '### `COORDINATE()` : Declare a Counter Coordinate\n\n'
+        '---\n\n'
+        'Identifies a position at a signed offset from the current position '
+        'of an active scalar flow counter.\n\n'
+        '**Usage:**\n\n'
+        '```\n'
+        '.parameter := COORDINATE(stack, 3)\n'
+        '```\n\n'
+        'The second argument is an ordinary compile-time expression. The '
+        "counter class's `coordinate_offsets` policy controls whether "
+        'positive, negative, or both nonzero offset directions are valid; '
+        '`allow_zero_offset` controls zero independently. '
+        '`COORDINATE()` is valid only on the right side of a `:=` declaration.'
+    ),
+}
+
+COUNTER_COORDINATE_DOCS: dict[str, str] = {
+    ':=': (
+        '### `:=` : Declare Counter Coordinate\n\n'
+        '---\n\n'
+        'Saves an immutable coordinate on one active scalar flow counter '
+        'without emitting bytecode or consuming address space.\n\n'
+        '**Usage:**\n\n'
+        '```\n'
+        '.slot := COORDINATE(stack, 0)\n'
+        '.arg := COORDINATE(stack, 3)\n'
+        '```\n\n'
+        'A later bare reference to the declared symbol (for example '
+        '`lds .arg`) resolves to the current counter value minus the saved '
+        'coordinate — the position’s current offset at that program '
+        'point. Referencing a coordinate invalidated by crossing its saved '
+        'position is an error.'
     ),
 }
 # Generate BYTEx docs for BYTE0 through BYTE9
@@ -402,9 +589,11 @@ for _i in range(10):
         f'This is bits {_i * 8 + 7}\u2013{_i * 8} of the value.'
     )
 
-# Combined lookup: all directive docs keyed by name (no prefix).
+# Combined lookup: all directive docs keyed by name (no prefix). Includes the
+# `:=` counter-coordinate declaration so aggregate consumers cannot miss it.
 ALL_DIRECTIVE_DOCS: dict[str, str] = {
     **COMPILER_DIRECTIVE_DOCS,
     **BYTECODE_DIRECTIVE_DOCS,
     **PREPROCESSOR_DIRECTIVE_DOCS,
+    **COUNTER_COORDINATE_DOCS,
 }

@@ -4,14 +4,14 @@ import unittest
 import bespokeasm.assembler.model.operand_set as AS
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
-from bespokeasm.assembler.label_scope import LabelScope
-from bespokeasm.assembler.label_scope import LabelScopeType
-from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
-from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.model.instruction_parser import InstructioParser
+from bespokeasm.assembler.symbol_scope import SymbolScope
+from bespokeasm.assembler.symbol_scope import SymbolScopeType
+from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
+from bespokeasm.assembler.symbol_scope.named_scope_manager import NamedScopeManager
 from ruamel.yaml import YAML
 
 from test import config_files
@@ -29,7 +29,7 @@ class TestConfigObject(unittest.TestCase):
         cls._register_argument_config_str = pkg_resources.files(config_files) \
             .joinpath('register_argument_exmaple_config.yaml').read_text()
         cls._eater_sap1_config_str = pkg_resources.files(config_files).joinpath('eater-sap1-isa.yaml').read_text()
-        cls.label_values = LabelScope(LabelScopeType.GLOBAL, None, 'global')
+        cls.label_values = SymbolScope(SymbolScopeType.GLOBAL, None, 'global')
         cls.label_values.set_label_value('label1', 2, 1)
         cls.label_values.set_label_value('LABEL2', 0xF0, 2)
 

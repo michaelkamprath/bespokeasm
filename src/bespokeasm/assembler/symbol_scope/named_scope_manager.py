@@ -3,16 +3,29 @@ from __future__ import annotations
 import os
 
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
-from bespokeasm.assembler.label_scope import LabelScope
-from bespokeasm.assembler.label_scope import LabelScopeType
 from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.symbol_scope import SymbolScope
+from bespokeasm.assembler.symbol_scope import SymbolScopeType
+from bespokeasm.assembler.symbol_scope.flow_symbols import CounterCoordinate
 
 
-class NamedLabelScope(LabelScope):
+class NamedSymbolScope(SymbolScope):
     """Represents a named scope."""
 
-    def __init__(self, name: str, prefix: str, scope_reference: str, defined_at: LineIdentifier):
-        super().__init__(LabelScopeType.NAMED, None, scope_reference)
+    def __init__(
+        self,
+        name: str,
+        prefix: str,
+        scope_reference: str,
+        defined_at: LineIdentifier,
+        reserved_keywords: set[str] | frozenset[str] | None = None,
+    ):
+        super().__init__(
+            SymbolScopeType.NAMED,
+            None,
+            scope_reference,
+            reserved_keywords,
+        )
         self._name = name
         self._prefix = prefix
         self._defined_at = defined_at
@@ -30,19 +43,24 @@ class NamedLabelScope(LabelScope):
         return self._defined_at
 
     def __str__(self) -> str:
-        return f'NamedLabelScope<{self.name}, prefix="{self.prefix}">'
+        return f'NamedSymbolScope<{self.name}, prefix="{self.prefix}">'
 
 
 class NamedScopeManager:
-    """Manages named label scopes throughout the assembly process."""
+    """Manage named lexical symbol scopes throughout assembly."""
 
-    def __init__(self, diagnostic_reporter: DiagnosticReporter):
+    def __init__(
+        self,
+        diagnostic_reporter: DiagnosticReporter,
+        reserved_keywords: set[str] | frozenset[str] | None = None,
+    ):
         if diagnostic_reporter is None:
             raise ValueError('DiagnosticReporter is required for NamedScopeManager')
         # Global scope definitions: {scope_name: NamedScopeDefinition}
-        self._scope_definitions: dict[str, NamedLabelScope] = {}
+        self._scope_definitions: dict[str, NamedSymbolScope] = {}
         self._used_prefixes: set[str] = set()
         self._diagnostic_reporter = diagnostic_reporter
+        self._reserved_keywords = reserved_keywords
 
     @property
     def diagnostic_reporter(self) -> DiagnosticReporter:
@@ -99,14 +117,20 @@ class NamedScopeManager:
                     )
 
         # Create the scope definition
-        definition = NamedLabelScope(name, prefix, name, defined_at)
+        definition = NamedSymbolScope(
+            name,
+            prefix,
+            name,
+            defined_at,
+            self._reserved_keywords,
+        )
         self._scope_definitions[name] = definition
         self._used_prefixes.add(prefix)
 
     def get_label_value(
         self,
         label: str,
-        current_scope: LabelScope,
+        current_scope: SymbolScope,
         active_named_scopes: ActiveNamedScopeList,
         line_id: LineIdentifier,
     ) -> int:
@@ -167,14 +191,56 @@ class NamedScopeManager:
                         # Label prefix matches but wrong file
                         # Let it fall back to normal scope hierarchy
                         return False
-                    scope.set_label_value(label, value, line_id, LabelScopeType.NAMED)
+                    scope.set_label_value(label, value, line_id, SymbolScopeType.NAMED)
                     return True
         return False
 
-    def get_scope_definition(self, name: str) -> NamedLabelScope | None:
+    def get_counter_coordinate(
+        self,
+        label: str,
+        current_scope: SymbolScope,
+        active_named_scopes: ActiveNamedScopeList,
+    ) -> CounterCoordinate | None:
+        """Resolve a coordinate from active named scopes, then lexical scopes."""
+        for name in active_named_scopes:
+            if name in self._scope_definitions:
+                scope = self._scope_definitions[name]
+                if label.startswith(scope.prefix):
+                    return scope.get_counter_coordinate(label)
+        return current_scope.get_counter_coordinate(label)
+
+    def set_counter_coordinate(
+        self,
+        coordinate: CounterCoordinate,
+        active_named_scopes: ActiveNamedScopeList,
+    ) -> bool:
+        """Insert a coordinate into a matching active named scope when eligible."""
+        for name in active_named_scopes:
+            if name not in self._scope_definitions:
+                continue
+            scope = self._scope_definitions[name]
+            if not coordinate.label.startswith(scope.prefix):
+                continue
+            scope_file = (
+                os.path.realpath(scope.defined_at.filename)
+                if scope.defined_at.filename
+                else None
+            )
+            coordinate_file = (
+                os.path.realpath(coordinate.line_id.filename)
+                if coordinate.line_id.filename
+                else None
+            )
+            if scope_file != coordinate_file:
+                return False
+            scope.set_counter_coordinate(coordinate, scope=SymbolScopeType.NAMED)
+            return True
+        return False
+
+    def get_scope_definition(self, name: str) -> NamedSymbolScope | None:
         """Get a named scope definition by name.
 
-        Returns the NamedLabelScope if it exists, None otherwise.
+        Returns the NamedSymbolScope if it exists, None otherwise.
         This method is used internally and by tests.
         """
         return self._scope_definitions.get(name)

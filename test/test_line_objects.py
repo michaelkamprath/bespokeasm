@@ -3,11 +3,6 @@ import unittest
 
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
-from bespokeasm.assembler.label_scope import GlobalLabelScope
-from bespokeasm.assembler.label_scope import LabelScope
-from bespokeasm.assembler.label_scope import LabelScopeType
-from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
-from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object.data_line import DataLine
@@ -22,6 +17,11 @@ from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
+from bespokeasm.assembler.symbol_scope import GlobalSymbolScope
+from bespokeasm.assembler.symbol_scope import SymbolScope
+from bespokeasm.assembler.symbol_scope import SymbolScopeType
+from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
+from bespokeasm.assembler.symbol_scope.named_scope_manager import NamedScopeManager
 
 from test import config_files
 
@@ -32,13 +32,13 @@ class TestLineObject(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         lineid = LineIdentifier(1, 'setUpClass')
-        global_scope = GlobalLabelScope(set())
+        global_scope = GlobalSymbolScope(set())
         global_scope.set_label_value('var1', 12, lineid)
         global_scope.set_label_value('my_val', 8, lineid)
         global_scope.set_label_value('the_two', 2, lineid)
         global_scope.set_label_value('VALUE1', 8777773, lineid)
         global_scope.set_label_value('VALUE2', 139, lineid)
-        local_scope = LabelScope(LabelScopeType.LOCAL, global_scope, 'TestInstructionParsing')
+        local_scope = SymbolScope(SymbolScopeType.LOCAL, global_scope, 'TestInstructionParsing')
         local_scope.set_label_value('.local_var', 10, lineid)
         cls.label_values = local_scope
 
@@ -48,7 +48,7 @@ class TestLineObject(unittest.TestCase):
         self.active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
 
     def test_data_line_creation(self):
-        label_values = GlobalLabelScope(set())
+        label_values = GlobalSymbolScope(set())
         label_values.set_label_value('test1', 0x1234, 1)
         memzone = MemoryZone(16, 0, 2**16 - 1, 'GLOBAL')
 
@@ -64,7 +64,7 @@ class TestLineObject(unittest.TestCase):
             '\0',
             diagnostic_reporter=self.diagnostic_reporter,
         )
-        d1.label_scope = label_values
+        d1.symbol_scope = label_values
         d1.generate_words()
         self.assertIsInstance(d1, DataLine)
         self.assertEqual(d1.byte_size, 4, 'data line has 4 bytes')
@@ -92,7 +92,7 @@ class TestLineObject(unittest.TestCase):
             '\0',
             diagnostic_reporter=self.diagnostic_reporter,
         )
-        d2.label_scope = label_values
+        d2.symbol_scope = label_values
         d2.generate_words()
         self.assertIsInstance(d2, DataLine)
         self.assertEqual(d2.byte_size, 2, 'data line has 2 bytes')
@@ -115,7 +115,7 @@ class TestLineObject(unittest.TestCase):
             '\0',
             diagnostic_reporter=self.diagnostic_reporter,
         )
-        d3.label_scope = label_values
+        d3.symbol_scope = label_values
         d3.generate_words()
         self.assertIsInstance(d3, DataLine)
         self.assertEqual(d3.byte_size, 2, 'data line has 2 bytes, ignore bad argument')
@@ -138,7 +138,7 @@ class TestLineObject(unittest.TestCase):
             '\0',
             diagnostic_reporter=self.diagnostic_reporter,
         )
-        d4.label_scope = label_values
+        d4.symbol_scope = label_values
         d4.generate_words()
         self.assertIsInstance(d4, DataLine)
         self.assertEqual(d4.byte_size, 1, 'data line has 1 bytes')
@@ -163,7 +163,7 @@ class TestLineObject(unittest.TestCase):
             0,
             diagnostic_reporter=self.diagnostic_reporter,
         )
-        d5.label_scope = label_values
+        d5.symbol_scope = label_values
         d5.generate_words()
         self.assertIsInstance(d5, DataLine)
         self.assertEqual(d5.byte_size, 13, 'byte string has 13 bytes')
@@ -188,7 +188,7 @@ class TestLineObject(unittest.TestCase):
             0,
             diagnostic_reporter=self.diagnostic_reporter,
         )
-        d5a.label_scope = label_values
+        d5a.symbol_scope = label_values
         d5a.generate_words()
         self.assertIsInstance(d5a, DataLine)
         self.assertEqual(d5a.byte_size, 14, 'character string has 14 bytes')
@@ -213,7 +213,7 @@ class TestLineObject(unittest.TestCase):
             0,
             diagnostic_reporter=self.diagnostic_reporter,
         )
-        d6a.label_scope = label_values
+        d6a.symbol_scope = label_values
         d6a.generate_words()
         self.assertIsInstance(d6a, DataLine)
         self.assertEqual(d6a.byte_size, 14, 'character string has 14 bytes')
@@ -236,7 +236,7 @@ class TestLineObject(unittest.TestCase):
             0,
             diagnostic_reporter=self.diagnostic_reporter,
         )
-        d6.label_scope = label_values
+        d6.symbol_scope = label_values
         d6.generate_words()
         self.assertIsInstance(d6, DataLine)
         self.assertEqual(d6.byte_size, 4, 'data line has 4 bytes')
@@ -264,7 +264,7 @@ class TestLineObject(unittest.TestCase):
             0,
             diagnostic_reporter=self.diagnostic_reporter,
         )
-        d7.label_scope = label_values
+        d7.symbol_scope = label_values
         d7.generate_words()
         self.assertIsInstance(d7, DataLine)
         self.assertEqual(d7.byte_size, 8, 'data line has 8 bytes')
@@ -296,7 +296,7 @@ class TestLineObject(unittest.TestCase):
             '\0',
             diagnostic_reporter=self.diagnostic_reporter,
         )
-        d8.label_scope = label_values
+        d8.symbol_scope = label_values
         d8.generate_words()
         self.assertIsInstance(d8, DataLine)
         self.assertEqual(d8.byte_size, 8, 'data line has 8 bytes')
@@ -328,7 +328,7 @@ class TestLineObject(unittest.TestCase):
             '\0',
             diagnostic_reporter=self.diagnostic_reporter,
         )
-        d9.label_scope = label_values
+        d9.symbol_scope = label_values
         d9.generate_words()
         self.assertIsInstance(d9, DataLine)
         self.assertEqual(d9.byte_size, 4, 'data line has 4 bytes')
@@ -354,7 +354,7 @@ class TestLineObject(unittest.TestCase):
             'big',
             'little',
             0,  diagnostic_reporter=self.diagnostic_reporter)
-        d9a.label_scope = label_values
+        d9a.symbol_scope = label_values
         d9a.generate_words()
         self.assertIsInstance(d9a, DataLine)
         self.assertEqual(d9a.byte_size, 8, 'data line has 8 bytes')
@@ -389,7 +389,7 @@ class TestLineObject(unittest.TestCase):
             0,
             diagnostic_reporter=self.diagnostic_reporter,
         )
-        d10.label_scope = label_values
+        d10.symbol_scope = label_values
         d10.generate_words()
         self.assertIsInstance(d10, DataLine)
         self.assertEqual(d10.byte_size, 7, 'byte string has 7 bytes')
@@ -415,7 +415,7 @@ class TestLineObject(unittest.TestCase):
             0,
             diagnostic_reporter=self.diagnostic_reporter,
         )
-        d11.label_scope = label_values
+        d11.symbol_scope = label_values
         d11.generate_words()
         self.assertIsInstance(d11, DataLine)
         self.assertEqual(d11.byte_size, 7, 'byte string has 7 bytes')
@@ -438,7 +438,7 @@ class TestLineObject(unittest.TestCase):
             'big',
             0,  diagnostic_reporter=self.diagnostic_reporter)
         label_values.set_label_value('PSAV', 0x1234, LineIdentifier(1, 'test_d12'))
-        d12.label_scope = label_values
+        d12.symbol_scope = label_values
         d12.generate_words()
         self.assertIsInstance(d12, DataLine)
         self.assertEqual(d12.byte_size, 3, 'byte string has 3 bytes')
@@ -461,7 +461,7 @@ class TestLineObject(unittest.TestCase):
             0,
             diagnostic_reporter=self.diagnostic_reporter,
         )
-        d12a.label_scope = label_values
+        d12a.symbol_scope = label_values
         d12a.generate_words()
         self.assertIsInstance(d12a, DataLine)
         self.assertEqual(d12a.byte_size, 16, 'mixed byte list has 16 bytes')
@@ -513,7 +513,7 @@ class TestLineObject(unittest.TestCase):
             0,
             diagnostic_reporter=self.diagnostic_reporter,
         )
-        d13.label_scope = label_values
+        d13.symbol_scope = label_values
         d13.generate_words()
         self.assertIsInstance(d13, DataLine)
         self.assertEqual(d13.byte_size, 4, 'byte string has 3 bytes')
@@ -525,7 +525,7 @@ class TestLineObject(unittest.TestCase):
         )
 
     def test_label_line_creation(self):
-        label_values = GlobalLabelScope(set())
+        label_values = GlobalSymbolScope(set())
         label_values.set_label_value('test1', 0x1234, 1)
         label_values.set_label_value('MY_VALUE', 20, 1)
         register_set = {'a', 'b', 'sp', 'mar'}
@@ -551,6 +551,20 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(l2.get_value(), 1945, 'constant value is assigned')
         self.assertEqual(l2.address, 1212, 'address value is address')
         self.assertEqual(l2.get_label(), 'my_constant', 'label string')
+
+        for scoped_name in ('.local_constant', '_file_constant'):
+            scoped_constant: LabelLine = LabelLine.factory(
+                13,
+                f'{scoped_name} EQU 7',
+                'scoped constant',
+                register_set,
+                label_values,
+                active_named_scopes,
+                memzone,
+            )
+            self.assertIsInstance(scoped_constant, LabelLine)
+            self.assertEqual(scoped_constant.get_label(), scoped_name)
+            self.assertEqual(scoped_constant.get_value(), 7)
 
         l3: LabelLine = LabelLine.factory(
             13, 'myLabelIsCool:', 'cool comment', register_set, label_values, active_named_scopes, memzone
@@ -630,7 +644,7 @@ class TestLineObject(unittest.TestCase):
             isa_model.predefined_memory_zones,
         )
 
-        label_values = GlobalLabelScope(isa_model.registers)
+        label_values = GlobalSymbolScope(isa_model.registers)
         label_values.set_label_value('a_const', 40, 1)
         active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         lineid = LineIdentifier(123, 'test_label_line_with_instruction')
@@ -654,7 +668,7 @@ class TestLineObject(unittest.TestCase):
         self.assertIsInstance(objs1[0], LabelLine, 'the first line object should be a label')
         self.assertIsInstance(objs1[1], DataLine, 'the first line object should be a data line')
         self.assertEqual(objs1[0].get_label(), 'the_byte', 'the label string should match')
-        objs1[1].label_scope = label_values
+        objs1[1].symbol_scope = label_values
         objs1[1].generate_words()
         self.assertEqual(objs1[1].byte_size, 1, 'the data value should have 1 byte')
         self.assertEqual(
@@ -680,7 +694,7 @@ class TestLineObject(unittest.TestCase):
         self.assertIsInstance(objs2[0], LabelLine, 'the first line object should be a label')
         self.assertIsInstance(objs2[1], InstructionLine, 'the first line object should be an Instruction line')
         self.assertEqual(objs2[0].get_label(), 'the_instr', 'the label string should match')
-        objs2[1].label_scope = label_values
+        objs2[1].symbol_scope = label_values
         objs2[1].generate_words()
         self.assertEqual(objs2[1].word_count, 2, 'the instruction value should have 2 words')
         self.assertEqual(
@@ -718,7 +732,7 @@ class TestLineObject(unittest.TestCase):
             isa_model.predefined_memory_zones,
         )
 
-        label_values = GlobalLabelScope(isa_model.registers)
+        label_values = GlobalSymbolScope(isa_model.registers)
         label_values.set_label_value('a_const', 40, 1)
         active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         lineid = LineIdentifier(123, 'test_unallowed_label_line_situations')
@@ -774,7 +788,7 @@ class TestLineObject(unittest.TestCase):
             isa_model.predefined_memory_zones,
         )
 
-        label_values = GlobalLabelScope(isa_model.registers)
+        label_values = GlobalSymbolScope(isa_model.registers)
         label_values.set_label_value('test1', 0xA, 1)
         label_values.set_label_value('high_de', 0xde00, 1)
 
@@ -787,7 +801,7 @@ class TestLineObject(unittest.TestCase):
         ins1.set_start_address(1212)
         self.assertIsInstance(ins1, InstructionLine)
         self.assertEqual(ins1.word_count, 1, 'has 1 word')
-        ins1.label_scope = label_values
+        ins1.symbol_scope = label_values
         ins1.generate_words()
         self.assertEqual(
             ins1.get_words(),
@@ -804,7 +818,7 @@ class TestLineObject(unittest.TestCase):
         ins2.set_start_address(1212)
         self.assertIsInstance(ins2, InstructionLine)
         self.assertEqual(ins2.word_count, 1, 'has 1 word')
-        ins2.label_scope = label_values
+        ins2.symbol_scope = label_values
         ins2.generate_words()
         self.assertEqual(
             ins2.get_words(),
@@ -821,7 +835,7 @@ class TestLineObject(unittest.TestCase):
         ins3.set_start_address(1313)
         self.assertIsInstance(ins3, InstructionLine)
         self.assertEqual(ins3.word_count, 3, 'has 3 words')
-        ins3.label_scope = label_values
+        ins3.symbol_scope = label_values
         ins3.generate_words()
         self.assertEqual(
             ins3.get_words(),
@@ -842,7 +856,7 @@ class TestLineObject(unittest.TestCase):
         ins4.set_start_address(1313)
         self.assertIsInstance(ins4, InstructionLine)
         self.assertEqual(ins4.word_count, 1, 'has 1 word')
-        ins4.label_scope = label_values
+        ins4.symbol_scope = label_values
         ins4.generate_words()
         self.assertEqual(
             ins4.get_words(),
@@ -859,7 +873,7 @@ class TestLineObject(unittest.TestCase):
         ins5.set_start_address(888)
         self.assertIsInstance(ins5, InstructionLine)
         self.assertEqual(ins5.word_count, 2, 'has 2 words')
-        ins5.label_scope = label_values
+        ins5.symbol_scope = label_values
         ins5.generate_words()
         self.assertEqual(
             ins5.get_words(),
@@ -879,7 +893,7 @@ class TestLineObject(unittest.TestCase):
         ins6.set_start_address(888)
         self.assertIsInstance(ins6, InstructionLine)
         self.assertEqual(ins6.word_count, 1, 'has 1 word')
-        ins6.label_scope = label_values
+        ins6.symbol_scope = label_values
         ins6.generate_words()
         self.assertEqual(
             ins6.get_words(),
@@ -918,7 +932,7 @@ class TestLineObject(unittest.TestCase):
             isa_model.predefined_memory_zones,
         )
 
-        label_values = GlobalLabelScope(isa_model.registers)
+        label_values = GlobalSymbolScope(isa_model.registers)
         label_values.set_label_value('test1', 0xABCD, 1)
 
         ins1 = InstructionLine.factory(
@@ -930,7 +944,7 @@ class TestLineObject(unittest.TestCase):
         ins1.set_start_address(1212)
         self.assertIsInstance(ins1, InstructionLine)
         self.assertEqual(ins1.word_count, 3, 'has 3 words')
-        ins1.label_scope = label_values
+        ins1.symbol_scope = label_values
         ins1.generate_words()
         self.assertEqual(
             ins1.get_words(),
@@ -951,7 +965,7 @@ class TestLineObject(unittest.TestCase):
         ins2.set_start_address(1212)
         self.assertIsInstance(ins2, InstructionLine)
         self.assertEqual(ins2.word_count, 3, 'has 3 words')
-        ins2.label_scope = label_values
+        ins2.symbol_scope = label_values
         ins2.generate_words()
         self.assertEqual(
             ins2.get_words(),
@@ -972,7 +986,7 @@ class TestLineObject(unittest.TestCase):
         ins3.set_start_address(1212)
         self.assertIsInstance(ins3, InstructionLine)
         self.assertEqual(ins3.word_count, 2, 'has 2 words')
-        ins3.label_scope = label_values
+        ins3.symbol_scope = label_values
         ins3.generate_words()
         self.assertEqual(
             ins3.get_words(),
@@ -992,7 +1006,7 @@ class TestLineObject(unittest.TestCase):
             isa_model.predefined_memory_zones,
         )
 
-        label_values = GlobalLabelScope(isa_model.registers)
+        label_values = GlobalSymbolScope(isa_model.registers)
         label_values.set_label_value('test1', 0xABCD, 1)
 
         ins1 = InstructionLine.factory(
@@ -1004,7 +1018,7 @@ class TestLineObject(unittest.TestCase):
         ins1.set_start_address(1234)
         self.assertIsInstance(ins1, InstructionLine)
         self.assertEqual(ins1.word_count, 1, 'has 1 word')
-        ins1.label_scope = label_values
+        ins1.symbol_scope = label_values
         ins1.generate_words()
         self.assertEqual(
             ins1.get_words(),
@@ -1021,7 +1035,7 @@ class TestLineObject(unittest.TestCase):
         ins2.set_start_address(1234)
         self.assertIsInstance(ins2, InstructionLine)
         self.assertEqual(ins2.word_count, 2, 'has 2 words')
-        ins2.label_scope = label_values
+        ins2.symbol_scope = label_values
         ins2.generate_words()
         self.assertEqual(
             ins2.get_words(),
@@ -1042,7 +1056,7 @@ class TestLineObject(unittest.TestCase):
         ins3.set_start_address(1234)
         self.assertIsInstance(ins3, InstructionLine)
         self.assertEqual(ins3.word_count, 2, 'has 2 words')
-        ins3.label_scope = label_values
+        ins3.symbol_scope = label_values
         ins3.generate_words()
         self.assertEqual(
             ins3.get_words(),
@@ -1054,7 +1068,7 @@ class TestLineObject(unittest.TestCase):
         )
 
     def test_test_line_object_factory(self):
-        label_values = GlobalLabelScope(set())
+        label_values = GlobalSymbolScope(set())
         label_values.set_label_value('test1', 0x1234, 1)
         active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
         line_id = LineIdentifier(33, 'test_test_line_object_factory')

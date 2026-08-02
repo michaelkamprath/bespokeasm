@@ -1,20 +1,17 @@
-import re
 import sys
 
 import click
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
+from bespokeasm.assembler.line_object.preprocessor_line.message import (
+    parse_trailing_message,
+)
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
 
 
 class PrintLine(PreprocessorLine):
-    PATTERN_PRINT = re.compile(
-        r'^#print(?:\s+(\d+))?(?:\s+(black|red|green|yellow|blue|magenta|cyan|white))?\s+"([\s\S]*?)"\s*$',
-        re.IGNORECASE,
-    )
-
     def __init__(
                 self,
                 line_id: LineIdentifier,
@@ -27,30 +24,20 @@ class PrintLine(PreprocessorLine):
             ) -> None:
         super().__init__(line_id, instruction, comment, memzone)
 
-        match = re.search(PrintLine.PATTERN_PRINT, instruction)
-        if match is None:
+        parsed_message = parse_trailing_message(
+            instruction.strip()[len('#print'):].strip()
+        )
+        if parsed_message is None:
             sys.exit(f'ERROR - {line_id}: Invalid #print directive syntax: {instruction}')
 
-        min_level_str = match.group(1)
-        color_str = match.group(2)
-        message = match.group(3)
-
+        min_level_str = parsed_message.leading_text or None
         try:
             min_level = int(min_level_str) if min_level_str is not None else None
         except ValueError:
             sys.exit(f'ERROR - {line_id}: Invalid verbosity level in #print directive: {instruction}')
 
-        try:
-            min_level = int(min_level_str) if min_level_str is not None else None
-        except ValueError:
-            sys.exit(f'ERROR - {line_id}: Invalid verbosity level in #print directive: {instruction}')
-
-        color = None
-        if color_str is not None:
-            color = color_str.lower()
-            allowed_colors = {'black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white'}
-            if color not in allowed_colors:
-                sys.exit(f'ERROR - {line_id}: Invalid color in #print directive: {color_str}')
+        color = parsed_message.color
+        message = parsed_message.text
 
         should_emit = (
             condition_stack.currently_active(preprocessor)

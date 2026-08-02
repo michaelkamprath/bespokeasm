@@ -3,19 +3,20 @@ from __future__ import annotations
 import re
 import sys
 
-from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import INSTRUCTION_EXPRESSION_PATTERN
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.symbol import SYMBOL_PATTERN
+from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.expression import ExpressionNode
+from bespokeasm.expression import ExpressionUseContext
 from bespokeasm.expression import parse_expression
 
 
 # NOTE: the order of the RHS expressions is important, as it determines the order of evaluation. Need to parse the
 #       quoted strings first, then the expressions.
 PREPROCESSOR_CONDITION_IF_PATTERN = re.compile(
-    f'^(?:#if)\\s+({INSTRUCTION_EXPRESSION_PATTERN})\\s+(==|!=|>|>=|<|<=)\\s+'
+    f'^(?:#if)\\s+({INSTRUCTION_EXPRESSION_PATTERN})\\s+(==|!=|>=|<=|>|<)\\s+'
     f"(?:(?:\\\')(.+)(?:\\\')|(?:\\\")(.+)(?:\\\")|({INSTRUCTION_EXPRESSION_PATTERN}))"
 )
 
@@ -24,7 +25,7 @@ PREPROCESSOR_CONDITION_IMPLIED_IF_PATTERN = re.compile(
 )
 
 PREPROCESSOR_CONDITION_ELIF_PATTERN = re.compile(
-    f'^(?:#elif)\\s+({INSTRUCTION_EXPRESSION_PATTERN})\\s+(==|!=|>|>=|<|<=)\\s+'
+    f'^(?:#elif)\\s+({INSTRUCTION_EXPRESSION_PATTERN})\\s+(==|!=|>=|<=|>|<)\\s+'
     f"(?:(?:\\\')(.+)(?:\\\')|(?:\\\")(.+)(?:\\\")|({INSTRUCTION_EXPRESSION_PATTERN}))"
 )
 
@@ -34,6 +35,10 @@ PREPROCESSOR_CONDITION_IMPLIED_ELIF_PATTERN = re.compile(
 
 PREPROCESSOR_CONDITION_IFDEF_PATTERN = re.compile(
     fr'^(#ifdef|#ifndef)\s+({SYMBOL_PATTERN})\b'
+)
+
+PREPROCESSOR_COMPARISON_OPERATOR_PATTERN = re.compile(
+    r'\s+(?:==|!=|>=|<=|>|<)\s+',
 )
 
 
@@ -94,21 +99,52 @@ class IfPreprocessorCondition(PreprocessorCondition):
                 compare_pattern: re.Pattern[str],
                 implied_pattern: re.Pattern[str],
             ) -> None:
-        match = compare_pattern.match(line_str.strip())
+        stripped_line = line_str.strip()
+        match = (
+            compare_pattern.match(stripped_line)
+            if PREPROCESSOR_COMPARISON_OPERATOR_PATTERN.search(stripped_line)
+            else None
+        )
         if match is None:
-            match2 = implied_pattern.match(line_str.strip())
+            match2 = implied_pattern.match(stripped_line)
             if match2 is None:
                 raise ValueError(f'Invalid preprocessor condition at line: {line_str}')
+            self._matched_length = match2.end()
             self._lhs_expression = match2.group(1)
             self._operator = '!='
             self._rhs_expression = '0'
         else:
+            self._matched_length = match.end()
             self._lhs_expression = match.group(1)
             self._operator = match.group(2)
-            self._rhs_expression = match.group(3) or match.group(4) or match.group(5)
+            self._rhs_expression = next(
+                value
+                for value in (match.group(3), match.group(4), match.group(5))
+                if value is not None
+            )
 
     def __repr__(self) -> str:
         return f'IfPreprocessorCondition<#if {self._lhs_expression} {self._operator} {self._rhs_expression}>'
+
+    @property
+    def lhs_expression(self) -> str:
+        """Return the source expression on the left side of the comparison."""
+        return self._lhs_expression
+
+    @property
+    def operator(self) -> str:
+        """Return the normalized comparison operator."""
+        return self._operator
+
+    @property
+    def rhs_expression(self) -> str:
+        """Return the source expression on the right side of the comparison."""
+        return self._rhs_expression
+
+    @property
+    def is_complete(self) -> bool:
+        """Return whether parsing consumed the complete condition string."""
+        return self._matched_length == len(self._line_str.strip())
 
     def _check_and_set_parent(self, parent: PreprocessorCondition):
         raise ValueError('Cannot set parent of an IfPreprocessorCondition')
@@ -151,11 +187,13 @@ class IfPreprocessorCondition(PreprocessorCondition):
             self._line,
             lhs_resolved,
             preprocessor.default_numeric_base,
+            context=ExpressionUseContext.PREPROCESSOR_CONDITION,
         )
         rhs_expression: ExpressionNode = parse_expression(
             self._line,
             rhs_resolved,
             preprocessor.default_numeric_base,
+            context=ExpressionUseContext.PREPROCESSOR_CONDITION,
         )
 
         if len(lhs_expression.contained_labels()) > 0 or len(rhs_expression.contained_labels()) > 0:

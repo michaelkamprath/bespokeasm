@@ -57,6 +57,13 @@ The following instruction macros have been added in the ISA configuration file f
 | `m2iv` | immediate | zero page address | Copies an immediate 2 byte word to a zero page word |
 | `m4iq` | immediate | zero page address | Copies an immediate 4 byte long to a zero page long |
 
+### Flow Counters
+The ISA configuration declares a `stack` [flow counter](https://github.com/michaelkamprath/bespokeasm/wiki/Instruction-Set-Configuration-File#flow-counters) class that lets **BespokeASM** track MinOS hardware stack depth at assembly time. Code that opts in with `#track stack ...` gets push/pull balance checking on every execution path, and can name stack slots with `.name := COORDINATE(stack, N)` so that a bare `.name` reference always resolves to the slot's current `sp`-relative offset — inserting or removing a `phs` no longer requires hand-fixing every `lds`/`sts` offset below it. The metadata is analysis-only: it changes no emitted byte code, and existing programs that do not use the feature assemble exactly as before.
+
+Because the stack pointer is memory-mapped at `0xffff`, the class also watches writes to that address. Instructions that write memory through direct address operands declare their write target with `flow_write_operands`, so a write resolving to `0xffff` — such as `spinit`, `mib ...,0xffff`, `stb 0xffff`, `clb 0xffff`, or another direct read/modify/write instruction — makes an active stack counter indeterminate and invalidates its prior coordinates. Use `#resume stack = <value>` afterward when deliberately reinitializing the stack inside a tracked region. Indirect/indexed stores (`stt`, `str`, and `szp`) and SP-relative `sts` are intentionally not watched; code that rewrites the SP cell indirectly must bracket that operation with `#suspend`/`#resume`. Matching is exact on the write's starting address, so a multi-byte write beginning below `0xffff` is not detected.
+
+See [`software/flow-stack-demo.min64x4`](software/flow-stack-demo.min64x4) for a small, heavily commented demonstration. Its caller pushes and names two arguments, while its branchy subroutine names the caller's stack slots behind the 2-byte return address, pushes a local value, and returns through the `rts` balance check.
+
 ### Assembly Syntax
 **BespokeASM**'s syntax is close to the syntax that Carsten used for the Minimal 64x4's assembly language. However, there are some differences:
 

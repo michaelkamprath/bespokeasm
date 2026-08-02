@@ -150,15 +150,30 @@ def is_string_numeric(value_str: str, default_numeric_base: str = 'decimal') -> 
     )
 
 
-PATTERN_ALLOWED_LABELS = re.compile(
-        r'^(?!__|\.\.)(?:(?:\.|_|[a-zA-Z])[a-zA-Z0-9_]*)$',
-        flags=re.IGNORECASE | re.MULTILINE
-    )
+PATTERN_GLOBAL_SYMBOL = r'[a-zA-Z][a-zA-Z0-9_]*'
+PATTERN_FILE_SYMBOL = r'_(?!_)[a-zA-Z0-9_]+'
+PATTERN_LOCAL_SYMBOL = r'\.[a-zA-Z0-9_]+'
+PATTERN_SYMBOL = (
+    fr'(?:{PATTERN_GLOBAL_SYMBOL}|{PATTERN_FILE_SYMBOL}|{PATTERN_LOCAL_SYMBOL})'
+)
+PATTERN_CONSTANT_SYMBOL = PATTERN_SYMBOL
+PATTERN_ALLOWED_SYMBOLS = re.compile(
+    fr'^{PATTERN_SYMBOL}$',
+    flags=re.IGNORECASE | re.MULTILINE,
+)
+# Retain the established public name for callers that treat all assembler
+# symbols as labels.
+PATTERN_ALLOWED_LABELS = PATTERN_ALLOWED_SYMBOLS
 
 
-def is_valid_label(s: str):
-    res = re.search(PATTERN_ALLOWED_LABELS, s)
-    return (res is not None)
+def is_valid_symbol(value: str) -> bool:
+    """Return whether a value is a valid global, file, or local symbol name."""
+    return PATTERN_ALLOWED_SYMBOLS.fullmatch(value) is not None
+
+
+def is_valid_label(value: str) -> bool:
+    """Return whether a value is a valid assembler label or symbol name."""
+    return is_valid_symbol(value)
 
 
 # Number format preservation utilities

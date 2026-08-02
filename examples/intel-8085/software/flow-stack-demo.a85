@@ -1,0 +1,111 @@
+; ============================================================================
+; flow-stack-demo.a85 — BespokeASM flow-counter demonstration for the
+; Intel 8085 example ISA
+; ============================================================================
+; The `stack` flow-counter class declared in intel-8085.yaml tracks BYTES of
+; 8085 hardware stack depth at assembly time. Nothing here changes the
+; emitted bytecode: the directives and `:=` declarations are emission-inert,
+; and every coordinate reference below resolves to the same numeric literal a programmer
+; would otherwise compute (and re-compute after every edit) by hand.
+;
+; Stack coordinate convention (declared by the ISA configuration):
+;   * coordinates are 1-based — COORDINATE(stack, 1) names the byte the
+;     stack pointer physically addresses, so the byte at physical address
+;     sp+N is coordinate N+1;
+;   * a coordinate offset value therefore converts to a `dad sp` displacement by
+;     subtracting 1.
+; In a `mode=called` region the caller's 2-byte return address occupies
+; coordinates 1-2, so caller-pushed data starts at coordinate 3.
+;
+; Assemble (static analysis is on by default):
+;   bespokeasm compile -c ../intel-8085.yaml -p -t hex flow-stack-demo.a85
+
+; Memory map: the stack grows DOWN from STACK_TOP toward the program's data
+; ceiling. The ISA's `stack` class deliberately declares no max_value — the
+; 8085 stack lives in general-purpose RAM, so the real depth limit is a fact
+; of THIS program's memory map, not of the hardware. The `#track ... max=`
+; instance bound below derives that limit from these symbols, so it stays
+; correct if the layout changes.
+STACK_TOP = 0xF000              ; initial stack pointer
+DATA_CEILING = 0xEFF0           ; highest address program data may occupy;
+                                ;   the stack may grow down to just above it
+
+    .org 0x0000
+
+; ----------------------------------------------------------------------------
+; main — pushes two 16-bit arguments and calls sum16.
+;
+; `lxi sp, ...` replaces the stack pointer wholesale, which no signed depth
+; delta can express. Its ISA metadata therefore makes an active stack counter
+; indeterminate. The explicit #resume immediately afterward anchors the known
+; empty-stack state at zero.
+; ----------------------------------------------------------------------------
+#track stack max=STACK_TOP - DATA_CEILING - 1
+                                ; open with a balanced exit contract and this
+                                ; program's memory-map-specific bound
+main:
+    lxi sp, STACK_TOP           ; stack=0 -> ?: replace the physical anchor
+#resume stack = 0               ; stack=? -> 0: newly initialized empty stack
+                                ; max= is a per-instance bound (tighten-only
+                                ; against the class bounds): this program owns
+                                ; the 15 addresses strictly above the inclusive
+                                ; DATA_CEILING and below STACK_TOP, so pushing
+                                ; deeper is an assembly-time error
+    lxi b, 1234                 ; second argument value
+    push b                      ; stack: 0 -> 2
+    lxi d, 4321                 ; first argument value
+    push d                      ; stack: 2 -> 4
+#assert stack == 4              ; checkpoint: both 16-bit arguments are stacked
+    call sum16                  ; declared flow_call_effects {stack: 0}:
+                                ;   caller-visible depth is still 4 here
+    pop d                       ; reclaim arguments: 4 -> 2
+    pop b                       ; stack: 2 -> 0
+#endtrack stack                 ; balanced exit check: counter is back at 0
+    hlt
+
+; ----------------------------------------------------------------------------
+; sum16 — a `called` subroutine taking two 16-bit arguments pushed by the
+; caller; returns their sum in HL (saturated to 0xFFFF on overflow).
+;
+; Entry stack picture (counter = 0, coordinates fixed at declaration):
+;   coordinate 1-2 : return address   (physical SP+0 / SP+1)
+;   coordinate 3-4 : .arg1            (pushed last by the caller)
+;   coordinate 5-6 : .arg2            (pushed first by the caller)
+;
+; The whole point of coordinate references: after the `push b` prologue the same
+; coordinates are two bytes further from SP, and every offset below
+; updates automatically. Inserting another push would require no edits.
+; ----------------------------------------------------------------------------
+#track stack mode=called        ; routine-owned movement: init 0, exit 0
+sum16:
+.arg1 := COORDINATE(stack, 3)   ; first argument, just above the return address
+.arg2 := COORDINATE(stack, 5)   ; second argument
+    push b                      ; preserve caller's BC: stack 0 -> 2
+                                ;   ...shifting every coordinate offset below by +2
+
+    ; load .arg1 into DE. .arg1 is now 3 + 2 = 5; coordinates are
+    ; 1-based, so the dad sp displacement is .arg1 - 1 (= 4).
+    lxi h, .arg1 - 1
+    dad sp                      ; HL -> low byte of .arg1
+    mov e, m
+    inx h
+    mov d, m                    ; DE = .arg1
+
+    ; load .arg2 into BC (caller's BC is already saved on the stack).
+    ; .arg2 is now 5 + 2 = 7, so the displacement is 6.
+    lxi h, .arg2 - 1
+    dad sp                      ; HL -> low byte of .arg2
+    mov c, m
+    inx h
+    mov b, m                    ; BC = .arg2
+
+    xchg                        ; HL = .arg1 (DE becomes scratch)
+    dad b                       ; HL = .arg1 + .arg2; carry flags overflow
+    jnc .done                   ; balanced conditional branch: both the taken
+                                ;   and fall-through edges carry stack = 2
+    lxi h, 0xFFFF               ; overflow path: saturate the result
+.done:                          ; join point: both paths arrive with stack = 2
+    pop b                       ; restore caller's BC: 2 -> 0
+    ret                         ; terminal: exit contract (0) is checked
+                                ;   BEFORE the physical return-address pop
+#endtrack stack                 ; lexical delimiter; every path ended at ret

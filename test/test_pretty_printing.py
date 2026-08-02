@@ -9,10 +9,6 @@ import unittest
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.engine import Assembler
-from bespokeasm.assembler.label_scope import GlobalLabelScope
-from bespokeasm.assembler.label_scope import LabelScope
-from bespokeasm.assembler.label_scope.named_scope_manager import ActiveNamedScopeList
-from bespokeasm.assembler.label_scope.named_scope_manager import NamedScopeManager
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object.factory import LineOjectFactory
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
@@ -21,6 +17,10 @@ from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.pretty_printer.factory import PrettyPrinterFactory
 from bespokeasm.assembler.pretty_printer.listing import ListingPrettyPrinter
+from bespokeasm.assembler.symbol_scope import GlobalSymbolScope
+from bespokeasm.assembler.symbol_scope import SymbolScope
+from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
+from bespokeasm.assembler.symbol_scope.named_scope_manager import NamedScopeManager
 
 from test import config_files
 
@@ -158,13 +158,13 @@ class TestPrettyPrinting(unittest.TestCase):
         line_objs = []
         preprocessor = Preprocessor(diagnostic_reporter=self.diagnostic_reporter)
         active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
-        label_scope = GlobalLabelScope(set())
+        symbol_scope = GlobalSymbolScope(set())
         for i, line in enumerate(lines, 1):
             line_obj = LineOjectFactory.parse_line(
                 line_id=LineIdentifier(i, f'test_listing_prints_original_mnemonic - {line}'),
                 line_str=line,
                 model=isa_model,
-                label_scope=None,
+                symbol_scope=None,
                 active_named_scopes=active_named_scopes,
                 current_memzone=memzone_mngr.global_zone,
                 memzone_manager=memzone_mngr,
@@ -173,7 +173,7 @@ class TestPrettyPrinting(unittest.TestCase):
                 log_verbosity=0,
             )[0]
             line_obj.set_start_address(0x1000 + i)
-            line_obj.label_scope = label_scope
+            line_obj.symbol_scope = symbol_scope
             line_obj.generate_words()
             line_objs.append(line_obj)
         printer = PrettyPrinterFactory.getPrettyPrinter('listing', line_objs, isa_model, 'test.asm')
@@ -183,7 +183,7 @@ class TestPrettyPrinting(unittest.TestCase):
             self.assertIn(mnemonic, output, f'Listing should show original mnemonic: {mnemonic}')
 
     def test_listing_handles_4bit_words_in_assembler_flow(self):
-        LabelScope._global_scope = None
+        SymbolScope._global_scope = None
         try:
             with tempfile.TemporaryDirectory() as temp_dir:
                 config_file = os.path.join(temp_dir, 'test_4bit_isa.json')
@@ -239,7 +239,7 @@ class TestPrettyPrinting(unittest.TestCase):
                 with open(output_file, 'rb') as handle:
                     self.assertEqual(handle.read(), bytes.fromhex('0F'))
         finally:
-            LabelScope._global_scope = None
+            SymbolScope._global_scope = None
 
         output = stdout.getvalue()
         self.assertIn(f'File: {source_file}', output)
