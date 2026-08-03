@@ -579,12 +579,10 @@ instructions:
       category: Arithmetic
       title: Set carry flag (C=1)
       modifies:
-        - register: a
-          description: Undefined
-        - flag: C
-          description: Set to 1
         - flag: N
           description: Set to 0
+        - flag: C
+          description: Set to 1
         - flag: Z
           description: Set to 0
       cycles: 3
@@ -600,12 +598,10 @@ instructions:
       category: Arithmetic
       title: Clear carry flag (C=0)
       modifies:
-        - register: a
-          description: Undefined
-        - flag: C
-          description: Set to 0
         - flag: N
           description: Set to 1
+        - flag: C
+          description: Set to 0
         - flag: Z
           description: Set to 0
       cycles: 3
@@ -3106,15 +3102,6 @@ instructions:
       category: Arithmetic
       title: 'Store A to Z: *Z = A'
       cycles: 3
-      modifies:
-        - register: A
-          description: Updated
-        - flag: N
-          description: Reflects result
-        - flag: C
-          description: Reflects result
-        - flag: Z
-          description: Reflects result
   stb:
     flow_effects:
       stack: 0
@@ -3150,15 +3137,6 @@ instructions:
       category: Arithmetic
       title: 'Store A at rel address in zero page: *(*Z) = A'
       cycles: 6
-      modifies:
-        - register: A
-          description: Updated
-        - flag: N
-          description: Reflects result
-        - flag: C
-          description: Reflects result
-        - flag: Z
-          description: Reflects result
   str:
     flow_effects:
       stack: 0
@@ -3510,9 +3488,6 @@ instructions:
       category: Memory Movement
       title: 'Clear fast word: *V = 0x0000'
       cycles: 5
-      modifies:
-        - register: A
-          description: Set to 0
   clw:
     flow_effects:
       stack: 0
@@ -3552,9 +3527,6 @@ instructions:
       category: Memory Movement
       title: 'Clear zero-page long: *Q = 0x00000000'
       cycles: 7
-      modifies:
-        - register: A
-          description: Set to 0
   cll:
     flow_effects:
       stack: 0
@@ -4419,11 +4391,11 @@ instructions:
         - register: A
           description: Updated
         - flag: N
-          description: Reflects result
+          description: Reflects MSB of result
         - flag: C
-          description: Reflects result
+          description: Reflects MSB of result
         - flag: Z
-          description: Reflects result
+          description: Reflects MSB of result
   aiw:
     flow_effects:
       stack: 0
@@ -4587,11 +4559,11 @@ instructions:
         - register: A
           description: Updated
         - flag: N
-          description: Reflects result
+          description: Reflects MSB of result
         - flag: C
-          description: Reflects result
+          description: Reflects MSB of result
         - flag: Z
-          description: Reflects result
+          description: Reflects MSB of result
   azw:
     flow_effects:
       stack: 0
@@ -4755,11 +4727,11 @@ instructions:
         - register: A
           description: Updated
         - flag: N
-          description: Reflects result
+          description: Reflects MSB of result
         - flag: C
-          description: Reflects result
+          description: Reflects MSB of result
         - flag: Z
-          description: Reflects result
+          description: Reflects MSB of result
   abw:
     flow_effects:
       stack: 0
@@ -4839,11 +4811,11 @@ instructions:
         - register: A
           description: Updated (MSB of result)
         - flag: N
-          description: Reflects result
+          description: Reflects MSB of result
         - flag: C
-          description: Reflects result
+          description: Reflects MSB of result
         - flag: Z
-          description: Reflects result
+          description: Reflects MSB of result
   sui:
     flow_effects:
       stack: 0
@@ -5321,11 +5293,11 @@ instructions:
         - register: A
           description: Updated
         - flag: N
-          description: Reflects result
+          description: Reflects MSB of result
         - flag: C
-          description: Reflects result
+          description: Reflects MSB of result
         - flag: Z
-          description: Reflects result
+          description: Reflects MSB of result
   siw:
     flow_effects:
       stack: 0
@@ -5489,11 +5461,11 @@ instructions:
         - register: A
           description: Updated
         - flag: N
-          description: Reflects result
+          description: Reflects MSB of result
         - flag: C
-          description: Reflects result
+          description: Reflects MSB of result
         - flag: Z
-          description: Reflects result
+          description: Reflects MSB of result
   szw:
     flow_effects:
       stack: 0
@@ -5658,11 +5630,11 @@ instructions:
         - register: A
           description: Updated
         - flag: N
-          description: Reflects result
+          description: Reflects MSB of result
         - flag: C
-          description: Reflects result
+          description: Reflects MSB of result
         - flag: Z
-          description: Reflects result
+          description: Reflects MSB of result
   sbw:
     flow_effects:
       stack: 0
@@ -5743,11 +5715,11 @@ instructions:
         - register: A
           description: Updated (MSB of result)
         - flag: N
-          description: Reflects result
+          description: Reflects MSB of result
         - flag: C
-          description: Reflects result
+          description: Reflects MSB of result
         - flag: Z
-          description: Reflects result
+          description: Reflects MSB of result
   cpi:
     flow_effects:
       stack: 0

@@ -4475,11 +4475,11 @@ instructions:
       - register: A
         description: Updated
       - flag: N
-        description: Reflects result
+        description: Set based on MSB of result
       - flag: C
-        description: Reflects result
+        description: Set based on MSB of result
       - flag: Z
-        description: Reflects result
+        description: Set based on MSB of result
   aiw:
     flow_effects:
       stack: 0
@@ -4609,11 +4609,11 @@ instructions:
       - register: A
         description: Updated
       - flag: N
-        description: Reflects result
+        description: Set based on MSB of result
       - flag: C
-        description: Reflects result
+        description: Set based on MSB of result
       - flag: Z
-        description: Reflects result
+        description: Set based on MSB of result
   azq:
     flow_effects:
       stack: 0
@@ -4770,11 +4770,11 @@ instructions:
       - register: A
         description: Set to MSB of result
       - flag: N
-        description: Reflects result
+        description: Set based on MSB of result
       - flag: C
-        description: Reflects result
+        description: Set based on MSB of result
       - flag: Z
-        description: Reflects result
+        description: Set based on MSB of result
   sui:
     flow_effects:
       stack: 0
@@ -5208,11 +5208,11 @@ instructions:
       - register: A
         description: Updated
       - flag: N
-        description: Reflects result
+        description: Set based on MSB of result
       - flag: C
-        description: Reflects result
+        description: Set based on MSB of result
       - flag: Z
-        description: Reflects result
+        description: Set based on MSB of result
   siw:
     flow_effects:
       stack: 0
@@ -5342,11 +5342,11 @@ instructions:
       - register: A
         description: Updated
       - flag: N
-        description: Reflects result
+        description: Set based on MSB of result
       - flag: C
-        description: Reflects result
+        description: Set based on MSB of result
       - flag: Z
-        description: Reflects result
+        description: Set based on MSB of result
   szq:
     flow_effects:
       stack: 0
@@ -5503,11 +5503,11 @@ instructions:
       - register: A
         description: Set to MSB of result
       - flag: N
-        description: Reflects result
+        description: Set based on MSB of result
       - flag: C
-        description: Reflects result
+        description: Set based on MSB of result
       - flag: Z
-        description: Reflects result
+        description: Set based on MSB of result
   cpi:
     flow_effects:
       stack: 0
