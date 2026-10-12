@@ -125,8 +125,8 @@ class FlowLinearAnalyzer:
         )
 
     def _error(self, line_object, message: str) -> None:
-        # The reporter is fail-fast today (error() exits), but every call site
-        # still guards-and-returns afterward so an accumulate-and-continue
+        # The reporter is fail-fast today (error() exits), but call sites
+        # still guard invalid state afterward so an accumulate-and-continue
         # reporter cannot turn an error path into a crash on invalid state.
         self._diagnostic_reporter.error(
             line_object.line_id,

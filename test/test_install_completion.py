@@ -1,4 +1,5 @@
-import os
+import shutil
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -12,6 +13,12 @@ class TestInstallCompletion(unittest.TestCase):
     def setUp(self):
         self.runner = CliRunner()
         self.main = _build_main()
+        self._tmp_path = None
+
+    def tearDown(self):
+        # Clean up temp files after each test
+        if self._tmp_path is not None and self._tmp_path.exists():
+            shutil.rmtree(self._tmp_path)
 
     def _invoke(self, *extra_args, env=None, prog_name='bespokeasm'):
         # Pass --prog-name explicitly because under pytest sys.argv[0] is the test
@@ -32,41 +39,41 @@ class TestInstallCompletion(unittest.TestCase):
 
     def test_bash_writes_file_with_completion_markers(self):
         """`install-completion --shell bash --path X` writes a Click-bash-style script and prints bash guidance."""
-        with self.runner.isolated_filesystem() as tmp:
-            dest = os.path.join(tmp, 'bespokeasm.bash')
-            result = self._invoke('--shell', 'bash', '--path', dest)
-            self.assertEqual(result.exit_code, 0, result.output)
-            script = self._read(dest)
-            # Click's bash completion script references the prog-name's completion env var.
-            self.assertIn('_BESPOKEASM_COMPLETE', script, 'bash script wires Click completion env var')
-            self.assertIn(f'Installed bash completions at {dest}', result.output)
-            self.assertIn('bash-completion', result.output, 'bash-specific guidance shown')
+        self._tmp_path = Path(tempfile.mkdtemp())
+        dest = self._tmp_path / 'bespokeasm.bash'
+        result = self._invoke('--shell', 'bash', '--path', str(dest))
+        self.assertEqual(result.exit_code, 0, result.output)
+        script = self._read(dest)
+        # Click's bash completion script references the prog-name's completion env var.
+        self.assertIn('_BESPOKEASM_COMPLETE', script, 'bash script wires Click completion env var')
+        self.assertIn(f'Installed bash completions at {dest}', result.output)
+        self.assertIn('bash-completion', result.output, 'bash-specific guidance shown')
 
     def test_zsh_injects_zstyle_block(self):
         """zsh output is augmented with bespokeasm-specific zstyle preferences (sort, list-packed, group-order)."""
-        with self.runner.isolated_filesystem() as tmp:
-            dest = os.path.join(tmp, '_bespokeasm')
-            result = self._invoke('--shell', 'zsh', '--path', dest)
-            self.assertEqual(result.exit_code, 0, result.output)
-            script = self._read(dest)
-            # zsh-specific tail injected by install_completion.
-            self.assertIn('# bespokeasm completion preferences', script)
-            self.assertIn("zstyle ':completion:*:*:bespokeasm:*' sort false", script)
-            self.assertIn("zstyle ':completion:*:*:bespokeasm:*' list-packed true", script)
-            self.assertIn('_BESPOKEASM_COMPLETE', script, 'click-generated zsh body present')
-            self.assertIn('Installed zsh completions', result.output)
-            self.assertIn('fpath', result.output, 'zsh-specific guidance shown')
+        self._tmp_path = Path(tempfile.mkdtemp())
+        dest = self._tmp_path / '_bespokeasm'
+        result = self._invoke('--shell', 'zsh', '--path', str(dest))
+        self.assertEqual(result.exit_code, 0, result.output)
+        script = self._read(dest)
+        # zsh-specific tail injected by install_completion.
+        self.assertIn('# bespokeasm completion preferences', script)
+        self.assertIn("zstyle ':completion:*:*:bespokeasm:*' sort false", script)
+        self.assertIn("zstyle ':completion:*:*:bespokeasm:*' list-packed true", script)
+        self.assertIn('_BESPOKEASM_COMPLETE', script, 'click-generated zsh body present')
+        self.assertIn('Installed zsh completions', result.output)
+        self.assertIn('fpath', result.output, 'zsh-specific guidance shown')
 
     def test_fish_writes_file_and_emits_fish_guidance(self):
         """fish path writes a script and surfaces fish-specific post-install guidance."""
-        with self.runner.isolated_filesystem() as tmp:
-            dest = os.path.join(tmp, 'bespokeasm.fish')
-            result = self._invoke('--shell', 'fish', '--path', dest)
-            self.assertEqual(result.exit_code, 0, result.output)
-            script = self._read(dest)
-            self.assertIn('_BESPOKEASM_COMPLETE', script)
-            self.assertIn('Installed fish completions', result.output)
-            self.assertIn('fish', result.output.lower())
+        self._tmp_path = Path(tempfile.mkdtemp())
+        dest = self._tmp_path / 'bespokeasm.fish'
+        result = self._invoke('--shell', 'fish', '--path', str(dest))
+        self.assertEqual(result.exit_code, 0, result.output)
+        script = self._read(dest)
+        self.assertIn('_BESPOKEASM_COMPLETE', script)
+        self.assertIn('Installed fish completions', result.output)
+        self.assertIn('fish', result.output.lower())
 
     # ---- Shell auto-detection ----
     # When --shell is omitted, the command falls back to _detect_shell() which
@@ -75,12 +82,12 @@ class TestInstallCompletion(unittest.TestCase):
 
     def test_auto_detect_uses_shell_env_var(self):
         """With SHELL=/bin/bash and no --shell flag, _detect_shell picks 'bash' for install."""
-        with self.runner.isolated_filesystem() as tmp:
-            dest = os.path.join(tmp, 'auto.bash')
-            # SHELL=/bin/bash should let _detect_shell pick 'bash' without --shell.
-            result = self._invoke('--path', dest, env={'SHELL': '/bin/bash'})
-            self.assertEqual(result.exit_code, 0, result.output)
-            self.assertIn('Installed bash completions', result.output)
+        self._tmp_path = Path(tempfile.mkdtemp())
+        dest = self._tmp_path / 'auto.bash'
+        # SHELL=/bin/bash should let _detect_shell pick 'bash' without --shell.
+        result = self._invoke('--path', str(dest), env={'SHELL': '/bin/bash'})
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertIn('Installed bash completions', result.output)
 
     def test_no_shell_detected_exits_with_error(self):
         """If --shell is omitted and SHELL/PSModulePath provide no signal, exit 1 with a helpful message."""
@@ -136,18 +143,18 @@ class TestInstallCompletion(unittest.TestCase):
     def test_custom_prog_name_used_in_zstyle_block(self):
         """A custom --prog-name flows through to the completion env-var name (uppercased,
         dashes->underscores) and to the zstyle group context (verbatim)."""
-        with self.runner.isolated_filesystem() as tmp:
-            dest = os.path.join(tmp, '_customprog')
-            result = self._invoke(
-                '--shell', 'zsh', '--path', dest,
-                prog_name='custom-prog',
-            )
-            self.assertEqual(result.exit_code, 0, result.output)
-            script = self._read(dest)
-            # prog-name is uppercased and dashes -> underscores for the env var.
-            self.assertIn('_CUSTOM_PROG_COMPLETE', script)
-            # The original (with dash) appears in the zstyle group context.
-            self.assertIn("zstyle ':completion:*:*:custom-prog:*' sort false", script)
+        self._tmp_path = Path(tempfile.mkdtemp())
+        dest = self._tmp_path / '_customprog'
+        result = self._invoke(
+            '--shell', 'zsh', '--path', str(dest),
+            prog_name='custom-prog',
+        )
+        self.assertEqual(result.exit_code, 0, result.output)
+        script = self._read(dest)
+        # prog-name is uppercased and dashes -> underscores for the env var.
+        self.assertIn('_CUSTOM_PROG_COMPLETE', script)
+        # The original (with dash) appears in the zstyle group context.
+        self.assertIn("zstyle ':completion:*:*:custom-prog:*' sort false", script)
 
 
 if __name__ == '__main__':
