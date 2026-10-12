@@ -7,7 +7,7 @@ class LineIdentifier:
         return str(self)
 
     def __str__(self) -> str:
-        return f'file {self._filename if self._filename is not None else "unnown_file"}, line {self._line_num}'
+        return f'file {self._filename if self._filename is not None else "unknown_file"}, line {self._line_num}'
 
     @property
     def filename(self) -> str:
