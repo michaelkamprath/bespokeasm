@@ -19,6 +19,7 @@ Changes that are planned but not implemented yet:
 
 
 ## [Unreleased]
+* **Behavior change:** Development and CI now use uv with a committed lockfile. Use `uv sync --locked` and `uv run --locked` in place of manual environment setup and `pip install ".[dev]"`; development tools, including pre-commit, are now in the default `dev` dependency group instead of published dependencies or extras.
 * Added Python 3.12, 3.13, and 3.14 package classifiers to reflect the versions covered by CI.
 * Added a per-register `reserved: false` configuration option to document a register in generated ISA documentation without reserving its name as an assembler keyword. The Minimal 64x4 example ISAs now use it for `a`/`b`, whose unconditional reservation had broken conventional source that uses those names for zero-page variables.
 * Fixed bug in VIM syntax highlighting that caused parsing errors.

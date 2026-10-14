@@ -55,19 +55,45 @@ Note: the standalone binary has a slightly slower startup than a `pipx` install 
 
 #### Install from source
 
-For development or if you prefer `pip`:
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/) (on macOS: `brew install uv`), then:
 
 ```sh
-git clone git@github.com:michaelkamprath/bespokeasm.git
+git clone https://github.com/michaelkamprath/bespokeasm.git
 cd bespokeasm
-pip install .
+uv tool install .
 ```
 
-For development (building wheels/binaries), install dev extras:
+This installs BespokeASM into an isolated tool environment and makes `bespokeasm` available from any directory without activating a virtual environment. If uv reports that its executable directory is missing from your PATH, run `uv tool update-shell` and restart your shell.
 
 ```sh
-pip install ".[dev]"
+bespokeasm --help
+bespokeasm install-completion
 ```
+
+After updating the checkout, reinstall with `uv tool install --force .` from the repository root. To remove the installation, run `uv tool uninstall bespokeasm`.
+
+#### Development setup
+
+From the repository root, synchronize the development environment:
+
+```sh
+uv sync --locked
+uv run --locked bespokeasm --help
+```
+
+uv manages `.venv` and installs the project in editable mode together with the default `dev` dependency group, including test, lint, and packaging tools. Run project commands through `uv run`; no manual environment activation is needed.
+
+To also make the CLI available from any directory while developing, run this from the repository root:
+
+```sh
+uv tool install --editable .
+```
+
+This creates a separate tool environment whose `bespokeasm` command reflects source edits without reinstalling. Keep the checkout at its original location, and use `uv tool update-shell` if uv reports that its executable directory is missing from PATH. If you previously installed BespokeASM as a non-editable uv tool, use `uv tool install --force --editable .` to replace it. Continue using `uv sync --locked` and `uv run --locked` for tests, linters, and builds in the project environment.
+
+Dependencies are declared in `pyproject.toml` and locked in the committed `uv.lock`. Add runtime dependencies with `uv add <package>` and development tools with `uv add --dev <package>`. After manually changing dependencies or the project version, run `uv lock` and commit both files. To deliberately upgrade locked dependencies, run `uv lock --upgrade`, then `uv sync --locked` and the checks below.
+
+The Makefile also uses uv: `make tests`, `make coverage`, `make flake8`, `make pipx-wheel`, `make pyinstaller`, and `make nuitka`. Standalone builds additionally require host tools such as ripgrep (PyInstaller) or a C compiler (Nuitka).
 
 ### Installing Syntax Highlighting
 #### Visual Studio Code
@@ -101,8 +127,15 @@ Contributions are welcome. All contributions should pass the configured linters.
 
 ```sh
 cd /path/to/bespokeasm/repository
-pipenv sync --dev
-pre-commit install
+uv sync --locked
+uv run --locked pre-commit install
+```
+
+Before submitting changes, run:
+
+```sh
+uv run --locked pre-commit run --all-files
+uv run --locked pytest -q
 ```
 
 # License

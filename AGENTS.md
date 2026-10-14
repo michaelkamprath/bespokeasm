@@ -3,14 +3,12 @@
 
 ## Quickstart
 
-Requires Python 3.11+ and a virtual environment. From the repository root:
+Requires [uv](https://docs.astral.sh/uv/getting-started/installation/) and Python 3.11+. From the repository root:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install .
+uv sync --locked
 mkdir -p build
-bespokeasm -c examples/slu4-minimal-cpu/slu4-minimal-cpu.yaml examples/slu4-minimal-cpu/hello.min-asm -n -p
+uv run --locked bespokeasm -c examples/slu4-minimal-cpu/slu4-minimal-cpu.yaml examples/slu4-minimal-cpu/hello.min-asm -n -p
 ```
 This will compile the `hello.min-asm` file into a pretty printed listing of the bytecode and not emit a binary file.
 
@@ -73,22 +71,24 @@ CHANGELOG and version discipline:
 Release checklist:
 - Update versions in `src/bespokeasm/__init__.py` and `pyproject.toml`
 - Update `CHANGELOG.md`
-- Run tests: `pytest -q`
-- Run `pre-commit run --all-files` and fix any issues
+- Refresh the lockfile: `uv lock`
+- Run tests: `uv run --locked pytest -q`
+- Run `uv run --locked pre-commit run --all-files` and fix any issues
 - Tag the release and push
 
 ## Development Rules
 
-### Use Virtual Environment
-- Use the Python virtual environment at project root: `.venv`, If this does not exist, create it with `python3 -m venv .venv` from the root of the project.
-- Activate with: `source .venv/bin/activate` (Linux/macOS) or `.venv\Scripts\activate` (Windows)
-- If the virtual environment is new, install the dependencies with `pip install -r requirements.txt` from the root of the project.
-- IMPORTANT: The virtual environment is used for all development activities. Always activate the virtual environment before running any development commands.
+### Use uv
+- Manage the project environment with uv from the repository root. Run `uv sync --locked` to create or synchronize `.venv`, including the default `dev` dependency group.
+- Run all Python development commands through `uv run --locked` (for example, `uv run --locked pytest -q`); manual virtual environment activation is unnecessary.
+- Declare runtime dependencies in `[project.dependencies]` and development tools in `[dependency-groups].dev` in `pyproject.toml`. Use `uv add` or `uv add --dev` when adding dependencies.
+- After changing dependencies or project metadata (including the version), run `uv lock` and include the updated `uv.lock` with the change. Do not manually edit the lockfile.
+- Keep `.venv` ignored and `uv.lock` tracked. CI uses `--locked` to reject stale lockfiles.
 
 ### Project Coding Best Practices
 - Keep shell completion paths lightweight by avoiding heavy imports at CLI import time; route completion invocations to `completion_cli.entry_point()` and lazily import heavy modules inside command handlers.
 - If helpers move between modules, update tests to import from the new module rather than re-exporting unused symbols just for tests.
-- Always run `pre-commit run --all-files` and `pytest -q` after changes to properly lint and test the code. Ensure the Python virtual environment is active before running them.
+- Always run `uv run --locked pre-commit run --all-files` and `uv run --locked pytest -q` after changes to properly lint and test the code. Use uv to run both checks in the project environment.
 - Flow-counter metadata, directives, and coordinate declarations must be emission-inert. When changing flow analysis or adding flow annotations to example programs, byte-compare the assembled output against a pre-change baseline (compile the prior source from git history and `cmp` the binaries). The test suite alone has missed emission bugs that byte-comparison caught, and byte identity is the feature's core guarantee.
 
 ### Test Resource Boundaries

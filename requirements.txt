@@ -2,5 +2,4 @@ click
 intelhex
 packaging
 ruamel.yaml
-pre-commit
 click-default-group

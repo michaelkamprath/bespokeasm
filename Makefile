@@ -1,16 +1,14 @@
-PYTHON := $(shell if [ -x ".venv/bin/python" ]; then echo ".venv/bin/python"; elif command -v python3 >/dev/null 2>&1; then echo "python3"; else echo "python"; fi)
+UV ?= uv
+PYTHON := $(UV) run --locked python
 PYINSTALLER_DIST := dist
 PYINSTALLER_NAME := bespokeasm
 
 .PHONY: tests coverage coverage-html coverage-xml clean flake8 pyinstaller nuitka pipx-wheel
 
 tests:
-	@$(PYTHON) -m pytest --version >/dev/null 2>&1 || { echo "ERROR: pytest is not installed in the current Python environment. Install with: pip install pytest"; exit 1; }
 	PYTHONPATH=./src:${PYTHONPATH} $(PYTHON) -m pytest test/ -v
 
 coverage:
-	@$(PYTHON) -m coverage --version >/dev/null 2>&1 || { echo "ERROR: coverage is not installed in the current Python environment. Install with: pip install coverage"; exit 1; }
-	@$(PYTHON) -m pytest --version >/dev/null 2>&1 || { echo "ERROR: pytest is not installed in the current Python environment. Install with: pip install pytest"; exit 1; }
 	PYTHONPATH=./src:${PYTHONPATH} $(PYTHON) -m coverage run --source=src/bespokeasm -m pytest test/
 	$(PYTHON) -m coverage report -m
 
@@ -33,13 +31,11 @@ clean:
 	rm -f ./coverage.xml
 
 flake8:
-	flake8 ./src/ ./test/ --count --max-line-length=127 --statistics
+	$(UV) run --locked flake8 ./src/ ./test/ --count --max-line-length=127 --statistics
 
 pyinstaller:
 	# Requires that ripgrep `rg` is installed in host system. See: https://github.com/BurntSushi/ripgrep
-	# Also requires `pyinstaller` in the current python environment. `pip install pyinstaller`
 	@command -v rg >/dev/null 2>&1 || { echo "ERROR: ripgrep (rg) is not installed. Install from https://github.com/BurntSushi/ripgrep"; exit 1; }
-	@$(PYTHON) -m PyInstaller --version >/dev/null 2>&1 || { echo "ERROR: pyinstaller is not installed in the current Python environment. Install with: pip install pyinstaller"; exit 1; }
 	PYTHONPATH=./src $(PYTHON) -m PyInstaller --onefile --name $(PYINSTALLER_NAME) \
 		--distpath $(PYINSTALLER_DIST) --paths src --collect-all bespokeasm \
 		--add-data "src/bespokeasm/configgen/sublime/resources:bespokeasm/configgen/sublime/resources" \
@@ -78,9 +74,7 @@ NUITKA_NOFOLLOW := \
 	--nofollow-import-to=ftplib --nofollow-import-to=unittest
 
 nuitka:
-	# Requires `nuitka[onefile]` in the current python environment. `pip install nuitka[onefile]`
 	# Also requires a C compiler (gcc/clang).
-	@$(PYTHON) -m nuitka --version >/dev/null 2>&1 || { echo "ERROR: nuitka is not installed. Install with: pip install 'nuitka[onefile]'"; exit 1; }
 	PYTHONPATH=./src $(PYTHON) -m nuitka \
 		--onefile \
 		-o bespokeasm \

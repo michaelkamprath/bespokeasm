@@ -25,13 +25,14 @@ dependencies = [
     "click",
     "intelhex",
     "packaging",
-    "pre-commit",
     "click-default-group",
     "ruamel.yaml",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
+    "pre-commit",
+    "flake8",
     "build",
     "pipx",
     "pyinstaller",
