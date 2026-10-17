@@ -23,6 +23,7 @@ Changes that are planned but not implemented yet:
 * Added Python 3.12, 3.13, and 3.14 package classifiers to reflect the versions covered by CI.
 * Added a per-register `reserved: false` configuration option to document a register in generated ISA documentation without reserving its name as an assembler keyword. The Minimal 64x4 example ISAs now use it for `a`/`b`, whose unconditional reservation had broken conventional source that uses those names for zero-page variables.
 * Fixed bug in VIM syntax highlighting that caused parsing errors.
+* Improved the `#print` error for an unsupported color name (e.g. `purple`): it now reports the unknown color and lists the supported colors instead of a misleading "invalid verbosity level" error.
 
 ## [0.8.0]
 * Added a general-purpose `#assert` preprocessor directive with the same comparison and symbol-resolution semantics as `#if`. Failed assertions may include an optional user message and `#print`-style color; flow-enabled assertions may also compare `COUNTER()` values and counter-coordinate offsets.

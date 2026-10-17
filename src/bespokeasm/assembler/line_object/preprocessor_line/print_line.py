@@ -6,6 +6,9 @@ from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
 from bespokeasm.assembler.line_object.preprocessor_line.message import (
     parse_trailing_message,
 )
+from bespokeasm.assembler.line_object.preprocessor_line.message import (
+    PREPROCESSOR_MESSAGE_COLORS,
+)
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
@@ -34,6 +37,15 @@ class PrintLine(PreprocessorLine):
         try:
             min_level = int(min_level_str) if min_level_str is not None else None
         except ValueError:
+            # A word in the color position that isn't a supported color falls through to
+            # the verbosity slot, so report it as an unknown color rather than a bad level.
+            last_token = min_level_str.split()[-1]
+            if last_token.isalpha():
+                sys.exit(
+                    f'ERROR - {line_id}: Unknown color "{last_token}" in #print directive. '
+                    f'Supported colors are: {", ".join(PREPROCESSOR_MESSAGE_COLORS)}. '
+                    f'Directive: {instruction}'
+                )
             sys.exit(f'ERROR - {line_id}: Invalid verbosity level in #print directive: {instruction}')
 
         color = parsed_message.color

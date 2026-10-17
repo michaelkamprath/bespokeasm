@@ -182,9 +182,11 @@ class TestPreprocessorPrint(unittest.TestCase):
                                 for args, kwargs in [(c.args, c.kwargs) for c in mock_secho_high.call_args_list]))
 
     def test_print_color_invalid_raises(self):
-        with self.assertRaises(SystemExit):
+        with self.assertRaises(SystemExit) as cm:
             with patch('click.secho') as _:
                 self._load_file('test_preprocessor_print_color_invalid.asm', log_verbosity=3)
+        self.assertIn('Unknown color "chartreuse"', str(cm.exception.code))
+        self.assertIn('magenta', str(cm.exception.code))
 
 
 if __name__ == '__main__':
