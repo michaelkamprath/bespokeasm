@@ -9,6 +9,9 @@ BespokeASM application.
 Run it from the repository root in a color-capable terminal:
 
 ```bash
-source .venv/bin/activate
-PYTHONPATH=src python dev/color-scheme/color_demo.py
+uv sync --locked
+uv run --locked python dev/color-scheme/color_demo.py
 ```
+
+`uv sync` installs BespokeASM in editable mode, so edits to `color_scheme.py`
+are picked up on the next run without reinstalling.

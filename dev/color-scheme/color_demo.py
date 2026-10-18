@@ -4,6 +4,10 @@ Visual color mapping demo for BespokeASM syntax highlighting.
 
 This demo shows the RGB hex colors from the central color scheme alongside
 their 256-color terminal approximations, displayed with actual terminal colors.
+
+Run from the repository root:
+
+    uv run --locked python dev/color-scheme/color_demo.py
 """
 import sys
 

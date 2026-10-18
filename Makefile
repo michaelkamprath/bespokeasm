@@ -3,13 +3,13 @@ PYTHON := $(UV) run --locked python
 PYINSTALLER_DIST := dist
 PYINSTALLER_NAME := bespokeasm
 
-.PHONY: tests coverage coverage-html coverage-xml clean flake8 pyinstaller nuitka pipx-wheel
+.PHONY: tests coverage coverage-html coverage-xml clean distclean flake8 pyinstaller nuitka pipx-wheel
 
 tests:
-	PYTHONPATH=./src:${PYTHONPATH} $(PYTHON) -m pytest test/ -v
+	$(PYTHON) -m pytest test/ -v
 
 coverage:
-	PYTHONPATH=./src:${PYTHONPATH} $(PYTHON) -m coverage run --source=src/bespokeasm -m pytest test/
+	$(PYTHON) -m coverage run --source=src/bespokeasm -m pytest test/
 	$(PYTHON) -m coverage report -m
 
 coverage-html: coverage
@@ -21,14 +21,14 @@ coverage-xml: coverage
 	@echo "XML coverage report generated at ./coverage.xml"
 
 clean:
-	find . -name '*.pyc' -delete
-	find . -name '__pycache__' -delete
-	rm -Rf ./build
-	rm -Rf ./bespokeasm.egg-info
-	rm -Rf ./dist/
-	rm -Rf ./htmlcov
-	rm -f ./.coverage
-	rm -f ./coverage.xml
+	find . -path ./.venv -prune -o -name '*.pyc' -delete
+	find . -path ./.venv -prune -o -name '__pycache__' -type d -exec rm -rf {} +
+	rm -Rf ./build ./dist ./htmlcov ./.pytest_cache
+	rm -Rf ./src/bespokeasm.egg-info
+	rm -f ./.coverage ./coverage.xml ./bespokeasm.spec
+
+distclean: clean
+	rm -Rf ./.venv
 
 flake8:
 	$(UV) run --locked flake8 ./src/ ./test/ --count --max-line-length=127 --statistics
