@@ -1,5 +1,4 @@
 import re
-import sys
 from functools import cached_property
 
 import bespokeasm.assembler.model.operand.factory as OF
@@ -55,14 +54,20 @@ class IndexedRegisterOperand(RegisterOperand):
                 default_numeric_base=self.default_numeric_base,
             )
             if op.null_operand:
-                sys.exit(f'ERROR: indirect indexed register operand "{operand_id}" configured with a empty index "{op_id}".')
+                diagnostic_reporter.error(
+                    None,
+                    f'indirect indexed register operand "{operand_id}" configured with a empty index "{op_id}".',
+                )
             self._index_operand_list.append(op)
             op_match_patterns.append(op.match_pattern)
         # check to see that all operands have the same byte code size
         op_bytecode_size = self._index_operand_list[0].bytecode_size
         for op in self._index_operand_list[1:]:
             if op.bytecode_size != op_bytecode_size:
-                sys.exit(f'ERROR - not all index operands configured with same byte code size for operand "{operand_id}"')
+                diagnostic_reporter.error(
+                    None,
+                    f'not all index operands configured with same byte code size for operand "{operand_id}"',
+                )
 
         # Operands are sorted according to matching precedence order, which is set
         # by the enum value of the types. This allows matching to consider an operand

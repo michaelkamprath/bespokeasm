@@ -1,5 +1,4 @@
 import re
-import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import INSTRUCTION_EXPRESSION_PATTERN
@@ -117,7 +116,7 @@ class DirectiveLine:
         if line_match is not None and len(line_match.groups()) == 1:
             count_str = line_match.group(1)
             if len(count_str) == 0:
-                sys.exit(f'ERROR: {line_id} - .zero directive missing length argument')
+                isa_model.diagnostic_reporter.error(line_id, '.zero directive missing length argument')
             return FillDataLine(
                 line_id,
                 line_match.group(0),

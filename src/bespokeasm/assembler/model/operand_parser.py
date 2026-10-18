@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import sys
 from typing import Literal
 
 from bespokeasm.assembler.bytecode.parts import ByteCodePart
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model.operand import Operand
@@ -49,7 +49,10 @@ class OperandSetsModel:
         self._word_size = word_size
         self._word_segment_size = word_segment_size
         if 'list' not in self._config:
-            sys.exit(f'ERROR - Operand Set configuration dictionary is missing "list" key for instruction "{instruction}"')
+            raise AssemblerError(
+                None,
+                f'Operand Set configuration dictionary is missing "list" key for instruction "{instruction}"',
+            )
         operand_sets = self._config['list']
         self._operand_sets = []
         for k in operand_sets:
@@ -57,9 +60,10 @@ class OperandSetsModel:
             if opset is not None:
                 self._operand_sets.append(opset)
             else:
-                sys.exit(
-                    f'ERROR: instuction set configuration file makes reference to unknow operand set "{k}"'
-                    f' in definition of instruction "{instruction}"'
+                raise AssemblerError(
+                    None,
+                    f'instuction set configuration file makes reference to unknow operand set "{k}"'
+                    f' in definition of instruction "{instruction}"',
                 )
 
     def __repr__(self) -> str:
@@ -313,7 +317,10 @@ class OperandParser:
         if instruction_operands_config is not None:
             self._config = instruction_operands_config
             if 'count' not in self._config:
-                sys.exit(f'ERROR - configuration for instruction "{instruction}" does not have a "count" element')
+                diagnostic_reporter.error(
+                    None,
+                    f'configuration for instruction "{instruction}" does not have a "count" element',
+                )
         else:
             self._config = {'count': 0}
         # Set up Specific Operand
@@ -351,10 +358,11 @@ class OperandParser:
     def validate(self, instruction: str):
         # check to make sure we as many operands configured as count.
         if self._operand_sets_model is not None and self.operand_count != self._operand_sets_model.operand_count:
-            sys.exit(
-                f'ERROR: CONFIGURATION - the number of properly configured operands '
+            raise AssemblerError(
+                None,
+                f'the number of properly configured operands '
                 f'({self._operand_sets_model.operand_count}) does not match prescribed '
-                f'number ({self.operand_count}) for instruction "{instruction}"'
+                f'number ({self.operand_count}) for instruction "{instruction}"',
             )
 
     @property

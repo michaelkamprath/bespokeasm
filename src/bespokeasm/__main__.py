@@ -55,6 +55,7 @@ def _docs_handler(config_file, output_file, verbose):
     import os
 
     import click
+    from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
     from bespokeasm.docsgen import DocumentationGenerator
 
     config_file = os.path.abspath(os.path.expanduser(config_file))
@@ -65,7 +66,8 @@ def _docs_handler(config_file, output_file, verbose):
 
     generator = DocumentationGenerator(config_file, verbose)
     try:
-        output_path = generator.generate_markdown_documentation(output_file)
+        with DiagnosticReporter().reporting_errors():
+            output_path = generator.generate_markdown_documentation(output_file)
         click.echo(f'Documentation generated: {output_path}')
     except SystemExit:
         # Re-raise SystemExit from the generator (contains proper error messages)
@@ -83,7 +85,8 @@ def _vscode_handler(config_file, verbose, editor_config_dir, language_name, lang
     config_file = os.path.abspath(os.path.expanduser(config_file))
     vscode_config_dir = os.path.abspath(os.path.expanduser(editor_config_dir))
     generator = VSCodeConfigGenerator(config_file, verbose, vscode_config_dir, language_name, language_version, code_extension)
-    generator.generate()
+    with generator.model.diagnostic_reporter.reporting_errors():
+        generator.generate()
 
 
 def _sublime_handler(config_file, verbose, editor_config_dir, language_name, language_version, code_extension):
@@ -94,7 +97,8 @@ def _sublime_handler(config_file, verbose, editor_config_dir, language_name, lan
     config_file = os.path.abspath(os.path.expanduser(config_file))
     save_config_dir = os.path.abspath(os.path.expanduser(editor_config_dir))
     generator = SublimeConfigGenerator(config_file, verbose, save_config_dir, language_name, language_version, code_extension)
-    generator.generate()
+    with generator.model.diagnostic_reporter.reporting_errors():
+        generator.generate()
 
 
 def _vim_handler(config_file, verbose, editor_config_dir, language_name, language_version, code_extension):
@@ -105,7 +109,8 @@ def _vim_handler(config_file, verbose, editor_config_dir, language_name, languag
     config_file = os.path.abspath(os.path.expanduser(config_file))
     vim_config_dir = os.path.abspath(os.path.expanduser(editor_config_dir))
     generator = VimConfigGenerator(config_file, verbose, vim_config_dir, language_name, language_version, code_extension)
-    generator.generate()
+    with generator.model.diagnostic_reporter.reporting_errors():
+        generator.generate()
 
 
 _HANDLERS = CommandHandlers(

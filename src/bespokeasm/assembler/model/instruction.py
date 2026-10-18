@@ -1,6 +1,6 @@
-import sys
 from typing import Literal
 
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.model.decorators import apply_decorator_symbol
 from bespokeasm.assembler.model.instruction_base import InstructionBase
 from bespokeasm.assembler.model.operand_parser import OperandParser
@@ -48,11 +48,15 @@ class InstructionVariant(InstructionBase):
         # validate config
         if 'bytecode' not in self._variant_config:
             if variant_num == 0:
-                sys.exit(f'ERROR: configuration for instruction "{mnemonic}" does not have a byte code configuration')
+                diagnostic_reporter.error(
+                    None,
+                    f'configuration for instruction "{mnemonic}" does not have a byte code configuration',
+                )
             else:
-                sys.exit(
-                    f'ERROR: configuration for instruction "{mnemonic}" does not have a '
-                    f'byte code configuration in variant {variant_num}.'
+                diagnostic_reporter.error(
+                    None,
+                    f'configuration for instruction "{mnemonic}" does not have a '
+                    f'byte code configuration in variant {variant_num}.',
                 )
         if 'operands' in self._variant_config:
             try:
@@ -69,7 +73,7 @@ class InstructionVariant(InstructionBase):
                     default_numeric_base=default_numeric_base,
                 )
             except TypeError as e:
-                sys.exit(f'ERROR: Operand configuration for instruction "{mnemonic}" is invalid: {e}')
+                diagnostic_reporter.error(None, f'Operand configuration for instruction "{mnemonic}" is invalid: {e}')
             self._operand_parser.validate(mnemonic)
         else:
             self._operand_parser = None
@@ -98,13 +102,13 @@ class InstructionVariant(InstructionBase):
     @property
     def base_bytecode_size(self) -> int:
         if 'size' not in self._variant_config['bytecode']:
-            sys.exit(f'ERROR: Instruction "{self.mnemonic}" does not have a bytecode size configured')
+            raise AssemblerError(None, f'Instruction "{self.mnemonic}" does not have a bytecode size configured')
         return self._variant_config['bytecode']['size']
 
     @property
     def base_bytecode_value(self) -> int:
         if 'value' not in self._variant_config['bytecode']:
-            sys.exit(f'ERROR: Instruction "{self.mnemonic}" does not have a bytecode value configured')
+            raise AssemblerError(None, f'Instruction "{self.mnemonic}" does not have a bytecode value configured')
         return self._variant_config['bytecode']['value']
 
     @property
@@ -207,7 +211,7 @@ class Instruction(InstructionBase):
                     )
                 )
         if len(self._variants) == 0:
-            sys.exit(f'ERROR - Configuration for instruction "{mnemonic}" has no valid variant.')
+            diagnostic_reporter.error(None, f'Configuration for instruction "{mnemonic}" has no valid variant.')
 
     @property
     def variants(self) -> list[InstructionVariant]:

@@ -1,5 +1,3 @@
-import sys
-
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model.operand import Operand
@@ -42,9 +40,10 @@ class OperandSet:
             )
             if operand.null_operand:
                 # null operands not supported in operand sets. must use specific operand configuration.
-                sys.exit(
-                    f'ERROR: The configuration for operand set "{name}" contains unallowed null '
-                    f'operand type named "{arg_type_id}".'
+                diagnostic_reporter.error(
+                    None,
+                    f'The configuration for operand set "{name}" contains unallowed null '
+                    f'operand type named "{arg_type_id}".',
                 )
             self._ordered_operand_list.append(operand)
 

@@ -4,6 +4,7 @@ import tempfile
 import unittest
 
 from bespokeasm.assembler.bytecode.word import Word
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.engine import Assembler
 from bespokeasm.assembler.line_identifier import LineIdentifier
@@ -639,7 +640,7 @@ class TestAssemblerEngine(unittest.TestCase):
         second.symbol_scope = local_scope
         second.active_named_scopes = active_named_scopes
 
-        with self.assertRaises(SystemExit) as duplicate_error:
+        with self.assertRaises(AssemblerError) as duplicate_error:
             second.register_operand_labels(named_scope_manager)
         self.assertIn('defined multiple times', str(duplicate_error.exception))
 

@@ -1,6 +1,6 @@
 import re
-import sys
 
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
 from bespokeasm.assembler.memory_zone import MemoryZone
@@ -35,7 +35,7 @@ class UseScopeLine(PreprocessorLine):
 
             # Validate input
             if not scope_name:
-                sys.exit(f'ERROR: {line_id} - Scope name cannot be empty')
+                raise AssemblerError(line_id, 'Scope name cannot be empty')
 
             # Activate the scope
             self._scope_name = scope_name
@@ -48,7 +48,7 @@ class UseScopeLine(PreprocessorLine):
                     min_verbosity=2,
                 )
         else:
-            sys.exit(f'ERROR: {line_id} - Invalid #use-scope directive syntax: {instruction}')
+            raise AssemblerError(line_id, f'Invalid #use-scope directive syntax: {instruction}')
 
     @property
     def scope_name(self) -> str:

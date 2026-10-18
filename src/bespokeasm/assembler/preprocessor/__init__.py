@@ -1,5 +1,4 @@
 import re
-import sys
 
 from bespokeasm import BESPOKEASM_VERSION_STR
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
@@ -34,16 +33,18 @@ class Preprocessor:
 
         for symbol_def in predefined_symbols:
             if 'name' not in symbol_def:
-                sys.exit(
-                    'ERROR: Preprocessor symbol definition in instruction set configuration YAML file '
-                    'is missing the required "name" field.'
+                self._diagnostic_reporter.error(
+                    None,
+                    'Preprocessor symbol definition in instruction set configuration YAML file '
+                    'is missing the required "name" field.',
                 )
             try:
                 self.create_symbol(symbol_def['name'], symbol_def.get('value', ''))
             except ValueError:
-                sys.exit(
-                    f'ERROR: Preprocessor symbol {symbol_def["name"]} is defined multiple times in '
-                    f'instruction set configuration YAML file.'
+                self._diagnostic_reporter.error(
+                    None,
+                    f'Preprocessor symbol {symbol_def["name"]} is defined multiple times in '
+                    f'instruction set configuration YAML file.',
                 )
 
     @property
@@ -91,8 +92,9 @@ class Preprocessor:
             symbol = self.get_symbol(s)
             if symbol is not None:
                 if s in resolved_symbols:
-                    sys.exit(
-                        f'ERROR - {line_id}: Preprocessor macro symbol {s} is indirectly referring to itself'
+                    self._diagnostic_reporter.error(
+                        line_id,
+                        f'Preprocessor macro symbol {s} is indirectly referring to itself',
                     )
                 # first, recurse through this symbol's replacement string to resolve any symbols it may contain
                 local_resolved_symbols = resolved_symbols.copy()

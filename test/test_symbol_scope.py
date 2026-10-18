@@ -5,6 +5,7 @@ import unittest
 from collections import defaultdict
 
 from bespokeasm.assembler.assembly_file import AssemblyFile
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.engine import Assembler
 from bespokeasm.assembler.line_identifier import LineIdentifier
@@ -38,7 +39,7 @@ class TestSymbolScope(unittest.TestCase):
         self.assertEqual(ls1.get_label_value('test2', 2), 42)
         self.assertIsNone(ls1.get_label_value('undef', 3), 'should not find undefined label')
 
-        with self.assertRaises(SystemExit, msg='label cannot be defined multiple times'):
+        with self.assertRaises(AssemblerError, msg='label cannot be defined multiple times'):
             ls1.set_label_value('test1', 666, 1234)
 
     def test_symbol_kinds_share_duplicate_definition_namespace(self):
@@ -53,7 +54,7 @@ class TestSymbolScope(unittest.TestCase):
         )
         coordinate_first = GlobalSymbolScope(set())
         coordinate_first.set_counter_coordinate(coordinate)
-        with self.assertRaises(SystemExit, msg='label cannot shadow a coordinate'):
+        with self.assertRaises(AssemblerError, msg='label cannot shadow a coordinate'):
             coordinate_first.set_label_value('slot', 1, line_id)
 
         label_first = GlobalSymbolScope(set())
@@ -123,16 +124,16 @@ class TestSymbolScope(unittest.TestCase):
         local_scope.set_label_value('zerountilnow', 13, lineid)
         self.assertEqual(local_scope.get_label_value('zerountilnow', lineid), 13)
 
-        with self.assertRaises(SystemExit, msg='register labels cannot have values'):
+        with self.assertRaises(AssemblerError, msg='register labels cannot have values'):
             local_scope.get_label_value('a', 101)
 
-        with self.assertRaises(SystemExit, msg='labels cannot be system keywords - local'):
+        with self.assertRaises(AssemblerError, msg='labels cannot be system keywords - local'):
             local_scope.set_label_value('.cstr', 666, lineid)
-        with self.assertRaises(SystemExit, msg='labels cannot be system keywords - file'):
+        with self.assertRaises(AssemblerError, msg='labels cannot be system keywords - file'):
             file_scope.set_label_value('_cstr', 666, lineid)
-        with self.assertRaises(SystemExit, msg='labels cannot be system keywords - file with local label'):
+        with self.assertRaises(AssemblerError, msg='labels cannot be system keywords - file with local label'):
             file_scope.set_label_value('.cstr', 666, lineid)
-        with self.assertRaises(SystemExit, msg='labels cannot be system keywords - file with local label'):
+        with self.assertRaises(AssemblerError, msg='labels cannot be system keywords - file with local label'):
             local_scope.set_label_value('zero', 666, lineid)
 
     def test_line_object_scope_assignment(self):

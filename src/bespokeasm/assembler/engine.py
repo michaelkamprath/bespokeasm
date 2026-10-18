@@ -77,6 +77,10 @@ class Assembler:
         return getattr(self, '_analysis_source_index', None)
 
     def assemble_bytecode(self):
+        with self._diagnostic_reporter.reporting_errors():
+            self._assemble_bytecode()
+
+    def _assemble_bytecode(self):
         # Create the named scope manager for this assembly session
         diagnostic_reporter = self._diagnostic_reporter
         named_scope_manager = NamedScopeManager(

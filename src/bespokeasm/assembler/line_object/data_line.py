@@ -1,6 +1,5 @@
 import math
 import re
-import sys
 from typing import Literal
 
 from bespokeasm.assembler.bytecode.word import Word
@@ -67,23 +66,33 @@ class DataLine(LineWithWords):
         if args_str == '':
             return None
 
-        value_items = DataLine._split_data_items(args_str, line_id)
+        value_items = DataLine._split_data_items(args_str, line_id, diagnostic_reporter)
         if len(value_items) == 0:
             return None
 
         values_list = []
         if directive_str in ('.cstr', '.asciiz'):
             if len(value_items) != 1:
-                sys.exit(f'ERROR: {line_id} - {directive_str} data directive used with non-string value')
-            string_values = DataLine._extract_string_item(value_items[0], line_id, directive_str)
+                diagnostic_reporter.error(line_id, f'{directive_str} data directive used with non-string value')
+            string_values = DataLine._extract_string_item(
+                value_items[0],
+                line_id,
+                directive_str,
+                diagnostic_reporter,
+            )
             values_list.extend(string_values)
             values_list.extend([cstr_terminator])
         else:
             for item in value_items:
                 if DataLine._is_quoted_item(item):
-                    string_values = DataLine._extract_string_item(item, line_id, directive_str)
+                    string_values = DataLine._extract_string_item(
+                        item,
+                        line_id,
+                        directive_str,
+                        diagnostic_reporter,
+                    )
                     if directive_str != '.byte':
-                        sys.exit(f'ERROR: {line_id} - {directive_str} data directive used with string value')
+                        diagnostic_reporter.error(line_id, f'{directive_str} data directive used with string value')
                     values_list.extend(string_values)
                 else:
                     values_list.append(item)
@@ -106,7 +115,7 @@ class DataLine(LineWithWords):
         )
 
     @staticmethod
-    def _split_data_items(args_str: str, line_id: LineIdentifier) -> list[str]:
+    def _split_data_items(args_str: str, line_id: LineIdentifier, diagnostic_reporter) -> list[str]:
         """Split comma-separated data items while respecting quoted strings."""
         items = []
         token_chars = []
@@ -136,7 +145,7 @@ class DataLine(LineWithWords):
                 token_chars.append(ch)
 
         if quote_char is not None:
-            sys.exit(f'ERROR: {line_id} - unterminated string in data directive')
+            diagnostic_reporter.error(line_id, 'unterminated string in data directive')
 
         item = ''.join(token_chars).strip()
         if item != '':
@@ -151,9 +160,14 @@ class DataLine(LineWithWords):
         return quote in ('"', '\'') and item_str[-1] == quote
 
     @staticmethod
-    def _extract_string_item(item_str: str, line_id: LineIdentifier, directive_str: str) -> list[int]:
+    def _extract_string_item(
+            item_str: str,
+            line_id: LineIdentifier,
+            directive_str: str,
+            diagnostic_reporter,
+    ) -> list[int]:
         if not DataLine._is_quoted_item(item_str):
-            sys.exit(f'ERROR: {line_id} - {directive_str} data directive used with non-string value')
+            diagnostic_reporter.error(line_id, f'{directive_str} data directive used with non-string value')
         converted_str = bytes(item_str[1:-1], 'utf-8').decode('unicode_escape')
         return [ord(x) for x in converted_str]
 
@@ -276,7 +290,7 @@ class DataLine(LineWithWords):
                     self.line_id,
                 )
             else:
-                sys.exit(f'ERROR: line {self.line_id} - unknown data item "{arg_item}"')
+                self.diagnostic_reporter.error(self.line_id, f'unknown data item "{arg_item}"')
             value_size = DataLine.DIRECTIVE_VALUE_BYTE_SIZE[self._directive]
             value_mask = DataLine.DIRECTIVE_VALUE_MASK[self._directive]
             masked_val = arg_val & value_mask

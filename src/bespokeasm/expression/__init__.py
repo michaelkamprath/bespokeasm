@@ -9,8 +9,9 @@
 import enum
 import operator
 import re
-import sys
 
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
+from bespokeasm.assembler.diagnostic_reporter import InternalAssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.symbol_scope import SymbolScope
 from bespokeasm.assembler.symbol_scope.flow_symbols import FlowSymbolError
@@ -165,7 +166,7 @@ class ExpressionNode:
             if symbol_scope is None:
                 if self.token_type == TokenType.T_LABEL_OR_NUM:
                     return parse_numeric_string(self.value, self.default_numeric_base)
-                sys.exit(f'ERROR - INTERNAL: {line_id} - Label {self.value} has no symbol scope = {self}')
+                raise InternalAssemblerError(line_id, f'Label {self.value} has no symbol scope = {self}')
             # in ths case value is a label
             if active_named_scopes is not None:
                 val = active_named_scopes.named_scope_manager.get_label_value(
@@ -198,11 +199,11 @@ class ExpressionNode:
                         'instruction operand values, data values, and flow '
                         'directives'
                     )
-                sys.exit(f'ERROR: {line_id} - Label {self.value} resolves to NONE = {self}')
+                raise AssemblerError(line_id, f'Label {self.value} resolves to NONE = {self}')
             return val
         else:
             # this wasn't a numeric value
-            sys.exit(f'ERROR: {line_id} - Label {self.value} is not numeric = {self}')
+            raise AssemblerError(line_id, f'Label {self.value} is not numeric = {self}')
 
     def _compute(
         self,
@@ -235,9 +236,10 @@ class ExpressionNode:
             try:
                 arg_value_bytes = masked_arg.to_bytes(byte_count, byteorder='little', signed=False)
             except OverflowError as oe:
-                sys.exit(
-                    f'ERROR - {line_id}: Cound not conver value "{arg_value}" to bytes. masked value = {masked_arg}, {oe}'
-                )
+                raise AssemblerError(
+                    line_id,
+                    f'Cound not conver value "{arg_value}" to bytes. masked value = {masked_arg}, {oe}',
+                ) from oe
             return arg_value_bytes[byte_idx]
         elif self.token_type == TokenType.T_NEGATION:
             arg_value = self.left_child._compute(symbol_scope, active_named_scopes, line_id)
@@ -434,7 +436,7 @@ def _lexical_analysis(
                 f'ERROR: {line_id} - invalid {normalized_base} numeric literal: {part}'
             )
         else:
-            sys.exit(f'ERROR: {line_id} - invalid token: {part}')
+            raise AssemblerError(line_id, f'invalid token: {part}')
         tokens.append(token)
         last_end = match.end()
     if s[last_end:].strip():

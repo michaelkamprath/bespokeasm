@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.model.instruction import Instruction
 from bespokeasm.assembler.model.instruction import InstructionVariant
@@ -83,10 +84,10 @@ class TestInstructionVariant(unittest.TestCase):
     def test_variant_missing_size_and_value_raise(self):
         # Omitting size or value should exit with descriptive messages.
         variant = self._make_variant({'bytecode': {'value': 0x11}})
-        with self.assertRaisesRegex(SystemExit, 'bytecode size'):
+        with self.assertRaisesRegex(AssemblerError, 'bytecode size'):
             _ = variant.base_bytecode_size
         variant = self._make_variant({'bytecode': {'size': 1}})
-        with self.assertRaisesRegex(SystemExit, 'bytecode value'):
+        with self.assertRaisesRegex(AssemblerError, 'bytecode value'):
             _ = variant.base_bytecode_value
 
 

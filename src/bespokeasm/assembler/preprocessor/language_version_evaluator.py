@@ -9,8 +9,8 @@ The evaluator is used by #if, #elif, and #require preprocessor directives when t
 encounter language version symbols.
 """
 import re
-import sys
 
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.preprocessor.symbol import SYMBOL_PATTERN
 from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
@@ -145,8 +145,13 @@ class LanguageVersionEvaluator:
             # Always try comparison expression first since that's the most common case
             return cls._evaluate_comparison_expression(expression, preprocessor, line_id)
 
+        except AssemblerError:
+            raise
         except Exception as e:
-            sys.exit(f'ERROR: {line_id} - Failed to evaluate language version expression "{expression}": {e}')
+            preprocessor.diagnostic_reporter.error(
+                line_id,
+                f'Failed to evaluate language version expression "{expression}": {e}',
+            )
 
     @classmethod
     def _evaluate_comparison_expression(cls, expression: str, preprocessor, line_id: LineIdentifier) -> bool:
@@ -179,14 +184,17 @@ class LanguageVersionEvaluator:
             invalid_ops = ['~=', '=~', '&', '|', '^', '%']
             for invalid_op in invalid_ops:
                 if invalid_op in expression:
-                    sys.exit(f'ERROR: {line_id} - Invalid operator {invalid_op} in language version expression')
+                    preprocessor.diagnostic_reporter.error(
+                        line_id,
+                        f'Invalid operator {invalid_op} in language version expression',
+                    )
 
             resolved = preprocessor.resolve_symbols(line_id, expression)
 
             # Check if language version symbols were not resolved
             for symbol in cls.LANGUAGE_VERSION_SYMBOLS:
                 if symbol in resolved:
-                    sys.exit(f'ERROR: {line_id} - Version symbol {symbol} is not defined')
+                    preprocessor.diagnostic_reporter.error(line_id, f'Version symbol {symbol} is not defined')
 
             try:
                 expr_node = parse_expression(line_id, resolved, preprocessor.default_numeric_base)
@@ -203,6 +211,8 @@ class LanguageVersionEvaluator:
                 else:
                     # String expression - check if it's non-empty
                     return bool(resolved.strip())
+            except AssemblerError:
+                raise
             except Exception:
                 # If parsing fails, check if it's a non-empty string after resolving
                 return bool(resolved.strip())
@@ -249,6 +259,8 @@ class LanguageVersionEvaluator:
                 active_scopes = ActiveNamedScopeList.empty(preprocessor.diagnostic_reporter)
                 lhs_value = lhs_expression.get_value(None, active_scopes, line_id)
                 rhs_value = rhs_expression.get_value(None, active_scopes, line_id)
+        except AssemblerError:
+            raise
         except Exception:
             # If parsing fails, do string comparison
             lhs_value = lhs_resolved
@@ -272,4 +284,4 @@ class LanguageVersionEvaluator:
         elif operator == '<=':
             return lhs_value <= rhs_value
         else:
-            sys.exit(f'ERROR: {line_id} - Unknown operator {operator} in language version expression')
+            raise AssemblerError(line_id, f'Unknown operator {operator} in language version expression')

@@ -7,8 +7,8 @@ coordinate cannot be consumed as an ordinary numeric label.
 from __future__ import annotations
 
 import enum
-import sys
 
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.keywords import ASSEMBLER_KEYWORD_SET
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.symbol_scope.flow_symbols import CounterCoordinate
@@ -180,7 +180,10 @@ class SymbolScope:
         # remove label prefix for checking
         base_label = label[len(symbol_scope.symbol_prefix):]
         if base_label in self.reserved_keywords:
-            sys.exit(f"ERROR: {line_id} - Label '{label}' is unallowed because it used an assembler keyword '{base_label}'")
+            raise AssemblerError(
+                line_id,
+                f"Label '{label}' is unallowed because it used an assembler keyword '{base_label}'",
+            )
         if symbol_scope.value < self.type.value:
             self.parent.set_label_value(label, value, line_id)
         elif symbol_scope == self.type:
@@ -188,11 +191,11 @@ class SymbolScope:
                 self._labels[label] = SymbolScope.LabelInfo(label, value, line_id)
                 self._defined_symbol_names.add(label)
             else:
-                sys.exit(f"ERROR: {line_id} - Label '{label}' is defined multiple times at scope {self}")
+                raise AssemblerError(line_id, f"Label '{label}' is defined multiple times at scope {self}")
         else:
             # we are only here if the label is too low level for this scope
             # example: local label defined before any global labels
-            sys.exit(f"ERROR: {line_id} - Label '{label}' is to low of scope for available scopes at this line.")
+            raise AssemblerError(line_id, f"Label '{label}' is to low of scope for available scopes at this line.")
 
     _global_scope = None
 
@@ -236,5 +239,5 @@ class GlobalSymbolScope(SymbolScope):
         '''Global scope version first checks whether passed label is actually a register'''
         # check to see if label is a register
         if label in self._register_labels:
-            sys.exit(f'ERROR: {line_id} - register label "{label}" used in numeric expression')
+            raise AssemblerError(line_id, f'register label "{label}" used in numeric expression')
         return super().get_label_value(label, line_id)

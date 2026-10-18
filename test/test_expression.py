@@ -1,5 +1,6 @@
 import unittest
 
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.symbol_scope import GlobalSymbolScope
@@ -418,7 +419,7 @@ class TestExpression(unittest.TestCase):
         labels = TestExpression.label_values
         scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
 
-        with self.assertRaises(SystemExit, msg='extraneous comparison operator'):
+        with self.assertRaises(AssemblerError, msg='extraneous comparison operator'):
             parse_expression(line_id, '<$2024').get_value(labels, scopes, 1)
 
 

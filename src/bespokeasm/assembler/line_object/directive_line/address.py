@@ -1,5 +1,4 @@
-import sys
-
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.expression import ExpressionNode
@@ -42,14 +41,16 @@ class AddressOrgLine(SetMemoryZoneLine):
         else:
             value = self.memory_zone.start + offset_value
         if value < self.memzone_manager.global_zone.start:
-            sys.exit(
-                f'ERROR: {self.line_id} - .org address value of {value} is less than the minimum '
-                f'address of {self.memzone_manager.global_zone.start} in memory zone {self._memzone.name}'
+            raise AssemblerError(
+                self.line_id,
+                f'.org address value of {value} is less than the minimum '
+                f'address of {self.memzone_manager.global_zone.start} in memory zone {self._memzone.name}',
             )
         if value > self.memzone_manager.global_zone.end:
-            sys.exit(
-                f'ERROR: {self.line_id} - .org address value of {value} is greater than the maximum '
-                f'address of {self.memzone_manager.global_zone.end} in memory zone {self._memzone.name}'
+            raise AssemblerError(
+                self.line_id,
+                f'.org address value of {value} is greater than the maximum '
+                f'address of {self.memzone_manager.global_zone.end} in memory zone {self._memzone.name}',
             )
         return value
 

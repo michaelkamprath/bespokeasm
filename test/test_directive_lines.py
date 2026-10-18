@@ -3,6 +3,7 @@ import importlib.resources as pkg_resources
 import unittest
 
 from bespokeasm.assembler.bytecode.word import Word
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
@@ -107,7 +108,7 @@ class TestDirectiveLines(unittest.TestCase):
         self.assertIsInstance(o5, AddressOrgLine)
         self.assertEqual(o5.address, 12)
 
-        with self.assertRaises(SystemExit, msg='register address should fail'):
+        with self.assertRaises(AssemblerError, msg='register address should fail'):
             e1 = DirectiveLine.factory(
                 1357,
                 '.org sp',

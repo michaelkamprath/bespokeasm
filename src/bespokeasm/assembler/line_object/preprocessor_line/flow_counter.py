@@ -1,6 +1,6 @@
 import re
-import sys
 
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
 from bespokeasm.assembler.memory_zone import MemoryZone
@@ -161,9 +161,9 @@ def _resolve_protecting_flow_names(
             break
         for name in defined_names:
             if name in expanding:
-                sys.exit(
-                    f'ERROR - {line_id}: Preprocessor macro symbol {name} is '
-                    'indirectly referring to itself'
+                preprocessor.diagnostic_reporter.error(
+                    line_id,
+                    f'Preprocessor macro symbol {name} is indirectly referring to itself',
                 )
             replacement = _resolve_protecting_flow_names(
                 preprocessor,
@@ -191,11 +191,12 @@ def _resolve_protecting_flow_names(
                     and _OPEN_CALL_PATTERN.match(_replacement)
                 )
                 if forms_split_call:
-                    sys.exit(
-                        f'ERROR - {line_id}: macro "{_name}" expansion forms a '
+                    preprocessor.diagnostic_reporter.error(
+                        line_id,
+                        f'macro "{_name}" expansion forms a '
                         'flow operator call from separate fragments; flow '
                         'operators must be written as complete calls such as '
-                        'COUNTER(name)'
+                        'COUNTER(name)',
                     )
                 return _replacement
 
@@ -289,7 +290,7 @@ class FlowCounterDirectiveLine(PreprocessorLine):
                     value_text,
                     self._isa_model.default_numeric_base,
                 )
-            except (SyntaxError, SystemExit) as error:
+            except (SyntaxError, SystemExit, AssemblerError) as error:
                 self._error(str(error))
                 continue
             parsed_parameters[name] = value_expression
@@ -341,7 +342,7 @@ class FlowCounterDirectiveLine(PreprocessorLine):
                 self._isa_model.default_numeric_base,
                 context=ExpressionUseContext.FLOW_DIRECTIVE,
             )
-        except (SyntaxError, SystemExit) as error:
+        except (SyntaxError, SystemExit, AssemblerError) as error:
             self._error(str(error))
             return None
 

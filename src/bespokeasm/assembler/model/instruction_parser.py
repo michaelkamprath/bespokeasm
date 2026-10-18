@@ -1,8 +1,7 @@
-import sys
-
 from bespokeasm.assembler.analysis import SourceIdentity
 from bespokeasm.assembler.bytecode.assembled import AssembledInstruction
 from bespokeasm.assembler.bytecode.generator import BytecodeGenerator
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
@@ -29,7 +28,7 @@ class InstructioParser(InstructioParserBase):
 
         instr_obj: InstructionBase = isa_model.instructions.get(source_mnemonic)
         if instr_obj is None:
-            sys.exit(f'ERROR: {line_id} - Unrecognized mnemonic "{source_mnemonic}"')
+            raise AssemblerError(line_id, f'Unrecognized mnemonic "{source_mnemonic}"')
 
         # Always use the canonical mnemonic for bytecode generation
         canonical_mnemonic = instr_obj.mnemonic

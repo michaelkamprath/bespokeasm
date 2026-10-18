@@ -11,6 +11,7 @@ from bespokeasm.assembler.control_flow import ControlFlowGraph
 from bespokeasm.assembler.control_flow import ControlFlowNode
 from bespokeasm.assembler.control_flow import declared_coordinate_labels
 from bespokeasm.assembler.control_flow import references_declared_coordinate
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.assembler.line_object.counter_coordinate_line import CounterCoordinateLine
@@ -681,6 +682,7 @@ class FlowLinearAnalyzer:
             RuntimeError,
             SyntaxError,
             SystemExit,
+            AssemblerError,
             ValueError,
         ) as error:
             self._error(
@@ -727,6 +729,7 @@ class FlowLinearAnalyzer:
                 RuntimeError,
                 SyntaxError,
                 SystemExit,
+                AssemblerError,
                 ValueError,
             ):
                 targets.append(None)
@@ -885,6 +888,7 @@ class FlowLinearAnalyzer:
             RuntimeError,
             SyntaxError,
             SystemExit,
+            AssemblerError,
             ValueError,
         ) as error:
             self._error(
@@ -1017,6 +1021,7 @@ class FlowLinearAnalyzer:
             RuntimeError,
             SyntaxError,
             SystemExit,
+            AssemblerError,
             ValueError,
         ) as error:
             self._error(line_object, str(error))
@@ -2279,6 +2284,7 @@ class FlowGraphAnalyzer(FlowLinearAnalyzer):
                             RuntimeError,
                             SyntaxError,
                             SystemExit,
+                            AssemblerError,
                             ValueError,
                         ) as error:
                             self._error(entry, str(error))
@@ -2366,6 +2372,7 @@ class FlowGraphAnalyzer(FlowLinearAnalyzer):
                 RuntimeError,
                 SyntaxError,
                 SystemExit,
+                AssemblerError,
                 ValueError,
             ):
                 # Ordinary bytecode generation owns diagnostics for branches

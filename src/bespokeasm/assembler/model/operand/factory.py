@@ -1,5 +1,3 @@
-import sys
-
 from bespokeasm.assembler.model.operand import Operand
 from bespokeasm.assembler.model.operand.types import address
 from bespokeasm.assembler.model.operand.types import deferred_numeric
@@ -170,6 +168,6 @@ class OperandFactory:
                 diagnostic_reporter,
             )
         else:
-            sys.exit(f'ERROR - Operand {operand_id} was configured with unknown type "{type_str}"')
+            diagnostic_reporter.error(None, f'Operand {operand_id} was configured with unknown type "{type_str}"')
         operand.default_numeric_base = default_numeric_base
         return operand

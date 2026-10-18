@@ -1,5 +1,3 @@
-import sys
-
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.model.instruction_base import InstructionBase
 from bespokeasm.assembler.model.operand.operand_label import contains_operand_label_annotation
@@ -69,8 +67,7 @@ class InstructionMacroVariant(InstructionBase):
 
     @property
     def base_bytecode_size(self) -> int:
-        sys.exit('ERROR - InstrutionMacroVariant.base_bytecode_size is unimplemented')
-        return 0
+        raise NotImplementedError('InstrutionMacroVariant.base_bytecode_size is unimplemented')
 
     def __str__(self) -> str:
         operand_str = str(self._operand_parser) if self._operand_parser is not None else 'NO_OPERANDS'

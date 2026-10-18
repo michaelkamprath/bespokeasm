@@ -1,6 +1,7 @@
 import re
-import sys
 from collections.abc import Iterable
+
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 
 
 DECORATOR_SYMBOLS = {
@@ -37,13 +38,14 @@ def get_decorator_symbol(
 
     decorator_type = decorator_config.get('type')
     if decorator_type is None:
-        sys.exit(f'ERROR - {context} decorator type is not configured.')
+        raise AssemblerError(None, f'{context} decorator type is not configured.')
 
     symbol = DECORATOR_SYMBOLS.get(decorator_type)
     if symbol is None:
-        sys.exit(
-            f'ERROR - {context} uses unknown decorator type "{decorator_type}". '
-            f'Allowed values: {", ".join(DECORATOR_SYMBOLS.keys())}'
+        raise AssemblerError(
+            None,
+            f'{context} uses unknown decorator type "{decorator_type}". '
+            f'Allowed values: {", ".join(DECORATOR_SYMBOLS.keys())}',
         )
     return symbol, bool(decorator_config.get('is_prefix', False))
 
@@ -58,13 +60,14 @@ def get_decorator_regex_pattern(
 
     decorator_type = decorator_config.get('type')
     if decorator_type is None:
-        sys.exit(f'ERROR - {context} decorator type is not configured.')
+        raise AssemblerError(None, f'{context} decorator type is not configured.')
 
     pattern = DECORATOR_REGEX_PATTERNS.get(decorator_type)
     if pattern is None:
-        sys.exit(
-            f'ERROR - {context} uses unknown decorator type "{decorator_type}". '
-            f'Allowed values: {", ".join(DECORATOR_REGEX_PATTERNS.keys())}'
+        raise AssemblerError(
+            None,
+            f'{context} uses unknown decorator type "{decorator_type}". '
+            f'Allowed values: {", ".join(DECORATOR_REGEX_PATTERNS.keys())}',
         )
     return pattern
 

@@ -1,9 +1,9 @@
 import re
-import sys
 from functools import cached_property
 
 from bespokeasm.assembler.bytecode.parts import ExpressionByteCodePartInMemoryZone
 from bespokeasm.assembler.bytecode.parts import NumericByteCodePart
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
@@ -70,14 +70,16 @@ class RelativeAddressByteCodePart(ExpressionByteCodePartInMemoryZone):
             # minus one to account for the current address being 1 byte of instruction size
             relative_value -= instruction_size - 1
         if self._max_relative_value is not None and relative_value > self._max_relative_value:
-            sys.exit(
-                f'ERROR: {self.line_id} - Relative address offset is larger than configured '
-                f'maximum value of {self._max_relative_value}'
+            raise AssemblerError(
+                self.line_id,
+                f'Relative address offset is larger than configured '
+                f'maximum value of {self._max_relative_value}',
             )
         if self._min_relative_value is not None and relative_value < self._min_relative_value:
-            sys.exit(
-                f'ERROR: {self.line_id} - Relative address offset is smaller than configured '
-                f'minimum value of {self._min_relative_value}'
+            raise AssemblerError(
+                self.line_id,
+                f'Relative address offset is smaller than configured '
+                f'minimum value of {self._min_relative_value}',
             )
         return relative_value
 

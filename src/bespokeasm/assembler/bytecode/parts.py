@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import sys
 from functools import reduce
 from typing import Literal
 
 from bespokeasm.assembler.bytecode.value import Value
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.bytecode.word_slice import WordSlice
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
+from bespokeasm.assembler.diagnostic_reporter import InternalAssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.symbol_scope import SymbolScope
@@ -96,7 +97,7 @@ class ByteCodePart:
 
     @property
     def instruction_string(self) -> str:
-        sys.exit(f'ERROR: INTERNAL - fetching ByteCodePart instruction string unimplemented for: {self}')
+        raise NotImplementedError(f'fetching ByteCodePart instruction string unimplemented for: {self}')
 
     def get_value(
         self,
@@ -155,8 +156,9 @@ class ByteCodePart:
         elif isinstance(value_representation, Value):
             return value_representation.get_words_ordered()
         else:
-            sys.exit(
-                f'ERROR: INTERNAL - get_words received unexpected value representation type: {type(value_representation)}'
+            raise InternalAssemblerError(
+                self.line_id,
+                f'get_words received unexpected value representation type: {type(value_representation)}',
             )
 
     def contains_register_labels(self, register_labels: set[str]) -> bool:
@@ -262,8 +264,9 @@ class ByteCodePart:
                         current_word_slices.append((value_representation, part.intra_word_endian))
                     else:
                         # this should never happen
-                        sys.exit(
-                            f'ERROR: INTERNAL - CompositeByteCodePart received Value representation: {value_representation}'
+                        raise InternalAssemblerError(
+                            part.line_id,
+                            f'CompositeByteCodePart received Value representation: {value_representation}',
                         )
             else:
                 value_representation = part.get_value_representation(
@@ -399,7 +402,10 @@ class ExpressionByteCodePart(ByteCodePart):
             self.line_id,
         )
         if isinstance(value, str):
-            sys.exit(f'ERROR: {self.line_id} - expression "{self._expression}" did not resolve to an int, got: {value}')
+            raise AssemblerError(
+                self.line_id,
+                f'expression "{self._expression}" did not resolve to an int, got: {value}',
+            )
         return value
 
     def contains_register_labels(self, register_labels: set[str]) -> bool:
@@ -454,9 +460,9 @@ class ExpressionByteCodePartWithValidation(ExpressionByteCodePart):
             bytecode_address,
         )
         if self._max is not None and value > self._max:
-            sys.exit(f'ERROR: {self.line_id} - operand value of {value} exceeds maximun allowed of {self._max}')
+            raise AssemblerError(self.line_id, f'operand value of {value} exceeds maximun allowed of {self._max}')
         if self._min is not None and value < self._min:
-            sys.exit(f'ERROR: {self.line_id} - operand value of {value} is less than minimum allowed of {self._min}')
+            raise AssemblerError(self.line_id, f'operand value of {value} is less than minimum allowed of {self._min}')
         return value
 
 
@@ -507,14 +513,16 @@ class ExpressionByteCodePartInMemoryZone(ExpressionByteCodePart):
         )
         if self._memzone is not None:
             if value > self._memzone.end:
-                sys.exit(
-                    f'ERROR: {self.line_id} - address value of {value} exceeds maximun allowed '
-                    f'address of {self._memzone.end} in memory zone {self._memzone.name}'
+                raise AssemblerError(
+                    self.line_id,
+                    f'address value of {value} exceeds maximun allowed '
+                    f'address of {self._memzone.end} in memory zone {self._memzone.name}',
                 )
             if value < self._memzone.start:
-                sys.exit(
-                    f'ERROR: {self.line_id} - address value of {value} is less than minimum allowed '
-                    f'address of {self._memzone.start} in memory zone {self._memzone.name}'
+                raise AssemblerError(
+                    self.line_id,
+                    f'address value of {value} is less than minimum allowed '
+                    f'address of {self._memzone.start} in memory zone {self._memzone.name}',
                 )
         return value
 
@@ -566,9 +574,10 @@ class ExpressionEnumerationByteCodePart(ExpressionByteCodePart):
             bytecode_address,
         )
         if value not in self._value_dict:
-            sys.exit(
-                f'ERROR: {self.line_id} - numeric expression value of {value} is '
-                f'not an allowed value for numeric enumeration.'
+            raise AssemblerError(
+                self.line_id,
+                f'numeric expression value of {value} is '
+                f'not an allowed value for numeric enumeration.',
             )
         return self._value_dict[value]
 
@@ -597,14 +606,16 @@ class CompositeByteCodePart(ByteCodePart):
         """Validate that all Value-based ByteCodePart objects have consistent word and segment sizes."""
         for part in self._parts_list:
             if part.word_size != self.word_size:
-                sys.exit(
-                    f'ERROR: {self.line_id} - Value-based ByteCodePart has word_size {part.word_size}, '
-                    f'expected {self.word_size}'
+                raise AssemblerError(
+                    self.line_id,
+                    f'Value-based ByteCodePart has word_size {part.word_size}, '
+                    f'expected {self.word_size}',
                 )
             if part.segment_size != self.segment_size:
-                sys.exit(
-                    f'ERROR: {self.line_id} - Value-based ByteCodePart has segment_size {part.segment_size}, '
-                    f'expected {self.segment_size}'
+                raise AssemblerError(
+                    self.line_id,
+                    f'Value-based ByteCodePart has segment_size {part.segment_size}, '
+                    f'expected {self.segment_size}',
                 )
 
     def __str__(self) -> str:

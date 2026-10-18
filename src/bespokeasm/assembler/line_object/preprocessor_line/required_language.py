@@ -1,6 +1,7 @@
 import operator
 import re
 
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
 from bespokeasm.assembler.memory_zone import MemoryZone
@@ -169,8 +170,8 @@ class RequiredLanguageLine(PreprocessorLine):
                 min_verbosity=2,
             )
 
-        except SystemExit:
-            # Re-raise SystemExit (from evaluator or our own)
+        except (SystemExit, AssemblerError):
+            # Re-raise SystemExit and AssemblerError (from evaluator or our own)
             raise
         except Exception as e:
             isa_model.diagnostic_reporter.error(

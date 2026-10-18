@@ -1,5 +1,6 @@
 import re
 
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
 from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import (
@@ -239,7 +240,7 @@ class AssertLine(PreprocessorLine):
                 self._isa_model.default_numeric_base,
                 context=ExpressionUseContext.FLOW_DIRECTIVE,
             )
-        except (SyntaxError, SystemExit) as error:
+        except (SyntaxError, SystemExit, AssemblerError) as error:
             self._error(str(error), category='flow')
 
     @property

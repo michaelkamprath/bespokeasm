@@ -1,6 +1,8 @@
 """Tests for the DiagnosticReporter class."""
 import pytest
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
+from bespokeasm.assembler.diagnostic_reporter import InternalAssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 
 
@@ -248,3 +250,42 @@ class TestDiagnosticReporter:
         # Check tuple immutability
         with pytest.raises(AttributeError):
             diagnostics.foo = 'bar'
+
+    def test_reporting_errors_reports_assembler_error(self):
+        """An AssemblerError is reported with its line id and category."""
+        reporter = DiagnosticReporter()
+        line_id = LineIdentifier(7, 'test.asm')
+        with pytest.raises(SystemExit) as exc_info:
+            with reporter.reporting_errors():
+                raise AssemblerError(line_id, 'bad operand', category='flow')
+        assert str(exc_info.value) == f'ERROR: {line_id} - bad operand'
+        diagnostic = reporter.diagnostics[-1]
+        assert (diagnostic.level, diagnostic.line_id, diagnostic.message, diagnostic.category) == (
+            'error', line_id, 'bad operand', 'flow',
+        )
+
+    def test_reporting_errors_reports_internal_error_with_traceback(self, capsys):
+        """An InternalAssemblerError is reported as a bug, with its line id and a traceback."""
+        reporter = DiagnosticReporter()
+        line_id = LineIdentifier(3, 'test.asm')
+        with pytest.raises(SystemExit) as exc_info:
+            with reporter.reporting_errors():
+                raise InternalAssemblerError(line_id, 'invariant violated')
+        message = str(exc_info.value)
+        assert message.startswith(f'ERROR: {line_id} - INTERNAL: invariant violated')
+        assert 'BespokeASM bug' in message
+        assert reporter.diagnostics[-1].category == 'internal'
+        assert reporter.diagnostics[-1].line_id == line_id
+        assert 'Traceback' in capsys.readouterr().err
+
+    def test_internal_error_is_not_an_assembler_error(self):
+        """Handlers that discard AssemblerErrors from failed attempts must not swallow bugs."""
+        assert not issubclass(InternalAssemblerError, AssemblerError)
+
+    def test_reporting_errors_passes_other_exceptions(self):
+        """Exceptions other than the assembler error types propagate unchanged."""
+        reporter = DiagnosticReporter()
+        with pytest.raises(KeyError):
+            with reporter.reporting_errors():
+                raise KeyError('x')
+        assert reporter.diagnostics == ()

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import enum
-import sys
 
 from bespokeasm.assembler.bytecode.parts import ByteCodePart
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
+from bespokeasm.assembler.diagnostic_reporter import InternalAssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 
@@ -111,7 +112,10 @@ class Operand:
             elif pos_str == 'prefix':
                 return OperandBytecodePositionType.PREFIX
             else:
-                sys.exit(f'ERROR - ISA configuration assigned operand "{self.id}" with unknown bytecode position "{pos_str}"')
+                raise AssemblerError(
+                    None,
+                    f'ISA configuration assigned operand "{self.id}" with unknown bytecode position "{pos_str}"',
+                )
         else:
             return None
 
@@ -121,11 +125,11 @@ class Operand:
 
     @property
     def operand_argument_string(self) -> str:
-        sys.exit(f'ERROR: INTERNAL - tried to fetch operand argument string for an unsupported operand type: {self}')
+        raise InternalAssemblerError(None, f'tried to fetch operand argument string for an unsupported operand type: {self}')
 
     @property
     def operand_register_string(self) -> str:
-        sys.exit(f'ERROR: INTERNAL - tried to fetch operand register string for an unsupported operand type: {self}')
+        raise InternalAssemblerError(None, f'tried to fetch operand register string for an unsupported operand type: {self}')
 
     def parse_operand(
         self,
@@ -162,7 +166,10 @@ class OperandWithArgument(Operand):
             diagnostic_reporter,
         )
         if require_arg and 'argument' not in self._config:
-            sys.exit(f'ERROR: configuration for numeric operand {self} does not have an argument configuration')
+            diagnostic_reporter.error(
+                None,
+                f'configuration for numeric operand {self} does not have an argument configuration',
+            )
 
     @property
     def has_argument(self) -> bool:
@@ -172,15 +179,13 @@ class OperandWithArgument(Operand):
     def argument_size(self) -> int:
         """Returns the bytecode size of the argument for this operand. Must be configured."""
         if 'size' not in self._config['argument']:
-            sys.exit(f'ERROR: Operand {self} does not have a configured argument size')
+            raise AssemblerError(None, f'Operand {self} does not have a configured argument size')
         return self._config['argument']['size']
 
     @property
     def argument_word_align(self) -> bool:
         if 'word_align' not in self._config['argument']:
-            sys.exit(
-                f'ERROR: Operand {self} does not have a configured argument word_align setting'
-            )
+            raise AssemblerError(None, f'Operand {self} does not have a configured argument word_align setting')
         return self._config['argument']['word_align']
 
     @property

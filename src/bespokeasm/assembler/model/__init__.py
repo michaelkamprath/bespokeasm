@@ -1,7 +1,6 @@
 import json
 import os
 import re
-import sys
 from functools import cached_property
 from typing import Literal
 
@@ -41,7 +40,10 @@ class AssemblerModel:
         self._diagnostic_reporter = diagnostic_reporter
         self._global_symbol_scope = None
         self._flow_effect_metadata_cache: dict[str, bool] = {}
+        with diagnostic_reporter.reporting_errors():
+            self._load_config(config_file_path, is_verbose)
 
+    def _load_config(self, config_file_path: str, is_verbose: int) -> None:
         if config_file_path.endswith('.json'):
             with open(config_file_path) as json_file:
                 config_dict = json.load(json_file)
@@ -51,11 +53,14 @@ class AssemblerModel:
                 with open(config_file_path) as yaml_file:
                     config_dict = yaml_loader.load(yaml_file)
                 if config_dict is None:
-                    sys.exit('ERROR: Could not load YAML configuration file - file may be empty or invalid')
+                    self._diagnostic_reporter.error(
+                        None,
+                        'Could not load YAML configuration file - file may be empty or invalid',
+                    )
             except Exception as exc:
-                sys.exit(f'ERROR: {exc}')
+                self._diagnostic_reporter.error(None, str(exc))
         else:
-            sys.exit('ERROR: unknown ISA config file type')
+            self._diagnostic_reporter.error(None, 'unknown ISA config file type')
 
         self._config = config_dict
         self._reserved_keywords = frozenset(
@@ -76,9 +81,10 @@ class AssemblerModel:
                 flags=re.IGNORECASE | re.VERBOSE,
             )
             if version_match is None:
-                sys.exit(
-                    f'ERROR - provide ISA version "{self._isa_version}" is not in semantic versioning '
-                    f'format. See https://semver.org for details.'
+                self._diagnostic_reporter.error(
+                    None,
+                    f'provide ISA version "{self._isa_version}" is not in semantic versioning '
+                    f'format. See https://semver.org for details.',
                 )
         else:
             self._isa_name = config_file_name
@@ -92,7 +98,10 @@ class AssemblerModel:
         # check to see if any registers named with a keyword
         for reg in self._registers:
             if reg in self._reserved_keywords:
-                sys.exit(f'ERROR: the instruction set configuration file specified an unallowed register name: {reg}')
+                self._diagnostic_reporter.error(
+                    None,
+                    f'the instruction set configuration file specified an unallowed register name: {reg}',
+                )
         self._operand_sets = OperandSetCollection(
             self._config['operand_sets'],
             self.multi_word_endianness,
@@ -145,41 +154,49 @@ class AssemblerModel:
         if 'predefined' in self._config \
                 and self._config['predefined'] is not None \
                 and 'memory' in self._config['predefined']:
-            sys.exit(
-                'ERROR - ISA configuration file defines a predefined "memory" block. '
-                'Memory blocks have been deprecated and replaced with "data" blocks.'
+            self._diagnostic_reporter.error(
+                None,
+                'ISA configuration file defines a predefined "memory" block. '
+                'Memory blocks have been deprecated and replaced with "data" blocks.',
             )
 
         # ensure there is a general section
         if 'general' not in self._config:
-            sys.exit('ERROR - ISA configuration file does not contain a "general" section.')
+            self._diagnostic_reporter.error(None, 'ISA configuration file does not contain a "general" section.')
 
         # require min_version
         if 'min_version' not in self._config['general']:
-            sys.exit('ERROR - ISA configuration file does not contain a required "min_version" field in the general section.')
+            self._diagnostic_reporter.error(
+                None,
+                'ISA configuration file does not contain a required "min_version" field in the general section.',
+            )
 
         # what's the point if there is no instruction set?
         if 'instructions' not in self._config:
-            sys.exit('ERROR - ISA configuration file does not contain an "instructions" section.')
+            self._diagnostic_reporter.error(None, 'ISA configuration file does not contain an "instructions" section.')
 
         # Validate string_byte_packing option
         general = self._config['general']
         if general.get('string_byte_packing', False):
             word_size = general.get('word_size', 8)
             if word_size < 16 or word_size % 8 != 0:
-                sys.exit('ERROR - "string_byte_packing" is only allowed if word_size is a multiple of 8 and at least 16.')
+                self._diagnostic_reporter.error(
+                    None,
+                    '"string_byte_packing" is only allowed if word_size is a multiple of 8 and at least 16.',
+                )
         # Validate string_byte_packing_fill
         fill = general.get('string_byte_packing_fill', 0)
         if not isinstance(fill, int) or not (0 <= fill <= 255):
-            sys.exit('ERROR - "string_byte_packing_fill" must be an integer between 0 and 255.')
+            self._diagnostic_reporter.error(None, '"string_byte_packing_fill" must be an integer between 0 and 255.')
         try:
             general['default_numeric_base'] = normalize_default_numeric_base(
                 general.get('default_numeric_base')
             )
         except ValueError:
-            sys.exit(
-                'ERROR - "default_numeric_base" must be one of: decimal, hex/hexadecimal/base16, '
-                'octal/base8, binary/base2.'
+            self._diagnostic_reporter.error(
+                None,
+                '"default_numeric_base" must be one of: decimal, hex/hexadecimal/base16, '
+                'octal/base8, binary/base2.',
             )
         self._validate_ambiguous_source_identifiers()
         self._validate_flow_analysis_config()
@@ -193,24 +210,27 @@ class AssemblerModel:
                     f'version of BespokeASM is {BESPOKEASM_VERSION_STR}.'
                 )
             if required_version > BESPOKEASM_VERSION_STR:
-                sys.exit(
-                    f'ERROR: the instruction set configuration file requires at least BespokeASM '
-                    f'version {required_version}'
+                self._diagnostic_reporter.error(
+                    None,
+                    f'the instruction set configuration file requires at least BespokeASM '
+                    f'version {required_version}',
                 )
             if required_version < BESPOKEASM_MIN_REQUIRED_STR:
-                sys.exit(
-                    f'ERROR: this version of BespokeASM requires a configuration file that minimally '
-                    f'requires BespokeASM version {BESPOKEASM_MIN_REQUIRED_STR}'
+                self._diagnostic_reporter.error(
+                    None,
+                    f'this version of BespokeASM requires a configuration file that minimally '
+                    f'requires BespokeASM version {BESPOKEASM_MIN_REQUIRED_STR}',
                 )
 
         # check to see if a GLOBAL memory sone was defined and has an illegal origin
         for zone in self.predefined_memory_zones:
             if zone['name'] == 'GLOBAL':
                 if self.default_origin < zone['start']:
-                    sys.exit(
-                        f'ERROR: The ISA configuration file has redefined the GLOBAL memory zone and the '
+                    self._diagnostic_reporter.error(
+                        None,
+                        f'The ISA configuration file has redefined the GLOBAL memory zone and the '
                         f'default origin value of {self.default_origin} is less than the GLOBAL memory '
-                        f'zone start value of {zone["start"]}.'
+                        f'zone start value of {zone["start"]}.',
                     )
 
     def _flow_config_error(self, message: str) -> None:
@@ -691,11 +711,12 @@ class AssemblerModel:
             return
         for register_name in register_names:
             if is_unprefixed_numeric_string(register_name, self.default_numeric_base):
-                sys.exit(
-                    'ERROR: the instruction set configuration file specified register name '
+                self._diagnostic_reporter.error(
+                    None,
+                    'the instruction set configuration file specified register name '
                     f'"{register_name}" which is ambiguous with a bare {self.default_numeric_base} '
                     'numeric literal under general.default_numeric_base. Rename the register or '
-                    'use a different default_numeric_base.'
+                    'use a different default_numeric_base.',
                 )
 
     def _validate_ambiguous_named_entities(
@@ -707,12 +728,13 @@ class AssemblerModel:
             return
         for name in names:
             if is_unprefixed_numeric_string(name, self.default_numeric_base):
-                sys.exit(
-                    'ERROR: the instruction set configuration file specified '
+                self._diagnostic_reporter.error(
+                    None,
+                    'the instruction set configuration file specified '
                     f'{entity_description} "{name}" which is ambiguous with a bare '
                     f'{self.default_numeric_base} numeric literal under '
                     'general.default_numeric_base. Rename it or use a different '
-                    'default_numeric_base.'
+                    'default_numeric_base.',
                 )
 
     def _validate_ambiguous_source_identifiers(self) -> None:

@@ -2,6 +2,7 @@ import importlib.resources as pkg_resources
 import unittest
 
 from bespokeasm.assembler.bytecode.word import Word
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithWords
@@ -192,7 +193,7 @@ class TestInstructionMacros(unittest.TestCase):
         memzone_mngr = self.memory_zone_manager
         line_id = LineIdentifier(1, 'test_macro_usage_rejects_operand_labels')
 
-        with self.assertRaises(SystemExit) as usage_error:
+        with self.assertRaises(AssemblerError) as usage_error:
             InstructionLine.factory(
                 line_id,
                 'mov2 [@src_arg:$2000],[$1234]',

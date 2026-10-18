@@ -1,6 +1,6 @@
 import re
-import sys
 
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import INSTRUCTION_EXPRESSION_PATTERN
 from bespokeasm.assembler.line_object import LineObject
@@ -47,7 +47,7 @@ class LabelLine(LineObject):
             label_val = label_match.group(2).strip()
             if is_valid_label(label_val):
                 if label_val in registers:
-                    sys.exit(f'ERROR: {line_id} - used the register label "{label_val}" as a non-register label')
+                    raise AssemblerError(line_id, f'used the register label "{label_val}" as a non-register label')
                 return LabelLine(line_id, label_val, None, label_match.group(1).strip(), comment, current_memzone)
 
         # Now determine is the line is a constant
@@ -59,12 +59,12 @@ class LabelLine(LineObject):
                 default_numeric_base,
             )
             if value_expr.contains_register_labels(registers):
-                sys.exit(f'ERROR: {line_id} - Expression contains register label')
+                raise AssemblerError(line_id, 'Expression contains register label')
             constant_label = constant_match.group(1).strip()
             if not is_valid_label(constant_label):
-                sys.exit(f'ERROR: {line_id} - invalid format for constant label: {constant_label}')
+                raise AssemblerError(line_id, f'invalid format for constant label: {constant_label}')
             if constant_label in registers:
-                sys.exit(f'ERROR: {line_id} - used the register label "{constant_label}" as a non-register label')
+                raise AssemblerError(line_id, f'used the register label "{constant_label}" as a non-register label')
             try:
                 line_obj = LabelLine(
                     line_id,
@@ -75,7 +75,7 @@ class LabelLine(LineObject):
                     current_memzone,
                 )
             except ValueError as e:
-                sys.exit(f'ERROR: {line_id} - Constant assigned nonnumeric value because {e}')
+                raise AssemblerError(line_id, f'Constant assigned nonnumeric value because {e}')
             return line_obj
         # if we got here it was neither a Label or a Constant
         return None

@@ -1,9 +1,9 @@
 import re
-import sys
 from functools import cached_property
 
 from bespokeasm.assembler.bytecode.parts import ExpressionByteCodePart
 from bespokeasm.assembler.bytecode.parts import NumericByteCodePart
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model.operand import OperandType
@@ -42,14 +42,16 @@ class IndirectRegisterOperand(RegisterOperand):
         )
         if self.has_offset:
             if 'size' not in self._config['offset']:
-                sys.exit(
-                    f'ERROR - configuration for indirect register operand "{self.register}" is '
-                    f'missing "size" setting.'
+                diagnostic_reporter.error(
+                    None,
+                    f'configuration for indirect register operand "{self.register}" is '
+                    f'missing "size" setting.',
                 )
             if 'word_align' not in self._config['offset']:
-                sys.exit(
-                    f'ERROR - configuration for indirect register operand "{self.register}" is '
-                    f'missing "word_align" setting.'
+                diagnostic_reporter.error(
+                    None,
+                    f'configuration for indirect register operand "{self.register}" is '
+                    f'missing "word_align" setting.',
                 )
 
     def __str__(self):
@@ -155,9 +157,10 @@ class IndirectRegisterOperand(RegisterOperand):
             else:
                 if len(match.groups()) == 3 and match.group(2) is not None and match.group(3) is not None:
                     # and offset was added for an operand that wasn't configured to have one. Error.
-                    sys.exit(
-                        f'ERROR: {line_id} - An offset was provided for indirect register operand "{operand}" '
-                        f'when none was expected.'
+                    raise AssemblerError(
+                        line_id,
+                        f'An offset was provided for indirect register operand "{operand}" '
+                        f'when none was expected.',
                     )
                 arg_part = None
             return ParsedOperand(self, bytecode_part, arg_part, operand, self._word_size, self._word_segment_size)

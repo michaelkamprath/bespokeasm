@@ -1,5 +1,4 @@
 import re
-import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
@@ -52,11 +51,11 @@ class CreateMemzoneLine(PreprocessorLine):
                     self._name,
                 )
             except KeyError:
-                sys.exit(f'ERROR: {line_id} - Memory zone "{self._name}" defined multiple times')
+                isa_model.diagnostic_reporter.error(line_id, f'Memory zone "{self._name}" defined multiple times')
             except ValueError as v_err:
-                sys.exit(f'ERROR: {line_id} - {v_err}')
+                isa_model.diagnostic_reporter.error(line_id, f'{v_err}')
         else:
-            sys.exit(f'ERROR: {line_id} - Syntax error when creating memory zone')
+            isa_model.diagnostic_reporter.error(line_id, 'Syntax error when creating memory zone')
 
     def __repr__(self) -> str:
         return f'CreateMemzoneLine<{self._name}: {self._start_addr} -> {self._end_addr}>'

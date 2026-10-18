@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 
 from bespokeasm.assembler.bytecode.word import Word
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
@@ -184,7 +185,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
 
         # match no variant
-        with self.assertRaises(SystemExit, msg='no instruction variant should match here'):
+        with self.assertRaises(AssemblerError, msg='no instruction variant should match here'):
             InstructionLine.factory(
                 22,
                 '  mov h, l',
@@ -194,7 +195,7 @@ class TestInstructionParsing(unittest.TestCase):
                 memzone_mngr,
             )
 
-        with self.assertRaises(SystemExit, msg='no instruction variant should match here'):
+        with self.assertRaises(AssemblerError, msg='no instruction variant should match here'):
             InstructionLine.factory(
                 22,
                 '  mov 27',
@@ -313,7 +314,7 @@ class TestInstructionParsing(unittest.TestCase):
                 f'{instruction_str} should encode expected bytecode',
             )
 
-        with self.assertRaises(SystemExit) as undeclared:
+        with self.assertRaises(AssemblerError) as undeclared:
             InstructionLine.factory(
                 LineIdentifier(201, 'test_mnemonic_decorators'),
                 'm!',
@@ -481,7 +482,7 @@ class TestInstructionParsing(unittest.TestCase):
             'instruction byte should match',
         )
 
-        with self.assertRaises(SystemExit, msg='no instruction  should match here'):
+        with self.assertRaises(AssemblerError, msg='no instruction  should match here'):
             bad1 = InstructionLine.factory(
                 22, '  mov a, [sp+i]', 'some comment!',
                 isa_model, memzone_mngr.global_zone, memzone_mngr,
@@ -807,7 +808,7 @@ class TestInstructionParsing(unittest.TestCase):
             'instruction byte should match',
         )
 
-        with self.assertRaises(SystemExit, msg='test bounds'):
+        with self.assertRaises(AssemblerError, msg='test bounds'):
             e1 = InstructionLine.factory(
                 lineid, '  tstb b, 14', 'second argument is too large',
                 isa_model, memzone_mngr.global_zone, memzone_mngr,
@@ -816,7 +817,7 @@ class TestInstructionParsing(unittest.TestCase):
             e1.active_named_scopes = active_named_scopes
             e1.generate_words()
 
-        with self.assertRaises(SystemExit, msg='test invalid enumerations'):
+        with self.assertRaises(AssemblerError, msg='test invalid enumerations'):
             e2 = InstructionLine.factory(
                 lineid, '  enumarg 12', 'comment',
                 isa_model, memzone_mngr.global_zone, memzone_mngr,
@@ -868,7 +869,7 @@ class TestInstructionParsing(unittest.TestCase):
             'instruction byte should match',
         )
 
-        with self.assertRaises(SystemExit, msg='test invalid enumeration values'):
+        with self.assertRaises(AssemblerError, msg='test invalid enumeration values'):
             e1 = InstructionLine.factory(
                 lineid, 'num 7', 'number 7 is not allowed',
                 isa_model, memzone_mngr.global_zone, memzone_mngr,
@@ -904,12 +905,12 @@ class TestInstructionParsing(unittest.TestCase):
         )
 
         # no addressing punction for numeric expression operands
-        with self.assertRaises(SystemExit, msg='there should be no addressing punctuation in numeric expression operands'):
+        with self.assertRaises(AssemblerError, msg='there should be no addressing punctuation in numeric expression operands'):
             InstructionLine.factory(
                 lineid, 'add [.local_var+7]', 'comment',
                 isa_model, memzone_mngr.global_zone, memzone_mngr,
             )
-        with self.assertRaises(SystemExit, msg='there should be no addressing punctuation in numeric expression operands'):
+        with self.assertRaises(AssemblerError, msg='there should be no addressing punctuation in numeric expression operands'):
             InstructionLine.factory(
                 lineid, 'add {.local_var+7}', 'comment',
                 isa_model, memzone_mngr.global_zone, memzone_mngr,
@@ -1105,7 +1106,7 @@ class TestInstructionParsing(unittest.TestCase):
         )
 
         # test offsets that are too large or too small
-        with self.assertRaises(SystemExit, msg='offset out of range'):
+        with self.assertRaises(AssemblerError, msg='offset out of range'):
             bt1 = InstructionLine.factory(
                 lineid, 'jmp {.loop}', 'comment',
                 isa_model, memzone_mngr.global_zone, memzone_mngr,
@@ -1114,7 +1115,7 @@ class TestInstructionParsing(unittest.TestCase):
             bt1.symbol_scope = TestInstructionParsing.label_values
             bt1.generate_words()
 
-        with self.assertRaises(SystemExit, msg='offset out of range'):
+        with self.assertRaises(AssemblerError, msg='offset out of range'):
             bt2 = InstructionLine.factory(
                 lineid, 'jmp {.loop}', 'comment',
                 isa_model, memzone_mngr.global_zone, memzone_mngr,
@@ -1151,7 +1152,7 @@ class TestInstructionParsing(unittest.TestCase):
             'instruction byte should match',
         )
 
-        with self.assertRaises(SystemExit, msg='address out of range'):
+        with self.assertRaises(AssemblerError, msg='address out of range'):
             # the GLOBAL memory zone starts at $2000. Relative jumping before it should fail.
             t1 = InstructionLine.factory(
                 lineid, 'jmpr $1FF8', 'comment',
@@ -1163,7 +1164,7 @@ class TestInstructionParsing(unittest.TestCase):
             self.assertEqual(t1.word_count, 2, 'has 2 words')
             t1.generate_words()
 
-        with self.assertRaises(SystemExit, msg='address out of range'):
+        with self.assertRaises(AssemblerError, msg='address out of range'):
             # the GLOBAL memory zone starts at $2000. Relative jumping before it should fail.
             e2 = InstructionLine.factory(
                 lineid, 'jmp $0500', 'comment',
@@ -1247,7 +1248,7 @@ class TestInstructionParsing(unittest.TestCase):
 
         #  test error conditions
         # error case: extraneous comparison operators ignored
-        with self.assertRaises(SystemExit, msg='extraneous comparison operators should be ignored'):
+        with self.assertRaises(AssemblerError, msg='extraneous comparison operators should be ignored'):
             AddressByteCodePart(
                 '<$2024',
                 8,
@@ -1428,7 +1429,7 @@ class TestInstructionParsing(unittest.TestCase):
         t4.active_named_scopes = self.active_named_scopes
         self.assertIsInstance(t4, InstructionLine)
         self.assertEqual(t4.word_count, 3, 'has 3 words')
-        with self.assertRaises(SystemExit, msg='address not in target memory zone'):
+        with self.assertRaises(AssemblerError, msg='address not in target memory zone'):
             t4.generate_words()
 
     def test_minimal_fast_ops_validate_against_operand_fetch_page(self):
@@ -1791,7 +1792,7 @@ class TestInstructionParsing(unittest.TestCase):
             isa_model.predefined_memory_zones,
         )
 
-        with self.assertRaises(SystemExit) as one_label_per_operand:
+        with self.assertRaises(AssemblerError) as one_label_per_operand:
             InstructionLine.factory(
                 LineIdentifier(20, 'test_operand_label_invalid_parse_cases'),
                 'aword @a:@b:$1234',
@@ -1802,7 +1803,7 @@ class TestInstructionParsing(unittest.TestCase):
             )
         self.assertIn('Multiple operand-label annotations on the same operand', str(one_label_per_operand.exception))
 
-        with self.assertRaises(SystemExit) as unsupported_type:
+        with self.assertRaises(AssemblerError) as unsupported_type:
             InstructionLine.factory(
                 LineIdentifier(21, 'test_operand_label_invalid_parse_cases'),
                 'regop @r: ra',
@@ -1813,7 +1814,7 @@ class TestInstructionParsing(unittest.TestCase):
             )
         self.assertIn('Operand labels are only supported for operand types', str(unsupported_type.exception))
 
-        with self.assertRaises(SystemExit) as bad_syntax:
+        with self.assertRaises(AssemblerError) as bad_syntax:
             InstructionLine.factory(
                 LineIdentifier(22, 'test_operand_label_invalid_parse_cases'),
                 'aword @1bad: $1234',
@@ -1824,7 +1825,7 @@ class TestInstructionParsing(unittest.TestCase):
             )
         self.assertIn('Malformed operand-label syntax', str(bad_syntax.exception))
 
-        with self.assertRaises(SystemExit) as bad_spacing:
+        with self.assertRaises(AssemblerError) as bad_spacing:
             InstructionLine.factory(
                 LineIdentifier(22, 'test_operand_label_invalid_parse_cases'),
                 'aword @lbl : $1234',
@@ -1835,7 +1836,7 @@ class TestInstructionParsing(unittest.TestCase):
             )
         self.assertIn('Malformed operand-label syntax', str(bad_spacing.exception))
 
-        with self.assertRaises(SystemExit) as missing_colon:
+        with self.assertRaises(AssemblerError) as missing_colon:
             InstructionLine.factory(
                 LineIdentifier(22, 'test_operand_label_invalid_parse_cases'),
                 'aword @lbl $1234',
@@ -1847,7 +1848,7 @@ class TestInstructionParsing(unittest.TestCase):
         self.assertIn('Malformed operand-label syntax', str(missing_colon.exception))
         self.assertIn('missing ":"', str(missing_colon.exception))
 
-        with self.assertRaises(SystemExit) as same_line:
+        with self.assertRaises(AssemblerError) as same_line:
             InstructionLine.factory(
                 LineIdentifier(23, 'test_operand_label_invalid_parse_cases'),
                 'aword @lbl:',

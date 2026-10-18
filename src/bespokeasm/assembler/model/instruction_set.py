@@ -1,6 +1,6 @@
-import sys
 from typing import Literal
 
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.keywords import ASSEMBLER_KEYWORD_SET
 from bespokeasm.assembler.model.instruction import Instruction
 from bespokeasm.assembler.model.instruction_base import InstructionBase
@@ -40,12 +40,13 @@ class InstructionSet(dict[str, InstructionBase]):
             aliases = [alias.lower() for alias in instr_config.get('aliases', [])]
             for instruction_stem in [mnemonic] + aliases:
                 if instruction_stem in lower_keywords:
-                    sys.exit(
-                        f'ERROR - ISA configuration defined instruction "{instruction_stem}" '
-                        'which is also a BespokeASM keyword'
+                    diagnostic_reporter.error(
+                        None,
+                        f'ISA configuration defined instruction "{instruction_stem}" '
+                        'which is also a BespokeASM keyword',
                     )
                 if instruction_stem in self._instruction_stems:
-                    sys.exit(f'ERROR - Duplicate mnemonic or alias found: "{instruction_stem}"')
+                    diagnostic_reporter.error(None, f'Duplicate mnemonic or alias found: "{instruction_stem}"')
             instr_obj = Instruction(
                 mnemonic,
                 instr_config,
@@ -64,8 +65,9 @@ class InstructionSet(dict[str, InstructionBase]):
                 self._instruction_stems[instruction_stem] = instr_obj
             for source_mnemonic in instr_obj.valid_source_mnemonics:
                 if source_mnemonic in self:
-                    sys.exit(
-                        f'ERROR - Mnemonic "{source_mnemonic}" for instruction "{mnemonic}" '
+                    diagnostic_reporter.error(
+                        None,
+                        f'Mnemonic "{source_mnemonic}" for instruction "{mnemonic}" '
                         'collides with another instruction or alias.',
                     )
                 self[source_mnemonic] = instr_obj
@@ -78,10 +80,13 @@ class InstructionSet(dict[str, InstructionBase]):
             for mnemonic, macro_config in self._macros_config.items():
                 mnemonic = mnemonic.lower()
                 if mnemonic in lower_keywords:
-                    sys.exit(f'ERROR - ISA configuration defined instruction "{mnemonic}" which is also a BespokeASM keyword')
+                    diagnostic_reporter.error(
+                        None,
+                        f'ISA configuration defined instruction "{mnemonic}" which is also a BespokeASM keyword',
+                    )
                 # check macro mnemonic is not in existing instructions
                 if mnemonic in self or mnemonic in self._instruction_stems:
-                    sys.exit(f'ERROR - Macro "{mnemonic}" has same mnemonic as a configured instruction.')
+                    diagnostic_reporter.error(None, f'Macro "{mnemonic}" has same mnemonic as a configured instruction.')
                 variants, documentation = self._parse_macro_config(mnemonic, macro_config)
                 macro_list.append(
                     InstructionMacro(
@@ -136,15 +141,16 @@ class InstructionSet(dict[str, InstructionBase]):
             documentation = None
         elif isinstance(macro_config, dict):
             if 'variants' not in macro_config:
-                sys.exit(
-                    f'ERROR - Macro "{mnemonic}" configuration uses dictionary form and must contain a "variants" list.'
+                raise AssemblerError(
+                    None,
+                    f'Macro "{mnemonic}" configuration uses dictionary form and must contain a "variants" list.',
                 )
             variants = macro_config['variants']
             documentation = macro_config.get('documentation')
         else:
-            sys.exit(f'ERROR - Macro "{mnemonic}" configuration must be a list or a dictionary.')
+            raise AssemblerError(None, f'Macro "{mnemonic}" configuration must be a list or a dictionary.')
 
         if not isinstance(variants, list):
-            sys.exit(f'ERROR - Macro "{mnemonic}" configuration "variants" entry must be a list.')
+            raise AssemblerError(None, f'Macro "{mnemonic}" configuration "variants" entry must be a list.')
 
         return variants, documentation

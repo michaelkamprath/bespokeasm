@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import Mock
 
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object.preprocessor_line.create_scope import CreateScopeLine
@@ -124,7 +125,7 @@ class TestNamedScopeDirectives(unittest.TestCase):
         """Test UseScopeLine with invalid syntax."""
         instruction = '#use-scope invalid'
 
-        with self.assertRaises(SystemExit):
+        with self.assertRaises(AssemblerError):
             UseScopeLine(
                 self.line_id,
                 instruction,
@@ -158,7 +159,7 @@ class TestNamedScopeDirectives(unittest.TestCase):
         """Test DeactivateScopeLine with invalid syntax."""
         instruction = '#deactivate-scope invalid'
 
-        with self.assertRaises(SystemExit):
+        with self.assertRaises(AssemblerError):
             DeactivateScopeLine(
                 self.line_id,
                 instruction,

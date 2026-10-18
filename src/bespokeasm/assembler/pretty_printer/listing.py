@@ -1,8 +1,8 @@
 import io
 import math
-import sys
 
 from bespokeasm.assembler.bytecode.word import Word
+from bespokeasm.assembler.diagnostic_reporter import InternalAssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object import LineWithWords
@@ -179,8 +179,8 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         if line_bytes is not None:
             try:
                 output.write(line_bytes[0])
-            except IndexError:
-                sys.exit(f'ERROR - internal: line_bytes is empty for line {lobj} at {lobj.line_id}')
+            except IndexError as exc:
+                raise InternalAssemblerError(lobj.line_id, f'line_bytes is empty for line {lobj}') from exc
         else:
             output.write(' ' * (self._bytes_per_line * (hex_width+1)))
         output.write('| ')

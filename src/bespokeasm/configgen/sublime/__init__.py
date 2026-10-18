@@ -8,6 +8,7 @@ import tempfile
 from zipfile import ZipFile
 
 import bespokeasm.configgen.sublime.resources as resources
+from bespokeasm.assembler.diagnostic_reporter import InternalAssemblerError
 from bespokeasm.assembler.keywords import BYTECODE_DIRECTIVES_SET
 from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET
 from bespokeasm.assembler.keywords import expression_functions_for_isa
@@ -272,13 +273,15 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
                     syntax_dict['contexts']['instructions'].remove(instr_dict)
                 update_macros = True
         if not update_instructions:
-            sys.exit(
-                'ERROR - INTERNAL - Could not find "variable.function.instruction" '
+            raise InternalAssemblerError(
+                None,
+                'Could not find "variable.function.instruction" '
                 'configuration in instructions for Sulime syntax'
             )
         if not update_macros:
-            sys.exit(
-                'ERROR - INTERNAL - Could not find "variable.function.macro" configuration '
+            raise InternalAssemblerError(
+                None,
+                'Could not find "variable.function.macro" configuration '
                 'in instructions for Sulime syntax'
             )
 
@@ -287,7 +290,10 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
                 index = idx
                 break
         if index is None:
-            sys.exit('ERROR - INTERNAL - Could not find "instruction" configuration in pop_instruction_end for Sulime syntax')
+            raise InternalAssemblerError(
+                None,
+                'Could not find "instruction" configuration in pop_instruction_end for Sulime syntax',
+            )
         syntax_dict['contexts']['pop_instruction_end'][index]['match'] = self._replace_token_with_regex_list(
             syntax_dict['contexts']['pop_instruction_end'][index]['match'],
             '##INSTRUCTIONS##',
@@ -351,7 +357,7 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
                 updated = True
                 break
         if not updated:
-            sys.exit('ERROR - INTERNAL - did not find correct preprocessor rule for Sublime systax file.')
+            raise InternalAssemblerError(None, 'did not find correct preprocessor rule for Sublime systax file.')
 
         # expression functions
         func_regex = '|'.join(expression_functions_for_isa(self.model.flow_counters_enabled))
@@ -363,7 +369,7 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
                 updated = True
                 break
         if not updated:
-            sys.exit('ERROR - INTERNAL - did not find correct expression function rule for Sublime systax file.')
+            raise InternalAssemblerError(None, 'did not find correct expression function rule for Sublime systax file.')
 
         # save syntax file
         syntax_fp = os.path.join(destination_dir, self.language_name + '.sublime-syntax')

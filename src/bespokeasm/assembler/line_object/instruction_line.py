@@ -1,7 +1,7 @@
 import re
-import sys
 
 from bespokeasm.assembler.analysis import SourceIdentity
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithWords
 from bespokeasm.assembler.line_object.emdedded_string import EMBEDDED_STRING_PATTERN
@@ -57,10 +57,11 @@ class InstructionLine(LineWithWords):
         configured_mnemonics = isa_model.instructions.configured_mnemonics_for_stem(mnemonic_stem)
         decorator_position = 'prefix' if is_prefix else 'postfix'
         configured_forms = ', '.join(f'"{mnemonic}"' for mnemonic in configured_mnemonics)
-        sys.exit(
-            f'ERROR: {line_id} - Mnemonic "{command_str}" uses undeclared {decorator_position} '
+        raise AssemblerError(
+            line_id,
+            f'Mnemonic "{command_str}" uses undeclared {decorator_position} '
             f'decorator "{decorator_symbol}" for instruction root "{mnemonic_stem}". '
-            f'Configured forms: {configured_forms}'
+            f'Configured forms: {configured_forms}',
         )
 
     @classmethod
@@ -93,7 +94,7 @@ class InstructionLine(LineWithWords):
         for instruction_end_match in re.finditer(cls._INSTRUCTUION_EXTRACTION_PATTERN, instruction_tail):
             candidate_end_positions.add(command_end + instruction_end_match.start())
 
-        last_error: SystemExit | None = None
+        last_error: AssemblerError | SystemExit | None = None
         for candidate_end in sorted(candidate_end_positions, reverse=True):
             instruction_str = instruction_content[:candidate_end].rstrip()
             argument_str = instruction_str.strip()[len(command_str):]
@@ -109,7 +110,7 @@ class InstructionLine(LineWithWords):
                     current_memzone,
                     source_ordinal,
                 )
-            except SystemExit as exc:
+            except (AssemblerError, SystemExit) as exc:
                 last_error = exc
 
         if last_error is not None:

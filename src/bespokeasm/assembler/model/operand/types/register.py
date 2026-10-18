@@ -1,5 +1,4 @@
 import re
-import sys
 
 from bespokeasm.assembler.bytecode.parts import NumericByteCodePart
 from bespokeasm.assembler.line_identifier import LineIdentifier
@@ -34,8 +33,11 @@ class RegisterOperand(Operand):
             diagnostic_reporter,
         )
         if self.register not in regsiters:
-            sys.exit(f'ERROR - ISA configation declares register based operand {self} but the '
-                     f'register label "{self.register}" is not a declared register.')
+            diagnostic_reporter.error(
+                None,
+                f'ISA configation declares register based operand {self} but the '
+                f'register label "{self.register}" is not a declared register.',
+            )
 
     def __str__(self):
         return f'RegisterOperand<{self.id},register={self.register}>'

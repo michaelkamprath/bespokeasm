@@ -1,5 +1,4 @@
 import io
-import sys
 
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.line_object import LineObject
@@ -14,8 +13,10 @@ class IntelHexPrettyPrinter(PrettyPrinterBase):
     def __init__(self, line_objs:  list[LineObject], model: AssemblerModel, as_intel_hex: bool) -> None:
         super().__init__(line_objs, model)
         if model.word_size != 8:
-            sys.exit(f'ERROR - {"Intel " if as_intel_hex else ""}Hex Pretty '
-                     f'Printer only supports 8-bit words')
+            model.diagnostic_reporter.error(
+                None,
+                f'{"Intel " if as_intel_hex else ""}Hex Pretty Printer only supports 8-bit words',
+            )
         self._intel_hex = IntelHex()
         self._as_intel_hex = as_intel_hex
 

@@ -1,8 +1,8 @@
-import sys
-
 from bespokeasm.assembler.analysis import SourceIdentity
 from bespokeasm.assembler.bytecode.assembled import AssembledInstruction
 from bespokeasm.assembler.bytecode.assembled import CompositeAssembledInstruction
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
+from bespokeasm.assembler.diagnostic_reporter import InternalAssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
@@ -32,7 +32,7 @@ class MacroBytecodeGenerator:
     ) -> AssembledInstruction:
         if mnemonic != macro.mnemonic:
             # this shouldn't happen
-            sys.exit(f'ERROR: {line_id} - INTERNAL - Asked macro {macro} to parse mnemonic "{mnemonic}"')
+            raise InternalAssemblerError(line_id, f'Asked macro {macro} to parse mnemonic "{mnemonic}"')
 
         operand_label_error: OperandLabelError | None = None
         for variant in macro.variants:
@@ -55,12 +55,12 @@ class MacroBytecodeGenerator:
                 return assembled_instruction
 
         if operand_label_error is not None:
-            isa_model.diagnostic_reporter.error(
+            raise AssemblerError(
                 operand_label_error.line_id,
                 operand_label_error.message,
                 category=operand_label_error.category,
             )
-        isa_model.diagnostic_reporter.error(
+        raise AssemblerError(
             line_id,
             f'Macro "{mnemonic}" has no valid operands configured.',
         )
@@ -79,12 +79,12 @@ class MacroBytecodeGenerator:
     ) -> AssembledInstruction:
         if mnemonic != variant.mnemonic:
             # this shouldn't happen
-            sys.exit(f'ERROR: {line_id} - INTERNAL - Asked instruction {variant} to parse mnemonic "{mnemonic}"')
+            raise InternalAssemblerError(line_id, f'Asked instruction {variant} to parse mnemonic "{mnemonic}"')
         operand_list = split_operands(operands)
 
         for operand_str in operand_list:
             if contains_operand_label_annotation(operand_str):
-                isa_model.diagnostic_reporter.error(
+                raise AssemblerError(
                     line_id,
                     f'Macro "{mnemonic}" does not support operand labels in macro usage.',
                 )
@@ -103,7 +103,7 @@ class MacroBytecodeGenerator:
 
         # second, generate list of instruction strings and comments
         if 'instructions' not in variant._variant_config:
-            sys.exit(f'ERROR - macro "{mnemonic}" does not have any instructions configured.')
+            raise AssemblerError(line_id, f'macro "{mnemonic}" does not have any instructions configured.')
 
         instruction_lines: list[str] = []
         for step_num, instruction_format in enumerate(variant._variant_config['instructions']):
@@ -115,9 +115,10 @@ class MacroBytecodeGenerator:
                     arg_str = f'@ARG({op_num})'
                     if arg_str in instruction_str:
                         if op.operand_argument_string is None:
-                            sys.exit(
-                                f'ERROR: {line_id} - Macro "{variant.mnemonic}" step {step_num} uses @ARG({op_num}) '
-                                f'but no operand argument exist. Consider using @OP{step_num} instead.'
+                            raise AssemblerError(
+                                line_id,
+                                f'Macro "{variant.mnemonic}" step {step_num} uses @ARG({op_num}) '
+                                f'but no operand argument exist. Consider using @OP{step_num} instead.',
                             )
                         # gate the replace so that not called on unspported operand types
                         instruction_str = instruction_str.replace(arg_str, op.operand_argument_string)
@@ -125,9 +126,10 @@ class MacroBytecodeGenerator:
                     reg_str = f'@REG({op_num})'
                     if reg_str in instruction_str:
                         if op.operand_register_string is None:
-                            sys.exit(
-                                f'ERROR: {line_id} - Macro "{variant.mnemonic}" step {step_num} uses @REG({op_num}) '
-                                f'but no operand register exist. Consider using @OP{step_num} instead.'
+                            raise AssemblerError(
+                                line_id,
+                                f'Macro "{variant.mnemonic}" step {step_num} uses @REG({op_num}) '
+                                f'but no operand register exist. Consider using @OP{step_num} instead.',
                             )
                         # gate the replace so that not called on unspported operand types
                         instruction_str = instruction_str.replace(reg_str, op.operand_register_string)
@@ -139,15 +141,24 @@ class MacroBytecodeGenerator:
 
             if '@ARG' in instruction_str:
                 # ensure all @ARGs are handled
-                sys.exit(f'ERROR: {line_id} - Macro "{variant.mnemonic}" has unrecognized @ARG on step {step_num}')
+                raise AssemblerError(
+                    line_id,
+                    f'Macro "{variant.mnemonic}" has unrecognized @ARG on step {step_num}',
+                )
             if '@REG' in instruction_str:
                 # ensure all @REGs are handled
-                sys.exit(f'ERROR: {line_id} - Macro "{variant.mnemonic}" has unrecognized @REG on step {step_num}')
+                raise AssemblerError(
+                    line_id,
+                    f'Macro "{variant.mnemonic}" has unrecognized @REG on step {step_num}',
+                )
             if '@OP' in instruction_str:
                 # ensure all @OPs are handled
-                sys.exit(f'ERROR: {line_id} - Macro "{variant.mnemonic}" has unrecognized @OP on step {step_num}')
+                raise AssemblerError(
+                    line_id,
+                    f'Macro "{variant.mnemonic}" has unrecognized @OP on step {step_num}',
+                )
             if contains_operand_label_annotation(instruction_str):
-                isa_model.diagnostic_reporter.error(
+                raise AssemblerError(
                     line_id,
                     f'Macro "{variant.mnemonic}" step {step_num} expands to operand-label syntax, '
                     'which is not supported for macros.',

@@ -1,5 +1,3 @@
-import sys
-
 import bespokeasm.assembler.preprocessor.condition as condition
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
@@ -55,8 +53,9 @@ class ConditionLine(PreprocessorLine):
         try:
             condition_stack.process_condition(self._condition, preprocessor)
         except IndexError:
-            sys.exit(
-                f'ERROR - {line_id}: Preprocessor condition has no matching counterpart'
+            preprocessor.diagnostic_reporter.error(
+                line_id,
+                'Preprocessor condition has no matching counterpart',
             )
 
     def __repr__(self) -> str:

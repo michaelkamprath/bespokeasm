@@ -1,5 +1,4 @@
 import re
-import sys
 from functools import cached_property
 
 from bespokeasm.assembler.bytecode.parts import NumericByteCodePart
@@ -45,12 +44,18 @@ class EnumerationOperand(OperandWithArgument):
         # validate
         if self.has_bytecode_value_dict:
             if registers.intersection(set(self.bytecode_value_dict.keys())):
-                sys.exit(f'ERROR - Dictionary key operand "{operand_id}" uses a '
-                         f'register label as a key in the byte code dictionary')
+                diagnostic_reporter.error(
+                    None,
+                    f'Dictionary key operand "{operand_id}" uses a '
+                    f'register label as a key in the byte code dictionary',
+                )
         if self.has_argument_value_dict:
             if registers.intersection(set(self.argument_value_dict.keys())):
-                sys.exit(f'ERROR - Dictionary key operand "{operand_id}" uses a '
-                         f'register label as a key in the argument dictionary')
+                diagnostic_reporter.error(
+                    None,
+                    f'Dictionary key operand "{operand_id}" uses a '
+                    f'register label as a key in the argument dictionary',
+                )
 
     def __str__(self):
         return f'DictionaryKey<{self.id}>'

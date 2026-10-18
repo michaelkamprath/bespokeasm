@@ -4,6 +4,7 @@ import unittest
 
 import bespokeasm.assembler.model.operand_set as AS
 from bespokeasm.assembler.bytecode.word import Word
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
@@ -373,15 +374,15 @@ class TestConfigObject(unittest.TestCase):
             'just move [sp+2] into a'
         )
 
-        with self.assertRaises(SystemExit, msg='should error on unallowed operand combinations'):
+        with self.assertRaises(AssemblerError, msg='should error on unallowed operand combinations'):
             InstructioParser.parse_instruction(model2, test_line_id, 'mov a, a', memzone_mngr2)
-        with self.assertRaises(SystemExit, msg='[mar] should have no offset'):
+        with self.assertRaises(AssemblerError, msg='[mar] should have no offset'):
             InstructioParser.parse_instruction(model2, test_line_id, 'mov [mar+2], [label1]', memzone_mngr2)
-        with self.assertRaises(SystemExit, msg='should error due to too many operands'):
+        with self.assertRaises(AssemblerError, msg='should error due to too many operands'):
             InstructioParser.parse_instruction(model2, test_line_id, 'mov a, i, j', memzone_mngr2)
-        with self.assertRaises(SystemExit, msg='should error due to too many operands'):
+        with self.assertRaises(AssemblerError, msg='should error due to too many operands'):
             InstructioParser.parse_instruction(model2, test_line_id, 'nop 123', memzone_mngr2)
-        with self.assertRaises(SystemExit, msg='should error due to too few operands'):
+        with self.assertRaises(AssemblerError, msg='should error due to too few operands'):
             InstructioParser.parse_instruction(model2, test_line_id, 'mov a', memzone_mngr2)
 
     def test_bad_registers_in_configuratin(self):

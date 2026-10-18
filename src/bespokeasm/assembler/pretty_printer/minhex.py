@@ -1,5 +1,4 @@
 import io
-import sys
 
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.line_object import LineObject
@@ -20,12 +19,12 @@ class MinHexPrettyPrinter(PrettyPrinterBase):
     - Muted lines and other non-data lines are skipped.
     - Empty input produces an empty string.
 
-    Raises `SystemExit` at construction if the model's word size is not 8.
+    Reports an error at construction if the model's word size is not 8.
     """
 
     def __init__(self, line_objs:  list[LineObject], model: AssemblerModel) -> None:
         if model.word_size != 8:
-            sys.exit('ERROR - Min Hex Pretty Printer only supports 8-bit words')
+            model.diagnostic_reporter.error(None, 'Min Hex Pretty Printer only supports 8-bit words')
         super().__init__(line_objs, model)
 
     def pretty_print(self) -> str:

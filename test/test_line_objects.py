@@ -2,6 +2,7 @@ import importlib.resources as pkg_resources
 import unittest
 
 from bespokeasm.assembler.bytecode.word import Word
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
@@ -599,17 +600,17 @@ class TestLineObject(unittest.TestCase):
         self.assertEqual(l5.get_label(), 'test_bit', 'label string')
 
         # this should fail
-        with self.assertRaises(SystemExit, msg='unresolvable expression constant assignments should fail'):
+        with self.assertRaises(AssemblerError, msg='unresolvable expression constant assignments should fail'):
             LabelLine.factory(
                 13, 'my_constant = some_var1 + 7', 'bad constant',
                 register_set, label_values, active_named_scopes, memzone,
             )
-        with self.assertRaises(SystemExit, msg='labels should not be registers'):
+        with self.assertRaises(AssemblerError, msg='labels should not be registers'):
             LabelLine.factory(
                 13, 'mar = $1234', 'bad label', register_set,
                 label_values, active_named_scopes, memzone,
             )
-        with self.assertRaises(SystemExit, msg='labels should not be registers'):
+        with self.assertRaises(AssemblerError, msg='labels should not be registers'):
             LabelLine.factory(
                 13, 'sp:', 'bad label', register_set, label_values, active_named_scopes, memzone
             )
@@ -909,7 +910,7 @@ class TestLineObject(unittest.TestCase):
         # this instruction should fail because register A is not configured to be an
         # indirect register, so the parser assumes this is a indirect numeric expression
         # and then sees a register used there.
-        with self.assertRaises(SystemExit, msg='this instruction should fail'):
+        with self.assertRaises(AssemblerError, msg='this instruction should fail'):
             InstructionLine.factory(
                 22, '  mov [a+2],5', 'move it',
                 isa_model, memzone_mngr.global_zone, memzone_mngr,
@@ -917,7 +918,7 @@ class TestLineObject(unittest.TestCase):
 
         # this instruction should fail because register i is being used in a numeric
         # expression
-        with self.assertRaises(SystemExit, msg='this instruction should fail'):
+        with self.assertRaises(AssemblerError, msg='this instruction should fail'):
             InstructionLine.factory(
                 22, '  add i+5', 'add it',
                 isa_model, memzone_mngr.global_zone, memzone_mngr,
@@ -1222,7 +1223,7 @@ class TestLineObject(unittest.TestCase):
             )
 
         # anythin after an instruction other than an instruction os not supported (yet)
-        with self.assertRaises(SystemExit, msg='this instruction should fail'):
+        with self.assertRaises(AssemblerError, msg='this instruction should fail'):
             LineOjectFactory.parse_line(
                     lineid,
                     'ADD nope_str&$00FF       newLabel:',

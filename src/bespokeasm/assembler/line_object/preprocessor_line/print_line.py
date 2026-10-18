@@ -1,5 +1,3 @@
-import sys
-
 import click
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
@@ -31,7 +29,10 @@ class PrintLine(PreprocessorLine):
             instruction.strip()[len('#print'):].strip()
         )
         if parsed_message is None:
-            sys.exit(f'ERROR - {line_id}: Invalid #print directive syntax: {instruction}')
+            preprocessor.diagnostic_reporter.error(
+                line_id,
+                f'Invalid #print directive syntax: {instruction}',
+            )
 
         min_level_str = parsed_message.leading_text or None
         try:
@@ -41,12 +42,16 @@ class PrintLine(PreprocessorLine):
             # the verbosity slot, so report it as an unknown color rather than a bad level.
             last_token = min_level_str.split()[-1]
             if last_token.isalpha():
-                sys.exit(
-                    f'ERROR - {line_id}: Unknown color "{last_token}" in #print directive. '
+                preprocessor.diagnostic_reporter.error(
+                    line_id,
+                    f'Unknown color "{last_token}" in #print directive. '
                     f'Supported colors are: {", ".join(PREPROCESSOR_MESSAGE_COLORS)}. '
-                    f'Directive: {instruction}'
+                    f'Directive: {instruction}',
                 )
-            sys.exit(f'ERROR - {line_id}: Invalid verbosity level in #print directive: {instruction}')
+            preprocessor.diagnostic_reporter.error(
+                line_id,
+                f'Invalid verbosity level in #print directive: {instruction}',
+            )
 
         color = parsed_message.color
         message = parsed_message.text

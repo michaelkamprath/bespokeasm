@@ -1,9 +1,8 @@
-import sys
-
 from bespokeasm.assembler.analysis import SourceIdentity
 from bespokeasm.assembler.bytecode.assembled import AssembledInstruction
 from bespokeasm.assembler.bytecode.generator.instruction import InstructionBytecodeGenerator
 from bespokeasm.assembler.bytecode.generator.macro import MacroBytecodeGenerator
+from bespokeasm.assembler.diagnostic_reporter import InternalAssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
@@ -53,4 +52,4 @@ class BytecodeGenerator:
                         source_identity,
                     )
 
-        sys.exit(f'ERROR: INTERNAL - BytecodeGenerator got an unknown instruction type - {instruction}')
+        raise InternalAssemblerError(line_id, f'BytecodeGenerator got an unknown instruction type - {instruction}')

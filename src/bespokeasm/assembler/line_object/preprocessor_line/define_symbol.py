@@ -1,5 +1,4 @@
 import re
-import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
@@ -36,9 +35,12 @@ class DefineSymbolLine(PreprocessorLine):
                 elif len(define_match.groups()) == 2:
                     self._symbol = preprocessor.create_symbol(define_match.group(1), define_match.group(2), line_id)
                 else:
-                    sys.exit(f'ERROR - {line_id}: Invalid preprocessor symbol definition.')
+                    preprocessor.diagnostic_reporter.error(line_id, 'Invalid preprocessor symbol definition.')
             except ValueError:
-                sys.exit(f'ERROR - {line_id}: Preprocessor symbol {define_match.group(1)} is defined multiple times.')
+                preprocessor.diagnostic_reporter.error(
+                    line_id,
+                    f'Preprocessor symbol {define_match.group(1)} is defined multiple times.',
+                )
             if isa_model is None:
                 raise ValueError('AssemblerModel is required for DefineSymbolLine')
             isa_model.diagnostic_reporter.info(
@@ -47,7 +49,7 @@ class DefineSymbolLine(PreprocessorLine):
                 min_verbosity=2,
             )
         else:
-            sys.exit(f'ERROR - {line_id}: Invalid preprocessor symbol definition: {instruction}')
+            preprocessor.diagnostic_reporter.error(line_id, f'Invalid preprocessor symbol definition: {instruction}')
 
     def __repr__(self) -> str:
         return f'DefineSymbolLine<{self._symbol}>'

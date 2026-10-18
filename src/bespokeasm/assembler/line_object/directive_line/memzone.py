@@ -1,5 +1,4 @@
-import sys
-
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.memory_zone.manager import GLOBAL_ZONE_NAME
@@ -22,7 +21,7 @@ class SetMemoryZoneLine(LineObject):
             self._name = name_str
         memzone = memzone_manager.zone(self._name)
         if memzone is None:
-            sys.exit(f'ERROR: {line_id} - unknown memory zone "{name_str}"')
+            raise AssemblerError(line_id, f'unknown memory zone "{name_str}"')
         super().__init__(line_id, instruction, comment, memzone)
 
     @property

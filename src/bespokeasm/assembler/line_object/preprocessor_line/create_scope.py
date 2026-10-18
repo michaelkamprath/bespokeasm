@@ -1,5 +1,4 @@
 import re
-import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
@@ -35,10 +34,10 @@ class CreateScopeLine(PreprocessorLine):
 
             # Validate inputs
             if not scope_name:
-                sys.exit(f'ERROR: {line_id} - Scope name cannot be empty')
+                isa_model.diagnostic_reporter.error(line_id, 'Scope name cannot be empty')
 
             if not prefix or prefix == '':
-                sys.exit(f'ERROR: {line_id} - Scope prefix cannot be empty')
+                isa_model.diagnostic_reporter.error(line_id, 'Scope prefix cannot be empty')
 
             # Create the scope
             named_scope_manager.create_scope(scope_name, prefix, line_id)
@@ -54,7 +53,7 @@ class CreateScopeLine(PreprocessorLine):
             )
 
         else:
-            sys.exit(f'ERROR: {line_id} - Invalid #create-scope directive syntax: {instruction}')
+            isa_model.diagnostic_reporter.error(line_id, f'Invalid #create-scope directive syntax: {instruction}')
 
     @property
     def scope_name(self) -> str:

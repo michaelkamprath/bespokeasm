@@ -23,6 +23,7 @@ Changes that are planned but not implemented yet:
 * Added Python 3.12, 3.13, and 3.14 package classifiers to reflect the versions covered by CI.
 * Added a per-register `reserved: false` configuration option to document a register in generated ISA documentation without reserving its name as an assembler keyword. The Minimal 64x4 example ISAs now use it for `a`/`b`, whose unconditional reservation had broken conventional source that uses those names for zero-page variables.
 * Fixed bug in VIM syntax highlighting that caused parsing errors.
+* **Behavior change:** All assembly and ISA configuration errors are now reported through the diagnostic reporter, so they share one format (`ERROR: <file, line> - <message>`) instead of the previous mix of `ERROR - <file, line>: ...` and `ERROR: ...` styles. Internal consistency failures are now reported as `INTERNAL:` errors flagged as BespokeASM bugs, with a traceback, rather than looking like a user error.
 * Improved the `#print` error for an unsupported color name (e.g. `purple`): it now reports the unknown color and lists the supported colors instead of a misleading "invalid verbosity level" error.
 
 ## [0.8.0]

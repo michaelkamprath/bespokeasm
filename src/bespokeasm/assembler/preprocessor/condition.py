@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import re
-import sys
 
+from bespokeasm.assembler.diagnostic_reporter import InternalAssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import INSTRUCTION_EXPRESSION_PATTERN
 from bespokeasm.assembler.preprocessor import Preprocessor
@@ -152,7 +152,6 @@ class IfPreprocessorCondition(PreprocessorCondition):
     def _evaluate_condition(self, preprocessor: Preprocessor) -> bool:
         # Check if this is a PURE language version expression (not mixed with other symbols)
         from bespokeasm.assembler.preprocessor.language_version_evaluator import LanguageVersionEvaluator
-        import sys
 
         # Check for mixed expressions by examining LHS and RHS separately
         lhs_has_lang_symbols = LanguageVersionEvaluator.contains_language_version_symbols(self._lhs_expression)
@@ -166,10 +165,11 @@ class IfPreprocessorCondition(PreprocessorCondition):
         if (lhs_has_lang_symbols or rhs_has_lang_symbols) and (lhs_has_mixed or rhs_has_mixed):
             # Mixed expression detected - provide helpful error message
             expression = f'{self._lhs_expression} {self._operator} {self._rhs_expression}'
-            sys.exit(
-                f'ERROR: {self._line} - Mixed expressions containing language version symbols are not supported. '
+            preprocessor.diagnostic_reporter.error(
+                self._line,
+                'Mixed expressions containing language version symbols are not supported. '
                 f'Expression "{expression}" contains both language version symbols and complex operators/grouping. '
-                f'Use separate #if blocks for each condition instead.'
+                'Use separate #if blocks for each condition instead.',
             )
 
         expression = f'{self._lhs_expression} {self._operator} {self._rhs_expression}'
@@ -256,7 +256,7 @@ class ElifPreprocessorCondition(IfPreprocessorCondition):
         # if its condition evaluates true. If the parent lineage is false,
         # this should evaluate to true if its condition evaluates true.
         if self.parent is None:
-            sys.exit(f'ERROR - Internal: parent condition not set for {self} at line {self._line}')
+            raise InternalAssemblerError(self._line, f'parent condition not set for {self}')
         if self.parent.is_lineage_true(preprocessor):
             return False
         return self._evaluate_condition(preprocessor)
@@ -304,7 +304,7 @@ class ElsePreprocessorCondition(PreprocessorCondition):
 
     def evaluate(self, preprocessor: Preprocessor) -> bool:
         if self.parent is None:
-            sys.exit(f'ERROR - Internal: parent condition not set for {self} at line {self._line}')
+            raise InternalAssemblerError(self._line, f'parent condition not set for {self}')
         return not self.parent.is_lineage_true(preprocessor)
 
 

@@ -1,5 +1,4 @@
 import math
-import sys
 
 from bespokeasm.assembler.analysis import AnalysisOperand
 from bespokeasm.assembler.analysis import freeze_analysis_value
@@ -10,6 +9,8 @@ from bespokeasm.assembler.analysis import SourceIdentity
 from bespokeasm.assembler.bytecode.assembled import AssembledInstruction
 from bespokeasm.assembler.bytecode.parts import ExpressionByteCodePart
 from bespokeasm.assembler.bytecode.parts import NumericByteCodePart
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
+from bespokeasm.assembler.diagnostic_reporter import InternalAssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
@@ -46,7 +47,7 @@ class InstructionBytecodeGenerator:
     ) -> AssembledInstruction:
         if mnemonic != instruction.mnemonic:
             # this shouldn't happen
-            sys.exit(f'ERROR: {line_id} - INTERNAL - Asked instruction {instruction} to parse mnemonic "{mnemonic}"')
+            raise InternalAssemblerError(line_id, f'Asked instruction {instruction} to parse mnemonic "{mnemonic}"')
         source_mnemonic = mnemonic if source_mnemonic is None else source_mnemonic.lower()
 
         operand_label_error: OperandLabelError | None = None
@@ -70,12 +71,12 @@ class InstructionBytecodeGenerator:
                 return assembled_instruction
 
         if operand_label_error is not None:
-            isa_model.diagnostic_reporter.error(
+            raise AssemblerError(
                 operand_label_error.line_id,
                 operand_label_error.message,
                 category=operand_label_error.category,
             )
-        isa_model.diagnostic_reporter.error(
+        raise AssemblerError(
             line_id,
             f'Instruction "{source_mnemonic}" has no valid operands configured.',
         )
@@ -94,7 +95,7 @@ class InstructionBytecodeGenerator:
     ) -> AssembledInstruction:
         if mnemonic != variant.mnemonic:
             # this shouldn't happen
-            sys.exit(f'ERROR: {line_id} - INTERNAL - Asked instruction {variant} to parse mnemonic "{mnemonic}"')
+            raise InternalAssemblerError(line_id, f'Asked instruction {variant} to parse mnemonic "{mnemonic}"')
         operand_list = split_operands(operands)
 
         # generate the machine code parts

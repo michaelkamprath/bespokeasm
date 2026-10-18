@@ -1,5 +1,4 @@
 import re
-import sys
 
 from bespokeasm.assembler.bytecode.parts import ExpressionByteCodePartWithValidation
 from bespokeasm.assembler.line_identifier import LineIdentifier
@@ -33,9 +32,10 @@ class NumericBytecode(Operand):
         )
         # validate config
         if self.bytecode_max < self.bytecode_min:
-            sys.exit(
-                f'ERROR - Configuration for operand numeric bytecode {operand_id} '
-                f'has a max value {self.bytecode_max} smaller than the min value {self.bytecode_min}'
+            diagnostic_reporter.error(
+                None,
+                f'Configuration for operand numeric bytecode {operand_id} '
+                f'has a max value {self.bytecode_max} smaller than the min value {self.bytecode_min}',
             )
 
     def __str__(self):

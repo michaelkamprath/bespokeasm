@@ -1,5 +1,4 @@
 import re
-import sys
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
@@ -173,9 +172,9 @@ class LineOjectFactory:
                 )
                 if line_obj is not None:
                     if label_seen:
-                        sys.exit(
-                            f'ERROR: {line_id} - only one label or coordinate declaration '
-                            'is allowed per line'
+                        model.diagnostic_reporter.error(
+                            line_id,
+                            'only one label or coordinate declaration is allowed per line',
                         )
                     line_obj_list.append(line_obj)
                     label_seen = True
@@ -195,7 +194,7 @@ class LineOjectFactory:
                 )
                 if line_obj is not None:
                     if label_seen:
-                        sys.exit(f'ERROR: {line_id} - only one label or constant assignment is allowed per line')
+                        model.diagnostic_reporter.error(line_id, 'only one label or constant assignment is allowed per line')
                     line_obj_list.append(line_obj)
                     label_seen = True
                     instruction_str = instruction_str.replace(line_obj.instruction, '', 1).strip()
@@ -249,11 +248,11 @@ class LineOjectFactory:
                     continue
 
                 # if we are here, that means nothing was matched. Shouldn't happen, so let's error out
-                sys.exit(f'ERROR: {line_id} - unknown instruction "{instruction_str.strip()}"')
+                model.diagnostic_reporter.error(line_id, f'unknown instruction "{instruction_str.strip()}"')
 
         if len(line_obj_list) == 0:
             if instruction_str != '':
-                sys.exit(f'ERROR: {line_id} - unknown instruction "{instruction_str.strip()}"')
+                model.diagnostic_reporter.error(line_id, f'unknown instruction "{instruction_str.strip()}"')
             # if we got here, the line is only a comment
             line_obj = LineObject(line_id, instruction_str, comment_str, current_memzone)
             return [line_obj]
