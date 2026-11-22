@@ -17,8 +17,10 @@ from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.line_object.predefined_data import PredefinedDataLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.assembler.output_format import resolve_output_format
+from bespokeasm.assembler.output_format.base import OutputFormat
+from bespokeasm.assembler.output_format.base import RenderContext
 from bespokeasm.assembler.preprocessor import Preprocessor
-from bespokeasm.assembler.pretty_printer.factory import PrettyPrinterFactory
 from bespokeasm.assembler.symbol_scope import SymbolScopeType
 from bespokeasm.assembler.symbol_scope.flow_symbols import FlowSymbolError
 from bespokeasm.assembler.symbol_scope.named_scope_manager import NamedScopeManager
@@ -42,6 +44,7 @@ class Assembler:
                 predefined: list[str],
                 warnings_as_errors: bool = False,
                 flow_checks: bool = True,
+                pretty_print_format_explicit: bool = False,
             ):
         self._source_file = source_file
         self._output_file = output_file
@@ -49,6 +52,7 @@ class Assembler:
         self._generate_binary = generate_binary
         self._enable_pretty_print = enable_pretty_print
         self._pretty_print_format = pretty_print_format
+        self._pretty_print_format_explicit = pretty_print_format_explicit
         self._pretty_print_output = pretty_print_output
         self._binary_fill_value = binary_fill_value
         self._verbose = is_verbose
@@ -89,6 +93,7 @@ class Assembler:
     def _assemble_bytecode(self):
         # Create the named scope manager for this assembly session
         diagnostic_reporter = self._diagnostic_reporter
+        output_format = self._select_output_format()
         named_scope_manager = NamedScopeManager(
             diagnostic_reporter,
             self._model.reserved_keywords,
@@ -353,21 +358,31 @@ class Assembler:
                 min_verbosity=2,
             )
 
-        if self._enable_pretty_print:
-            pprinter = PrettyPrinterFactory.getPrettyPrinter(
-                self._pretty_print_format,
-                compilable_line_obs,
-                self._model,
-                self._source_file,
-                export_model=self._export_model,
+        if output_format is not None:
+            pretty_str = output_format.render(RenderContext(
+                model=self._model,
+                source_file=self._source_file,
+                line_objects=compilable_line_obs,
                 source_line_objects=line_obs,
-            )
-            pretty_str = pprinter.pretty_print()
+                export_model=self._export_model,
+            ))
             if self._pretty_print_output == 'stdout':
                 print(pretty_str)
             else:
                 with open(self._pretty_print_output, 'w') as f:
                     f.write(pretty_str)
+
+    def _select_output_format(self) -> OutputFormat | None:
+        """The ``-t`` format when ``-p`` is given; a warning if ``-t`` was given without ``-p``."""
+        if not self._enable_pretty_print:
+            if self._pretty_print_format_explicit:
+                self._diagnostic_reporter.warn(
+                    None,
+                    f'-t {self._pretty_print_format} has no effect without -p; '
+                    f"output format '{self._pretty_print_format}' is not selected",
+                )
+            return None
+        return resolve_output_format(self._model, self._pretty_print_format)
 
     @classmethod
     def _generate_bytes(

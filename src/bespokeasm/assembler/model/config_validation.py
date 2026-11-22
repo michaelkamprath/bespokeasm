@@ -16,6 +16,9 @@ from bespokeasm.assembler.annotations.schema import AnnotationNamespace
 from bespokeasm.assembler.annotations.schema import BUILTIN_NAMESPACES
 from bespokeasm.assembler.annotations.schema import load_annotation_namespaces
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
+from bespokeasm.assembler.output_format.defined import DefinedFormat
+from bespokeasm.assembler.output_format.defined import load_output_formats
+from bespokeasm.assembler.output_format.generators import LoadEnvironment
 from bespokeasm.utilities import is_valid_label
 
 ENDIAN_VALUES = ('big', 'little')
@@ -49,6 +52,7 @@ class ConfigValidator:
         self._config_name = os.path.basename(config_file_path)
         self._reporter = diagnostic_reporter
         self.annotation_namespaces: dict[str, AnnotationNamespace] = dict(BUILTIN_NAMESPACES)
+        self.output_formats: dict[str, DefinedFormat] = {}
 
     def error(self, path: str, problem: str) -> None:
         self._reporter.error(None, f'ISA configuration {self._config_name}: {path} {problem}')
@@ -145,6 +149,19 @@ class ConfigValidator:
         if predefined is not None:
             self._validate_predefined(predefined, general)
         self.annotation_namespaces = load_annotation_namespaces(config.get('annotations'), self.error)
+        word_size = general.get('word_size', 8)
+        self.output_formats = load_output_formats(
+            config.get('output_formats'),
+            LoadEnvironment(
+                annotation_namespaces=self.annotation_namespaces,
+                word_size=word_size if self._is_int(word_size) else 8,
+                error=self.error,
+                warn=self.warn,
+            ),
+        )
+
+    def warn(self, path: str, problem: str) -> None:
+        self._reporter.warn(None, f'ISA configuration {self._config_name}: {path} {problem}')
 
     def _validate_general(self, general: dict) -> None:
         path = 'general'
@@ -398,8 +415,9 @@ FLOW_METADATA_KEYS = {
 KNOWN_KEYS = {
     'root': {
         'description', 'general', 'operand_sets', 'instructions', 'macros', 'predefined', 'flow_counters',
-        'annotations',
+        'annotations', 'output_formats',
     },
+    'output_format': {'documentation', 'requires_word_size', 'template', 'sections'},
     'annotation': {'documentation', 'applies_to', 'scopes', 'arguments', 'data_size', 'value_range'},
     'annotation_argument': {
         'type', 'values', 'min', 'max', 'pattern', 'required', 'required_when', 'allowed_when', 'default',
@@ -550,6 +568,10 @@ class ConfigAdvisor:
                 self._check_keys(argument, 'annotation_argument', f'{path}.arguments.{arg_name}')
             self._check_keys(namespace.get('data_size'), 'annotation_data_size', f'{path}.data_size')
             self._check_keys(namespace.get('value_range'), 'annotation_value_range', f'{path}.value_range')
+
+        output_formats = config.get('output_formats')
+        for name, output_format in (output_formats.items() if isinstance(output_formats, dict) else ()):
+            self._check_keys(output_format, 'output_format', f'output_formats.{name}')
 
     def _check_keys(self, mapping, kind: str, path: str) -> None:
         if not isinstance(mapping, dict):

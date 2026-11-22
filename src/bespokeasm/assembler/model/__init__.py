@@ -17,6 +17,7 @@ from bespokeasm.assembler.model.instruction_set import InstructionSet
 from bespokeasm.assembler.model.operand_set import OperandSet
 from bespokeasm.assembler.model.operand_set import OperandSetCollection
 from bespokeasm.assembler.model.semantics import merge_instruction_semantics
+from bespokeasm.assembler.output_format.defined import DefinedFormat
 from bespokeasm.assembler.symbol_scope import SymbolScope
 from bespokeasm.assembler.symbol_scope import SymbolScopeType
 from bespokeasm.utilities import is_unprefixed_numeric_string
@@ -202,6 +203,7 @@ class AssemblerModel:
         validator = ConfigValidator(self._config, self._config_file, self._diagnostic_reporter)
         validator.validate()
         self._annotation_namespaces = validator.annotation_namespaces
+        self._output_formats = validator.output_formats
         ConfigAdvisor(self._config, self._config_file, self._diagnostic_reporter).advise()
 
         # Validate string_byte_packing option
@@ -1060,9 +1062,19 @@ class AssemblerModel:
             return []
 
     @property
+    def config_file_path(self) -> str:
+        """The path of the ISA configuration file this model was loaded from."""
+        return self._config_file
+
+    @property
     def annotation_namespaces(self) -> dict[str, AnnotationNamespace]:
         """Annotation namespaces available to ``#annotate``: ``listing`` plus those the config declares."""
         return self._annotation_namespaces
+
+    @property
+    def output_formats(self) -> dict[str, DefinedFormat]:
+        """Output formats the configuration defines (``output_formats``), keyed by ``-t`` name."""
+        return self._output_formats
 
     @property
     def allow_embedded_strings(self) -> bool:

@@ -421,7 +421,9 @@ def test_m0_flow_checks_cli_flag_defaults_on_and_forwards_value(flag, expected):
     result = CliRunner().invoke(cli, args)
 
     assert result.exit_code == 0, result.output
-    assert compile_calls[0][-1] is expected
+    # flow_checks is followed by pretty_print_format_explicit, the last positional argument.
+    assert compile_calls[0][-2] is expected
+    assert compile_calls[0][-1] is False
 
 
 @pytest.mark.parametrize(
