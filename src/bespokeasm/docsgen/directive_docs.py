@@ -356,6 +356,20 @@ PREPROCESSOR_DIRECTIVE_DOCS: dict[str, str] = {
         'If no message is provided, a default message is used. '
         'Respects conditional compilation and mute state.'
     ),
+    'annotate': (
+        '### `#annotate` : Annotate a Label or Constant\n\n'
+        '---\n\n'
+        'Attaches validated metadata to the label or constant defined on the next line.\n\n'
+        '**Usage:**\n\n'
+        '```\n'
+        '#annotate <namespace> key=value key="quoted value" flag\n'
+        'label:\n'
+        '```\n\n'
+        'The namespace must be `listing` or one the instruction set configuration declares, '
+        'and the configuration validates every argument. The line must be directly above the '
+        'definition; only further `#annotate` lines, for other namespaces, may sit between them. '
+        'Emits no bytes.'
+    ),
     'create-scope': (
         '### `#create-scope` : Create Named Label Scope\n\n'
         '---\n\n'

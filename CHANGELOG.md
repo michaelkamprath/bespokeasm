@@ -13,6 +13,11 @@ Changes that are planned but not implemented yet:
 * Allow multiple `cstr` defininitions on the same line
 
 
+## [Unreleased]
+* Added the `#annotate <namespace> key=value ...` directive, which attaches validated metadata to the label or constant defined on the next line. An ISA configuration declares namespaces in a new top-level `annotations` section, with typed arguments, presence rules, and `data_size` (word count of a label's data) and `value_range` (a constant's value) constraints; the framework's `listing` namespace is available in every ISA. Annotations emit no bytes. Nothing reads them yet; listings and output formats will.
+* **Behavior change:** `annotate` is now an assembler keyword in every ISA, so a label or constant named `annotate` must be renamed.
+
+
 ## [0.8.1]
 * **Behavior change:** Development and CI now use uv with a committed lockfile. Use `uv sync --locked` and `uv run --locked` in place of manual environment setup and `pip install ".[dev]"`; development tools, including pre-commit, are now in the default `dev` dependency group instead of published dependencies or extras.
 * Added Python 3.12, 3.13, and 3.14 package classifiers to reflect the versions covered by CI.

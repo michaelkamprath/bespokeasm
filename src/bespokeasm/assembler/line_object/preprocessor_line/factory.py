@@ -1,5 +1,6 @@
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
+from bespokeasm.assembler.line_object.preprocessor_line.annotate import AnnotationLine
 from bespokeasm.assembler.line_object.preprocessor_line.assert_line import AssertLine
 from bespokeasm.assembler.line_object.preprocessor_line.condition_line import ConditionLine
 from bespokeasm.assembler.line_object.preprocessor_line.create_memzone import CreateMemzoneLine
@@ -47,6 +48,14 @@ class PreprocessorLineFactory:
         has_arguments = bool(separator)
 
         match directive, has_arguments:
+            case ('#annotate', _):
+                line_object = AnnotationLine(
+                    line_id,
+                    instruction,
+                    comment,
+                    current_memzone,
+                    isa_model,
+                )
             case ('#track', _):
                 line_object = FlowTrackLine(
                     line_id,

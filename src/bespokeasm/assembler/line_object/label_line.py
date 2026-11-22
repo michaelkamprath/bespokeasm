@@ -109,6 +109,7 @@ class LabelLine(LineObject):
         super().__init__(line_id, instruction, comment, current_memzone)
         self._label = label
         self._value = value
+        self._annotations: dict = {}
 
     def __str__(self) -> str:
         return f'LabelLine<{self.get_label()} -> {self.get_value()}>'
@@ -116,6 +117,15 @@ class LabelLine(LineObject):
     @property
     def is_constant(self) -> bool:
         return self._value is not None
+
+    @property
+    def annotations(self) -> dict:
+        """The validated ``#annotate`` annotations on this definition, keyed by namespace name."""
+        return self._annotations
+
+    @annotations.setter
+    def annotations(self, value: dict) -> None:
+        self._annotations = dict(value)
 
     def get_label(self) -> str:
         """Returns the label string"""

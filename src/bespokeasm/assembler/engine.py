@@ -2,6 +2,7 @@ import os
 
 import click
 from bespokeasm.assembler.analysis import AnalysisSourceIndex
+from bespokeasm.assembler.annotations.model import ExportModel
 from bespokeasm.assembler.assembly_file import AssemblyFile
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
@@ -71,6 +72,11 @@ class Assembler:
     @property
     def model(self) -> AssemblerModel:
         return self._model
+
+    @property
+    def export_model(self) -> ExportModel | None:
+        """The annotated symbols of the last assembly; None before ``assemble_bytecode`` runs."""
+        return getattr(self, '_export_model', None)
 
     @property
     def analysis_source_index(self) -> AnalysisSourceIndex | None:
@@ -222,6 +228,9 @@ class Assembler:
                         lobj.get_value(),
                         lobj.line_id,
                     )
+
+        # Addresses are final, so annotated labels' data runs and symbol arguments can be checked.
+        self._export_model = ExportModel.build(line_obs)
 
         source_requires_flow_values = (
             self._model.analysis_records_enabled

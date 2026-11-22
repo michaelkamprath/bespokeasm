@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import re
 
+from bespokeasm.assembler.annotations.binding import AnnotationBinder
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
@@ -18,6 +19,7 @@ from bespokeasm.assembler.line_object.directive_line.address import AddressOrgLi
 from bespokeasm.assembler.line_object.directive_line.factory import SetMemoryZoneLine
 from bespokeasm.assembler.line_object.factory import LineOjectFactory
 from bespokeasm.assembler.line_object.label_line import LabelLine
+from bespokeasm.assembler.line_object.preprocessor_line.annotate import AnnotationLine
 from bespokeasm.assembler.line_object.preprocessor_line.condition_line import CONDITIONAL_LINE_PREFIX_LIST
 from bespokeasm.assembler.line_object.preprocessor_line.condition_line import ConditionLine
 from bespokeasm.assembler.line_object.preprocessor_line.create_scope import CreateScopeLine
@@ -83,15 +85,19 @@ class AssemblyFile:
                 current_memzone = memzone_manager.global_zone
                 condition_stack = ConditionStack(self._diagnostic_reporter)
                 active_named_scopes = ActiveNamedScopeList(self._named_scope_manager)
+                annotation_binder = AnnotationBinder()
                 for line in f:
                     line_num += 1
                     line_id = LineIdentifier(line_num, filename=self.filename)
                     line_str = line.strip()
+                    if len(line_str) == 0:
+                        annotation_binder.interrupt(line_id, 'a blank line')
                     if len(line_str) > 0:
                         # check to see if this is a #include line.
                         # this is the one preprocessor directive that is handled
                         # by the assembly file object.
                         if line_str.startswith('#include'):
+                            annotation_binder.interrupt(line_id, 'an #include directive')
                             # Only process the #include if the current conditional block is active
                             if condition_stack.currently_active(preprocessor):
                                 if condition_stack.is_muted:
@@ -115,6 +121,7 @@ class AssemblyFile:
                         lobj_list: list[LineObject] = []
                         is_conditional_directive = line_str.startswith(tuple(CONDITIONAL_LINE_PREFIX_LIST))
                         if not condition_stack.currently_active(preprocessor) and not is_conditional_directive:
+                            annotation_binder.interrupt(line_id, 'excluded by conditional compilation')
                             instruction_portion, comment_portion = split_line_comment(line_str)
                             instruction_str = instruction_portion.strip()
                             comment_str = comment_portion.strip()
@@ -137,6 +144,7 @@ class AssemblyFile:
                             log_verbosity,
                             self._filename,
                         ))
+                        self._track_annotations(annotation_binder, lobj_list, line_id)
                         for lobj in lobj_list:
                             if not isinstance(lobj, ConditionLine):
                                 lobj.compilable = condition_stack.currently_active(preprocessor)
@@ -212,6 +220,7 @@ class AssemblyFile:
                                         # if not in an active named scope, set to the current scope
                                         lobj.symbol_scope.set_label_value(lobj.get_label(), lobj.get_value(), lobj.line_id)
                             line_objects.append(lobj)
+                annotation_binder.finish()
         except FileNotFoundError:
             self._diagnostic_reporter.error(
                 None,
@@ -238,6 +247,26 @@ class AssemblyFile:
             )
         self._emit_missing_scope_warnings()
         return line_objects
+
+    @staticmethod
+    def _track_annotations(
+        binder: AnnotationBinder,
+        lobj_list: list[LineObject],
+        line_id: LineIdentifier,
+    ) -> None:
+        """Report one parsed source line to the annotation binder.
+
+        Only the first object matters: a line that defines a label or constant starts with it.
+        """
+        first = lobj_list[0] if lobj_list else None
+        if isinstance(first, AnnotationLine):
+            binder.add(first)
+        elif isinstance(first, LabelLine):
+            binder.bind(first)
+        elif binder.has_pending:
+            if type(first) is LineObject and first.instruction == '':
+                binder.interrupt(line_id, 'a comment line')
+            binder.interrupt(line_id, 'not a label or constant definition')
 
     PATTERN_INCLUDE_FILE = re.compile(
         r'^\#include\s+(?:\'|\")([\w\.\-_/]+)(?:\'|\")',
