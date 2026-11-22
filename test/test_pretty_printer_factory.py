@@ -7,6 +7,7 @@ from bespokeasm.assembler.pretty_printer.factory import PrettyPrinterFactory
 from bespokeasm.assembler.pretty_printer.intelhex import IntelHexPrettyPrinter
 from bespokeasm.assembler.pretty_printer.listing import ListingPrettyPrinter
 from bespokeasm.assembler.pretty_printer.minhex import MinHexPrettyPrinter
+from bespokeasm.assembler.pretty_printer.symbols import SymbolsPrettyPrinter
 
 
 class TestPrettyPrinterFactory(unittest.TestCase):
@@ -36,6 +37,11 @@ class TestPrettyPrinterFactory(unittest.TestCase):
         """'listing' dispatches to the Listing printer (annotated source view)."""
         printer = PrettyPrinterFactory.getPrettyPrinter('listing', [], self.model, 'main.asm')
         self.assertIsInstance(printer, ListingPrettyPrinter)
+
+    def test_returns_symbols(self):
+        """'symbols' dispatches to the JSON symbol-table printer."""
+        printer = PrettyPrinterFactory.getPrettyPrinter('symbols', [], self.model, 'main.asm')
+        self.assertIsInstance(printer, SymbolsPrettyPrinter)
 
     def test_unknown_type_raises(self):
         """Unknown printer-type strings raise NotImplementedError (not silent fallback)."""

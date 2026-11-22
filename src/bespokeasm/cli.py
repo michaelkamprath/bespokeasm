@@ -172,7 +172,7 @@ def build_cli(handlers: CommandHandlers):
         )
     @click.option(
             '--pretty-print-format', '-t',
-            type=click.Choice(['minhex', 'hex', 'intel_hex', 'listing'], case_sensitive=False),
+            type=click.Choice(['minhex', 'hex', 'intel_hex', 'listing', 'symbols'], case_sensitive=False),
             default='listing',
             help='The format that should be used when pretty printing.',
     )
