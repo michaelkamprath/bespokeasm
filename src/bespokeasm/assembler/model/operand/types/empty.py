@@ -34,8 +34,9 @@ class EmptyOperand(Operand):
     def type(self) -> OperandType:
         return OperandType.EMPTY
 
+    @property
     def null_operand(self) -> bool:
-        '''This operand type does not parse any thing from teh instruction'''
+        '''This operand type does not parse any thing from the instruction'''
         return True
 
     def parse_operand(

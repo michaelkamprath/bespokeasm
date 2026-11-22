@@ -111,7 +111,10 @@ class InstructionLine(LineWithWords):
                     source_ordinal,
                 )
             except (AssemblerError, SystemExit) as exc:
-                last_error = exc
+                # Candidates are tried longest first. The whole-line attempt knows about
+                # every operand the user wrote, so its explanation is the most useful one.
+                if last_error is None:
+                    last_error = exc
 
         if last_error is not None:
             raise last_error

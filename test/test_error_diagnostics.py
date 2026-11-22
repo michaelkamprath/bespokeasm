@@ -45,6 +45,21 @@ MINIMAL_CONFIG = {
             'bytecode': {'value': 3, 'size': 8},
             'operands': {'count': 1, 'operand_sets': {'list': ['imm']}},
         },
+        'mov': {
+            'bytecode': {'value': 2, 'size': 6},
+            'operands': {
+                'count': 2,
+                'operand_sets': {'list': ['reg', 'reg'], 'disallowed_pairs': [['ra', 'ra']]},
+            },
+        },
+    },
+    'macros': {
+        'ld2': [
+            {
+                'operands': {'count': 1, 'operand_sets': {'list': ['imm']}},
+                'instructions': ['ld a, @ARG(0)', 'ld b, @ARG(0)'],
+            },
+        ],
     },
 }
 
@@ -179,3 +194,33 @@ class TestConfigurationSchemaErrors:
         config_path.write_text('general: [oops\n')
         with pytest.raises(SystemExit, match='could not parse YAML configuration file isa.yaml'):
             assemble(tmp_path, '  nop\n', str(config_path))
+
+
+class TestOperandMismatchExplanations:
+    @pytest.mark.parametrize(
+        'source, pattern',
+        [
+            ('  ld a, 1, 2\n', r'instruction "ld" takes 2 operands, but 3 were given \("a", "1", "2"\)'),
+            ('  ld a\n', r'instruction "ld" takes 2 operands, but 1 was given \("a"\)'),
+            ('  nop a\n', r'instruction "nop" takes no operands, but 1 was given \("a"\)'),
+            ('  ld x, 1\n', r'operand 1 "x" of instruction "ld" is not valid; expected a register \(a, b\)'),
+            ('  mov a, 5\n', r'operand 2 "5" of instruction "mov" is not valid; expected a register \(a, b\)'),
+            ('foo:\n  ld foo, 1\n', r'operand 1 "foo" of instruction "ld" is not valid; expected a register'),
+            ('  ld a, b + 1\n', r'operand 2 "b \+ 1" of instruction "ld" uses register "b" in a numeric expression'),
+            ('  ld a, (1 + 2\n', r'operand 2 "\(1 \+ 2" of instruction "ld": expression ends unexpectedly'),
+            ('  ld a, 1 +\n', r'operand 2 "1 \+" of instruction "ld": expression ends unexpectedly'),
+            ('  ld a, 0x1G\n', r'operand 2 "0x1G" of instruction "ld": unexpected "G"'),
+            ("  ld a, 'ab'\n", r'operand 2 "\'ab\'" of instruction "ld": only single-character ordinals'),
+            ('  ld a, "x"\n', r'operand 2 "x" of instruction "ld": double-quoted strings are not valid'),
+            ('  ld a,\n', r'operand 2 of instruction "ld" is empty'),
+            ('  mov a, a\n', r'the operand combination "a", "a" is not allowed for instruction "mov"'),
+            ('  ld2 1, 2\n', r'macro "ld2" takes 1 operand, but 2 were given'),
+            ('  ld2 b\n', r'operand 1 "b" of macro "ld2" uses register "b" in a numeric expression'),
+        ],
+    )
+    def test_mismatch_names_the_offending_operand(self, tmp_path, source, pattern):
+        assert_error(tmp_path, source, pattern)
+
+    def test_valid_operands_still_assemble(self, tmp_path):
+        assembler = assemble(tmp_path, '  ld a, 5\n  mov a, b\n  ld2 7\n  jmp 0\n')
+        assert assembler is not None

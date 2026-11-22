@@ -17,6 +17,7 @@ from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.model.instruction import Instruction
 from bespokeasm.assembler.model.instruction import InstructionVariant
 from bespokeasm.assembler.model.operand.operand_label import OperandLabelError
+from bespokeasm.assembler.model.operand_diagnostics import explain_operand_mismatch
 from bespokeasm.assembler.model.operand_parser import MatchedOperandSet
 from bespokeasm.assembler.parsing import split_operands
 
@@ -78,7 +79,16 @@ class InstructionBytecodeGenerator:
             )
         raise AssemblerError(
             line_id,
-            f'Instruction "{source_mnemonic}" has no valid operands configured.',
+            explain_operand_mismatch(
+                'instruction',
+                source_mnemonic,
+                instruction.matching_variants(source_mnemonic),
+                line_id,
+                split_operands(operands),
+                isa_model.registers,
+                memzone_manager,
+                isa_model.default_numeric_base,
+            ),
         )
 
     @classmethod

@@ -373,6 +373,64 @@ class OperandParser:
     def _has_operand_sets(self):
         return self._operand_sets_model is not None
 
+    # ---- introspection used to explain failed matches -----------------------
+
+    def source_operand_counts(self) -> set[int]:
+        '''Return the numbers of operands a source line may write for this parser.
+
+        Specific operand configurations may contain null (``empty``) operands that are
+        not written in source, so their source count is the configured count minus the
+        null operands.
+        '''
+        counts: set[int] = set()
+        if self._operand_sets_model is not None:
+            counts.add(self._operand_sets_model.operand_count)
+        if self._specific_operands_model is not None:
+            for configured in self._specific_operands_model._specific_operands:
+                counts.add(sum(1 for operand in configured._operands if not operand.null_operand))
+        if not counts:
+            counts.add(self.operand_count)
+        return counts
+
+    def candidate_operands(self, position: int, source_operand_count: int) -> list[Operand]:
+        '''Return every operand definition that could accept the source operand at ``position``.'''
+        candidates: list[Operand] = []
+        if self._operand_sets_model is not None and self._operand_sets_model.operand_count == source_operand_count:
+            operand_sets = self._operand_sets_model._operand_sets
+            if position < len(operand_sets):
+                candidates.extend(operand_sets[position]._ordered_operand_list)
+        if self._specific_operands_model is not None:
+            for configured in self._specific_operands_model._specific_operands:
+                source_operands = [operand for operand in configured._operands if not operand.null_operand]
+                if len(source_operands) == source_operand_count and position < len(source_operands):
+                    candidates.append(source_operands[position])
+        return candidates
+
+    def disallowed_combination(
+        self,
+        line_id: LineIdentifier,
+        operands: list[str],
+        register_labels: set[str],
+        memzone_manager: MemoryZoneManager,
+    ) -> list[str] | None:
+        '''Return the operand ids if ``operands`` match an operand set combination listed in
+        ``disallowed_pairs``, otherwise None.'''
+        model = self._operand_sets_model
+        if model is None or 'disallowed_pairs' not in model._config or len(operands) != model.operand_count:
+            return None
+        operand_ids: list[str] = []
+        for operand_set, operand_text in zip(model._operand_sets, operands):
+            try:
+                parsed = operand_set.parse_operand(line_id, operand_text, register_labels, memzone_manager)
+            except Exception:
+                return None
+            if parsed is None:
+                return None
+            operand_ids.append(parsed.operand.id)
+        if operand_ids in model._config['disallowed_pairs']:
+            return operand_ids
+        return None
+
     def find_matching_operands(
         self, line_id: LineIdentifier,
         operands: list[str],

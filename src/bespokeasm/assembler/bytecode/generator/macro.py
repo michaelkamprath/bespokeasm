@@ -12,6 +12,7 @@ from bespokeasm.assembler.model.instruction_macro import MacroLineIdentifier
 from bespokeasm.assembler.model.instruction_parser_base import InstructioParserBase
 from bespokeasm.assembler.model.operand.operand_label import contains_operand_label_annotation
 from bespokeasm.assembler.model.operand.operand_label import OperandLabelError
+from bespokeasm.assembler.model.operand_diagnostics import explain_operand_mismatch
 from bespokeasm.assembler.model.operand_parser import MatchedOperandSet
 from bespokeasm.assembler.parsing import split_operands
 
@@ -62,7 +63,16 @@ class MacroBytecodeGenerator:
             )
         raise AssemblerError(
             line_id,
-            f'Macro "{mnemonic}" has no valid operands configured.',
+            explain_operand_mismatch(
+                'macro',
+                mnemonic,
+                macro.variants,
+                line_id,
+                split_operands(operands),
+                isa_model.registers,
+                memzone_manager,
+                isa_model.default_numeric_base,
+            ),
         )
 
     @classmethod
