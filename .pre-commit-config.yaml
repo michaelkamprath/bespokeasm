@@ -5,6 +5,8 @@ repos:
     rev: v5.0.0
     hooks:
     -   id: trailing-whitespace
+        # Golden minhex output: each row ends with a space, which the tests compare byte for byte.
+        exclude: ^test/config_files/minhex/.*\.minhex$
     -   id: end-of-file-fixer
     -   id: check-yaml
     -   id: check-json
@@ -22,6 +24,7 @@ repos:
         args: ['--autofix', '--no-sort-keys']
     -   id: trailing-whitespace
         args: ['--markdown-linebreak-ext=md']
+        exclude: ^test/config_files/minhex/.*\.minhex$
 -   repo: https://github.com/pycqa/flake8
     rev: '7.3.0'
     hooks:

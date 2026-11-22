@@ -73,8 +73,12 @@ class AssemblyFile:
                 memzone_manager: MemoryZoneManager,
                 preprocessor: Preprocessor,
                 log_verbosity: int,
-                assembly_files_used: set = set()
+                assembly_files_used: set | None = None
             ) -> list[LineObject]:
+        # A fresh set per top-level assembly; a shared default set would carry included files
+        # from one compilation into the next in the same process.
+        if assembly_files_used is None:
+            assembly_files_used = set()
         line_objects = []
 
         try:

@@ -4,7 +4,6 @@ from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.pretty_printer import PrettyPrinterBase
 from bespokeasm.assembler.pretty_printer.intelhex import IntelHexPrettyPrinter
 from bespokeasm.assembler.pretty_printer.listing import ListingPrettyPrinter
-from bespokeasm.assembler.pretty_printer.minhex import MinHexPrettyPrinter
 from bespokeasm.assembler.pretty_printer.symbols import SymbolsPrettyPrinter
 
 
@@ -12,7 +11,6 @@ class PrettyPrinterFactory:
     """Constructs a `PrettyPrinterBase` subclass keyed by string name.
 
     Recognized type strings:
-      - 'minhex'    -> MinHexPrettyPrinter
       - 'hex'       -> IntelHexPrettyPrinter (text dump mode)
       - 'intel_hex' -> IntelHexPrettyPrinter (Intel HEX file mode)
       - 'listing'   -> ListingPrettyPrinter
@@ -37,9 +35,7 @@ class PrettyPrinterFactory:
         are all parsed lines in source order, and ``export_model`` holds the annotated
         symbols; printers that do not need them ignore them.
         """
-        if pretty_printer_type == 'minhex':
-            return MinHexPrettyPrinter(line_objs, model)
-        elif pretty_printer_type == 'hex':
+        if pretty_printer_type == 'hex':
             return IntelHexPrettyPrinter(line_objs, model, False)
         elif pretty_printer_type == 'intel_hex':
             return IntelHexPrettyPrinter(line_objs, model, True)

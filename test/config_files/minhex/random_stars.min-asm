@@ -1,0 +1,31 @@
+; Random Stars Generator
+;   Example code for the Minimal UART CPU System by Carsten Herting (slu4)
+;
+;   Code based on slu4's original example at:
+;       https://github.com/slu4coder/Minimal-UART-CPU-System/blob/main/Programs/demos/rand.txt
+;
+
+#require "slu4-mincpu-asm >= 1.5.0"
+
+.org $c000
+
+    LDI 0xfe STA 0xffff
+    LDI BYTE0(scrtxt) PHS
+    LDI BYTE1(scrtxt) PHS
+    JPS os_Print
+    PLS PLS
+
+maze:
+    PHS JPS os_Random
+    PLS LSR LSR INC
+    CPI 61 BCS maze
+    PHS JPS os_CursorX PLS
+    PHS JPS os_Random
+    PLS LSR LSR LSR INC
+    CPI 26 BCS maze
+    PHS JPS os_CursorY PLS
+    LDI 42 OUT                  ; '*' = 42
+    JPA maze
+
+scrtxt:
+    .byte 27, $5b, $48, 27, $5b, $4A, 0

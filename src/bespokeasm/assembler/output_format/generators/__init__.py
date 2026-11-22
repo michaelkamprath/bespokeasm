@@ -130,11 +130,65 @@ class ListingGenerator(Generator):
         return ListingPrettyPrinter(context.line_objects, context.model, context.source_file).pretty_print().strip('\n')
 
 
+class RowsGenerator(Generator):
+    """Rows of bytes, with an address line at each ``.org``.
+
+    Each row starts with ``row_prefix`` and holds up to ``bytes_per_row`` bytes, each written
+    with the ``byte`` template (field ``byte``). At each ``.org`` the current row ends and the
+    ``org_line`` template (field ``address``) is written on its own line. Muted lines are skipped.
+    """
+    name = 'rows'
+    required_options = frozenset({'bytes_per_row', 'row_prefix', 'byte', 'org_line'})
+    required_word_size = 8
+
+    def configure(self, options: dict[str, Any]) -> None:
+        from bespokeasm.assembler.output_format.template import Template
+
+        bytes_per_row = options['bytes_per_row']
+        if isinstance(bytes_per_row, bool) or not isinstance(bytes_per_row, int) or bytes_per_row < 1:
+            self.error('bytes_per_row', 'must be a positive whole number')
+        self.bytes_per_row = bytes_per_row
+        if not isinstance(options['row_prefix'], str):
+            self.error('row_prefix', 'must be a string')
+        self.row_prefix = options['row_prefix']
+        self.byte = Template.parse(options['byte'], {'byte': 0}, lambda problem: self.error('byte', problem))
+        self.org_line = Template.parse(
+            options['org_line'], {'address': 0}, lambda problem: self.error('org_line', problem),
+        )
+
+    def render(self, context: RenderContext) -> str:
+        from bespokeasm.assembler.bytecode.word import Word
+        from bespokeasm.assembler.line_object import LineWithWords
+        from bespokeasm.assembler.line_object.directive_line.address import AddressOrgLine
+
+        lines: list[str] = []
+        row: list[str] = []
+
+        def end_row() -> None:
+            if row:
+                lines.append(self.row_prefix + ''.join(row))
+                row.clear()
+
+        for line in context.line_objects:
+            if isinstance(line, LineWithWords) and not line.is_muted:
+                for value in Word.words_to_bytes(line.get_words(), False, 'big'):
+                    row.append(self.byte.render({'byte': value}))
+                    if len(row) == self.bytes_per_row:
+                        end_row()
+            elif isinstance(line, AddressOrgLine):
+                end_row()
+                lines.append(self.org_line.render({'address': line.address}))
+        end_row()
+        return '\n'.join(lines)
+
+
 def generator_classes() -> dict[str, type[Generator]]:
     from bespokeasm.assembler.output_format.generators.exports import ExportsGenerator
     return {
         cls.name: cls
-        for cls in (IntelHexGenerator, HexGenerator, ByteListGenerator, ListingGenerator, ExportsGenerator)
+        for cls in (
+            IntelHexGenerator, HexGenerator, ByteListGenerator, ListingGenerator, RowsGenerator, ExportsGenerator,
+        )
     }
 
 

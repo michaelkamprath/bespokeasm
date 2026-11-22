@@ -6,7 +6,6 @@ from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.pretty_printer.factory import PrettyPrinterFactory
 from bespokeasm.assembler.pretty_printer.intelhex import IntelHexPrettyPrinter
 from bespokeasm.assembler.pretty_printer.listing import ListingPrettyPrinter
-from bespokeasm.assembler.pretty_printer.minhex import MinHexPrettyPrinter
 from bespokeasm.assembler.pretty_printer.symbols import SymbolsPrettyPrinter
 
 
@@ -18,10 +17,10 @@ class TestPrettyPrinterFactory(unittest.TestCase):
         self.diagnostic_reporter = DiagnosticReporter()
         self.model = AssemblerModel(config_path, 0, self.diagnostic_reporter)
 
-    def test_returns_minhex(self):
-        """'minhex' string dispatches to the MinHex printer (compact byte dump)."""
-        printer = PrettyPrinterFactory.getPrettyPrinter('minhex', [], self.model, 'main.asm')
-        self.assertIsInstance(printer, MinHexPrettyPrinter)
+    def test_minhex_is_not_a_builtin(self):
+        """'minhex' is a format of the Minimal CPU config, not a built-in printer."""
+        with self.assertRaises(NotImplementedError):
+            PrettyPrinterFactory.getPrettyPrinter('minhex', [], self.model, 'main.asm')
 
     def test_returns_hex(self):
         """'hex' dispatches to the Intel-hex printer in text-dump (non-Intel-HEX-file) mode."""

@@ -389,7 +389,7 @@ output_formats:
     documentation:
       description: Minimal CPU hex dump, for pasting into the Minimal CPU terminal.
     requires_word_size: 8
-    template: "{code}"
+    template: "{code}\n"            # the printer ended its last row with a newline too
     sections:
       code:
         generator: rows
@@ -401,10 +401,10 @@ output_formats:
 
 Work needed:
 
-1. Framework: the `rows` generator. Its four options are required; a missing one is a config error.
+1. Framework: the `rows` generator. Its four options are required; a missing one is a config error. `bytes_per_row` is a positive whole number and `row_prefix` a string; `byte` and `org_line` are templates with the fields `byte` and `address`. Like `intel_hex`, it needs 8-bit words. Its text ends without a newline, as every section's does, so the template adds the final one: `"{code}\n"` reproduces the printer's output byte for byte. (A program that emits nothing now gives one empty line instead of nothing.)
 2. CLI: build the `-t` choices from the built-in formats plus the config's formats. Remove `minhex` from the built-ins, and delete `MinHexPrettyPrinter` and its branch in `PrettyPrinterFactory`.
 3. Config: add the format above to `slu4-minimal-cpu.yaml`, and raise its `general.min_version` and `identifier.version`.
-4. Tests: tests may not read `examples/` (see AGENTS.md), so copy the example programs and the Minimal CPU config into a fixture directory under `test/`. Before you delete the old printer, record its output for each copied program as golden files there. Then the new format, added to the copied config as well, must match them byte for byte. Replace `test_pretty_printer_minhex.py` and the `minhex` case in `test_pretty_printer_factory.py` with that golden test.
+4. Tests: tests may not read `examples/` (see AGENTS.md), so copy the example programs and the Minimal CPU config into a fixture directory under `test/`. Before you delete the old printer, record its output for each copied program as golden files there. Then the new format, added to the copied config as well, must match them byte for byte. Replace `test_pretty_printer_minhex.py` and the `minhex` case in `test_pretty_printer_factory.py` with that golden test. Every minhex row ends with a space, so the golden files (`test/config_files/minhex/*.minhex`) are excluded from pre-commit's trailing-whitespace hook. Running several of the programs in one process exposed a shared default argument that carried included files from one assembly to the next; it is fixed.
 5. Docs: the command in `examples/slu4-minimal-cpu/README.md` does not change. The changelog must say that `-t minhex` is gone for every other ISA. The break is intended. minhex was made for one config, and it is the main existing example of why a config-specific format belongs in its config.
 
 ## Third example: an octal listing for the KENBAK-1
