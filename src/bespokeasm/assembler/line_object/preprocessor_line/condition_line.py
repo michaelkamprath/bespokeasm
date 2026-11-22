@@ -1,4 +1,5 @@
 import bespokeasm.assembler.preprocessor.condition as condition
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object.preprocessor_line import PreprocessorLine
 from bespokeasm.assembler.memory_zone import MemoryZone
@@ -36,7 +37,7 @@ class ConditionLine(PreprocessorLine):
         elif instruction == '#unmute' or instruction == '#emit':
             self._condition = condition.UnmutePreprocessorCondition(instruction, line_id)
         else:
-            raise ValueError(f'Invalid condition line: {instruction}')
+            raise AssemblerError(line_id, f'invalid conditional-compilation directive: {instruction}')
 
         if (
             isinstance(
@@ -53,9 +54,10 @@ class ConditionLine(PreprocessorLine):
         try:
             condition_stack.process_condition(self._condition, preprocessor)
         except IndexError:
+            directive = instruction.split(None, 1)[0]
             preprocessor.diagnostic_reporter.error(
                 line_id,
-                'Preprocessor condition has no matching counterpart',
+                f'{directive} has no matching #if, #ifdef, or #ifndef',
             )
 
     def __repr__(self) -> str:

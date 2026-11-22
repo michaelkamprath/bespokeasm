@@ -10,6 +10,7 @@ from bespokeasm import BESPOKEASM_VERSION_STR
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.keywords import assembler_keywords_for_isa
 from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.model.config_validation import ConfigValidator
 from bespokeasm.assembler.model.instruction_set import InstructionSet
 from bespokeasm.assembler.model.operand_set import OperandSet
 from bespokeasm.assembler.model.operand_set import OperandSetCollection
@@ -45,8 +46,14 @@ class AssemblerModel:
 
     def _load_config(self, config_file_path: str, is_verbose: int) -> None:
         if config_file_path.endswith('.json'):
-            with open(config_file_path) as json_file:
-                config_dict = json.load(json_file)
+            try:
+                with open(config_file_path) as json_file:
+                    config_dict = json.load(json_file)
+            except json.JSONDecodeError as exc:
+                self._diagnostic_reporter.error(
+                    None,
+                    f'could not parse JSON configuration file {os.path.basename(config_file_path)}: {exc}',
+                )
         elif config_file_path.endswith('.yaml'):
             yaml_loader = YAML()
             try:
@@ -58,10 +65,18 @@ class AssemblerModel:
                         'Could not load YAML configuration file - file may be empty or invalid',
                     )
             except Exception as exc:
-                self._diagnostic_reporter.error(None, str(exc))
+                self._diagnostic_reporter.error(
+                    None,
+                    f'could not parse YAML configuration file {os.path.basename(config_file_path)}: {exc}',
+                )
         else:
             self._diagnostic_reporter.error(None, 'unknown ISA config file type')
 
+        if not isinstance(config_dict, dict):
+            self._diagnostic_reporter.error(
+                None,
+                f'ISA configuration file {os.path.basename(config_file_path)} must contain a top-level mapping',
+            )
         self._config = config_dict
         self._reserved_keywords = frozenset(
             assembler_keywords_for_isa('flow_counters' in self._config)
@@ -174,6 +189,11 @@ class AssemblerModel:
         # what's the point if there is no instruction set?
         if 'instructions' not in self._config:
             self._diagnostic_reporter.error(None, 'ISA configuration file does not contain an "instructions" section.')
+
+        # Check the shape and types of the configuration before any value is read on demand,
+        # so a mistyped or missing field is reported by its configuration path rather than
+        # surfacing as a Python traceback or as an error on an unrelated source line.
+        ConfigValidator(self._config, self._config_file, self._diagnostic_reporter).validate()
 
         # Validate string_byte_packing option
         general = self._config['general']

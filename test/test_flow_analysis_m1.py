@@ -275,7 +275,7 @@ def test_m1_track_init_and_exit_parameters(tmp_path):
         ('#track stack init=', 'requires a value'),
         ('#endtrack stack nonsense', 'invalid flow directive parameters'),
         ('#track 123', 'invalid flow counter class name'),
-        ('#track stack mode=(', 'Invalid syntax'),
+        ('#track stack mode=(', 'expression ends unexpectedly'),
         ('#track stack mode=called mode=jumped', 'duplicate flow directive parameter'),
     ],
 )

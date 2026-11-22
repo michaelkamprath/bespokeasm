@@ -11,6 +11,7 @@ encounter language version symbols.
 import re
 
 from bespokeasm.assembler.diagnostic_reporter import AssemblerError
+from bespokeasm.assembler.diagnostic_reporter import ExpressionSyntaxError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.preprocessor.symbol import SYMBOL_PATTERN
 from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
@@ -211,6 +212,9 @@ class LanguageVersionEvaluator:
                 else:
                     # String expression - check if it's non-empty
                     return bool(resolved.strip())
+            except ExpressionSyntaxError:
+                # Not a numeric expression: a non-empty resolved string is truthy
+                return bool(resolved.strip())
             except AssemblerError:
                 raise
             except Exception:

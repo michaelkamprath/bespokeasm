@@ -11,6 +11,7 @@ import operator
 import re
 
 from bespokeasm.assembler.diagnostic_reporter import AssemblerError
+from bespokeasm.assembler.diagnostic_reporter import ExpressionSyntaxError
 from bespokeasm.assembler.diagnostic_reporter import InternalAssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.symbol_scope import SymbolScope
@@ -261,6 +262,8 @@ class ExpressionNode:
             elif self.token_type in [TokenType.T_DIV, TokenType.T_MOD]:
                 left_result = float(left_result)
                 right_result = float(right_result)
+                if right_result == 0:
+                    raise AssemblerError(line_id, f'division by zero in expression ({self.value} by 0)')
             return operation(left_result, right_result)
 
     def get_value(
@@ -310,17 +313,18 @@ def parse_expression(
     ast = _parse_expression_ast(line_id, expression, default_numeric_base)
     flow_nodes = ast.deferred_flow_nodes()
     if flow_nodes and context is None:
-        raise SyntaxError(
-            f'ERROR: {line_id} - flow expression has no tagged use context'
+        raise ExpressionSyntaxError(
+            line_id,
+            'flow expression has no tagged use context',
         )
     if flow_nodes and context not in {
         ExpressionUseContext.OPERAND_VALUE,
         ExpressionUseContext.DATA_VALUE,
         ExpressionUseContext.FLOW_DIRECTIVE,
     }:
-        raise SyntaxError(
-            f'ERROR: {line_id} - flow expressions are not allowed in '
-            f'{context.value.replace("_", " ")} expressions'
+        raise ExpressionSyntaxError(
+            line_id,
+            f"flow expressions are not allowed in {context.value.replace('_', ' ')} expressions",
         )
     for node in flow_nodes:
         node._expression_context = context
@@ -385,21 +389,24 @@ def _lexical_analysis(
     normalized_base = normalize_default_numeric_base(default_numeric_base)
     tokens = []
     if '&&' in expression_without_char_literals or '||' in expression_without_char_literals:
-        raise SyntaxError(
-            f"ERROR: {line_id} - boolean operators '&&' and '||' are not supported in expressions"
+        raise ExpressionSyntaxError(
+            line_id,
+            "boolean operators '&&' and '||' are not supported in expressions",
         )
     if '[' in expression_without_char_literals or ']' in expression_without_char_literals:
-        raise SyntaxError(
-            f'ERROR: {line_id} - brackets are not supported in numeric expressions'
+        raise ExpressionSyntaxError(
+            line_id,
+            'brackets are not supported in numeric expressions',
         )
     if expression_without_char_literals.count('"') % 2 != 0:
-        raise SyntaxError(
-            f'ERROR: {line_id} - unterminated string literal (double quotes are not valid in expressions)'
+        raise ExpressionSyntaxError(
+            line_id,
+            'unterminated string literal (double quotes are not valid in expressions)',
         )
     if re.search(r'"[^"]*"', expression_without_char_literals):
-        raise SyntaxError(
-            f'ERROR: {line_id} - double-quoted strings are not valid in expressions '
-            "(use single-character ordinals like 'A')"
+        raise ExpressionSyntaxError(
+            line_id,
+            "double-quoted strings are not valid in expressions (use single-character ordinals like 'A')",
         )
     last_end = 0
     for match in re.finditer(EXPRESSION_PARTS_PATTERN, s):
@@ -407,7 +414,7 @@ def _lexical_analysis(
             gap = s[last_end:match.start()]
             if gap.strip():
                 gap_str = gap.strip()
-                raise SyntaxError(f'ERROR: {line_id} - invalid token: {gap_str}')
+                raise ExpressionSyntaxError(line_id, f'invalid token: {gap_str}')
         part = match.group(0)
         if part in TOKEN_MAPPINGS:
             token_type = TOKEN_MAPPINGS[part]
@@ -432,16 +439,17 @@ def _lexical_analysis(
         elif is_valid_label(part):
             token = ExpressionNode(TokenType.T_LABEL, value=part)
         elif re.fullmatch(r'[\da-zA-Z]+', part) is not None:
-            raise SyntaxError(
-                f'ERROR: {line_id} - invalid {normalized_base} numeric literal: {part}'
+            raise ExpressionSyntaxError(
+                line_id,
+                f'invalid {normalized_base} numeric literal: {part}',
             )
         else:
-            raise AssemblerError(line_id, f'invalid token: {part}')
+            raise ExpressionSyntaxError(line_id, f'invalid token: {part}')
         tokens.append(token)
         last_end = match.end()
     if s[last_end:].strip():
         gap_str = s[last_end:].strip()
-        raise SyntaxError(f'ERROR: {line_id} - invalid token: {gap_str}')
+        raise ExpressionSyntaxError(line_id, f'invalid token: {gap_str}')
     tokens.append(ExpressionNode(TokenType.T_END))
     return tokens
 
@@ -457,33 +465,39 @@ def _strip_character_ordinals_for_validation(line_id: LineIdentifier, expression
 
         index += 1
         if index >= len(expression):
-            raise SyntaxError(
-                f"ERROR: {line_id} - unterminated character literal (use single quotes like 'A')"
+            raise ExpressionSyntaxError(
+                line_id,
+                "unterminated character literal (use single quotes like 'A')",
             )
         if expression[index] == "'":
-            raise SyntaxError(
-                f"ERROR: {line_id} - empty character literal is not valid (use single-character ordinals like 'A')"
+            raise ExpressionSyntaxError(
+                line_id,
+                "empty character literal is not valid (use single-character ordinals like 'A')",
             )
 
         if expression[index] == '\\':
             index += 1
             if index >= len(expression):
-                raise SyntaxError(
-                    f"ERROR: {line_id} - unterminated character literal (use single quotes like 'A')"
+                raise ExpressionSyntaxError(
+                    line_id,
+                    "unterminated character literal (use single quotes like 'A')",
                 )
         index += 1
 
         if index >= len(expression):
-            raise SyntaxError(
-                f"ERROR: {line_id} - unterminated character literal (use single quotes like 'A')"
+            raise ExpressionSyntaxError(
+                line_id,
+                "unterminated character literal (use single quotes like 'A')",
             )
         if expression[index] != "'":
             if "'" in expression[index:]:
-                raise SyntaxError(
-                    f"ERROR: {line_id} - only single-character ordinals are supported (use 'A')"
+                raise ExpressionSyntaxError(
+                    line_id,
+                    "only single-character ordinals are supported (use 'A')",
                 )
-            raise SyntaxError(
-                f"ERROR: {line_id} - unterminated character literal (use single quotes like 'A')"
+            raise ExpressionSyntaxError(
+                line_id,
+                "unterminated character literal (use single quotes like 'A')",
             )
         index += 1
         stripped_expression.append('0')
@@ -557,8 +571,23 @@ def _parse_e4(line_id: LineIdentifier, tokens: list[ExpressionNode]) -> Expressi
         return expression
 
 
+_EXPECTED_TOKEN_DESCRIPTIONS = {
+    TokenType.T_END: 'the end of the expression',
+    TokenType.T_RPAR: 'a closing parenthesis ")"',
+    TokenType.T_LPAR: 'a number, label, or "("',
+}
+
+
 def _match(line_id: LineIdentifier, tokens: list[ExpressionNode], token: TokenType) -> ExpressionNode:
     if tokens[0].token_type == token:
         return tokens.pop(0)
-    else:
-        raise SyntaxError(f'ERROR: {line_id} - Invalid syntax on token: {tokens}. Expected {token}')
+    expected = _EXPECTED_TOKEN_DESCRIPTIONS.get(token, token.name)
+    found = tokens[0]
+    if found.token_type == TokenType.T_END:
+        raise ExpressionSyntaxError(line_id, f'expression ends unexpectedly; expected {expected}')
+    if token == TokenType.T_END:
+        raise ExpressionSyntaxError(
+            line_id,
+            f'unexpected "{found.value}" after the end of the expression',
+        )
+    raise ExpressionSyntaxError(line_id, f'unexpected "{found.value}" in expression; expected {expected}')

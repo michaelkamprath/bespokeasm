@@ -14,8 +14,10 @@
 # Error cases:
 # - If the page directive would generate an address that is beyond the currently active memory zone, an error is
 #   generated.
+# - If the alignment value is zero or negative, an error is generated.
 import re
 
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import INSTRUCTION_EXPRESSION_PATTERN
 from bespokeasm.assembler.line_object import LineObject
@@ -50,7 +52,7 @@ class PageAlignLine(LineObject):
             else:
                 self._page_size = default_page_size
         else:
-            raise ValueError(f'Invalid page align directive "{instruction}"')
+            raise AssemblerError(line_id, f'invalid .align directive "{instruction}"')
 
     def __repr__(self) -> str:
         return f'PageAlignLine<page_size={self._page_size}>'
@@ -61,6 +63,11 @@ class PageAlignLine(LineObject):
         if isinstance(self._page_size, ExpressionNode):
             self._page_size = self._page_size.get_value(self.symbol_scope, self.active_named_scopes, self.line_id)
 
+        if self._page_size < 1:
+            raise AssemblerError(
+                self.line_id,
+                f'.align value must be a positive integer, not {self._page_size}',
+            )
         if self._page_size == 1:
             self._address = address
         else:

@@ -31,6 +31,15 @@ class AssemblerError(Exception):
         self.category = category
 
 
+class ExpressionSyntaxError(AssemblerError, SyntaxError):
+    """A malformed numeric expression in user source or configuration.
+
+    It is an AssemblerError so reporting boundaries turn it into a diagnostic, and
+    also a SyntaxError so operand parsers that try several interpretations of an
+    operand can discard it the way they always have.
+    """
+
+
 class InternalAssemblerError(RuntimeError):
     """A failed internal consistency check, meaning a bug in BespokeASM rather than in the
     user's source or configuration.

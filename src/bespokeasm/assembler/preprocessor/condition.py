@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.diagnostic_reporter import InternalAssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import INSTRUCTION_EXPRESSION_PATTERN
@@ -108,7 +109,7 @@ class IfPreprocessorCondition(PreprocessorCondition):
         if match is None:
             match2 = implied_pattern.match(stripped_line)
             if match2 is None:
-                raise ValueError(f'Invalid preprocessor condition at line: {line_str}')
+                raise AssemblerError(line, f'invalid conditional-compilation directive syntax: {line_str}')
             self._matched_length = match2.end()
             self._lhs_expression = match2.group(1)
             self._operator = '!='
@@ -147,7 +148,7 @@ class IfPreprocessorCondition(PreprocessorCondition):
         return self._matched_length == len(self._line_str.strip())
 
     def _check_and_set_parent(self, parent: PreprocessorCondition):
-        raise ValueError('Cannot set parent of an IfPreprocessorCondition')
+        raise AssemblerError(self._line, '#if cannot follow #else or #elif without a closing #endif')
 
     def _evaluate_condition(self, preprocessor: Preprocessor) -> bool:
         # Check if this is a PURE language version expression (not mixed with other symbols)
@@ -220,7 +221,7 @@ class IfPreprocessorCondition(PreprocessorCondition):
         elif self._operator == '<=':
             return lhs_value <= rhs_value
         else:
-            raise ValueError(f'Unknown operator {self._operator}')
+            raise InternalAssemblerError(self._line, f'Unknown operator {self._operator}')
 
     def evaluate(self, preprocessor: Preprocessor) -> bool:
         return self._evaluate_condition(preprocessor)
@@ -245,7 +246,7 @@ class ElifPreprocessorCondition(IfPreprocessorCondition):
         if isinstance(parent, ElifPreprocessorCondition) or isinstance(parent, IfPreprocessorCondition):
             self._parent = parent
         else:
-            raise ValueError('#elif can only have #if or #elif as a parent')
+            raise AssemblerError(self._line, '#elif must follow an #if, #ifdef, #ifndef, or #elif; it cannot follow #else')
 
     @property
     def is_dependent(self) -> bool:
@@ -268,7 +269,7 @@ class IfdefPreprocessorCondition(PreprocessorCondition):
 
         match = PREPROCESSOR_CONDITION_IFDEF_PATTERN.match(line_str.strip())
         if match is None:
-            raise ValueError(f'Invalid preprocessor condition at line: {line_str}')
+            raise AssemblerError(line, f'invalid conditional-compilation directive syntax: {line_str}')
         self._is_ifndef = match.group(1) == '#ifndef'
         self._symbol = match.group(2)
 
@@ -276,7 +277,7 @@ class IfdefPreprocessorCondition(PreprocessorCondition):
         return f'IfdefPreprocessorCondition<{"#ifndef" if self._is_ifndef else "#ifdef"} {self._symbol}>'
 
     def _check_and_set_parent(self, parent: PreprocessorCondition):
-        raise ValueError('Cannot set parent of an IfdefPreprocessorCondition')
+        raise AssemblerError(self._line, '#ifdef/#ifndef cannot follow #else or #elif without a closing #endif')
 
     def evaluate(self, preprocessor: Preprocessor) -> bool:
         symbol = preprocessor.get_symbol(self._symbol)
@@ -295,7 +296,10 @@ class ElsePreprocessorCondition(PreprocessorCondition):
 
     def _check_and_set_parent(self, parent: PreprocessorCondition):
         if isinstance(parent, ElsePreprocessorCondition) or isinstance(parent, EndifPreprocessorCondition):
-            raise ValueError('#else must have a conditional as a parent')
+            raise AssemblerError(
+                self._line,
+                '#else must follow an #if, #ifdef, #ifndef, or #elif; only one #else is allowed per conditional block',
+            )
         self._parent = parent
 
     @property
@@ -317,7 +321,7 @@ class EndifPreprocessorCondition(PreprocessorCondition):
 
     def _check_and_set_parent(self, parent: PreprocessorCondition):
         if isinstance(parent, EndifPreprocessorCondition):
-            raise ValueError('#endif must have a conditional as a parent')
+            raise AssemblerError(self._line, '#endif has no matching #if, #ifdef, or #ifndef')
         self._parent = parent
 
     @property

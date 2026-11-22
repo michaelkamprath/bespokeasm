@@ -132,7 +132,7 @@ class TestAssemblerModelDefaults(unittest.TestCase):
                         'default_numeric_base': 'binary',
                     },
                     'predefined': {
-                        'data': [{'name': '1010', 'address': 0, 'size': 1}],
+                        'data': [{'name': '1010', 'address': 0, 'size': 1, 'value': 0}],
                     },
                     'instructions': {},
                     'operand_sets': {},
