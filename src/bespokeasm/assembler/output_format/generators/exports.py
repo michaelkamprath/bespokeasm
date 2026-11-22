@@ -8,6 +8,7 @@ from typing import Any
 from bespokeasm.assembler.annotations.model import AnnotatedSymbol
 from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.output_format.base import RenderContext
+from bespokeasm.assembler.output_format.columns import ColumnTable
 from bespokeasm.assembler.output_format.generators import Generator
 from bespokeasm.assembler.output_format.template import Template
 
@@ -23,6 +24,7 @@ class ExportsGenerator(Generator):
     required_options = frozenset({'annotation'})
     optional_options = frozenset({
         'order', 'unique', 'reserved_names', 'name_pattern', 'lines_key', 'lines', 'value_map',
+        'columns', 'separator',
     })
 
     def configure(self, options: dict[str, Any]) -> None:
@@ -68,7 +70,24 @@ class ExportsGenerator(Generator):
                 )
         self.value_map = self._configure_value_map(options.get('value_map', {}))
         self.fields = self._field_samples()
-        self._configure_lines(options)
+        uses_lines = 'lines_key' in options or 'lines' in options
+        uses_columns = 'columns' in options
+        if uses_lines and uses_columns:
+            self.error(None, "uses generator 'exports' with both lines and columns; give lines_key and lines, or columns")
+        if 'separator' in options and not uses_columns:
+            self.error('separator', 'is only used with columns')
+        self.lines: dict[str, Template] | None = None
+        self.table: ColumnTable | None = None
+        if uses_columns:
+            self.table = ColumnTable.load(
+                options['columns'], options.get('separator'), self.fields,
+                lambda option, problem: self.error(option, problem),
+                enum_fields={
+                    name: spec.values for name, spec in self.namespace.arguments.items() if spec.type == 'enum'
+                },
+            )
+        else:
+            self._configure_lines(options)
 
     def _configure_value_map(self, value_map: Any) -> dict[str, dict[str, str]]:
         """``value_map`` rewrites enum argument values in this section's output, as in
@@ -99,7 +118,7 @@ class ExportsGenerator(Generator):
 
     def _configure_lines(self, options: dict[str, Any]) -> None:
         if 'lines_key' not in options or 'lines' not in options:
-            self.error(None, "uses generator 'exports', which requires 'lines_key' and 'lines'")
+            self.error(None, "uses generator 'exports', which requires 'lines_key' and 'lines', or 'columns'")
         key = options['lines_key']
         spec = self.namespace.arguments.get(key) if isinstance(key, str) else None
         if spec is None or spec.type != 'enum':
@@ -137,13 +156,17 @@ class ExportsGenerator(Generator):
                 + [s for s in symbols if not s.is_label]
             )
         hex_width = math.ceil(context.model.word_size / 4)
-        lines = []
+        rows = []
         seen: dict[str, AnnotatedSymbol] = {}
         for symbol in symbols:
             values = self._values(symbol, hex_width)
             self._check_name(values['name'], symbol, seen)
-            lines.append(self._line_template(symbol).render(values))
-        return '\n'.join(lines)
+            rows.append(values)
+        if self.table is not None:
+            # A column chooses its field by an argument's source value, before value_map.
+            keys = [symbol.annotations[self.namespace.name].arguments for symbol in symbols]
+            return self.table.render(rows, keys)
+        return '\n'.join(self._line_template(symbol).render(values) for symbol, values in zip(symbols, rows))
 
     def _values(self, symbol: AnnotatedSymbol, hex_width: int) -> dict[str, Any]:
         annotation = symbol.annotations[self.namespace.name]
@@ -160,7 +183,8 @@ class ExportsGenerator(Generator):
             'symbol': symbol.name,
             'address': symbol.address,
             'value': None if symbol.is_label else symbol.value,
-            'size': symbol.size,
+            # A label with no data has no size to report: the field is empty rather than 0.
+            'size': symbol.size or None,
             'words': ' '.join(f'{word.value:0{hex_width}x}' for word in symbol.words) if symbol.is_label else None,
         })
         return values

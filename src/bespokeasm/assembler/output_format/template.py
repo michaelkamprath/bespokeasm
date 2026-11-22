@@ -48,6 +48,21 @@ def has_value(value: Any) -> bool:
     return value is not None and value != ''
 
 
+def check_format_spec(name: str, sample: Any, spec: str, error: ErrorFn) -> None:
+    """Check that a format spec applies to a field, given a sample value of the field's type."""
+    if sample is NO_FORMAT_SPEC:
+        error(f'gives field "{name}" a format spec, which it does not take')
+    try:
+        format(sample, spec)
+    except (ValueError, TypeError) as exc:
+        error(f'gives field "{name}" the format spec "{spec}", which does not apply to it: {exc}')
+
+
+def format_value(value: Any, spec: str) -> str:
+    """A field's text: nothing when it has no value, else the value with its format spec applied."""
+    return _format_value(value, spec)
+
+
 def _format_value(value: Any, spec: str) -> str:
     if not has_value(value):
         return ''
@@ -140,14 +155,8 @@ class Template:
         if name not in fields:
             known = ', '.join(sorted(fields))
             error(f'uses unknown field "{name}"; known fields are {known}')
-        sample = fields[name]
         if spec:
-            if sample is NO_FORMAT_SPEC:
-                error(f'gives field "{name}" a format spec, which it does not take')
-            try:
-                format(sample, spec)
-            except (ValueError, TypeError) as exc:
-                error(f'gives field "{name}" the format spec "{spec}", which does not apply to it: {exc}')
+            check_format_spec(name, fields[name], spec, error)
         return _Field(name, spec)
 
     def render(self, values: dict[str, Any]) -> str:

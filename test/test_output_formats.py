@@ -10,6 +10,7 @@ from bespokeasm import BESPOKEASM_VERSION_STR
 from bespokeasm.assembler.engine import Assembler
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.output_format.builtin import BUILTIN_FORMAT_NAMES
+from bespokeasm.assembler.output_format.columns import ColumnTable
 from bespokeasm.assembler.output_format.template import NO_FORMAT_SPEC
 from bespokeasm.assembler.output_format.template import Template
 from bespokeasm.assembler.symbol_scope import SymbolScope
@@ -245,7 +246,7 @@ def test_exports_fields(tmp_path):
     output, _ = _run(tmp_path, SOURCE, _write_config(tmp_path, _format_with(lines=lines, order='source')))
     assert output.splitlines()[-4:] == [
         'MAXARG|MAXARG||200|||char',
-        'add_w|AddW|256||0||addr',
+        'add_w|AddW|256||||addr',  # no data run: size is empty, not 0
         'pa|pa|0x103||2|34 12|int|',
         'buf|buf|0x105||3|01 02 03|char|3',
     ]
@@ -394,7 +395,7 @@ def test_cli_reports_whether_type_was_given():
     (_format_with(order='name'), 'output_formats.xmin.sections.symbols.order must be address or source'),
     (_format_with(unique='symbol'), 'output_formats.xmin.sections.symbols.unique must be "name"'),
     (_format_with(name_pattern='('), 'name_pattern is not a valid regular expression'),
-    (_format_with(lines_key=None), "uses generator 'exports', which requires 'lines_key' and 'lines'"),
+    (_format_with(lines_key=None), "uses generator 'exports', which requires 'lines_key' and 'lines', or 'columns'"),
     (_format_with(lines_key='name'), "lines_key must name an enum argument of annotation 'xmin'"),
     (
         _format_with(lines={'addr': '{name}', 'var': '{name}'}),
@@ -810,3 +811,223 @@ def test_value_map_rewrites_an_argument_value(tmp_path):
 def test_value_map_config_errors(tmp_path, value_map, expected):
     output_format = _with(XMIN_FORMAT, 'sections', 'symbols', 'value_map', value_map)
     assert expected in _config_error(tmp_path, {'xmin': output_format})
+
+
+# ---- columns ----------------------------------------------------------------------------
+
+def _no_error(path, problem):
+    raise AssertionError(f'{path} {problem}')
+
+
+@pytest.mark.parametrize(('columns', 'separator', 'expected'), [
+    # Widths fit the widest of header and values; the last column is not padded.
+    (
+        [{'field': 'name', 'header': 'name'}, {'field': 'n', 'header': 'n'}],
+        None,
+        ['name   n', 'a      1', 'bbbbb  22'],
+    ),
+    # Right alignment, min_width, and a custom separator.
+    (
+        [{'field': 'name', 'min_width': 6}, {'field': 'n', 'align': 'right', 'format': '03o'}],
+        ' | ',
+        ['a      | 001', 'bbbbb  | 026'],
+    ),
+    # A field with no value prints as nothing, and trailing spaces are removed.
+    (
+        [{'field': 'n', 'header': 'n', 'format': '#06x'}, {'field': 'missing', 'header': 'm'}],
+        None,
+        ['n       m', '0x0001', '0x0016'],
+    ),
+])
+def test_column_table(columns, separator, expected):
+    fields = {'name': 'x', 'n': 0, 'missing': 0}
+    table = ColumnTable.load(columns, separator, fields, _no_error)
+    rows = [{'name': 'a', 'n': 1, 'missing': None}, {'name': 'bbbbb', 'n': 22, 'missing': None}]
+    assert table.render(rows).split('\n') == expected
+
+
+COLUMN_FORMAT = {
+    'template': '{symbols}\n',
+    'sections': {'symbols': {
+        'generator': 'exports',
+        'annotation': 'xmin',
+        'order': 'address',
+        'columns': [
+            {'field': 'name', 'header': 'name'},
+            {'field': 'kind', 'header': 'kind'},
+            {'field': 'type', 'header': 'type'},
+            {'field': 'count', 'header': 'count', 'align': 'right'},
+            {'field': 'address', 'header': 'address', 'format': '#06x'},
+            {'field': 'size', 'header': 'size', 'align': 'right'},
+            {'field': 'value', 'header': 'value'},
+        ],
+    }},
+}
+
+
+def test_exports_with_columns(tmp_path):
+    output, warnings = _run(tmp_path, SOURCE, _write_config(tmp_path, {'xmin': COLUMN_FORMAT}))
+    assert warnings == ''
+    assert output.split('\n') == [
+        'name    kind   type  count  address  size  value',
+        'AddW    addr                0x0100',
+        'pa      var    int          0x0103      2',
+        'buf     var    char      3  0x0105      3',
+        'MAXARG  const  char                        200',
+        '',
+    ]
+
+
+def test_columns_merge_from_a_shared_set(tmp_path):
+    formats = {'xmin_listing': {
+        'shared': 'xmin',
+        'template': '{symbols}',
+        'sections': {'symbols': {'columns': [{'field': 'name'}, {'field': 'address', 'format': '04x'}]}},
+    }}
+    output, _ = _run(tmp_path, SOURCE, _shared_config(tmp_path, formats=formats), fmt='xmin_listing')
+    assert output.split('\n') == ['MAXARG', 'AddW    0100', 'pa      0103', 'buf     0105']
+
+
+def test_export_names_are_checked_with_columns(tmp_path):
+    output_format = _with(COLUMN_FORMAT, 'sections', 'symbols', 'reserved_names', ['pa'])
+    message = _error(tmp_path, SOURCE, _write_config(tmp_path, {'xmin': output_format}))
+    assert "export name 'pa' is not valid for format 'xmin'; it is a reserved name" in message
+
+
+def _columns_with(columns=None, **options) -> dict:
+    output_format = copy.deepcopy(COLUMN_FORMAT)
+    symbols = output_format['sections']['symbols']
+    if columns is not None:
+        symbols['columns'] = columns
+    symbols.update(options)
+    return {'xmin': output_format}
+
+
+SECTION = 'output_formats.xmin.sections.symbols'
+
+
+@pytest.mark.parametrize(('output_formats', 'expected'), [
+    (_columns_with([]), f'{SECTION}.columns must be a non-empty list of columns'),
+    (_columns_with(['name']), f'{SECTION}.columns[0] must be a mapping with a field'),
+    (_columns_with([{'header': 'x'}]), f'{SECTION}.columns[0] needs a field, or by and cases'),
+    (_columns_with([{'field': 'adress'}]), f'{SECTION}.columns[0].field names unknown field "adress"'),
+    (
+        _columns_with([{'field': 'name', 'heading': 'x'}]),
+        f'{SECTION}.columns[0].heading is not a column setting; '
+        'columns take field, by, cases, header, format, align, min_width',
+    ),
+    (_columns_with([{'field': 'name', 'align': 'center'}]), f'{SECTION}.columns[0].align must be left or right'),
+    (_columns_with([{'field': 'name', 'min_width': -1}]), f'{SECTION}.columns[0].min_width must be a whole number'),
+    (_columns_with([{'field': 'name', 'header': 3}]), f'{SECTION}.columns[0].header must be a string'),
+    (
+        _columns_with([{'field': 'name', 'format': '04x'}]),
+        f'{SECTION}.columns[0].format gives field "name" the format spec "04x", which does not apply to it',
+    ),
+    (_columns_with(separator=1), f'{SECTION}.separator must be a string'),
+    (
+        _columns_with(lines_key='kind'),
+        f"{SECTION} uses generator 'exports' with both lines and columns; give lines_key and lines, or columns",
+    ),
+    (
+        {'xmin': _with(XMIN_FORMAT, 'sections', 'symbols', 'separator', ' ')},
+        f'{SECTION}.separator is only used with columns',
+    ),
+])
+def test_column_config_errors(tmp_path, output_formats, expected):
+    assert expected in _config_error(tmp_path, output_formats)
+
+
+def test_xmin_listing_worked_example(tmp_path, monkeypatch):
+    """The spec's xmin_listing example, from the copied Minimal 64x4 config."""
+    fixture = pkg_resources.files(config_files).joinpath('xmin')
+    output_path = tmp_path / 'addw.xmin_listing'
+    monkeypatch.chdir(str(fixture))
+    stderr = io.StringIO()
+    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(stderr):
+        Assembler(
+            'addw.min64x4', 'slu4-minimal-64x4.yaml', False, None, 0, None, 0,
+            True, 'xmin_listing', str(output_path), 0, [], [],
+        ).assemble_bytecode()
+    assert stderr.getvalue() == ''
+    output = output_path.read_text()
+    # The listing printer pads its comment column, and pre-commit strips trailing spaces from
+    # the stored file, so compare line by line without them. The exports table has none.
+    expected = fixture.joinpath('addw.xmin_listing').read_text()
+    assert [line.rstrip() for line in output.split('\n')] == [line.rstrip() for line in expected.split('\n')]
+    assert output.endswith('\n'.join([
+        'Exported to xmin:',
+        'name    kind   type  address  size  value',
+        'AddW    addr                        0x0100',
+        'pa      var    int   0x0113   2',
+        'pb      var    int   0x0115   2',
+        'pr      var    int   0x0117   2',
+        'MAXARG  const  int                  1000',
+        '',
+    ]))
+
+
+BY_KIND_COLUMNS = [
+    {'field': 'name', 'header': 'name'},
+    {'header': 'address', 'by': 'kind', 'cases': {'var': {'field': 'address', 'format': '#06x'}}},
+    {
+        'header': 'value', 'by': 'kind',
+        'cases': {'addr': {'field': 'address', 'format': '#06x'}, 'const': {'field': 'value'}},
+    },
+]
+
+
+def test_column_chooses_its_field_by_an_argument(tmp_path):
+    output, _ = _run(tmp_path, SOURCE, _write_config(tmp_path, _columns_with(BY_KIND_COLUMNS)))
+    assert output.split('\n') == [
+        'name    address  value',
+        'AddW             0x0100',
+        'pa      0x0103',
+        'buf     0x0105',
+        'MAXARG           200',
+        '',
+    ]
+
+
+def test_column_chooses_by_the_source_value_before_value_map(tmp_path):
+    output_format = _columns_with(BY_KIND_COLUMNS, value_map={'kind': {'addr': 'int'}})
+    output_format['xmin']['sections']['symbols']['columns'].append({'field': 'kind', 'header': 'kind'})
+    output, _ = _run(tmp_path, SOURCE, _write_config(tmp_path, output_format))
+    # value_map rewrites the kind column, but the value column still chose its case by kind=addr.
+    assert output.split('\n')[1] == 'AddW             0x0100  int'
+
+
+@pytest.mark.parametrize(('column', 'expected'), [
+    (
+        {'field': 'name', 'by': 'kind', 'cases': {'var': {'field': 'name'}}},
+        f'{SECTION}.columns[0] has a field and also by or cases; give a field, or by and cases',
+    ),
+    ({'header': 'x'}, f'{SECTION}.columns[0] needs a field, or by and cases'),
+    (
+        {'by': 'name', 'cases': {'x': {'field': 'name'}}},
+        f'{SECTION}.columns[0].by must name an enum argument; enum arguments are kind, type',
+    ),
+    ({'by': 'kind'}, f'{SECTION}.columns[0].cases must map values of \'kind\' to a field'),
+    (
+        {'by': 'kind', 'cases': {'func': {'field': 'name'}}},
+        f"{SECTION}.columns[0].cases.func is not a value of argument 'kind'",
+    ),
+    ({'by': 'kind', 'cases': {'var': 'address'}}, f'{SECTION}.columns[0].cases.var must be a mapping with a field'),
+    (
+        {'by': 'kind', 'cases': {'var': {'field': 'address', 'align': 'right'}}},
+        f'{SECTION}.columns[0].cases.var.align is not a case setting; cases take field, format',
+    ),
+    (
+        {'by': 'kind', 'cases': {'var': {'field': 'adress'}}},
+        f'{SECTION}.columns[0].cases.var.field names unknown field "adress"',
+    ),
+    (
+        {'by': 'kind', 'cases': {'var': {'field': 'name', 'format': '04x'}}},
+        f'{SECTION}.columns[0].cases.var.format gives field "name" the format spec "04x"',
+    ),
+    (
+        {'by': 'kind', 'cases': {'var': {'field': 'name'}}, 'format': '>4'},
+        f'{SECTION}.columns[0].format is set per case when a column has by and cases',
+    ),
+])
+def test_by_column_config_errors(tmp_path, column, expected):
+    assert expected in _config_error(tmp_path, _columns_with([column]))

@@ -563,6 +563,34 @@ output_formats:
           addr: "int {name} := 0x{address:04x}"
           var: "{type} {name}{?[{count}]} @ 0x{address:04x}"
           const: "{type} {name} := {value}"
+  xmin_listing:
+    shared: xmin
+    documentation:
+      description: Listing of the xmin build, with the exported symbols and their values.
+    template: |
+      {code}
+
+      Exported to xmin:
+      {symbols}
+    sections:
+      code:
+        generator: listing
+      symbols:
+        order: source
+        columns:
+          - { field: name, header: name }
+          - { field: kind, header: kind }
+          - { field: type, header: type }
+          # In xmin terms a var is bound to an address, while addr and const export a value.
+          - header: address
+            by: kind
+            cases: { var: { field: address, format: "#06x" } }
+          - { field: size, header: size }
+          - header: value
+            by: kind
+            cases:
+              addr: { field: address, format: "#06x" }
+              const: { field: value }
 
 instructions:
   nop:
