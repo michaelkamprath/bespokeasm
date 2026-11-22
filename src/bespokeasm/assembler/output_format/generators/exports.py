@@ -24,7 +24,7 @@ class ExportsGenerator(Generator):
     required_options = frozenset({'annotation'})
     optional_options = frozenset({
         'order', 'unique', 'reserved_names', 'name_pattern', 'lines_key', 'lines', 'value_map',
-        'columns', 'separator',
+        'columns', 'separator', 'header_rule', 'rule_separator',
     })
 
     def configure(self, options: dict[str, Any]) -> None:
@@ -74,8 +74,9 @@ class ExportsGenerator(Generator):
         uses_columns = 'columns' in options
         if uses_lines and uses_columns:
             self.error(None, "uses generator 'exports' with both lines and columns; give lines_key and lines, or columns")
-        if 'separator' in options and not uses_columns:
-            self.error('separator', 'is only used with columns')
+        for option in ('separator', 'header_rule', 'rule_separator'):
+            if option in options and not uses_columns:
+                self.error(option, 'is only used with columns')
         self.lines: dict[str, Template] | None = None
         self.table: ColumnTable | None = None
         if uses_columns:
@@ -85,6 +86,9 @@ class ExportsGenerator(Generator):
                 enum_fields={
                     name: spec.values for name, spec in self.namespace.arguments.items() if spec.type == 'enum'
                 },
+                header_rule=options.get('header_rule'),
+                rule_separator=options.get('rule_separator'),
+                warn=lambda option, problem: self.env.warn(self.option_path(option), problem),
             )
         else:
             self._configure_lines(options)

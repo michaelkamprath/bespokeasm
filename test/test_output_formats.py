@@ -898,8 +898,8 @@ def _columns_with(columns=None, **options) -> dict:
     output_format = copy.deepcopy(COLUMN_FORMAT)
     symbols = output_format['sections']['symbols']
     if columns is not None:
-        symbols['columns'] = columns
-    symbols.update(options)
+        symbols['columns'] = copy.deepcopy(columns)
+    symbols.update(copy.deepcopy(options))
     return {'xmin': output_format}
 
 
@@ -1131,3 +1131,232 @@ def test_one_process_can_assemble_a_program_that_includes_a_file_twice(tmp_path,
                 True, 'minhex', str(tmp_path / f'{attempt}.minhex'), 0, [], [],
             ).assemble_bytecode()
     assert (tmp_path / '0.minhex').read_bytes() == (tmp_path / '1.minhex').read_bytes()
+
+
+# ---- byte_lines and the KENBAK-1 octal listing ---------------------------------------------
+
+BYTE_LINES_FORMAT = {
+    'template': '{code}\n',
+    'sections': {'code': {
+        'generator': 'byte_lines',
+        'columns': [
+            {'field': 'label', 'header': 'label'},
+            {'field': 'address', 'header': 'adr', 'format': '03o'},
+            {'field': 'byte', 'header': 'data', 'format': '03o'},
+            {'field': 'source', 'header': 'description'},
+            {'field': 'comment'},
+        ],
+    }},
+}
+
+
+def _byte_lines(tmp_path, source: str, output_format=None, **config) -> list[str]:
+    formats = {'octal': output_format or BYTE_LINES_FORMAT}
+    output, warnings = _run(tmp_path, source, _write_config(tmp_path, formats, **config), fmt='octal')
+    assert warnings == ''
+    return output.split('\n')[:-1]
+
+
+def test_byte_lines_one_row_per_byte(tmp_path):
+    source = '\n'.join([
+        '.org 4',
+        'LIMIT = 9           ; a constant is not a label',
+        'start:',
+        '    ld a, b, c      ; three bytes',
+        'table: .byte 1, LIMIT',
+    ]) + '\n'
+    assert _byte_lines(tmp_path, source) == [
+        'label  adr  data  description',
+        'start  004  200   ld a, b, c      three bytes',
+        '       005  022',
+        '       006  060',
+        'table  007  001   .byte 1, LIMIT',
+        '       010  011',
+    ]
+
+
+def test_byte_lines_labels(tmp_path):
+    source = '\n'.join([
+        'first:',
+        '.second:',
+        '    .byte 1',
+        'stranded:          ; an .org moves on before any byte, so this label names nothing',
+        '.org $10',
+        '    .byte 2',
+    ]) + '\n'
+    assert _byte_lines(tmp_path, source) == [
+        'label          adr  data  description',
+        'first .second  000  001   .byte 1',
+        '               020  002   .byte 2',
+    ]
+
+
+def test_byte_lines_skips_muted_lines_and_predefined_data(tmp_path):
+    with open(pkg_resources.files(config_files).joinpath('test_instruction_operands.yaml')) as handle:
+        predefined = YAML(typ='safe').load(handle).get('predefined') or {}
+    predefined['data'] = [{'name': 'reg', 'address': 0x40, 'value': 7, 'size': 1}]
+    source = '.byte 1\n#mute\nhidden: .byte 2\n#unmute\n.byte 3\n'
+    lines = _byte_lines(tmp_path, source, extra={'predefined': predefined})
+    # A muted line still takes its addresses; its bytes are just not written.
+    assert lines == ['label  adr  data  description', '       000  001   .byte 1', '       002  003   .byte 3']
+
+
+def _byte_lines_with(**options) -> dict:
+    output_format = copy.deepcopy(BYTE_LINES_FORMAT)
+    code = output_format['sections']['code']
+    for key, value in options.items():
+        if value is None:
+            code.pop(key)
+        else:
+            code[key] = value
+    return {'octal': output_format}
+
+
+BYTE_LINES_SECTION = 'output_formats.octal.sections.code'
+
+
+@pytest.mark.parametrize(('output_formats', 'expected'), [
+    (_byte_lines_with(columns=None), f"{BYTE_LINES_SECTION} uses generator 'byte_lines', which requires option 'columns'"),
+    (
+        _byte_lines_with(columns=[{'field': 'value'}]),
+        f'{BYTE_LINES_SECTION}.columns[0].field names unknown field "value"; '
+        'known fields are address, byte, comment, label, source',
+    ),
+    (
+        _byte_lines_with(columns=[{'by': 'kind', 'cases': {'x': {'field': 'byte'}}}]),
+        f'{BYTE_LINES_SECTION}.columns[0].by is only available in exports tables',
+    ),
+    (_byte_lines_with(lines={'x': '{byte}'}), f"{BYTE_LINES_SECTION}.lines is not an option of generator 'byte_lines'"),
+])
+def test_byte_lines_config_errors(tmp_path, output_formats, expected):
+    assert expected in _config_error(tmp_path, output_formats)
+
+
+def test_byte_lines_needs_8_bit_words(tmp_path):
+    message = _config_error(tmp_path, _byte_lines_with(), annotations={}, fixture='test_16bit_data_words.yaml')
+    assert "uses generator 'byte_lines', which needs 8-bit words; this instruction set has 16-bit words" in message
+
+
+@pytest.mark.parametrize('program', ['led-chaser', 'led-bouncer'])
+def test_kenbak1_listing(tmp_path, monkeypatch, program):
+    """``config_files/kenbak`` holds copies of the KENBAK-1 config (with kenbak1) and its
+    example programs, and the expected listing of each."""
+    fixture = pkg_resources.files(config_files).joinpath('kenbak')
+    monkeypatch.chdir(str(fixture))
+    output_path = tmp_path / f'{program}.kenbak1'
+    stderr = io.StringIO()
+    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(stderr):
+        Assembler(
+            f'{program}.kb1', 'kenbak-1-isa.yaml', False, None, 0, None, 0,
+            True, 'kenbak1', str(output_path), 0, [], [],
+        ).assemble_bytecode()
+    assert stderr.getvalue() == ''
+    expected = fixture.joinpath(f'{program}.kenbak1').read_text()
+    assert output_path.read_text() == expected.replace('<bespokeasm_version>', BESPOKEASM_VERSION_STR)
+
+
+def test_by_needs_an_annotation_with_enum_arguments(tmp_path):
+    annotations = {'note': {'arguments': {'text': {'type': 'string'}}}}
+    formats = {'f': {'template': '{rows}', 'sections': {'rows': {
+        'generator': 'exports', 'annotation': 'note',
+        'columns': [{'by': 'text', 'cases': {'x': {'field': 'name'}}}],
+    }}}}
+    message = _config_error(tmp_path, formats, annotations=annotations)
+    assert 'output_formats.f.sections.rows.columns[0].by must name an enum argument, but this annotation has none' in message
+
+
+# ---- header_rule -------------------------------------------------------------------------------
+
+@pytest.mark.parametrize(('separator', 'expected'), [
+    # Each column's rule is its full width, including the unpadded last column.
+    (None, ['name   n', '-----  --', 'a      1', 'bbbbb  22']),
+    # A configured separator with no rule_separator: the rule fills the gaps too, a solid line.
+    (' | ', ['name  | n', '----------', 'a     | 1', 'bbbbb | 22']),
+])
+def test_column_table_header_rule(separator, expected):
+    columns = [{'field': 'name', 'header': 'name'}, {'field': 'n', 'header': 'n'}]
+    table = ColumnTable.load(columns, separator, {'name': 'x', 'n': 0}, _no_error, header_rule='-')
+    assert table.render([{'name': 'a', 'n': 1}, {'name': 'bbbbb', 'n': 22}]).split('\n') == expected
+
+
+def test_header_rule_in_byte_lines(tmp_path):
+    lines = _byte_lines(tmp_path, 'start:\n    ld a, b, c\n', output_format=_byte_lines_with(header_rule='=')['octal'])
+    assert lines[:3] == [
+        'label  adr  data  description',
+        '=====  ===  ====  ===========',
+        'start  000  200   ld a, b, c',
+    ]
+
+
+def test_header_rule_in_exports(tmp_path):
+    output, _ = _run(tmp_path, SOURCE, _write_config(tmp_path, _columns_with(BY_KIND_COLUMNS, header_rule='-')))
+    assert output.split('\n')[:3] == ['name    address  value', '------  -------  ------', 'AddW             0x0100']
+
+
+@pytest.mark.parametrize(('output_formats', 'expected'), [
+    (_byte_lines_with(header_rule='--'), f'{BYTE_LINES_SECTION}.header_rule must be a single character, such as "-"'),
+    (_byte_lines_with(header_rule=1), f'{BYTE_LINES_SECTION}.header_rule must be a single character'),
+    (
+        {'xmin': _with(XMIN_FORMAT, 'sections', 'symbols', 'header_rule', '-')},
+        f'{SECTION}.header_rule is only used with columns',
+    ),
+])
+def test_header_rule_config_errors(tmp_path, output_formats, expected):
+    assert expected in _config_error(tmp_path, output_formats)
+
+
+def test_header_rule_without_headers_is_a_warning(tmp_path):
+    output_format = _byte_lines_with(header_rule='-', columns=[{'field': 'address'}, {'field': 'byte'}])
+    warnings = _config_warnings(tmp_path, output_format)
+    assert (
+        f'{BYTE_LINES_SECTION}.header_rule has no effect: no column has a header, so there is no header row to rule'
+    ) in warnings
+
+
+def test_rule_separator(tmp_path):
+    columns = copy.deepcopy(BYTE_LINES_FORMAT['sections']['code']['columns'][:4])
+    output_format = _byte_lines_with(separator=' | ', header_rule='-', rule_separator='-+-', columns=columns)
+    assert _byte_lines(tmp_path, 'start:\n    ld a, b, c\n', output_format=output_format['octal'])[:3] == [
+        'label | adr | data | description',
+        '------+-----+------+------------',
+        'start | 000 | 200  | ld a, b, c',
+    ]
+
+
+@pytest.mark.parametrize(('separator', 'rule_separator', 'expected'), [
+    # Only rule_separator: the rows' gap is that many spaces, keeping the rule's alignment.
+    (None, '-+-', ['name    n', '------+---', 'bbbbb   22']),
+    (None, '|', ['name  n', '-----|--', 'bbbbb 22']),
+    # Only separator: the rule's gap is that many rule characters.
+    (' | ', None, ['name  | n', '----------', 'bbbbb | 22']),
+    # Both: each as written.
+    (' | ', '-+-', ['name  | n', '------+---', 'bbbbb | 22']),
+    # Neither: two spaces in the rows and in the rule.
+    (None, None, ['name   n', '-----  --', 'bbbbb  22']),
+])
+def test_gaps_follow_whichever_separator_is_configured(separator, rule_separator, expected):
+    columns = [{'field': 'name', 'header': 'name'}, {'field': 'n', 'header': 'n'}]
+    table = ColumnTable.load(
+        columns, separator, {'name': 'x', 'n': 0}, _no_error, header_rule='-', rule_separator=rule_separator,
+    )
+    assert table.render([{'name': 'bbbbb', 'n': 22}]).split('\n') == expected
+
+
+@pytest.mark.parametrize(('output_formats', 'expected'), [
+    (_byte_lines_with(rule_separator='-+-'), f'{BYTE_LINES_SECTION}.rule_separator is only used with header_rule'),
+    (_byte_lines_with(header_rule='-', rule_separator=3), f'{BYTE_LINES_SECTION}.rule_separator must be a string'),
+    (
+        {'xmin': _with(XMIN_FORMAT, 'sections', 'symbols', 'rule_separator', '+')},
+        f'{SECTION}.rule_separator is only used with columns',
+    ),
+])
+def test_rule_separator_config_errors(tmp_path, output_formats, expected):
+    assert expected in _config_error(tmp_path, output_formats)
+
+
+def test_rule_separator_of_another_length_is_a_warning(tmp_path):
+    warnings = _config_warnings(tmp_path, _byte_lines_with(separator=' | ', header_rule='-', rule_separator='+'))
+    assert (
+        f'{BYTE_LINES_SECTION}.rule_separator is 1 characters but separator is 3, '
+        'so the rule will not line up with the columns'
+    ) in warnings

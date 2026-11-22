@@ -189,7 +189,7 @@ Fields are fixed names with Python format specs, not expressions:
 
 - Template: `source_file`, `isa_name`, `isa_version`, `bespokeasm_version`, and the section names. A section name may not be the same as a field name, and a section field takes no format spec. A section's text never starts or ends with a blank line; the template decides the spacing around it. A section the template never uses is a config warning.
 - `exports` items: `name` (the `name` argument, else the symbol), `symbol`, `address` (labels only), `value` (constants only), `size` (in words; empty for a label with no data run, such as `kind=addr` on code), `words` (the words of a label's data run, in hex, in memory order, separated by spaces), and every annotation argument. A `symbol`-typed argument's field is its resolved value, an argument named in the section's `value_map` is its mapped text, and a count that the data set (`infer_times`, `terminated_when`) reads like a given one. An annotation argument may not have the name of one of these fields, except `name`; using such an annotation in `exports` is a config error.
-- `byte_lines` items: `label` (a label at that address, else empty), `address`, `byte`, `source` (the instruction text, on its first byte only) and `comment` (the same).
+- `byte_lines` items: `label` (the labels at that address, on the line's first byte, separated by spaces; else empty), `address`, `byte`, `source` (the instruction text, on its first byte only) and `comment` (the same). Rows are in address order. Constants are not labels. A label that an `.org` leaves behind before any byte names nothing. Muted lines are skipped but keep their addresses, so the listing has a gap there. Predefined data blocks from the config are not listed: the listing is the program's bytes.
 - `rows` items: `byte`, and `address` in `org_line`.
 
 `value_map` rewrites enum argument values in the section's output, as `{argument: {value: text}}`; `lines_key` still selects the line by the source value. An unknown field is a config error at load time, and so is a format spec that cannot apply to the field's type, such as `04x` on `name`. An empty field prints as nothing, and its format spec is not applied. In `exports`, `lines_key` names the enum argument whose value selects a `lines` template, and every value of that enum needs a template. With order: address, labels come first in address order, and constants follow in the order they are defined. With order: source, every export is in the order it is defined. The default is source.
@@ -205,12 +205,12 @@ Generators:
 | `byte_list` | comma-separated `0x..` bytes, for formats that embed a blob | none |
 | `listing` | the same text as `-t listing`, with `listing` annotations applied | none |
 | `rows` | rows of bytes, with an address line at each `.org` | `bytes_per_row`, `row_prefix`, `byte`, `org_line` |
-| `byte_lines` | a table with one line per assembled byte | `columns`, `separator` |
-| `exports` | one line per symbol that carries the annotation | `annotation`, `order`, `unique`, `reserved_names`, `name_pattern`, `value_map`, then either `lines_key` + `lines`, or `columns` + `separator` |
+| `byte_lines` | a table with one line per assembled byte | `columns`, `separator`, `header_rule`, `rule_separator` |
+| `exports` | one line per symbol that carries the annotation | `annotation`, `order`, `unique`, `reserved_names`, `name_pattern`, `value_map`, then either `lines_key` + `lines`, or `columns` + `separator` + `header_rule` + `rule_separator` |
 
-Tables. `byte_lines`, and `exports` with `columns`, use one column model. `columns` is a list in output order. Each entry names a `field`, and it can set `header` (default empty), `format` (a Python format spec, for example `03o` for octal), `align` (`left` or `right`, default `left`) and `min_width` (default 0). In `exports`, a column can instead choose its field per row, the table counterpart of `lines_key`: `by` names an enum argument, and `cases` maps its values to `{field, format}`. A row whose value has no case gets an empty cell. The lookup uses the source value, before `value_map`. `xmin_listing` uses this to show a `var`'s address under `address` and an `addr` export's address under `value`, as the xmin lines do. The generator writes a header row from the headers, unless all headers are empty, and then one row per item. A header is aligned like its column's values. `exports` takes either `lines_key` and `lines` or `columns`, never both, and `separator` only with `columns`. A column entry takes only `field`, `by`, `cases`, `header`, `format`, `align` and `min_width`; any other key is a config error. A column has either `field` or `by` with `cases`, not both. A `by` column sets `format` in each case instead of on the column, and a case takes only `field` and `format`. Export names are checked (`name_pattern`, `reserved_names`, `unique`) the same way in both modes.
+Tables. `byte_lines`, and `exports` with `columns`, use one column model. `columns` is a list in output order. Each entry names a `field`, and it can set `header` (default empty), `format` (a Python format spec, for example `03o` for octal), `align` (`left` or `right`, default `left`) and `min_width` (default 0). In `exports`, a column can instead choose its field per row, the table counterpart of `lines_key`: `by` names an enum argument, and `cases` maps its values to `{field, format}`. A row whose value has no case gets an empty cell. The lookup uses the source value, before `value_map`. `xmin_listing` uses this to show a `var`'s address under `address` and an `addr` export's address under `value`, as the xmin lines do. The generator writes a header row from the headers, unless all headers are empty, and then one row per item. A header is aligned like its column's values. `exports` takes either `lines_key` and `lines` or `columns`, never both, and `separator`, `header_rule` and `rule_separator` only with `columns`. A column entry takes only `field`, `by`, `cases`, `header`, `format`, `align` and `min_width`; any other key is a config error. A column has either `field` or `by` with `cases`, not both. A `by` column sets `format` in each case instead of on the column, and a case takes only `field` and `format`. Export names are checked (`name_pattern`, `reserved_names`, `unique`) the same way in both modes.
 
-Column widths adjust to the content, as in the built-in `-t listing`. The generator formats every value first. Each column is then as wide as the largest of its `min_width`, its header, and its widest value. Columns are joined with `separator` (default two spaces). The last column gets no padding, and the generator removes trailing spaces from each line, but not the rest of a separator: with `separator: " | "`, a row whose last cell is empty ends in `|`.
+Column widths adjust to the content, as in the built-in `-t listing`. The generator formats every value first. Each column is then as wide as the largest of its `min_width`, its header, and its widest value. Columns are joined with `separator` (default two spaces). The `header_rule` option (one character, such as `-`) draws a line of that character under the header row: each column is filled to its width, including the last. Between columns, the rows use `separator` and the rule uses `rule_separator`, each exactly as written. When only one is configured, the other follows its width: with only `rule_separator`, the rows' gap is that many spaces; with only `separator`, the rule's gap is that many rule characters, so the rule is a solid line. With neither, both gaps are two spaces. With `separator: " | "`, `header_rule: "-"` and `rule_separator: "-+-"`, the rule reads `------+-----+------`, as in `-t listing`. Keeping the two the same width, and their joints in line, is up to the config: when both are configured and their widths differ, that is a config warning, because the rule then does not line up. `header_rule` has no effect without a header row, which is also a config warning, and `rule_separator` needs `header_rule`. The last column gets no padding, and the generator removes trailing spaces from each line, but not the rest of a separator: with `separator: " | "`, a row whose last cell is empty ends in `|`.
 
 Responsibilities:
 
@@ -409,13 +409,13 @@ Work needed:
 
 ## Third example: an octal listing for the KENBAK-1
 
-KENBAK-1 programs are traditionally written in octal. A listing has one byte per row and four columns: label, address, coded data and a description. Addresses and bytes are three octal digits, and an operand byte gets its own row ([kenbak.com, Programming](https://www.kenbak.com/programming)). The built-in `-t listing` and the `listing` generator write hex, so neither can produce this layout.
+KENBAK-1 programs are traditionally written in octal. A listing has one byte per row, with columns for the location (address), the coded data, a label, the contents and comments. Addresses and bytes are three octal digits, and an operand byte gets its own row ([kenbak.com, Programming](https://www.kenbak.com/programming)). The built-in `-t listing` and the `listing` generator write hex, so neither can produce this layout.
 
 The framework needs the `byte_lines` generator. It writes a table with one line per assembled byte, with the column model and automatic widths from "Config-defined output formats". Octal comes from the format spec `03o`.
 
 ```yaml
 output_formats:
-  octal_listing:
+  kenbak1:
     documentation:
       description: KENBAK-1 style listing, one byte per row, in octal.
     requires_word_size: 8
@@ -426,31 +426,36 @@ output_formats:
     sections:
       code:
         generator: byte_lines
+        header_rule: "="
+        separator: " | "
         columns:
-          - { field: label, header: label, min_width: 8 }
-          - { field: address, header: adr, format: "03o" }
-          - { field: byte, header: data, format: "03o" }
-          - { field: source, header: description, min_width: 16 }
-          - { field: comment }
+          - { field: address, header: Loc, format: "03o" }
+          - { field: byte, header: Data, format: "03o" }
+          - { field: label, header: Label, min_width: 8 }
+          - { field: source, header: Contents, min_width: 16 }
+          - { field: comment, header: Comments }
 ```
 
-For `examples/kenbak-1/led-chaser.kb1`, `-t octal_listing` would start like this. These bytes match a real compile of the file with `-t listing`. The column widths are only an illustration, because a real build sizes them from the whole file.
+For `examples/kenbak-1/led-chaser.kb1`, `-t kenbak1` starts like this (from a real build; the column widths come from the whole file):
 
 ```
-label        adr  data  description
-init         004  023   ld a, 1
-             005  001
-             006  034   ld [OUTPUT], a     init the screen display
-             007  200
-.loop        010  367   jm left_loop       call left_loop function
-             011  016
+Loc | Data | Label      | Contents          | Comments
+==================================================================================
+004 | 023  | init       | ld a, 1           |
+005 | 001  |            |                   |
+006 | 034  |            | ld [OUTPUT], a    | init the screen display
+007 | 200  |            |                   |
+010 | 367  | .loop      | jm left_loop      | call left_loop function
+011 | 016  |            |                   |
 ```
 
 Work needed:
 
-1. Framework: the `byte_lines` generator. It uses the shared column model.
+1. Framework: the `byte_lines` generator. It uses the shared column model: `columns` is required, `separator` is optional, and it needs 8-bit words. A column's `by` and `cases` are not available, because its fields are not annotation arguments.
 2. Config: add the format to `kenbak-1-isa.yaml`, and raise `general.min_version` and `identifier.version`.
-3. Tests: copy `led-chaser.kb1` and the KENBAK-1 config, with the new format, into a fixture directory under `test/`, and add a golden file from it.
+3. Tests: copy `led-chaser.kb1` and the KENBAK-1 config, with the new format, into a fixture directory under `test/`, and add a golden file from it. `led-bouncer.kb1` is copied as well, for a second golden file.
+
+The KENBAK-1 config predefines its registers as data, including `P_REG` at `003` with the start address `004`. The listing leaves them out and starts at `004`, as above; the example README says where the start address comes from.
 
 A `radix` option on the built-in listing would also give octal. A config format is better here because it also sets the columns to match the traditional KENBAK-1 layout.
 
@@ -516,7 +521,10 @@ Errors from the later sections:
 | A section name equals a template field name, or the template names a section that is not defined | config load | config error naming the key path |
 | Unmatched `{?`, or a nested optional group | config load | config error naming the key path and the template |
 | A `columns` entry has no `field` (or `by` and `cases`), both, an unknown `field`, `align`, `format` or key, a bad `min_width` or `header`, or a `by` that is not an enum argument or a case for a value it does not have | config load | config error naming the key path, e.g. `output_formats.xmin_listing.sections.symbols.columns[3].align must be left or right, not "center"` |
-| `exports` has both `lines` and `columns`, or `separator` without `columns` | config load | config error naming the section |
+| `exports` has both `lines` and `columns`, or `separator`, `header_rule` or `rule_separator` without `columns`; `rule_separator` without `header_rule` | config load | config error naming the key path |
+| `rule_separator` not the length of `separator` | config load | **warning**: `... rule_separator is 1 characters but separator is 3, so the rule will not line up with the columns` |
+| `header_rule` is not a single character | config load | config error naming the key path |
+| `header_rule` on a table with no headers | config load | **warning**: `... header_rule has no effect: no column has a header, so there is no header row to rule` |
 | `-t` names a format that needs a different word size | compile | `output format 'minhex' requires 8-bit words` |
 | A section uses a generator that cannot work with the ISA's word size (`intel_hex`, `hex` and `byte_list` need 8-bit words) | config load | `generator 'intel_hex', which needs 8-bit words; this instruction set has 16-bit words` |
 

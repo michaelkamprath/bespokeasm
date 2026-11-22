@@ -182,12 +182,70 @@ class RowsGenerator(Generator):
         return '\n'.join(lines)
 
 
+class ByteLinesGenerator(Generator):
+    """A table with one row per assembled byte, in address order, using the shared column model.
+
+    Fields: ``label`` (the labels at that byte's address, on the line's first byte, else empty),
+    ``address``, ``byte``, ``source`` (the line's instruction text, on its first byte only) and
+    ``comment`` (the same). Only bytes from source are listed: predefined data blocks from the
+    ISA configuration are not. Muted lines are skipped.
+    """
+    name = 'byte_lines'
+    required_options = frozenset({'columns'})
+    optional_options = frozenset({'separator', 'header_rule', 'rule_separator'})
+    required_word_size = 8
+    FIELDS = {'label': 'x', 'address': 0, 'byte': 0, 'source': 'x', 'comment': 'x'}
+
+    def configure(self, options: dict[str, Any]) -> None:
+        from bespokeasm.assembler.output_format.columns import ColumnTable
+
+        self.table = ColumnTable.load(
+            options['columns'], options.get('separator'), self.FIELDS,
+            lambda option, problem: self.error(option, problem),
+            header_rule=options.get('header_rule'),
+            rule_separator=options.get('rule_separator'),
+            warn=lambda option, problem: self.env.warn(self.option_path(option), problem),
+        )
+
+    def render(self, context: RenderContext) -> str:
+        from bespokeasm.assembler.bytecode.word import Word
+        from bespokeasm.assembler.line_object import LineWithWords
+        from bespokeasm.assembler.line_object.label_line import LabelLine
+        from bespokeasm.assembler.line_object.predefined_data import PredefinedDataLine
+
+        rows: list[dict[str, Any]] = []
+        labels: list[LabelLine] = []
+        for line in context.line_objects:
+            if line.is_muted or isinstance(line, PredefinedDataLine):
+                continue
+            if isinstance(line, LabelLine):
+                if not line.is_constant:
+                    labels.append(line)
+                continue
+            if not isinstance(line, LineWithWords) or line.word_count == 0:
+                continue
+            # Labels name the first byte at their address; one left behind by an .org names nothing.
+            names = [label.get_label() for label in labels if label.address == line.address]
+            labels.clear()
+            for offset, value in enumerate(Word.words_to_bytes(line.get_words(), False, 'big')):
+                first = offset == 0
+                rows.append({
+                    'label': ' '.join(names) if first and names else None,
+                    'address': line.address + offset,
+                    'byte': value,
+                    'source': line.instruction.strip() if first else None,
+                    'comment': (line.comment or '').strip() if first else None,
+                })
+        return self.table.render(rows)
+
+
 def generator_classes() -> dict[str, type[Generator]]:
     from bespokeasm.assembler.output_format.generators.exports import ExportsGenerator
     return {
         cls.name: cls
         for cls in (
-            IntelHexGenerator, HexGenerator, ByteListGenerator, ListingGenerator, RowsGenerator, ExportsGenerator,
+            IntelHexGenerator, HexGenerator, ByteListGenerator, ListingGenerator, RowsGenerator, ByteLinesGenerator,
+            ExportsGenerator,
         )
     }
 

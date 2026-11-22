@@ -8,7 +8,12 @@ row: ``by`` names an enum argument and ``cases`` maps its values to ``{field, fo
 whose value has no case gets an empty cell. Every value is formatted first; each column is then as
 wide as the largest of its ``min_width``, its header and its widest value. Columns are joined
 with ``separator`` (default two spaces), the last column is not padded, and trailing spaces are
-removed from each line. A header row is written unless every header is empty.
+removed from each line. A header row is written unless every header is empty, and ``header_rule``
+(one character) draws a line of it under the header row, each column filled to its width.
+
+Between columns, a configured ``separator`` and ``rule_separator`` are used as written. With only
+``rule_separator``, the rows' gap is that many spaces; with only ``separator``, the rule's gap is
+that many rule characters, so the rule is a solid line. With neither, both gaps are two spaces.
 """
 from __future__ import annotations
 
@@ -51,9 +56,17 @@ class Column:
 
 
 class ColumnTable:
-    def __init__(self, columns: tuple[Column, ...], separator: str) -> None:
+    def __init__(
+        self,
+        columns: tuple[Column, ...],
+        separator: str,
+        header_rule: str | None = None,
+        rule_separator: str | None = None,
+    ) -> None:
         self._columns = columns
         self._separator = separator
+        self._header_rule = header_rule
+        self._rule_separator = separator if rule_separator is None else rule_separator  # set by load()
 
     @property
     def columns(self) -> tuple[Column, ...]:
@@ -74,16 +87,18 @@ class ColumnTable:
         fields: dict[str, Any],
         error: ColumnErrorFn,
         enum_fields: dict[str, tuple[str, ...]] | None = None,
+        header_rule: Any = None,
+        warn: Callable[[str, str], None] | None = None,
+        rule_separator: Any = None,
     ) -> ColumnTable:
         """Check a ``columns`` list and ``separator`` against the fields a generator offers.
 
         ``fields`` maps each field name to a sample value of its type, to check format specs.
-        ``enum_fields`` maps each field a column may choose its field ``by`` to its values.
+        ``enum_fields`` maps each field a column may choose its field ``by`` to its values; None
+        means this generator's columns cannot use ``by``.
         """
-        enum_fields = enum_fields or {}
-        if separator is None:
-            separator = DEFAULT_SEPARATOR
-        elif not isinstance(separator, str):
+        separator_given = separator is not None
+        if separator_given and not isinstance(separator, str):
             error('separator', 'must be a string')
         if not isinstance(columns, list) or not columns:
             error('columns', 'must be a non-empty list of columns, each a mapping with a field')
@@ -123,20 +138,44 @@ class ColumnTable:
             if isinstance(min_width, bool) or not isinstance(min_width, int) or min_width < 0:
                 error(f'{path}.min_width', 'must be a whole number, 0 or more')
             loaded.append(Column(field, header, spec, align, min_width, by, cases))
-        return ColumnTable(tuple(loaded), separator)
+        if header_rule is not None:
+            if not isinstance(header_rule, str) or len(header_rule) != 1:
+                error('header_rule', 'must be a single character, such as "-"')
+            if not any(column.header for column in loaded) and warn is not None:
+                warn('header_rule', 'has no effect: no column has a header, so there is no header row to rule')
+        if rule_separator is not None:
+            if header_rule is None:
+                error('rule_separator', 'is only used with header_rule')
+            if not isinstance(rule_separator, str):
+                error('rule_separator', 'must be a string, such as "-+-"')
+            if separator_given and len(rule_separator) != len(separator) and warn is not None:
+                warn(
+                    'rule_separator',
+                    f'is {len(rule_separator)} characters but separator is {len(separator)}, '
+                    'so the rule will not line up with the columns',
+                )
+        # Whichever gap is not configured follows the width of the one that is.
+        if not separator_given:
+            separator = ' ' * len(rule_separator) if rule_separator is not None else DEFAULT_SEPARATOR
+        if rule_separator is None and header_rule is not None:
+            rule_separator = header_rule * len(separator) if separator_given else separator
+        return ColumnTable(tuple(loaded), separator, header_rule, rule_separator)
 
     @staticmethod
     def _load_cases(
         entry: dict,
         path: str,
         fields: dict[str, Any],
-        enum_fields: dict[str, tuple[str, ...]],
+        enum_fields: dict[str, tuple[str, ...]] | None,
         error: ColumnErrorFn,
     ) -> tuple[tuple[str, str, str], ...]:
         by = entry['by']
+        if enum_fields is None:
+            error(f'{path}.by', 'is only available in exports tables, where a column can choose by an annotation argument')
         if by not in enum_fields:
-            known = ', '.join(sorted(enum_fields)) or 'none here'
-            error(f'{path}.by', f'must name an enum argument; enum arguments are {known}')
+            if not enum_fields:
+                error(f'{path}.by', 'must name an enum argument, but this annotation has none')
+            error(f'{path}.by', f'must name an enum argument; enum arguments are {", ".join(sorted(enum_fields))}')
         cases = entry.get('cases')
         if not isinstance(cases, dict) or not cases:
             error(f'{path}.cases', f"must map values of '{by}' to a field, as {{value: {{field: ..., format: ...}}}}")
@@ -174,6 +213,9 @@ class ColumnTable:
             for index, column in enumerate(self._columns)
         ]
         lines = []
+        rule = None
+        if self._header_rule is not None and any(headers):
+            rule = self._rule_separator.join(self._header_rule * width for width in widths).rstrip()
         for line in cells:
             texts = []
             last = len(self._columns) - 1
@@ -185,4 +227,6 @@ class ColumnTable:
                 else:
                     texts.append(text.ljust(widths[index]))
             lines.append(self._separator.join(texts).rstrip())
+            if rule is not None and len(lines) == 1:
+                lines.append(rule)
         return '\n'.join(lines)
