@@ -224,6 +224,12 @@ class AssemblyFile:
             min_verbosity=2,
         )
 
+        for open_condition in condition_stack.open_conditions:
+            self._diagnostic_reporter.warn(
+                open_condition.line_id,
+                f'{open_condition.directive} has no matching #endif before the end of '
+                f'{os.path.basename(self.filename)}',
+            )
         if condition_stack.is_muted:
             line_id = LineIdentifier(line_num if line_num > 0 else 1, filename=self.filename)
             self._diagnostic_reporter.warn(

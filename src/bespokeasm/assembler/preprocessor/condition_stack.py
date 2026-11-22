@@ -53,6 +53,11 @@ class ConditionStack:
             self._mute_counter -= 1
 
     @property
+    def open_conditions(self) -> list[PreprocessorCondition]:
+        """Conditions that have been opened but not closed with #endif, outermost first."""
+        return list(self._stack)
+
+    @property
     def is_muted(self) -> bool:
         """Returns True if the current condition stack is muted."""
         return self._mute_counter > 0

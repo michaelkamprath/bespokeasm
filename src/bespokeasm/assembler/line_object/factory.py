@@ -134,6 +134,18 @@ class LineOjectFactory:
         return f'; did you mean {names}?'
 
     @classmethod
+    def _warn_if_symbol_shadows_mnemonic(cls, line_id: LineIdentifier, label_obj: LabelLine, model: AssemblerModel) -> None:
+        name = label_obj.get_label()
+        if model.instructions.get(name.lower()) is None:
+            return
+        kind = 'constant' if label_obj.is_constant else 'label'
+        model.diagnostic_reporter.warn(
+            line_id,
+            f'{kind} "{name}" has the same name as an instruction mnemonic; a line that starts with "{name}" '
+            'followed by operands will be assembled as that instruction',
+        )
+
+    @classmethod
     def _report_unparsable_text(
         cls,
         line_id: LineIdentifier,
@@ -279,6 +291,7 @@ class LineOjectFactory:
                 if line_obj is not None:
                     if label_seen:
                         model.diagnostic_reporter.error(line_id, 'only one label or constant assignment is allowed per line')
+                    cls._warn_if_symbol_shadows_mnemonic(line_id, line_obj, model)
                     line_obj_list.append(line_obj)
                     label_seen = True
                     instruction_str = instruction_str.replace(line_obj.instruction, '', 1).strip()

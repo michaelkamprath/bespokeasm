@@ -78,10 +78,11 @@ instructions:
     bytecode:
       value: 6
       size: 4
-    operand_count: 1
-    operand_values:
+    operands:
+      count: 1
       operand_sets:
-        - address
+        list:
+          - address
   jc:
     bytecode:
       value: 7

@@ -72,6 +72,11 @@ class PreprocessorCondition:
     def line_id(self) -> LineIdentifier:
         return self._line
 
+    @property
+    def directive(self) -> str:
+        """The preprocessor directive that introduced this condition, such as ``#if``."""
+        return self._line_str.strip().split(None, 1)[0]
+
     def _check_and_set_parent(self, parent: PreprocessorCondition):
         self._parent = parent
 
@@ -106,6 +111,7 @@ class IfPreprocessorCondition(PreprocessorCondition):
             if PREPROCESSOR_COMPARISON_OPERATOR_PATTERN.search(stripped_line)
             else None
         )
+        self._warned_undefined_symbols = False
         if match is None:
             match2 = implied_pattern.match(stripped_line)
             if match2 is None:
@@ -114,6 +120,7 @@ class IfPreprocessorCondition(PreprocessorCondition):
             self._lhs_expression = match2.group(1)
             self._operator = '!='
             self._rhs_expression = '0'
+            self._rhs_quoted = False
         else:
             self._matched_length = match.end()
             self._lhs_expression = match.group(1)
@@ -122,6 +129,35 @@ class IfPreprocessorCondition(PreprocessorCondition):
                 value
                 for value in (match.group(3), match.group(4), match.group(5))
                 if value is not None
+            )
+            self._rhs_quoted = match.group(5) is None
+
+    def _warn_undefined_symbols(self, preprocessor: Preprocessor) -> None:
+        """Warn once about bare names in the condition that are not preprocessor symbols.
+
+        An undefined name is compared as its own literal text, which is almost never what
+        the user meant. Quoted right-hand sides are deliberate text and are not checked.
+        """
+        if self._warned_undefined_symbols:
+            return
+        self._warned_undefined_symbols = True
+        sides = [self._lhs_expression]
+        if not self._rhs_quoted:
+            sides.append(self._rhs_expression)
+        undefined: list[str] = []
+        for side in sides:
+            try:
+                names = parse_expression(self._line, side, preprocessor.default_numeric_base).contained_labels()
+            except AssemblerError:
+                continue
+            for name in sorted(names):
+                if preprocessor.get_symbol(name) is None and name not in undefined:
+                    undefined.append(name)
+        for name in undefined:
+            preprocessor.diagnostic_reporter.warn(
+                self._line,
+                f'preprocessor symbol "{name}" is not defined; {self.directive} compares it as the literal '
+                f'text "{name}" (use #ifdef or #ifndef to test whether a symbol is defined)',
             )
 
     def __repr__(self) -> str:
@@ -181,6 +217,7 @@ class IfPreprocessorCondition(PreprocessorCondition):
                 return LanguageVersionEvaluator.evaluate_expression(expression, preprocessor, self._line)
 
         # Fall back to original evaluation logic for non-language-version expressions
+        self._warn_undefined_symbols(preprocessor)
         lhs_resolved = preprocessor.resolve_symbols(self._line, self._lhs_expression)
         rhs_resolved = preprocessor.resolve_symbols(self._line, self._rhs_expression)
 

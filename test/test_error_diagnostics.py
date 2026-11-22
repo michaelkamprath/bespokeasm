@@ -6,8 +6,11 @@ diagnostics stay useful.
 """
 from __future__ import annotations
 
+import contextlib
 import copy
+import io
 import pathlib
+import re
 
 import pytest
 from bespokeasm.assembler.engine import Assembler
@@ -73,7 +76,13 @@ def write_config(tmp_path: pathlib.Path, mutate=None, name: str = 'isa.yaml') ->
     return str(path)
 
 
-def assemble(tmp_path: pathlib.Path, source: str, config_path: str | None = None) -> Assembler:
+def assemble(
+    tmp_path: pathlib.Path,
+    source: str,
+    config_path: str | None = None,
+    *,
+    warnings_as_errors: bool = False,
+) -> Assembler:
     if config_path is None:
         config_path = write_config(tmp_path)
     source_path = tmp_path / 'prog.diag'
@@ -83,10 +92,17 @@ def assemble(tmp_path: pathlib.Path, source: str, config_path: str | None = None
         'binary', str(tmp_path / 'out.bin'),
         0, None, 0,
         False, 'listing', None, 0,
-        [], [], False,
+        [], [], warnings_as_errors,
     )
     assembler.assemble_bytecode()
     return assembler
+
+
+def assemble_capturing_warnings(tmp_path: pathlib.Path, source: str, config_path: str | None = None) -> str:
+    stderr = io.StringIO()
+    with contextlib.redirect_stderr(stderr):
+        assemble(tmp_path, source, config_path)
+    return stderr.getvalue()
 
 
 def assert_error(tmp_path: pathlib.Path, source: str, pattern: str, config_path: str | None = None) -> None:
@@ -300,3 +316,95 @@ class TestConfigurationFileType:
         pattern = r'ISA configuration file "isa.txt" must have a \.yaml, \.yml, or \.json extension'
         with pytest.raises(SystemExit, match=pattern):
             assemble(tmp_path, '  nop\n', config_path)
+
+
+class TestLikelyMistakesAreWarnings:
+    @pytest.mark.parametrize(
+        'source, pattern',
+        [
+            ('#if 1\n  nop\n', r'WARNING: .*line 1 - #if has no matching #endif before the end of prog\.diag'),
+            ('#ifdef FOO\n  nop\n', r'WARNING: .*line 1 - #ifdef has no matching #endif'),
+            (
+                '#if FOO == 1\n  nop\n#endif\n',
+                r'preprocessor symbol "FOO" is not defined; #if compares it as the literal text "FOO"',
+            ),
+            ('#if FOO\n  nop\n#endif\n', r'preprocessor symbol "FOO" is not defined'),
+            ('#define 123 abc\n  nop\n', r'preprocessor symbol name "123" is not a valid symbol name'),
+            ('nop:\n  nop\n', r'label "nop" has the same name as an instruction mnemonic'),
+            ('ld = 3\n  nop\n', r'constant "ld" has the same name as an instruction mnemonic'),
+            ('  .byte 1, 2,\n', r'trailing comma in \.byte directive is ignored'),
+            ('  .byte 1,,2\n', r'empty value between commas in \.byte directive is ignored'),
+        ],
+    )
+    def test_warning_is_emitted(self, tmp_path, source, pattern):
+        output = assemble_capturing_warnings(tmp_path, source)
+        assert re.search(pattern, output), output
+
+    @pytest.mark.parametrize(
+        'source',
+        [
+            '#define FOO bar\n#if FOO == "bar"\n  nop\n#endif\n',
+            '#define FOO 1\n#if FOO == 1\n  nop\n#endif\n',
+            '#if 1\n  nop\n#endif\n',
+            '  .byte 1, 2, 3\n',
+            'start:\n  nop\n',
+        ],
+    )
+    def test_no_warning_for_correct_source(self, tmp_path, source):
+        assert 'WARNING' not in assemble_capturing_warnings(tmp_path, source)
+
+    def test_undefined_symbol_warning_is_emitted_once(self, tmp_path):
+        output = assemble_capturing_warnings(tmp_path, '#if FOO\n  nop\n  nop\n  nop\n#endif\n')
+        assert output.count('preprocessor symbol "FOO" is not defined') == 1
+
+    def test_warnings_as_errors_elevates_warning(self, tmp_path):
+        with pytest.raises(SystemExit, match='ERROR: .*#if has no matching #endif'):
+            assemble(tmp_path, '#if 1\n  nop\n', warnings_as_errors=True)
+
+
+class TestConfigurationAdvisories:
+    @pytest.mark.parametrize(
+        'mutate, pattern',
+        [
+            (
+                lambda c: c.update(instruction={}),
+                r'<root>\.instruction is not a recognized setting and is ignored \(did you mean "instructions"\?\)',
+            ),
+            (
+                lambda c: c['general'].update(multi_word_endianess='little'),
+                r'general\.multi_word_endianess is not a recognized setting.*multi_word_endian',
+            ),
+            (
+                lambda c: c['instructions']['nop'].update(bytecodes={}),
+                r'instructions\.nop\.bytecodes is not a recognized setting.*bytecode',
+            ),
+            (
+                lambda c: c['instructions']['jmp']['operands'].update(operand_set={}),
+                r'instructions\.jmp\.operands\.operand_set is not a recognized setting',
+            ),
+            (
+                lambda c: c['operand_sets']['imm']['operand_values']['u8'].update(arguments={}),
+                r'operand_sets\.imm\.operand_values\.u8\.arguments is not a recognized setting.*argument',
+            ),
+            (
+                lambda c: c.update(predefined={'constants': [{'name': '9FOO', 'value': 1}]}),
+                r'predefined\.constants\[9FOO\] name "9FOO" is not a valid symbol name',
+            ),
+            (
+                lambda c: c.update(predefined={'constants': [{'name': 'a', 'value': 1}]}),
+                r'predefined\.constants\[a\] name "a" is also a register name',
+            ),
+        ],
+    )
+    def test_advisory_is_a_warning(self, tmp_path, mutate, pattern):
+        config_path = write_config(tmp_path, mutate)
+        output = assemble_capturing_warnings(tmp_path, '  nop\n', config_path)
+        assert re.search(f'WARNING: ISA configuration isa.yaml: {pattern}', output), output
+
+    def test_clean_configuration_has_no_advisories(self, tmp_path):
+        assert 'WARNING' not in assemble_capturing_warnings(tmp_path, '  nop\n')
+
+    def test_advisory_becomes_error_with_warnings_as_errors(self, tmp_path):
+        config_path = write_config(tmp_path, lambda c: c.update(instruction={}))
+        with pytest.raises(SystemExit, match=r'ERROR: ISA configuration isa.yaml: <root>\.instruction'):
+            assemble(tmp_path, '  nop\n', config_path, warnings_as_errors=True)

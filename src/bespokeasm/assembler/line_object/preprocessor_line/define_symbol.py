@@ -8,6 +8,7 @@ from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.symbol import PreprocessorSymbol
 from bespokeasm.assembler.preprocessor.symbol import SYMBOL_PATTERN
+from bespokeasm.utilities import is_valid_label
 
 
 class DefineSymbolLine(PreprocessorLine):
@@ -29,6 +30,13 @@ class DefineSymbolLine(PreprocessorLine):
         super().__init__(line_id, instruction, comment, memzone)
         define_match = re.search(DefineSymbolLine.PATTERN_DEFINE_SYMBOL, instruction.strip())
         if define_match is not None:
+            symbol_name = define_match.group(1)
+            if not is_valid_label(symbol_name):
+                preprocessor.diagnostic_reporter.warn(
+                    line_id,
+                    f'preprocessor symbol name "{symbol_name}" is not a valid symbol name (names must start '
+                    'with a letter or underscore), so it can never be referenced',
+                )
             try:
                 if len(define_match.groups()) == 1:
                     self._symbol = preprocessor.create_symbol(define_match.group(1), None, line_id)

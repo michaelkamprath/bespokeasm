@@ -7,7 +7,6 @@ general :
     name: bespokeasm-test
     version: "0.3.0"
   min_version: "0.7.0"
-registers:
 operand_sets:
   2byte_value:
     operand_values:

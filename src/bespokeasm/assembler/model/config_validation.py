@@ -8,10 +8,12 @@ that names the offending path within the configuration file.
 """
 from __future__ import annotations
 
+import difflib
 import os
 from collections.abc import Callable
 
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
+from bespokeasm.utilities import is_valid_label
 
 ENDIAN_VALUES = ('big', 'little')
 ENDIAN_KEYS = (
@@ -380,3 +382,210 @@ class ConfigValidator:
                 entry_path = f'{path}[{name}]'
             if check_entry is not None:
                 check_entry(entry, entry_path)
+
+
+# ---- advisory checks ------------------------------------------------------------
+
+FLOW_METADATA_KEYS = {
+    'flow_effects', 'flow_terminal', 'flow_transfer', 'flow_target_operand',
+    'flow_call_effects', 'flow_invalidates', 'flow_write_operands',
+}
+KNOWN_KEYS = {
+    'root': {'description', 'general', 'operand_sets', 'instructions', 'macros', 'predefined', 'flow_counters'},
+    'general': {
+        'address_size', 'allow_embedded_strings', 'cstr_terminator', 'default_numeric_base', 'documentation',
+        'endian', 'endianness', 'flags', 'identifier', 'intra_word_endian', 'intra_word_endianness',
+        'min_version', 'multi_word_endian', 'multi_word_endianness', 'origin', 'page_size', 'registers',
+        'string_byte_packing', 'string_byte_packing_fill', 'word_size', 'word_segment_size',
+    },
+    'identifier': {'name', 'version', 'extension'},
+    'register': {'title', 'description', 'reserved', 'size', 'documentation'},
+    'instruction': {'aliases', 'bytecode', 'documentation', 'operands', 'variants', 'mnemonic_decorator'} | FLOW_METADATA_KEYS,
+    'variant': {'bytecode', 'documentation', 'operands', 'mnemonic_decorator'} | FLOW_METADATA_KEYS,
+    'bytecode': {'value', 'size', 'suffix', 'endian', 'multi_word_endian', 'intra_word_endian'},
+    'suffix': {'value', 'size'},
+    'operands': {'count', 'operand_sets', 'specific_operands'},
+    'operand_sets_ref': {'list', 'disallowed_pairs', 'reverse_argument_order', 'reverse_bytecode_order'},
+    'specific_operands': {'list', 'reverse_argument_order', 'reverse_bytecode_order'},
+    'operand': {
+        'type', 'argument', 'bytecode', 'decorator', 'documentation', 'index_operands', 'offset',
+        'offset_from_instruction_end', 'register', 'use_curly_braces',
+    },
+    'operand_argument': {
+        'size', 'word_align', 'endian', 'multi_word_endian', 'intra_word_endian', 'valid_address', 'memory_zone',
+        'slice_lsb', 'match_address_msb', 'match_on_argument_bytcode', 'min', 'max', 'value_dict',
+    },
+    'operand_bytecode': {'value', 'size', 'position', 'min', 'max', 'value_dict', 'word_align'},
+    'offset': {'size', 'word_align', 'min', 'max', 'multi_word_endian', 'intra_word_endian'},
+    'decorator': {'type', 'is_prefix'},
+    'operand_set': {'operand_values', 'documentation', 'bytecode_size'},
+    'macro': {'variants', 'documentation'},
+    'macro_variant': {'operands', 'instructions', 'documentation'},
+    'predefined': {'constants', 'data', 'memory_zones', 'symbols'},
+    'predefined_constant': {'name', 'value', 'documentation'},
+    'predefined_data': {'name', 'address', 'value', 'size', 'documentation'},
+    'predefined_memory_zone': {'name', 'start', 'end', 'documentation'},
+    'predefined_symbol': {'name', 'value', 'documentation'},
+    'flow_counter': {
+        'allow_zero_offset', 'coordinate_offsets', 'default_init', 'documentation', 'entry_modes', 'exit_policy',
+        'invalidate_on_write', 'join', 'max_value', 'min_value', 'operation', 'source', 'unknown_instructions',
+    },
+}
+
+
+# Accepted for compatibility, but never offered as a suggestion.
+DEPRECATED_KEYS = {'endian', 'endianness', 'multi_word_endianness', 'intra_word_endianness'}
+
+
+class ConfigAdvisor:
+    """Warns about configuration content that is accepted but almost certainly a mistake.
+
+    Everything reported here is a warning in the ``user`` category, so ``-W`` turns it
+    into an error.
+    """
+
+    def __init__(self, config: dict, config_file_path: str, diagnostic_reporter: DiagnosticReporter) -> None:
+        self._config = config
+        self._config_name = os.path.basename(config_file_path)
+        self._reporter = diagnostic_reporter
+
+    def warn(self, path: str, problem: str) -> None:
+        self._reporter.warn(None, f'ISA configuration {self._config_name}: {path} {problem}')
+
+    def advise(self) -> None:
+        config = self._config
+        self._check_keys(config, 'root', '<root>')
+        general = config.get('general') if isinstance(config.get('general'), dict) else {}
+        self._check_keys(general, 'general', 'general')
+        if isinstance(general.get('identifier'), dict):
+            self._check_keys(general['identifier'], 'identifier', 'general.identifier')
+        registers = general.get('registers')
+        register_names: set[str] = set()
+        if isinstance(registers, dict):
+            register_names = {str(name) for name in registers}
+            for name, info in registers.items():
+                if isinstance(info, dict):
+                    self._check_keys(info, 'register', f'general.registers.{name}')
+        elif isinstance(registers, list):
+            register_names = {str(name) for name in registers}
+
+        for name, operand_set in (config.get('operand_sets') or {}).items():
+            if not isinstance(operand_set, dict):
+                continue
+            path = f'operand_sets.{name}'
+            self._check_keys(operand_set, 'operand_set', path)
+            self._check_operand_mapping(operand_set.get('operand_values'), f'{path}.operand_values')
+
+        for mnemonic, instruction in (config.get('instructions') or {}).items():
+            if not isinstance(instruction, dict):
+                continue
+            path = f'instructions.{mnemonic}'
+            self._check_keys(instruction, 'instruction', path)
+            self._check_variant_body(instruction, path)
+            for index, variant in enumerate(instruction.get('variants') or [], start=1):
+                if isinstance(variant, dict):
+                    self._check_keys(variant, 'variant', f'{path}.variants[{index}]')
+                    self._check_variant_body(variant, f'{path}.variants[{index}]')
+
+        for mnemonic, macro in (config.get('macros') or {}).items():
+            path = f'macros.{mnemonic}'
+            if isinstance(macro, dict):
+                self._check_keys(macro, 'macro', path)
+                variants = macro.get('variants') or []
+                variant_paths = [f'{path}.variants[{index}]' for index in range(1, len(variants) + 1)]
+            elif isinstance(macro, list):
+                variants = macro
+                variant_paths = [f'{path}[{index}]' for index in range(1, len(variants) + 1)]
+            else:
+                continue
+            for variant, variant_path in zip(variants, variant_paths):
+                if isinstance(variant, dict):
+                    self._check_keys(variant, 'macro_variant', variant_path)
+                    if isinstance(variant.get('operands'), dict):
+                        self._check_operands(variant['operands'], f'{variant_path}.operands')
+
+        predefined = config.get('predefined')
+        if isinstance(predefined, dict):
+            self._check_keys(predefined, 'predefined', 'predefined')
+            for key, kind in (
+                ('constants', 'predefined_constant'),
+                ('data', 'predefined_data'),
+                ('memory_zones', 'predefined_memory_zone'),
+                ('symbols', 'predefined_symbol'),
+            ):
+                for index, entry in enumerate(predefined.get(key) or []):
+                    if not isinstance(entry, dict):
+                        continue
+                    name = entry.get('name')
+                    entry_path = f'predefined.{key}[{name if isinstance(name, str) else index}]'
+                    self._check_keys(entry, kind, entry_path)
+                    if key in ('constants', 'data') and isinstance(name, str):
+                        self._check_predefined_name(name, entry_path, register_names)
+
+        for name, counter in (config.get('flow_counters') or {}).items():
+            if isinstance(counter, dict):
+                self._check_keys(counter, 'flow_counter', f'flow_counters.{name}')
+
+    def _check_keys(self, mapping, kind: str, path: str) -> None:
+        if not isinstance(mapping, dict):
+            return
+        allowed = KNOWN_KEYS[kind]
+        for key in mapping:
+            if key in allowed:
+                continue
+            suggestion = difflib.get_close_matches(str(key), sorted(allowed - DEPRECATED_KEYS), n=1, cutoff=0.7)
+            hint = f' (did you mean "{suggestion[0]}"?)' if suggestion else ''
+            self.warn(f'{path}.{key}', f'is not a recognized setting and is ignored{hint}')
+
+    def _check_variant_body(self, variant: dict, path: str) -> None:
+        bytecode = variant.get('bytecode')
+        if isinstance(bytecode, dict):
+            self._check_keys(bytecode, 'bytecode', f'{path}.bytecode')
+            if isinstance(bytecode.get('suffix'), dict):
+                self._check_keys(bytecode['suffix'], 'suffix', f'{path}.bytecode.suffix')
+        if isinstance(variant.get('operands'), dict):
+            self._check_operands(variant['operands'], f'{path}.operands')
+        if isinstance(variant.get('mnemonic_decorator'), dict):
+            self._check_keys(variant['mnemonic_decorator'], 'decorator', f'{path}.mnemonic_decorator')
+
+    def _check_operands(self, operands: dict, path: str) -> None:
+        self._check_keys(operands, 'operands', path)
+        if isinstance(operands.get('operand_sets'), dict):
+            self._check_keys(operands['operand_sets'], 'operand_sets_ref', f'{path}.operand_sets')
+        specific = operands.get('specific_operands')
+        if isinstance(specific, dict):
+            for name, config in specific.items():
+                if isinstance(config, dict):
+                    self._check_keys(config, 'specific_operands', f'{path}.specific_operands.{name}')
+                    self._check_operand_mapping(config.get('list'), f'{path}.specific_operands.{name}.list')
+
+    def _check_operand_mapping(self, operands, path: str) -> None:
+        if not isinstance(operands, dict):
+            return
+        for operand_id, operand in operands.items():
+            if not isinstance(operand, dict):
+                continue
+            operand_path = f'{path}.{operand_id}'
+            self._check_keys(operand, 'operand', operand_path)
+            for key, kind in (
+                ('argument', 'operand_argument'),
+                ('bytecode', 'operand_bytecode'),
+                ('offset', 'offset'),
+                ('decorator', 'decorator'),
+            ):
+                if isinstance(operand.get(key), dict):
+                    self._check_keys(operand[key], kind, f'{operand_path}.{key}')
+            self._check_operand_mapping(operand.get('index_operands'), f'{operand_path}.index_operands')
+
+    def _check_predefined_name(self, name: str, path: str, register_names: set[str]) -> None:
+        if not is_valid_label(name):
+            self.warn(
+                path,
+                f'name "{name}" is not a valid symbol name (names must start with a letter, "_", or "."), '
+                'so it can never be referenced in source',
+            )
+        elif name in register_names:
+            self.warn(
+                path,
+                f'name "{name}" is also a register name, so it can never be referenced in source',
+            )

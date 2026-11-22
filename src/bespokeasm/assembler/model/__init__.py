@@ -10,6 +10,7 @@ from bespokeasm import BESPOKEASM_VERSION_STR
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.keywords import assembler_keywords_for_isa
 from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.model.config_validation import ConfigAdvisor
 from bespokeasm.assembler.model.config_validation import ConfigValidator
 from bespokeasm.assembler.model.instruction_set import InstructionSet
 from bespokeasm.assembler.model.operand_set import OperandSet
@@ -122,7 +123,7 @@ class AssemblerModel:
                     f'the instruction set configuration file specified an unallowed register name: {reg}',
                 )
         self._operand_sets = OperandSetCollection(
-            self._config['operand_sets'],
+            self._config.get('operand_sets') or {},
             self.multi_word_endianness,
             self.intra_word_endianness,
             self.registers,
@@ -198,6 +199,7 @@ class AssemblerModel:
         # so a mistyped or missing field is reported by its configuration path rather than
         # surfacing as a Python traceback or as an error on an unrelated source line.
         ConfigValidator(self._config, self._config_file, self._diagnostic_reporter).validate()
+        ConfigAdvisor(self._config, self._config_file, self._diagnostic_reporter).advise()
 
         # Validate string_byte_packing option
         general = self._config['general']

@@ -66,7 +66,7 @@ class DataLine(LineWithWords):
         if args_str == '':
             return None
 
-        value_items = DataLine._split_data_items(args_str, line_id, diagnostic_reporter)
+        value_items = DataLine._split_data_items(args_str, line_id, diagnostic_reporter, directive_str)
         if len(value_items) == 0:
             return None
 
@@ -115,12 +115,18 @@ class DataLine(LineWithWords):
         )
 
     @staticmethod
-    def _split_data_items(args_str: str, line_id: LineIdentifier, diagnostic_reporter) -> list[str]:
+    def _split_data_items(
+            args_str: str,
+            line_id: LineIdentifier,
+            diagnostic_reporter,
+            directive_str: str = 'data',
+    ) -> list[str]:
         """Split comma-separated data items while respecting quoted strings."""
         items = []
         token_chars = []
         quote_char = None
         escape_next = False
+        empty_items = 0
 
         for ch in args_str:
             if quote_char is not None:
@@ -140,6 +146,8 @@ class DataLine(LineWithWords):
                 item = ''.join(token_chars).strip()
                 if item != '':
                     items.append(item)
+                else:
+                    empty_items += 1
                 token_chars = []
             else:
                 token_chars.append(ch)
@@ -150,6 +158,10 @@ class DataLine(LineWithWords):
         item = ''.join(token_chars).strip()
         if item != '':
             items.append(item)
+        elif args_str.rstrip().endswith(','):
+            diagnostic_reporter.warn(line_id, f'trailing comma in {directive_str} directive is ignored')
+        if empty_items > 0:
+            diagnostic_reporter.warn(line_id, f'empty value between commas in {directive_str} directive is ignored')
         return items
 
     @staticmethod

@@ -8,11 +8,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 Changes that are planned but not implemented yet:
 
 * Add ability for an instruction to have order agnostic operands. That is, `instr a, b` is the same as `instr b, a`. This allows `swap` to occupy less instruction space.
-* Improve error checking:
-  * Disallowed operands
-  * missing `:` after labels
-  * unknown labels
-  * Disallow instructions on the same line as an `.org` directive
 * Create a "align if needed" preprocessor directive paid that generates an `.align` directive if the bytecode in between the pair isn't naturally on the same page and can fit on the same page if aligned. An error would be benerated if the block of code can't fit on the same page regardless of alignment.
 * Update the `#ifdef` and related preprocessor directives to include detection of labels and constants.
 * Allow multiple `cstr` defininitions on the same line
@@ -25,6 +20,11 @@ Changes that are planned but not implemented yet:
 * Fixed bug in VIM syntax highlighting that caused parsing errors.
 * **Behavior change:** All assembly and ISA configuration errors are now reported through the diagnostic reporter, so they share one format (`ERROR: <file, line> - <message>`) instead of the previous mix of `ERROR - <file, line>: ...` and `ERROR: ...` styles. Internal consistency failures are now reported as `INTERNAL:` errors flagged as BespokeASM bugs, with a traceback, rather than looking like a user error.
 * Improved the `#print` error for an unsupported color name (e.g. `purple`): it now reports the unknown color and lists the supported colors instead of a misleading "invalid verbosity level" error.
+* Malformed expressions, division by zero, `.align 0`, and misplaced `#else`/`#elif` are now reported as assembler errors instead of Python tracebacks, and expression syntax errors name the unexpected token.
+* ISA configuration files are validated when loaded. Missing or mistyped fields and out-of-range bytecode values are reported by configuration path (e.g. `general.address_size`) instead of as tracebacks or errors on an unrelated source line. `.yml` is now an accepted extension.
+* Operand errors now say what was wrong (operand count, which operand was rejected and what is accepted there, a register in a numeric expression, or a `disallowed_pairs` combination) instead of `Instruction "x" has no valid operands configured.`
+* Clearer messages for unknown and duplicate labels, local labels without a preceding global label, missing-colon labels, directives missing arguments, and misspelled mnemonics or directives (with did-you-mean suggestions).
+* **Behavior change:** likely mistakes that previously assembled silently now warn, and `-W` turns the warnings into errors: unterminated `#if` blocks, undefined symbols in `#if`, labels or constants named like a mnemonic, stray commas in data directives, unrecognized ISA configuration keys, and predefined names that are invalid or collide with a register.
 
 ## [0.8.0]
 * Added a general-purpose `#assert` preprocessor directive with the same comparison and symbol-resolution semantics as `#if`. Failed assertions may include an optional user message and `#print`-style color; flow-enabled assertions may also compare `COUNTER()` values and counter-coordinate offsets.
