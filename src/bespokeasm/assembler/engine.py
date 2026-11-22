@@ -359,6 +359,8 @@ class Assembler:
                 compilable_line_obs,
                 self._model,
                 self._source_file,
+                export_model=self._export_model,
+                source_line_objects=line_obs,
             )
             pretty_str = pprinter.pretty_print()
             if self._pretty_print_output == 'stdout':
