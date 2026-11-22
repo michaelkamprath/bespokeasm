@@ -21,7 +21,7 @@ class SetMemoryZoneLine(LineObject):
             self._name = name_str
         memzone = memzone_manager.zone(self._name)
         if memzone is None:
-            raise AssemblerError(line_id, f'unknown memory zone "{name_str}"')
+            raise AssemblerError(line_id, memzone_manager.unknown_zone_message(name_str))
         super().__init__(line_id, instruction, comment, memzone)
 
     @property

@@ -39,6 +39,17 @@ def symbol_scope_name(symbol: str) -> str:
     return _SCOPE_NAMES[SymbolScopeType.get_symbol_scope(symbol)]
 
 
+def _terminator_text(element: int, terminator: int | None) -> str:
+    value = '' if terminator is None else f'{terminator} '
+    return f'{value}terminator' if element == 1 else f'{element}-word {value}terminator'
+
+
+def _found_data(size: int) -> str:
+    if size == 0:
+        return 'no data follows it'
+    return f'{_plural(size, "word")} of data {"follows" if size == 1 else "follow"} it'
+
+
 def _plural(count: int, noun: str) -> str:
     return f'{count} {noun}' if count == 1 else f'{count} {noun}s'
 
@@ -65,6 +76,9 @@ class AnnotatedSymbol:
     line_id: LineIdentifier
     annotations: dict[str, Annotation]
     data_run: tuple[LineWithWords, ...] = ()
+    # Annotations whose data must end with a terminator element, with that element's word count.
+    # Checked once words exist (``ExportModel.check_terminators``).
+    terminated: list[tuple[Annotation, int]] = field(default_factory=list)
 
     @property
     def is_label(self) -> bool:
@@ -98,6 +112,24 @@ class ExportModel:
 
     def for_namespace(self, namespace: str) -> list[AnnotatedSymbol]:
         return [symbol for symbol in self._symbols if namespace in symbol.annotations]
+
+    def check_terminators(self, terminator: int) -> None:
+        """After bytecode generation: each terminated data run must end with a terminator element,
+        every word of which is ``terminator`` (the ISA's ``.cstr`` terminator)."""
+        for symbol in self._symbols:
+            for annotation, element in symbol.terminated:
+                last = symbol.words[-element:]
+                if all(word.value == terminator for word in last):
+                    continue
+                found = ' '.join(f'0x{word.value:02x}' for word in last)
+                raise AssemblerError(
+                    symbol.line_id,
+                    f"'{symbol.name}' is annotated as "
+                    f'{annotation.namespace.data_size.inferring_arguments(annotation.arguments)}, '
+                    'which needs its data to end '
+                    f'with a {_terminator_text(element, terminator)}, but it ends with {found} '
+                    f"(annotation '{annotation.name}')",
+                )
 
     @classmethod
     def build(cls, line_objects: list[LineObject]) -> ExportModel:
@@ -146,21 +178,43 @@ class ExportModel:
 
     @staticmethod
     def _check_data_size(symbol: AnnotatedSymbol, annotation: Annotation) -> None:
+        namespace = annotation.namespace
         try:
-            expected = annotation.namespace.expected_words(annotation.arguments)
+            element = namespace.element_words(annotation.arguments)
+            expected = namespace.expected_words(annotation.arguments) if element is None else None
         except ValueError as exc:
             raise AssemblerError(annotation.line_id, str(exc))
+        if element is not None:
+            terminated = namespace.is_terminated(annotation.arguments)
+            minimum = 2 if terminated else 1
+            if symbol.size >= minimum * element and symbol.size % element == 0:
+                # The data sets the count, which then reads like any given argument.
+                annotation.arguments[namespace.data_size.times] = symbol.size // element - (minimum - 1)
+                if terminated:
+                    symbol.terminated.append((annotation, element))
+                return
+            if symbol.size < minimum * element:
+                needs = f'at least one {element}-word element'
+                if terminated:
+                    needs += f' and a {_terminator_text(element, None)}'
+            else:
+                needs = f'a whole number of {element}-word elements'
+            raise AssemblerError(
+                symbol.line_id,
+                f"'{symbol.name}' is annotated as {namespace.data_size_basis(annotation.arguments)}, "
+                f"which needs {needs}, but {_found_data(symbol.size)} (annotation '{annotation.name}')",
+            )
         if expected is None or expected == symbol.size:
             return
-        if symbol.size == 0:
-            found = 'no data follows it'
-        else:
-            verb = 'follows' if symbol.size == 1 else 'follow'
-            found = f'{_plural(symbol.size, "word")} of data {verb} it'
+        found = _found_data(symbol.size)
+        basis = annotation.namespace.data_size_basis(annotation.arguments)
+        annotated = (
+            f'as {basis}, which needs {_plural(expected, "word")},' if basis
+            else f'as {_plural(expected, "word")}'
+        )
         raise AssemblerError(
             symbol.line_id,
-            f"'{symbol.name}' is annotated as {_plural(expected, 'word')} but {found} "
-            f"(annotation '{annotation.name}')",
+            f"'{symbol.name}' is annotated {annotated} but {found} (annotation '{annotation.name}')",
         )
 
     @staticmethod

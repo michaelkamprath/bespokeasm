@@ -1,0 +1,36 @@
+; Extended Min (xmin) export demo: a 16-bit add routine that an xmin script calls.
+;
+; Assemble with the `xmin` output format to write `addw.xmin`:
+;
+;   bespokeasm compile -c slu4-minimal-64x4.yaml -n -p -t xmin --pretty-print-output addw.xmin xmin-addw.min64x4
+;
+; `XMIN_USER_CODE` is defined only while the `xmin` format is selected, so this file
+; assembles only with `-p -t xmin`. Each `#annotate xmin` line exports the symbol on the
+; next line; the script then uses them like this:
+;
+;   use "addw"
+;   pa = 1234
+;   pb = 99
+;   call AddW
+;   print(pr)
+
+.memzone XMIN_USER_CODE
+.org 0 "XMIN_USER_CODE"
+
+; `add_w` is not a legal xmin name, so the export is named AddW.
+#annotate xmin kind=addr name=AddW
+add_w:
+    LDB pa+0 ADB pb+0 STB pr+0
+    LDB pa+1 ACB pb+1 STB pr+1
+    RTS
+
+; Each int must be followed by exactly 2 bytes of data.
+#annotate xmin kind=var type=int
+pa: .2byte 0
+#annotate xmin kind=var type=int
+pb: .2byte 0
+#annotate xmin kind=var type=int
+pr: .2byte 0
+
+#annotate xmin kind=const type=int
+MAXARG = 1000

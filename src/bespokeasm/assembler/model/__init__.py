@@ -18,6 +18,7 @@ from bespokeasm.assembler.model.operand_set import OperandSet
 from bespokeasm.assembler.model.operand_set import OperandSetCollection
 from bespokeasm.assembler.model.semantics import merge_instruction_semantics
 from bespokeasm.assembler.output_format.defined import DefinedFormat
+from bespokeasm.assembler.output_format.defined import format_scoped_names
 from bespokeasm.assembler.symbol_scope import SymbolScope
 from bespokeasm.assembler.symbol_scope import SymbolScopeType
 from bespokeasm.utilities import is_unprefixed_numeric_string
@@ -1075,6 +1076,12 @@ class AssemblerModel:
     def output_formats(self) -> dict[str, DefinedFormat]:
         """Output formats the configuration defines (``output_formats``), keyed by ``-t`` name."""
         return self._output_formats
+
+    @cached_property
+    def format_scoped_names(self) -> dict[str, dict[str, list[str]]]:
+        """Memory zones (``memory_zones``) and constants (``constants``) that only output formats
+        define, each mapped to the formats that define it. They exist only while one is selected."""
+        return format_scoped_names(self._output_formats)
 
     @property
     def allow_embedded_strings(self) -> bool:

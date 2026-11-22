@@ -88,13 +88,38 @@ class SelectedRule:
     selector: str | None = None
     table: tuple[tuple[str, Any], ...] = ()
     times: str | None = None
+    # A boolean argument that, when true, makes ``times`` come from the label's data.
+    infer_times: str | None = None
+    # When this holds, the data ends with a terminator element that ``times`` leaves out,
+    # and ``times`` comes from the data.
+    terminated_when: Condition | None = None
 
-    def evaluate(self, namespace: str, values: dict[str, Any]) -> Any:
+    def applies(self, values: dict[str, Any]) -> bool:
+        return self.when is None or self.when.holds(values)
+
+    def infers_times(self, values: dict[str, Any]) -> bool:
+        """Whether these arguments ask for ``times`` to be taken from the data."""
+        return self.applies(values) and (
+            (self.infer_times is not None and values.get(self.infer_times) is True)
+            or self.is_terminated(values)
+        )
+
+    def is_terminated(self, values: dict[str, Any]) -> bool:
+        """Whether these arguments say the data ends with a terminator that ``times`` leaves out."""
+        return self.terminated_when is not None and self.applies(values) and self.terminated_when.holds(values)
+
+    def inferring_arguments(self, values: dict[str, Any]) -> str:
+        """The argument values that make ``times`` come from the data, as source writes them."""
+        if self.is_terminated(values):
+            return ' '.join(_argument_text(key, values[key]) for key, _ in self.terminated_when.tests)
+        return f"'{self.infer_times}'"
+
+    def evaluate(self, namespace: str, values: dict[str, Any], apply_times: bool = True) -> Any:
         """Return the constraint value for these arguments, or None if the rule does not apply.
 
         Raises ValueError when an argument the rule needs is absent.
         """
-        if self.when is not None and not self.when.holds(values):
+        if not self.applies(values):
             return None
         if self.selector is None:
             result = self.fixed
@@ -105,9 +130,33 @@ class SelectedRule:
                     f"annotation '{namespace}': {self.kind} needs argument '{self.selector}'"
                 )
             result = dict(self.table)[selected]
-        if self.times is not None:
+            if result is None:
+                # A null table entry: this value is not allowed where the rule applies.
+                where = f' when {self.when.describe()}' if self.when is not None else ''
+                raise ValueError(f"annotation '{namespace}': {self.selector}={selected} is not allowed{where}")
+        if apply_times and self.times is not None:
             result = result * values.get(self.times, 1)
         return result
+
+    def basis(self, values: dict[str, Any]) -> str:
+        """The argument values that chose this rule's value, as in ``type=char count=16``.
+
+        These are the selector and ``times`` arguments; a fixed rule names the arguments its
+        ``when`` tests instead. Empty when no argument chose the value.
+        """
+        keys = [key for key in (self.selector, self.times, self.infer_times) if key is not None and key in values]
+        if not keys and self.selector is None and self.when is not None:
+            keys = [key for key, _ in self.when.tests if key in values]
+        return ' '.join(_argument_text(key, values[key]) for key in keys)
+
+
+def _argument_text(key: str, value: Any) -> str:
+    """An argument as source writes it: a true boolean is a bare key."""
+    if value is True:
+        return key
+    if value is False:
+        return f'{key}=false'
+    return f'{key}={value}'
 
 
 @dataclass(frozen=True)
@@ -169,6 +218,13 @@ class AnnotationNamespace:
                     line_id,
                     f"argument '{spec.name}' is required when {spec.required_when.describe()}",
                 )
+        rule = self.data_size
+        if rule is not None and rule.infers_times(values) and rule.times in explicit:
+            self._error(
+                line_id,
+                f"'{rule.times}' cannot be given with {rule.inferring_arguments(values)}, "
+                f'which takes {rule.times} from the data',
+            )
         return values
 
     def _unknown_argument_problem(self, key: str) -> str:
@@ -236,6 +292,24 @@ class AnnotationNamespace:
         if self.value_range is None:
             return None
         return self.value_range.evaluate(self.name, values)
+
+    def element_words(self, values: dict[str, Any]) -> int | None:
+        """The ``data_size`` of one element when the data sets ``times`` for these arguments, else None."""
+        if self.data_size is None or not self.data_size.infers_times(values):
+            return None
+        return self.data_size.evaluate(self.name, values, apply_times=False)
+
+    def is_terminated(self, values: dict[str, Any]) -> bool:
+        """Whether a label's data must end with a terminator element that the count leaves out."""
+        return self.data_size is not None and self.data_size.is_terminated(values)
+
+    def data_size_basis(self, values: dict[str, Any]) -> str:
+        """The arguments that chose the ``data_size`` word count, for messages."""
+        return self.data_size.basis(values) if self.data_size is not None else ''
+
+    def value_range_basis(self, values: dict[str, Any]) -> str:
+        """The arguments that chose the ``value_range``, for messages."""
+        return self.value_range.basis(values) if self.value_range is not None else ''
 
 
 def _parse_integer(text: str, default_numeric_base: str) -> int | None:
@@ -523,7 +597,22 @@ class _NamespaceLoader:
             target = arguments.get(times)
             if target is None or target.type != 'integer':
                 self._error(f'{value_path}.times', 'must name an integer argument of this annotation')
-        selectors = [name for name in value if name != 'times']
+        terminated_when = None
+        if 'terminated_when' in rule:
+            if key != 'data_size':
+                self._error(f'{rule_path}.terminated_when', 'is only allowed in data_size')
+            if times is None:
+                self._error(f'{rule_path}.terminated_when', f'needs {value_path}.times, the argument it computes')
+            terminated_when = self._condition(rule, 'terminated_when', rule_path, argument_basics)
+        infer_times = None
+        if 'infer_times' in value:
+            if times is None:
+                self._error(f'{value_path}.infer_times', 'needs times, the argument it computes')
+            infer_times = value['infer_times']
+            target = arguments.get(infer_times)
+            if target is None or target.type != 'boolean':
+                self._error(f'{value_path}.infer_times', 'must name a boolean argument of this annotation')
+        selectors = [name for name in value if name not in ('times', 'infer_times')]
         if len(selectors) != 1:
             self._error(value_path, 'must select its value by exactly one enum argument')
         selector = selectors[0]
@@ -543,8 +632,13 @@ class _NamespaceLoader:
                     f'{value_path}.{selector}.{table_key}',
                     f'is not a value of argument \'{selector}\'',
                 )
-            table.append((str(table_key), convert(table_value, f'{value_path}.{selector}.{table_key}')))
-        return SelectedRule(kind=key, when=when, selector=selector, table=tuple(table), times=times)
+            # A null entry means the value is not allowed where the rule applies.
+            converted = None if table_value is None else convert(table_value, f'{value_path}.{selector}.{table_key}')
+            table.append((str(table_key), converted))
+        return SelectedRule(
+            kind=key, when=when, selector=selector, table=tuple(table), times=times, infer_times=infer_times,
+            terminated_when=terminated_when,
+        )
 
 
 def load_annotation_namespaces(section, error: ConfigErrorFn) -> dict[str, AnnotationNamespace]:

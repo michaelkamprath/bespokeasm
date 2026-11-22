@@ -6,6 +6,7 @@ import io
 import json
 
 import pytest
+from bespokeasm import BESPOKEASM_VERSION_STR
 from bespokeasm.assembler.engine import Assembler
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.output_format.builtin import BUILTIN_FORMAT_NAMES
@@ -79,12 +80,16 @@ def _reset_assembler_state():
     SymbolScope._global_scope = None
 
 
-def _write_config(tmp_path, output_formats=None, annotations=None, fixture='test_instruction_operands.yaml') -> str:
+def _write_config(
+    tmp_path, output_formats=None, annotations=None, fixture='test_instruction_operands.yaml', extra=None,
+) -> str:
+    """The fixture with annotations and formats set; ``extra`` sets other top-level keys."""
     with open(pkg_resources.files(config_files).joinpath(fixture)) as handle:
         config = YAML(typ='safe').load(handle)
     config['annotations'] = copy.deepcopy(annotations if annotations is not None else {'xmin': XMIN_ANNOTATION})
     if output_formats is not None:
         config['output_formats'] = copy.deepcopy(output_formats)
+    config.update(copy.deepcopy(extra or {}))
     path = tmp_path / 'isa.json'
     path.write_text(json.dumps(config))
     return str(path)
@@ -103,6 +108,9 @@ def _format_with(**section_overrides) -> dict:
 
 
 def _run(tmp_path, source: str, config_path: str, fmt: str | None = 'xmin', pretty: bool = True, explicit=False):
+    # Each run starts clean: the global symbol scope is cached across assemblies in one process.
+    InstructionLine.reset_instruction_pattern_cache()
+    SymbolScope._global_scope = None
     source_path = tmp_path / 'main.asm'
     source_path.write_text(source)
     output_path = tmp_path / 'out.txt'
@@ -136,6 +144,11 @@ def _error(tmp_path, source: str, config_path: str, fmt: str = 'xmin') -> str:
 
 def _config_error(tmp_path, output_formats, **kwargs) -> str:
     return _error(tmp_path, 'ld a, b, c\n', _write_config(tmp_path, output_formats, **kwargs), fmt='listing')
+
+
+def _config_warnings(tmp_path, output_formats, **kwargs) -> str:
+    _, warnings = _run(tmp_path, 'ld a, b, c\n', _write_config(tmp_path, output_formats, **kwargs), fmt='listing')
+    return warnings
 
 
 # ---- templates ----------------------------------------------------------------------
@@ -477,3 +490,323 @@ def test_type_completion_offers_builtins_and_config_formats(tmp_path):
     assert _complete_output_formats(with_config, None, '') == [*BUILTIN_OUTPUT_FORMAT_NAMES, 'xmin', 'xmin_listing']
     assert _complete_output_formats(with_config, None, 'xm') == ['xmin', 'xmin_listing']
     assert _complete_output_formats(SimpleNamespace(params={}), None, 'h') == ['hex']
+
+
+# ---- shared sets and format-scoped zones and constants ------------------------------------
+
+SHARED_SET = {
+    'requires_word_size': 8,
+    'predefined': {
+        'memory_zones': [{'name': 'XMIN_CODE', 'start': 0x0100, 'end': 0x0FFF}],
+        'constants': [{'name': 'XMIN_DEBUG', 'value': 0}],
+    },
+    'sections': {'symbols': {
+        key: XMIN_FORMAT['sections']['symbols'][key]
+        for key in ('generator', 'annotation', 'unique', 'name_pattern', 'reserved_names')
+    }},
+}
+
+SHARED_FORMAT = {
+    'shared': 'xmin',
+    'template': XMIN_FORMAT['template'],
+    'sections': {
+        'code': {'generator': 'intel_hex'},
+        'symbols': {key: XMIN_FORMAT['sections']['symbols'][key] for key in ('order', 'lines_key', 'lines')},
+    },
+}
+
+ZONE_SOURCE = '.memzone XMIN_CODE\nld a, b, c\n.byte XMIN_DEBUG\n'
+
+
+def _shared_config(tmp_path, formats=None, shared=None, predefined=None) -> str:
+    extra = {'output_format_shared': shared if shared is not None else {'xmin': SHARED_SET}}
+    if predefined is not None:
+        extra['predefined'] = predefined
+    return _write_config(tmp_path, formats if formats is not None else {'xmin': SHARED_FORMAT}, extra=extra)
+
+
+def _with(base: dict, *path_and_value) -> dict:
+    """A deep copy of ``base`` with the value at a key path set (None removes it)."""
+    result = copy.deepcopy(base)
+    *path, value = path_and_value
+    target = result
+    for key in path[:-1]:
+        target = target.setdefault(key, {})
+    if value is None:
+        target.pop(path[-1], None)
+    else:
+        target[path[-1]] = value
+    return result
+
+
+def test_shared_set_merges_into_the_format(tmp_path):
+    standalone, _ = _run(tmp_path, SOURCE, _write_config(tmp_path, {'xmin': XMIN_FORMAT}))
+    shared, warnings = _run(tmp_path, SOURCE, _shared_config(tmp_path))
+    assert warnings == ''
+    assert shared == standalone
+
+
+def test_format_option_overrides_the_shared_option(tmp_path):
+    shared = {'xmin': _with(SHARED_SET, 'sections', 'symbols', 'order', 'source')}
+    output, _ = _run(tmp_path, SOURCE, _shared_config(tmp_path, shared=shared))
+    # The format sets order: address, so labels come before the constant.
+    assert output.splitlines()[-4:] == [
+        'int AddW := 0x0100', 'int pa @ 0x0103', 'char buf[3] @ 0x0105', 'char MAXARG := 200',
+    ]
+    shared_order = {'xmin': _with(SHARED_FORMAT, 'sections', 'symbols', 'order', None)}
+    output, _ = _run(tmp_path, SOURCE, _shared_config(tmp_path, formats=shared_order, shared=shared))
+    assert output.splitlines()[-4] == 'char MAXARG := 200'
+
+
+def test_selected_format_defines_its_zones_and_constants(tmp_path):
+    output, warnings = _run(tmp_path, ZONE_SOURCE, _shared_config(tmp_path))
+    assert ':040100008012300039' in output
+    assert 'no symbols carry' in warnings
+
+
+def test_format_constant_overrides_the_shared_constant(tmp_path):
+    formats = {
+        'xmin': SHARED_FORMAT,
+        'xmin_debug': _with(SHARED_FORMAT, 'predefined', {'constants': [{'name': 'XMIN_DEBUG', 'value': 1}]}),
+    }
+    config = _shared_config(tmp_path, formats=formats)
+    assert ':040100008012300039' in _run(tmp_path, ZONE_SOURCE, config, fmt='xmin')[0]
+    assert ':040100008012300138' in _run(tmp_path, ZONE_SOURCE, config, fmt='xmin_debug')[0]
+
+
+def test_format_level_predefined_without_a_shared_set(tmp_path):
+    output_format = _with(XMIN_FORMAT, 'predefined', {'constants': [{'name': 'LEVEL', 'value': 7}]})
+    output, _ = _run(tmp_path, 'ld a, b, c\n.byte LEVEL\n', _write_config(tmp_path, {'xmin': output_format}))
+    assert ':040000008012300733' in output
+
+
+@pytest.mark.parametrize('fmt', ['listing', None])
+def test_format_scoped_zone_needs_its_format(tmp_path, fmt):
+    pretty = fmt is not None
+    with pytest.raises(SystemExit) as exc_info:
+        _run(tmp_path, ZONE_SOURCE, _shared_config(tmp_path), fmt=fmt or 'listing', pretty=pretty)
+    assert (
+        'unknown memory zone "XMIN_CODE"; it is defined only by output format \'xmin\' (compile with -p -t xmin)'
+    ) in str(exc_info.value)
+
+
+def test_format_scoped_constant_needs_its_format(tmp_path):
+    message = _error(tmp_path, 'ld a, b, c\n.byte XMIN_DEBUG\n', _shared_config(tmp_path), fmt='listing')
+    assert (
+        'unknown label "XMIN_DEBUG"; it is a constant defined only by output format \'xmin\' '
+        '(compile with -p -t xmin)'
+    ) in message
+
+
+def test_format_scoped_name_defined_by_several_formats(tmp_path):
+    config = _shared_config(tmp_path, formats={'xmin': SHARED_FORMAT, 'xmin2': SHARED_FORMAT})
+    message = _error(tmp_path, ZONE_SOURCE, config, fmt='listing')
+    assert (
+        "it is defined only by output formats 'xmin', 'xmin2' (compile with -p and -t naming one of them)"
+    ) in message
+
+
+def test_source_may_reuse_a_format_constant_name_when_the_format_is_not_selected(tmp_path):
+    source = 'XMIN_DEBUG = 5\nld a, b, c\n.byte XMIN_DEBUG\n'
+    output, _ = _run(tmp_path, source, _shared_config(tmp_path), fmt='hex')
+    assert output is not None
+    assert 'label "XMIN_DEBUG" is defined multiple times' in _error(tmp_path, source, _shared_config(tmp_path))
+
+
+def test_shared_requires_word_size_is_inherited(tmp_path):
+    shared = {'xmin': _with(SHARED_SET, 'requires_word_size', 16)}
+    message = _error(tmp_path, SOURCE, _shared_config(tmp_path, shared=shared))
+    assert "output format 'xmin' requires 16-bit words; this instruction set has 8-bit words" in message
+
+
+def test_unused_shared_section_is_not_built(tmp_path):
+    # The shared section is incomplete on its own (no lines), and this format does not use it.
+    output_format = {'shared': 'xmin', 'template': '{code}', 'sections': {'code': {'generator': 'hex'}}}
+    output, warnings = _run(tmp_path, SOURCE, _shared_config(tmp_path, formats={'xmin': output_format}))
+    assert output is not None
+    assert warnings == ''
+
+
+def test_model_lists_format_scoped_names(tmp_path):
+    config = _shared_config(tmp_path, formats={'xmin': SHARED_FORMAT, 'xmin2': SHARED_FORMAT})
+    with contextlib.redirect_stderr(io.StringIO()):
+        model = Assembler(
+            str(tmp_path / 'unused.asm'), config, False, None, 0, None, 0, False, 'listing', 'stdout', 0, [], [],
+        ).model
+    assert model.format_scoped_names == {
+        'memory_zones': {'XMIN_CODE': ['xmin', 'xmin2']},
+        'constants': {'XMIN_DEBUG': ['xmin', 'xmin2']},
+    }
+    assert model.output_formats['xmin'].shared == 'xmin'
+
+
+TOP_LEVEL_PREDEFINED = {
+    'memory_zones': [{'name': 'ZERO_PAGE', 'start': 0, 'end': 0xFF}],
+    'constants': [{'name': 'LIMIT', 'value': 10}],
+    'data': [{'name': 'table', 'address': 0x200, 'value': 0, 'size': 1}],
+}
+
+
+@pytest.mark.parametrize(('shared', 'formats', 'expected'), [
+    (
+        None, {'xmin': _with(SHARED_FORMAT, 'shared', 'xmn')},
+        "output_formats.xmin.shared names unknown shared set 'xmn'; shared sets are xmin",
+    ),
+    (
+        {}, {'xmin': SHARED_FORMAT},
+        "output_formats.xmin.shared names unknown shared set 'xmin'; "
+        'this configuration has no output_format_shared section',
+    ),
+    (
+        {'xmin': _with(SHARED_SET, 'template', '{code}')}, None,
+        'output_format_shared.xmin.template is not allowed in a shared set; only an output format can have it',
+    ),
+    (
+        {'xmin': _with(SHARED_SET, 'documentation', {'description': 'x'})}, None,
+        'output_format_shared.xmin.documentation is not allowed in a shared set',
+    ),
+    (
+        {'xmin': _with(SHARED_SET, 'shared', 'other')}, None,
+        'output_format_shared.xmin.shared is not allowed in a shared set',
+    ),
+    (
+        {'xmin': _with(SHARED_SET, 'predefined', 'data', [{'name': 'd', 'address': 0, 'value': 0, 'size': 1}])},
+        None,
+        'output_format_shared.xmin.predefined.data is not allowed here; '
+        'an output format can predefine only memory_zones and constants',
+    ),
+    (
+        {'xmin': _with(SHARED_SET, 'predefined', 'memory_zones', [{'name': 'ZERO_PAGE', 'start': 0, 'end': 1}])},
+        None,
+        'output_format_shared.xmin.predefined.memory_zones[ZERO_PAGE] cannot be defined: '
+        "'ZERO_PAGE' is already a predefined memory zone",
+    ),
+    (
+        None, {'xmin': _with(SHARED_FORMAT, 'predefined', {'constants': [{'name': 'LIMIT', 'value': 1}]})},
+        "output_formats.xmin.predefined.constants[LIMIT] cannot be defined: 'LIMIT' is already a predefined constant",
+    ),
+    (
+        None, {'xmin': _with(SHARED_FORMAT, 'predefined', {'constants': [{'name': 'table', 'value': 1}]})},
+        "cannot be defined: 'table' is already a predefined data label",
+    ),
+    (
+        None,
+        {'xmin': _with(SHARED_FORMAT, 'predefined', {'memory_zones': [{'name': 'GLOBAL', 'start': 0, 'end': 1}]})},
+        "output_formats.xmin.predefined.memory_zones[GLOBAL] cannot be defined: 'GLOBAL' is already a built-in "
+        'memory zone',
+    ),
+    (
+        None,
+        {'xmin': _with(SHARED_FORMAT, 'predefined', {'constants': [{'name': 'C', 'value': 1}, {'name': 'C', 'value': 2}]})},
+        "output_formats.xmin.predefined.constants[C] defines the constant 'C' a second time",
+    ),
+    (
+        None,
+        {'xmin': _with(SHARED_FORMAT, 'predefined', {'memory_zones': [{'name': 'Z', 'start': 9, 'end': 1}]})},
+        'output_formats.xmin.predefined.memory_zones[Z] start address 9 is greater than end address 1',
+    ),
+    (
+        None, {'xmin': _with(SHARED_FORMAT, 'predefined', {'constants': [{'name': 'C'}]})},
+        'output_formats.xmin.predefined.constants[C].value is required and must be an integer',
+    ),
+    (
+        {'xmin': _with(SHARED_SET, 'sections', 'symbols', 'unique', 'symbol')}, None,
+        'output_format_shared.xmin.sections.symbols.unique must be "name"',
+    ),
+    (
+        {'xmin': _with(SHARED_SET, 'sections', 'symbols', 'colour', 'red')}, None,
+        "output_format_shared.xmin.sections.symbols.colour is not an option of generator 'exports'",
+    ),
+    (
+        {'xmin': _with(SHARED_SET, 'sections', 'symbols', 'generator', 'export')}, None,
+        "output_format_shared.xmin.sections.symbols.generator names unknown generator 'export'",
+    ),
+    (
+        None, {'xmin': _with(SHARED_FORMAT, 'sections', 'symbols', 'lines', 'addr', '{adress}')},
+        'output_formats.xmin.sections.symbols.lines.addr uses unknown field "adress"',
+    ),
+    (
+        {'xmin': _with(SHARED_SET, 'requires_word_size', 0)}, None,
+        'output_format_shared.xmin.requires_word_size must be a positive integer',
+    ),
+])
+def test_shared_config_errors(tmp_path, shared, formats, expected):
+    with pytest.raises(SystemExit) as exc_info:
+        _run(
+            tmp_path, 'ld a, b, c\n',
+            _shared_config(tmp_path, formats=formats, shared=shared, predefined=TOP_LEVEL_PREDEFINED),
+            fmt='listing',
+        )
+    assert expected in str(exc_info.value)
+
+
+def test_shared_config_warnings(tmp_path):
+    shared = {
+        'xmin': _with(SHARED_SET, 'requires_wordsize', 8),
+        'unused': {'requires_word_size': 8},
+    }
+    formats = {'xmin': _with(
+        SHARED_FORMAT, 'predefined', {'constants': [{'name': 'C', 'value': 1, 'documentaton': 'x'}]},
+    )}
+    warnings = _config_warnings(tmp_path, formats, extra={'output_format_shared': shared})
+    assert 'output_format_shared.unused is not used by any output format' in warnings
+    assert 'output_format_shared.xmin.requires_wordsize is not a recognized setting' in warnings
+    assert 'output_formats.xmin.predefined.constants[C].documentaton is not a recognized setting' in warnings
+    assert 'output_format_shared.xmin.sections' not in warnings
+
+
+# ---- golden: the spec's worked example with the Minimal 64x4 config ------------------------
+
+def test_xmin_worked_example(tmp_path):
+    """The spec's worked example. ``config_files/xmin`` holds copies of the shipped Minimal 64x4
+    config (with the xmin annotation and format), ``addw.min64x4`` and the expected file."""
+    fixture = pkg_resources.files(config_files).joinpath('xmin')
+    source = fixture.joinpath('addw.min64x4')
+    output_path = tmp_path / 'addw.xmin'
+    stderr = io.StringIO()
+    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(stderr):
+        Assembler(
+            str(source), str(fixture.joinpath('slu4-minimal-64x4.yaml')), False, None, 0, None, 0,
+            True, 'xmin', str(output_path), 0, [], [],
+        ).assemble_bytecode()
+    assert stderr.getvalue() == ''
+    expected = fixture.joinpath('addw.xmin').read_text().replace('<bespokeasm_version>', BESPOKEASM_VERSION_STR)
+    assert output_path.read_text() == expected
+
+
+def test_array_count_from_the_data_is_exported(tmp_path):
+    annotation = copy.deepcopy(XMIN_ANNOTATION)
+    annotation['arguments']['array'] = {'type': 'boolean', 'allowed_when': {'kind': ['var']}}
+    annotation['data_size']['words']['infer_times'] = 'array'
+    config = _write_config(tmp_path, {'xmin': XMIN_FORMAT}, annotations={'xmin': annotation})
+    source = '#annotate xmin kind=var type=char array\ngreeting: .cstr "hello"\n'
+    output, _ = _run(tmp_path, source, config)
+    assert output.splitlines()[-1] == 'char greeting[6] @ 0x0000'
+
+
+def _str_annotation() -> dict:
+    annotation = copy.deepcopy(XMIN_ANNOTATION)
+    annotation['arguments']['type']['values'].append('str')
+    annotation['data_size']['words']['type']['str'] = 1
+    annotation['data_size']['terminated_when'] = {'type': ['str']}
+    return annotation
+
+
+def test_value_map_rewrites_an_argument_value(tmp_path):
+    output_format = _with(XMIN_FORMAT, 'sections', 'symbols', 'value_map', {'type': {'str': 'char'}})
+    config = _write_config(tmp_path, {'xmin': output_format}, annotations={'xmin': _str_annotation()})
+    source = '#annotate xmin kind=var type=str\ngreeting: .cstr "hello"\n#annotate xmin kind=var type=int\nn: .2byte 0\n'
+    output, _ = _run(tmp_path, source, config)
+    assert output.splitlines()[-2:] == ['char greeting[5] @ 0x0000', 'int n @ 0x0006']
+
+
+@pytest.mark.parametrize(('value_map', 'expected'), [
+    ({'kind2': {'a': 'b'}}, "value_map.kind2 must name an enum argument of annotation 'xmin'"),
+    ({'name': {'a': 'b'}}, "value_map.name must name an enum argument of annotation 'xmin'"),
+    ({'type': {'short': 'int'}}, "value_map.type.short is not a value of argument 'type'"),
+    ({'type': {'char': 1}}, 'value_map.type.char must be a string'),
+    ({'type': ['char']}, 'value_map.type must map values of the argument to output text'),
+])
+def test_value_map_config_errors(tmp_path, value_map, expected):
+    output_format = _with(XMIN_FORMAT, 'sections', 'symbols', 'value_map', value_map)
+    assert expected in _config_error(tmp_path, {'xmin': output_format})

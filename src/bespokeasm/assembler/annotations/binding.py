@@ -98,8 +98,10 @@ class AnnotationBinder:
         value = definition.get_value()
         low, high = allowed
         if not low <= value <= high:
+            basis = annotation.namespace.value_range_basis(annotation.arguments)
+            range_of = f', the range of {basis}' if basis else ''
             raise AssemblerError(
                 definition.line_id,
-                f"'{definition.get_label()}' value {value} is outside {low} to {high} "
+                f"'{definition.get_label()}' value {value} is outside {low} to {high}{range_of} "
                 f"(annotation '{annotation.name}')",
             )

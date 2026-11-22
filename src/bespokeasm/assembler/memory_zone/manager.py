@@ -4,8 +4,17 @@ GLOBAL_ZONE_NAME = 'GLOBAL'
 
 
 class MemoryZoneManager:
-    def __init__(self, address_bits: int, default_origin: int, predefined_zones: list[dict] = []) -> None:
+    def __init__(
+        self,
+        address_bits: int,
+        default_origin: int,
+        predefined_zones: list[dict] = [],
+        format_scoped_zones: dict[str, list[str]] | None = None,
+    ) -> None:
+        """``format_scoped_zones`` maps each zone that only output formats define to those
+        formats, so a reference to one that is not selected gets a helpful error."""
         self._address_bits = address_bits
+        self._format_scoped_zones = dict(format_scoped_zones or {})
 
         self._zones: dict[str, MemoryZone] = {
             mz['name']: MemoryZone(address_bits, mz['start'], mz['end'], mz['name'])
@@ -23,6 +32,14 @@ class MemoryZoneManager:
 
     def zone(self, name: str) -> MemoryZone:
         return self._zones.get(name, None)
+
+    def unknown_zone_message(self, name: str) -> str:
+        message = f'unknown memory zone "{name}"'
+        formats = self._format_scoped_zones.get(name)
+        if formats:
+            from bespokeasm.assembler.output_format.defined import format_scoped_hint
+            message += f'; {format_scoped_hint(formats)}'
+        return message
 
     def create_zone(self, address_bits: int, start: int, end: int, name: str) -> MemoryZone:
         if name in self._zones:

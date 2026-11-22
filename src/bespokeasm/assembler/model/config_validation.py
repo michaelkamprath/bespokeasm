@@ -157,7 +157,34 @@ class ConfigValidator:
                 word_size=word_size if self._is_int(word_size) else 8,
                 error=self.error,
                 warn=self.warn,
+                check_predefined=lambda entries, path: self._validate_format_predefined(entries, path, general),
+                predefined_names=self._predefined_names(predefined or {}),
             ),
+            config.get('output_format_shared'),
+        )
+
+    @staticmethod
+    def _predefined_names(predefined: dict) -> dict[str, dict[str, str]]:
+        """Top-level predefined names that a format may not reuse, by the kind a format can define."""
+        def names(key: str) -> list[str]:
+            entries = predefined.get(key) or []
+            return [entry['name'] for entry in entries if isinstance(entry, dict) and isinstance(entry.get('name'), str)]
+        constants = {name: 'predefined constant' for name in names('constants')}
+        constants.update({name: 'predefined data label' for name in names('data')})
+        return {
+            'memory_zones': {name: 'predefined memory zone' for name in names('memory_zones')},
+            'constants': constants,
+        }
+
+    def _validate_format_predefined(self, predefined: dict, path: str, general: dict) -> None:
+        """The ``predefined`` mapping of an output format or shared set: memory zones and constants."""
+        self._validate_named_entries(
+            predefined, 'constants', f'{path}.constants',
+            lambda entry, entry_path: self.require_int(entry, 'value', entry_path, required=True),
+        )
+        self._validate_named_entries(
+            predefined, 'memory_zones', f'{path}.memory_zones',
+            lambda entry, entry_path: self._check_zone(entry, entry_path, general),
         )
 
     def warn(self, path: str, problem: str) -> None:
@@ -366,24 +393,27 @@ class ConfigValidator:
             self.require_int(entry, 'size', path, required=True, minimum=1)
         self._validate_named_entries(predefined, 'data', 'predefined.data', check_data)
 
+        self._validate_named_entries(
+            predefined, 'memory_zones', 'predefined.memory_zones',
+            lambda entry, path: self._check_zone(entry, path, general),
+        )
+        self._validate_named_entries(predefined, 'symbols', 'predefined.symbols', None)
+
+    def _check_zone(self, entry: dict, path: str, general: dict) -> None:
         address_size = general.get('address_size')
         address_limit = (1 << address_size) - 1 if self._is_int(address_size) and address_size > 0 else None
-
-        def check_zone(entry: dict, path: str) -> None:
-            start = self.require_int(entry, 'start', path, required=True, minimum=0)
-            end = self.require_int(entry, 'end', path, required=True, minimum=0)
-            if not self._is_int(start) or not self._is_int(end):
-                return
-            if start > end:
-                self.error(path, f'start address {start} is greater than end address {end}')
-            if address_limit is not None and end > address_limit:
-                self.error(
-                    path,
-                    f'end address {end} is outside the {address_size}-bit address space '
-                    f'(maximum address is {address_limit})',
-                )
-        self._validate_named_entries(predefined, 'memory_zones', 'predefined.memory_zones', check_zone)
-        self._validate_named_entries(predefined, 'symbols', 'predefined.symbols', None)
+        start = self.require_int(entry, 'start', path, required=True, minimum=0)
+        end = self.require_int(entry, 'end', path, required=True, minimum=0)
+        if not self._is_int(start) or not self._is_int(end):
+            return
+        if start > end:
+            self.error(path, f'start address {start} is greater than end address {end}')
+        if address_limit is not None and end > address_limit:
+            self.error(
+                path,
+                f'end address {end} is outside the {address_size}-bit address space '
+                f'(maximum address is {address_limit})',
+            )
 
     def _validate_named_entries(
         self,
@@ -415,14 +445,15 @@ FLOW_METADATA_KEYS = {
 KNOWN_KEYS = {
     'root': {
         'description', 'general', 'operand_sets', 'instructions', 'macros', 'predefined', 'flow_counters',
-        'annotations', 'output_formats',
+        'annotations', 'output_formats', 'output_format_shared',
     },
-    'output_format': {'documentation', 'requires_word_size', 'template', 'sections'},
+    'output_format': {'documentation', 'requires_word_size', 'template', 'sections', 'shared', 'predefined'},
+    'output_format_shared': {'requires_word_size', 'sections', 'predefined'},
     'annotation': {'documentation', 'applies_to', 'scopes', 'arguments', 'data_size', 'value_range'},
     'annotation_argument': {
         'type', 'values', 'min', 'max', 'pattern', 'required', 'required_when', 'allowed_when', 'default',
     },
-    'annotation_data_size': {'when', 'words'},
+    'annotation_data_size': {'when', 'words', 'terminated_when'},
     'annotation_value_range': {'when', 'range'},
     'general': {
         'address_size', 'allow_embedded_strings', 'cstr_terminator', 'default_numeric_base', 'documentation',
@@ -569,9 +600,25 @@ class ConfigAdvisor:
             self._check_keys(namespace.get('data_size'), 'annotation_data_size', f'{path}.data_size')
             self._check_keys(namespace.get('value_range'), 'annotation_value_range', f'{path}.value_range')
 
-        output_formats = config.get('output_formats')
-        for name, output_format in (output_formats.items() if isinstance(output_formats, dict) else ()):
-            self._check_keys(output_format, 'output_format', f'output_formats.{name}')
+        for section, kind in (('output_formats', 'output_format'), ('output_format_shared', 'output_format_shared')):
+            formats = config.get(section)
+            for name, output_format in (formats.items() if isinstance(formats, dict) else ()):
+                if not isinstance(output_format, dict):
+                    continue
+                path = f'{section}.{name}'
+                self._check_keys(output_format, kind, path)
+                predefined = output_format.get('predefined')
+                if not isinstance(predefined, dict):
+                    continue
+                for key, entry_kind in (('constants', 'predefined_constant'), ('memory_zones', 'predefined_memory_zone')):
+                    for index, entry in enumerate(predefined.get(key) or []):
+                        if not isinstance(entry, dict):
+                            continue
+                        entry_name = entry.get('name')
+                        entry_path = f'{path}.predefined.{key}[{entry_name if isinstance(entry_name, str) else index}]'
+                        self._check_keys(entry, entry_kind, entry_path)
+                        if key == 'constants' and isinstance(entry_name, str):
+                            self._check_predefined_name(entry_name, entry_path, register_names)
 
     def _check_keys(self, mapping, kind: str, path: str) -> None:
         if not isinstance(mapping, dict):
