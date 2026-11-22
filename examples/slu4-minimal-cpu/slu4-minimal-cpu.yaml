@@ -7,9 +7,9 @@ general:
   origin: 0x8000
   identifier:
     name: slu4-mincpu-asm
-    version: "1.5.1"
+    version: "1.6.0"
     extension: min-asm
-  min_version: 0.7.0
+  min_version: 0.9.0
 operand_sets:
   immediate:
     operand_values:
@@ -78,6 +78,23 @@ predefined:
       value: 0xfec5
     - name: os_InpBuf
       value: 0xfec9
+# Pretty-print format for this ISA only (see the BespokeASM wiki). `-p -t minhex` writes
+# rows of hex bytes for pasting into the Minimal CPU terminal, with the address on its own
+# line at each `.org`. It does not change the assembled byte code.
+output_formats:
+  minhex:
+    documentation:
+      description: Minimal CPU hex dump, for pasting into the Minimal CPU terminal.
+    requires_word_size: 8
+    template: "{code}\n"
+    sections:
+      code:
+        generator: rows
+        bytes_per_row: 16
+        row_prefix: ":"
+        byte: "{byte:02x} "          # each byte, with its trailing space
+        org_line: "{address:04x}"    # written at each .org; 4 digits for address_size 16
+
 instructions:
   nop:
     bytecode:

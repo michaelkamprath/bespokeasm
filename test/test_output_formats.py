@@ -1031,3 +1031,103 @@ def test_column_chooses_by_the_source_value_before_value_map(tmp_path):
 ])
 def test_by_column_config_errors(tmp_path, column, expected):
     assert expected in _config_error(tmp_path, _columns_with([column]))
+
+
+# ---- rows and the minhex format -------------------------------------------------------------
+
+ROWS_FORMAT = {
+    'requires_word_size': 8,
+    'template': '{code}\n',
+    'sections': {'code': {
+        'generator': 'rows',
+        'bytes_per_row': 4,
+        'row_prefix': ':',
+        'byte': '{byte:02x} ',
+        'org_line': '{address:04x}',
+    }},
+}
+
+
+@pytest.mark.parametrize(('source', 'expected'), [
+    # Rows wrap after bytes_per_row bytes; every byte keeps its trailing space.
+    ('.byte 1, 2, 3, 4, 5\n', ':01 02 03 04 \n:05 \n'),
+    # An .org ends the current row and writes the address on its own line.
+    ('.byte 1, 2\n.org $10\n.byte 3\n', ':01 02 \n0010\n:03 \n'),
+    ('.org $20\n.byte $aa\n.org $30\n', '0020\n:aa \n0030\n'),
+    # Muted lines are skipped.
+    ('.byte 1\n#mute\n.byte 2\n#unmute\n.byte 3\n', ':01 03 \n'),
+])
+def test_rows_generator(tmp_path, source, expected):
+    output, warnings = _run(tmp_path, source, _write_config(tmp_path, {'rows': ROWS_FORMAT}), fmt='rows')
+    assert warnings == ''
+    assert output == expected
+
+
+def _rows_with(**options) -> dict:
+    output_format = copy.deepcopy(ROWS_FORMAT)
+    code = output_format['sections']['code']
+    for key, value in options.items():
+        if value is None:
+            code.pop(key)
+        else:
+            code[key] = value
+    return {'rows': output_format}
+
+
+ROWS_SECTION = 'output_formats.rows.sections.code'
+
+
+@pytest.mark.parametrize(('output_formats', 'expected'), [
+    (_rows_with(org_line=None), f"{ROWS_SECTION} uses generator 'rows', which requires option 'org_line'"),
+    (_rows_with(bytes_per_row=0), f'{ROWS_SECTION}.bytes_per_row must be a positive whole number'),
+    (_rows_with(row_prefix=1), f'{ROWS_SECTION}.row_prefix must be a string'),
+    (_rows_with(byte='{value:02x}'), f'{ROWS_SECTION}.byte uses unknown field "value"; known fields are byte'),
+    (_rows_with(org_line='{address:>q}'), f'{ROWS_SECTION}.org_line gives field "address" the format spec ">q"'),
+])
+def test_rows_config_errors(tmp_path, output_formats, expected):
+    assert expected in _config_error(tmp_path, output_formats)
+
+
+def test_rows_needs_8_bit_words(tmp_path):
+    message = _config_error(tmp_path, _rows_with(), annotations={}, fixture='test_16bit_data_words.yaml')
+    assert "uses generator 'rows', which needs 8-bit words; this instruction set has 16-bit words" in message
+
+
+def test_minhex_is_not_offered_by_other_isas(tmp_path):
+    message = _error(tmp_path, 'ld a, b, c\n', _write_config(tmp_path), fmt='minhex')
+    assert "this instruction set does not define output format 'minhex'" in message
+
+
+MINHEX_PROGRAMS = ['hello', 'mathlib', 'primes32', 'random-maze', 'random_stars', 'stringlib']
+
+
+@pytest.mark.parametrize('program', MINHEX_PROGRAMS)
+def test_minhex_format_matches_the_former_printer(tmp_path, monkeypatch, program):
+    """``config_files/minhex`` holds copies of the Minimal CPU config and its example programs,
+    and the output of the removed built-in minhex printer for each. The config format must
+    reproduce it byte for byte."""
+    fixture = pkg_resources.files(config_files).joinpath('minhex')
+    monkeypatch.chdir(str(fixture))
+    output_path = tmp_path / f'{program}.minhex'
+    stderr = io.StringIO()
+    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(stderr):
+        Assembler(
+            f'{program}.min-asm', 'slu4-minimal-cpu.yaml', False, None, 0, None, 0,
+            True, 'minhex', str(output_path), 0, [], [],
+        ).assemble_bytecode()
+    assert stderr.getvalue() == ''
+    assert output_path.read_bytes() == fixture.joinpath(f'{program}.minhex').read_bytes()
+
+
+def test_one_process_can_assemble_a_program_that_includes_a_file_twice(tmp_path, monkeypatch):
+    """The set of included files belongs to one assembly; it used to be a shared default argument."""
+    monkeypatch.chdir(str(pkg_resources.files(config_files).joinpath('minhex')))
+    for attempt in range(2):
+        InstructionLine.reset_instruction_pattern_cache()
+        SymbolScope._global_scope = None
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            Assembler(
+                'primes32.min-asm', 'slu4-minimal-cpu.yaml', False, None, 0, None, 0,
+                True, 'minhex', str(tmp_path / f'{attempt}.minhex'), 0, [], [],
+            ).assemble_bytecode()
+    assert (tmp_path / '0.minhex').read_bytes() == (tmp_path / '1.minhex').read_bytes()

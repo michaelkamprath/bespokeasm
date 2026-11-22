@@ -66,6 +66,6 @@ Where each option means:
 
 * `-c path/to/slu5-minimal-cpu.yaml` - Provides the path to the ISA configuration that defines the instruction set to be used when assembling. The Minimal CPU ISA configuration file [is provided here](./slu4-minimal-cpu.yaml).
 * `-p` - Tells **BespokeASM** to pretty print the results to a human usable format.
-* `-t minhex` - Configured the format of the pretty printing. In this case, the `minhex` format is the same as the format that the Minimal CPU assembler emits, and can be directly copy/pasted into a terminal session with the Minimal CPU for uploading.
+* `-t minhex` - Configured the format of the pretty printing. In this case, the `minhex` format is the same as the format that the Minimal CPU assembler emits, and can be directly copy/pasted into a terminal session with the Minimal CPU for uploading. The format is defined in this ISA configuration's `output_formats` section, so it is available only with this configuration (BespokeASM 0.9.0 or later).
 * `--no-binary` - Tells **BespokeASM** to not emit a binary file containing the byte code. For the most part, the Minimal CPU does not use binary files in its day-to-day usage.
 * `path/to/source.min-asm` - The assembly source file to compile. By convention for **BespokeASM**, Minimal CPU assembly files have the extension of `*.min-cpu`. The only impact of this file extension is to signal to various editors what [syntax highlighting to be used](https://github.com/michaelkamprath/bespokeasm/wiki/Installation-and-Usage#installing-language-extensions).
