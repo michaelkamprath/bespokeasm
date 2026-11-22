@@ -480,6 +480,16 @@ sine_table:
 
 collapse acts on the label's data run. hide acts on every line from the label up to the next label of any scope. A config may not declare a namespace named `listing`. Further framework namespaces would follow the same rule.
 
+Details:
+
+- A symbol's lines begin at its first `#annotate` line, directly above the definition. A heading and a page break go before that line, so the annotations stay with their symbol.
+- `heading` prints a blank line, the heading text and a `-` underline as long as the text.
+- `page_break` writes a form feed and then the file and column headers again, so each page reads on its own; the repeated file line says `File: <name> (continued)`, so it does not read as a second file where the form feed does not start a new page (a terminal or editor). On the first line of a file, the form feed goes before that file's header, which is not marked continued.
+- `collapse` prints the data run's first line with its first row of words, then a summary row with the address of the first word not shown and `... N more bytes` (`words` when the ISA's words are not 8 bits). Comment lines inside the run are left out too. If the first row holds the whole run, there is no summary row. `collapse` on a label with no data run, or on a constant, does nothing and is a warning.
+- `hide` leaves out the symbol's `#annotate` lines and every line up to the next label of any scope (a constant is not one); on a constant, only its own line. A hidden symbol prints no heading or page break.
+- Column widths come from the lines that are printed, so hidden lines do not widen the listing.
+- Other formats ignore the namespace, except the `listing` generator, which writes the same text as `-t listing`.
+
 ## Errors and diagnostics
 
 Every problem is an error with the source line, not a warning, unless marked otherwise. Config errors (last row) fail when the config loads, before any source is read.
@@ -493,7 +503,7 @@ Every problem is an error with the source line, not a warning, unless marked oth
 | Data that cannot set the count: not a whole number of elements, or too little data | `'odd' is annotated as type=int array, which needs a whole number of 2-word elements, but 3 words of data follow it` |
 | The next line is not a label, a constant or another #annotate | `#annotate must be directly above a label or constant definition` |
 | Symbol kind or scope not allowed (`applies_to`, `scopes`) | `annotation 'xmin' is not allowed on local label '.loop'` |
-| Same namespace twice on one symbol | `symbol 'pa' already has an 'xmin' annotation` |
+| Same namespace twice on one symbol | `symbol 'pa' already has an annotation in the 'xmin' namespace` |
 | `data_size` mismatch, or constant outside its value\_range (each names the arguments that chose the size or range) | `'pa' is annotated as type=int, which needs 2 words, but 1 word of data follows it` / `'MAXARG' value 40000 is outside -32768 to 32767, the range of type=int` |
 | `terminated_when` data that does not end with the terminator | `'msg' is annotated as type=str, which needs its data to end with a 0 terminator, but it ends with 0x42` |
 | A rule's table has a `null` entry for the selected value | `annotation 'xmin': type=str is not allowed when kind is const` |

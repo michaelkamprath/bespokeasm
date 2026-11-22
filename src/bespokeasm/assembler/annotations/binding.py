@@ -67,7 +67,7 @@ class AnnotationBinder:
             if namespace.name in annotations:
                 raise AssemblerError(
                     line.line_id,
-                    f"symbol '{name}' already has an '{namespace.name}' annotation",
+                    f"symbol '{name}' already has an annotation in the '{namespace.name}' namespace",
                 )
             if kind not in namespace.applies_to:
                 raise AssemblerError(
