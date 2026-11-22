@@ -6,6 +6,9 @@ from typing import NamedTuple
 
 
 SUPPORTED_COMPLETION_SHELLS = ('bash', 'zsh', 'fish')
+# Kept here, not imported, so shell completion stays light. A test checks it matches
+# bespokeasm.assembler.output_format.builtin.BUILTIN_FORMAT_NAMES.
+BUILTIN_OUTPUT_FORMAT_NAMES = ('listing', 'hex', 'intel_hex', 'minhex', 'symbols')
 VERBOSE_HELP = 'Verbosity of logging (counting flag: -v, -vv, -vvv or --verbose <n>).'
 
 
@@ -15,6 +18,53 @@ class CommandHandlers(NamedTuple):
     vscode: Callable[..., Any]
     sublime: Callable[..., Any]
     vim: Callable[..., Any]
+
+
+def config_output_format_names(config_file: str) -> list[str]:
+    """The ``output_formats`` names in a configuration file, read without loading the whole file.
+
+    Used only for shell completion, so a problem reading the file yields no names.
+    """
+    import re
+
+    try:
+        with open(config_file) as handle:
+            text = handle.read()
+    except OSError:
+        return []
+    if config_file.endswith('.json'):
+        import json
+        try:
+            formats = json.loads(text).get('output_formats')
+        except (ValueError, AttributeError):
+            return []
+        return [str(name) for name in formats] if isinstance(formats, dict) else []
+    names: list[str] = []
+    indent = None
+    in_section = False
+    for line in text.splitlines():
+        if re.match(r'^output_formats\s*:\s*(#.*)?$', line):
+            in_section = True
+            continue
+        if not in_section or line.strip() == '' or line.lstrip().startswith('#'):
+            continue
+        if not line[0].isspace():
+            break
+        match = re.match(r'^(\s+)([A-Za-z][A-Za-z0-9_]*)\s*:', line)
+        if match is not None:
+            if indent is None:
+                indent = match.group(1)
+            if match.group(1) == indent:
+                names.append(match.group(2))
+    return names
+
+
+def _complete_output_formats(ctx, _param, incomplete: str):
+    names = list(BUILTIN_OUTPUT_FORMAT_NAMES)
+    config_file = ctx.params.get('config_file')
+    if config_file:
+        names.extend(name for name in config_output_format_names(config_file) if name not in names)
+    return [name for name in names if name.startswith(incomplete)]
 
 
 def _detect_shell():
@@ -172,9 +222,11 @@ def build_cli(handlers: CommandHandlers):
         )
     @click.option(
             '--pretty-print-format', '-t',
-            type=click.Choice(['minhex', 'hex', 'intel_hex', 'listing', 'symbols'], case_sensitive=False),
             default='listing',
-            help='The format that should be used when pretty printing.',
+            shell_complete=_complete_output_formats,
+            help='The format that should be used when pretty printing: '
+                 + ', '.join(BUILTIN_OUTPUT_FORMAT_NAMES)
+                 + ', or a format the instruction set configuration defines. Defaults to listing.',
     )
     @click.option(
             '--pretty-print-output',  default='stdout',
@@ -207,7 +259,9 @@ def build_cli(handlers: CommandHandlers):
                 'still resolved when checks are disabled.'
             )
         )
+    @click.pass_context
     def compile(
+                ctx,
                 asm_file,
                 config_file,
                 binary,
@@ -240,6 +294,7 @@ def build_cli(handlers: CommandHandlers):
             macro_symbol,
             warnings_as_errors,
             flow_checks,
+            ctx.get_parameter_source('pretty_print_format') is not click.core.ParameterSource.DEFAULT,
         )
 
     @main.command(cls=OptionForwardingCommand, short_help='generate markdown documentation for an ISA')

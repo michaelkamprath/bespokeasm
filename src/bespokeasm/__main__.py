@@ -20,6 +20,7 @@ def _compile_handler(
             macro_symbol,
             warnings_as_errors,
             flow_checks,
+            pretty_print_format_explicit=False,
         ):
     import os
 
@@ -47,6 +48,7 @@ def _compile_handler(
         macro_symbol,
         warnings_as_errors,
         flow_checks=flow_checks,
+        pretty_print_format_explicit=pretty_print_format_explicit,
     )
     asm.assemble_bytecode()
 

@@ -173,12 +173,12 @@ output_formats:
 
 Fields are fixed names with Python format specs, not expressions:
 
-- Template: `source_file`, `isa_name`, `isa_version`, `bespokeasm_version`, and the section names. A section name may not be the same as a field name.
-- `exports` items: `name` (the `name` argument, else the symbol), `symbol`, `address` (labels only), `value` (constants only), `size` (in words), `words` (the words of a label's data run, in hex, separated by spaces), and every annotation argument.
+- Template: `source_file`, `isa_name`, `isa_version`, `bespokeasm_version`, and the section names. A section name may not be the same as a field name, and a section field takes no format spec. A section's text never starts or ends with a blank line; the template decides the spacing around it. A section the template never uses is a config warning.
+- `exports` items: `name` (the `name` argument, else the symbol), `symbol`, `address` (labels only), `value` (constants only), `size` (in words), `words` (the words of a label's data run, in hex, in memory order, separated by spaces), and every annotation argument. A `symbol`-typed argument's field is its resolved value. An annotation argument may not have the name of one of these fields, except `name`; using such an annotation in `exports` is a config error.
 - `byte_lines` items: `label` (a label at that address, else empty), `address`, `byte`, `source` (the instruction text, on its first byte only) and `comment` (the same).
 - `rows` items: `byte`, and `address` in `org_line`.
 
-An unknown field is a config error at load time. An empty field prints as nothing, and its format spec is not applied. In `exports`, `lines_key` names the enum argument whose value selects a `lines` template, and every value of that enum needs a template. With order: address, labels come first in address order, and constants follow in the order they are defined. With order: source, every export is in the order it is defined.
+An unknown field is a config error at load time, and so is a format spec that cannot apply to the field's type, such as `04x` on `name`. An empty field prints as nothing, and its format spec is not applied. In `exports`, `lines_key` names the enum argument whose value selects a `lines` template, and every value of that enum needs a template. With order: address, labels come first in address order, and constants follow in the order they are defined. With order: source, every export is in the order it is defined. The default is source.
 
 Optional parts. In any line template, `{?...}` is an optional group. The generator writes the group only when every field inside it has a value; otherwise it writes nothing for the whole group. Example: `{name}{?[{count}]}` gives `buf[16]` when `count` is 16 and `pa` when there is no `count`. Groups do not nest, and an unmatched `{?` is a config error. Literal braces are written `{{` and `}}`, as in Python.
 
@@ -471,7 +471,7 @@ Every problem is an error with the source line, not a warning, unless marked oth
 | Export name fails the `name` pattern, or is in `reserved_names` | `export name 'sum_to' is not valid for format 'xmin'` |
 | Two exports with one name (`unique: name`) | `export name 'pa' is used by 'pa' and '_pa'` |
 | Format used with no matching annotations | **warning**: `format 'xmin': no symbols carry an 'xmin' annotation` |
-| `-t` names a config format but `-p` is absent | **warning**: `-t xmin has no effect without -p; output format 'xmin' is not selected` |
+| `-t` is given but `-p` is absent (any format, built-in or config) | **warning**: `-t xmin has no effect without -p; output format 'xmin' is not selected` |
 | Config: unknown template field, missing `lines` entry, namespace named `listing`, format named like a built-in | config error naming the key path |
 
 Errors from the later sections:
@@ -491,6 +491,7 @@ Errors from the later sections:
 | Unmatched `{?`, or a nested optional group | config load | config error naming the key path and the template |
 | A `columns` entry has no `field`, or an unknown `field`, `align` or `format` | config load | config error naming the key path |
 | `-t` names a format that needs a different word size | compile | `output format 'minhex' requires 8-bit words` |
+| A section uses a generator that cannot work with the ISA's word size (`intel_hex`, `hex` and `byte_list` need 8-bit words) | config load | `generator 'intel_hex', which needs 8-bit words; this instruction set has 16-bit words` |
 
 ## Documentation generation
 

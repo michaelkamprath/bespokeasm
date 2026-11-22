@@ -17,6 +17,9 @@ Changes that are planned but not implemented yet:
 * Added the `#annotate <namespace> key=value ...` directive, which attaches validated metadata to the label or constant defined on the next line. An ISA configuration declares namespaces in a new top-level `annotations` section, with typed arguments, presence rules, and `data_size` (word count of a label's data) and `value_range` (a constant's value) constraints; the framework's `listing` namespace is available in every ISA. Annotations emit no bytes. Nothing reads them yet; listings and output formats will.
 * **Behavior change:** `annotate` is now an assembler keyword in every ISA, so a label or constant named `annotate` must be renamed.
 * Added the `-t symbols` pretty-print format, which writes every label and constant as JSON with its value, scope, file, line and annotations (symbols predefined by the ISA configuration come first and name the configuration file), so other tools can read annotations without a config-defined output format.
+* Added config-defined output formats. A new top-level `output_formats` section declares formats, each a template with named sections; a section uses one generator (`intel_hex`, `hex`, `byte_list`, `listing`, or `exports`, which writes one line per annotated symbol). Templates use fixed field names with Python format specs and `{?...}` optional groups, and are checked when the configuration loads. Each format becomes a `-t` value for that configuration only.
+* **Behavior change:** `-t` accepts any name and is checked against the configuration after it loads, so an unknown name is now reported as `this instruction set does not define output format '...'` with the available formats, instead of a usage error. Shell completion offers the configuration's formats.
+* **Behavior change:** Giving `-t` without `-p` now warns that the format is not selected (an error with `-W`).
 
 
 ## [0.8.1]
