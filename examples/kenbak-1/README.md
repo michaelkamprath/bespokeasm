@@ -90,5 +90,25 @@ To compile the code, follow the BespokeASM instructions using the `kenbak-1-isa.
 bespokeasm compile -p -c kenbak-1-isa.yaml my_code.kb1
 ```
 
+### Octal Listing
+KENBAK-1 programs are traditionally written and entered in octal. The configuration defines a `kenbak1` output format (BespokeASM 0.9.0 or later) that lists one byte per row: the address and the data in octal, then the label, and the source and comment on each instruction's first byte:
+
+```sh
+bespokeasm compile -n -p -t kenbak1 -c kenbak-1-isa.yaml led-chaser.kb1
+```
+
+```
+Loc | Data | Label      | Contents          | Comments
+==================================================================================
+004 | 023  | init       | ld a, 1           |
+005 | 001  |            |                   |
+006 | 034  |            | ld [OUTPUT], a    | init the screen display
+007 | 200  |            |                   |
+010 | 367  | .loop      | jm left_loop      | call left_loop function
+011 | 016  |            |                   |
+```
+
+The listing shows only the program's bytes. The registers that the configuration predefines, including the program counter `P_REG` at address `003` (which holds `004`, the start of the program), are not listed.
+
 ### Syntax Highlighting
 BespokeASM has the ability to generate for various popular text editors a syntax highlighting language extension specific to this KENBAK-1 instruction set. [See the documentation](https://github.com/michaelkamprath/bespokeasm/wiki/Installation-and-Usage#installing-language-extensions) for information for on how to install and use the language extensions.
