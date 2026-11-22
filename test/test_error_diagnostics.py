@@ -224,3 +224,79 @@ class TestOperandMismatchExplanations:
     def test_valid_operands_still_assemble(self, tmp_path):
         assembler = assemble(tmp_path, '  ld a, 5\n  mov a, b\n  ld2 7\n  jmp 0\n')
         assert assembler is not None
+
+
+class TestUnparsableLineMessages:
+    @pytest.mark.parametrize(
+        'source, pattern',
+        [
+            (
+                'start\n  nop\n',
+                r'unknown instruction "start"; if this is meant to be a label, write it with a colon as "start:"',
+            ),
+            ('  ldd a, 1\n', r'unknown instruction "ldd" in "ldd a, 1"; did you mean "ld"\?'),
+            ('  .bytes 1, 2\n', r'unknown directive "\.bytes"; did you mean "\.byte"'),
+            ('  .frobnicate\n', r'unknown directive "\.frobnicate"$'),
+            ('  .org\n', r'\.org directive requires an address'),
+            ('  .fill 10\n', r'\.fill directive requires a count and a fill value'),
+            ('  .byte\n', r'\.byte directive requires at least one value'),
+            ('X EQU\n  nop\n', r'constant "X" is missing a value after "="'),
+            ('X =\n  nop\n', r'constant "X" is missing a value after "="'),
+            ('#frobnicate\n  nop\n', r'unknown preprocessor directive "#frobnicate"'),
+            ('#defin X 1\n  nop\n', r'unknown preprocessor directive "#defin"; did you mean "#define"\?'),
+            ('my label:\n  nop\n', r'label "my label" is not valid; label names cannot contain spaces'),
+        ],
+    )
+    def test_unparsable_text_is_classified(self, tmp_path, source, pattern):
+        assert_error(tmp_path, source, pattern)
+
+
+class TestLabelMessages:
+    def test_unknown_global_label(self, tmp_path):
+        assert_error(tmp_path, '  jmp nowhere\n', r'line 1 - unknown label "nowhere"; it is not defined')
+
+    def test_unknown_local_label_explains_scope(self, tmp_path):
+        assert_error(
+            tmp_path,
+            'one:\n.l:\n  nop\ntwo:\n  jmp .l\n',
+            r'line 5 - unknown label "\.l"; local labels \(starting with "\."\) are only visible',
+        )
+
+    def test_unknown_file_label_explains_scope(self, tmp_path):
+        assert_error(tmp_path, '  jmp _hidden\n', r'unknown label "_hidden"; file-scoped labels')
+
+    def test_duplicate_label_names_first_definition(self, tmp_path):
+        assert_error(
+            tmp_path,
+            'foo:\n  nop\nfoo:\n  nop\n',
+            r'line 3 - label "foo" is defined multiple times; first defined at file .*prog\.diag, line 1',
+        )
+
+    def test_local_label_before_global_label(self, tmp_path):
+        assert_error(tmp_path, '.loop:\n  nop\n', r'local label "\.loop" must come after a global label')
+
+    def test_keyword_as_label(self, tmp_path):
+        assert_error(
+            tmp_path,
+            'byte = 5\n  nop\n',
+            r'"byte" cannot be used as a label or constant name because "byte" is an assembler keyword',
+        )
+
+    def test_bytecode_past_end_of_zone(self, tmp_path):
+        assert_error(
+            tmp_path,
+            '  .org 0xFFFF\n  jmp 0\n',
+            r'line 2 - bytecode at this line extends to address 65537 \(0x10001\), past the end of memory zone "GLOBAL"',
+        )
+
+
+class TestConfigurationFileType:
+    def test_yml_extension_is_accepted(self, tmp_path):
+        config_path = write_config(tmp_path, name='isa.yml')
+        assert assemble(tmp_path, '  nop\n', config_path) is not None
+
+    def test_other_extension_is_rejected_by_name(self, tmp_path):
+        config_path = write_config(tmp_path, name='isa.txt')
+        pattern = r'ISA configuration file "isa.txt" must have a \.yaml, \.yml, or \.json extension'
+        with pytest.raises(SystemExit, match=pattern):
+            assemble(tmp_path, '  nop\n', config_path)

@@ -53,6 +53,11 @@ class LabelLine(LineObject):
         # Now determine is the line is a constant
         constant_match = re.search(LabelLine.PATTERN_CONSTANT, line_str)
         if constant_match is not None and len(constant_match.groups()) == 2:
+            if constant_match.group(2).strip() == '':
+                raise AssemblerError(
+                    line_id,
+                    f'constant "{constant_match.group(1).strip()}" is missing a value after "="',
+                )
             value_expr = parse_expression(
                 line_id,
                 constant_match.group(2).strip(),

@@ -26,7 +26,7 @@ class MemoryZoneManager:
 
     def create_zone(self, address_bits: int, start: int, end: int, name: str) -> MemoryZone:
         if name in self._zones:
-            raise KeyError(f'MemoryZone name {name} alredy exists.')
+            raise KeyError(f'MemoryZone name {name} already exists.')
         if start < self.global_zone.start:
             raise ValueError(
                 f'The start address {start} for memory zone "{name}" is outside the bounds of the GLOBAL zone'

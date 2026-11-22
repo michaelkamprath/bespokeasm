@@ -226,7 +226,7 @@ class TestSymbolScope(unittest.TestCase):
             )
             with self.assertRaises(SystemExit) as ctx:
                 assembler.assemble_bytecode()
-            self.assertIn('low of scope', str(ctx.exception))
+            self.assertIn('must come after a global label', str(ctx.exception))
 
     def test_local_label_after_org_is_error(self):
         """Doc: Labels > Label Scope > Local - locals cannot appear between .org and next non-local label."""
@@ -263,4 +263,4 @@ class TestSymbolScope(unittest.TestCase):
             )
             with self.assertRaises(SystemExit) as ctx:
                 assembler.assemble_bytecode()
-            self.assertIn('low of scope', str(ctx.exception))
+            self.assertIn('must come after a global label', str(ctx.exception))

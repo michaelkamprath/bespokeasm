@@ -44,14 +44,14 @@ class MemoryZone:
     def current_address(self, value: int):
         if value < self.start:
             raise ValueError(
-                f'Setting current address of memory zone "{self.name}" to {value} is '
-                f'less than minimum zone address {self.start}.'
+                f'address {value} ({hex(value)}) is before the start of memory zone "{self.name}" '
+                f'(zone starts at {self.start}, {hex(self.start)})'
             )
         # check against 1 byte past zone end. This allows for the address updates to be
         # right up to the end.
         if value > self.end + 1:
             raise ValueError(
-                f'Setting current address of memory zone "{self.name}" to {value} exceed '
-                f'maximum zone address {self.end}.'
+                f'bytecode at this line extends to address {value} ({hex(value)}), past the end of '
+                f'memory zone "{self.name}" (zone ends at {self.end}, {hex(self.end)})'
             )
         self._current_address = value

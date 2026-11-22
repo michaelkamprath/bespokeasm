@@ -460,7 +460,7 @@ class ExpressionByteCodePartWithValidation(ExpressionByteCodePart):
             bytecode_address,
         )
         if self._max is not None and value > self._max:
-            raise AssemblerError(self.line_id, f'operand value of {value} exceeds maximun allowed of {self._max}')
+            raise AssemblerError(self.line_id, f'operand value of {value} exceeds maximum allowed of {self._max}')
         if self._min is not None and value < self._min:
             raise AssemblerError(self.line_id, f'operand value of {value} is less than minimum allowed of {self._min}')
         return value
@@ -515,7 +515,7 @@ class ExpressionByteCodePartInMemoryZone(ExpressionByteCodePart):
             if value > self._memzone.end:
                 raise AssemblerError(
                     self.line_id,
-                    f'address value of {value} exceeds maximun allowed '
+                    f'address value of {value} exceeds maximum allowed '
                     f'address of {self._memzone.end} in memory zone {self._memzone.name}',
                 )
             if value < self._memzone.start:

@@ -491,7 +491,7 @@ def test_m1_flow_keywords_are_reserved_only_for_enabled_isas(tmp_path):
         _assembler(tmp_path, 'nop\n', config_path=flow_path)
 
     for flow_checks in (True, False):
-        with pytest.raises(SystemExit, match='used an assembler keyword'):
+        with pytest.raises(SystemExit, match='is an assembler keyword'):
             _assemble(
                 tmp_path,
                 'track:\nnop\n',
@@ -823,7 +823,7 @@ def test_m1_flow_directives_are_case_sensitive(tmp_path):
     recognized case-insensitively.
     """
     assembler = _assembler(tmp_path, '#TRACK stack\nnop\n')
-    with pytest.raises(SystemExit, match='unknown instruction'):
+    with pytest.raises(SystemExit, match='unknown preprocessor directive'):
         assembler.assemble_bytecode()
 
 

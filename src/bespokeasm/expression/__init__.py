@@ -32,6 +32,23 @@ EXPRESSION_PARTS_PATTERN = \
     )
 
 
+def _unknown_label_message(label: str) -> str:
+    """Describe an unresolved label, with a hint about scope rules when the prefix implies one."""
+    message = f'unknown label "{label}"'
+    if label.startswith('.'):
+        message += (
+            '; local labels (starting with ".") are only visible between the global label '
+            'that precedes them and the next global label'
+        )
+    elif label.startswith('_'):
+        message += (
+            '; file-scoped labels (starting with "_") are only visible within the file that defines them'
+        )
+    else:
+        message += '; it is not defined in any source file, predefined constant, or data block'
+    return message
+
+
 class ExpressionUseContext(enum.Enum):
     """The assembly context in which an expression is consumed."""
 
@@ -200,11 +217,11 @@ class ExpressionNode:
                         'instruction operand values, data values, and flow '
                         'directives'
                     )
-                raise AssemblerError(line_id, f'Label {self.value} resolves to NONE = {self}')
+                raise AssemblerError(line_id, _unknown_label_message(self.value))
             return val
         else:
             # this wasn't a numeric value
-            raise AssemblerError(line_id, f'Label {self.value} is not numeric = {self}')
+            raise AssemblerError(line_id, f'"{self.value}" does not have a numeric value')
 
     def _compute(
         self,
@@ -239,7 +256,7 @@ class ExpressionNode:
             except OverflowError as oe:
                 raise AssemblerError(
                     line_id,
-                    f'Cound not conver value "{arg_value}" to bytes. masked value = {masked_arg}, {oe}',
+                    f'could not convert value "{arg_value}" to bytes (masked value = {masked_arg}): {oe}',
                 ) from oe
             return arg_value_bytes[byte_idx]
         elif self.token_type == TokenType.T_NEGATION:

@@ -182,7 +182,7 @@ class SymbolScope:
         if base_label in self.reserved_keywords:
             raise AssemblerError(
                 line_id,
-                f"Label '{label}' is unallowed because it used an assembler keyword '{base_label}'",
+                f'"{label}" cannot be used as a label or constant name because "{base_label}" is an assembler keyword',
             )
         if symbol_scope.value < self.type.value:
             self.parent.set_label_value(label, value, line_id)
@@ -191,11 +191,25 @@ class SymbolScope:
                 self._labels[label] = SymbolScope.LabelInfo(label, value, line_id)
                 self._defined_symbol_names.add(label)
             else:
-                raise AssemblerError(line_id, f"Label '{label}' is defined multiple times at scope {self}")
+                existing = self._labels.get(label)
+                where = (
+                    f'first defined at {existing.line_id}' if existing is not None
+                    else 'already defined as a counter coordinate'
+                )
+                raise AssemblerError(line_id, f'label "{label}" is defined multiple times; {where}')
         else:
             # we are only here if the label is too low level for this scope
             # example: local label defined before any global labels
-            raise AssemblerError(line_id, f"Label '{label}' is to low of scope for available scopes at this line.")
+            if symbol_scope == SymbolScopeType.LOCAL:
+                raise AssemblerError(
+                    line_id,
+                    f'local label "{label}" must come after a global label; local labels (starting with ".") '
+                    'belong to the most recent global label',
+                )
+            raise AssemblerError(
+                line_id,
+                f'label "{label}" cannot be defined here: no {symbol_scope.name.lower()} scope is active at this line',
+            )
 
     _global_scope = None
 

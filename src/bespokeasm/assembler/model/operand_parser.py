@@ -62,7 +62,7 @@ class OperandSetsModel:
             else:
                 raise AssemblerError(
                     None,
-                    f'instuction set configuration file makes reference to unknow operand set "{k}"'
+                    f'instruction set configuration file refers to unknown operand set "{k}"'
                     f' in definition of instruction "{instruction}"',
                 )
 

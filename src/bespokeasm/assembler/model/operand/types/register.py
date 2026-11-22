@@ -35,7 +35,7 @@ class RegisterOperand(Operand):
         if self.register not in regsiters:
             diagnostic_reporter.error(
                 None,
-                f'ISA configation declares register based operand {self} but the '
+                f'ISA configuration declares register based operand {self} but the '
                 f'register label "{self.register}" is not a declared register.',
             )
 
@@ -64,7 +64,7 @@ class RegisterOperand(Operand):
             return get_decorator_regex_pattern(
                 self._config['decorator'],
                 context=(
-                    f'ISA configation declares register based operand "{self.id}" '
+                    f'ISA configuration declares register based operand "{self.id}" '
                     f'for register "{self.register}"'
                 ),
             )

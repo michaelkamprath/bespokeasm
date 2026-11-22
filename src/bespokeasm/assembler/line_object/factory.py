@@ -1,5 +1,9 @@
+import difflib
 import re
 
+from bespokeasm.assembler.keywords import BYTECODE_DIRECTIVES_SET
+from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET
+from bespokeasm.assembler.keywords import preprocessor_directives_for_isa
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object.counter_coordinate_line import CounterCoordinateLine
@@ -102,6 +106,86 @@ class LineOjectFactory:
             flags=re.IGNORECASE,
         ):
             cls._flow_expression_error(line_id, model, 'ordinary constant assignments')
+
+    _DIRECTIVE_ARGUMENT_HINTS = {
+        '.org': 'requires an address, for example ".org 0x100"',
+        '.memzone': 'requires the name of a memory zone, for example ".memzone GLOBAL"',
+        '.fill': 'requires a count and a fill value, for example ".fill 16, 0"',
+        '.zero': 'requires a count, for example ".zero 16"',
+        '.zerountil': 'requires an end address, for example ".zerountil 0x0FFF"',
+        '.align': 'takes an optional alignment value, for example ".align 256"',
+        '.byte': 'requires at least one value or string, for example ".byte 1, 2, 3"',
+        '.2byte': 'requires at least one value, for example ".2byte 0x1234"',
+        '.4byte': 'requires at least one value, for example ".4byte 0x12345678"',
+        '.8byte': 'requires at least one value',
+        '.16byte': 'requires at least one value',
+        '.cstr': 'requires a quoted string, for example \'.cstr "hello"\'',
+        '.asciiz': 'requires a quoted string, for example \'.asciiz "hello"\'',
+    }
+
+    @staticmethod
+    def _suggestion(word: str, candidates: list[str]) -> str:
+        """Return a "; did you mean ..." suffix for the closest known names, or an empty string."""
+        lowered = {candidate.lower(): candidate for candidate in candidates}
+        matches = difflib.get_close_matches(word.lower(), list(lowered), n=2, cutoff=0.7)
+        if not matches:
+            return ''
+        names = ' or '.join(f'"{lowered[match]}"' for match in matches)
+        return f'; did you mean {names}?'
+
+    @classmethod
+    def _report_unparsable_text(
+        cls,
+        line_id: LineIdentifier,
+        instruction_str: str,
+        model: AssemblerModel,
+    ) -> None:
+        """Report source text that is not a label, constant, directive, or instruction.
+
+        The generic "unknown instruction" wording hides several distinct mistakes, so the
+        text is classified first and each class gets a message that says what to fix.
+        """
+        text = instruction_str.strip()
+        reporter = model.diagnostic_reporter
+        first_word = text.split(None, 1)[0]
+
+        if text.startswith('#'):
+            known = sorted(f'#{name}' for name in preprocessor_directives_for_isa(model.flow_counters_enabled))
+            reporter.error(
+                line_id,
+                f'unknown preprocessor directive "{first_word}"{cls._suggestion(first_word, known)}',
+            )
+
+        if text.startswith('.'):
+            name_match = re.match(r'\.\w+', text)
+            directive = name_match.group(0).lower() if name_match else first_word
+            if directive in cls._DIRECTIVE_ARGUMENT_HINTS:
+                reporter.error(line_id, f'{directive} directive {cls._DIRECTIVE_ARGUMENT_HINTS[directive]}')
+            known = sorted(f'.{name}' for name in COMPILER_DIRECTIVES_SET | BYTECODE_DIRECTIVES_SET)
+            reporter.error(line_id, f'unknown directive "{directive}"{cls._suggestion(directive, known)}')
+
+        constant_match = re.fullmatch(fr'({PATTERN_SYMBOL})\s*(?:=|EQU)', text, flags=re.IGNORECASE)
+        if constant_match is not None:
+            reporter.error(line_id, f'constant "{constant_match.group(1)}" is missing a value after "="')
+
+        if re.fullmatch(PATTERN_SYMBOL, text) is not None:
+            suggestion = cls._suggestion(text, model.operation_mnemonics)
+            if suggestion:
+                suggestion = suggestion.replace('; did you mean', '; if it is an instruction, did you mean', 1)
+            reporter.error(
+                line_id,
+                f'unknown instruction "{text}"; if this is meant to be a label, write it with a colon '
+                f'as "{text}:"{suggestion}',
+            )
+
+        if re.fullmatch(fr'{PATTERN_SYMBOL}(?:\s+{PATTERN_SYMBOL})+:', text) is not None:
+            reporter.error(line_id, f'label "{text[:-1]}" is not valid; label names cannot contain spaces')
+
+        quoted = f'"{first_word}" in "{text}"' if first_word != text else f'"{text}"'
+        reporter.error(
+            line_id,
+            f'unknown instruction {quoted}{cls._suggestion(first_word, model.operation_mnemonics)}',
+        )
 
     @classmethod
     def parse_line(
@@ -247,12 +331,12 @@ class LineOjectFactory:
                     instruction_str = instruction_str.replace(line_obj.instruction, '', 1).strip()
                     continue
 
-                # if we are here, that means nothing was matched. Shouldn't happen, so let's error out
-                model.diagnostic_reporter.error(line_id, f'unknown instruction "{instruction_str.strip()}"')
+                # if we are here, that means nothing was matched.
+                cls._report_unparsable_text(line_id, instruction_str, model)
 
         if len(line_obj_list) == 0:
             if instruction_str != '':
-                model.diagnostic_reporter.error(line_id, f'unknown instruction "{instruction_str.strip()}"')
+                cls._report_unparsable_text(line_id, instruction_str, model)
             # if we got here, the line is only a comment
             line_obj = LineObject(line_id, instruction_str, comment_str, current_memzone)
             return [line_obj]

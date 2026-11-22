@@ -54,7 +54,7 @@ class AssemblerModel:
                     None,
                     f'could not parse JSON configuration file {os.path.basename(config_file_path)}: {exc}',
                 )
-        elif config_file_path.endswith('.yaml'):
+        elif config_file_path.endswith(('.yaml', '.yml')):
             yaml_loader = YAML()
             try:
                 with open(config_file_path) as yaml_file:
@@ -70,7 +70,11 @@ class AssemblerModel:
                     f'could not parse YAML configuration file {os.path.basename(config_file_path)}: {exc}',
                 )
         else:
-            self._diagnostic_reporter.error(None, 'unknown ISA config file type')
+            self._diagnostic_reporter.error(
+                None,
+                f'ISA configuration file "{os.path.basename(config_file_path)}" must have a '
+                '.yaml, .yml, or .json extension',
+            )
 
         if not isinstance(config_dict, dict):
             self._diagnostic_reporter.error(
