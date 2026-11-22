@@ -7,6 +7,7 @@ from typing import Literal
 import click
 from bespokeasm import BESPOKEASM_MIN_REQUIRED_STR
 from bespokeasm import BESPOKEASM_VERSION_STR
+from bespokeasm.assembler.annotations.schema import AnnotationNamespace
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.keywords import assembler_keywords_for_isa
 from bespokeasm.assembler.line_identifier import LineIdentifier
@@ -198,7 +199,9 @@ class AssemblerModel:
         # Check the shape and types of the configuration before any value is read on demand,
         # so a mistyped or missing field is reported by its configuration path rather than
         # surfacing as a Python traceback or as an error on an unrelated source line.
-        ConfigValidator(self._config, self._config_file, self._diagnostic_reporter).validate()
+        validator = ConfigValidator(self._config, self._config_file, self._diagnostic_reporter)
+        validator.validate()
+        self._annotation_namespaces = validator.annotation_namespaces
         ConfigAdvisor(self._config, self._config_file, self._diagnostic_reporter).advise()
 
         # Validate string_byte_packing option
@@ -1055,6 +1058,11 @@ class AssemblerModel:
             return self._config['predefined']['symbols']
         else:
             return []
+
+    @property
+    def annotation_namespaces(self) -> dict[str, AnnotationNamespace]:
+        """Annotation namespaces available to ``#annotate``: ``listing`` plus those the config declares."""
+        return self._annotation_namespaces
 
     @property
     def allow_embedded_strings(self) -> bool:

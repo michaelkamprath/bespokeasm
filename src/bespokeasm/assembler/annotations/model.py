@@ -1,0 +1,184 @@
+"""The export model: annotated symbols as later features (listings, output formats) read them.
+
+Annotations are recorded on the ``LabelLine`` that defines the symbol while source is
+parsed. After the first assembly pass assigns addresses, ``ExportModel.build`` collects
+every annotated symbol, measures each label's data run, checks ``data_size``, and
+resolves ``symbol``-typed arguments. A data run's words are read only on request, after
+the second pass has generated them.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from dataclasses import field
+from typing import Any
+
+from bespokeasm.assembler.annotations.schema import AnnotationNamespace
+from bespokeasm.assembler.bytecode.word import Word
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
+from bespokeasm.assembler.line_identifier import LineIdentifier
+from bespokeasm.assembler.line_object import LineObject
+from bespokeasm.assembler.line_object import LineWithWords
+from bespokeasm.assembler.line_object.data_line import DataLine
+from bespokeasm.assembler.line_object.directive_line.fill_data import FillDataLine
+from bespokeasm.assembler.line_object.directive_line.fill_data import FillUntilDataLine
+from bespokeasm.assembler.line_object.emdedded_string import EmbeddedString
+from bespokeasm.assembler.line_object.label_line import LabelLine
+from bespokeasm.assembler.symbol_scope import SymbolScopeType
+
+DATA_LINE_TYPES = (DataLine, FillDataLine, FillUntilDataLine, EmbeddedString)
+
+_SCOPE_NAMES = {
+    SymbolScopeType.GLOBAL: 'global',
+    SymbolScopeType.FILE: 'file',
+    SymbolScopeType.LOCAL: 'local',
+}
+
+
+def symbol_scope_name(symbol: str) -> str:
+    """The annotation scope name (global, file or local) implied by a symbol's prefix."""
+    return _SCOPE_NAMES[SymbolScopeType.get_symbol_scope(symbol)]
+
+
+def _plural(count: int, noun: str) -> str:
+    return f'{count} {noun}' if count == 1 else f'{count} {noun}s'
+
+
+@dataclass
+class Annotation:
+    """One validated ``#annotate`` line."""
+    namespace: AnnotationNamespace
+    arguments: dict[str, Any]
+    line_id: LineIdentifier
+    resolved_symbols: dict[str, int] = field(default_factory=dict)
+
+    @property
+    def name(self) -> str:
+        return self.namespace.name
+
+
+@dataclass
+class AnnotatedSymbol:
+    name: str
+    kind: str                         # 'label' or 'constant'
+    scope: str                        # 'global', 'file' or 'local'
+    value: int                        # the address of a label, the value of a constant
+    line_id: LineIdentifier
+    annotations: dict[str, Annotation]
+    data_run: tuple[LineWithWords, ...] = ()
+
+    @property
+    def is_label(self) -> bool:
+        return self.kind == 'label'
+
+    @property
+    def address(self) -> int | None:
+        return self.value if self.is_label else None
+
+    @property
+    def size(self) -> int | None:
+        """The word count of a label's data run; None for a constant."""
+        if not self.is_label:
+            return None
+        return sum(line.word_count for line in self.data_run)
+
+    @property
+    def words(self) -> list[Word]:
+        """The words of a label's data run. Valid only after bytecode generation."""
+        return [word for line in self.data_run for word in line.get_words()]
+
+
+class ExportModel:
+    def __init__(self, symbols: list[AnnotatedSymbol]) -> None:
+        self._symbols = symbols
+
+    @property
+    def symbols(self) -> list[AnnotatedSymbol]:
+        """Every annotated symbol, in the order it is defined in source."""
+        return list(self._symbols)
+
+    def for_namespace(self, namespace: str) -> list[AnnotatedSymbol]:
+        return [symbol for symbol in self._symbols if namespace in symbol.annotations]
+
+    @classmethod
+    def build(cls, line_objects: list[LineObject]) -> ExportModel:
+        """Collect annotated symbols from source-ordered line objects after the first pass."""
+        symbols: list[AnnotatedSymbol] = []
+        for index, line in enumerate(line_objects):
+            if not isinstance(line, LabelLine) or not line.compilable or not line.annotations:
+                continue
+            name = line.get_label()
+            is_label = not line.is_constant
+            symbol = AnnotatedSymbol(
+                name=name,
+                kind='label' if is_label else 'constant',
+                scope=symbol_scope_name(name),
+                value=line.get_value(),
+                line_id=line.line_id,
+                annotations=dict(line.annotations),
+                data_run=cls._data_run(line_objects, index) if is_label else (),
+            )
+            for annotation in symbol.annotations.values():
+                if is_label:
+                    cls._check_data_size(symbol, annotation)
+                cls._resolve_symbol_arguments(line, annotation)
+            symbols.append(symbol)
+        return ExportModel(symbols)
+
+    @staticmethod
+    def _data_run(line_objects: list[LineObject], label_index: int) -> tuple[LineWithWords, ...]:
+        """The data directives that follow a label without a break.
+
+        Blank lines never become line objects, and comment-only lines are skipped.
+        Anything else ends the run, including the end of the label's file.
+        """
+        label = line_objects[label_index]
+        run: list[LineWithWords] = []
+        for line in line_objects[label_index + 1:]:
+            if line.line_id.filename != label.line_id.filename:
+                break
+            if isinstance(line, DATA_LINE_TYPES) and line.compilable:
+                run.append(line)
+                continue
+            if type(line) is LineObject and line.compilable and line.instruction == '':
+                continue
+            break
+        return tuple(run)
+
+    @staticmethod
+    def _check_data_size(symbol: AnnotatedSymbol, annotation: Annotation) -> None:
+        try:
+            expected = annotation.namespace.expected_words(annotation.arguments)
+        except ValueError as exc:
+            raise AssemblerError(annotation.line_id, str(exc))
+        if expected is None or expected == symbol.size:
+            return
+        if symbol.size == 0:
+            found = 'no data follows it'
+        else:
+            verb = 'follows' if symbol.size == 1 else 'follow'
+            found = f'{_plural(symbol.size, "word")} of data {verb} it'
+        raise AssemblerError(
+            symbol.line_id,
+            f"'{symbol.name}' is annotated as {_plural(expected, 'word')} but {found} "
+            f"(annotation '{annotation.name}')",
+        )
+
+    @staticmethod
+    def _resolve_symbol_arguments(line: LabelLine, annotation: Annotation) -> None:
+        for spec in annotation.namespace.arguments.values():
+            if spec.type != 'symbol' or spec.name not in annotation.arguments:
+                continue
+            target = annotation.arguments[spec.name]
+            named_scopes = line.active_named_scopes
+            if named_scopes is not None:
+                value = named_scopes.named_scope_manager.get_label_value(
+                    target, line.symbol_scope, named_scopes, annotation.line_id,
+                )
+            else:
+                value = line.symbol_scope.get_label_value(target, annotation.line_id)
+            if value is None:
+                raise AssemblerError(
+                    annotation.line_id,
+                    f"annotation '{annotation.name}': '{spec.name}' names unknown symbol '{target}'",
+                )
+            annotation.resolved_symbols[spec.name] = value

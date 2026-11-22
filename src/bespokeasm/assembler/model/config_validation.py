@@ -12,6 +12,9 @@ import difflib
 import os
 from collections.abc import Callable
 
+from bespokeasm.assembler.annotations.schema import AnnotationNamespace
+from bespokeasm.assembler.annotations.schema import BUILTIN_NAMESPACES
+from bespokeasm.assembler.annotations.schema import load_annotation_namespaces
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.utilities import is_valid_label
 
@@ -45,6 +48,7 @@ class ConfigValidator:
         self._config = config
         self._config_name = os.path.basename(config_file_path)
         self._reporter = diagnostic_reporter
+        self.annotation_namespaces: dict[str, AnnotationNamespace] = dict(BUILTIN_NAMESPACES)
 
     def error(self, path: str, problem: str) -> None:
         self._reporter.error(None, f'ISA configuration {self._config_name}: {path} {problem}')
@@ -140,6 +144,7 @@ class ConfigValidator:
         predefined = self.require_dict(config, 'predefined', '<root>', allow_none=True)
         if predefined is not None:
             self._validate_predefined(predefined, general)
+        self.annotation_namespaces = load_annotation_namespaces(config.get('annotations'), self.error)
 
     def _validate_general(self, general: dict) -> None:
         path = 'general'
@@ -391,7 +396,16 @@ FLOW_METADATA_KEYS = {
     'flow_call_effects', 'flow_invalidates', 'flow_write_operands',
 }
 KNOWN_KEYS = {
-    'root': {'description', 'general', 'operand_sets', 'instructions', 'macros', 'predefined', 'flow_counters'},
+    'root': {
+        'description', 'general', 'operand_sets', 'instructions', 'macros', 'predefined', 'flow_counters',
+        'annotations',
+    },
+    'annotation': {'documentation', 'applies_to', 'scopes', 'arguments', 'data_size', 'value_range'},
+    'annotation_argument': {
+        'type', 'values', 'min', 'max', 'pattern', 'required', 'required_when', 'allowed_when', 'default',
+    },
+    'annotation_data_size': {'when', 'words'},
+    'annotation_value_range': {'when', 'range'},
     'general': {
         'address_size', 'allow_embedded_strings', 'cstr_terminator', 'default_numeric_base', 'documentation',
         'endian', 'endianness', 'flags', 'identifier', 'intra_word_endian', 'intra_word_endianness',
@@ -525,6 +539,17 @@ class ConfigAdvisor:
         for name, counter in (config.get('flow_counters') or {}).items():
             if isinstance(counter, dict):
                 self._check_keys(counter, 'flow_counter', f'flow_counters.{name}')
+
+        annotations = config.get('annotations')
+        for name, namespace in (annotations.items() if isinstance(annotations, dict) else ()):
+            if not isinstance(namespace, dict):
+                continue
+            path = f'annotations.{name}'
+            self._check_keys(namespace, 'annotation', path)
+            for arg_name, argument in (namespace.get('arguments') or {}).items():
+                self._check_keys(argument, 'annotation_argument', f'{path}.arguments.{arg_name}')
+            self._check_keys(namespace.get('data_size'), 'annotation_data_size', f'{path}.data_size')
+            self._check_keys(namespace.get('value_range'), 'annotation_value_range', f'{path}.value_range')
 
     def _check_keys(self, mapping, kind: str, path: str) -> None:
         if not isinstance(mapping, dict):
