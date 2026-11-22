@@ -1,6 +1,10 @@
 import io
 import math
+from dataclasses import dataclass
+from dataclasses import field
 
+from bespokeasm.assembler.annotations.model import ExportModel
+from bespokeasm.assembler.annotations.schema import LISTING_NAMESPACE_NAME
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.diagnostic_reporter import InternalAssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
@@ -13,12 +17,58 @@ from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.pretty_printer import PrettyPrinterBase
 
 
+LineKey = tuple[str, int]
+
+
+@dataclass
+class _Collapse:
+    """A collapsed data run: its first line shows one row of words, then a summary row."""
+    first_words: int        # words on the run's first line
+    total: int              # words in the whole run
+    address: int            # address of the run's first word
+    unit: str               # "bytes" or "words"
+    shown: int = 0          # words on the first row; set once the row width is known
+
+    @property
+    def omitted(self) -> int:
+        return self.total - self.shown
+
+    @property
+    def first_omitted(self) -> int:
+        return self.address + self.shown
+
+    def text(self) -> str:
+        return f'... {self.omitted} more {self.unit if self.omitted != 1 else self.unit[:-1]}'
+
+
+@dataclass
+class _ListingPlan:
+    """What the ``listing`` annotations do to this listing, keyed by (file, line number)."""
+    hidden: set[LineKey] = field(default_factory=set)
+    headings: dict[LineKey, str] = field(default_factory=dict)
+    page_breaks: set[LineKey] = field(default_factory=set)
+    collapses: dict[LineKey, _Collapse] = field(default_factory=dict)
+
+
+def _key(line: LineObject) -> LineKey:
+    return (line.line_id.filename, line.line_id.line_num)
+
+
 class ListingPrettyPrinter(PrettyPrinterBase):
     MAX_NUM_BYTES_PER_LINE = 6
     INSTRUCTION_INDENT = 4
 
-    def __init__(self, line_objs:  list[LineObject], model: AssemblerModel, main_filename: str) -> None:
-        super().__init__(line_objs, model, instruction_indent=ListingPrettyPrinter.INSTRUCTION_INDENT)
+    def __init__(
+        self,
+        line_objs: list[LineObject],
+        model: AssemblerModel,
+        main_filename: str,
+        export_model: ExportModel | None = None,
+    ) -> None:
+        self._plan = ListingPrettyPrinter._plan_annotations(line_objs, model, export_model)
+        # Column widths come from the lines that are printed.
+        visible = [line for line in line_objs if _key(line) not in self._plan.hidden]
+        super().__init__(visible, model, instruction_indent=ListingPrettyPrinter.INSTRUCTION_INDENT)
         self._address_size = math.ceil(self.model.address_size/4)
         self._address_format_str = f'{{0:0{self._address_size}x}}'
         self._main_filename = main_filename
@@ -42,6 +92,15 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         )
         if self._flow_width:
             self._flow_width = max(self._flow_width, len('flow'))
+        # A collapsed run shows its first row of words; the summary row counts the rest.
+        for key, collapse in list(self._plan.collapses.items()):
+            collapse.shown = min(collapse.first_words, self._bytes_per_line)
+            if collapse.omitted == 0:
+                del self._plan.collapses[key]
+                continue
+            self._max_instruction_width = max(
+                self._max_instruction_width, len(collapse.text()) + ListingPrettyPrinter.INSTRUCTION_INDENT,
+            )
 
     def pretty_print(self) -> str:
         if len(self.line_objects) < 1:
@@ -61,21 +120,110 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         cur_filename = None
         hex_width = Word(0, self._word_size, self._word_segment_size).ideal_hex_width
         for lo in lobjs:
+            key = _key(lo)
+            page_break = key in self._plan.page_breaks
             # detect a new file and print the file header
             if lo.line_id.filename != cur_filename:
                 # print new file header
                 cur_filename = lo.line_id.filename
+                if page_break:
+                    output.write('\f')
                 self._print_file_header(output, cur_filename, hex_width)
+            elif page_break:
+                # A new page repeats the headers, marked as the same file continuing.
+                output.write('\f')
+                self._print_file_header(output, cur_filename, hex_width, continued=True)
+            heading = self._plan.headings.get(key)
+            if heading is not None:
+                output.write(f'\n{heading}\n{"-" * len(heading)}\n')
 
             # print the line object
-            self._print_line_object(output, lo, hex_width)
+            collapse = self._plan.collapses.get(key)
+            self._print_line_object(output, lo, hex_width, first_row_only=collapse is not None)
+            if collapse is not None:
+                self._print_collapse_row(output, hex_width, collapse)
         return output.getvalue()
 
-    def _print_file_header(self, output: io.StringIO, filename: str, hex_width: int) -> None:
+    @staticmethod
+    def _plan_annotations(
+        line_objs: list[LineObject],
+        model: AssemblerModel,
+        export_model: ExportModel | None,
+    ) -> _ListingPlan:
+        """Work out what each ``#annotate listing`` does to this listing."""
+        plan = _ListingPlan()
+        if export_model is None:
+            return plan
+        by_file: dict[str, list[LineObject]] = {}
+        for line in sorted(line_objs, key=lambda x: (x.line_id.filename, x.line_id.line_num)):
+            by_file.setdefault(line.line_id.filename, []).append(line)
+        unit = 'bytes' if model.word_size == 8 else 'words'
+        for symbol in export_model.for_namespace(LISTING_NAMESPACE_NAME):
+            arguments = symbol.annotations[LISTING_NAMESPACE_NAME].arguments
+            filename = symbol.line_id.filename
+            # The symbol's lines start at its first #annotate line, directly above its definition.
+            start = min(annotation.line_id.line_num for annotation in symbol.annotations.values())
+            if arguments.get('hide'):
+                plan.hidden.update(ListingPrettyPrinter._hidden_lines(by_file.get(filename, []), symbol, start))
+                continue
+            if arguments.get('page_break'):
+                plan.page_breaks.add((filename, start))
+            if arguments.get('heading'):
+                plan.headings[(filename, start)] = arguments['heading']
+            if arguments.get('collapse'):
+                ListingPrettyPrinter._plan_collapse(plan, model, symbol, unit)
+        return plan
+
+    @staticmethod
+    def _hidden_lines(file_lines: list[LineObject], symbol, start: int) -> set[LineKey]:
+        """A label's lines run from its #annotate lines up to the next label of any scope;
+        a constant's lines end with its definition."""
+        hidden: set[LineKey] = set()
+        definition = symbol.line_id.line_num
+        for line in file_lines:
+            number = line.line_id.line_num
+            if number < start:
+                continue
+            if number > definition and (
+                not symbol.is_label or (isinstance(line, LabelLine) and not line.is_constant)
+            ):
+                break
+            hidden.add(_key(line))
+        return hidden
+
+    @staticmethod
+    def _plan_collapse(plan: _ListingPlan, model: AssemblerModel, symbol, unit: str) -> None:
+        run = [line for line in symbol.data_run if not line.is_muted]
+        if not run:
+            model.diagnostic_reporter.warn(
+                symbol.line_id,
+                f"'#annotate listing collapse' on '{symbol.name}' has no effect: no data follows it",
+            )
+            return
+        first = run[0]
+        total = sum(line.word_count for line in run)
+        plan.collapses[_key(first)] = _Collapse(first.word_count, total, first.address, unit)
+        # Everything after the first data line, up to the run's last line, is left out.
+        last = run[-1].line_id.line_num
+        for line in symbol.data_run:
+            if line is not first:
+                plan.hidden.add(_key(line))
+        filename = first.line_id.filename
+        plan.hidden.update(
+            (filename, number) for number in range(first.line_id.line_num + 1, last + 1)
+        )
+
+    def _print_file_header(
+        self,
+        output: io.StringIO,
+        filename: str,
+        hex_width: int,
+        continued: bool = False,
+    ) -> None:
         COMMENT_HEADER = 'comment'
         comment_header_width = len(COMMENT_HEADER) if len(COMMENT_HEADER) > self.max_comment_width else self.max_comment_width
 
-        output.write(f'\n\nFile: {filename}\n')
+        output.write(f'\n\nFile: {filename}{" (continued)" if continued else ""}\n')
         output.write(
             '-'*(self.max_line_num_width + 2) + '+' +
             '-'*(self._address_size + 2) + '+' +
@@ -142,7 +290,29 @@ class ListingPrettyPrinter(PrettyPrinterBase):
             '-'*(comment_header_width + 2) + '\n'
         )
 
-    def _print_line_object(self, output: io.StringIO, lobj: LineObject, hex_width: int) -> None:
+    def _print_collapse_row(self, output: io.StringIO, hex_width: int, collapse: _Collapse) -> None:
+        """The row after a collapsed data line: where the omitted words start, and how many."""
+        byte_width = self._bytes_per_line * (hex_width + 1)
+        output.write(
+            ' ' * (self.max_line_num_width + 1)
+            + ' | '
+            + self._address_format_str.format(collapse.first_omitted)
+            + ' | '
+            + ' ' * byte_width
+            + '| '
+            + f'{" " * ListingPrettyPrinter.INSTRUCTION_INDENT + collapse.text(): <{self.max_instruction_width}}'
+            + ' | '
+            + (' ' * self._flow_width + ' | ' if self._flow_width else '')
+            + '\n'
+        )
+
+    def _print_line_object(
+        self,
+        output: io.StringIO,
+        lobj: LineObject,
+        hex_width: int,
+        first_row_only: bool = False,
+    ) -> None:
         # wite the lobj details to output using the following format:
         #    line number in decimal | address in hex | machine code in hex (6 bytes wide) | instruction text | comment text
         #     1 | 0000 | 00 00 00 00 00 00 | nop | this is a comment
@@ -213,6 +383,8 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         output.write(lobj.comment)
         output.write('\n')
 
+        if first_row_only:
+            return
         remaining_byte_rows = line_bytes[1:] if line_bytes is not None else ()
         remaining_flow_rows = flow_annotations[1:]
         continuation_count = max(

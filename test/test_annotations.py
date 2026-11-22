@@ -303,7 +303,8 @@ def test_annotation_at_end_of_file(tmp_path):
 
 def test_same_namespace_twice_on_one_symbol(tmp_path):
     source = '#annotate xmin kind=addr\n#annotate xmin kind=addr\nstart:\n    ld a, b, c\n'
-    assert "symbol 'start' already has an 'xmin' annotation" in _assemble_error(tmp_path, source, _xmin_config(tmp_path))
+    message = _assemble_error(tmp_path, source, _xmin_config(tmp_path))
+    assert "symbol 'start' already has an annotation in the 'xmin' namespace" in message
 
 
 @pytest.mark.parametrize(('source', 'expected'), [

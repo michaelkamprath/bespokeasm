@@ -368,7 +368,10 @@ PREPROCESSOR_DIRECTIVE_DOCS: dict[str, str] = {
         'The namespace must be `listing` or one the instruction set configuration declares, '
         'and the configuration validates every argument. The line must be directly above the '
         'definition; only further `#annotate` lines, for other namespaces, may sit between them. '
-        'Emits no bytes.'
+        'Emits no bytes.\n\n'
+        'The `listing` namespace shapes `-t listing` output: `heading="..."` prints a heading above '
+        'the symbol, `page_break` starts a new page, `collapse` shows only the first row of a '
+        "label's data, and `hide` leaves the symbol's lines out. Bytes are assembled either way."
     ),
     'create-scope': (
         '### `#create-scope` : Create Named Label Scope\n\n'

@@ -40,7 +40,7 @@ class PrettyPrinterFactory:
         elif pretty_printer_type == 'intel_hex':
             return IntelHexPrettyPrinter(line_objs, model, True)
         elif pretty_printer_type == 'listing':
-            return ListingPrettyPrinter(line_objs, model, main_filename)
+            return ListingPrettyPrinter(line_objs, model, main_filename, export_model)
         elif pretty_printer_type == 'symbols':
             return SymbolsPrettyPrinter(line_objs, model, main_filename, export_model, source_line_objects)
         raise NotImplementedError

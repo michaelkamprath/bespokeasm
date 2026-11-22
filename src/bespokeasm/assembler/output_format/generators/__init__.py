@@ -127,7 +127,9 @@ class ListingGenerator(Generator):
 
     def render(self, context: RenderContext) -> str:
         from bespokeasm.assembler.pretty_printer.listing import ListingPrettyPrinter
-        return ListingPrettyPrinter(context.line_objects, context.model, context.source_file).pretty_print().strip('\n')
+        return ListingPrettyPrinter(
+            context.line_objects, context.model, context.source_file, context.export_model,
+        ).pretty_print().strip('\n')
 
 
 class RowsGenerator(Generator):
