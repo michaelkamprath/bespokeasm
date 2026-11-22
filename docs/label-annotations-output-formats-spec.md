@@ -188,7 +188,7 @@ output_formats:
 Fields are fixed names with Python format specs, not expressions:
 
 - Template: `source_file`, `isa_name`, `isa_version`, `bespokeasm_version`, and the section names. A section name may not be the same as a field name, and a section field takes no format spec. A section's text never starts or ends with a blank line; the template decides the spacing around it. A section the template never uses is a config warning.
-- `exports` items: `name` (the `name` argument, else the symbol), `symbol`, `address` (labels only), `value` (constants only), `size` (in words), `words` (the words of a label's data run, in hex, in memory order, separated by spaces), and every annotation argument. A `symbol`-typed argument's field is its resolved value, an argument named in the section's `value_map` is its mapped text, and a count that the data set (`infer_times`, `terminated_when`) reads like a given one. An annotation argument may not have the name of one of these fields, except `name`; using such an annotation in `exports` is a config error.
+- `exports` items: `name` (the `name` argument, else the symbol), `symbol`, `address` (labels only), `value` (constants only), `size` (in words; empty for a label with no data run, such as `kind=addr` on code), `words` (the words of a label's data run, in hex, in memory order, separated by spaces), and every annotation argument. A `symbol`-typed argument's field is its resolved value, an argument named in the section's `value_map` is its mapped text, and a count that the data set (`infer_times`, `terminated_when`) reads like a given one. An annotation argument may not have the name of one of these fields, except `name`; using such an annotation in `exports` is a config error.
 - `byte_lines` items: `label` (a label at that address, else empty), `address`, `byte`, `source` (the instruction text, on its first byte only) and `comment` (the same).
 - `rows` items: `byte`, and `address` in `org_line`.
 
@@ -208,9 +208,9 @@ Generators:
 | `byte_lines` | a table with one line per assembled byte | `columns`, `separator` |
 | `exports` | one line per symbol that carries the annotation | `annotation`, `order`, `unique`, `reserved_names`, `name_pattern`, `value_map`, then either `lines_key` + `lines`, or `columns` + `separator` |
 
-Tables. `byte_lines`, and `exports` with `columns`, use one column model. `columns` is a list in output order. Each entry names a `field`, and it can set `header` (default empty), `format` (a Python format spec, for example `03o` for octal), `align` (`left` or `right`, default `left`) and `min_width` (default 0). The generator writes a header row from the headers, unless all headers are empty, and then one row per item.
+Tables. `byte_lines`, and `exports` with `columns`, use one column model. `columns` is a list in output order. Each entry names a `field`, and it can set `header` (default empty), `format` (a Python format spec, for example `03o` for octal), `align` (`left` or `right`, default `left`) and `min_width` (default 0). In `exports`, a column can instead choose its field per row, the table counterpart of `lines_key`: `by` names an enum argument, and `cases` maps its values to `{field, format}`. A row whose value has no case gets an empty cell. The lookup uses the source value, before `value_map`. `xmin_listing` uses this to show a `var`'s address under `address` and an `addr` export's address under `value`, as the xmin lines do. The generator writes a header row from the headers, unless all headers are empty, and then one row per item. A header is aligned like its column's values. `exports` takes either `lines_key` and `lines` or `columns`, never both, and `separator` only with `columns`. A column entry takes only `field`, `by`, `cases`, `header`, `format`, `align` and `min_width`; any other key is a config error. A column has either `field` or `by` with `cases`, not both. A `by` column sets `format` in each case instead of on the column, and a case takes only `field` and `format`. Export names are checked (`name_pattern`, `reserved_names`, `unique`) the same way in both modes.
 
-Column widths adjust to the content, as in the built-in `-t listing`. The generator formats every value first. Each column is then as wide as the largest of its `min_width`, its header, and its widest value. Columns are joined with `separator` (default two spaces). The last column gets no padding, and the generator removes trailing spaces from each line.
+Column widths adjust to the content, as in the built-in `-t listing`. The generator formats every value first. Each column is then as wide as the largest of its `min_width`, its header, and its widest value. Columns are joined with `separator` (default two spaces). The last column gets no padding, and the generator removes trailing spaces from each line, but not the rest of a separator: with `separator: " | "`, a row whose last cell is empty ends in `|`.
 
 Responsibilities:
 
@@ -247,6 +247,7 @@ output_format_shared:
         annotation: xmin
         unique: name
         reserved_names: [and, append, asm, ...]   # as in the section above
+        value_map: { type: { str: char } }        # in the set, so xmin_listing shows char too
 
 output_formats:
   xmin:
@@ -283,9 +284,15 @@ output_formats:
           - { field: name, header: name }
           - { field: kind, header: kind }
           - { field: type, header: type }
-          - { field: address, header: address, format: "#06x" }
+          - header: address         # a var is bound to an address
+            by: kind
+            cases: { var: { field: address, format: "#06x" } }
           - { field: size, header: size }
-          - { field: value, header: value }
+          - header: value           # addr and const export a value
+            by: kind
+            cases:
+              addr: { field: address, format: "#06x" }
+              const: { field: value }
 ```
 
 Rules:
@@ -304,7 +311,7 @@ For the worked example below, `-t xmin_listing` ends with this table, sized by t
 ```
 Exported to xmin:
 name    kind   type  address  size  value
-AddW    addr         0x0100
+AddW    addr                        0x0100
 pa      var    int   0x0113   2
 pb      var    int   0x0115   2
 pr      var    int   0x0117   2
@@ -508,7 +515,8 @@ Errors from the later sections:
 | Unknown generator name | config load | `output format 'xmin', section 'code': unknown generator 'intelhex'` |
 | A section name equals a template field name, or the template names a section that is not defined | config load | config error naming the key path |
 | Unmatched `{?`, or a nested optional group | config load | config error naming the key path and the template |
-| A `columns` entry has no `field`, or an unknown `field`, `align` or `format` | config load | config error naming the key path |
+| A `columns` entry has no `field` (or `by` and `cases`), both, an unknown `field`, `align`, `format` or key, a bad `min_width` or `header`, or a `by` that is not an enum argument or a case for a value it does not have | config load | config error naming the key path, e.g. `output_formats.xmin_listing.sections.symbols.columns[3].align must be left or right, not "center"` |
+| `exports` has both `lines` and `columns`, or `separator` without `columns` | config load | config error naming the section |
 | `-t` names a format that needs a different word size | compile | `output format 'minhex' requires 8-bit words` |
 | A section uses a generator that cannot work with the ISA's word size (`intel_hex`, `hex` and `byte_list` need 8-bit words) | config load | `generator 'intel_hex', which needs 8-bit words; this instruction set has 16-bit words` |
 

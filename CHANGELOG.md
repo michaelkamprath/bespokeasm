@@ -21,7 +21,8 @@ Changes that are planned but not implemented yet:
 * **Behavior change:** `-t` accepts any name and is checked against the configuration after it loads, so an unknown name is now reported as `this instruction set does not define output format '...'` with the available formats, instead of a usage error. Shell completion offers the configuration's formats.
 * **Behavior change:** Giving `-t` without `-p` now warns that the format is not selected (an error with `-W`).
 * Added shared definitions for config-defined output formats. A top-level `output_format_shared` section holds named sets that a format includes with `shared` and can override per item, section, or option. A format or set can also predefine memory zones and constants, which exist only while that format is selected; referencing one otherwise is an error that names the formats that define it.
-* The Minimal 64x4 and Minimal 64x4 Redux example configurations now declare an `xmin` annotation and an `xmin` output format, so `-p -t xmin` writes an Extended Min (xmin) source file with an `asm` block and the annotated symbols. They now require BespokeASM 0.9.0.
+* The `exports` generator can write a table instead of line templates: `columns` lists the fields in order, each with an optional `header`, Python `format` spec, `align` and `min_width`, and widths fit the content as in `-t listing`. A column can also choose its field per row by an enum argument (`by` and `cases`).
+* The Minimal 64x4 and Minimal 64x4 Redux example configurations now declare an `xmin` annotation and an `xmin` output format, so `-p -t xmin` writes an Extended Min (xmin) source file with an `asm` block and the annotated symbols, and `-p -t xmin_listing` writes the listing followed by a table of the exported symbols. They now require BespokeASM 0.9.0.
 
 
 ## [0.8.1]

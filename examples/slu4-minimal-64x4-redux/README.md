@@ -65,12 +65,18 @@ The ISA configuration declares a `stack` [flow counter](https://github.com/micha
 See [`software/flow-stack-demo.min64x4r`](software/flow-stack-demo.min64x4r) for a small, heavily commented demonstration: a caller that pushes two arguments under a tracked region, and a `#track stack mode=called` subroutine that names its caller-argument coordinates (accounting for the 2-byte return address `jps` pushes at `sp+1..sp+2`), pushes a local so the argument offsets demonstrably shift, and returns through the `rts` balance check.
 
 ### Extended Min (xmin) Export
-The ISA configuration declares an `xmin` annotation and an `xmin` output format. Source marks each label or constant to export with `#annotate xmin ...` on the line above it, and compiling with `-p -t xmin` writes an Extended Min (xmin) source file: an `asm` block holding the machine code as Intel HEX records, followed by one declaration per exported symbol. An xmin script loads the file with `use` and can then `call` the routine and read or write its variables. A variable is a `char`, `int` or `long`, or an array of one with `count=N`; with `array` instead of `count`, the data sets the count. A string is `type=str` above a `.cstr`: `#annotate xmin kind=var type=str` above `msg: .cstr "hello"` exports `char msg[5]`, because xmin strings carry a length rather than a terminator. The `XMIN_USER_CODE` (`0x0100`–`0x0FFF`) and `XMIN_USER_CODE_HI` (`0xED80`–`0xEFFF`) memory zones exist only while the `xmin` format is selected. Annotations emit no bytes, so programs that do not use them assemble exactly as before.
+The ISA configuration declares an `xmin` annotation and an `xmin` output format. Source marks each label or constant to export with `#annotate xmin ...` on the line above it, and compiling with `-p -t xmin` writes an Extended Min (xmin) source file: an `asm` block holding the machine code as Intel HEX records, followed by one declaration per exported symbol. An xmin script loads the file with `use` and can then `call` the routine and read or write its variables. A variable is a `char`, `int` or `long`, or an array of one with `count=N`; with `array` instead of `count`, the data sets the count. A string is `type=str` above a `.cstr`: `#annotate xmin kind=var type=str` above `msg: .cstr "hello"` exports `char msg[5]`, because xmin strings carry a length rather than a terminator. The `XMIN_USER_CODE` (`0x0100`–`0x0FFF`) and `XMIN_USER_CODE_HI` (`0xED80`–`0xEFFF`) memory zones exist only while the `xmin` or `xmin_listing` format is selected. Annotations emit no bytes, so programs that do not use them assemble exactly as before.
 
 See [`software/xmin-addb.min64x4r`](software/xmin-addb.min64x4r) for an 8-bit add routine with its parameter block, compiled with:
 
 ```sh
 bespokeasm compile -c slu4-minimal-64x4-redux.yaml -n -p -t xmin --pretty-print-output addb.xmin software/xmin-addb.min64x4r
+```
+
+To check what was exported, `-p -t xmin_listing` prints the normal listing followed by a table of the exported symbols with their kind, type, address, size and value:
+
+```sh
+bespokeasm compile -c slu4-minimal-64x4-redux.yaml -n -p -t xmin_listing software/xmin-addb.min64x4r
 ```
 
 ### Assembly Syntax

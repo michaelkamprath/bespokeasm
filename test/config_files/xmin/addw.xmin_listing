@@ -1,0 +1,34 @@
+File: addw.min64x4
+------+------+----------+----------------------------------------+---------
+ line | addr |  bytes   | instruction                            | comment
+------+------+----------+----------------------------------------+---------
+    1 | 0100 |          | .memzone XMIN_USER_CODE                |
+    2 | 0100 |          | .org 0 "XMIN_USER_CODE"                |
+    4 | 0100 |          | #annotate xmin kind=addr name=AddW     |
+    5 | 0100 |          | add_w:                                 |
+    6 | 0100 | 76 13 01 |     LDB pa+0                           |
+    6 | 0103 | a4 15 01 |     ADB pb+0                           |
+    6 | 0106 | 7e 17 01 |     STB pr+0                           |
+    7 | 0109 | 76 14 01 |     LDB pa+1                           |
+    7 | 010c | f3 16 01 |     ACB pb+1                           |
+    7 | 010f | 7e 18 01 |     STB pr+1                           |
+    8 | 0112 | 69       |     RTS                                |
+   10 | 0113 |          | #annotate xmin kind=var type=int       |
+   11 | 0113 |          | pa:                                    |
+   11 | 0113 | 00 00    |     .2byte 0                           |
+   12 | 0115 |          | #annotate xmin kind=var type=int       |
+   13 | 0115 |          | pb:                                    |
+   13 | 0115 | 00 00    |     .2byte 0                           |
+   14 | 0117 |          | #annotate xmin kind=var type=int       |
+   15 | 0117 |          | pr:                                    |
+   15 | 0117 | 00 00    |     .2byte 0                           |
+   17 | 0119 |          | #annotate xmin kind=const type=int     |
+   18 | 0119 |          | MAXARG = 1000                          |
+
+Exported to xmin:
+name    kind   type  address  size  value
+AddW    addr                        0x0100
+pa      var    int   0x0113   2
+pb      var    int   0x0115   2
+pr      var    int   0x0117   2
+MAXARG  const  int                  1000
