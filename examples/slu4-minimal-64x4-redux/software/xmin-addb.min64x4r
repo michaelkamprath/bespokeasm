@@ -1,0 +1,32 @@
+; Extended Min (xmin) export demo: an 8-bit add routine that an xmin script calls.
+;
+; Assemble with the `xmin` output format to write `addb.xmin`:
+;
+;   bespokeasm compile -c slu4-minimal-64x4-redux.yaml -n -p -t xmin --pretty-print-output addb.xmin xmin-addb.min64x4r
+;
+; `XMIN_USER_CODE` is defined only while the `xmin` format is selected, so this file
+; assembles only with `-p -t xmin`. Each `#annotate xmin` line exports the symbol on the
+; next line; the script then uses them like this:
+;
+;   use "addb"
+;   pa = 12
+;   pb = 30
+;   call AddB
+;   print(pr)
+
+.memzone XMIN_USER_CODE
+.org 0 "XMIN_USER_CODE"
+
+; `add_b` is not a legal xmin name, so the export is named AddB.
+#annotate xmin kind=addr name=AddB
+add_b:
+    LDB pa ADB pb SDB pr
+    RTS
+
+; Each char must be followed by exactly 1 byte of data.
+#annotate xmin kind=var type=char
+pa: .byte 0
+#annotate xmin kind=var type=char
+pb: .byte 0
+#annotate xmin kind=var type=char
+pr: .byte 0

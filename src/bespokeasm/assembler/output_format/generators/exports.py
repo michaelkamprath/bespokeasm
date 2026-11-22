@@ -21,7 +21,9 @@ _ARGUMENT_SAMPLES = {'enum': 'x', 'string': 'x', 'integer': 0, 'boolean': True, 
 class ExportsGenerator(Generator):
     name = 'exports'
     required_options = frozenset({'annotation'})
-    optional_options = frozenset({'order', 'unique', 'reserved_names', 'name_pattern', 'lines_key', 'lines'})
+    optional_options = frozenset({
+        'order', 'unique', 'reserved_names', 'name_pattern', 'lines_key', 'lines', 'value_map',
+    })
 
     def configure(self, options: dict[str, Any]) -> None:
         annotation = options['annotation']
@@ -64,8 +66,29 @@ class ExportsGenerator(Generator):
                     f"names annotation '{namespace.name}', whose argument '{argument}' has the same name as "
                     f'an export field ({", ".join(SYMBOL_FIELDS)})',
                 )
+        self.value_map = self._configure_value_map(options.get('value_map', {}))
         self.fields = self._field_samples()
         self._configure_lines(options)
+
+    def _configure_value_map(self, value_map: Any) -> dict[str, dict[str, str]]:
+        """``value_map`` rewrites enum argument values in this section's output, as in
+        ``{type: {str: char}}``. Line selection by ``lines_key`` still uses the source value."""
+        if not isinstance(value_map, dict):
+            self.error('value_map', 'must map enum argument names to mappings of value to output text')
+        result: dict[str, dict[str, str]] = {}
+        for argument, mapping in value_map.items():
+            spec = self.namespace.arguments.get(argument)
+            if spec is None or spec.type != 'enum':
+                self.error(f'value_map.{argument}', f"must name an enum argument of annotation '{self.namespace.name}'")
+            if not isinstance(mapping, dict):
+                self.error(f'value_map.{argument}', 'must map values of the argument to output text')
+            for value, text in mapping.items():
+                if str(value) not in spec.values:
+                    self.error(f'value_map.{argument}.{value}', f"is not a value of argument '{argument}'")
+                if not isinstance(text, str):
+                    self.error(f'value_map.{argument}.{value}', 'must be a string')
+            result[argument] = {str(value): text for value, text in mapping.items()}
+        return result
 
     def _field_samples(self) -> dict[str, Any]:
         fields: dict[str, Any] = {'name': 'x', 'symbol': 'x', 'address': 0, 'value': 0, 'size': 0, 'words': '00'}
@@ -129,7 +152,8 @@ class ExportsGenerator(Generator):
             if spec.type == 'symbol':
                 values[argument] = annotation.resolved_symbols.get(argument)
             else:
-                values[argument] = annotation.arguments.get(argument)
+                value = annotation.arguments.get(argument)
+                values[argument] = self.value_map.get(argument, {}).get(value, value)
         name_argument = annotation.arguments.get('name') if 'name' in self.namespace.arguments else None
         values.update({
             'name': str(name_argument) if name_argument not in (None, '') else symbol.name,

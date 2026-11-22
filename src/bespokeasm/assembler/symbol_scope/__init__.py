@@ -140,6 +140,13 @@ class SymbolScope:
             return self.parent.has_label(label)
         return False
 
+    def format_scoped_constant_formats(self, label: str) -> list[str]:
+        """The output formats that define ``label`` when only formats define it, else empty."""
+        scope = self
+        while scope.parent is not None:
+            scope = scope.parent
+        return getattr(scope, 'format_scoped_constants', {}).get(label, [])
+
     def get_counter_coordinate(self, label: str) -> CounterCoordinate | None:
         """Resolve a coordinate through the same lexical hierarchy as labels."""
         if label in self._counter_coordinates:
@@ -248,6 +255,9 @@ class GlobalSymbolScope(SymbolScope):
             reserved_keywords,
         )
         self._register_labels = register_labels
+        # Constants that only output formats define, mapped to those formats. Set for each
+        # assembly; used only to explain a reference that does not resolve.
+        self.format_scoped_constants: dict[str, list[str]] = {}
 
     def get_label_value(self, label: str, line_id: LineIdentifier) -> int:
         '''Global scope version first checks whether passed label is actually a register'''

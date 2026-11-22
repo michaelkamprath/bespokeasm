@@ -20,17 +20,21 @@ XMIN_ANNOTATION = {
     'scopes': ['global'],
     'arguments': {
         'kind': {'type': 'enum', 'values': ['addr', 'var', 'const'], 'required': True},
-        'type': {'type': 'enum', 'values': ['char', 'int', 'long'], 'required_when': {'kind': ['var', 'const']}},
+        'type': {
+            'type': 'enum', 'values': ['char', 'int', 'long', 'str'], 'required_when': {'kind': ['var', 'const']},
+        },
         'count': {'type': 'integer', 'min': 1, 'allowed_when': {'kind': ['var']}},
+        'array': {'type': 'boolean', 'allowed_when': {'kind': ['var']}},
         'name': {'type': 'string', 'pattern': '^[A-Za-z][A-Za-z0-9]{0,12}$'},
     },
     'data_size': {
         'when': {'kind': ['var']},
-        'words': {'type': {'char': 1, 'int': 2, 'long': 4}, 'times': 'count'},
+        'words': {'type': {'char': 1, 'int': 2, 'long': 4, 'str': 1}, 'times': 'count', 'infer_times': 'array'},
+        'terminated_when': {'type': ['str']},
     },
     'value_range': {
         'when': {'kind': ['const']},
-        'range': {'type': {'char': [0, 255], 'int': [-32768, 32767], 'long': [-2147483648, 2147483647]}},
+        'range': {'type': {'char': [0, 255], 'int': [-32768, 32767], 'long': [-2147483648, 2147483647], 'str': None}},
     },
 }
 
@@ -229,7 +233,7 @@ def test_data_run_ends_at_end_of_file(tmp_path):
     included = '#annotate xmin kind=var type=int\ncounter:\n'
     source = '#include "lib.asm"\n.2byte 0\n'
     message = _assemble_error(tmp_path, source, _xmin_config(tmp_path), files={'lib.asm': included})
-    assert "'counter' is annotated as 2 words but no data follows it" in message
+    assert "'counter' is annotated as type=int, which needs 2 words, but no data follows it" in message
 
 
 def test_annotation_obeys_conditional_compilation(tmp_path):
@@ -333,7 +337,133 @@ def test_scope_and_kind_restrictions(tmp_path, source, expected):
 def test_data_size_mismatch(tmp_path, data, found):
     source = f'#annotate xmin kind=var type=int\n{data}\n'
     message = _assemble_error(tmp_path, source, _xmin_config(tmp_path))
-    assert f"'x' is annotated as 2 words but {found}" in message
+    assert f"'x' is annotated as type=int, which needs 2 words, but {found}" in message
+
+
+def test_data_size_mismatch_names_the_count(tmp_path):
+    source = '#annotate xmin kind=var type=int count=3\nx: .2byte 0\n'
+    message = _assemble_error(tmp_path, source, _xmin_config(tmp_path))
+    assert "'x' is annotated as type=int count=3, which needs 6 words, but 2 words of data follow it" in message
+
+
+@pytest.mark.parametrize(('rule', 'expected'), [
+    # A fixed size names the arguments its `when` tests.
+    (
+        {'when': {'kind': ['var']}, 'words': 2},
+        "'x' is annotated as kind=var, which needs 2 words, but 1 word of data follows it (annotation 'fixed')",
+    ),
+    # With no argument choosing the size, the message gives the size alone.
+    ({'words': 2}, "'x' is annotated as 2 words but 1 word of data follows it (annotation 'fixed')"),
+])
+def test_data_size_mismatch_with_a_fixed_size(tmp_path, rule, expected):
+    annotations = {'fixed': {'arguments': {'kind': {'type': 'enum', 'values': ['var']}}, 'data_size': rule}}
+    message = _assemble_error(tmp_path, '#annotate fixed kind=var\nx: .byte 0\n', _write_config(tmp_path, annotations))
+    assert expected in message
+
+
+@pytest.mark.parametrize(('data', 'count'), [
+    ('x: .cstr "hello"', 6),
+    ('x: .byte 1\n    .byte 2, 3', 3),
+    ('x: .byte 9', 1),
+])
+def test_array_takes_its_count_from_the_data(tmp_path, data, count):
+    source = f'#annotate xmin kind=var type=char array\n{data}\n'
+    assembler, _, _ = _assemble(tmp_path, source, _xmin_config(tmp_path))
+    arguments = assembler.export_model.symbols[0].annotations['xmin'].arguments
+    assert arguments['count'] == count
+    assert arguments['array'] is True
+
+
+def test_array_count_is_in_whole_elements(tmp_path):
+    source = '#annotate xmin kind=var type=int array\nx: .2byte 1, 2, 3\n'
+    assembler, _, _ = _assemble(tmp_path, source, _xmin_config(tmp_path))
+    assert assembler.export_model.symbols[0].annotations['xmin'].arguments['count'] == 3
+
+
+@pytest.mark.parametrize(('annotation', 'data', 'expected'), [
+    (
+        'type=int array', 'x: .byte 1, 2, 3',
+        "'x' is annotated as type=int array, which needs a whole number of 2-word elements, "
+        "but 3 words of data follow it (annotation 'xmin')",
+    ),
+    (
+        'type=char array', 'x:\n    ld a, b, c',
+        "'x' is annotated as type=char array, which needs at least one 1-word element, but no data follows it",
+    ),
+    (
+        'type=char array count=3', 'x: .byte 1, 2, 3',
+        "annotation 'xmin': 'count' cannot be given with 'array', which takes count from the data",
+    ),
+    # array=false is the same as leaving it out: the size is type times count (1).
+    (
+        'type=char array=false', 'x: .byte 1, 2, 3',
+        "'x' is annotated as type=char array=false, which needs 1 word, but 3 words of data follow it",
+    ),
+])
+def test_array_errors(tmp_path, annotation, data, expected):
+    message = _assemble_error(tmp_path, f'#annotate xmin kind=var {annotation}\n{data}\n', _xmin_config(tmp_path))
+    assert expected in message
+
+
+@pytest.mark.parametrize(('data', 'count'), [
+    ('x: .cstr "hello"', 5),
+    ('x: .byte "ab"\n    .cstr "cd"', 4),
+    ('x: .byte 65, 0', 1),
+])
+def test_terminated_count_leaves_out_the_terminator(tmp_path, data, count):
+    source = f'#annotate xmin kind=var type=str\n{data}\n'
+    assembler, _, _ = _assemble(tmp_path, source, _xmin_config(tmp_path))
+    assert assembler.export_model.symbols[0].annotations['xmin'].arguments['count'] == count
+
+
+@pytest.mark.parametrize(('annotation', 'data', 'expected'), [
+    (
+        'type=str', 'x: .byte 65, 66',
+        "'x' is annotated as type=str, which needs its data to end with a 0 terminator, but it ends with 0x42 "
+        "(annotation 'xmin')",
+    ),
+    (
+        'type=str', 'x: .cstr ""',
+        "'x' is annotated as type=str, which needs at least one 1-word element and a terminator, "
+        'but 1 word of data follows it',
+    ),
+    (
+        'type=str', 'x:\n    ld a, b, c',
+        "'x' is annotated as type=str, which needs at least one 1-word element and a terminator, "
+        'but no data follows it',
+    ),
+    (
+        'type=str count=5', 'x: .cstr "hello"',
+        "annotation 'xmin': 'count' cannot be given with type=str, which takes count from the data",
+    ),
+])
+def test_terminated_errors(tmp_path, annotation, data, expected):
+    message = _assemble_error(tmp_path, f'#annotate xmin kind=var {annotation}\n{data}\n', _xmin_config(tmp_path))
+    assert expected in message
+
+
+def test_terminator_is_the_isa_cstr_terminator(tmp_path):
+    config = _load_fixture('test_instruction_operands.yaml')
+    config['general']['cstr_terminator'] = 3
+    config['annotations'] = {'xmin': XMIN_ANNOTATION}
+    path = tmp_path / 'isa.json'
+    path.write_text(json.dumps(config))
+    assembler, _, _ = _assemble(tmp_path, '#annotate xmin kind=var type=str\nx: .cstr "hi"\n', str(path))
+    assert assembler.export_model.symbols[0].annotations['xmin'].arguments['count'] == 2
+    SymbolScope._global_scope = None
+    message = _assemble_error(tmp_path, '#annotate xmin kind=var type=str\nx: .byte 1, 0\n', str(path))
+    assert 'which needs its data to end with a 3 terminator, but it ends with 0x00' in message
+
+
+def test_null_table_entry_is_not_allowed(tmp_path):
+    message = _assemble_error(tmp_path, '#annotate xmin kind=const type=str\nX = 5\n', _xmin_config(tmp_path))
+    assert "annotation 'xmin': type=str is not allowed when kind is const" in message
+
+
+def test_value_range_with_a_fixed_range(tmp_path):
+    annotations = {'small': {'arguments': {}, 'value_range': {'range': [0, 9]}}}
+    message = _assemble_error(tmp_path, '#annotate small\nLIMIT = 10\n', _write_config(tmp_path, annotations))
+    assert "'LIMIT' value 10 is outside 0 to 9 (annotation 'small')" in message
 
 
 @pytest.mark.parametrize('data', [
@@ -351,7 +481,7 @@ def test_data_size_matches(tmp_path, data):
 
 def test_value_range(tmp_path):
     message = _assemble_error(tmp_path, '#annotate xmin kind=const type=char\nLIMIT = 1000\n', _xmin_config(tmp_path))
-    assert "'LIMIT' value 1000 is outside 0 to 255" in message
+    assert "'LIMIT' value 1000 is outside 0 to 255, the range of type=char (annotation 'xmin')" in message
     SymbolScope._global_scope = None
     assembler, _, _ = _assemble(tmp_path, '#annotate xmin kind=const type=int\nLIMIT = -5\n', _xmin_config(tmp_path))
     assert assembler.export_model.symbols[0].value == -5
@@ -386,6 +516,41 @@ def test_annotate_is_a_reserved_word(tmp_path):
     (
         {'ns': {'arguments': {'a': {'type': 'enum', 'values': ['x']}}, 'data_size': {'words': {'a': {'x': 1}, 'times': 'a'}}}},
         'annotations.ns.data_size.words.times must name an integer argument',
+    ),
+    (
+        {'ns': {
+            'arguments': {'a': {'type': 'enum', 'values': ['x']}, 'flag': {'type': 'boolean'}},
+            'data_size': {'words': {'a': {'x': 1}, 'infer_times': 'flag'}},
+        }},
+        'annotations.ns.data_size.words.infer_times needs times, the argument it computes',
+    ),
+    (
+        {'ns': {
+            'arguments': {'a': {'type': 'enum', 'values': ['x']}, 'n': {'type': 'integer'}},
+            'data_size': {'words': {'a': {'x': 1}, 'times': 'n', 'infer_times': 'n'}},
+        }},
+        'annotations.ns.data_size.words.infer_times must name a boolean argument',
+    ),
+    (
+        {'ns': {
+            'arguments': {'a': {'type': 'enum', 'values': ['x']}},
+            'data_size': {'words': {'a': {'x': 1}}, 'terminated_when': {'a': ['x']}},
+        }},
+        'annotations.ns.data_size.terminated_when needs annotations.ns.data_size.words.times, the argument it computes',
+    ),
+    (
+        {'ns': {
+            'arguments': {'a': {'type': 'enum', 'values': ['x']}},
+            'value_range': {'range': {'a': {'x': [0, 1]}}, 'terminated_when': {'a': ['x']}},
+        }},
+        'annotations.ns.value_range.terminated_when is only allowed in data_size',
+    ),
+    (
+        {'ns': {
+            'arguments': {'a': {'type': 'enum', 'values': ['x']}, 'n': {'type': 'integer'}},
+            'data_size': {'words': {'a': {'x': 1}, 'times': 'n'}, 'terminated_when': {'n': [1]}},
+        }},
+        'annotations.ns.data_size.terminated_when.n must name another enum argument',
     ),
     (
         {'ns': {'applies_to': ['label'], 'value_range': {'range': [0, 1]}}},

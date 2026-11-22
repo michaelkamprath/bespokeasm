@@ -99,11 +99,25 @@ class Assembler:
             self._model.reserved_keywords,
         )
 
+        # The selected format's memory zones and constants act as top-level predefined ones.
+        format_zones = output_format.predefined_memory_zones if output_format is not None else []
+        format_constants = output_format.predefined_constants if output_format is not None else []
+        format_scoped_names = self._model.format_scoped_names
         global_symbol_scope = self._model.global_symbol_scope
+        global_symbol_scope.format_scoped_constants = format_scoped_names['constants']
+        predefines_lineid = LineIdentifier(0, os.path.basename(self._config_file))
+        for constant in format_constants:
+            global_symbol_scope.set_label_value(
+                constant['name'],
+                constant['value'],
+                predefines_lineid,
+                scope=SymbolScopeType.GLOBAL,
+            )
         memzone_manager = MemoryZoneManager(
             self._model.address_size,
             self._model.default_origin,
-            self._model.predefined_memory_zones,
+            list(self._model.predefined_memory_zones) + format_zones,
+            format_scoped_names['memory_zones'],
         )
 
         # create preprocessor
@@ -116,7 +130,6 @@ class Assembler:
         preprocessor.add_cli_symbols(self._predefined_symbols)
 
         # create the predefined memory blocks
-        predefines_lineid = LineIdentifier(0, os.path.basename(self._config_file))
         predefined_line_obs: list[LineObject] = []
         for predefined_memory in self._model.predefined_data_blocks:
             label: str = predefined_memory['name']
@@ -330,6 +343,9 @@ class Assembler:
                         f'  memory zone of other line <{last_line.line_id}> = {last_line.memory_zone}',
                     )
                 last_line = lobj
+
+        # Annotated data that must end with a string terminator can be checked now that words exist.
+        self._export_model.check_terminators(self._model.cstr_terminator)
 
         # Finally generate the binary image
         fill_word = Word(

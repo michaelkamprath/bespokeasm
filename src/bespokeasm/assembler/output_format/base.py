@@ -59,6 +59,16 @@ class OutputFormat(ABC):
     def is_builtin(self) -> bool:
         return self._is_builtin
 
+    @property
+    def predefined_memory_zones(self) -> list[dict]:
+        """Memory zones that exist only while this format is selected."""
+        return []
+
+    @property
+    def predefined_constants(self) -> list[dict]:
+        """Constants that exist only while this format is selected."""
+        return []
+
     def check_requirements(self, model: AssemblerModel) -> None:
         if self._requires_word_size is not None and model.word_size != self._requires_word_size:
             model.diagnostic_reporter.error(

@@ -1,0 +1,18 @@
+.memzone XMIN_USER_CODE
+.org 0 "XMIN_USER_CODE"
+
+#annotate xmin kind=addr name=AddW
+add_w:
+    LDB pa+0 ADB pb+0 STB pr+0
+    LDB pa+1 ACB pb+1 STB pr+1
+    RTS
+
+#annotate xmin kind=var type=int
+pa: .2byte 0
+#annotate xmin kind=var type=int
+pb: .2byte 0
+#annotate xmin kind=var type=int
+pr: .2byte 0
+
+#annotate xmin kind=const type=int
+MAXARG = 1000

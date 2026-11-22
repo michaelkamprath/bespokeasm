@@ -32,9 +32,13 @@ EXPRESSION_PARTS_PATTERN = \
     )
 
 
-def _unknown_label_message(label: str) -> str:
+def _unknown_label_message(label: str, symbol_scope: SymbolScope | None = None) -> str:
     """Describe an unresolved label, with a hint about scope rules when the prefix implies one."""
     message = f'unknown label "{label}"'
+    formats = symbol_scope.format_scoped_constant_formats(label) if symbol_scope is not None else []
+    if formats:
+        from bespokeasm.assembler.output_format.defined import format_scoped_hint
+        return f'{message}; {format_scoped_hint(formats, "a constant")}'
     if label.startswith('.'):
         message += (
             '; local labels (starting with ".") are only visible between the global label '
@@ -217,7 +221,7 @@ class ExpressionNode:
                         'instruction operand values, data values, and flow '
                         'directives'
                     )
-                raise AssemblerError(line_id, _unknown_label_message(self.value))
+                raise AssemblerError(line_id, _unknown_label_message(self.value, symbol_scope))
             return val
         else:
             # this wasn't a numeric value
