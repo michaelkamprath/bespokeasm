@@ -7,7 +7,7 @@ from bespokeasm.assembler.output_format.base import RenderContext
 BUILTIN_FORMAT_DESCRIPTIONS = {
     'listing': 'Source listing with addresses and assembled bytes.',
     'hex': 'Text hex dump of the assembled bytes.',
-    'intel_hex': 'Intel HEX records.',
+    'intel_hex': 'Intel HEX encoding of the assembled bytes.',
     'symbols': 'Every label and constant, with annotations, as JSON.',
 }
 BUILTIN_FORMAT_NAMES = tuple(BUILTIN_FORMAT_DESCRIPTIONS)

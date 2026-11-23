@@ -70,6 +70,9 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.STRING_ESCAPE, 'constant.character.escape', 'Strings - Escaped Characters'),
             (SyntaxElement.COMMENT, 'comment.line', 'Comments'),
             (SyntaxElement.PARAMETER, 'variable.parameter', 'Parameters'),
+            (SyntaxElement.ANNOTATION_NAMESPACE, 'entity.name.namespace.annotation', 'Annotation Namespaces'),
+            (SyntaxElement.ANNOTATION_ARGUMENT, 'variable.parameter.annotation', 'Annotation Arguments'),
+            (SyntaxElement.ANNOTATION_VALUE, 'constant.other.annotation.value', 'Annotation Values'),
             (SyntaxElement.INSTRUCTION, 'variable.function.instruction', 'Instruction Functions'),
             (SyntaxElement.MACRO, 'variable.function.macro', 'Macro Functions'),
             (SyntaxElement.REGISTER, 'variable.language', 'Variables - Language'),
@@ -358,6 +361,14 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
                 break
         if not updated:
             raise InternalAssemblerError(None, 'did not find correct preprocessor rule for Sublime systax file.')
+        # #annotate namespaces and argument names
+        namespaces, arguments = self.model.annotation_highlight_names
+        for context in ('annotation_namespace', 'annotation_arguments'):
+            for rule in syntax_dict['contexts'][context]:
+                if 'match' in rule:
+                    rule['match'] = rule['match'].replace(
+                        '##ANNOTATION_NAMESPACES##', '|'.join(namespaces),
+                    ).replace('##ANNOTATION_ARGUMENTS##', '|'.join(arguments))
 
         # expression functions
         func_regex = '|'.join(expression_functions_for_isa(self.model.flow_counters_enabled))

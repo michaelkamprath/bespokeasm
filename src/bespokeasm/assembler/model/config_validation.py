@@ -452,6 +452,7 @@ KNOWN_KEYS = {
     'annotation': {'documentation', 'applies_to', 'scopes', 'arguments', 'data_size', 'value_range'},
     'annotation_argument': {
         'type', 'values', 'min', 'max', 'pattern', 'required', 'required_when', 'allowed_when', 'default',
+        'documentation',
     },
     'annotation_data_size': {'when', 'words', 'terminated_when'},
     'annotation_value_range': {'when', 'range'},

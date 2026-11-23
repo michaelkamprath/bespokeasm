@@ -21,6 +21,8 @@ _ARGUMENT_PATTERN = re.compile(
     flags=re.VERBOSE,
 )
 _ESCAPE_PATTERN = re.compile(r'\\(.)')
+# In a quoted value, \n is a line break and \t a tab; any other escaped character stands for itself.
+_ESCAPES = {'n': '\n', 't': '\t'}
 
 
 def parse_annotation_directive(line_id: LineIdentifier, instruction: str) -> tuple[str, list[RawArgument]]:
@@ -50,7 +52,7 @@ def parse_annotation_directive(line_id: LineIdentifier, instruction: str) -> tup
         value = match.group('value')
         quoted = value is not None and value.startswith('"')
         if quoted:
-            value = _ESCAPE_PATTERN.sub(r'\1', value[1:-1])
+            value = _ESCAPE_PATTERN.sub(lambda escape: _ESCAPES.get(escape.group(1), escape.group(1)), value[1:-1])
         arguments.append(RawArgument(match.group('key'), value, quoted))
         position = match.end()
     return namespace, arguments

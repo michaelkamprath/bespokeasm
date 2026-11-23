@@ -1012,7 +1012,8 @@ class AssemblerModel:
 
     @cached_property
     def predefined_labels(self) -> list[str]:
-        '''Provides a list of labels that were created by entities defined in the ISA model.
+        '''Provides a list of labels that were created by entities defined in the ISA model,
+           including the memory zones and constants that only output formats define.
            Intend use is for creating syntax highlighting rules.
         '''
         results: list[str] = []
@@ -1022,6 +1023,9 @@ class AssemblerModel:
             results.append(item['name'])
         for item in self.predefined_memory_zones:
             results.append(item['name'])
+        # Names that only output formats define are highlighted like other predefined names.
+        for kind in ('constants', 'memory_zones'):
+            results.extend(name for name in self.format_scoped_names[kind] if name not in results)
         return results
 
     @cached_property
@@ -1071,6 +1075,16 @@ class AssemblerModel:
     def annotation_namespaces(self) -> dict[str, AnnotationNamespace]:
         """Annotation namespaces available to ``#annotate``: ``listing`` plus those the config declares."""
         return self._annotation_namespaces
+
+    @property
+    def annotation_highlight_names(self) -> tuple[list[str], list[str]]:
+        """Annotation namespace names and argument names, longest first, for syntax highlighting."""
+        namespaces = sorted(self._annotation_namespaces, key=lambda name: (-len(name), name))
+        arguments = sorted(
+            {name for namespace in self._annotation_namespaces.values() for name in namespace.arguments},
+            key=lambda name: (-len(name), name),
+        )
+        return namespaces, arguments
 
     @property
     def output_formats(self) -> dict[str, DefinedFormat]:

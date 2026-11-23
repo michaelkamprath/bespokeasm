@@ -73,6 +73,9 @@ class ArgumentSpec:
     allowed_when: Condition | None = None
     has_default: bool = False
     default: Any = None
+    # From ``documentation``: what the argument means, and for an enum what each value means.
+    description: str | None = None
+    value_descriptions: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -169,6 +172,8 @@ class AnnotationNamespace:
     data_size: SelectedRule | None = None
     value_range: SelectedRule | None = None
     is_builtin: bool = False
+    # From ``documentation.examples``: each a mapping of ``title``, ``description`` and ``code``.
+    examples: tuple[dict[str, str], ...] = ()
 
     # ---- source validation -------------------------------------------------
 
@@ -336,12 +341,34 @@ LISTING_NAMESPACE = AnnotationNamespace(
     applies_to=SYMBOL_KINDS,
     scopes=SYMBOL_SCOPES,
     arguments={
-        'heading': ArgumentSpec('heading', 'string'),
-        'page_break': ArgumentSpec('page_break', 'boolean'),
-        'collapse': ArgumentSpec('collapse', 'boolean'),
-        'hide': ArgumentSpec('hide', 'boolean'),
+        'heading': ArgumentSpec(
+            'heading', 'string', description='Prints this heading, underlined, above the symbol.',
+        ),
+        'page_break': ArgumentSpec(
+            'page_break', 'boolean',
+            description='Starts a new page above the symbol: a form feed, then the file and column headers again.',
+        ),
+        'collapse': ArgumentSpec(
+            'collapse', 'boolean',
+            description="Shows the first row of the label's data, then a count of the words not shown.",
+        ),
+        'hide': ArgumentSpec(
+            'hide', 'boolean',
+            description="Leaves the symbol's lines out of the listing; its bytes are still assembled.",
+        ),
     },
     is_builtin=True,
+    examples=(
+        {
+            'title': 'A heading above a collapsed table',
+            'description': 'The listing prints the heading, then the first row of the table and a count of the rest.',
+            'code': (
+                '#annotate listing heading="Lookup tables" collapse\n'
+                'sine_table:\n'
+                '    .byte 0, 3, 6, 9, 12, 16, 19, 22, 25, 28, 31, 34, 37, 40, 43, 46'
+            ),
+        },
+    ),
 )
 
 BUILTIN_NAMESPACES = {LISTING_NAMESPACE.name: LISTING_NAMESPACE}
@@ -363,13 +390,21 @@ class _NamespaceLoader:
     def load(self) -> AnnotationNamespace:
         config = self._config
         description = None
+        examples: tuple[dict[str, str], ...] = ()
         documentation = config.get('documentation')
         if documentation is not None:
             if not isinstance(documentation, dict):
                 self._error(f'{self._path}.documentation', 'must be a mapping')
+            for key in documentation:
+                if key not in ('description', 'examples'):
+                    self._error(
+                        f'{self._path}.documentation.{key}',
+                        'is not a documentation setting; annotations take description, examples',
+                    )
             description = documentation.get('description')
             if description is not None and not isinstance(description, str):
                 self._error(f'{self._path}.documentation.description', 'must be a string')
+            examples = self._examples(documentation.get('examples'), f'{self._path}.documentation.examples')
 
         applies_to = self._name_list('applies_to', SYMBOL_KINDS)
         scopes = self._name_list('scopes', SYMBOL_SCOPES)
@@ -398,6 +433,8 @@ class _NamespaceLoader:
             arguments[arg_name] = ArgumentSpec(
                 required_when=required_when,
                 allowed_when=allowed_when,
+                # Not `description`: that name holds the namespace's own description.
+                description=self._argument_documentation(arg_config, arg_path),
                 **basics,
             )
 
@@ -418,7 +455,54 @@ class _NamespaceLoader:
             arguments=arguments,
             data_size=data_size,
             value_range=value_range,
+            examples=examples,
         )
+
+    def _examples(self, examples: Any, path: str) -> tuple[dict[str, str], ...]:
+        """Usage examples, as instructions have: each a ``code`` block with an optional ``title``
+        and ``description``."""
+        if examples is None:
+            return ()
+        if not isinstance(examples, list):
+            self._error(path, 'must be a list of examples, each with code and an optional title and description')
+        loaded = []
+        for index, example in enumerate(examples):
+            example_path = f'{path}[{index}]'
+            if not isinstance(example, dict):
+                self._error(example_path, 'must be a mapping with code and an optional title and description')
+            for key in example:
+                if key not in ('title', 'description', 'code'):
+                    self._error(f'{example_path}.{key}', 'is not an example setting; examples take title, description, code')
+            if 'code' not in example:
+                self._error(example_path, 'needs code')
+            for key in ('title', 'description', 'code'):
+                if key in example and not isinstance(example[key], str):
+                    self._error(f'{example_path}.{key}', 'must be a string')
+            loaded.append({key: example[key].rstrip('\n') if key == 'code' else example[key] for key in example})
+        return tuple(loaded)
+
+    def _argument_documentation(self, config: dict, path: str) -> str | None:
+        """An argument's optional ``documentation``: its ``description``. Each enum value is
+        documented with the value itself, under ``values``."""
+        documentation = config.get('documentation')
+        if documentation is None:
+            return None
+        doc_path = f'{path}.documentation'
+        if not isinstance(documentation, dict):
+            self._error(doc_path, 'must be a mapping')
+        for key in documentation:
+            if key == 'values':
+                self._error(
+                    f'{doc_path}.values',
+                    f'is not a documentation setting; document each value under {path}.values, '
+                    'as {value: {documentation: {description: ...}}}',
+                )
+            if key != 'description':
+                self._error(f'{doc_path}.{key}', 'is not a documentation setting; arguments take description')
+        description = documentation.get('description')
+        if description is not None and not isinstance(description, str):
+            self._error(f'{doc_path}.description', 'must be a string')
+        return description
 
     def _name_list(self, key: str, choices: tuple[str, ...]) -> tuple[str, ...]:
         if key not in self._config:
@@ -447,13 +531,9 @@ class _NamespaceLoader:
                 self._error(f'{path}.{key}', f'only applies to arguments of type {" or ".join(allowed_types)}')
 
         values: tuple[str, ...] = ()
+        value_descriptions: tuple[tuple[str, str], ...] = ()
         if arg_type == 'enum':
-            raw_values = config.get('values')
-            if not isinstance(raw_values, list) or len(raw_values) == 0:
-                self._error(f'{path}.values', 'is required for an enum argument and must be a non-empty list')
-            values = tuple(str(value) for value in raw_values)
-            if len(set(values)) != len(values):
-                self._error(f'{path}.values', 'must not repeat a value')
+            values, value_descriptions = self._enum_values(config.get('values'), f'{path}.values')
 
         minimum = config.get('min')
         maximum = config.get('max')
@@ -493,7 +573,52 @@ class _NamespaceLoader:
             'required': required,
             'has_default': has_default,
             'default': default,
+            'value_descriptions': value_descriptions,
         }
+
+    def _enum_values(self, raw_values: Any, path: str) -> tuple[tuple[str, ...], tuple[tuple[str, str], ...]]:
+        """An enum's values: a list, or a mapping of each value to its optional ``documentation``
+        (``{addr: {documentation: {description: ...}}, var: ...}``)."""
+        if isinstance(raw_values, list):
+            if not raw_values:
+                self._error(path, 'is required for an enum argument and must not be empty')
+            values = tuple(str(value) for value in raw_values)
+            if len(set(values)) != len(values):
+                self._error(path, 'must not repeat a value')
+            return values, ()
+        if not isinstance(raw_values, dict) or not raw_values:
+            self._error(
+                path,
+                'is required for an enum argument: a list of values, or a mapping of each value to its documentation',
+            )
+        values = tuple(str(value) for value in raw_values)
+        described = []
+        for value, entry in raw_values.items():
+            entry_path = f'{path}.{value}'
+            if entry is None:
+                continue
+            if not isinstance(entry, dict):
+                self._error(entry_path, 'must be a mapping with an optional documentation block')
+            for key in entry:
+                if key != 'documentation':
+                    self._error(f'{entry_path}.{key}', 'is not a value setting; a value takes only documentation')
+            documentation = entry.get('documentation')
+            if documentation is None:
+                continue
+            if not isinstance(documentation, dict):
+                self._error(f'{entry_path}.documentation', 'must be a mapping')
+            for key in documentation:
+                if key != 'description':
+                    self._error(
+                        f'{entry_path}.documentation.{key}',
+                        'is not a documentation setting; a value takes description',
+                    )
+            description = documentation.get('description')
+            if description is not None:
+                if not isinstance(description, str):
+                    self._error(f'{entry_path}.documentation.description', 'must be a string')
+                described.append((str(value), description))
+        return values, tuple(described)
 
     def _check_default(self, arg_type, default, values, minimum, maximum, pattern, path) -> Any:
         if arg_type == 'enum':

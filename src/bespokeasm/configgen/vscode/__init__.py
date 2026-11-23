@@ -63,6 +63,9 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.STRING_ESCAPE, 'constant.character.escape', 'Strings - Escaped Characters'),
             (SyntaxElement.COMMENT, 'comment.line', 'Comments'),
             (SyntaxElement.PARAMETER, 'variable.parameter', 'Parameters'),
+            (SyntaxElement.ANNOTATION_NAMESPACE, 'entity.name.namespace.annotation', 'Annotation Namespaces'),
+            (SyntaxElement.ANNOTATION_ARGUMENT, 'variable.parameter.annotation', 'Annotation Arguments'),
+            (SyntaxElement.ANNOTATION_VALUE, 'constant.other.annotation.value', 'Annotation Values'),
             (SyntaxElement.INSTRUCTION, 'variable.function.instruction', 'Functions - Instruction'),
             (SyntaxElement.MACRO, 'variable.function.macro', 'Functions - Macro'),
             (SyntaxElement.REGISTER, 'variable.language', 'Variables - Language'),
@@ -370,6 +373,14 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
                         ))
                         preprocesspr_str = pattern['match']
                         pattern['match'] = preprocesspr_str.replace('##PREPROCESSOR##', preprocessor_regex)
+
+        # handle #annotate namespaces and argument names
+        namespaces, arguments = self.model.annotation_highlight_names
+        for pattern in grammar_json['repository']['annotation_directive']['patterns']:
+            if 'match' in pattern:
+                pattern['match'] = pattern['match'].replace(
+                    '##ANNOTATION_NAMESPACES##', '|'.join(namespaces),
+                ).replace('##ANNOTATION_ARGUMENTS##', '|'.join(arguments))
 
         # handle expresion functions
         for item in grammar_json['repository']['operators']['patterns']:

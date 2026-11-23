@@ -17,8 +17,9 @@
 .memzone XMIN_USER_CODE
 .org 0 "XMIN_USER_CODE"
 
-; `add_b` is not a legal xmin name, so the export is named AddB.
-#annotate xmin kind=addr name=AddB
+; `add_b` is not a legal xmin name, so the export is named AddB. The description becomes
+; comment lines above the declaration in the xmin file.
+#annotate xmin kind=addr name=AddB description="Adds two chars: pr = pa + pb.\nSet pa and pb, call AddB, then read pr."
 add_b:
     LDB pa ADB pb SDB pr
     RTS

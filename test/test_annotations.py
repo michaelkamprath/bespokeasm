@@ -277,6 +277,20 @@ def test_argument_errors(tmp_path, source, expected):
     assert expected in _assemble_error(tmp_path, source, _xmin_config(tmp_path))
 
 
+@pytest.mark.parametrize(('written', 'value'), [
+    ('"a\\nb"', 'a\nb'),            # \n is a line break
+    ('"a\\tb"', 'a\tb'),            # \t is a tab
+    ('"say \\"hi\\""', 'say "hi"'),  # an escaped quote
+    ('"back\\\\slash"', 'back\\slash'),  # an escaped backslash
+    ('"\\x"', 'x'),                 # any other escaped character stands for itself
+])
+def test_quoted_value_escapes(written, value):
+    from bespokeasm.assembler.annotations.parser import parse_annotation_directive
+    from bespokeasm.assembler.line_identifier import LineIdentifier
+    _, arguments = parse_annotation_directive(LineIdentifier(1, 'x.asm'), f'#annotate listing heading={written}')
+    assert arguments[0].value == value
+
+
 def test_quoted_string_with_escapes(tmp_path):
     source = '#annotate listing heading="Say \\"hi\\"; then go"\nx:\n    ld a, b, c\n'
     assembler, _, _ = _assemble(tmp_path, source, _xmin_config(tmp_path))

@@ -24,7 +24,7 @@ class ExportsGenerator(Generator):
     required_options = frozenset({'annotation'})
     optional_options = frozenset({
         'order', 'unique', 'reserved_names', 'name_pattern', 'lines_key', 'lines', 'value_map',
-        'columns', 'separator', 'header_rule', 'rule_separator',
+        'columns', 'separator', 'header_rule', 'rule_separator', 'comment_field', 'comment_prefix',
     })
 
     def configure(self, options: dict[str, Any]) -> None:
@@ -77,6 +77,7 @@ class ExportsGenerator(Generator):
         for option in ('separator', 'header_rule', 'rule_separator'):
             if option in options and not uses_columns:
                 self.error(option, 'is only used with columns')
+        self._configure_comment(options, uses_columns)
         self.lines: dict[str, Template] | None = None
         self.table: ColumnTable | None = None
         if uses_columns:
@@ -119,6 +120,39 @@ class ExportsGenerator(Generator):
             if argument != 'name':
                 fields[argument] = _ARGUMENT_SAMPLES[spec.type]
         return fields
+
+    def _configure_comment(self, options: dict[str, Any], uses_columns: bool) -> None:
+        """``comment_field`` names a field whose text, when present, is written as comment lines
+        above the export's line, each starting with ``comment_prefix``. Line templates only: a
+        comment row would break a table."""
+        self.comment_field: str | None = None
+        self.comment_prefix = ''
+        given = [option for option in ('comment_field', 'comment_prefix') if option in options]
+        if not given:
+            return
+        if len(given) == 1:
+            other = 'comment_prefix' if given[0] == 'comment_field' else 'comment_field'
+            self.error(given[0], f'needs {other} too')
+        if uses_columns:
+            self.error('comment_field', 'is only used with lines_key and lines, not with columns')
+        field = options['comment_field']
+        if field not in self.fields:
+            self.error(
+                'comment_field', f'names unknown field "{field}"; known fields are {", ".join(sorted(self.fields))}',
+            )
+        if not isinstance(options['comment_prefix'], str):
+            self.error('comment_prefix', 'must be a string, such as "# "')
+        self.comment_field = field
+        self.comment_prefix = options['comment_prefix']
+
+    def _comment_lines(self, values: dict[str, Any]) -> list[str]:
+        """The comment lines above one export: each line of the comment field's text, prefixed."""
+        if self.comment_field is None:
+            return []
+        text = values.get(self.comment_field)
+        if text is None or text == '':
+            return []
+        return [f'{self.comment_prefix}{line}'.rstrip() for line in str(text).split('\n')]
 
     def _configure_lines(self, options: dict[str, Any]) -> None:
         if 'lines_key' not in options or 'lines' not in options:
@@ -170,7 +204,11 @@ class ExportsGenerator(Generator):
             # A column chooses its field by an argument's source value, before value_map.
             keys = [symbol.annotations[self.namespace.name].arguments for symbol in symbols]
             return self.table.render(rows, keys)
-        return '\n'.join(self._line_template(symbol).render(values) for symbol, values in zip(symbols, rows))
+        lines = []
+        for symbol, values in zip(symbols, rows):
+            lines.extend(self._comment_lines(values))
+            lines.append(self._line_template(symbol).render(values))
+        return '\n'.join(lines)
 
     def _values(self, symbol: AnnotatedSymbol, hex_width: int) -> dict[str, Any]:
         annotation = symbol.annotations[self.namespace.name]

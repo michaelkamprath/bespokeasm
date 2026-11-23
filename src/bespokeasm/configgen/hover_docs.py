@@ -60,6 +60,7 @@ def build_hover_docs(assembler_model: AssemblerModel, verbose: int = 0) -> dict:
             ),
         },
         'registers': markdown_generator.generate_register_hover_docs(),
+        'annotations': markdown_generator.generate_annotation_hover_docs(),
         'expression_functions': {
             name: doc
             for name, doc in directive_docs.EXPRESSION_FUNCTION_DOCS.items()

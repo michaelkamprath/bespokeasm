@@ -88,6 +88,16 @@ Each entry in `predefined.data` (see the [Instruction Set Configuration File](ht
 | --- | --- | --- |
 | `description` | string | A short summary of the data block's meaning or usage. |
 
+### Annotation and Output Format Documentation
+Each namespace in `annotations` and each format in `output_formats` (see the [Annotations](https://github.com/michaelkamprath/bespokeasm/wiki/Annotations) and [Output Formats](https://github.com/michaelkamprath/bespokeasm/wiki/Output-Formats) wiki pages) may include an optional `documentation` field. Memory zones and constants that a format or `output_format_shared` set predefines take the same `documentation` fields as top-level ones.
+
+| Option Key | Value Type | Description |
+| --- | --- | --- |
+| `description` | string | A short summary of the annotation namespace or output format. A namespace or format without one is still documented, with no description. |
+| `examples` | array | _Annotation namespaces only._ Usage examples, as for instructions: each a dictionary with `code`, and an optional `title` and `description`. |
+
+An annotation argument may have its own `documentation` with a `description` of the argument. An enum argument documents each value with the value itself: its `values` may be a mapping of each value to an optional `documentation` block with a `description`, instead of a list. Both appear in the generated Annotations section and in editor hover text.
+
 # Generated Documentation
 
 ## Markdown Documentation Page
@@ -104,9 +114,12 @@ The markdown documentation page will have the following overall structure:
 4. **Predefined Constants Section** - Documents the `predefined.constants` entries declared in the configuration file
 5. **Predefined Data Section** - Documents the `predefined.data` entries declared in the configuration file
 6. **Operand Sets Section** - Documents each configured operand set with narrative context and a per-operand table
-7. **Instructions Section** - Organized by category with detailed instruction documentation
-8. **Macros Section** - Organized by category with detailed macro documentation using the same layout as instructions
-9. **Examples Section** - General ISA examples defined in `general.documentation.examples`
+7. **Flow Counters Section** - Documents each `flow_counters` class, when the configuration declares any
+8. **Output Formats Section** - Every `-t` value the ISA accepts: the built-in formats and the configuration's
+9. **Annotations Section** - Each annotation namespace the configuration declares, when it declares any
+10. **Instructions Section** - Organized by category with detailed instruction documentation
+11. **Macros Section** - Organized by category with detailed macro documentation using the same layout as instructions
+12. **Examples Section** - General ISA examples defined in `general.documentation.examples`
 
 ### General Information Section
 
@@ -165,6 +178,8 @@ Hexadecimal values should be zero-padded to match the ISA address size when `gen
 
 Column inclusion follows the [Table Column Optimization](#table-column-optimization) guidance. When no zone supplies a `documentation` field, the `Title` and `Description` columns are omitted and only `Name`, `Start`, and `End` are shown.
 
+Memory zones that only output formats define (a format's or `output_format_shared` set's `predefined.memory_zones`) are listed after the top-level ones, once each. Their `Description` ends with a note naming the formats, for example *Only with `-t xmin` or `-t xmin_listing`.*, and their hover text has an **Only with** row.
+
 ### Predefined Constants Section
 The predefined constants section is emitted immediately after the Predefined Memory Zones section and before the `# Operand Sets` section. It begins with the markdown header `## Predefined Constants`. This section is generated only when `predefined.constants` is present and contains at least one entry (documentation fields remain optional).
 
@@ -177,6 +192,8 @@ Each constant is rendered as a table row with the following default columns:
 
 Column inclusion follows the [Table Column Optimization](#table-column-optimization) guidance. When no constant supplies a `documentation` field, the `Type`, `Size (Words)`, and `Description` columns are omitted and only `Name` and `Value` are shown.
 
+Constants that only output formats define are listed after the top-level ones, with the same note as format-scoped memory zones. A constant that formats define with different values shows each, as in `0x0000 (`xmin`), 0x0001 (`xmin_debug`)`, in the table and in its hover text.
+
 ### Predefined Data Section
 The predefined data section is emitted immediately after the Predefined Constants section and before the `# Operand Sets` section. It begins with the markdown header `## Predefined Data`. This section is generated only when `predefined.data` is present and contains at least one entry (documentation fields remain optional).
 
@@ -188,6 +205,22 @@ Each data block is rendered as a table row with the following default columns:
 - `Description` - Populated from `documentation.description` when present.
 
 Column inclusion follows the [Table Column Optimization](#table-column-optimization) guidance. When no data block supplies a `documentation` field, the `Description` column is omitted and only `Name`, `Address`, `Size (Bytes)`, and `Value` are shown.
+
+### Output Formats Section
+The output formats section begins with `# Output Formats` and a sentence on selecting a format with `-p -t <format>`. It is generated for every ISA, because every ISA accepts the built-in formats. One table lists every format, built-in first and then the configuration's in definition order:
+- `Format` - The `-t` name, rendered as inline code.
+- `Description` - The built-in format's description, or the format's `documentation.description`. A `requires_word_size` that the ISA meets is not shown, since it says nothing; one it does not meet is noted, because the format can never be selected.
+- `Defined By` - `built-in` or `configuration`. How a configuration builds a format, such as from an `output_format_shared` set, is not shown: it is for configuration authors, not readers of the ISA documentation.
+- `Predefines` - The memory zones and constants that exist only while the format is selected.
+
+### Annotations Section
+The annotations section begins with `# Annotations` and a sentence on the `#annotate` syntax that mentions the framework's `listing` namespace. It is generated only when the configuration declares an `annotations` namespace; `listing` itself is not documented per ISA. Each namespace gets a `## `<name>`` heading, then:
+- Its `documentation.description`.
+- Which symbol kinds and scopes it applies to (`applies_to`, `scopes`).
+- A table of its arguments: `Argument`, `Description` (the argument's `documentation.description`), `Type`, `Values` (enum values, with each value's `documentation.description`; an integer range; a string pattern), `Presence` (required, required when, only when) and `Default`. Conditions read as `` `kind` is `var` or `const` ``.
+- The `data_size` constraint in prose, sizes in the ISA's units (bytes for 8-bit words), including `times`, `infer_times` and `terminated_when`, for example "`type=int` 2 bytes, times `count`. With `array`, `count` comes from the data instead."
+- The `value_range` constraint in prose, with a `null` table entry shown as not allowed.
+- The namespace's `documentation.examples`, if any, under `### Examples`, each with a `####` title, its description and an `assembly` code block, like instruction examples.
 
 ### Operand Sets Section
 The operand sets section is emitted immediately after the Predefined Data section and before the `# Instructions` section. It begins with the markdown header `## Operand Sets`. Each operand set documented in the ISA configuration is rendered as a separate `### `<operand set key>` - <operand set title>` subsection (if `documentation.title` is provided). If no title is provided, the header is simply `### `<operand set key>`` with the key rendered as inline code. Operand sets are ordered first by `documentation.category` (alphabetical, with uncategorized sets listed last) and then by display name.

@@ -61,6 +61,9 @@ class SyntaxElement(Enum):
     FLOW_COORDINATE_USAGE = 'flow_coordinate_usage'
     COMPILER_LABEL = 'compiler_label'
     PARAMETER = 'parameter'
+    ANNOTATION_NAMESPACE = 'annotation_namespace'
+    ANNOTATION_ARGUMENT = 'annotation_argument'
+    ANNOTATION_VALUE = 'annotation_value'
 
     # Preprocessor and directives
     PREPROCESSOR = 'preprocessor'
@@ -117,7 +120,6 @@ DEFAULT_COLOR_SCHEME = ColorScheme(
         SyntaxElement.LABEL_NAME: '#278ed8',
         SyntaxElement.LABEL_DEFINITION: '#278ed8',
         SyntaxElement.LABEL_USAGE: '#7fcaff',
-        SyntaxElement.PUNCTUATION_LABEL_COLON: '#ed80a2',
         SyntaxElement.OPERAND_LABEL_AT: '#ed80a2',
         SyntaxElement.OPERAND_LABEL_NAME: '#278ed8',
         SyntaxElement.OPERAND_LABEL_COLON: '#ed80a2',
@@ -146,6 +148,9 @@ DEFAULT_COLOR_SCHEME = ColorScheme(
         SyntaxElement.FLOW_COORDINATE_USAGE: '#fbd7c9',
         SyntaxElement.COMPILER_LABEL: '#abedc1',
         SyntaxElement.PARAMETER: '#abd7ed',
+        SyntaxElement.ANNOTATION_NAMESPACE: '#ff00a2',
+        SyntaxElement.ANNOTATION_ARGUMENT: '#c080ff',
+        SyntaxElement.ANNOTATION_VALUE: '#89c616',
 
         # Preprocessor and directives
         SyntaxElement.PREPROCESSOR: '#c080ff',
@@ -160,7 +165,7 @@ DEFAULT_COLOR_SCHEME = ColorScheme(
         SyntaxElement.PUNCTUATION_SEPARATOR: '#ed80a2',
         SyntaxElement.PUNCTUATION_VARIABLE: '#ed80a2',
         SyntaxElement.PUNCTUATION_PREPROCESSOR: '#ed80a2',
-
+        SyntaxElement.PUNCTUATION_LABEL_COLON: '#ed80a2',
 
         # Special punctuation (may have additional styling)
         SyntaxElement.BRACKET: '#b72dd2',

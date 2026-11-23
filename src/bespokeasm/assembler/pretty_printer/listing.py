@@ -135,7 +135,9 @@ class ListingPrettyPrinter(PrettyPrinterBase):
                 self._print_file_header(output, cur_filename, hex_width, continued=True)
             heading = self._plan.headings.get(key)
             if heading is not None:
-                output.write(f'\n{heading}\n{"-" * len(heading)}\n')
+                # A heading may span lines (\n in the annotation); the underline is as long as the longest.
+                underline = '-' * max(len(line) for line in heading.split('\n'))
+                output.write(f'\n{heading}\n{underline}\n')
 
             # print the line object
             collapse = self._plan.collapses.get(key)

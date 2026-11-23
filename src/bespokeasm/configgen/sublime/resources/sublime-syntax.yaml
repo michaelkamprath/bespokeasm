@@ -75,6 +75,36 @@ contexts:
         1: keyword.control.preprocessor
         3: variable.other.flow.counter variable.other.flow.counter.usage
 
+  annotation_directive:
+    # `#annotate <namespace> key=value ...`: the namespace, then the argument names.
+    - match: (?<=\#)(annotate)\b
+      captures:
+        1: keyword.control.preprocessor
+      push: annotation_namespace
+
+  annotation_namespace:
+    - meta_scope: meta.annotation
+    - match: \s*\b(##ANNOTATION_NAMESPACES##)\b
+      captures:
+        1: entity.name.namespace.annotation
+      set: annotation_arguments
+    - match: (?=\S|$)
+      set: annotation_arguments
+
+  annotation_arguments:
+    - meta_scope: meta.annotation
+    - match: \b(##ANNOTATION_ARGUMENTS##)\b(?:\s*(=))?
+      captures:
+        1: variable.parameter.annotation
+        2: punctuation.separator.key-value.annotation
+    - include: strings
+    - include: numbers
+    - match: (?<==)\s*([A-Za-z_][A-Za-z0-9_]*)\b
+      captures:
+        1: constant.other.annotation.value
+    - match: (?=(?:\s*\;|\s*$))
+      pop: true
+
   flow_operators:
     - match: (?i)\b(?:COORDINATE|COUNTER)\b
       scope: keyword.operator.flow
@@ -249,6 +279,7 @@ contexts:
       push:
         - meta_scope: meta.preprocessor
         - include: flow_counter_directives
+        - include: annotation_directive
         - match: (?<=\#)(?:##PREPROCESSOR##)\b
           scope: keyword.control.preprocessor
         - include: strings
