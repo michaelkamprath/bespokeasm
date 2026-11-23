@@ -1360,3 +1360,75 @@ def test_rule_separator_of_another_length_is_a_warning(tmp_path):
         f'{BYTE_LINES_SECTION}.rule_separator is 1 characters but separator is 3, '
         'so the rule will not line up with the columns'
     ) in warnings
+
+
+# ---- export comments ---------------------------------------------------------------------
+
+def _described_annotation() -> dict:
+    annotation = copy.deepcopy(XMIN_ANNOTATION)
+    annotation['arguments']['description'] = {'type': 'string'}
+    return annotation
+
+
+def _comment_format(**options) -> dict:
+    output_format = copy.deepcopy(XMIN_FORMAT)
+    output_format['sections']['symbols'].update({'comment_field': 'description', 'comment_prefix': '# ', **options})
+    for key, value in options.items():
+        if value is None:
+            output_format['sections']['symbols'].pop(key)
+    return {'xmin': output_format}
+
+
+def test_export_comment_lines(tmp_path):
+    source = '\n'.join([
+        '#annotate xmin kind=addr name=AddW description="Adds pa and pb.\\nThe sum is in pr."',
+        'add_w:',
+        '    ld a, b, c',
+        '#annotate xmin kind=var type=int description="the result\\n\\nset by AddW"',
+        'pr: .2byte 0',
+        '#annotate xmin kind=var type=char',
+        'flag: .byte 0',
+    ]) + '\n'
+    config = _write_config(tmp_path, _comment_format(), annotations={'xmin': _described_annotation()})
+    output, warnings = _run(tmp_path, source, config)
+    assert warnings == ''
+    assert output.split('\n')[-9:] == [
+        '# Adds pa and pb.',
+        '# The sum is in pr.',
+        'int AddW := 0x0000',
+        '# the result',
+        '#',                       # an empty comment line has no trailing space
+        '# set by AddW',
+        'int pr @ 0x0003',
+        'char flag @ 0x0005',      # no description, no comment
+        '',
+    ]
+
+
+@pytest.mark.parametrize(('options', 'expected'), [
+    ({'comment_prefix': None}, f'{SECTION}.comment_field needs comment_prefix too'),
+    ({'comment_field': None}, f'{SECTION}.comment_prefix needs comment_field too'),
+    ({'comment_field': 'descripton'}, f'{SECTION}.comment_field names unknown field "descripton"'),
+    ({'comment_prefix': 3}, f'{SECTION}.comment_prefix must be a string'),
+])
+def test_export_comment_config_errors(tmp_path, options, expected):
+    assert expected in _config_error(tmp_path, _comment_format(**options), annotations={'xmin': _described_annotation()})
+
+
+def test_export_comments_are_not_for_tables(tmp_path):
+    output_format = _columns_with(comment_field='description', comment_prefix='# ')
+    message = _config_error(tmp_path, output_format, annotations={'xmin': _described_annotation()})
+    assert f'{SECTION}.comment_field is only used with lines_key and lines, not with columns' in message
+
+
+def test_the_xmin_examples_in_the_config_assemble(tmp_path):
+    """Every example in the xmin annotation's documentation compiles with -t xmin, with no warnings."""
+    from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
+    from bespokeasm.assembler.model import AssemblerModel
+    config = str(pkg_resources.files(config_files).joinpath('xmin', 'slu4-minimal-64x4.yaml'))
+    examples = AssemblerModel(config, 0, DiagnosticReporter()).annotation_namespaces['xmin'].examples
+    assert len(examples) == 3
+    for example in examples:
+        output, warnings = _run(tmp_path, example['code'] + '\n', config)
+        assert warnings == '', example['title']
+        assert output.strip().endswith(('int pr @ 0x0117', 'char banner[5] @ 0x0108', 'int MAXARG := 1000'))

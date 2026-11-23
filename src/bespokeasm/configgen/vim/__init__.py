@@ -127,6 +127,10 @@ class VimConfigGenerator(LanguageConfigGenerator):
             (f'{lang_group}Escape', SyntaxElement.STRING_ESCAPE),
             (f'{lang_group}Comment', SyntaxElement.COMMENT),
             (f'{lang_group}Param', SyntaxElement.PARAMETER),
+            (f'{lang_group}AnnotationNamespace', SyntaxElement.ANNOTATION_NAMESPACE),
+            (f'{lang_group}AnnotationArgument', SyntaxElement.ANNOTATION_ARGUMENT),
+            (f'{lang_group}AnnotationPunct', SyntaxElement.PUNCTUATION_SEPARATOR),
+            (f'{lang_group}AnnotationValue', SyntaxElement.ANNOTATION_VALUE),
             (f'{lang_group}Separator', SyntaxElement.PUNCTUATION_SEPARATOR),
             (f'{lang_group}Instruction', SyntaxElement.INSTRUCTION),
             (f'{lang_group}Macro', SyntaxElement.MACRO),
@@ -520,6 +524,23 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
             fr'contains={bracket_contains}'
         )
 
+        # #annotate: the namespace, argument names, '=' and word values, up to any comment.
+        # Defined after the instruction, macro and label rules so these win a same-position tie
+        # (an argument value such as `int` can also be a mnemonic).
+        namespaces, arguments = self.model.annotation_highlight_names
+        lines.append(
+            fr'syn match {lang_group}AnnotationNamespace '
+            fr'/\%(^\s*#annotate\s\+\)\@<={self._alternation(namespaces)}\>/'
+        )
+        lines.append(
+            fr'syn match {lang_group}AnnotationArgument '
+            fr'/\%(^\s*#annotate\>[^;]*\)\@<=\<{self._alternation(arguments)}\>/'
+        )
+        lines.append(fr'syn match {lang_group}AnnotationPunct /\%(^\s*#annotate\>[^;]*\)\@<==/')
+        lines.append(
+            fr'syn match {lang_group}AnnotationValue '
+            r'/\%(^\s*#annotate\>[^;]*=\s*\)\@<=\h\w*\>/'
+        )
         lines.append('')
         # Base links (fallbacks if explicit colors below are not supported)
         lines.append(f'hi def link {lang_group}Comment Comment')
@@ -557,6 +578,10 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         lines.append(f'hi def link {lang_group}Paren Delimiter')
         lines.append(f'hi def link {lang_group}Separator Delimiter')
         lines.append(f'hi def link {lang_group}Param Identifier')
+        lines.append(f'hi def link {lang_group}AnnotationNamespace Identifier')
+        lines.append(f'hi def link {lang_group}AnnotationArgument Identifier')
+        lines.append(f'hi def link {lang_group}AnnotationPunct Delimiter')
+        lines.append(f'hi def link {lang_group}AnnotationValue Constant')
         # BespokeASM color scheme from central configuration
         color_lines = self._generate_vim_color_lines(lang_group)
         lines.extend(color_lines)
@@ -693,6 +718,12 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
             for name, doc in predefined.get(category, {}).items():
                 docs[name.lower()] = doc
 
+        # Looked up only on `#annotate` lines (see s:AnnotationKey), so they cannot collide.
+        for namespace, namespace_docs in hover_docs.get('annotations', {}).items():
+            docs[f'annotate:{namespace}'] = namespace_docs['doc']
+            for argument, doc in namespace_docs['arguments'].items():
+                docs[f'annotate:{namespace}:{argument}'] = doc
+
         return docs
 
     def _vim_string_escape(self, value: str) -> str:
@@ -711,7 +742,31 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         lines.extend([
             '\\ }',
             '',
+            '" On an #annotate line: the namespace, an argument name, or a value (its argument).',
+            'function! s:AnnotationKey(word) abort',
+            "  let l:line = getline('.')",
+            "  let l:namespace = matchstr(l:line, '^\\s*#annotate\\s\\+\\zs\\h\\w*')",
+            "  if l:namespace ==# '' || stridx(l:line[: col('.') - 1], ';') >= 0",
+            "    return ''",
+            '  endif',
+            '  if a:word ==# l:namespace',
+            "    return has_key(s:docs, 'annotate:' . l:namespace) ? 'annotate:' . l:namespace : ''",
+            '  endif',
+            "  let l:key = 'annotate:' . l:namespace . ':' . a:word",
+            '  if has_key(s:docs, l:key)',
+            '    return l:key',
+            '  endif',
+            "  let l:argument = matchstr(l:line[: col('.') - 1], '\\h\\w*\\ze\\s*=\\s*\\h\\w*$')",
+            "  let l:key = 'annotate:' . l:namespace . ':' . l:argument",
+            "  return l:argument !=# '' && has_key(s:docs, l:key) ? l:key : ''",
+            'endfunction',
+            '',
             f'function! {vim_filetype}_docs#Show(word) abort',
+            '  let l:annotation_key = s:AnnotationKey(a:word)',
+            "  if l:annotation_key !=# ''",
+            '    call s:OpenPreview(a:word, s:docs[l:annotation_key])',
+            '    return',
+            '  endif',
             '  let l:key = tolower(a:word)',
             '  if !has_key(s:docs, l:key)',
             "    if has_key(s:docs, '.' . l:key)",
@@ -740,9 +795,12 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
             '',
             f'function! {vim_filetype}_docs#PopupAtCursor(word) abort',
             '  let l:word = tolower(a:word)',
-            '  let l:key = has_key(s:docs, l:word) ? l:word :',
-            "        \\ (has_key(s:docs, '.' . l:word) ? '.' . l:word :",
-            "        \\ (has_key(s:docs, '#' . l:word) ? '#' . l:word : ''))",
+            '  let l:key = s:AnnotationKey(a:word)',
+            "  if l:key ==# ''",
+            '    let l:key = has_key(s:docs, l:word) ? l:word :',
+            "          \\ (has_key(s:docs, '.' . l:word) ? '.' . l:word :",
+            "          \\ (has_key(s:docs, '#' . l:word) ? '#' . l:word : ''))",
+            '  endif',
             "  if l:key == '' | return | endif",
             "  let l:lines = ['# ' . l:key, ''] + split(s:docs[l:key], '\\n')",
             "  if has('popupwin')",

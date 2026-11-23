@@ -566,6 +566,32 @@ def _get_directive_at_point(view, point):
     return None
 
 
+ANNOTATE_LINE_PATTERN = re.compile(r'^\s*#annotate\s+([A-Za-z][A-Za-z0-9_]*)')
+ANNOTATION_WORD_PATTERN = re.compile(r'[A-Za-z_][A-Za-z0-9_]*')
+ANNOTATION_VALUE_OF_PATTERN = re.compile(r'([A-Za-z_][A-Za-z0-9_]*)\s*=\s*$')
+
+
+def _get_annotation_doc(line_text, column, annotation_docs):
+    """Hover text for a word on an `#annotate` line: the namespace, an argument name, or a
+    value (which shows its argument). Strings and comments are excluded."""
+    match = ANNOTATE_LINE_PATTERN.match(line_text)
+    if match is None or not _is_offset_in_code_region(line_text, column):
+        return None
+    namespace_docs = annotation_docs.get(match.group(1))
+    if not namespace_docs:
+        return None
+    if match.start(1) <= column < match.end(1):
+        return namespace_docs.get('doc')
+    argument_docs = namespace_docs.get('arguments', {})
+    for word in ANNOTATION_WORD_PATTERN.finditer(line_text, match.end()):
+        if column < word.start():
+            return None
+        if column < word.end():
+            value_of = ANNOTATION_VALUE_OF_PATTERN.search(line_text[match.end():word.start()])
+            return argument_docs.get(value_of.group(1) if value_of else word.group(0))
+    return None
+
+
 def _get_register_at_point(view, point):
     """Check if the point is on a register token and return its name."""
     line_region = view.line(point)
@@ -1200,6 +1226,17 @@ class BespokeAsmHoverListener(sublime_plugin.EventListener):
                         )
                         _show_popup(view, popup_html, point, max_width)
                         return
+
+        # Check #annotate namespaces and arguments
+        if docs and hover_mnemonics:
+            line_region = view.line(point)
+            annotation_doc = _get_annotation_doc(
+                view.substr(line_region), point - line_region.begin(), docs.get('annotations', {})
+            )
+            if annotation_doc:
+                popup_html = _render_markdown(annotation_doc, hover_colors)
+                _show_popup(view, popup_html, point, max_width)
+                return
 
         # Check registers
         if docs and hover_mnemonics:

@@ -462,28 +462,104 @@ predefined:
 annotations:
   xmin:
     documentation:
-      description: Export a symbol to the xmin source file format.
+      description: >-
+        Exports a label or constant to an [Extended Min (xmin)](https://github.com/michaelkamprath/extended-min)
+        script. Compiling with `-p -t xmin` writes an xmin source file: an `asm` block holding the machine code,
+        followed by one declaration per annotated symbol. A routine's address becomes an
+        int constant the script can `call`, a label's data becomes a variable the script
+        binds with `@`, and a constant becomes an xmin constant. The script loads the file
+        with `use`.
+      examples:
+        - title: A routine and its parameter block
+          description: >-
+            `-t xmin` exports `add_b` as `int AddB := 0x0100`, with its description as comment
+            lines above it, and each parameter as a variable bound to its data, such as
+            `char pa @ 0x010a`. A script sets `pa` and `pb`, calls `AddB`, then reads `pr`.
+          code: |
+            .memzone XMIN_USER_CODE
+            #annotate xmin kind=addr name=AddB description="Adds two chars: pr = pa + pb."
+            add_b:
+                LDB pa ADB pb SDB pr
+                RTS
+            #annotate xmin kind=var type=char
+            pa: .byte 0
+            #annotate xmin kind=var type=char
+            pb: .byte 0
+            #annotate xmin kind=var type=char
+            pr: .byte 0
+        - title: Arrays and strings
+          description: >-
+            With `array`, the data sets the count: `int primes[4]`. A `str` is a `.cstr` without
+            its terminator: `char banner[5]`.
+          code: |
+            .memzone XMIN_USER_CODE
+            #annotate xmin kind=var type=int array
+            primes: .2byte 2, 3, 5, 7
+            #annotate xmin kind=var type=str
+            banner: .cstr "Hello"
+        - title: A constant
+          description: Exported as `int MAXARG := 1000`.
+          code: |
+            #annotate xmin kind=const type=int
+            MAXARG = 1000
     applies_to: [label, constant]
     scopes: [global]
     arguments:
       kind:
         type: enum
-        values: [addr, var, const]
+        values:
+          addr:
+            documentation:
+              description: the label's address, as an int constant, for `call AddW` or a binding `@ AddW`
+          var:
+            documentation:
+              description: a variable bound to the label's data (`int pa @ 0x0113`)
+          const:
+            documentation:
+              description: the constant's value, as an xmin constant (`int MAXARG := 1000`)
         required: true
+        documentation:
+          description: What the export declares in the xmin script.
       type:
         type: enum
-        values: [char, int, long, str]   # str: a .cstr string, exported as a char array
+        values:
+          char:
+            documentation:
+              description: 1 byte
+          int:
+            documentation:
+              description: 2 bytes, signed
+          long:
+            documentation:
+              description: 4 bytes, signed
+          str:
+            documentation:
+              description: a `.cstr` string, exported as a char array without its terminator
         required_when: { kind: [var, const] }
+        documentation:
+          description: The xmin type of the variable or constant.
       count:
         type: integer
         min: 1
         allowed_when: { kind: [var], type: [char, int, long] }
+        documentation:
+          description: Makes the variable an array of this many elements (`char buf[16]`).
       array:
         type: boolean
         allowed_when: { kind: [var], type: [char, int, long] }
+        documentation:
+          description: Makes the variable an array whose count comes from the label's data, instead of `count`.
       name:
         type: string
         pattern: '^[A-Za-z][A-Za-z0-9]{0,12}$'
+        documentation:
+          description: The name to export under, when the assembly name is not a legal xmin name (`name=AddW` for `add_w`).
+      description:
+        type: string
+        documentation:
+          description: >-
+            A comment written above the export's declaration in the xmin file, such as how to pass
+            arguments to a routine. Write `\n` in the quoted value to start a new comment line.
     data_size:
       when: { kind: [var] }
       # `array` sets count from the data: the data's size divided by the type's size.
@@ -544,6 +620,8 @@ output_formats:
           addr: "int {name} := 0x{address:04x}"
           var: "{type} {name}{?[{count}]} @ 0x{address:04x}"
           const: "{type} {name} := {value}"
+        comment_field: description    # the description argument, as # comment lines above the declaration
+        comment_prefix: "# "
   xmin_listing:
     shared: xmin
     documentation:

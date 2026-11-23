@@ -10,6 +10,51 @@
       "end": "\\n",
       "name": "comment.line.semicolon"
     },
+    "annotation_directive": {
+      "begin": "(?<=\\#)(annotate)\\b",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.control.preprocessor"
+        }
+      },
+      "end": "(?=(?:\\s*\\;|\\s*$))",
+      "name": "meta.annotation",
+      "patterns": [
+        {
+          "match": "\\G(\\s+)(##ANNOTATION_NAMESPACES##)\\b",
+          "captures": {
+            "2": {
+              "name": "entity.name.namespace.annotation"
+            }
+          }
+        },
+        {
+          "match": "\\b(##ANNOTATION_ARGUMENTS##)\\b(?:\\s*(=))?",
+          "captures": {
+            "1": {
+              "name": "variable.parameter.annotation"
+            },
+            "2": {
+              "name": "punctuation.separator.key-value.annotation"
+            }
+          }
+        },
+        {
+          "include": "#strings"
+        },
+        {
+          "include": "#numeric-values"
+        },
+        {
+          "match": "(?<==)\\s*([A-Za-z_][A-Za-z0-9_]*)\\b",
+          "captures": {
+            "1": {
+              "name": "constant.other.annotation.value"
+            }
+          }
+        }
+      ]
+    },
     "compiler_labels": {
       "match": "\\b(?:##COMPILERCONSTANTS##)\\b",
       "name": "constant.language"
@@ -226,6 +271,9 @@
           "patterns": [
             {
               "include": "#flow_counter_directives"
+            },
+            {
+              "include": "#annotation_directive"
             },
             {
               "match": "(?<=\\#)(?:##PREPROCESSOR##)\\b",

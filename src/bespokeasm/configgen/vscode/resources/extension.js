@@ -355,6 +355,40 @@ function getDirectiveAtPosition(lineText, character) {
   return null;
 }
 
+const ANNOTATE_LINE_RE = /^\s*#annotate\s+([A-Za-z][A-Za-z0-9_]*)/;
+
+// Hover text for a word on an `#annotate` line: the namespace, an argument name, or a
+// value (which shows its argument). Strings and comments are excluded.
+function getAnnotationDocAtPosition(lineText, character, annotationDocs) {
+  const match = ANNOTATE_LINE_RE.exec(lineText);
+  if (!match || !isOffsetInCodeRegion(lineText, character)) {
+    return null;
+  }
+  const namespaceDocs = annotationDocs[match[1]];
+  if (!namespaceDocs) {
+    return null;
+  }
+  const namespaceStart = match[0].length - match[1].length;
+  if (character >= namespaceStart && character < match[0].length) {
+    return namespaceDocs.doc;
+  }
+  const argumentDocs = namespaceDocs.arguments || {};
+  const wordRe = /[A-Za-z_][A-Za-z0-9_]*/g;
+  wordRe.lastIndex = match[0].length;
+  let word;
+  while ((word = wordRe.exec(lineText)) !== null) {
+    if (character < word.index) {
+      return null;
+    }
+    if (character < word.index + word[0].length) {
+      const valueOf = /([A-Za-z_][A-Za-z0-9_]*)\s*=\s*$/.exec(lineText.slice(match[0].length, word.index));
+      const argumentName = valueOf ? valueOf[1] : word[0];
+      return argumentDocs[argumentName] || null;
+    }
+  }
+  return null;
+}
+
 function getRegisterAtPosition(lineText, character) {
   let match;
   REGISTER_RE.lastIndex = 0;
@@ -543,6 +577,7 @@ function activate(context) {
   ];
   const registerDocs = hoverDocs.registers || {};
   const exprFuncDocs = hoverDocs.expression_functions || {};
+  const annotationDocs = hoverDocs.annotations || {};
   const wordPattern = /(?:##MNEMONIC_PATTERN##|##LABEL_PATTERN##)/i;
   const provider = {
     provideHover(document, position) {
@@ -558,6 +593,14 @@ function activate(context) {
               return new vscode.Hover(buildMarkdownHover(category[directiveName]));
             }
           }
+        }
+      }
+
+      // Check #annotate namespaces and arguments
+      if (hoverSettings.mnemonics) {
+        const annotationDoc = getAnnotationDocAtPosition(lineText, position.character, annotationDocs);
+        if (annotationDoc) {
+          return new vscode.Hover(buildMarkdownHover(annotationDoc));
         }
       }
 

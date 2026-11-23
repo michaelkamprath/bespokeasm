@@ -63,6 +63,14 @@ class MarkdownGenerator:
         if isinstance(flow_counters, list) and flow_counters:
             sections.append(self._generate_flow_counters_section())
 
+        # Output formats and annotations sections
+        output_formats = getattr(self.doc_model, 'output_formats', None)
+        if isinstance(output_formats, list) and output_formats:
+            sections.append(self._generate_output_formats_section())
+        annotations = getattr(self.doc_model, 'annotations', None)
+        if isinstance(annotations, list) and self._declared_annotations():
+            sections.append(self._generate_annotations_section())
+
         # Instructions section
         if self.doc_model.instruction_docs:
             sections.append(self._generate_instructions_section())
@@ -159,6 +167,268 @@ class MarkdownGenerator:
 
             sections.append('\n\n'.join(counter_sections))
         return '\n\n'.join(sections)
+
+    @staticmethod
+    def _format_list(formats: list[str]) -> str:
+        """`-t a`, `-t b` or `-t c`."""
+        items = [f'`-t {name}`' for name in formats]
+        if len(items) <= 1:
+            return ''.join(items)
+        return f'{", ".join(items[:-1])} or {items[-1]}'
+
+    def _with_format_note(self, description: str | None, formats: list[str] | None) -> str | None:
+        """A predefined item that only output formats define says which ones."""
+        if not formats:
+            return description
+        note = f'*Only with {self._format_list(formats)}.*'
+        return f'{description} {note}' if description else note
+
+    def _generate_output_formats_section(self) -> str:
+        """Every -t value this ISA accepts."""
+        sections = [
+            '# Output Formats',
+            (
+                'Select a pretty-print format with `-p -t <format>`. The built-in formats are '
+                'available for every instruction set; the others are defined by this configuration. See '
+                '[Output Formats](https://github.com/michaelkamprath/bespokeasm/wiki/Output-Formats).'
+            ),
+        ]
+        rows = []
+        for output_format in self.doc_model.output_formats:
+            # How the configuration builds a format (a shared set) is for config authors, not readers.
+            source = 'built-in' if output_format['builtin'] else 'configuration'
+            predefined = ', '.join(f'`{name}`' for name in output_format.get('predefined') or [])
+            annotations = ', '.join(f'`{name}`' for name in output_format.get('annotations') or [])
+            rows.append([
+                f"`{output_format['name']}`",
+                self._format_description(output_format),
+                source,
+                annotations,
+                predefined,
+            ])
+        sections.append(self._generate_markdown_table(
+            ['Format', 'Description', 'Defined By', 'Exports Annotations', 'Predefines'],
+            rows,
+            column_alignments=['left'] * 5,
+        ))
+        return '\n\n'.join(sections)
+
+    def _format_description(self, output_format: dict[str, Any]) -> str:
+        """The format's description. A word-size requirement that this ISA meets says nothing, so
+        only a requirement it does not meet is mentioned: the format can never be selected."""
+        description = output_format.get('description') or ''
+        required = output_format.get('requires_word_size')
+        word_size = getattr(self.doc_model, 'general_docs', {}).get('hardware', {}).get('word_size')
+        if required and word_size is not None and required != word_size:
+            note = f'*Cannot be used with this ISA: it needs {required}-bit words.*'
+            description = f'{description} {note}' if description else note
+        return description
+
+    def _generate_annotations_section(self) -> str:
+        """The annotation namespaces this configuration declares."""
+        sections = [
+            '# Annotations',
+            (
+                'Source attaches an annotation to a label or constant with '
+                '`#annotate <namespace> key=value ...` on the line directly above its definition. '
+                'Every instruction set also has the `listing` namespace, which shapes `-t listing` '
+                'output. See [Annotations](https://github.com/michaelkamprath/bespokeasm/wiki/Annotations).'
+            ),
+        ]
+        for namespace in self._declared_annotations():
+            parts = [f"## `{namespace['name']}`", *self._namespace_body(namespace, heading_level=2)]
+            sections.append('\n\n'.join(parts))
+        return '\n\n'.join(sections)
+
+    def _declared_annotations(self) -> list[dict[str, Any]]:
+        return [namespace for namespace in self.doc_model.annotations if not namespace.get('builtin')]
+
+    def _namespace_body(self, namespace: dict[str, Any], heading_level: int) -> list[str]:
+        """A namespace's description, where it applies, its arguments, its constraints and its
+        examples. ``heading_level`` is the level of the namespace's own heading."""
+        singular_unit, plural_unit = self._hover_size_units()
+        parts = []
+        if namespace.get('description'):
+            parts.append(str(namespace['description']))
+        kinds = ' and '.join(f'{kind}s' for kind in namespace['applies_to'])
+        scopes = namespace['scopes']
+        scope_text = 'any scope' if len(scopes) == 3 else f"{' or '.join(scopes)} scope"
+        parts.append(f'Applies to {kinds}, in {scope_text}.')
+        rows = []
+        for argument in namespace['arguments']:
+            rows.append([
+                f"`{argument['name']}`",
+                self._argument_description(argument),
+                argument['type'],
+                self._argument_values(argument),
+                self._argument_presence(argument),
+                f"`{argument['default']}`" if argument['has_default'] else '',
+            ])
+        if rows:
+            parts.append(self._generate_markdown_table(
+                ['Argument', 'Description', 'Type', 'Values', 'Presence', 'Default'],
+                rows,
+                column_alignments=['left'] * 6,
+            ))
+        data_size = namespace.get('data_size')
+        if data_size:
+            parts.append(self._data_size_text(data_size, singular_unit, plural_unit))
+        value_range = namespace.get('value_range')
+        if value_range:
+            parts.append(self._value_range_text(value_range))
+        examples = namespace.get('examples') or []
+        if examples:
+            parts.append(f"{'#' * (heading_level + 1)} Examples")
+            for example in examples:
+                if example.get('title'):
+                    parts.append(f"{'#' * (heading_level + 2)} {example['title']}")
+                if example.get('description'):
+                    parts.append(str(example['description']))
+                parts.append(f"```assembly\n{example['code']}\n```")
+        return parts
+
+    @staticmethod
+    def _argument_description(argument: dict[str, Any]) -> str:
+        return argument.get('description') or ''
+
+    @staticmethod
+    def _condition_text(tests: list[tuple[str, list[str]]] | None) -> str:
+        """`kind` is `var` or `const`, and ..."""
+        parts = []
+        for key, values in tests or []:
+            quoted = [f'`{value}`' for value in values]
+            choice = quoted[0] if len(quoted) == 1 else f"{', '.join(quoted[:-1])} or {quoted[-1]}"
+            parts.append(f'`{key}` is {choice}')
+        return ' and '.join(parts)
+
+    def generate_annotation_hover_docs(self) -> dict[str, dict[str, Any]]:
+        """Hover markdown for each annotation namespace and each of its arguments, keyed by
+        namespace: ``{'doc': ..., 'arguments': {name: ...}}``. Includes the framework's ``listing``."""
+        docs: dict[str, dict[str, Any]] = {}
+        singular_unit, plural_unit = self._hover_size_units()
+        for namespace in getattr(self.doc_model, 'annotations', None) or []:
+            name = namespace['name']
+            heading = 'Framework Annotation' if namespace.get('builtin') else 'Annotation'
+            namespace_doc = '\n\n'.join([
+                f'### `{name}` : {heading}', '---', *self._namespace_body(namespace, heading_level=3),
+            ])
+            arguments = {
+                argument['name']: self._argument_hover(namespace, argument, singular_unit, plural_unit)
+                for argument in namespace['arguments']
+            }
+            docs[name] = {'doc': namespace_doc, 'arguments': arguments}
+        return docs
+
+    def _argument_hover(
+        self, namespace: dict[str, Any], argument: dict[str, Any], singular_unit: str, plural_unit: str,
+    ) -> str:
+        sections = [f"### `{argument['name']}` : `{namespace['name']}` Annotation Argument", '---']
+        if argument.get('description'):
+            sections.append(str(argument['description']))
+        rows = [
+            ('Type', argument['type']),
+            ('Values', self._argument_values(argument, separator=', ') if not argument.get('value_descriptions')
+             else ', '.join(f'`{value}`' for value in argument['values'])),
+            ('Presence', self._argument_presence(argument)),
+            ('Default', f"`{argument['default']}`" if argument['has_default'] else ''),
+        ]
+        table = self._generate_markdown_table(
+            ['Attribute', 'Value'],
+            [[f'**{label}**', value] for label, value in rows if value],
+            column_alignments=['left', 'left'],
+        )
+        if table:
+            sections.append(table)
+        if argument.get('value_descriptions'):
+            sections.append('\n'.join(f'- `{value}`: {text}' for value, text in argument['value_descriptions']))
+        data_size = namespace.get('data_size')
+        if data_size and argument['name'] in data_size.get('arguments', []):
+            sections.append(self._data_size_text(data_size, singular_unit, plural_unit))
+        value_range = namespace.get('value_range')
+        if value_range and argument['name'] in value_range.get('arguments', []):
+            sections.append(self._value_range_text(value_range))
+        return '\n\n'.join(sections)
+
+    @staticmethod
+    def _argument_values(argument: dict[str, Any], separator: str = '<br>') -> str:
+        if argument['type'] == 'enum':
+            described = dict(argument.get('value_descriptions') or [])
+            if described:
+                return separator.join(
+                    f'`{value}`: {described[value]}' if value in described else f'`{value}`'
+                    for value in argument['values']
+                )
+            return ', '.join(f'`{value}`' for value in argument['values'])
+        if argument['type'] == 'integer':
+            low, high = argument.get('minimum'), argument.get('maximum')
+            if low is not None and high is not None:
+                return f'{low} to {high}'
+            if low is not None:
+                return f'{low} or more'
+            if high is not None:
+                return f'{high} or less'
+            return ''
+        if argument['type'] == 'string' and argument.get('pattern'):
+            return f"matches `{argument['pattern']}`"
+        if argument['type'] == 'symbol':
+            return 'a label or constant'
+        if argument['type'] == 'boolean':
+            return 'a bare flag, or `true`/`false`'
+        return ''
+
+    @classmethod
+    def _argument_presence(cls, argument: dict[str, Any]) -> str:
+        parts = []
+        if argument['required']:
+            parts.append('required')
+        elif argument.get('required_when'):
+            parts.append(f"required when {cls._condition_text(argument['required_when'])}")
+        else:
+            parts.append('optional')
+        if argument.get('allowed_when'):
+            parts.append(f"only when {cls._condition_text(argument['allowed_when'])}")
+        return '; '.join(parts)
+
+    def _data_size_text(self, rule: dict[str, Any], singular_unit: str, plural_unit: str) -> str:
+        """The data-size constraint: one element's size, then how many elements."""
+        when = f" when {self._condition_text(rule['when'])}" if rule.get('when') else ''
+        if rule.get('selector'):
+            sizes = ', '.join(
+                f"`{value}` {self._format_quantity_with_units(words, singular_unit, plural_unit)}"
+                if words is not None else f'`{value}` not allowed'
+                for value, words in rule['table']
+            )
+            size_text = f"one element's size depends on `{rule['selector']}`: {sizes}"
+        else:
+            size_text = f"{self._format_quantity_with_units(rule.get('fixed'), singular_unit, plural_unit)}"
+        text = f"**Data size** (a label's data, {when.strip() or 'always'}): {size_text}."
+        times = rule.get('times')
+        if times:
+            ways = [f'`{times}` elements (1 when absent)']
+            if rule.get('infer_times'):
+                ways.append(
+                    f"with `{rule['infer_times']}`, as many elements as the data holds"
+                )
+            if rule.get('terminated_when'):
+                ways.append(
+                    f"when {self._condition_text(rule['terminated_when'])}, as many as the data holds "
+                    f'before its string terminator, which must end the data'
+                )
+            text += ' The data holds ' + '; '.join(ways) + '.'
+        return text
+
+    def _value_range_text(self, rule: dict[str, Any]) -> str:
+        when = f" when {self._condition_text(rule['when'])}" if rule.get('when') else ''
+        if rule.get('selector'):
+            ranges = ', '.join(
+                f'`{value}` {limits[0]} to {limits[1]}' if limits is not None else f'`{value}` not allowed'
+                for value, limits in rule['table']
+            )
+            range_text = f"by `{rule['selector']}`: {ranges}"
+        else:
+            fixed = rule.get('fixed')
+            range_text = f'{fixed[0]} to {fixed[1]}' if fixed else ''
+        return f"**Value range** (a constant's value, {when.strip() or 'always'}): {range_text}."
 
     def generate_instruction_markdown(
         self,
@@ -263,6 +533,12 @@ class MarkdownGenerator:
             if value_text:
                 rows.append(('Value', f'`{value_text}`'))
 
+            if constant.get('format_values'):
+                rows[-1:] = [('Value', ', '.join(
+                    f'`{self._format_hex_value(format_value, hex_width)}` (`{format_name}`)'
+                    for format_name, format_value in constant['format_values'].items()
+                ))]
+
             const_type = constant.get('type')
             if const_type:
                 rows.append(('Type', f'`{const_type}`'))
@@ -271,6 +547,9 @@ class MarkdownGenerator:
                 size_text = self._format_quantity_with_units(constant.get('size'), singular_unit, plural_unit)
                 if size_text:
                     rows.append(('Size', size_text))
+
+            if constant.get('formats'):
+                rows.append(('Only with', self._format_list(constant['formats'])))
 
             description = constant.get('description')
             docs[name] = self._generate_predefined_hover_markdown(
@@ -351,6 +630,9 @@ class MarkdownGenerator:
             end_text = self._format_hex_value(zone.get('end'), hex_width)
             if end_text:
                 rows.append(('End', f'`{end_text}`'))
+
+            if zone.get('formats'):
+                rows.append(('Only with', self._format_list(zone['formats'])))
 
             zone_title = zone.get('title') or 'Predefined Memory Zone'
             description = zone.get('description')
@@ -764,6 +1046,7 @@ class MarkdownGenerator:
             if documented:
                 title = zone.get('title') or name
                 description = zone.get('description')
+            description = self._with_format_note(description, zone.get('formats'))
 
             rows.append([
                 name_cell,
@@ -802,6 +1085,11 @@ class MarkdownGenerator:
 
             value = constant.get('value')
             value_hex = self._format_hex_value(value, hex_width)
+            if constant.get('format_values'):
+                value_hex = ', '.join(
+                    f'{self._format_hex_value(format_value, hex_width)} (`{format_name}`)'
+                    for format_name, format_value in constant['format_values'].items()
+                )
 
             documented = constant.get('documented', False)
             const_type = None
@@ -812,6 +1100,7 @@ class MarkdownGenerator:
                 if const_type == 'variable':
                     size = constant.get('size')
                 description = constant.get('description')
+            description = self._with_format_note(description, constant.get('formats'))
 
             rows.append([
                 name_cell,

@@ -217,3 +217,8 @@ def test_two_listing_annotations_on_one_symbol(tmp_path):
     with pytest.raises(SystemExit) as exc_info:
         _listing(tmp_path, '#annotate listing hide\n#annotate listing collapse\nt: .byte 1\n')
     assert "symbol 't' already has an annotation in the 'listing' namespace" in str(exc_info.value)
+
+
+def test_heading_on_several_lines(tmp_path):
+    listing, _ = _listing(tmp_path, '#annotate listing heading="Lookup\\ntables and data"\nt: .byte 1\n')
+    assert '\nLookup\ntables and data\n---------------\n' in listing

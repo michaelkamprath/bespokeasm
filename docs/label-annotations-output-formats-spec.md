@@ -6,7 +6,7 @@ Nov 21, 2026 · @Michael Kamprath
 
 Add two framework features to BespokeASM: **label annotations** in assembly source, and **output formats defined by the instruction set config file**. An annotation attaches typed, config-validated metadata to a label or constant. An output format turns the compiled bytes plus the annotated symbols into a text file through templates in the config.
 
-The first user is Extended Min (xmin). An xmin script can carry machine code in an `asm` block of Intel HEX records, then `call` it and exchange data through fixed-address variables (`int pa @ 0x0115`). Today the user copies records and addresses by hand, and they go stale whenever the routine moves. With this feature, the Minimal 64x4 config defines an `xmin` annotation and an `xmin` format, and `bespokeasm compile -p -t xmin addw.min64x4` writes a complete `.xmin` file that a script loads with `use`.
+The first user is [Extended Min (xmin)](https://github.com/michaelkamprath/extended-min). An xmin script can carry machine code in an `asm` block of Intel HEX records, then `call` it and exchange data through fixed-address variables (`int pa @ 0x0115`). Today the user copies records and addresses by hand, and they go stale whenever the routine moves. With this feature, the Minimal 64x4 config defines an `xmin` annotation and an `xmin` format, and `bespokeasm compile -p -t xmin addw.min64x4` writes a complete `.xmin` file that a script loads with `use`.
 
 Both features follow the pattern flow counters already set: the config enables and describes the feature, source opts in with a `#` directive, and using it against an ISA that doesn't enable it is an error.
 
@@ -22,6 +22,8 @@ Goals:
 - Formats are declarative (templates and rules in YAML). A config never ships executable code.
 - Annotations emit no bytes and don't change the assembled image.
 - Only explicitly annotated symbols are exported. Nothing is inferred from label scope or naming.
+- **Stretch goal: verbatim text blocks.** Source can carry text that is not assembled, such as xmin functions that wrap an assembly routine, for an output format to copy into its file (see "Stretch: verbatim text blocks").
+- **Stretch goal: continued `#annotate` lines.** A long quoted value, such as a multi-line `description`, can be split across source lines (see "Stretch: continuing an `#annotate` line").
 - **Stretch goal: polymorphic output formats.** Every format, built-in or config, implements one `OutputFormat` interface: a name, documentation, requirements (such as word size) and a render step. There are two implementations. A Python format is a class, as the printers are now. A defined format is a template plus sections, loaded from a definition file (YAML or JSON) in the schema of this spec. Built-in formats can be either kind; config formats are always defined formats. One registry holds both kinds, and `-t`, `PrettyPrinterFactory` and the docs generator use only the interface. So `listing` can stay Python while `hex` or `symbols` ship as definitions.
 
 Non-goals:
@@ -63,7 +65,7 @@ Grammar:
 ```
 annotation = "#annotate" namespace { argument } [ comment ]
 argument   = key "=" value | key            (* a bare key is boolean true *)
-value      = symbol-word | numeric-literal | quoted-string
+value      = symbol-word | numeric-literal | quoted-string   (* in quotes, \n is a line break, \t a tab; \x is x *)
 ```
 
 Rules:
@@ -133,12 +135,15 @@ Schema:
 
 | Key | Meaning |
 | --- | --- |
+| `documentation` | optional: `description`, and `examples` (as for instructions: a list of `code` blocks, each with an optional `title` and `description`). Both appear in the generated docs and in hover text. |
 | `applies_to` | `label`, `constant`, or both |
 | `scopes` | symbol scopes allowed: `global`, `file`, `local` (default: all). The scope comes from the name's prefix (`.` local, `_` file, otherwise global); being defined inside a named scope (`#create-scope`) does not change it |
 | `arguments.<key>.type` | `enum`, `integer`, `string`, `boolean` or `symbol`. A symbol value names a label or constant, and the export model carries its resolved value: an address for a label, the value for a constant |
 | `values`, `min`, `max`, `pattern` | constraints for that type |
 | `required`, `required_when`, `allowed_when` | presence rules; `_when` keys test other enum arguments |
 | `default` | value used when the argument is absent |
+| `documentation` | optional: `description`, what the argument means. Shown in the generated docs and in editor hover text. |
+| `values` as a mapping | for an enum, instead of a list: each value maps to an optional `documentation` block with a `description` of what the value means, as `addr: { documentation: { description: ... } }`. |
 | `data_size` | constraint: the exact word count of the label's data run, from argument values (`words`). A mismatch is a compile error. In `words`, `times` names an integer argument that multiplies the selected size, and `infer_times` names a boolean argument that, when true, sets the `times` argument from the data instead. `terminated_when` is a condition on enum arguments; when it holds, the data sets `times` and must end with a terminator element that `times` leaves out (see below). |
 | table entries | `words` and `range` select their value by one enum argument and list every value of it. A `null` entry means that value is not allowed where the rule applies: `str: null` in `value_range` makes `kind=const type=str` an error. |
 | `value_range` | constraint: the inclusive range a constant's value must lie in, from argument values. A value outside it is a compile error. |
@@ -192,7 +197,7 @@ Fields are fixed names with Python format specs, not expressions:
 - `byte_lines` items: `label` (the labels at that address, on the line's first byte, separated by spaces; else empty), `address`, `byte`, `source` (the instruction text, on its first byte only) and `comment` (the same). Rows are in address order. Constants are not labels. A label that an `.org` leaves behind before any byte names nothing. Muted lines are skipped but keep their addresses, so the listing has a gap there. Predefined data blocks from the config are not listed: the listing is the program's bytes.
 - `rows` items: `byte`, and `address` in `org_line`.
 
-`value_map` rewrites enum argument values in the section's output, as `{argument: {value: text}}`; `lines_key` still selects the line by the source value. An unknown field is a config error at load time, and so is a format spec that cannot apply to the field's type, such as `04x` on `name`. An empty field prints as nothing, and its format spec is not applied. In `exports`, `lines_key` names the enum argument whose value selects a `lines` template, and every value of that enum needs a template. With order: address, labels come first in address order, and constants follow in the order they are defined. With order: source, every export is in the order it is defined. The default is source.
+With line templates, `comment_field` names a field (such as a `description` string argument) and `comment_prefix` the comment syntax (`"# "`): when the field has a value, each of its lines is written before the export's line, prefixed, with trailing spaces removed. The two are given together, and not with `columns`, because a comment row would break a table. The Minimal 64x4 `xmin` format uses them for its `description` argument, so `description="Adds pa and pb.\nThe sum is in pr."` writes two `#` comment lines above `int AddW := 0x0100`. `value_map` rewrites enum argument values in the section's output, as `{argument: {value: text}}`; `lines_key` still selects the line by the source value. An unknown field is a config error at load time, and so is a format spec that cannot apply to the field's type, such as `04x` on `name`. An empty field prints as nothing, and its format spec is not applied. In `exports`, `lines_key` names the enum argument whose value selects a `lines` template, and every value of that enum needs a template. With order: address, labels come first in address order, and constants follow in the order they are defined. With order: source, every export is in the order it is defined. The default is source.
 
 Optional parts. In any line template, `{?...}` is an optional group. The generator writes the group only when every field inside it has a value; otherwise it writes nothing for the whole group. Example: `{name}{?[{count}]}` gives `buf[16]` when `count` is 16 and `pa` when there is no `count`. Groups do not nest, and an unmatched `{?` is a config error. Literal braces are written `{{` and `}}`, as in Python.
 
@@ -206,7 +211,7 @@ Generators:
 | `listing` | the same text as `-t listing`, with `listing` annotations applied | none |
 | `rows` | rows of bytes, with an address line at each `.org` | `bytes_per_row`, `row_prefix`, `byte`, `org_line` |
 | `byte_lines` | a table with one line per assembled byte | `columns`, `separator`, `header_rule`, `rule_separator` |
-| `exports` | one line per symbol that carries the annotation | `annotation`, `order`, `unique`, `reserved_names`, `name_pattern`, `value_map`, then either `lines_key` + `lines`, or `columns` + `separator` + `header_rule` + `rule_separator` |
+| `exports` | one line per symbol that carries the annotation | `annotation`, `order`, `unique`, `reserved_names`, `name_pattern`, `value_map`, then either `lines_key` + `lines` (with optional `comment_field` + `comment_prefix`), or `columns` + `separator` + `header_rule` + `rule_separator` |
 
 Tables. `byte_lines`, and `exports` with `columns`, use one column model. `columns` is a list in output order. Each entry names a `field`, and it can set `header` (default empty), `format` (a Python format spec, for example `03o` for octal), `align` (`left` or `right`, default `left`) and `min_width` (default 0). In `exports`, a column can instead choose its field per row, the table counterpart of `lines_key`: `by` names an enum argument, and `cases` maps its values to `{field, format}`. A row whose value has no case gets an empty cell. The lookup uses the source value, before `value_map`. `xmin_listing` uses this to show a `var`'s address under `address` and an `addr` export's address under `value`, as the xmin lines do. The generator writes a header row from the headers, unless all headers are empty, and then one row per item. A header is aligned like its column's values. `exports` takes either `lines_key` and `lines` or `columns`, never both, and `separator`, `header_rule` and `rule_separator` only with `columns`. A column entry takes only `field`, `by`, `cases`, `header`, `format`, `align` and `min_width`; any other key is a config error. A column has either `field` or `by` with `cases`, not both. A `by` column sets `format` in each case instead of on the column, and a case takes only `field` and `format`. Export names are checked (`name_pattern`, `reserved_names`, `unique`) the same way in both modes.
 
@@ -490,6 +495,145 @@ Details:
 - Column widths come from the lines that are printed, so hidden lines do not widen the listing.
 - Other formats ignore the namespace, except the `listing` generator, which writes the same text as `-t listing`.
 
+## Stretch: continuing an `#annotate` line
+
+Status: specified, not implemented. Planned for 0.9.1.
+
+A `description` that spans several comment lines is written with `\n` escapes, which can make one source line very long. This stretch feature lets an `#annotate` line continue onto the next lines, and joins adjacent quoted strings:
+
+```
+#annotate xmin kind=addr name=SumTo description= \
+    "SumTo\n" \
+    "  Sums a series of integers from 1 to the value in `pa`.\n" \
+    "  Returns the result in `pr`."
+sumto:
+```
+
+The xmin file then has:
+
+```
+# SumTo
+#   Sums a series of integers from 1 to the value in `pa`.
+#   Returns the result in `pr`.
+int SumTo := 0x01f0
+```
+
+Rules:
+
+1. **Scope.** Continuation applies only to `#annotate` lines. Other source lines are unchanged: an instruction, directive or comment that already ends in `\` (for example `; see C:\dir\`) keeps its meaning. Continuation for every line is a separate, larger decision (line numbers, listings, and existing source), left for later.
+2. **Continuing.** An `#annotate` line continues when its last character, after trailing spaces, is a `\` that is outside a quoted value and before any `;` comment. The `\` and the line break are replaced by one space, and the next physical line is appended. A continued line can therefore not carry a comment: a `;` hides the `\`. The last line of the directive may have a comment.
+3. **Continuation lines.** Any line may follow, indented or not. A blank line, or the end of the file, after a `\` is an error: `#annotate ends with \ but line 14 is blank`. A continuation line is part of the directive, so it is not the "next line" that the annotation binds to; the annotation binds to the definition directly after the directive's last line.
+4. **Adjacent strings.** Two quoted strings separated only by spaces are one value: `"ab" "cd"` is `"abcd"`. Escapes (`\n`, `\t`, `\"`, `\\`) apply within each string. Joining applies wherever a quoted value may appear, on one line or across continued lines.
+5. **Conditional compilation.** The whole directive is inside or outside an `#if` block together; a continuation line is never treated as a separate line by the preprocessor.
+6. **Diagnostics.** Errors about the directive report the line where `#annotate` starts.
+7. **Listings.** `-t listing` shows each physical line as written, so line numbers stay continuous. The continuation lines have no address or bytes, like the `#annotate` line itself. Generated editor syntax highlights a continued directive as an `#annotate` line throughout.
+
+Tests would cover: a value split across lines, adjacent strings on one line, a comment on the last line only, a `\` inside quotes (not a continuation), a blank or end-of-file line after `\` (error), binding to the definition after the last line, an `#if` around a continued directive, and the listing's line numbers.
+
+## Stretch: verbatim text blocks
+
+Status: specified, not implemented. Planned for 0.9.1.
+
+An output format often needs more than the assembly's bytes and symbols. An xmin file is a script, so the routines that call the machine code belong in it too, next to the declarations they use. A verbatim block lets the assembly source carry that text:
+
+```asm
+#annotate xmin kind=addr name=SumTo description="Sums 1..pa into pr."
+sumto:
+    ...
+    RTS
+
+#verbatim xmin
+def AddTo(char value):
+  pa = value
+  call SumTo
+  return pr
+#endverbatim
+```
+
+`-t xmin` then ends with:
+
+```
+int SumTo := 0x01f0
+int pa @ 0x0f00
+int pr @ 0x0f04
+
+def AddTo(char value):
+  pa = value
+  call SumTo
+  return pr
+```
+
+The feature is general: the block names an annotation namespace, and any output format can write that namespace's blocks. A C header format could carry `static inline` wrappers the same way.
+
+### Source
+
+1. `#verbatim <namespace>` starts a block and `#endverbatim` ends it, each on a line of its own. A comment is allowed after either.
+2. The lines between are text. They are not assembled, not preprocessed (no macro symbol substitution, and `#` lines inside are text), they emit no bytes and they take no address. Each line is kept exactly as written, including its indentation and any `;`, because the target language decides what they mean. xmin, for one, is indentation-sensitive.
+3. A block may appear anywhere a line of code may, and there may be any number of blocks, in any file. Conditional compilation applies to the block as a whole: a block inside a false `#if` branch is skipped. An `#if` inside a block is text.
+4. A block does not bind to a symbol and does not affect `#annotate` binding, except that an `#annotate` line must still be directly above its definition: a block between them is an error, like any other line.
+5. `verbatim` and `endverbatim` become reserved words in every ISA, as other directive names are.
+
+### Configuration
+
+A namespace opts in with `verbatim`:
+
+```yaml
+annotations:
+  xmin:
+    verbatim:
+      documentation:
+        description: xmin source, such as functions that call the routines, copied into the xmin file.
+    ...
+```
+
+`verbatim` is a mapping; its only key is the optional `documentation`, which the generated docs and hover text show. A namespace that only carries text may have no `arguments`. `listing` cannot opt in.
+
+The new `verbatim` generator writes a namespace's blocks:
+
+| Generator | Output | Options |
+| --- | --- | --- |
+| `verbatim` | every block of one namespace, in source order (included files where they are included), separated by one blank line | `namespace` (required), `separator` (text between blocks, default one blank line) |
+
+Each block's lines are written as they are, except that trailing spaces are removed, and blank lines at the start and end of a block are dropped, so the section never starts or ends with a blank line. A section with no blocks is empty. The xmin template places the blocks after the declarations, in an optional group so a source without blocks gets no extra blank lines:
+
+```yaml
+template: |
+  # {source_file}: generated by BespokeASM {bespokeasm_version} ({isa_name} {isa_version})
+  asm
+  {code}
+
+  {symbols}{?
+
+  {script}}
+sections:
+  script:
+    generator: verbatim
+    namespace: xmin
+```
+
+(The optional group around a section field is new: today an optional group holds line fields, and a section field is always written. A section counts as having a value when its text is not empty.)
+
+### Elsewhere
+
+- `-t listing` shows a block's lines as source lines with no address or bytes, and `#annotate listing hide` on the symbol before a block does not hide it, since a block is not part of a symbol.
+- `-t symbols` adds `verbatim`: a list of `{namespace, file, line, text}` objects, in source order.
+- Generated editor syntax highlights `#verbatim` and `#endverbatim` as directives and the namespace name as an annotation namespace; the lines between get a single plain scope (`meta.verbatim` / `string.unquoted.verbatim`), not assembly highlighting. Hover over the namespace on a `#verbatim` line shows the namespace's `verbatim.documentation`.
+- Generated ISA docs list, for each namespace that opts in, that it accepts verbatim blocks, with the `verbatim.documentation` description.
+
+### Errors
+
+| Condition | When | Message (suggested) |
+| --- | --- | --- |
+| `#verbatim` names a namespace that does not exist, or that does not accept blocks | compile | `annotation 'xmn' does not accept #verbatim blocks; namespaces that do: xmin` |
+| `#verbatim` without a namespace | compile | `#verbatim requires an annotation namespace, for example "#verbatim xmin"` |
+| No `#endverbatim` before the end of the file | compile | `#verbatim block started on line 12 has no #endverbatim` |
+| `#endverbatim` without a block | compile | `#endverbatim without a #verbatim block` |
+| A block between `#annotate` and its definition | compile | the existing `#annotate must be directly above a label or constant definition` error |
+| A `verbatim` generator whose namespace does not opt in | config load | config error naming the key path |
+| A format uses blocks, but the source has none | compile | no message: an empty section is normal |
+
+Tests would cover: a block's text copied exactly (indentation, `;`, `#`, blank lines inside), several blocks and their order across `#include`, `#if` around a block, the template's optional group with and without blocks, `#annotate` with a block in between, each error, the listing's line numbers, and `-t symbols`.
+
 ## Errors and diagnostics
 
 Every problem is an error with the source line, not a warning, unless marked otherwise. Config errors (last row) fail when the config loads, before any source is read.
@@ -551,6 +695,16 @@ Changes:
 
 The `documentation` keys in the config examples above exist for this purpose. A namespace or format without `documentation.description` still appears, with no description.
 
+As built:
+
+- The Output Formats section appears for every ISA, because every ISA accepts the built-in formats. It lists each format's description, where it is defined (built-in or configuration; a shared set is a config-authoring detail and is not shown), the annotations it exports, and the zones and constants it predefines. A required word size is shown only when the ISA does not meet it, as a note that the format cannot be used.
+- The Annotations section appears only when the config declares a namespace; it mentions `listing` in its introduction rather than documenting it per ISA. Argument presence uses the same wording as the errors ("required when kind is one of var, const"), and sizes use the ISA's units (bytes for 8-bit words).
+- Each namespace's argument table has the columns Argument, Description, Type, Values (with each enum value's meaning, when documented), Presence and Default. Conditions read as `` `kind` is `var` or `const` ``. The data-size text gives one element's size and then how many elements the data holds.
+- The Output Formats table has an Exports Annotations column: the annotations each format's `exports` sections read.
+- Hover text: on an `#annotate` line, the namespace shows the namespace's documentation (as in the docs), and an argument name, or a value after `=`, shows that argument's: its description, type, values and their meanings, presence, and any data-size or value-range rule it chooses. The framework's `listing` namespace and its arguments have built-in descriptions. Comments and quoted values on the line get no annotation hover.
+- Format-scoped items appear once each, after the top-level ones, with *Only with `-t xmin` or `-t xmin_listing`.* in their description and an **Only with** row in their hover text. A constant that formats define with different values shows each value with its format.
+- Editor syntax: VS Code, Sublime Text and Vim highlight `#annotate` lines only (not comments, quoted values or other lines): the declared namespace (`entity.name.namespace.annotation`, a new `annotation_namespace` color), argument names (`variable.parameter.annotation`, a new `annotation_argument` color), `=` (`punctuation.separator.key-value.annotation`, the separator color) and word values such as `var` or `true` (`constant.other.annotation.value`, a new `annotation_value` color). Numbers and quoted strings keep their usual scopes. In Vim, these rules come after the instruction rules, so a value such as `int` is not taken as a mnemonic. Format-scoped names join the predefined names that are highlighted.
+
 ## Open questions
 
 1. **Directive name.** Decided: `#annotate`. The shorter `#attr` and `#label` were rejected.
@@ -558,7 +712,7 @@ The `documentation` keys in the config examples above exist for this purpose. A 
 3. **Config-declared namespaces in listings.** Should a config namespace be able to add listing behavior, or does `listing` stay framework-only? Decided: framework-only.
 4. **Generic symbol export.** Decided: add a built-in `-t symbols`. It writes every label and constant as JSON, with its value, scope and annotations, so other tools can use annotations without a config format. It starts as a Python format. If it later ships as a definition, it needs a `symbols_json` generator, because templates do not escape JSON strings.
 5. **Template conditionals.** `count_suffix` was a special case. Decided: replaced by general optional groups, `{?...}` (see "Config-defined output formats").
-6. **Built-in formats as shipped definitions.** Should `intel_hex`, `hex`, `listing` and `symbols` be format definitions in a file shipped with BespokeASM, in the same schema as config formats? Recommendation: yes, in YAML like the configs. Each one is a template with one section, for example `{code}` with `generator: listing`. Then `PrettyPrinterFactory`, the `-t` choices and the docs use one path for all formats. The generators stay Python. The listing printer, about 300 lines with automatic widths, file headers and flow columns, does not become declarative. Decided: a stretch goal, with Python and defined built-ins side by side (see Goals).
+6. **Built-in formats as shipped definitions.** Should `intel_hex`, `hex`, `listing` and `symbols` be format definitions in a file shipped with BespokeASM, in the same schema as config formats? Recommendation: yes, in YAML like the configs. Each one is a template with one section, for example `{code}` with `generator: listing`. Then `PrettyPrinterFactory`, the `-t` choices and the docs use one path for all formats. The generators stay Python. The listing printer, about 300 lines with automatic widths, file headers and flow columns, does not become declarative. Decided: a stretch goal, with Python and defined built-ins side by side (see Goals), planned for 0.9.1.
 
 ## Suggested implementation order
 
@@ -571,7 +725,9 @@ The `documentation` keys in the config examples above exist for this purpose. A 
 7. The byte\_lines generator and the KENBAK-1 octal listing.
 8. The listing namespace in the listing printer.
 9. Documentation generation, hover text, and the VS Code, Sublime Text and Vim syntax for #annotate.
-10. Stretch: built-in formats shipped as definitions.
+10. Stretch, planned for 0.9.1: built-in formats shipped as definitions.
+11. Stretch, planned for 0.9.1: continuing an `#annotate` line, with adjacent quoted strings joined (see "Stretch: continuing an `#annotate` line").
+12. Stretch, planned for 0.9.1: verbatim text blocks (see "Stretch: verbatim text blocks").
 
 The worked example's golden test follows the same rule as the minhex and KENBAK-1 tests: copy `addw.min64x4` and the Minimal 64x4 config, with the xmin annotation and format, into a fixture directory under `test/`.
 

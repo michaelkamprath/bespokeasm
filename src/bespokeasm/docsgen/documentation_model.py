@@ -30,6 +30,9 @@ class DocumentationModel:
         self.predefined_data = self._parse_predefined_data()
         self.operand_sets = self._parse_operand_sets_documentation()
         self.flow_counters = self._parse_flow_counter_documentation()
+        self._add_format_scoped_predefined()
+        self.annotations = self._parse_annotation_documentation()
+        self.output_formats = self._parse_output_format_documentation()
         self.instruction_docs = self._parse_instruction_documentation()
         self.macro_docs = self._parse_macro_documentation()
 
@@ -205,6 +208,151 @@ class DocumentationModel:
             })
 
         return constants
+
+    def _config_output_formats(self) -> dict[str, Any]:
+        formats = getattr(self.isa_model, 'output_formats', None)
+        return formats if isinstance(formats, dict) else {}
+
+    def _add_format_scoped_predefined(self) -> None:
+        """Add the memory zones and constants that only output formats define.
+
+        Each entry is listed once, with ``formats`` naming the formats that define it. A constant
+        that formats define with different values also has ``format_values``.
+        """
+        zones: dict[str, dict[str, Any]] = {}
+        constants: dict[str, dict[str, Any]] = {}
+        for format_name, output_format in self._config_output_formats().items():
+            for zone in output_format.predefined_memory_zones:
+                entry = zones.setdefault(zone['name'], self._format_scoped_zone(zone))
+                entry['formats'].append(format_name)
+            for constant in output_format.predefined_constants:
+                entry = constants.setdefault(constant['name'], self._format_scoped_constant(constant))
+                entry['formats'].append(format_name)
+                entry['format_values'][format_name] = constant.get('value')
+        for entry in constants.values():
+            if len(set(entry['format_values'].values())) <= 1:
+                entry['format_values'] = {}
+        self.predefined_memory_zones.extend(zones.values())
+        self.predefined_constants.extend(constants.values())
+
+    @staticmethod
+    def _documentation(entry: dict[str, Any]) -> dict[str, Any] | None:
+        doc = entry.get('documentation')
+        return doc if isinstance(doc, dict) else None
+
+    def _format_scoped_zone(self, zone: dict[str, Any]) -> dict[str, Any]:
+        doc = self._documentation(zone)
+        return {
+            'name': zone.get('name'),
+            'start': zone.get('start'),
+            'end': zone.get('end'),
+            'title': doc.get('title') if doc else None,
+            'description': doc.get('description') if doc else None,
+            'documented': doc is not None,
+            'formats': [],
+        }
+
+    def _format_scoped_constant(self, constant: dict[str, Any]) -> dict[str, Any]:
+        doc = self._documentation(constant)
+        return {
+            'name': constant.get('name'),
+            'value': constant.get('value'),
+            'type': doc.get('type') if doc else None,
+            'size': doc.get('size') if doc else None,
+            'description': doc.get('description') if doc else None,
+            'documented': doc is not None,
+            'formats': [],
+            'format_values': {},
+        }
+
+    def _parse_annotation_documentation(self) -> list[dict[str, Any]]:
+        """Every annotation namespace: the framework's ``listing`` (``builtin``) and those the
+        configuration declares. The ISA document shows only the declared ones; hover text has all."""
+        namespaces = []
+        declared = getattr(self.isa_model, 'annotation_namespaces', None)
+        for namespace in (declared.values() if isinstance(declared, dict) else ()):
+            arguments = []
+            for spec in namespace.arguments.values():
+                arguments.append({
+                    'name': spec.name,
+                    'type': spec.type,
+                    'values': list(spec.values),
+                    'minimum': spec.minimum,
+                    'maximum': spec.maximum,
+                    'pattern': spec.pattern.pattern if spec.pattern is not None else None,
+                    'required': spec.required,
+                    'required_when': self._condition_tests(spec.required_when),
+                    'allowed_when': self._condition_tests(spec.allowed_when),
+                    'default': spec.default if spec.has_default else None,
+                    'has_default': spec.has_default,
+                    'description': spec.description,
+                    'value_descriptions': list(spec.value_descriptions),
+                })
+            namespaces.append({
+                'name': namespace.name,
+                'builtin': namespace.is_builtin,
+                'description': namespace.description,
+                'applies_to': list(namespace.applies_to),
+                'scopes': list(namespace.scopes),
+                'arguments': arguments,
+                'examples': [dict(example) for example in namespace.examples],
+                'data_size': self._rule_documentation(namespace.data_size),
+                'value_range': self._rule_documentation(namespace.value_range),
+            })
+        return namespaces
+
+    @staticmethod
+    def _condition_tests(condition) -> list[tuple[str, list[str]]] | None:
+        """A condition as (argument, allowed values) pairs, all of which must hold."""
+        if condition is None:
+            return None
+        return [(key, list(values)) for key, values in condition.tests]
+
+    @staticmethod
+    def _rule_documentation(rule) -> dict[str, Any] | None:
+        if rule is None:
+            return None
+        return {
+            'when': DocumentationModel._condition_tests(rule.when),
+            'fixed': rule.fixed,
+            'selector': rule.selector,
+            'table': list(rule.table),
+            'times': rule.times,
+            'infer_times': rule.infer_times,
+            'terminated_when': DocumentationModel._condition_tests(rule.terminated_when),
+            # The arguments that choose the rule's value (not its `when`), for argument hover text.
+            'arguments': [
+                name for name in (
+                    rule.selector, rule.times, rule.infer_times,
+                    *(key for key, _ in (rule.terminated_when.tests if rule.terminated_when else ())),
+                ) if name
+            ],
+        }
+
+    def _parse_output_format_documentation(self) -> list[dict[str, Any]]:
+        """Every ``-t`` value this ISA accepts: the built-in formats, then the configuration's."""
+        from bespokeasm.assembler.output_format.builtin import BUILTIN_FORMATS
+
+        formats = []
+        for name, output_format in {**BUILTIN_FORMATS, **self._config_output_formats()}.items():
+            formats.append({
+                'name': name,
+                'description': output_format.description,
+                'builtin': output_format.is_builtin,
+                'requires_word_size': output_format.requires_word_size,
+                'shared': getattr(output_format, 'shared', None),
+                # The annotations its exports sections read.
+                'annotations': [
+                    generator.namespace.name
+                    for generator in getattr(output_format, 'sections', {}).values()
+                    if getattr(generator, 'namespace', None) is not None
+                ],
+                'predefined': [
+                    item['name']
+                    for item in output_format.predefined_memory_zones + output_format.predefined_constants
+                ],
+            })
+        return formats
 
     def _parse_predefined_data(self) -> list[dict[str, Any]]:
         """
