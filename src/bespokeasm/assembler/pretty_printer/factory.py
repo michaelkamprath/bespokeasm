@@ -2,7 +2,6 @@ from bespokeasm.assembler.annotations.model import ExportModel
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.pretty_printer import PrettyPrinterBase
-from bespokeasm.assembler.pretty_printer.intelhex import IntelHexPrettyPrinter
 from bespokeasm.assembler.pretty_printer.listing import ListingPrettyPrinter
 from bespokeasm.assembler.pretty_printer.symbols import SymbolsPrettyPrinter
 
@@ -10,13 +9,12 @@ from bespokeasm.assembler.pretty_printer.symbols import SymbolsPrettyPrinter
 class PrettyPrinterFactory:
     """Constructs a `PrettyPrinterBase` subclass keyed by string name.
 
-    Recognized type strings:
-      - 'hex'       -> IntelHexPrettyPrinter (text dump mode)
-      - 'intel_hex' -> IntelHexPrettyPrinter (Intel HEX file mode)
+    These back the built-in formats written in Python. Recognized type strings:
       - 'listing'   -> ListingPrettyPrinter
       - 'symbols'   -> SymbolsPrettyPrinter (every label and constant as JSON)
 
-    Any other value raises `NotImplementedError`.
+    Any other value raises `NotImplementedError`. The built-in ``hex`` and ``intel_hex``
+    formats are defined formats (``output_format/resources/builtin_formats.yaml``).
     """
 
     @classmethod
@@ -35,11 +33,7 @@ class PrettyPrinterFactory:
         are all parsed lines in source order, and ``export_model`` holds the annotated
         symbols; printers that do not need them ignore them.
         """
-        if pretty_printer_type == 'hex':
-            return IntelHexPrettyPrinter(line_objs, model, False)
-        elif pretty_printer_type == 'intel_hex':
-            return IntelHexPrettyPrinter(line_objs, model, True)
-        elif pretty_printer_type == 'listing':
+        if pretty_printer_type == 'listing':
             return ListingPrettyPrinter(line_objs, model, main_filename, export_model)
         elif pretty_printer_type == 'symbols':
             return SymbolsPrettyPrinter(line_objs, model, main_filename, export_model, source_line_objects)

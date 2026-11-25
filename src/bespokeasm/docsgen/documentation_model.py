@@ -331,10 +331,10 @@ class DocumentationModel:
 
     def _parse_output_format_documentation(self) -> list[dict[str, Any]]:
         """Every ``-t`` value this ISA accepts: the built-in formats, then the configuration's."""
-        from bespokeasm.assembler.output_format.builtin import BUILTIN_FORMATS
+        from bespokeasm.assembler.output_format.builtin import builtin_formats
 
         formats = []
-        for name, output_format in {**BUILTIN_FORMATS, **self._config_output_formats()}.items():
+        for name, output_format in {**builtin_formats(), **self._config_output_formats()}.items():
             formats.append({
                 'name': name,
                 'description': output_format.description,

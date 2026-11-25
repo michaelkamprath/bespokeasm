@@ -24,7 +24,7 @@ Goals:
 - Only explicitly annotated symbols are exported. Nothing is inferred from label scope or naming.
 - **Stretch goal: verbatim text blocks.** Source can carry text that is not assembled, such as xmin functions that wrap an assembly routine, for an output format to copy into its file (see "Stretch: verbatim text blocks").
 - **Stretch goal: continued `#annotate` lines.** A long quoted value, such as a multi-line `description`, can be split across source lines (see "Stretch: continuing an `#annotate` line").
-- **Stretch goal: polymorphic output formats.** Every format, built-in or config, implements one `OutputFormat` interface: a name, documentation, requirements (such as word size) and a render step. There are two implementations. A Python format is a class, as the printers are now. A defined format is a template plus sections, loaded from a definition file (YAML or JSON) in the schema of this spec. Built-in formats can be either kind; config formats are always defined formats. One registry holds both kinds, and `-t`, `PrettyPrinterFactory` and the docs generator use only the interface. So `listing` can stay Python while `hex` or `symbols` ship as definitions.
+- **Stretch goal: polymorphic output formats.** Every format, built-in or config, implements one `OutputFormat` interface: a name, documentation, requirements (such as word size) and a render step. There are two implementations. A Python format is a class, as the printers are now. A defined format is a template plus sections, loaded from a definition file (YAML or JSON) in the schema of this spec. Built-in formats can be either kind; config formats are always defined formats. One registry holds both kinds, and `-t` and the docs generator use only the interface. Implemented: `hex` and `intel_hex` ship as definitions in `output_format/resources/builtin_formats.yaml`, and `listing` and `symbols` stay Python (see open question 6).
 
 Non-goals:
 
@@ -497,7 +497,7 @@ Details:
 
 ## Stretch: continuing an `#annotate` line
 
-Status: specified, not implemented. Planned for 0.9.1.
+Status: specified, not implemented. Planned for 0.9.0.
 
 A `description` that spans several comment lines is written with `\n` escapes, which can make one source line very long. This stretch feature lets an `#annotate` line continue onto the next lines, and joins adjacent quoted strings:
 
@@ -532,7 +532,7 @@ Tests would cover: a value split across lines, adjacent strings on one line, a c
 
 ## Stretch: verbatim text blocks
 
-Status: specified, not implemented. Planned for 0.9.1.
+Status: specified, not implemented. Planned for 0.9.0.
 
 An output format often needs more than the assembly's bytes and symbols. An xmin file is a script, so the routines that call the machine code belong in it too, next to the declarations they use. A verbatim block lets the assembly source carry that text:
 
@@ -617,7 +617,7 @@ sections:
 
 - `-t listing` shows a block's lines as source lines with no address or bytes, and `#annotate listing hide` on the symbol before a block does not hide it, since a block is not part of a symbol.
 - `-t symbols` adds `verbatim`: a list of `{namespace, file, line, text}` objects, in source order.
-- Generated editor syntax highlights `#verbatim` and `#endverbatim` as directives and the namespace name as an annotation namespace; the lines between get a single plain scope (`meta.verbatim` / `string.unquoted.verbatim`), not assembly highlighting. Hover over the namespace on a `#verbatim` line shows the namespace's `verbatim.documentation`.
+- Generated editor syntax highlights `#verbatim` and `#endverbatim` as directives and the namespace name as an annotation namespace; every line between them gets one scope, `string.unquoted.verbatim.<namespace>` (Vim: a region linked to `String`), with no assembly highlighting inside, so a block is one uniform color that differs from comments. A `;` comment after `#verbatim` or `#endverbatim` keeps the comment scope; the region starts on the line after `#verbatim` and ends before `#endverbatim`. Hover over the namespace on a `#verbatim` line shows the namespace's `verbatim.documentation`.
 - Generated ISA docs list, for each namespace that opts in, that it accepts verbatim blocks, with the `verbatim.documentation` description.
 
 ### Errors
@@ -712,7 +712,7 @@ As built:
 3. **Config-declared namespaces in listings.** Should a config namespace be able to add listing behavior, or does `listing` stay framework-only? Decided: framework-only.
 4. **Generic symbol export.** Decided: add a built-in `-t symbols`. It writes every label and constant as JSON, with its value, scope and annotations, so other tools can use annotations without a config format. It starts as a Python format. If it later ships as a definition, it needs a `symbols_json` generator, because templates do not escape JSON strings.
 5. **Template conditionals.** `count_suffix` was a special case. Decided: replaced by general optional groups, `{?...}` (see "Config-defined output formats").
-6. **Built-in formats as shipped definitions.** Should `intel_hex`, `hex`, `listing` and `symbols` be format definitions in a file shipped with BespokeASM, in the same schema as config formats? Recommendation: yes, in YAML like the configs. Each one is a template with one section, for example `{code}` with `generator: listing`. Then `PrettyPrinterFactory`, the `-t` choices and the docs use one path for all formats. The generators stay Python. The listing printer, about 300 lines with automatic widths, file headers and flow columns, does not become declarative. Decided: a stretch goal, with Python and defined built-ins side by side (see Goals), planned for 0.9.1.
+6. **Built-in formats as shipped definitions.** Should `intel_hex`, `hex`, `listing` and `symbols` be format definitions in a file shipped with BespokeASM, in the same schema as config formats? Decided: Python and defined built-ins side by side (see Goals). `hex` and `intel_hex` are definitions, each a `{?{code}\n}` template with one section, so an empty hex dump still writes nothing. A built-in definition is loaded once, independent of the ISA: its generators are checked against its own `requires_word_size`, and selecting it on an ISA with another word size is the usual requirement error. A problem in a shipped definition is a BespokeASM bug, not a config error. `listing` stays Python: its output starts with blank lines and, on a page break, a form feed before the file header, which a section cannot reproduce, because a section's text never starts with a blank line. `symbols` stays Python because templates do not escape JSON strings (open question 4).
 
 ## Suggested implementation order
 
@@ -725,9 +725,9 @@ As built:
 7. The byte\_lines generator and the KENBAK-1 octal listing.
 8. The listing namespace in the listing printer.
 9. Documentation generation, hover text, and the VS Code, Sublime Text and Vim syntax for #annotate.
-10. Stretch, planned for 0.9.1: built-in formats shipped as definitions.
-11. Stretch, planned for 0.9.1: continuing an `#annotate` line, with adjacent quoted strings joined (see "Stretch: continuing an `#annotate` line").
-12. Stretch, planned for 0.9.1: verbatim text blocks (see "Stretch: verbatim text blocks").
+10. Stretch, done: built-in formats shipped as definitions (`hex` and `intel_hex`).
+11. Stretch: continuing an `#annotate` line, with adjacent quoted strings joined (see "Stretch: continuing an `#annotate` line").
+12. Stretch: verbatim text blocks (see "Stretch: verbatim text blocks").
 
 The worked example's golden test follows the same rule as the minhex and KENBAK-1 tests: copy `addw.min64x4` and the Minimal 64x4 config, with the xmin annotation and format, into a fixture directory under `test/`.
 

@@ -7,7 +7,7 @@ from typing import NamedTuple
 
 SUPPORTED_COMPLETION_SHELLS = ('bash', 'zsh', 'fish')
 # Kept here, not imported, so shell completion stays light. A test checks it matches
-# bespokeasm.assembler.output_format.builtin.BUILTIN_FORMAT_NAMES.
+# bespokeasm.assembler.output_format.builtin.builtin_format_names().
 BUILTIN_OUTPUT_FORMAT_NAMES = ('listing', 'hex', 'intel_hex', 'symbols')
 VERBOSE_HELP = 'Verbosity of logging (counting flag: -v, -vv, -vvv or --verbose <n>).'
 

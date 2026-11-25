@@ -9,8 +9,13 @@ import pytest
 from bespokeasm import BESPOKEASM_VERSION_STR
 from bespokeasm.assembler.engine import Assembler
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
-from bespokeasm.assembler.output_format.builtin import BUILTIN_FORMAT_NAMES
+from bespokeasm.assembler.output_format.builtin import builtin_format_names
+from bespokeasm.assembler.output_format.builtin import builtin_formats
+from bespokeasm.assembler.output_format.builtin import BuiltinFormatError
+from bespokeasm.assembler.output_format.builtin import load_builtin_definitions
+from bespokeasm.assembler.output_format.builtin import PrinterFormat
 from bespokeasm.assembler.output_format.columns import ColumnTable
+from bespokeasm.assembler.output_format.defined import DefinedFormat
 from bespokeasm.assembler.output_format.template import NO_FORMAT_SPEC
 from bespokeasm.assembler.output_format.template import Template
 from bespokeasm.assembler.symbol_scope import SymbolScope
@@ -448,7 +453,7 @@ def test_config_warnings(tmp_path):
 # ---- -t names and completion -------------------------------------------------------------
 
 def test_cli_builtin_names_match_the_registry():
-    assert set(BUILTIN_OUTPUT_FORMAT_NAMES) == set(BUILTIN_FORMAT_NAMES)
+    assert BUILTIN_OUTPUT_FORMAT_NAMES == builtin_format_names()
 
 
 def test_config_output_format_names_from_yaml(tmp_path):
@@ -1432,3 +1437,45 @@ def test_the_xmin_examples_in_the_config_assemble(tmp_path):
         output, warnings = _run(tmp_path, example['code'] + '\n', config)
         assert warnings == '', example['title']
         assert output.strip().endswith(('int pr @ 0x0117', 'char banner[5] @ 0x0108', 'int MAXARG := 1000'))
+
+
+# ---- built-in format definitions -----------------------------------------------------------
+
+def test_builtin_formats_are_defined_or_python():
+    formats = builtin_formats()
+    assert tuple(formats) == ('listing', 'hex', 'intel_hex', 'symbols')
+    for name in ('hex', 'intel_hex'):
+        assert isinstance(formats[name], DefinedFormat)
+        assert formats[name].is_builtin and formats[name].requires_word_size == 8
+        assert formats[name].description
+    for name in ('listing', 'symbols'):
+        assert isinstance(formats[name], PrinterFormat) and formats[name].is_builtin
+
+
+def test_defined_builtin_on_another_word_size(tmp_path):
+    config_path = _write_config(tmp_path, annotations={}, fixture='test_16bit_data_words.yaml')
+    message = _error(tmp_path, '; nothing to assemble\n', config_path, fmt='hex')
+    assert "output format 'hex' requires 8-bit words; this instruction set has 16-bit words" in message
+
+
+def test_hex_of_a_program_without_bytes_writes_nothing(tmp_path):
+    output, _ = _run(tmp_path, 'LIMIT = 3\n', _write_config(tmp_path), fmt='hex')
+    assert output == ''
+    output, _ = _run(tmp_path, 'LIMIT = 3\n', _write_config(tmp_path), fmt='intel_hex')
+    assert output == ':00000001FF\n'
+
+
+@pytest.mark.parametrize('definitions, problem', [
+    ('h:\n  template: "{code}"\n  sections:\n    code:\n      generator: hex\n',
+     "builtin.h.sections.code uses generator 'hex', which needs 8-bit words"),
+    ('h:\n  template: "{code}"\n  sections:\n    code:\n      generator: hexx\n',
+     "builtin.h.sections.code.generator names unknown generator 'hexx'"),
+    ('h:\n  template: "{code}"\n  sections:\n    code:\n      generator: exports\n      annotation: xmin\n'
+     '      lines_key: kind\n      lines: {}\n',
+     'builtin.h.sections.code.annotation'),
+    ('- h\n', 'must be a mapping of format names'),
+])
+def test_builtin_definition_problems_are_bugs(definitions, problem):
+    with pytest.raises(BuiltinFormatError) as exc_info:
+        load_builtin_definitions(definitions)
+    assert problem in str(exc_info.value)

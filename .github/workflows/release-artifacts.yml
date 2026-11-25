@@ -73,12 +73,13 @@ jobs:
             --distpath dist --paths src --collect-all bespokeasm \
             --add-data "src/bespokeasm/configgen/sublime/resources:bespokeasm/configgen/sublime/resources" \
             --add-data "src/bespokeasm/configgen/vscode/resources:bespokeasm/configgen/vscode/resources" \
+            --add-data "src/bespokeasm/assembler/output_format/resources:bespokeasm/assembler/output_format/resources" \
             --exclude-module email --exclude-module http --exclude-module urllib \
             --exclude-module ssl --exclude-module xml --exclude-module ctypes \
             --exclude-module ftplib --exclude-module socket --exclude-module netrc \
             --exclude-module webbrowser --exclude-module plistlib --exclude-module calendar \
             --exclude-module csv --exclude-module fractions \
-            --exclude-module statistics --exclude-module argparse --exclude-module uuid \
+            --exclude-module statistics --exclude-module argparse \
             --exclude-module pre_commit \
             src/bespokeasm/__main__.py
       - name: Rename artifact with platform
@@ -133,12 +134,13 @@ jobs:
             --distpath dist --paths src --collect-all bespokeasm \
             --add-data "src/bespokeasm/configgen/sublime/resources:bespokeasm/configgen/sublime/resources" \
             --add-data "src/bespokeasm/configgen/vscode/resources:bespokeasm/configgen/vscode/resources" \
+            --add-data "src/bespokeasm/assembler/output_format/resources:bespokeasm/assembler/output_format/resources" \
             --exclude-module email --exclude-module http --exclude-module urllib \
             --exclude-module ssl --exclude-module xml --exclude-module ctypes \
             --exclude-module ftplib --exclude-module socket --exclude-module netrc \
             --exclude-module webbrowser --exclude-module plistlib --exclude-module calendar \
             --exclude-module csv --exclude-module fractions \
-            --exclude-module statistics --exclude-module argparse --exclude-module uuid \
+            --exclude-module statistics --exclude-module argparse \
             --exclude-module pre_commit \
             src/bespokeasm/__main__.py
       - name: Rename artifact with platform
@@ -201,12 +203,13 @@ jobs:
             --distpath dist --paths src --collect-all bespokeasm \
             --add-data "src/bespokeasm/configgen/sublime/resources${SEP}bespokeasm/configgen/sublime/resources" \
             --add-data "src/bespokeasm/configgen/vscode/resources${SEP}bespokeasm/configgen/vscode/resources" \
+            --add-data "src/bespokeasm/assembler/output_format/resources${SEP}bespokeasm/assembler/output_format/resources" \
             --exclude-module email --exclude-module http --exclude-module urllib \
             --exclude-module ssl --exclude-module xml --exclude-module ctypes \
             --exclude-module ftplib --exclude-module socket --exclude-module netrc \
             --exclude-module webbrowser --exclude-module plistlib --exclude-module calendar \
             --exclude-module csv --exclude-module fractions \
-            --exclude-module statistics --exclude-module argparse --exclude-module uuid \
+            --exclude-module statistics --exclude-module argparse \
             --exclude-module pre_commit \
             src/bespokeasm/__main__.py
       - name: Rename artifact with platform
