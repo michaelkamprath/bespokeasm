@@ -154,7 +154,15 @@ def test_block_between_annotate_and_definition_is_an_error(tmp_path):
         '#verbatim listing\nx\n#endverbatim\n',
         "annotation 'listing' does not accept #verbatim blocks; namespaces that do: script",
     ),
-    ('#verbatim script extra\nx\n#endverbatim\n', '#verbatim takes one annotation namespace, such as "#verbatim xmin"'),
+    (
+        '#verbatim script extra\nx\n#endverbatim\n',
+        "line 1 - annotation 'script' has no #verbatim part 'extra'; it declares no parts",
+    ),
+    (
+        '#verbatim script a b\nx\n#endverbatim\n',
+        'the #verbatim line takes an annotation namespace and an optional part, such as "#verbatim xmin" or '
+        '"#verbatim xmin header", not "script a b"',
+    ),
     ('ld a, b, c\n#verbatim script\nx\n', 'line 2 - #verbatim block started on line 2 has no #endverbatim'),
     ('ld a, b, c\n#endverbatim\n', 'line 2 - #endverbatim without a #verbatim block'),
     ('#verbatim script\nx\n#endverbatim now\n', 'line 3 - #endverbatim takes no arguments'),
@@ -198,7 +206,7 @@ def test_verbatim_is_a_reserved_word(tmp_path):
     ),
     (
         lambda config: config['annotations']['script'].update(verbatim={'documentaton': {}}),
-        'annotations.script.verbatim.documentaton is not a verbatim setting; verbatim takes documentation',
+        'annotations.script.verbatim.documentaton is not a verbatim setting; verbatim takes documentation and parts',
     ),
     (
         lambda config: config['annotations']['script'].update(verbatim={'documentation': {'title': 'x'}}),
@@ -219,6 +227,92 @@ def test_namespace_with_only_verbatim(tmp_path):
     config = _write_config(tmp_path, annotations={'text': {'verbatim': {}}}, output_formats={'text': output_format})
     output, _, _ = _run(tmp_path, 'ld a, b, c\n#verbatim text\nhello\n#endverbatim\n', config, fmt='text')
     assert output == 'hello\n'
+
+
+# ---- parts ---------------------------------------------------------------------------------------
+
+def _parts_config(tmp_path) -> str:
+    """The script namespace with a ``header`` part, placed first by its own section."""
+    annotation = copy.deepcopy(SCRIPT_ANNOTATION)
+    annotation['arguments']['kind'] = {'type': 'enum', 'values': ['x'], 'default': 'x'}
+    annotation['verbatim']['parts'] = {'header': {'documentation': {'description': 'Comments at the top of the file.'}}}
+    output_format = copy.deepcopy(SCRIPT_FORMAT)
+    output_format['template'] = 'begin\n{?{header}\n\n}{exports}{?\n\n{script}}\n'
+    output_format['sections']['header'] = {'generator': 'verbatim', 'namespace': 'script', 'part': 'header'}
+    return _write_config(tmp_path, annotations={'script': annotation}, output_formats={'script': output_format})
+
+
+def test_a_part_is_placed_by_its_own_section(tmp_path):
+    source = (
+        ANNOTATED
+        + '#verbatim script\nfunctions\n#endverbatim\n'
+        + '#verbatim script header  ; the file comment\n# top\n#endverbatim\n'
+    )
+    output, _, _ = _run(tmp_path, source, _parts_config(tmp_path))
+    assert output == 'begin\n# top\n\nstart\n\nfunctions\n'
+
+
+def test_without_the_part_the_optional_group_writes_nothing(tmp_path):
+    output, _, _ = _run(tmp_path, ANNOTATED + '#verbatim script\nfunctions\n#endverbatim\n', _parts_config(tmp_path))
+    assert output == 'begin\nstart\n\nfunctions\n'
+
+
+def test_unknown_part_lists_the_parts(tmp_path):
+    message = _error(tmp_path, '#verbatim script headr\nx\n#endverbatim\n', _parts_config(tmp_path))
+    assert "line 1 - annotation 'script' has no #verbatim part 'headr'; its parts are: header" in message
+
+
+def test_unknown_part_in_an_excluded_block_is_not_checked(tmp_path):
+    output, _, _ = _run(
+        tmp_path, ANNOTATED + '#if 0\n#verbatim script headr\nx\n#endverbatim\n#endif\n', _parts_config(tmp_path),
+    )
+    assert output == 'begin\nstart\n'
+
+
+def test_symbols_gives_the_part(tmp_path):
+    source = ANNOTATED + '#verbatim script header\n# top\n#endverbatim\n'
+    output, _, _ = _run(tmp_path, source, _parts_config(tmp_path), fmt='symbols')
+    assert json.loads(output)['verbatim'][0]['part'] == 'header'
+
+
+@pytest.mark.parametrize(('change', 'expected'), [
+    (
+        lambda config: config['output_formats']['script']['sections']['header'].update(part='footer'),
+        "output_formats.script.sections.header.part names 'footer', which is not a #verbatim part of annotation "
+        "'script'; its parts are: header",
+    ),
+    (
+        lambda config: config['annotations']['script']['verbatim'].update(parts={}),
+        'annotations.script.verbatim.parts must be a non-empty mapping of part names',
+    ),
+    (
+        lambda config: config['annotations']['script']['verbatim'].update(parts=['header']),
+        'annotations.script.verbatim.parts must be a non-empty mapping of part names',
+    ),
+    (
+        lambda config: config['annotations']['script']['verbatim'].update(parts={'2nd': {}, 'header': {}}),
+        'annotations.script.verbatim.parts.2nd is not a part name',
+    ),
+    (
+        lambda config: config['annotations']['script']['verbatim'].update(parts={'header': {'title': 'x'}}),
+        'annotations.script.verbatim.parts.header.title is not a part setting; a part takes documentation',
+    ),
+])
+def test_part_config_errors(tmp_path, change, expected):
+    path = _parts_config(tmp_path)
+    config = json.loads(open(path).read())
+    change(config)
+    open(path, 'w').write(json.dumps(config))
+    assert expected in _error(tmp_path, 'ld a, b, c\n', path, fmt='listing')
+
+
+def test_generated_docs_list_the_parts(tmp_path):
+    model = AssemblerModel(_parts_config(tmp_path), 0, DiagnosticReporter())
+    markdown = MarkdownGenerator(DocumentationModel(model)).generate()
+    assert (
+        'A block can name a part, which an output format places separately:\n\n'
+        '- `#verbatim script header`: Comments at the top of the file.'
+    ) in markdown
 
 
 # ---- elsewhere ---------------------------------------------------------------------------------
@@ -246,7 +340,9 @@ def test_listing_hide_does_not_hide_a_block(tmp_path):
 def test_symbols_lists_the_blocks(tmp_path):
     source = ANNOTATED + '#verbatim script\n  one\n#endverbatim\n#if 0\n#verbatim script\nskipped\n#endverbatim\n#endif\n'
     output, _, _ = _run(tmp_path, source, _write_config(tmp_path), fmt='symbols')
-    assert json.loads(output)['verbatim'] == [{'namespace': 'script', 'file': 'main.asm', 'line': 4, 'text': '  one'}]
+    assert json.loads(output)['verbatim'] == [
+        {'namespace': 'script', 'part': None, 'file': 'main.asm', 'line': 4, 'text': '  one'},
+    ]
 
 
 def test_generated_docs_say_which_namespaces_accept_blocks(tmp_path):
@@ -256,7 +352,23 @@ def test_generated_docs_say_which_namespaces_accept_blocks(tmp_path):
     assert 'Accepts `#verbatim script` text blocks: Script text copied into the script file.' in markdown
 
 
-def test_xmin_format_writes_blocks_after_the_declarations(tmp_path):
+def test_xmin_format_writes_the_header_part_after_the_generated_line(tmp_path):
+    """The Minimal 64x4 xmin format, from the copied config: a header block, wherever it is in
+    the source, comes right after the generated-by line, then a blank line and the declarations."""
+    config = str(pkg_resources.files(config_files).joinpath('xmin', 'slu4-minimal-64x4.yaml'))
+    source = (
+        '.memzone XMIN_USER_CODE\n'
+        '#annotate xmin kind=addr name=Go\ngo: RTS\n'
+        '#verbatim xmin header\n# GoLib\n#\n# Calls go.\n#endverbatim\n'
+    )
+    output, warnings, _ = _run(tmp_path, source, config, fmt='xmin')
+    assert warnings == ''
+    lines = output.split('\n')
+    assert lines[0].startswith('# main.asm: generated by BespokeASM')
+    assert lines[1:7] == ['# GoLib', '#', '# Calls go.', '', 'int Go := 0x0100', '']
+
+
+def test_xmin_format_writes_blocks_between_the_declarations_and_the_asm_block(tmp_path):
     """The Minimal 64x4 xmin format, from the copied config."""
     config = str(pkg_resources.files(config_files).joinpath('xmin', 'slu4-minimal-64x4.yaml'))
     source = (
@@ -266,4 +378,4 @@ def test_xmin_format_writes_blocks_after_the_declarations(tmp_path):
     )
     output, warnings, _ = _run(tmp_path, source, config, fmt='xmin')
     assert warnings == ''
-    assert output.endswith('\nint Go := 0x0100\n\ndef run():\n  call Go\n')
+    assert '\nint Go := 0x0100\n\ndef run():\n  call Go\n\nasm\n:' in output

@@ -574,11 +574,20 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
             lines.append(
                 fr'syn match {lang_group}VerbatimNamespace /\%(^\s*#verbatim\s\+\)\@<={verbatim_alt}\>/ contained'
             )
+            # A part may follow the namespace: `#verbatim xmin header`.
+            part_names = sorted({
+                part
+                for namespace in verbatim_namespaces
+                for part in self.model.annotation_namespaces[namespace].verbatim_part_names
+            })
+            groups = ['VerbatimPunc', 'VerbatimDirective', 'VerbatimNamespace', 'VerbatimComment']
+            if part_names:
+                part_alt = self._alternation(part_names)
+                lines.append(fr'syn match {lang_group}VerbatimPart /\%({head}\s\+\)\@<={part_alt}\>/ contained')
+                head = fr'{head}\%(\s\+{part_alt}\>\)\='
+                groups.append('VerbatimPart')
             lines.append(fr'syn match {lang_group}VerbatimComment /\%({head}\s*\)\@<=;.*/ contained')
-            verbatim_parts = ','.join(
-                f'{lang_group}{group}'
-                for group in ('VerbatimPunc', 'VerbatimDirective', 'VerbatimNamespace', 'VerbatimComment')
-            )
+            verbatim_parts = ','.join(f'{lang_group}{group}' for group in groups)
             lines.append(
                 fr'syn region {lang_group}Verbatim start=/^\ze\s*#verbatim\s\+{verbatim_alt}\>/ '
                 fr'end=/^\ze\s*#endverbatim\>/ contains={verbatim_parts}'
@@ -592,6 +601,7 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         lines.append(f'hi def link {lang_group}VerbatimDirective {lang_group}PreProc')
         lines.append(f'hi def link {lang_group}VerbatimNamespace {lang_group}AnnotationNamespace')
         lines.append(f'hi def link {lang_group}VerbatimComment {lang_group}Comment')
+        lines.append(f'hi def link {lang_group}VerbatimPart {lang_group}AnnotationValue')
         lines.append(f'hi def link {lang_group}StringPunc Delimiter')
         lines.append(f'hi def link {lang_group}HexNumber Number')
         lines.append(f'hi def link {lang_group}BinNumber Number')

@@ -200,19 +200,23 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
         }
 
     @staticmethod
-    def _verbatim_block_rule(namespace: str) -> dict:
-        """A `#verbatim <namespace>` ... `#endverbatim` block: the directives as preprocessor lines
-        (with any comment), and every line between them as `string.unquoted.verbatim.<namespace>`."""
+    def _verbatim_block_rule(namespace: str, parts: tuple[str, ...] = ()) -> dict:
+        """A `#verbatim <namespace> [<part>]` ... `#endverbatim` block: the directives as
+        preprocessor lines (with any comment), and every line between them as
+        `string.unquoted.verbatim.<namespace>`."""
         directive_captures = {
             '1': {'name': 'punctuation.definition.preprocessor'},
             '2': {'name': 'keyword.control.preprocessor'},
         }
+        part_alternation = '|'.join(re.escape(part) for part in parts)
+        part = rf'(?:\s+({part_alternation})\b)?' if parts else '()'
         return {
-            'begin': rf'^\s*(\#)(verbatim)\s+({re.escape(namespace)})\b\s*(;.*)?$',
+            'begin': rf'^\s*(\#)(verbatim)\s+({re.escape(namespace)})\b{part}\s*(;.*)?$',
             'beginCaptures': {
                 **directive_captures,
                 '3': {'name': 'entity.name.namespace.annotation'},
-                '4': {'name': 'comment.line.semicolon'},
+                '4': {'name': 'constant.other.annotation.value'},
+                '5': {'name': 'comment.line.semicolon'},
             },
             'end': r'^\s*(\#)(endverbatim)\b\s*(;.*)?$',
             'endCaptures': {**directive_captures, '3': {'name': 'comment.line.semicolon'}},
@@ -408,7 +412,10 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
         verbatim_namespaces = self.model.verbatim_namespaces
         if verbatim_namespaces:
             grammar_json['repository']['verbatim_blocks'] = {
-                'patterns': [self._verbatim_block_rule(namespace) for namespace in verbatim_namespaces],
+                'patterns': [
+                    self._verbatim_block_rule(namespace, self.model.annotation_namespaces[namespace].verbatim_part_names)
+                    for namespace in verbatim_namespaces
+                ],
             }
             grammar_json['repository']['main']['patterns'].insert(0, {'include': '#verbatim_blocks'})
 

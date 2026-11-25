@@ -53,6 +53,7 @@ class SymbolsPrettyPrinter(PrettyPrinterBase):
             'verbatim': [
                 {
                     'namespace': block.namespace,
+                    'part': block.part,
                     'file': self._display_path(block.line_id.filename),
                     'line': block.line_id.line_num,
                     'text': block.text,

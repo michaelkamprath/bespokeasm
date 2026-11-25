@@ -20,7 +20,7 @@ from test import config_files
 
 ANNOTATIONS = {
     'xmin': {
-        'verbatim': {'documentation': {'description': 'xmin script text.'}},
+        'verbatim': {'documentation': {'description': 'xmin script text.'}, 'parts': {'header': {}}},
         'arguments': {
             'kind': {'type': 'enum', 'values': ['addr', 'var'], 'required': True},
             'count': {'type': 'integer'},
@@ -139,8 +139,11 @@ def test_vscode_grammar(config_path, tmp_path):
     (block,) = grammar['repository']['verbatim_blocks']['patterns']
     assert block['contentName'] == 'string.unquoted.verbatim.xmin'
     begin, end = re.compile(block['begin']), re.compile(block['end'])
-    assert begin.search('  #verbatim xmin ; why').groups() == ('#', 'verbatim', 'xmin', '; why')
+    assert begin.search('  #verbatim xmin ; why').groups() == ('#', 'verbatim', 'xmin', None, '; why')
+    assert begin.search('#verbatim xmin header ; top').groups() == ('#', 'verbatim', 'xmin', 'header', '; top')
     assert begin.search('#verbatim listing') is None
+    assert begin.search('#verbatim xmin headr') is None
+    assert block['beginCaptures']['4']['name'] == 'constant.other.annotation.value'
     assert end.search('#endverbatim ; done').groups() == ('#', 'endverbatim', '; done')
     assert block['beginCaptures']['3']['name'] == 'entity.name.namespace.annotation'
     assert block['endCaptures']['3']['name'] == 'comment.line.semicolon'
@@ -181,7 +184,9 @@ def test_sublime_syntax(config_path, tmp_path):
     assert contexts['main'][0] == {'include': 'verbatim_blocks'}
     (block,) = contexts['verbatim_blocks']
     assert re.match(block['match'], '  #verbatim xmin ; why') and not re.match(block['match'], '#verbatim listing')
+    assert re.match(block['match'], '#verbatim xmin header ; top').group(4) == 'header'
     assert block['captures'][3] == 'entity.name.namespace.annotation'
+    assert block['captures'][4] == 'constant.other.annotation.value'
     assert block['push'] == ['verbatim_body_xmin', 'verbatim_header']
     assert contexts['verbatim_body_xmin'] == [
         {'meta_content_scope': 'string.unquoted.verbatim.xmin'},
@@ -247,12 +252,15 @@ def test_vim_verbatim_block_highlighting(config_path, tmp_path):
     generator.generate()
     vim_ft = generator.language_id.replace('-', '').lower()
     source = tmp_path / 'block.testasm'
-    source.write_text('#verbatim xmin ; why\n  x = 1 ; text\n#if kind\n#endverbatim ; done\n  ld a, b, c\n')
+    source.write_text(
+        '#verbatim xmin ; why\n  x = 1 ; text\n#if kind\n#endverbatim ; done\n  ld a, b, c\n'
+        '#verbatim xmin header ; top\n# text\n#endverbatim\n'
+    )
     output = tmp_path / 'groups.out'
     script = tmp_path / 'groups.vim'
     script.write_text('\n'.join([
         'let out = []',
-        'for lnum in range(1, 5)',
+        'for lnum in range(1, 8)',
         '  let groups = []',
         '  for col in range(1, len(getline(lnum)))',
         "    if getline(lnum)[col - 1] !~# '\\s'",
@@ -273,6 +281,8 @@ def test_vim_verbatim_block_highlighting(config_path, tmp_path):
     assert groups[1] == ['Verbatim'] and groups[2] == ['Verbatim']
     assert 'Verbatim' not in groups[3] and 'PreProc' in groups[3] and 'Comment' in groups[3]
     assert 'Verbatim' not in groups[4]
+    assert groups[5] == ['VerbatimPunc', 'VerbatimDirective', 'VerbatimNamespace', 'VerbatimPart', 'VerbatimComment']
+    assert groups[6] == ['Verbatim']
 
 
 # ---- hover lookups on #annotate lines --------------------------------------------------

@@ -11,11 +11,11 @@ import os
 import re
 
 from bespokeasm.assembler.annotations.binding import AnnotationBinder
-from bespokeasm.assembler.annotations.continuation import ContinuedDirective
-from bespokeasm.assembler.annotations.continuation import is_annotate_line
-from bespokeasm.assembler.annotations.continuation import read_continued_annotate
 from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
+from bespokeasm.assembler.line_continuation import continuation_line_objects
+from bespokeasm.assembler.line_continuation import list_first_line
+from bespokeasm.assembler.line_continuation import read_continued_line
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object.counter_coordinate_line import CounterCoordinateLine
@@ -122,15 +122,13 @@ class AssemblyFile:
                         continue
                     if is_end_verbatim_line(line_str) and condition_stack.currently_active(preprocessor):
                         raise AssemblerError(line_id, '#endverbatim without a #verbatim block')
-                    # A continued #annotate is one directive, in or out of an #if as a whole.
-                    continued = (
-                        read_continued_annotate(source_lines, line_num - 1, line_id)
-                        if is_annotate_line(line_str) else None
-                    )
+                    # A continued line (#annotate, a data directive or an embedded string) is one
+                    # line, in or out of an #if as a whole.
+                    continued = read_continued_line(source_lines, line_num - 1, line_id)
                     continuation_lines: list[LineObject] = []
                     if continued is not None:
                         line_num += len(continued.continuation)
-                        continuation_lines = self._continuation_line_objects(continued, current_memzone)
+                        continuation_lines = continuation_line_objects(continued, self.filename, current_memzone)
                     if len(line_str) == 0:
                         annotation_binder.interrupt(line_id, 'a blank line')
                     if len(line_str) > 0:
@@ -175,7 +173,7 @@ class AssemblyFile:
                                 continuation_line.is_muted = condition_stack.is_muted
                                 line_objects.append(continuation_line)
                             continue
-                        if continued is not None:
+                        if continued is not None and continued.is_annotate:
                             lobj_list.append(AnnotationLine(
                                 line_id, continued.first_line, '', current_memzone, isa_model,
                                 directive=continued.text,
@@ -183,9 +181,10 @@ class AssemblyFile:
                             # The continuation lines are part of the directive: listed, not bound to.
                             lobj_list.extend(continuation_lines)
                         else:
-                            lobj_list.extend(LineOjectFactory.parse_line(
+                            parsed = LineOjectFactory.parse_line(
                                 line_id,
-                                line_str,
+                                # The last line's comment is listed on its own row, not the first.
+                                continued.text if continued is not None else line_str,
                                 isa_model,
                                 current_scope,
                                 active_named_scopes,
@@ -195,7 +194,11 @@ class AssemblyFile:
                                 condition_stack,
                                 log_verbosity,
                                 self._filename,
-                            ))
+                            )
+                            if continued is not None:
+                                list_first_line(parsed, continued)
+                            lobj_list.extend(parsed)
+                            lobj_list.extend(continuation_lines)
                         self._track_annotations(annotation_binder, lobj_list, line_id)
                         for lobj in lobj_list:
                             if not isinstance(lobj, ConditionLine):
@@ -312,26 +315,14 @@ class AssemblyFile:
         text line, so a listing shows each line, and the ``EndVerbatimLine``."""
         block = read_verbatim_block(source_lines, line_id.line_num - 1, line_id)
         if active:
-            VerbatimLine.check_namespace(line_id, block.namespace, isa_model.annotation_namespaces)
+            VerbatimLine.check_names(line_id, block.namespace, block.part, isa_model.annotation_namespaces)
         objects: list[LineObject] = [VerbatimLine(
             line_id, block.header[0], block.header[1], memzone,
-            block.namespace or '', tuple(text for _, text in block.body),
+            block.namespace or '', tuple(text for _, text in block.body), block.part,
         )]
         for number, text in block.body:
             objects.append(LineObject(LineIdentifier(number, filename=self.filename), text, '', memzone))
         objects.append(EndVerbatimLine(LineIdentifier(block.end_line, filename=self.filename), *block.end, memzone))
-        return objects
-
-    def _continuation_line_objects(self, continued: ContinuedDirective, memzone) -> list[LineObject]:
-        """Inert line objects for a continued directive's later lines, so a listing shows each
-        physical line as written. Only the last can carry a comment."""
-        objects = []
-        for index, (number, text) in enumerate(continued.continuation):
-            is_last = index == len(continued.continuation) - 1
-            code = split_line_comment(text)[0].strip() if is_last else text
-            objects.append(LineObject(
-                LineIdentifier(number, filename=self.filename), code, continued.comment if is_last else '', memzone,
-            ))
         return objects
 
     @staticmethod

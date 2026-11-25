@@ -160,7 +160,9 @@ BYTECODE_DIRECTIVE_DOCS: dict[str, str] = {
         '.cstr "string"\n'
         '```\n\n'
         'The terminator byte defaults to `0` but can be configured in '
-        'the ISA configuration. Supports escape sequences.'
+        'the ISA configuration. Supports escape sequences. Adjacent strings are one string, and a '
+        'line ending in `\\` continues on the next, so a long string can be split: '
+        '`.cstr "Hello, " \\` then `"world"`.'
     ),
     'asciiz': (
         '### `.asciiz` : Null-Terminated String\n\n'
@@ -387,13 +389,14 @@ PREPROCESSOR_DIRECTIVE_DOCS: dict[str, str] = {
         'copies the text into its file, such as script functions that call the assembled routines.\n\n'
         '**Usage:**\n\n'
         '```\n'
-        '#verbatim <namespace>\n'
+        '#verbatim <namespace> [<part>]\n'
         'text, kept exactly as written\n'
         '#endverbatim\n'
         '```\n\n'
         'The namespace must be an annotation namespace of the instruction set that accepts verbatim '
-        'blocks. The lines in between are not preprocessed and emit no bytes. A block inside a false '
-        '`#if` branch is skipped.'
+        'blocks. A part, such as `header`, must be one the namespace declares; a format places '
+        'each part where it belongs in its file. The lines in between are not preprocessed and emit '
+        'no bytes. A block inside a false `#if` branch is skipped.'
     ),
     'endverbatim': (
         '### `#endverbatim` : End Verbatim Text Block\n\n'

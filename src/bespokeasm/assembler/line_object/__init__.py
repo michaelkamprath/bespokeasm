@@ -68,6 +68,11 @@ class LineObject:
         """returns the original instruction text that generated this line object"""
         return self._instruction
 
+    def list_as(self, instruction: str) -> None:
+        """Show this text for the line in a listing. For a line continued onto later physical
+        lines, which parses the joined text but lists its first line. Changes nothing else."""
+        self._instruction = instruction.strip()
+
     @property
     def comment(self) -> str:
         """returns the code comment associated with this line object"""

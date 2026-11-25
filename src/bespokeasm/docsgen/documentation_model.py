@@ -298,7 +298,13 @@ class DocumentationModel:
                 'examples': [dict(example) for example in namespace.examples],
                 # Whether source may carry `#verbatim <namespace>` blocks, and what they are for.
                 'verbatim': (
-                    {'description': namespace.verbatim_description} if namespace.accepts_verbatim else None
+                    {
+                        'description': namespace.verbatim_description,
+                        'parts': [
+                            {'name': name, 'description': description}
+                            for name, description in namespace.verbatim_parts
+                        ],
+                    } if namespace.accepts_verbatim else None
                 ),
                 'data_size': self._rule_documentation(namespace.data_size),
                 # A list of rules: the first whose `when` holds applies.

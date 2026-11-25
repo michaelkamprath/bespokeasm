@@ -202,6 +202,13 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         safe_name = re.sub(r'[^0-9A-Za-z_]', '_', self.language_name or 'bespokeasm')
         return f'bespokeasm_hover_{safe_name}.py'
 
+    def _verbatim_part_pattern(self, namespace: str) -> str:
+        """The optional part after a `#verbatim` line's namespace, as capture group 4."""
+        parts = self.model.annotation_namespaces[namespace].verbatim_part_names
+        if not parts:
+            return '()'
+        return rf"(?:\s+({'|'.join(re.escape(part) for part in parts)})\b)?"
+
     def _add_verbatim_contexts(self, contexts: dict) -> None:
         """`#verbatim <namespace>` ... `#endverbatim` blocks, for namespaces that accept them: the
         `#verbatim` line as a preprocessor line (with any comment), then every line up to
@@ -212,11 +219,12 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         contexts['main'].insert(0, {'include': 'verbatim_blocks'})
         contexts['verbatim_blocks'] = [
             {
-                'match': rf'^\s*(\#)(verbatim)\s+({re.escape(namespace)})\b',
+                'match': rf'^\s*(\#)(verbatim)\s+({re.escape(namespace)})\b{self._verbatim_part_pattern(namespace)}',
                 'captures': {
                     1: 'punctuation.definition.preprocessor',
                     2: 'keyword.control.preprocessor',
                     3: 'entity.name.namespace.annotation',
+                    4: 'constant.other.annotation.value',
                 },
                 # The rest of the #verbatim line first, then the block.
                 'push': [f'verbatim_body_{namespace}', 'verbatim_header'],

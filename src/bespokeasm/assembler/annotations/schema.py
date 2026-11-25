@@ -179,6 +179,13 @@ class AnnotationNamespace:
     # Whether source may carry ``#verbatim <namespace>`` blocks, and what they are for.
     accepts_verbatim: bool = False
     verbatim_description: str | None = None
+    # The parts a block may name (``#verbatim <namespace> <part>``), in declaration order, each
+    # with its description. A format places each part's blocks with its own section.
+    verbatim_parts: tuple[tuple[str, str | None], ...] = ()
+
+    @property
+    def verbatim_part_names(self) -> tuple[str, ...]:
+        return tuple(name for name, _ in self.verbatim_parts)
 
     # ---- source validation -------------------------------------------------
 
@@ -469,8 +476,8 @@ class _NamespaceLoader:
         )
 
     def _verbatim(self) -> dict[str, Any]:
-        """``verbatim`` opts the namespace in to ``#verbatim`` blocks: a mapping whose only key is
-        the optional ``documentation`` (a ``description``)."""
+        """``verbatim`` opts the namespace in to ``#verbatim`` blocks: a mapping with the optional
+        ``documentation`` (a ``description``) and ``parts`` (the parts a block may name)."""
         if 'verbatim' not in self._config:
             return {}
         path = f'{self._path}.verbatim'
@@ -478,23 +485,44 @@ class _NamespaceLoader:
         if not isinstance(config, dict):
             self._error(path, 'must be a mapping, such as {} or {documentation: {description: ...}}')
         for key in config:
-            if key != 'documentation':
-                self._error(f'{path}.{key}', 'is not a verbatim setting; verbatim takes documentation')
-        description = None
-        documentation = config.get('documentation')
-        if documentation is not None:
-            if not isinstance(documentation, dict):
-                self._error(f'{path}.documentation', 'must be a mapping')
-            for key in documentation:
-                if key != 'description':
-                    self._error(
-                        f'{path}.documentation.{key}',
-                        'is not a documentation setting; verbatim documentation takes description',
-                    )
-            description = documentation.get('description')
-            if description is not None and not isinstance(description, str):
-                self._error(f'{path}.documentation.description', 'must be a string')
-        return {'accepts_verbatim': True, 'verbatim_description': description}
+            if key not in ('documentation', 'parts'):
+                self._error(f'{path}.{key}', 'is not a verbatim setting; verbatim takes documentation and parts')
+        parts_config = config.get('parts', {})
+        if not isinstance(parts_config, dict) or ('parts' in config and not parts_config):
+            self._error(f'{path}.parts', 'must be a non-empty mapping of part names, such as {header: {}}')
+        parts = []
+        for name, part in parts_config.items():
+            part_path = f'{path}.parts.{name}'
+            if not isinstance(name, str) or not PATTERN_NAMESPACE_NAME.match(name):
+                self._error(part_path, 'is not a part name: a letter followed by letters, digits or underscores')
+            if part is not None and not isinstance(part, dict):
+                self._error(part_path, 'must be a mapping, such as {} or {documentation: {description: ...}}')
+            for key in part or {}:
+                if key != 'documentation':
+                    self._error(f'{part_path}.{key}', 'is not a part setting; a part takes documentation')
+            parts.append((name, self._verbatim_description((part or {}).get('documentation'), part_path)))
+        return {
+            'accepts_verbatim': True,
+            'verbatim_description': self._verbatim_description(config.get('documentation'), path),
+            'verbatim_parts': tuple(parts),
+        }
+
+    def _verbatim_description(self, documentation: Any, path: str) -> str | None:
+        """The ``description`` of a verbatim ``documentation`` mapping, or ``None``."""
+        if documentation is None:
+            return None
+        if not isinstance(documentation, dict):
+            self._error(f'{path}.documentation', 'must be a mapping')
+        for key in documentation:
+            if key != 'description':
+                self._error(
+                    f'{path}.documentation.{key}',
+                    'is not a documentation setting; verbatim documentation takes description',
+                )
+        description = documentation.get('description')
+        if description is not None and not isinstance(description, str):
+            self._error(f'{path}.documentation.description', 'must be a string')
+        return description
 
     def _examples(self, examples: Any, path: str) -> tuple[dict[str, str], ...]:
         """Usage examples, as instructions have: each a ``code`` block with an optional ``title``

@@ -1,9 +1,9 @@
-"""``#verbatim <namespace>`` ... ``#endverbatim``: a block of text that is not assembled.
+"""``#verbatim <namespace> [<part>]`` ... ``#endverbatim``: a block of text that is not assembled.
 
 The lines between the two directives are kept exactly as written and are not preprocessed:
 a ``#`` line inside a block is text. An output format writes a namespace's blocks with the
-``verbatim`` generator. ``AssemblyFile`` reads a block as a unit, so conditional compilation
-applies to it as a whole.
+``verbatim`` generator, one section for the blocks that name no part and one for each part.
+``AssemblyFile`` reads a block as a unit, so conditional compilation applies to it as a whole.
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ VERBATIM_DIRECTIVE = '#verbatim'
 END_DIRECTIVE = '#endverbatim'
 _VERBATIM_PATTERN = re.compile(r'#verbatim(?=\s|;|$)')
 _END_PATTERN = re.compile(r'#endverbatim(?=\s|;|$)')
-_NAMESPACE_PATTERN = re.compile(r'[A-Za-z][A-Za-z0-9_]*')
+_NAMESPACE_PATTERN = re.compile(r'(?P<namespace>[A-Za-z][A-Za-z0-9_]*)(?:\s+(?P<part>[A-Za-z][A-Za-z0-9_]*))?')
 
 
 def is_verbatim_line(line_str: str) -> bool:
@@ -35,6 +35,7 @@ def is_end_verbatim_line(line_str: str) -> bool:
 class VerbatimBlockSource:
     """A block as read from a file: its directive lines and the text lines between them."""
     namespace: str | None                    # None when the #verbatim line names no namespace
+    part: str | None                         # None when the #verbatim line names no part
     header: tuple[str, str]                  # the #verbatim line's code and comment
     body: tuple[tuple[int, str], ...]        # (line number, text as written) of each text line
     end_line: int
@@ -46,10 +47,12 @@ def read_verbatim_block(source_lines: list[str], index: int, line_id: LineIdenti
     code, comment = split_line_comment(source_lines[index].strip())
     code = code.strip()
     rest = code[len(VERBATIM_DIRECTIVE):].strip()
-    namespace = rest if _NAMESPACE_PATTERN.fullmatch(rest) else None
-    if rest and namespace is None:
+    names = _NAMESPACE_PATTERN.fullmatch(rest)
+    if rest and names is None:
         raise AssemblerError(
-            line_id, f'#verbatim takes one annotation namespace, such as "#verbatim xmin", not "{rest}"',
+            line_id,
+            'the #verbatim line takes an annotation namespace and an optional part, such as '
+            f'"#verbatim xmin" or "#verbatim xmin header", not "{rest}"',
         )
     body: list[tuple[int, str]] = []
     for end_index in range(index + 1, len(source_lines)):
@@ -62,7 +65,8 @@ def read_verbatim_block(source_lines: list[str], index: int, line_id: LineIdenti
                     f'{END_DIRECTIVE} takes no arguments',
                 )
             return VerbatimBlockSource(
-                namespace=namespace,
+                namespace=names.group('namespace') if names else None,
+                part=names.group('part') if names else None,
                 header=(code, comment.strip()),
                 body=tuple(body),
                 end_line=end_index + 1,
@@ -90,17 +94,25 @@ class VerbatimLine(PreprocessorLine):
         memzone: MemoryZone,
         namespace: str,
         text_lines: tuple[str, ...],
+        part: str | None = None,
     ) -> None:
         super().__init__(line_id, instruction, comment, memzone)
         self._namespace = namespace
+        self._part = part
         self._text_lines = text_lines
 
     def __repr__(self) -> str:
-        return f'VerbatimLine<{self._namespace}: {len(self._text_lines)} lines>'
+        name = f'{self._namespace} {self._part}' if self._part else self._namespace
+        return f'VerbatimLine<{name}: {len(self._text_lines)} lines>'
 
     @property
     def namespace(self) -> str:
         return self._namespace
+
+    @property
+    def part(self) -> str | None:
+        """The part the block names, or ``None``."""
+        return self._part
 
     @property
     def text_lines(self) -> tuple[str, ...]:
@@ -119,8 +131,9 @@ class VerbatimLine(PreprocessorLine):
         return '\n'.join(lines)
 
     @staticmethod
-    def check_namespace(line_id: LineIdentifier, namespace: str | None, namespaces: dict) -> None:
-        """A block must name an annotation namespace of the ISA that accepts verbatim blocks."""
+    def check_names(line_id: LineIdentifier, namespace: str | None, part: str | None, namespaces: dict) -> None:
+        """A block must name an annotation namespace of the ISA that accepts verbatim blocks, and
+        a part only when the namespace declares it."""
         accepting = sorted(name for name, spec in namespaces.items() if spec.accepts_verbatim)
         if namespace is None:
             example = accepting[0] if accepting else 'xmin'
@@ -130,7 +143,11 @@ class VerbatimLine(PreprocessorLine):
             )
         spec = namespaces.get(namespace)
         if spec is not None and spec.accepts_verbatim:
-            return
+            if part is None or part in spec.verbatim_part_names:
+                return
+            parts = spec.verbatim_part_names
+            which = f'its parts are: {", ".join(parts)}' if parts else 'it declares no parts'
+            raise AssemblerError(line_id, f"annotation '{namespace}' has no #verbatim part '{part}'; {which}")
         which = (
             f'namespaces that do: {", ".join(accepting)}' if accepting
             else 'no annotation namespace of this instruction set does'

@@ -22,6 +22,8 @@ class EmbeddedString(LineWithWords):
         rf'^{EMBEDDED_STRING_PATTERN}',
         flags=re.IGNORECASE | re.MULTILINE | re.DOTALL
     )
+    # A further string after spaces: adjacent strings ("ab" "cd") are one string.
+    NEXT_STRING_PATTERN = re.compile(rf'\s*{EMBEDDED_STRING_PATTERN}', flags=re.IGNORECASE | re.DOTALL)
 
     @classmethod
     def factory(
@@ -40,11 +42,16 @@ class EmbeddedString(LineWithWords):
         match = re.search(EmbeddedString.QUOTED_STRING_PATTERN, instruction)
         if match is None or len(match.groups()) != 2:
             return None
+        pieces = [match.group(2)]
+        end = match.end()
+        while (following := EmbeddedString.NEXT_STRING_PATTERN.match(instruction, end)) is not None:
+            pieces.append(following.group(2))
+            end = following.end()
 
         return EmbeddedString(
             line_id,
-            match.group(0),
-            match.group(2),
+            instruction[:end],
+            pieces,
             comment,
             current_memzone,
             word_size,
@@ -58,7 +65,7 @@ class EmbeddedString(LineWithWords):
             self,
             line_id: LineIdentifier,
             instruction: str,
-            quoted_string: str,
+            quoted_strings: list[str],
             comment: str,
             current_memzone: MemoryZone,
             word_size: int,
@@ -77,9 +84,9 @@ class EmbeddedString(LineWithWords):
             intra_word_endianness,
             multi_word_endianness,
         )
-        self._string_bytes = \
-            [ord(x) for x in list(bytes(quoted_string, 'utf-8').decode('unicode_escape'))] \
-            + [cstr_terminator]
+        # Escapes apply within each string, then the strings are joined.
+        text = ''.join(bytes(piece, 'utf-8').decode('unicode_escape') for piece in quoted_strings)
+        self._string_bytes = [ord(x) for x in text] + [cstr_terminator]
 
     def __str__(self):
         return f'EmbeddedString<{self.instruction}, size={self.byte_size}, chars={self._string_bytes}>'

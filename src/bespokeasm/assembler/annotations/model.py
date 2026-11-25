@@ -15,6 +15,7 @@ from typing import Any
 from bespokeasm.assembler.annotations.schema import AnnotationNamespace
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.diagnostic_reporter import AssemblerError
+from bespokeasm.assembler.line_continuation import ContinuationLine
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object import LineWithWords
@@ -104,11 +105,13 @@ class AnnotatedSymbol:
 
 @dataclass(frozen=True)
 class VerbatimBlock:
-    """One ``#verbatim`` block: its namespace, where it starts, and its text as formats write it."""
+    """One ``#verbatim`` block: its namespace and part, where it starts, and its text as formats
+    write it."""
     namespace: str
     line_id: LineIdentifier
     text: str
     last_line: int                    # the line number of its #endverbatim
+    part: str | None = None           # None when the block names no part
 
 
 class ExportModel:
@@ -121,8 +124,9 @@ class ExportModel:
         """Every ``#verbatim`` block, in source order (included files where they are included)."""
         return list(self._verbatim_blocks)
 
-    def verbatim_for(self, namespace: str) -> list[VerbatimBlock]:
-        return [block for block in self._verbatim_blocks if block.namespace == namespace]
+    def verbatim_for(self, namespace: str, part: str | None = None) -> list[VerbatimBlock]:
+        """The blocks of one namespace that name ``part`` (``None``: the blocks that name no part)."""
+        return [block for block in self._verbatim_blocks if block.namespace == namespace and block.part == part]
 
     @property
     def symbols(self) -> list[AnnotatedSymbol]:
@@ -158,7 +162,7 @@ class ExportModel:
         for index, line in enumerate(line_objects):
             if isinstance(line, VerbatimLine) and line.compilable:
                 last_line = line.line_id.line_num + len(line.text_lines) + 1
-                blocks.append(VerbatimBlock(line.namespace, line.line_id, line.text, last_line))
+                blocks.append(VerbatimBlock(line.namespace, line.line_id, line.text, last_line, line.part))
                 continue
             if not isinstance(line, LabelLine) or not line.compilable or not line.annotations:
                 continue
@@ -184,8 +188,8 @@ class ExportModel:
     def _data_run(line_objects: list[LineObject], label_index: int) -> tuple[LineWithWords, ...]:
         """The data directives that follow a label without a break.
 
-        Blank lines never become line objects, and comment-only lines are skipped.
-        Anything else ends the run, including the end of the label's file.
+        Blank lines never become line objects, and comment-only lines and the later lines of a
+        continued line are skipped. Anything else ends the run, including the end of the label's file.
         """
         label = line_objects[label_index]
         run: list[LineWithWords] = []
@@ -196,6 +200,8 @@ class ExportModel:
                 run.append(line)
                 continue
             if type(line) is LineObject and line.compilable and line.instruction == '':
+                continue
+            if isinstance(line, ContinuationLine) and line.compilable:
                 continue
             break
         return tuple(run)

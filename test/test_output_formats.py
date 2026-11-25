@@ -1459,6 +1459,47 @@ def test_export_comments_are_not_for_tables(tmp_path):
     assert f'{SECTION}.comment_field is only used with lines_key and lines, not with columns' in message
 
 
+def _gap_annotation() -> dict:
+    annotation = _described_annotation()
+    annotation['arguments']['gap'] = {'type': 'boolean'}
+    return annotation
+
+
+def test_blank_line_after_an_export_that_sets_the_argument(tmp_path):
+    source = '\n'.join([
+        '#annotate xmin kind=var type=char description="first" gap',
+        'a1: .byte 0',
+        '#annotate xmin kind=var type=char',
+        'a2: .byte 0',
+        '#annotate xmin kind=var type=char gap',
+        'a3: .byte 0',
+        '#annotate xmin kind=var type=char gap',   # the last export: no blank line after it
+        'a4: .byte 0',
+    ]) + '\n'
+    config = _write_config(
+        tmp_path, _comment_format(blank_line_after='gap'), annotations={'xmin': _gap_annotation()},
+    )
+    output, warnings = _run(tmp_path, source, config)
+    assert warnings == ''
+    assert output.split('\n')[-8:] == [
+        '# first', 'char a1 @ 0x0000', '', 'char a2 @ 0x0001', 'char a3 @ 0x0002', '', 'char a4 @ 0x0003', '',
+    ]
+
+
+@pytest.mark.parametrize(('option', 'expected'), [
+    ('gpa', f"{SECTION}.blank_line_after must name a boolean argument of annotation 'xmin'"),
+    ('description', f"{SECTION}.blank_line_after must name a boolean argument of annotation 'xmin'"),
+])
+def test_blank_line_after_config_errors(tmp_path, option, expected):
+    output_format = _comment_format(blank_line_after=option)
+    assert expected in _config_error(tmp_path, output_format, annotations={'xmin': _gap_annotation()})
+
+
+def test_blank_line_after_is_not_for_tables(tmp_path):
+    message = _config_error(tmp_path, _columns_with(blank_line_after='gap'), annotations={'xmin': _gap_annotation()})
+    assert f'{SECTION}.blank_line_after is only used with lines_key and lines, not with columns' in message
+
+
 def test_the_xmin_examples_in_the_config_assemble(tmp_path):
     """Every example in the xmin annotation's documentation compiles with -t xmin, with no warnings."""
     from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
@@ -1469,7 +1510,9 @@ def test_the_xmin_examples_in_the_config_assemble(tmp_path):
     for example in examples:
         output, warnings = _run(tmp_path, example['code'] + '\n', config)
         assert warnings == '', example['title']
-        assert output.strip().endswith(('int pr @ 0x0117', 'char banner[5] @ 0x0108', 'int kPort := 0xfec0'))
+        declarations = output.split('\n\nasm\n')[0]
+        assert declarations.endswith(('int pr @ 0x0117', 'char banner[5] @ 0x0108', 'int kPort := 0xfec0'))
+        assert output.endswith(':00000001FF\n')
 
 
 def test_xmin_addr_constant_is_a_16_bit_address(tmp_path):
@@ -1484,7 +1527,7 @@ def test_xmin_addr_constant_is_a_16_bit_address(tmp_path):
     )
     output, warnings = _run(tmp_path, source, config)
     assert warnings == ''
-    assert output.strip().split('\n')[-3:] == ['int Go := 0x0100', 'int kReg := 0xfec0', 'int LIMIT := -5']
+    assert output.split('\n')[1:4] == ['int Go := 0x0100', 'int kReg := 0xfec0', 'int LIMIT := -5']
     listing, _ = _run(tmp_path, source, config, fmt='xmin_listing')
     assert listing.strip().split('\n')[-3:] == [
         'Go     addr                        0x0100',

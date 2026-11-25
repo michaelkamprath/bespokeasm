@@ -258,6 +258,14 @@ class MarkdownGenerator:
             verbatim = f"Accepts `#verbatim {namespace['name']}` text blocks"
             description = namespace['verbatim'].get('description')
             parts.append(f'{verbatim}: {description}' if description else f'{verbatim}.')
+            verbatim_parts = namespace['verbatim'].get('parts') or []
+            if verbatim_parts:
+                parts.append('A block can name a part, which an output format places separately:')
+                parts.append('\n'.join(
+                    f"- `#verbatim {namespace['name']} {part['name']}`"
+                    + (f": {part['description']}" if part.get('description') else '')
+                    for part in verbatim_parts
+                ))
         rows = []
         for argument in namespace['arguments']:
             rows.append([

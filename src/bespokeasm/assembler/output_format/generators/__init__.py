@@ -242,11 +242,12 @@ class ByteLinesGenerator(Generator):
 
 
 class VerbatimGenerator(Generator):
-    """Every ``#verbatim`` block of one annotation namespace, in source order, joined by
-    ``separator`` (default: one blank line between blocks)."""
+    """Every ``#verbatim`` block of one annotation namespace and part (without ``part``: the
+    blocks that name no part), in source order, joined by ``separator`` (default: one blank
+    line between blocks)."""
     name = 'verbatim'
     required_options = frozenset({'namespace'})
-    optional_options = frozenset({'separator'})
+    optional_options = frozenset({'part', 'separator'})
 
     def configure(self, options: dict[str, Any]) -> None:
         namespace = options['namespace']
@@ -259,12 +260,17 @@ class VerbatimGenerator(Generator):
             )
             self.error('namespace', f"names '{namespace}', which does not accept #verbatim blocks; {which}")
         self.verbatim_namespace = namespace
+        self.part = options.get('part')
+        if self.part is not None and self.part not in spec.verbatim_part_names:
+            parts = spec.verbatim_part_names
+            which = f'its parts are: {", ".join(parts)}' if parts else 'it declares no parts'
+            self.error('part', f"names '{self.part}', which is not a #verbatim part of annotation '{namespace}'; {which}")
         self.separator = options.get('separator', '\n\n')
         if not isinstance(self.separator, str):
             self.error('separator', 'must be a string, such as "\\n\\n"')
 
     def render(self, context: RenderContext) -> str:
-        texts = [block.text for block in context.export_model.verbatim_for(self.verbatim_namespace) if block.text]
+        texts = [block.text for block in context.export_model.verbatim_for(self.verbatim_namespace, self.part) if block.text]
         return self.separator.join(texts)
 
 
