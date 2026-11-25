@@ -245,8 +245,62 @@ def _mask_verbatim_blocks(lines):
     return masked
 
 
+ANNOTATE_START_PATTERN = re.compile(r'^\s*#annotate(?=\s|$)')
+
+
+def _continues_line(text):
+    """Whether a line continues onto the next: it ends with a `\\` that is outside quotes, and
+    it has no `;` comment (a continued line cannot carry one), as the assembler reads it."""
+    quote = None
+    escaped = False
+    for character in text:
+        if quote:
+            if escaped:
+                escaped = False
+            elif character == '\\':
+                escaped = True
+            elif character == quote:
+                quote = None
+        elif character in ('"', "'"):
+            quote = character
+        elif character == ';':
+            return False
+    return quote is None and text.rstrip().endswith('\\')
+
+
+def _annotate_continuation_start(get_line, row):
+    """For a later line of a continued #annotate, the row of its #annotate line; otherwise -1."""
+    k = row - 1
+    while k >= 0 and _continues_line(get_line(k)):
+        if ANNOTATE_START_PATTERN.match(get_line(k)):
+            return k
+        k -= 1
+    return -1
+
+
+def _mask_annotate_continuations(lines):
+    """The later lines of a continued #annotate hold arguments, not assembly: replace them with
+    spaces, so `description="..."` on its own line is not read as a constant definition."""
+    masked = []
+    continuing = False
+    for text in lines:
+        if continuing:
+            continuing = _continues_line(text)
+            masked.append(' ' * len(text))
+            continue
+        continuing = bool(ANNOTATE_START_PATTERN.match(text)) and _continues_line(text)
+        masked.append(text)
+    return masked
+
+
+def _mask_non_assembly_text(lines):
+    """The lines symbol lookups and the semantic pass read: #verbatim block text and #annotate
+    continuation lines become spaces, and every line keeps its length."""
+    return _mask_annotate_continuations(_mask_verbatim_blocks(lines))
+
+
 def _collect_lines(view):
-    return _mask_verbatim_blocks(view.substr(sublime.Region(0, view.size())).splitlines())
+    return _mask_non_assembly_text(view.substr(sublime.Region(0, view.size())).splitlines())
 
 
 def _collect_included_files(lines, base_dir, visited=None):
@@ -264,7 +318,7 @@ def _collect_included_files(lines, base_dir, visited=None):
             continue
         try:
             with open(resolved, encoding='utf-8') as handle:
-                include_lines = _mask_verbatim_blocks(handle.read().splitlines())
+                include_lines = _mask_non_assembly_text(handle.read().splitlines())
         except OSError:
             continue
         visited.add(resolved)
@@ -601,20 +655,24 @@ def _get_directive_at_point(view, point):
 
 
 ANNOTATE_LINE_PATTERN = re.compile(r'^\s*#annotate\s+([A-Za-z][A-Za-z0-9_]*)')
-VERBATIM_LINE_PATTERN = re.compile(r'^\s*#verbatim\s+([A-Za-z][A-Za-z0-9_]*)')
+VERBATIM_LINE_PATTERN = re.compile(r'^\s*#verbatim\s+([A-Za-z][A-Za-z0-9_]*)(?:\s+([A-Za-z][A-Za-z0-9_]*))?')
 ANNOTATION_WORD_PATTERN = re.compile(r'[A-Za-z_][A-Za-z0-9_]*')
 ANNOTATION_VALUE_OF_PATTERN = re.compile(r'([A-Za-z_][A-Za-z0-9_]*)\s*=\s*$')
 
 
 def _get_annotation_doc(line_text, column, annotation_docs):
     """Hover text for a word on an `#annotate` line: the namespace, an argument name, or a
-    value (which shows its argument). On a `#verbatim` line, the namespace. Strings and
-    comments are excluded."""
+    value (which shows its argument). On a `#verbatim` line, the namespace or the part. Strings
+    and comments are excluded."""
     verbatim = VERBATIM_LINE_PATTERN.match(line_text)
     if verbatim is not None:
         namespace_docs = annotation_docs.get(verbatim.group(1))
-        if namespace_docs and verbatim.start(1) <= column < verbatim.end(1):
+        if not namespace_docs:
+            return None
+        if verbatim.start(1) <= column < verbatim.end(1):
             return namespace_docs.get('doc')
+        if verbatim.group(2) and verbatim.start(2) <= column < verbatim.end(2):
+            return (namespace_docs.get('parts') or {}).get(verbatim.group(2))
         return None
     match = ANNOTATE_LINE_PATTERN.match(line_text)
     if match is None or not _is_offset_in_code_region(line_text, column):
@@ -1354,6 +1412,30 @@ class BespokeAsmHoverListener(sublime_plugin.EventListener):
         docs = _load_instruction_docs(view)
         hover_colors = _load_hover_colors(view)
         max_width = _get_hover_max_width(view, DEFAULT_HOVER_MAX_WIDTH)
+
+        # A later line of a continued #annotate holds only arguments of the namespace named on
+        # the #annotate line.
+        row = view.rowcol(point)[0]
+        annotate_row = _annotate_continuation_start(
+            lambda r: view.substr(view.line(view.text_point(r, 0))), row
+        )
+        if annotate_row >= 0:
+            header = ANNOTATE_LINE_PATTERN.match(view.substr(view.line(view.text_point(annotate_row, 0))))
+            if not (docs and hover_mnemonics and header):
+                return
+            line_region = view.line(point)
+            prefix = '#annotate {} '.format(header.group(1))
+            annotation_doc = _get_annotation_doc(
+                prefix + view.substr(line_region), len(prefix) + point - line_region.begin(),
+                docs.get('annotations', {}),
+            )
+            if annotation_doc:
+                popup_html = _render_markdown(
+                    annotation_doc, hover_colors,
+                    code_renderer=_annotation_code_renderer(hover_colors, docs.get('annotations', {})),
+                )
+                _show_popup(view, popup_html, point, max_width)
+            return
 
         # Check directives first (these have their own token patterns)
         if docs and hover_mnemonics:

@@ -239,6 +239,33 @@ def test_annotation_hover_text(model):
     assert '**Data size**' not in hover['xmin']['arguments']['note']
     assert 'Leaves the symbol\'s lines out of the listing' in hover['listing']['arguments']['hide']
 
+    # Namespaces without #verbatim parts have none to show.
+    assert hover['xmin']['parts'] == {} and hover['listing']['parts'] == {}
+
+
+def test_verbatim_part_hover_text():
+    """Each #verbatim part has hover text: its description, or a note that it is placed separately."""
+    with open(pkg_resources.files(config_files).joinpath('xmin', 'slu4-minimal-64x4.yaml')) as handle:
+        config = YAML(typ='safe').load(handle)
+    reporter = DiagnosticReporter()
+    parts = build_hover_docs(_model_from(config, reporter), 0)['annotations']['xmin']['parts']
+    assert list(parts) == ['header']
+    assert parts['header'].startswith('### `header` : `#verbatim xmin` Part\n\n---\n\nxmin comment lines')
+    del config['annotations']['xmin']['verbatim']['parts']['header']['documentation']
+    parts = build_hover_docs(_model_from(config, reporter), 0)['annotations']['xmin']['parts']
+    assert parts['header'].endswith('---\n\nAn output format places these blocks separately.')
+
+
+def _model_from(config: dict, reporter: DiagnosticReporter) -> AssemblerModel:
+    import tempfile
+    InstructionLine.reset_instruction_pattern_cache()
+    SymbolScope._global_scope = None
+    with tempfile.TemporaryDirectory() as directory:
+        path = f'{directory}/isa.json'
+        with open(path, 'w') as handle:
+            json.dump(config, handle)
+        return AssemblerModel(path, 0, reporter)
+
 
 def test_namespace_hover_lists_the_arguments(model):
     """A hover is too narrow for the arguments table, so the namespace hover lists one argument per

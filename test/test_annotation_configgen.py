@@ -704,7 +704,7 @@ def test_vscode_extension_ignores_verbatim_block_text(config_path, tmp_path):
     generator, destination = _generator(VSCodeConfigGenerator, config_path, tmp_path)
     generator.generate()
     extension = destination / 'extensions' / 'test-lang'
-    assert 'return includeFiles.maskVerbatimBlocks(lines);' in (extension / 'extension.js').read_text()
+    assert 'return includeFiles.maskNonAssemblyText(lines);' in (extension / 'extension.js').read_text()
     (tmp_path / 'inside.asm').write_text('INSIDE = 1\n')
     (tmp_path / 'lib.asm').write_text('\n'.join(VERBATIM_SOURCE) + '\n')
     probe = tmp_path / 'probe.js'
@@ -780,3 +780,111 @@ def test_hover_colors_are_the_syntax_colors():
         ('punctuation_preprocessor', SyntaxElement.PUNCTUATION_PREPROCESSOR),
     ):
         assert hover_colors[key] == DEFAULT_COLOR_SCHEME.get_color(element), key
+
+
+# A continued #annotate, then lines that look continued but are not: the `\` is in a comment, or
+# ends a data line, whose continuation is assembly.
+ANNOTATE_CONTINUED_SOURCE = [
+    '#annotate xmin kind=addr gap \\',
+    '    description="a; b" \\',          # a ; inside quotes is not a comment
+    '    note=x',
+    'UART = $fe00',
+    '#annotate xmin kind=addr ; a comment ends the line \\',
+    'NOTE = 2',
+    '.byte 1, \\',
+    '  2',
+]
+MASKED_ANNOTATE_CONTINUED_SOURCE = [
+    ANNOTATE_CONTINUED_SOURCE[0], ' ' * len(ANNOTATE_CONTINUED_SOURCE[1]), ' ' * len(ANNOTATE_CONTINUED_SOURCE[2]),
+    *ANNOTATE_CONTINUED_SOURCE[3:],
+]
+# The #annotate line each row continues, or -1.
+ANNOTATE_CONTINUATION_STARTS = [-1, 0, 0, -1, -1, -1, -1, -1]
+PART_HOVER_DOCS = {'xmin': {'doc': 'NAMESPACE', 'parts': {'header': 'PART'}, 'arguments': {'note': 'NOTE'}}}
+# (line, column, expected hover) on #verbatim lines, and on an #annotate continuation line read
+# with its #annotate line's namespace in front, as the plugins do.
+PART_HOVER_CASES = [
+    ('#verbatim xmin header', 11, 'NAMESPACE'),
+    ('#verbatim xmin header', 16, 'PART'),
+    ('#verbatim   xmin   header ; c', 20, 'PART'),
+    ('#verbatim xmin header', 3, None),
+    ('#verbatim xmin footer', 16, None),
+    ('#verbatim xmin', 11, 'NAMESPACE'),
+    ('#annotate xmin     note=x', 20, 'NOTE'),
+]
+
+
+def test_sublime_plugin_reads_annotate_continuations_as_arguments(config_path, tmp_path):
+    """The Sublime plugin's symbol lookups skip an #annotate's continuation lines, which hold
+    arguments, and its hover finds a #verbatim part and an argument on a continuation line."""
+    hover = _generated_sublime_plugin(config_path, tmp_path)
+    assert hover._mask_non_assembly_text(ANNOTATE_CONTINUED_SOURCE) == MASKED_ANNOTATE_CONTINUED_SOURCE
+    assert [
+        hover._annotate_continuation_start(lambda row: ANNOTATE_CONTINUED_SOURCE[row], row)
+        for row in range(len(ANNOTATE_CONTINUED_SOURCE))
+    ] == ANNOTATE_CONTINUATION_STARTS
+    constants = hover._build_definition_map(
+        [{'path': 'main.asm', 'lines': hover._mask_non_assembly_text(ANNOTATE_CONTINUED_SOURCE)}], 'constant',
+    )
+    assert sorted(constants) == ['NOTE', 'UART']
+    for line, column, expected in PART_HOVER_CASES:
+        assert hover._get_annotation_doc(line, column, PART_HOVER_DOCS) == expected, (line, column)
+
+
+ANNOTATE_NODE_PROBE = r"""
+const Module = require('module');
+const fs = require('fs');
+const path = require('path');
+const extensionDir = process.argv[2];
+const original = Module._load;
+Module._load = function (request, ...rest) {
+  if (request === 'vscode') {
+    return { SemanticTokensLegend: class { constructor(types) { this.types = types; } } };
+  }
+  return original.call(this, request, ...rest);
+};
+const includeFiles = require(path.join(extensionDir, 'include_files.js'));
+const constantsHover = require(path.join(extensionDir, 'constants_hover.js'));
+const source = fs.readFileSync(path.join(extensionDir, 'extension.js'), 'utf8')
+  + '\nmodule.exports.__probe = getAnnotationDocAtPosition;\n';
+const probePath = path.join(extensionDir, '__annotate_probe.js');
+fs.writeFileSync(probePath, source);
+const getDoc = require(probePath).__probe;
+const lines = JSON.parse(process.argv[3]);
+const cases = JSON.parse(process.argv[4]);
+const docs = JSON.parse(process.argv[5]);
+const masked = includeFiles.maskNonAssemblyText(lines);
+console.log(JSON.stringify({
+  masked,
+  starts: lines.map((_, row) => includeFiles.annotateContinuationStart((r) => lines[r], row)),
+  constants: [...constantsHover.buildConstantDefinitionMapFromFiles([{ lines: masked }]).keys()].sort(),
+  hovers: cases.map(([line, column]) => getDoc(line, column, docs)),
+}));
+"""
+
+
+def test_vscode_extension_reads_annotate_continuations_as_arguments(config_path, tmp_path):
+    """The VS Code extension's symbol lookups skip an #annotate's continuation lines, and its
+    hover finds a #verbatim part and an argument on a continuation line."""
+    import shutil
+    import subprocess
+    node = shutil.which('node')
+    if not node:
+        pytest.skip('node is not available to run the VS Code extension code')
+    generator, destination = _generator(VSCodeConfigGenerator, config_path, tmp_path)
+    generator.generate()
+    extension = destination / 'extensions' / 'test-lang'
+    probe = tmp_path / 'annotate_probe.js'
+    probe.write_text(ANNOTATE_NODE_PROBE)
+    result = subprocess.run(
+        [
+            node, str(probe), str(extension), json.dumps(ANNOTATE_CONTINUED_SOURCE),
+            json.dumps([case[:2] for case in PART_HOVER_CASES]), json.dumps(PART_HOVER_DOCS),
+        ],
+        capture_output=True, text=True, check=True,
+    )
+    found = json.loads(result.stdout)
+    assert found['masked'] == MASKED_ANNOTATE_CONTINUED_SOURCE
+    assert found['starts'] == ANNOTATE_CONTINUATION_STARTS
+    assert found['constants'] == ['NOTE', 'UART']
+    assert found['hovers'] == [case[2] for case in PART_HOVER_CASES]

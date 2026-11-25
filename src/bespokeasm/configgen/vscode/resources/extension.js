@@ -35,13 +35,14 @@ function getLanguageId(context) {
   return packageJson?.contributes?.languages?.[0]?.id || null;
 }
 
-// The document's lines, with #verbatim block text replaced by spaces (see maskVerbatimBlocks).
+// The document's lines, with #verbatim block text and #annotate continuation lines replaced
+// by spaces (see maskNonAssemblyText).
 function documentLines(document) {
   const lines = [];
   for (let i = 0; i < document.lineCount; i += 1) {
     lines.push(document.lineAt(i).text);
   }
-  return includeFiles.maskVerbatimBlocks(lines);
+  return includeFiles.maskNonAssemblyText(lines);
 }
 
 function buildLabelDefinitionMap(document) {
@@ -360,19 +361,27 @@ function getDirectiveAtPosition(lineText, character) {
 }
 
 const ANNOTATE_LINE_RE = /^\s*#annotate\s+([A-Za-z][A-Za-z0-9_]*)/;
-const VERBATIM_LINE_RE = /^\s*#verbatim\s+([A-Za-z][A-Za-z0-9_]*)/;
+const VERBATIM_LINE_RE = /^(\s*#verbatim\s+)([A-Za-z][A-Za-z0-9_]*)(?:(\s+)([A-Za-z][A-Za-z0-9_]*))?/;
 
 // Hover text for a word on an `#annotate` line: the namespace, an argument name, or a
-// value (which shows its argument). On a `#verbatim` line, the namespace. Strings and
-// comments are excluded.
+// value (which shows its argument). On a `#verbatim` line, the namespace or the part. Strings
+// and comments are excluded.
 function getAnnotationDocAtPosition(lineText, character, annotationDocs) {
   const verbatim = VERBATIM_LINE_RE.exec(lineText);
   if (verbatim) {
-    const namespaceStart = verbatim[0].length - verbatim[1].length;
-    const namespaceDocs = annotationDocs[verbatim[1]];
-    return namespaceDocs && character >= namespaceStart && character < verbatim[0].length
-      ? namespaceDocs.doc
-      : null;
+    const namespaceDocs = annotationDocs[verbatim[2]];
+    if (!namespaceDocs) {
+      return null;
+    }
+    const namespaceStart = verbatim[1].length;
+    if (character >= namespaceStart && character < namespaceStart + verbatim[2].length) {
+      return namespaceDocs.doc;
+    }
+    const partStart = namespaceStart + verbatim[2].length + (verbatim[3] || '').length;
+    if (verbatim[4] && character >= partStart && character < partStart + verbatim[4].length) {
+      return (namespaceDocs.parts || {})[verbatim[4]] || null;
+    }
+    return null;
   }
   const match = ANNOTATE_LINE_RE.exec(lineText);
   if (!match || !isOffsetInCodeRegion(lineText, character)) {
@@ -595,6 +604,19 @@ function activate(context) {
     provideHover(document, position) {
       const hoverSettings = getHoverSettings(document, languageId);
       const lineText = document.lineAt(position.line).text;
+
+      // A later line of a continued #annotate holds only arguments of the namespace named on
+      // the #annotate line.
+      const annotateRow = includeFiles.annotateContinuationStart((row) => document.lineAt(row).text, position.line);
+      if (annotateRow >= 0) {
+        const header = ANNOTATE_LINE_RE.exec(document.lineAt(annotateRow).text);
+        if (!header || !hoverSettings.mnemonics) {
+          return null;
+        }
+        const prefix = `#annotate ${header[1]} `;
+        const annotationDoc = getAnnotationDocAtPosition(prefix + lineText, prefix.length + position.character, annotationDocs);
+        return annotationDoc ? new vscode.Hover(buildMarkdownHover(annotationDoc)) : null;
+      }
 
       // Check directives first
       if (hoverSettings.mnemonics) {
