@@ -15,7 +15,12 @@ class Preprocessor:
         isa_model=None,
         *,
         diagnostic_reporter: DiagnosticReporter,
+        output_format: str | None = None,
+        output_format_names: tuple[str, ...] | None = None,
     ) -> None:
+        """``output_format`` is the selected format's name, or None when no format is selected;
+        ``output_format_names`` are the ISA's format names, which ``__OUTPUT_FORMAT__`` is
+        compared with (None skips that check)."""
         if diagnostic_reporter is None:
             raise ValueError('DiagnosticReporter is required for Preprocessor')
         self._diagnostic_reporter = diagnostic_reporter
@@ -24,6 +29,12 @@ class Preprocessor:
 
         # Add built-in BespokeASM version symbol
         self._add_bespokeasm_version_symbol()
+        # The selected output format, or 0 when none is selected (format names start with a letter).
+        self._output_format_names = output_format_names
+        self._warned: set[tuple[str, str]] = set()
+        self._symbols['__OUTPUT_FORMAT__'] = PreprocessorSymbol(
+            '__OUTPUT_FORMAT__', output_format if output_format else '0',
+        )
 
         # Add built-in language version symbols if ISA model is provided
         if isa_model is not None:
@@ -50,6 +61,18 @@ class Preprocessor:
     @property
     def diagnostic_reporter(self):
         return self._diagnostic_reporter
+
+    @property
+    def output_format_names(self) -> tuple[str, ...] | None:
+        """The ISA's output format names, which ``__OUTPUT_FORMAT__`` is compared with."""
+        return self._output_format_names
+
+    def warn_once(self, line_id: LineIdentifier, message: str) -> None:
+        """Warn about a line once, although each assembly pass evaluates its conditions."""
+        key = (str(line_id), message)
+        if key not in self._warned:
+            self._warned.add(key)
+            self._diagnostic_reporter.warn(line_id, message)
 
     @property
     def default_numeric_base(self) -> str:

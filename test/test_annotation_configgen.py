@@ -888,3 +888,48 @@ def test_vscode_extension_reads_annotate_continuations_as_arguments(config_path,
     assert found['starts'] == ANNOTATE_CONTINUATION_STARTS
     assert found['constants'] == ['NOTE', 'UART']
     assert found['hovers'] == [case[2] for case in PART_HOVER_CASES]
+
+
+# Built-in symbols begin with two underscores, which no label can; hover must read the whole name.
+BUILTIN_SYMBOL_LINE = '#if __OUTPUT_FORMAT__ == xmin'
+BUILTIN_SYMBOL_COLUMNS = [4, 5, 12, 20]   # the first underscore, the second, the middle, the last
+
+
+class _LineRegion:
+    def __init__(self, text):
+        self.text = text
+
+    def begin(self):
+        return 0
+
+
+class _LineView:
+    """The parts of a Sublime view that the hover's token lookup reads, for a one-line file."""
+
+    def __init__(self, text):
+        self.text = text
+
+    def line(self, point):
+        return _LineRegion(self.text)
+
+    def substr(self, region):
+        return region.text
+
+
+def test_sublime_hover_reads_a_built_in_symbol_whole(config_path, tmp_path):
+    hover = _generated_sublime_plugin(config_path, tmp_path)
+    view = _LineView(BUILTIN_SYMBOL_LINE)
+    for column in BUILTIN_SYMBOL_COLUMNS:
+        assert hover._get_token_at_point(view, column) == '__OUTPUT_FORMAT__', column
+    assert hover._get_token_at_point(view, 26) == 'xmin'
+
+
+def test_vscode_hover_reads_a_built_in_symbol_whole(config_path, tmp_path):
+    generator, destination = _generator(VSCodeConfigGenerator, config_path, tmp_path)
+    generator.generate()
+    js = (destination / 'extensions' / 'test-lang' / 'extension.js').read_text()
+    word = re.compile(re.search(r'const wordPattern = /(.+?)/i;', js).group(1), re.IGNORECASE)
+    # As getWordRangeAtPosition does: the match that contains the position.
+    for column in BUILTIN_SYMBOL_COLUMNS:
+        (found,) = (m.group(0) for m in word.finditer(BUILTIN_SYMBOL_LINE) if m.start() <= column <= m.end())
+        assert found == '__OUTPUT_FORMAT__', column

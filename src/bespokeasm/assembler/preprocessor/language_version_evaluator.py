@@ -26,11 +26,14 @@ class LanguageVersionEvaluator:
         '__LANGUAGE_VERSION__',
         '__BESPOKEASM_VERSION__',
     }
+    # The selected output format's name, or 0 when none is selected. It compares as text.
+    OUTPUT_FORMAT_SYMBOL = '__OUTPUT_FORMAT__'
     LANGUAGE_VERSION_SYMBOLS = {
         '__LANGUAGE_NAME__',
         '__LANGUAGE_VERSION_MAJOR__',
         '__LANGUAGE_VERSION_MINOR__',
         '__LANGUAGE_VERSION_PATCH__',
+        OUTPUT_FORMAT_SYMBOL,
     }.union(SEMANTIC_VERSION_SYMBOLS)
 
     @classmethod
@@ -234,6 +237,11 @@ class LanguageVersionEvaluator:
                     f'Version symbol {symbol} is not defined',
                 )
 
+        if cls.OUTPUT_FORMAT_SYMBOL in (lhs_expr, rhs_expr):
+            other = rhs_expr if lhs_expr == cls.OUTPUT_FORMAT_SYMBOL else lhs_expr
+            cls._check_output_format_name(other, preprocessor, line_id)
+            return cls._compare(lhs_resolved.strip('\'"'), operator, rhs_resolved.strip('\'"'), line_id)
+
         if (
             lhs_expr in cls.SEMANTIC_VERSION_SYMBOLS
             or rhs_expr in cls.SEMANTIC_VERSION_SYMBOLS
@@ -271,6 +279,19 @@ class LanguageVersionEvaluator:
             rhs_value = rhs_resolved
 
         return cls._compare(lhs_value, operator, rhs_value, line_id)
+
+    @classmethod
+    def _check_output_format_name(cls, name: str, preprocessor, line_id: LineIdentifier) -> None:
+        """Warn when ``__OUTPUT_FORMAT__`` is compared with a name that is not one of the ISA's
+        formats: the comparison can never be true, so the name is most likely a typo."""
+        known = preprocessor.output_format_names
+        name = name.strip().strip('\'"')
+        if known is None or name == '0' or name in known or name in cls.LANGUAGE_VERSION_SYMBOLS:
+            return
+        preprocessor.warn_once(
+            line_id,
+            f'"{name}" is not an output format of this instruction set; its formats are: {", ".join(known)}',
+        )
 
     @staticmethod
     def _compare(lhs_value, operator: str, rhs_value, line_id: LineIdentifier) -> bool:

@@ -599,7 +599,9 @@ function activate(context) {
   const registerDocs = hoverDocs.registers || {};
   const exprFuncDocs = hoverDocs.expression_functions || {};
   const annotationDocs = hoverDocs.annotations || {};
-  const wordPattern = /(?:##MNEMONIC_PATTERN##|##LABEL_PATTERN##)/i;
+  // Built-in preprocessor symbols such as __OUTPUT_FORMAT__ begin with two underscores, which
+  // no label can, so the label pattern alone would read one as _OUTPUT_FORMAT__.
+  const wordPattern = /(?:__[A-Za-z0-9_]+__|##MNEMONIC_PATTERN##|##LABEL_PATTERN##)/i;
   const provider = {
     provideHover(document, position) {
       const hoverSettings = getHoverSettings(document, languageId);

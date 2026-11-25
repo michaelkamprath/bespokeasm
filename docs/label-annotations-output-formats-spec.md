@@ -310,7 +310,7 @@ Rules:
 4. When no format that declares or shares a name is selected, a reference to that name is an error that names the formats: `unknown memory zone "XMIN_USER_CODE"; it is defined only by output formats 'xmin', 'xmin_listing' (compile with -p and -t naming one of them)`. With one format, the note ends `(compile with -p -t xmin)`. A constant gives the same note after `unknown label "XMIN_DEBUG"; it is a constant defined only by ...`. Source may define a label of the same name when no such format is selected; when one is, the name is defined twice, as with any predefined name.
 5. A shared or format-level name may not reuse a top-level predefined name (a memory zone, or a constant or data label), nor name the `GLOBAL` zone, nor appear twice in one list. Each is a config error.
 6. One compilation writes one format. To get the `.xmin` file and the listing, compile twice. If the two formats override a constant differently and the source tests it, the two compiles can produce different bytes. The framework does not check this; keeping them the same is the programmer's job.
-7. Config formats add to the built-in formats; they do not replace them. A config that declares formats can still use every built-in format (intel\_hex, hex, listing, symbols). But a built-in format does not select a format's shared set, so source that uses XMIN\_USER\_CODE fails with -t listing. Use -t xmin\_listing for that source. The same is true of a compile with no -p, and of -p with no -t, because the default format is listing.
+7. Config formats add to the built-in formats; they do not replace them. A config that declares formats can still use every built-in format (intel\_hex, hex, listing, symbols). But a built-in format does not select a format's shared set, so source that uses XMIN\_USER\_CODE fails with -t listing. Use -t xmin\_listing for that source. The same is true of a compile with no -p, and of -p with no -t, because the default format is listing. Source that should also build without the format selects its lines with `__OUTPUT_FORMAT__` (see "Selecting source by format").
 8. In the worked example below, `XMIN_USER_CODE` comes from the shared set, so the source needs no include file for it.
 
 For the worked example below, `-t xmin_listing` ends with this table, sized by the column rules above:
@@ -324,6 +324,30 @@ pb      var    int   0x0115   2
 pr      var    int   0x0117   2
 MAXARG  const  int                  1000
 ```
+
+## Selecting source by format: `__OUTPUT_FORMAT__`
+
+A format's zones and constants exist only while it is selected, so source that uses them cannot be assembled for any other output, such as a ROM image of the same routines. The built-in preprocessor symbol `__OUTPUT_FORMAT__` names the selected format, so `#if` can choose the lines for each build:
+
+```asm
+#if __OUTPUT_FORMAT__ == xmin
+.memzone XMIN_USER_CODE
+#elif __OUTPUT_FORMAT__ == xmin_listing
+.memzone XMIN_USER_CODE
+#else
+.org $8000                      ; any other build: a binary alone, or -t listing or -t intel_hex
+#endif
+```
+
+Rules:
+
+1. The value is the selected format's name: the `-t` value, spelled as the format is named, so `-t LISTING` gives `listing`. With `-p` and no `-t` it is `listing`, the default format. Without `-p` no format is selected (including when `-t` is given without `-p`), and the value is `0`. Format names start with a letter, so `0` is never a format's name.
+2. The symbol is always defined, like `__FLOW_COUNTERS_AVAILABLE__`, so `#ifdef __OUTPUT_FORMAT__` is always true. Test it with `#if`: `#if __OUTPUT_FORMAT__` alone is true when a format is selected, and `#if __OUTPUT_FORMAT__ == 0` when none is.
+3. It compares as text, with `==` or `!=`, in one comparison per `#if` or `#elif`, as the other built-in symbols do: `&&`, `||` and grouping are not allowed. The name may be quoted (`"xmin"`).
+4. Comparing it with a name that is not one of this ISA's formats (a built-in format or one the config defines), nor `0`, is a **warning**, since the comparison can never be true and is most likely a typo: `"xmn" is not an output format of this instruction set; its formats are: listing, hex, intel_hex, symbols, xmin, xmin_listing`. Names match exactly, so `LISTING` gets the warning too.
+5. `#require __OUTPUT_FORMAT__ == xmin` makes a format a requirement. When it is not met, the error names the selected format: `output format requirement not met: __OUTPUT_FORMAT__ == xmin (the selected format is listing)`, or `(no output format is selected)` without `-p`. A file that both `xmin` and `xmin_listing` can build should use `#if` instead, since one `#require` compares with one name.
+6. Like the other built-in symbols, it is substituted wherever it appears in source, strings included, so `.cstr "__OUTPUT_FORMAT__"` emits the format's name. Generated editor syntax highlights it with them, and hover shows its documentation.
+7. The symbol only selects source. A program that does not test it assembles to the same bytes as before.
 
 ## Worked example: the Minimal 64x4 `xmin` format
 
@@ -678,6 +702,8 @@ Every problem is an error with the source line, not a warning, unless marked oth
 | Two exports with one name (`unique: name`) | `export name 'pa' is used by 'pa' and '_pa'` |
 | Format used with no matching annotations | **warning**: `format 'xmin': no symbols carry an 'xmin' annotation` |
 | `-t` is given but `-p` is absent (any format, built-in or config) | **warning**: `-t xmin has no effect without -p; output format 'xmin' is not selected` |
+| `__OUTPUT_FORMAT__` compared with a name that is not one of the ISA's formats | **warning**: `"xmn" is not an output format of this instruction set; its formats are: ...` |
+| `#require __OUTPUT_FORMAT__ == xmin` with another format selected | `output format requirement not met: __OUTPUT_FORMAT__ == xmin (the selected format is listing)` |
 | Config: unknown template field, missing `lines` entry, namespace named `listing`, format named like a built-in | config error naming the key path |
 
 Errors from the later sections:
@@ -750,6 +776,7 @@ As built:
 10. Stretch, done: built-in formats shipped as definitions (`hex` and `intel_hex`).
 11. Stretch, done: continuing an `#annotate` line, with adjacent quoted strings joined (see "Stretch: continuing an `#annotate` line").
 12. Stretch, done: verbatim text blocks (see "Stretch: verbatim text blocks").
+13. The `__OUTPUT_FORMAT__` preprocessor symbol (see "Selecting source by format").
 
 The worked example's golden test follows the same rule as the minhex and KENBAK-1 tests: copy `addw.min64x4` and the Minimal 64x4 config, with the xmin annotation and format, into a fixture directory under `test/`.
 

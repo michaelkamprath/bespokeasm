@@ -12,6 +12,12 @@ import sublime_plugin
 
 
 WORD_PATTERN = re.compile(r'(?:##MNEMONIC_PATTERN##|##LABEL_PATTERN##)', re.IGNORECASE)
+# Built-in preprocessor symbols such as __OUTPUT_FORMAT__ begin with two underscores, which no
+# label can, so the label pattern alone would read one as _OUTPUT_FORMAT__.
+BUILTIN_SYMBOL_PATTERN = r'__[A-Za-z0-9_]+__'
+HOVER_WORD_PATTERN = re.compile(
+    r'(?:' + BUILTIN_SYMBOL_PATTERN + r'|##MNEMONIC_PATTERN##|##LABEL_PATTERN##)', re.IGNORECASE
+)
 LABEL_DEFINITION_PATTERN = re.compile(r'^\s*(?P<name>##LABEL_PATTERN##)\s*:(?!=)')
 OPERAND_LABEL_DEFINITION_PATTERN = re.compile(r'@(?P<name>##LABEL_PATTERN##):\s*')
 CONSTANT_DEFINITION_PATTERN = re.compile(r'^\s*(?P<name>##CONSTANT_PATTERN##)\s*(?:=|\bEQU\b)')
@@ -468,7 +474,7 @@ def _get_token_at_point(view, point):
     line_region = view.line(point)
     line_text = view.substr(line_region)
     column = point - line_region.begin()
-    for match in WORD_PATTERN.finditer(line_text):
+    for match in HOVER_WORD_PATTERN.finditer(line_text):
         if match.start() <= column <= match.end():
             return match.group(0)
     return None
