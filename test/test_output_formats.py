@@ -9,8 +9,13 @@ import pytest
 from bespokeasm import BESPOKEASM_VERSION_STR
 from bespokeasm.assembler.engine import Assembler
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
-from bespokeasm.assembler.output_format.builtin import BUILTIN_FORMAT_NAMES
+from bespokeasm.assembler.output_format.builtin import builtin_format_names
+from bespokeasm.assembler.output_format.builtin import builtin_formats
+from bespokeasm.assembler.output_format.builtin import BuiltinFormatError
+from bespokeasm.assembler.output_format.builtin import load_builtin_definitions
+from bespokeasm.assembler.output_format.builtin import PrinterFormat
 from bespokeasm.assembler.output_format.columns import ColumnTable
+from bespokeasm.assembler.output_format.defined import DefinedFormat
 from bespokeasm.assembler.output_format.template import NO_FORMAT_SPEC
 from bespokeasm.assembler.output_format.template import Template
 from bespokeasm.assembler.symbol_scope import SymbolScope
@@ -448,7 +453,7 @@ def test_config_warnings(tmp_path):
 # ---- -t names and completion -------------------------------------------------------------
 
 def test_cli_builtin_names_match_the_registry():
-    assert set(BUILTIN_OUTPUT_FORMAT_NAMES) == set(BUILTIN_FORMAT_NAMES)
+    assert BUILTIN_OUTPUT_FORMAT_NAMES == builtin_format_names()
 
 
 def test_config_output_format_names_from_yaml(tmp_path):
@@ -988,6 +993,23 @@ def test_column_chooses_its_field_by_an_argument(tmp_path):
     ]
 
 
+def test_column_field_list_shows_the_first_field_with_a_value(tmp_path):
+    columns = [
+        {'field': 'name', 'header': 'name'},
+        {'field': ['value', 'address'], 'header': 'number', 'format': '#06x'},
+        {'header': 'addr', 'by': 'kind', 'cases': {'addr': {'field': ['address', 'value']}}},
+    ]
+    output, _ = _run(tmp_path, SOURCE, _write_config(tmp_path, _columns_with(columns)))
+    assert output.split('\n') == [
+        'name    number  addr',
+        'AddW    0x0100  256',
+        'pa      0x0103',
+        'buf     0x0105',
+        'MAXARG  0x00c8',
+        '',
+    ]
+
+
 def test_column_chooses_by_the_source_value_before_value_map(tmp_path):
     output_format = _columns_with(BY_KIND_COLUMNS, value_map={'kind': {'addr': 'int'}})
     output_format['xmin']['sections']['symbols']['columns'].append({'field': 'kind', 'header': 'kind'})
@@ -1030,6 +1052,22 @@ def test_column_chooses_by_the_source_value_before_value_map(tmp_path):
     ),
 ])
 def test_by_column_config_errors(tmp_path, column, expected):
+    assert expected in _config_error(tmp_path, _columns_with([column]))
+
+
+@pytest.mark.parametrize(('column', 'expected'), [
+    ({'field': []}, f'{SECTION}.columns[0].field must be a field name, or a list of field names'),
+    ({'field': ['value', 'adress']}, f'{SECTION}.columns[0].field names unknown field "adress"'),
+    (
+        {'field': ['value', 'name'], 'format': '04x'},
+        f'{SECTION}.columns[0].format gives field "name" the format spec "04x"',
+    ),
+    (
+        {'by': 'kind', 'cases': {'var': {'field': ['address', 3]}}},
+        f'{SECTION}.columns[0].cases.var.field must be a field name, or a list of field names',
+    ),
+])
+def test_field_list_config_errors(tmp_path, column, expected):
     assert expected in _config_error(tmp_path, _columns_with([column]))
 
 
@@ -1421,6 +1459,47 @@ def test_export_comments_are_not_for_tables(tmp_path):
     assert f'{SECTION}.comment_field is only used with lines_key and lines, not with columns' in message
 
 
+def _gap_annotation() -> dict:
+    annotation = _described_annotation()
+    annotation['arguments']['gap'] = {'type': 'boolean'}
+    return annotation
+
+
+def test_blank_line_after_an_export_that_sets_the_argument(tmp_path):
+    source = '\n'.join([
+        '#annotate xmin kind=var type=char description="first" gap',
+        'a1: .byte 0',
+        '#annotate xmin kind=var type=char',
+        'a2: .byte 0',
+        '#annotate xmin kind=var type=char gap',
+        'a3: .byte 0',
+        '#annotate xmin kind=var type=char gap',   # the last export: no blank line after it
+        'a4: .byte 0',
+    ]) + '\n'
+    config = _write_config(
+        tmp_path, _comment_format(blank_line_after='gap'), annotations={'xmin': _gap_annotation()},
+    )
+    output, warnings = _run(tmp_path, source, config)
+    assert warnings == ''
+    assert output.split('\n')[-8:] == [
+        '# first', 'char a1 @ 0x0000', '', 'char a2 @ 0x0001', 'char a3 @ 0x0002', '', 'char a4 @ 0x0003', '',
+    ]
+
+
+@pytest.mark.parametrize(('option', 'expected'), [
+    ('gpa', f"{SECTION}.blank_line_after must name a boolean argument of annotation 'xmin'"),
+    ('description', f"{SECTION}.blank_line_after must name a boolean argument of annotation 'xmin'"),
+])
+def test_blank_line_after_config_errors(tmp_path, option, expected):
+    output_format = _comment_format(blank_line_after=option)
+    assert expected in _config_error(tmp_path, output_format, annotations={'xmin': _gap_annotation()})
+
+
+def test_blank_line_after_is_not_for_tables(tmp_path):
+    message = _config_error(tmp_path, _columns_with(blank_line_after='gap'), annotations={'xmin': _gap_annotation()})
+    assert f'{SECTION}.blank_line_after is only used with lines_key and lines, not with columns' in message
+
+
 def test_the_xmin_examples_in_the_config_assemble(tmp_path):
     """Every example in the xmin annotation's documentation compiles with -t xmin, with no warnings."""
     from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
@@ -1431,4 +1510,71 @@ def test_the_xmin_examples_in_the_config_assemble(tmp_path):
     for example in examples:
         output, warnings = _run(tmp_path, example['code'] + '\n', config)
         assert warnings == '', example['title']
-        assert output.strip().endswith(('int pr @ 0x0117', 'char banner[5] @ 0x0108', 'int MAXARG := 1000'))
+        declarations = output.split('\n\nasm\n')[0]
+        assert declarations.endswith(('int pr @ 0x0117', 'char banner[5] @ 0x0108', 'int kPort := 0xfec0'))
+        assert output.endswith(':00000001FF\n')
+
+
+def test_xmin_addr_constant_is_a_16_bit_address(tmp_path):
+    """In the Minimal 64x4 config, kind=addr on a constant writes its value in hex, as kind=addr
+    on a label writes its address, so an I/O register above 0x7fff exports as an xmin int."""
+    config = str(pkg_resources.files(config_files).joinpath('xmin', 'slu4-minimal-64x4.yaml'))
+    source = (
+        '.memzone XMIN_USER_CODE\n'
+        '#annotate xmin kind=addr name=Go\ngo: RTS\n'
+        '#annotate xmin kind=addr name=kReg\nREG = $FEC0\n'
+        '#annotate xmin kind=const type=int\nLIMIT = -5\n'
+    )
+    output, warnings = _run(tmp_path, source, config)
+    assert warnings == ''
+    assert output.split('\n')[1:4] == ['int Go := 0x0100', 'int kReg := 0xfec0', 'int LIMIT := -5']
+    listing, _ = _run(tmp_path, source, config, fmt='xmin_listing')
+    assert listing.strip().split('\n')[-3:] == [
+        'Go     addr                        0x0100',
+        'kReg   addr                        0xfec0',
+        'LIMIT  const  int                  -5',
+    ]
+    message = _error(tmp_path, '#annotate xmin kind=addr name=kReg\nREG = $10000\n', config)
+    assert "'REG' value 65536 is outside 0 to 65535, the range of kind=addr" in message
+
+
+# ---- built-in format definitions -----------------------------------------------------------
+
+def test_builtin_formats_are_defined_or_python():
+    formats = builtin_formats()
+    assert tuple(formats) == ('listing', 'hex', 'intel_hex', 'symbols')
+    for name in ('hex', 'intel_hex'):
+        assert isinstance(formats[name], DefinedFormat)
+        assert formats[name].is_builtin and formats[name].requires_word_size == 8
+        assert formats[name].description
+    for name in ('listing', 'symbols'):
+        assert isinstance(formats[name], PrinterFormat) and formats[name].is_builtin
+
+
+def test_defined_builtin_on_another_word_size(tmp_path):
+    config_path = _write_config(tmp_path, annotations={}, fixture='test_16bit_data_words.yaml')
+    message = _error(tmp_path, '; nothing to assemble\n', config_path, fmt='hex')
+    assert "output format 'hex' requires 8-bit words; this instruction set has 16-bit words" in message
+
+
+def test_hex_of_a_program_without_bytes_writes_nothing(tmp_path):
+    output, _ = _run(tmp_path, 'LIMIT = 3\n', _write_config(tmp_path), fmt='hex')
+    assert output == ''
+    output, _ = _run(tmp_path, 'LIMIT = 3\n', _write_config(tmp_path), fmt='intel_hex')
+    assert output == ':00000001FF\n'
+
+
+@pytest.mark.parametrize('definitions, problem', [
+    ('h:\n  template: "{code}"\n  sections:\n    code:\n      generator: hex\n',
+     "builtin.h.sections.code uses generator 'hex', which needs 8-bit words"),
+    ('h:\n  template: "{code}"\n  sections:\n    code:\n      generator: hexx\n',
+     "builtin.h.sections.code.generator names unknown generator 'hexx'"),
+    ('h:\n  template: "{code}"\n  sections:\n    code:\n      generator: exports\n      annotation: xmin\n'
+     '      lines_key: kind\n      lines: {}\n',
+     'builtin.h.sections.code.annotation'),
+    ('- h\n', 'must be a mapping of format names'),
+])
+def test_builtin_definition_problems_are_bugs(definitions, problem):
+    with pytest.raises(BuiltinFormatError) as exc_info:
+        load_builtin_definitions(definitions)
+    assert problem in str(exc_info.value)

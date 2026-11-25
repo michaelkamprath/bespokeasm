@@ -4,6 +4,23 @@ from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.docsgen import build_documentation_model
 from bespokeasm.docsgen import directive_docs
 from bespokeasm.docsgen.markdown_generator import MarkdownGenerator
+from packaging import version
+
+
+def _language_symbol_values(assembler_model: AssemblerModel) -> dict[str, str]:
+    """The values the language symbols take for this ISA, as the preprocessor sets them."""
+    values = {
+        '__LANGUAGE_NAME__': assembler_model.isa_name,
+        '__LANGUAGE_VERSION__': assembler_model.isa_version,
+    }
+    try:
+        parsed = version.parse(str(assembler_model.isa_version))
+        parts = (parsed.major, parsed.minor, parsed.micro)
+    except version.InvalidVersion:
+        parts = (0, 0, 0)
+    for suffix, part in zip(('MAJOR', 'MINOR', 'PATCH'), parts):
+        values[f'__LANGUAGE_VERSION_{suffix}__'] = str(part)
+    return values
 
 
 def build_hover_docs(assembler_model: AssemblerModel, verbose: int = 0) -> dict:
@@ -45,6 +62,8 @@ def build_hover_docs(assembler_model: AssemblerModel, verbose: int = 0) -> dict:
         preprocessor_docs['assert'] += directive_docs.FLOW_ASSERT_DOC_SUFFIX
     predefined_docs = markdown_generator.generate_predefined_hover_docs()
     predefined_docs['constants'].update(directive_docs.BUILTIN_CONSTANT_DOCS)
+    for name, value in _language_symbol_values(assembler_model).items():
+        predefined_docs['constants'][name] += f'\n\nFor this instruction set it is `{value}`.'
     return {
         'instructions': instruction_docs,
         'macros': macro_docs,

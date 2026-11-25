@@ -17,9 +17,13 @@
           "name": "keyword.control.preprocessor"
         }
       },
-      "end": "(?=(?:\\s*\\;|\\s*$))",
+      "end": "(?=\\s*\\;)|(?<![\\\\\\s])(?=\\s*$)",
       "name": "meta.annotation",
       "patterns": [
+        {
+          "match": "\\\\(?=\\s*$)",
+          "name": "punctuation.separator.continuation.annotation"
+        },
         {
           "match": "\\G(\\s+)(##ANNOTATION_NAMESPACES##)\\b",
           "captures": {
@@ -545,6 +549,9 @@
     "main": {
       "patterns": [
         {
+          "include": "#line_continuation"
+        },
+        {
           "include": "#counter_coordinates"
         },
         {
@@ -673,6 +680,10 @@
           "name": "constant.character.escape"
         }
       ]
+    },
+    "line_continuation": {
+      "match": "\\\\(?=\\s*$)",
+      "name": "punctuation.separator.continuation"
     }
   },
   "scopeName": "source.asm"

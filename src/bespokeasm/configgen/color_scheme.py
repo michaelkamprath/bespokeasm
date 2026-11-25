@@ -45,6 +45,9 @@ class SyntaxElement(Enum):
     # Comments
     COMMENT = 'comment'
 
+    # Text of a #verbatim block: not assembly, so one color throughout
+    VERBATIM_TEXT = 'verbatim_text'
+
     # Instructions and functions
     INSTRUCTION = 'instruction'
     MACRO = 'macro'
@@ -132,6 +135,9 @@ DEFAULT_COLOR_SCHEME = ColorScheme(
         # Comments
         SyntaxElement.COMMENT: '#568c3b',
 
+        # Text of a #verbatim block
+        SyntaxElement.VERBATIM_TEXT: '#9ecfc4',
+
         # Instructions and functions
         SyntaxElement.INSTRUCTION: '#ffa83f',
         SyntaxElement.MACRO: '#ff883f',  # Consistent across all editors
@@ -190,6 +196,15 @@ HOVER_COLOR_ELEMENT_MAP: dict[str, SyntaxElement] = {
     'register': SyntaxElement.REGISTER,
     'punctuation_preprocessor': SyntaxElement.PUNCTUATION_PREPROCESSOR,
     'operator': SyntaxElement.OPERATOR,
+    'annotation_namespace': SyntaxElement.ANNOTATION_NAMESPACE,
+    'annotation_argument': SyntaxElement.ANNOTATION_ARGUMENT,
+    'annotation_value': SyntaxElement.ANNOTATION_VALUE,
+    'string': SyntaxElement.STRING,
+    'punctuation_string': SyntaxElement.PUNCTUATION_STRING,
+    'comment': SyntaxElement.COMMENT,
+    'label': SyntaxElement.LABEL_DEFINITION,
+    'label_colon': SyntaxElement.PUNCTUATION_LABEL_COLON,
+    'verbatim_text': SyntaxElement.VERBATIM_TEXT,
 }
 
 

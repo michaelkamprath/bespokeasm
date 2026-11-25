@@ -7,6 +7,7 @@ version: 2
 
 contexts:
   main:
+    - include: line_continuation
     - include: counter_coordinates
     - include: directives
     - include: instructions
@@ -102,7 +103,10 @@ contexts:
     - match: (?<==)\s*([A-Za-z_][A-Za-z0-9_]*)\b
       captures:
         1: constant.other.annotation.value
-    - match: (?=(?:\s*\;|\s*$))
+    # A line ending in \ continues the directive onto the next line.
+    - match: \\(?=\s*$)
+      scope: punctuation.separator.continuation.annotation
+    - match: (?=\s*\;)|(?<![\\\s])(?=\s*$)
       pop: true
 
   flow_operators:
@@ -264,6 +268,7 @@ contexts:
       scope: storage.type
       push:
         - meta_scope: meta.directive
+        - include: line_continuation
         - include: pop_instruction_end
         - include: strings
         - include: numerical_expressions
@@ -286,6 +291,11 @@ contexts:
         - include: numerical_expressions
         - match: (?=(?:\s*\;|\s*$))
           pop: true
+
+  # A trailing \ continues a data directive or an embedded string on the next line.
+  line_continuation:
+    - match: \\(?=\s*$)
+      scope: punctuation.separator.continuation
 
   directives:
     - include: compiler_directives

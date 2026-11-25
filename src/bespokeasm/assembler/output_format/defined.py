@@ -14,7 +14,7 @@ from typing import Any
 from bespokeasm import BESPOKEASM_VERSION_STR
 from bespokeasm.assembler.output_format.base import OutputFormat
 from bespokeasm.assembler.output_format.base import RenderContext
-from bespokeasm.assembler.output_format.builtin import BUILTIN_FORMAT_NAMES
+from bespokeasm.assembler.output_format.builtin import builtin_format_names
 from bespokeasm.assembler.output_format.generators import build_generator
 from bespokeasm.assembler.output_format.generators import Generator
 from bespokeasm.assembler.output_format.generators import LoadEnvironment
@@ -40,8 +40,9 @@ class DefinedFormat(OutputFormat):
         sections: dict[str, Generator],
         shared: str | None = None,
         predefined: dict[str, list[dict]] | None = None,
+        is_builtin: bool = False,
     ) -> None:
-        super().__init__(name, description, requires_word_size, is_builtin=False)
+        super().__init__(name, description, requires_word_size, is_builtin=is_builtin)
         self._template = template
         self._sections = sections
         self._shared = shared
@@ -217,8 +218,17 @@ def _merge_sections(
     return merged
 
 
-def _load_format(name: str, config: Any, shared_sets: dict[str, dict], env: LoadEnvironment) -> DefinedFormat:
-    path = f'output_formats.{name}'
+def load_format_definition(
+    name: str,
+    config: Any,
+    env: LoadEnvironment,
+    shared_sets: dict[str, dict] | None = None,
+    root: str = 'output_formats',
+    is_builtin: bool = False,
+) -> DefinedFormat:
+    """Load one format definition. ``root`` is the config path of the section that holds it."""
+    shared_sets = shared_sets or {}
+    path = f'{root}.{name}'
     if not isinstance(config, dict):
         env.error(path, 'must be a mapping')
 
@@ -279,6 +289,7 @@ def _load_format(name: str, config: Any, shared_sets: dict[str, dict], env: Load
         generators,
         shared=shared,
         predefined={kind: [item.value for item in items] for kind, items in predefined.items()},
+        is_builtin=is_builtin,
     )
 
 
@@ -290,14 +301,14 @@ def load_output_formats(section: Any, env: LoadEnvironment, shared_section: Any 
     if not isinstance(section, dict):
         env.error('output_formats', 'must be a mapping of output format names')
     formats: dict[str, DefinedFormat] = {}
-    builtin_names = {name.lower() for name in BUILTIN_FORMAT_NAMES}
+    builtin_names = {name.lower() for name in builtin_format_names()}
     for name, config in section.items():
         path = f'output_formats.{name}'
         if not isinstance(name, str) or PATTERN_NAME.match(name) is None:
             env.error(path, 'is not a valid output format name (start with a letter; use letters, digits and "_")')
         if name.lower() in builtin_names:
             env.error(path, f"cannot be defined: '{name}' is a built-in output format")
-        formats[name] = _load_format(name, config, shared_sets, env)
+        formats[name] = load_format_definition(name, config, env, shared_sets)
     used_sets = {output_format.shared for output_format in formats.values()}
     for set_name in shared_sets:
         if set_name not in used_sets:

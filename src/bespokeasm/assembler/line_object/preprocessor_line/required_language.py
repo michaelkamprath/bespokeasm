@@ -159,6 +159,14 @@ class RequiredLanguageLine(PreprocessorLine):
 
             # If requirement not met, exit with error
             if not result:
+                if LanguageVersionEvaluator.OUTPUT_FORMAT_SYMBOL in expression:
+                    selected = preprocessor.get_symbol(LanguageVersionEvaluator.OUTPUT_FORMAT_SYMBOL).value
+                    isa_model.diagnostic_reporter.error(
+                        line_id,
+                        f'output format requirement not met: {expression} ('
+                        + (f'the selected format is {selected})' if selected != '0'
+                           else 'no output format is selected)'),
+                    )
                 isa_model.diagnostic_reporter.error(
                     line_id,
                     f'Language version requirement not met: {expression}',

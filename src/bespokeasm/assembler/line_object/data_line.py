@@ -11,6 +11,12 @@ from bespokeasm.expression import ExpressionUseContext
 from bespokeasm.expression import parse_expression
 
 
+# A quoted string, in either quote style. Strings separated only by spaces are one string.
+_STRING_PIECE = r'"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\''
+_ADJACENT_STRINGS_PATTERN = re.compile(rf'(?:{_STRING_PIECE})(?:\s*(?:{_STRING_PIECE}))*')
+_STRING_PIECE_PATTERN = re.compile(_STRING_PIECE)
+
+
 class DataLine(LineWithWords):
     PATTERN_DATA_DIRECTIVE = re.compile(
         r'^(\.byte|\.2byte|\.4byte|\.8byte|\.16byte|\.cstr|\.asciiz)\b\s*(.*)$',
@@ -166,10 +172,7 @@ class DataLine(LineWithWords):
 
     @staticmethod
     def _is_quoted_item(item_str: str) -> bool:
-        if len(item_str) < 2:
-            return False
-        quote = item_str[0]
-        return quote in ('"', '\'') and item_str[-1] == quote
+        return len(item_str) >= 2 and _ADJACENT_STRINGS_PATTERN.fullmatch(item_str) is not None
 
     @staticmethod
     def _extract_string_item(
@@ -180,7 +183,9 @@ class DataLine(LineWithWords):
     ) -> list[int]:
         if not DataLine._is_quoted_item(item_str):
             diagnostic_reporter.error(line_id, f'{directive_str} data directive used with non-string value')
-        converted_str = bytes(item_str[1:-1], 'utf-8').decode('unicode_escape')
+        # Adjacent strings ("ab" "cd") are one string; escapes apply within each.
+        pieces = [piece[1:-1] for piece in _STRING_PIECE_PATTERN.findall(item_str)]
+        converted_str = ''.join(bytes(piece, 'utf-8').decode('unicode_escape') for piece in pieces)
         return [ord(x) for x in converted_str]
 
     def __init__(

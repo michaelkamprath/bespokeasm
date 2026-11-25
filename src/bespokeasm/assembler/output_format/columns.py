@@ -5,7 +5,8 @@
 (default empty), ``format`` (a Python format spec), ``align`` (``left`` or ``right``, default
 ``left``) and ``min_width`` (default 0). Instead of ``field``, a column can choose its field per
 row: ``by`` names an enum argument and ``cases`` maps its values to ``{field, format}``; a row
-whose value has no case gets an empty cell. Every value is formatted first; each column is then as
+whose value has no case gets an empty cell. A ``field``, in a column or a case, may also be a list
+of fields: the cell shows the first of them that has a value. Every value is formatted first; each column is then as
 wide as the largest of its ``min_width``, its header and its widest value. Columns are joined
 with ``separator`` (default two spaces), the last column is not padded, and trailing spaces are
 removed from each line. A header row is written unless every header is empty, and ``header_rule``
@@ -34,25 +35,41 @@ ALIGNMENTS = ('left', 'right')
 DEFAULT_SEPARATOR = '  '
 
 
+def _first_value(row: dict[str, Any], fields: tuple[str, ...]) -> Any:
+    """The value of the first of these fields that has one, else None."""
+    return next((row[field] for field in fields if row.get(field) not in (None, '')), None)
+
+
 @dataclass(frozen=True)
 class Column:
-    field: str | None
+    field: tuple[str, ...] | None      # the cell shows the first of these fields that has a value
     header: str = ''
     format: str = ''
     align: str = 'left'
     min_width: int = 0
     by: str | None = None
-    cases: tuple[tuple[str, str, str], ...] = ()   # (value of ``by``, field, format spec)
+    cases: tuple[tuple[str, tuple[str, ...], str], ...] = ()   # (value of ``by``, fields, format spec)
 
     def cell(self, row: dict[str, Any], key: dict[str, Any]) -> str:
         """This column's text for a row; ``key`` holds the values ``by`` is looked up in."""
         if self.by is None:
-            return format_value(row.get(self.field), self.format)
+            return format_value(_first_value(row, self.field), self.format)
         selected = key.get(self.by)
-        for value, field, spec in self.cases:
+        for value, fields, spec in self.cases:
             if value == selected:
-                return format_value(row.get(field), spec)
+                return format_value(_first_value(row, fields), spec)
         return ''
+
+
+def _field_names(field: Any, path: str, fields: dict[str, Any], error: ColumnErrorFn) -> tuple[str, ...]:
+    """A ``field`` setting, a field name or a non-empty list of them, as a tuple of names."""
+    names = field if isinstance(field, list) else [field]
+    if not names or not all(isinstance(name, str) for name in names):
+        error(path, 'must be a field name, or a list of field names')
+    for name in names:
+        if name not in fields:
+            error(path, f'names unknown field "{name}"; known fields are {", ".join(sorted(fields))}')
+    return tuple(names)
 
 
 class ColumnTable:
@@ -74,9 +91,10 @@ class ColumnTable:
 
     @property
     def field_names(self) -> set[str]:
-        names = {column.field for column in self._columns if column.field is not None}
+        names = {field for column in self._columns for field in (column.field or ())}
         for column in self._columns:
-            names.update(field for _, field, _ in column.cases)
+            for _, fields, _ in column.cases:
+                names.update(fields)
         return names
 
     @classmethod
@@ -116,11 +134,11 @@ class ColumnTable:
                 error(path, 'has a field and also by or cases; give a field, or by and cases')
             if field is None and by is None:
                 error(path, 'needs a field, or by and cases')
-            cases: tuple[tuple[str, str, str], ...] = ()
+            cases: tuple[tuple[str, tuple[str, ...], str], ...] = ()
             if by is not None:
                 cases = cls._load_cases(entry, path, fields, enum_fields, error)
-            elif field not in fields:
-                error(f'{path}.field', f'names unknown field "{field}"; known fields are {", ".join(sorted(fields))}')
+            else:
+                field = _field_names(field, f'{path}.field', fields, error)
             header = entry.get('header', '')
             if not isinstance(header, str):
                 error(f'{path}.header', 'must be a string')
@@ -129,8 +147,8 @@ class ColumnTable:
                 error(f'{path}.format', 'is set per case when a column has by and cases')
             if not isinstance(spec, str):
                 error(f'{path}.format', 'must be a string with a format spec, such as "04x"')
-            if spec:
-                check_format_spec(field, fields[field], spec, lambda problem: error(f'{path}.format', problem))
+            for name in (field or ()) if spec else ():
+                check_format_spec(name, fields[name], spec, lambda problem: error(f'{path}.format', problem))
             align = entry.get('align', 'left')
             if align not in ALIGNMENTS:
                 error(f'{path}.align', f'must be left or right, not "{align}"')
@@ -168,7 +186,7 @@ class ColumnTable:
         fields: dict[str, Any],
         enum_fields: dict[str, tuple[str, ...]] | None,
         error: ColumnErrorFn,
-    ) -> tuple[tuple[str, str, str], ...]:
+    ) -> tuple[tuple[str, tuple[str, ...], str], ...]:
         by = entry['by']
         if enum_fields is None:
             error(f'{path}.by', 'is only available in exports tables, where a column can choose by an annotation argument')
@@ -189,15 +207,13 @@ class ColumnTable:
             for key in case:
                 if key not in CASE_KEYS:
                     error(f'{case_path}.{key}', f'is not a case setting; cases take {", ".join(CASE_KEYS)}')
-            field = case['field']
-            if field not in fields:
-                error(f'{case_path}.field', f'names unknown field "{field}"; known fields are {", ".join(sorted(fields))}')
+            names = _field_names(case['field'], f'{case_path}.field', fields, error)
             spec = case.get('format', '')
             if not isinstance(spec, str):
                 error(f'{case_path}.format', 'must be a string with a format spec, such as "04x"')
-            if spec:
-                check_format_spec(field, fields[field], spec, lambda problem: error(f'{case_path}.format', problem))
-            loaded.append((str(value), field, spec))
+            for name in names if spec else ():
+                check_format_spec(name, fields[name], spec, lambda problem: error(f'{case_path}.format', problem))
+            loaded.append((str(value), names, spec))
         return tuple(loaded)
 
     def render(self, rows: list[dict[str, Any]], keys: list[dict[str, Any]] | None = None) -> str:

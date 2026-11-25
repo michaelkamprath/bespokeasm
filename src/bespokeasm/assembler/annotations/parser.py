@@ -10,10 +10,11 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 DIRECTIVE = '#annotate'
 
 _NAMESPACE_PATTERN = re.compile(r'\s*([A-Za-z][A-Za-z0-9_]*)(?=\s|$)')
+_QUOTED_PATTERN = re.compile(r'"(?:[^"\\]|\\.)*"')
 _ARGUMENT_PATTERN = re.compile(
     r'''\s*(?P<key>[A-Za-z_][A-Za-z0-9_]*)
         (?:\s*=\s*(?P<value>
-            "(?:[^"\\]|\\.)*"            # quoted string
+            "(?:[^"\\]|\\.)*"(?:\s*"(?:[^"\\]|\\.)*")*   # quoted strings: adjacent ones are one value
           | '(?:[^'\\]|\\.)'             # character literal
           | [^\s"'=]+                    # symbol word or numeric literal
         ))?
@@ -52,7 +53,11 @@ def parse_annotation_directive(line_id: LineIdentifier, instruction: str) -> tup
         value = match.group('value')
         quoted = value is not None and value.startswith('"')
         if quoted:
-            value = _ESCAPE_PATTERN.sub(lambda escape: _ESCAPES.get(escape.group(1), escape.group(1)), value[1:-1])
+            # Adjacent strings ("ab" "cd") are one value; escapes apply within each string.
+            value = ''.join(
+                _ESCAPE_PATTERN.sub(lambda escape: _ESCAPES.get(escape.group(1), escape.group(1)), text[1:-1])
+                for text in _QUOTED_PATTERN.findall(value)
+            )
         arguments.append(RawArgument(match.group('key'), value, quoted))
         position = match.end()
     return namespace, arguments

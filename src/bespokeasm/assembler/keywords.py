@@ -12,7 +12,7 @@ BASE_PREPROCESSOR_DIRECTIVES_SET = {
     'define', 'if', 'elif', 'else', 'endif', 'ifdef', 'ifndef',
     'mute', 'unmute', 'emit',
     'create-scope', 'use-scope', 'deactivate-scope',
-    'annotate',
+    'annotate', 'verbatim', 'endverbatim',
 }
 
 FLOW_PREPROCESSOR_DIRECTIVES_SET = {
@@ -47,6 +47,7 @@ BUILTIN_CONSTANTS_SET = {
     '__LANGUAGE_VERSION_PATCH__',
     '__BESPOKEASM_VERSION__',
     '__FLOW_COUNTERS_AVAILABLE__',
+    '__OUTPUT_FORMAT__',
 }
 
 ASSEMBLER_KEYWORD_SET = (

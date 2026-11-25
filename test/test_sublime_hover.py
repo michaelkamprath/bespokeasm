@@ -836,3 +836,101 @@ def test_sublime_coordinate_scan_disabled_without_flow_operator():
     hover.COORD_DEFINITION_PATTERN = None
     entries = [{'path': '/tmp/test.asm', 'lines': ['.arg := COORDINATE(stack, 3)']}]
     assert hover._build_definition_map(entries, 'coordinate') == {}
+
+
+# --- Coloring hover code as the syntax colors it -------------------------------------------
+
+# A distinct color per role, so each expectation names exactly one role.
+ROLE_COLORS = {
+    key: f'#{index:06x}' for index, key in enumerate((
+        'instruction', 'parameter', 'number', 'punctuation', 'preprocessor', 'punctuation_preprocessor',
+        'directive', 'data_type', 'annotation_namespace', 'annotation_argument', 'annotation_value',
+        'string', 'punctuation_string', 'comment', 'label', 'label_colon', 'verbatim_text',
+    ), 1)
+}
+ROLE_NAMES = {color: key for key, color in ROLE_COLORS.items()}
+
+
+def _roles(rendered_html):
+    """Each colored piece of rendered code as (text, role)."""
+    return [
+        (text.replace('&nbsp;', ' ').replace('&quot;', '"').replace('&#x27;', "'"), ROLE_NAMES[color])
+        for color, text in re.findall(r'<span style="color:([^;]+);">([^<]*)</span>', rendered_html)
+    ]
+
+
+def test_sublime_code_block_colors_an_annotate_line_like_the_syntax():
+    hover = _load_sublime_hover_module()
+    line = '#annotate xmin kind=var name=AddW count=2 gap description="a; b"  ; why'
+    assert _roles(hover._render_code_block([line], ROLE_COLORS)) == [
+        ('#', 'punctuation_preprocessor'), ('annotate', 'preprocessor'), ('xmin', 'annotation_namespace'),
+        ('kind', 'annotation_argument'), ('=', 'punctuation'), ('var', 'annotation_value'),
+        ('name', 'annotation_argument'), ('=', 'punctuation'), ('AddW', 'annotation_value'),
+        ('count', 'annotation_argument'), ('=', 'punctuation'), ('2', 'number'),
+        ('gap', 'annotation_argument'),
+        ('description', 'annotation_argument'), ('=', 'punctuation'),
+        ('"', 'punctuation_string'), ('a; b', 'string'), ('"', 'punctuation_string'),
+        ('; why', 'comment'),
+    ]
+
+
+def test_sublime_code_block_colors_a_continued_annotate_and_a_verbatim_block():
+    hover = _load_sublime_hover_module()
+    lines = [
+        '#annotate xmin kind=addr description= \\',
+        '    "continued" name=Go',
+        '#verbatim xmin header ; top',
+        '# xmin text, not a directive',
+        'def go(): call Go',
+        '#endverbatim',
+    ]
+    roles = _roles(hover._render_code_block(lines, ROLE_COLORS))
+    assert ('\\', 'punctuation') in roles
+    # The continuation line is still the directive's arguments.
+    assert roles[roles.index(('continued', 'string')) + 2:][:3] == [
+        ('name', 'annotation_argument'), ('=', 'punctuation'), ('Go', 'annotation_value'),
+    ]
+    assert ('header', 'annotation_value') in roles and ('; top', 'comment') in roles
+    # The block's text is one color, whatever it holds; #endverbatim is a directive again.
+    assert ('# xmin text, not a directive', 'verbatim_text') in roles
+    assert ('def go(): call Go', 'verbatim_text') in roles
+    assert roles[-2:] == [('#', 'punctuation_preprocessor'), ('endverbatim', 'preprocessor')]
+
+
+def test_sublime_code_block_colors_labels_strings_and_comments():
+    hover = _load_sublime_hover_module()
+    lines = ['message: .cstr "Hi; there"  ; greeting', '.loop:']
+    assert _roles(hover._render_code_block(lines, ROLE_COLORS)) == [
+        ('message', 'label'), (':', 'label_colon'), ('.', 'data_type'), ('cstr', 'data_type'),
+        ('"', 'punctuation_string'), ('Hi; there', 'string'), ('"', 'punctuation_string'),
+        ('; greeting', 'comment'),
+        ('.loop', 'label'), (':', 'label_colon'),
+    ]
+
+
+def test_sublime_markdown_links_become_hyperlinks():
+    hover = _load_sublime_hover_module()
+    rendered = hover._render_inline('See [Extended Min](https://github.com/example/extended-min) and `[x](y)`.')
+    assert '<a href="https://github.com/example/extended-min">Extended Min</a>' in rendered
+    assert '[x](y)' in rendered          # not a web link: left as written
+
+
+def test_sublime_annotation_hover_colors_inline_code_by_role():
+    hover = _load_sublime_hover_module()
+    docs = {
+        'xmin': {'doc': '', 'arguments': {'kind': '', 'name': ''}, 'values': ['addr', 'var']},
+        'listing': {'doc': '', 'arguments': {'hide': ''}, 'values': []},
+    }
+    render = hover._annotation_code_renderer(ROLE_COLORS, docs)
+    assert _roles(render('xmin')) == [('xmin', 'annotation_namespace')]
+    assert _roles(render('kind')) == [('kind', 'annotation_argument')]
+    assert _roles(render('addr')) == [('addr', 'annotation_value')]
+    assert _roles(render('name=AddW')) == [
+        ('name', 'annotation_argument'), ('=', 'punctuation'), ('AddW', 'annotation_value'),
+    ]
+    assert _roles(render('#annotate listing hide'))[2:] == [
+        ('listing', 'annotation_namespace'), ('hide', 'annotation_argument'),
+    ]
+    assert render('int pa @ 0x0113') is None         # other code keeps the inline code color
+    html = hover._render_markdown('### `kind` : `xmin` Annotation Argument', ROLE_COLORS, code_renderer=render)
+    assert _roles(html) == [('kind', 'annotation_argument'), ('xmin', 'annotation_namespace')]

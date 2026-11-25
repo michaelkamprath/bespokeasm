@@ -1,0 +1,23 @@
+# The built-in output formats that are defined, not written in Python. Each one uses the
+# schema of a configuration's output_formats section and is a -t value for every ISA.
+#
+# listing and symbols stay in Python (pretty_printer/): the listing's file headers and blank
+# lines are not a template, and a template does not escape JSON strings. A built-in format
+# may not use exports sections, because no annotation namespace exists for every ISA.
+hex:
+  documentation:
+    description: Text hex dump of the assembled bytes.
+  requires_word_size: 8
+  template: "{?{code}\n}"     # an empty dump writes nothing
+  sections:
+    code:
+      generator: hex
+
+intel_hex:
+  documentation:
+    description: Intel HEX encoding of the assembled bytes.
+  requires_word_size: 8
+  template: "{?{code}\n}"     # an empty dump writes nothing
+  sections:
+    code:
+      generator: intel_hex

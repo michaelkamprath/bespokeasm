@@ -1,4 +1,5 @@
 """Generated ISA docs cover annotations, output formats and format-scoped zones and constants."""
+import copy
 import importlib.resources as pkg_resources
 import json
 
@@ -174,6 +175,21 @@ def test_annotations_section(markdown):
     assert '## `listing`' not in section
 
 
+def test_each_value_range_rule_is_documented(tmp_path):
+    with open(pkg_resources.files(config_files).joinpath('test_instruction_operands.yaml')) as handle:
+        config = YAML(typ='safe').load(handle)
+    annotations = copy.deepcopy(ANNOTATIONS)
+    xmin = annotations['xmin']
+    xmin['value_range'] = [xmin['value_range'], {'when': {'kind': ['var']}, 'range': [0, 65535]}]
+    config['annotations'] = annotations
+    path = tmp_path / 'isa.json'
+    path.write_text(json.dumps(config))
+    markdown = MarkdownGenerator(DocumentationModel(AssemblerModel(str(path), 0, DiagnosticReporter()))).generate()
+    section = _section(markdown, '# Annotations')
+    assert "**Value range** (a constant's value, when `kind` is `const`): by `type`:" in section
+    assert "**Value range** (a constant's value, when `kind` is `var`): 0 to 65535." in section
+
+
 def test_output_formats_list_the_annotations_they_export(markdown):
     section = _section(markdown, '# Output Formats')
     assert '| Format | Description | Defined By | Exports Annotations | Predefines |' in section
@@ -209,6 +225,9 @@ def test_namespace_and_argument_descriptions_are_both_kept(model):
 def test_annotation_hover_text(model):
     hover = build_hover_docs(model, 0)['annotations']
     assert set(hover) == {'listing', 'xmin'}
+    # The enum values, which an editor colors as values in the hover.
+    assert hover['xmin']['values'] == ['char', 'const', 'int', 'str', 'var']
+    assert hover['listing']['values'] == []
     assert hover['xmin']['doc'].startswith('### `xmin` : Annotation\n\n---\n\nExport a symbol to an xmin script.')
     assert hover['listing']['doc'].startswith('### `listing` : Framework Annotation')
     kind = hover['xmin']['arguments']['kind']
@@ -219,6 +238,49 @@ def test_annotation_hover_text(model):
     assert '**Value range**' in hover['xmin']['arguments']['type']
     assert '**Data size**' not in hover['xmin']['arguments']['note']
     assert 'Leaves the symbol\'s lines out of the listing' in hover['listing']['arguments']['hide']
+
+    # Namespaces without #verbatim parts have none to show.
+    assert hover['xmin']['parts'] == {} and hover['listing']['parts'] == {}
+
+
+def test_verbatim_part_hover_text():
+    """Each #verbatim part has hover text: its description, or a note that it is placed separately."""
+    with open(pkg_resources.files(config_files).joinpath('xmin', 'slu4-minimal-64x4.yaml')) as handle:
+        config = YAML(typ='safe').load(handle)
+    reporter = DiagnosticReporter()
+    parts = build_hover_docs(_model_from(config, reporter), 0)['annotations']['xmin']['parts']
+    assert list(parts) == ['header']
+    assert parts['header'].startswith('### `header` : `#verbatim xmin` Part\n\n---\n\nxmin comment lines')
+    del config['annotations']['xmin']['verbatim']['parts']['header']['documentation']
+    parts = build_hover_docs(_model_from(config, reporter), 0)['annotations']['xmin']['parts']
+    assert parts['header'].endswith('---\n\nAn output format places these blocks separately.')
+
+
+def _model_from(config: dict, reporter: DiagnosticReporter) -> AssemblerModel:
+    import tempfile
+    InstructionLine.reset_instruction_pattern_cache()
+    SymbolScope._global_scope = None
+    with tempfile.TemporaryDirectory() as directory:
+        path = f'{directory}/isa.json'
+        with open(path, 'w') as handle:
+            json.dump(config, handle)
+        return AssemblerModel(path, 0, reporter)
+
+
+def test_namespace_hover_lists_the_arguments(model):
+    """A hover is too narrow for the arguments table, so the namespace hover lists one argument per
+    line: type and values, when it is needed, its default, then its description. Each value's own
+    description is in the argument's hover. The generated ISA docs keep the table."""
+    doc = build_hover_docs(model, 0)['annotations']['xmin']['doc']
+    assert '| Argument |' not in doc and '<br>' not in doc
+    assert (
+        '**Arguments:**\n\n'
+        '- `kind`: enum (`var`, `const`), required. What the export declares.\n'
+        '- `type`: enum (`char`, `int`, `str`), required when `kind` is `var` or `const`.\n'
+        '- `count`: integer (1 or more), optional; only when `kind` is `var`.\n'
+        '- `array`: boolean (a bare flag, or `true`/`false`), optional; only when `kind` is `var`.\n'
+        '- `note`: string, optional, default `none`.'
+    ) in doc
 
 
 def _load_error(tmp_path, annotations) -> str:

@@ -35,11 +35,18 @@ function getLanguageId(context) {
   return packageJson?.contributes?.languages?.[0]?.id || null;
 }
 
-function buildLabelDefinitionMap(document) {
+// The document's lines, with #verbatim block text and #annotate continuation lines replaced
+// by spaces (see maskNonAssemblyText).
+function documentLines(document) {
   const lines = [];
   for (let i = 0; i < document.lineCount; i += 1) {
     lines.push(document.lineAt(i).text);
   }
+  return includeFiles.maskNonAssemblyText(lines);
+}
+
+function buildLabelDefinitionMap(document) {
+  const lines = documentLines(document);
 
   const entries = [{ uri: document.uri, lines }];
   const baseDir = document.uri.fsPath ? path.dirname(document.uri.fsPath) : null;
@@ -55,10 +62,7 @@ function buildLabelDefinitionMap(document) {
 }
 
 function buildConstantDefinitionMap(document) {
-  const lines = [];
-  for (let i = 0; i < document.lineCount; i += 1) {
-    lines.push(document.lineAt(i).text);
-  }
+  const lines = documentLines(document);
 
   const entries = [{ uri: document.uri, lines }];
   const baseDir = document.uri.fsPath ? path.dirname(document.uri.fsPath) : null;
@@ -195,10 +199,7 @@ function buildCoordinateDefinitionSet(document) {
   if (!DECLARATION_OPERATOR) {
     return coordinates;
   }
-  const lines = [];
-  for (let i = 0; i < document.lineCount; i += 1) {
-    lines.push(document.lineAt(i).text);
-  }
+  const lines = documentLines(document);
   const entries = [{ lines }];
   const baseDir = document.uri.fsPath ? path.dirname(document.uri.fsPath) : null;
   if (baseDir) {
@@ -223,12 +224,7 @@ function buildSemanticTokens(document) {
   const constantMap = buildConstantDefinitionMap(document);
   const constants = new Set(constantMap.keys());
   const coordinates = buildCoordinateDefinitionSet(document);
-  const lines = [];
-
-  for (let i = 0; i < document.lineCount; i += 1) {
-    const text = document.lineAt(i).text;
-    lines.push(text);
-  }
+  const lines = documentLines(document);
 
   const builder = new vscode.SemanticTokensBuilder(semanticLegend);
   const labelType = tokenTypes.get('label');
@@ -302,8 +298,17 @@ function getHoverSettings(document, languageId) {
   };
 }
 
+// Code fences in the hover docs name a generic assembly language. Naming this extension's own
+// language instead has VS Code color the code with its grammar, as in the editor.
+let hoverCodeLanguage = null;
+const ASSEMBLY_FENCE_RE = /^(\s*)```(?:assembly|asm)[ \t]*$/gm;
+
+function withHoverCodeLanguage(doc, language = hoverCodeLanguage) {
+  return language ? doc.replace(ASSEMBLY_FENCE_RE, `$1\`\`\`${language}`) : doc;
+}
+
 function buildMarkdownHover(doc) {
-  const markdown = new vscode.MarkdownString(doc);
+  const markdown = new vscode.MarkdownString(withHoverCodeLanguage(doc));
   markdown.isTrusted = false;
   return markdown;
 }
@@ -356,10 +361,28 @@ function getDirectiveAtPosition(lineText, character) {
 }
 
 const ANNOTATE_LINE_RE = /^\s*#annotate\s+([A-Za-z][A-Za-z0-9_]*)/;
+const VERBATIM_LINE_RE = /^(\s*#verbatim\s+)([A-Za-z][A-Za-z0-9_]*)(?:(\s+)([A-Za-z][A-Za-z0-9_]*))?/;
 
 // Hover text for a word on an `#annotate` line: the namespace, an argument name, or a
-// value (which shows its argument). Strings and comments are excluded.
+// value (which shows its argument). On a `#verbatim` line, the namespace or the part. Strings
+// and comments are excluded.
 function getAnnotationDocAtPosition(lineText, character, annotationDocs) {
+  const verbatim = VERBATIM_LINE_RE.exec(lineText);
+  if (verbatim) {
+    const namespaceDocs = annotationDocs[verbatim[2]];
+    if (!namespaceDocs) {
+      return null;
+    }
+    const namespaceStart = verbatim[1].length;
+    if (character >= namespaceStart && character < namespaceStart + verbatim[2].length) {
+      return namespaceDocs.doc;
+    }
+    const partStart = namespaceStart + verbatim[2].length + (verbatim[3] || '').length;
+    if (verbatim[4] && character >= partStart && character < partStart + verbatim[4].length) {
+      return (namespaceDocs.parts || {})[verbatim[4]] || null;
+    }
+    return null;
+  }
   const match = ANNOTATE_LINE_RE.exec(lineText);
   if (!match || !isOffsetInCodeRegion(lineText, character)) {
     return null;
@@ -477,10 +500,7 @@ function findReferences(document, token) {
     }
   }
 
-  const lines = [];
-  for (let i = 0; i < document.lineCount; i += 1) {
-    lines.push(document.lineAt(i).text);
-  }
+  const lines = documentLines(document);
   scanLines(lines, document.uri);
 
   const baseDir = document.uri.fsPath ? path.dirname(document.uri.fsPath) : null;
@@ -556,6 +576,7 @@ function activate(context) {
   if (!languageId) {
     return;
   }
+  hoverCodeLanguage = languageId;
 
   const hoverDocs = loadInstructionDocs(context);
   if (!hoverDocs) {
@@ -578,11 +599,26 @@ function activate(context) {
   const registerDocs = hoverDocs.registers || {};
   const exprFuncDocs = hoverDocs.expression_functions || {};
   const annotationDocs = hoverDocs.annotations || {};
-  const wordPattern = /(?:##MNEMONIC_PATTERN##|##LABEL_PATTERN##)/i;
+  // Built-in preprocessor symbols such as __OUTPUT_FORMAT__ begin with two underscores, which
+  // no label can, so the label pattern alone would read one as _OUTPUT_FORMAT__.
+  const wordPattern = /(?:__[A-Za-z0-9_]+__|##MNEMONIC_PATTERN##|##LABEL_PATTERN##)/i;
   const provider = {
     provideHover(document, position) {
       const hoverSettings = getHoverSettings(document, languageId);
       const lineText = document.lineAt(position.line).text;
+
+      // A later line of a continued #annotate holds only arguments of the namespace named on
+      // the #annotate line.
+      const annotateRow = includeFiles.annotateContinuationStart((row) => document.lineAt(row).text, position.line);
+      if (annotateRow >= 0) {
+        const header = ANNOTATE_LINE_RE.exec(document.lineAt(annotateRow).text);
+        if (!header || !hoverSettings.mnemonics) {
+          return null;
+        }
+        const prefix = `#annotate ${header[1]} `;
+        const annotationDoc = getAnnotationDocAtPosition(prefix + lineText, prefix.length + position.character, annotationDocs);
+        return annotationDoc ? new vscode.Hover(buildMarkdownHover(annotationDoc)) : null;
+      }
 
       // Check directives first
       if (hoverSettings.mnemonics) {

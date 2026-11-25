@@ -12,7 +12,8 @@ class AnnotationLine(PreprocessorLine):
 
     The arguments are validated against the namespace's declaration when the line is
     parsed; the annotation is attached to the next label or constant definition by
-    ``AnnotationBinder``.
+    ``AnnotationBinder``. A directive continued over several lines is parsed from ``directive``,
+    the joined text, while ``instruction`` is its first line as written, for the listing.
     """
 
     def __init__(
@@ -22,9 +23,12 @@ class AnnotationLine(PreprocessorLine):
         comment: str,
         memzone: MemoryZone,
         isa_model: AssemblerModel,
+        directive: str | None = None,
     ) -> None:
         super().__init__(line_id, instruction, comment, memzone)
-        namespace_name, raw_arguments = parse_annotation_directive(line_id, instruction)
+        namespace_name, raw_arguments = parse_annotation_directive(
+            line_id, instruction if directive is None else directive,
+        )
         namespace = isa_model.annotation_namespaces.get(namespace_name)
         if namespace is None:
             defined = ', '.join(sorted(isa_model.annotation_namespaces))

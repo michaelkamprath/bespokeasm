@@ -1,6 +1,7 @@
 import importlib.resources as pkg_resources
 import json
 import os
+import re
 import shutil
 from pathlib import Path
 
@@ -61,6 +62,7 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.PUNCTUATION_STRING, 'punctuation.definition.string', 'String Punctuation'),
             (SyntaxElement.STRING, 'string.quoted', 'Strings'),
             (SyntaxElement.STRING_ESCAPE, 'constant.character.escape', 'Strings - Escaped Characters'),
+            (SyntaxElement.VERBATIM_TEXT, 'string.unquoted.verbatim', 'Verbatim Text Blocks'),
             (SyntaxElement.COMMENT, 'comment.line', 'Comments'),
             (SyntaxElement.PARAMETER, 'variable.parameter', 'Parameters'),
             (SyntaxElement.ANNOTATION_NAMESPACE, 'entity.name.namespace.annotation', 'Annotation Namespaces'),
@@ -195,6 +197,30 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
                 'editorCursor.foreground': DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.CARET)
             },
             'tokenColors': token_colors
+        }
+
+    @staticmethod
+    def _verbatim_block_rule(namespace: str, parts: tuple[str, ...] = ()) -> dict:
+        """A `#verbatim <namespace> [<part>]` ... `#endverbatim` block: the directives as
+        preprocessor lines (with any comment), and every line between them as
+        `string.unquoted.verbatim.<namespace>`."""
+        directive_captures = {
+            '1': {'name': 'punctuation.definition.preprocessor'},
+            '2': {'name': 'keyword.control.preprocessor'},
+        }
+        part_alternation = '|'.join(re.escape(part) for part in parts)
+        part = rf'(?:\s+({part_alternation})\b)?' if parts else '()'
+        return {
+            'begin': rf'^\s*(\#)(verbatim)\s+({re.escape(namespace)})\b{part}\s*(;.*)?$',
+            'beginCaptures': {
+                **directive_captures,
+                '3': {'name': 'entity.name.namespace.annotation'},
+                '4': {'name': 'constant.other.annotation.value'},
+                '5': {'name': 'comment.line.semicolon'},
+            },
+            'end': r'^\s*(\#)(endverbatim)\b\s*(;.*)?$',
+            'endCaptures': {**directive_captures, '3': {'name': 'comment.line.semicolon'}},
+            'contentName': f'string.unquoted.verbatim.{namespace}',
         }
 
     def generate(self) -> None:
@@ -381,6 +407,17 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
                 pattern['match'] = pattern['match'].replace(
                     '##ANNOTATION_NAMESPACES##', '|'.join(namespaces),
                 ).replace('##ANNOTATION_ARGUMENTS##', '|'.join(arguments))
+
+        # #verbatim blocks: each line between the directives is one string scope for its namespace.
+        verbatim_namespaces = self.model.verbatim_namespaces
+        if verbatim_namespaces:
+            grammar_json['repository']['verbatim_blocks'] = {
+                'patterns': [
+                    self._verbatim_block_rule(namespace, self.model.annotation_namespaces[namespace].verbatim_part_names)
+                    for namespace in verbatim_namespaces
+                ],
+            }
+            grammar_json['repository']['main']['patterns'].insert(0, {'include': '#verbatim_blocks'})
 
         # handle expresion functions
         for item in grammar_json['repository']['operators']['patterns']:

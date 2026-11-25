@@ -241,13 +241,21 @@ class AssemblerModel:
                     f'The ISA configuration file requires BespokeASM version {required_version}. This '
                     f'version of BespokeASM is {BESPOKEASM_VERSION_STR}.'
                 )
-            if required_version > BESPOKEASM_VERSION_STR:
+            # Version ordering, not text order: 0.10.0 is newer than 0.9.0, and a pre-release such as
+            # 0.9.0a2 comes before 0.9.0.
+            try:
+                required = version.parse(str(required_version))
+            except version.InvalidVersion:
+                self._diagnostic_reporter.error(
+                    None, f'general.min_version "{required_version}" is not a version number, such as 0.9.0',
+                )
+            if required > version.parse(BESPOKEASM_VERSION_STR):
                 self._diagnostic_reporter.error(
                     None,
                     f'the instruction set configuration file requires at least BespokeASM '
                     f'version {required_version}',
                 )
-            if required_version < BESPOKEASM_MIN_REQUIRED_STR:
+            if required < version.parse(BESPOKEASM_MIN_REQUIRED_STR):
                 self._diagnostic_reporter.error(
                     None,
                     f'this version of BespokeASM requires a configuration file that minimally '
@@ -1085,6 +1093,11 @@ class AssemblerModel:
             key=lambda name: (-len(name), name),
         )
         return namespaces, arguments
+
+    @property
+    def verbatim_namespaces(self) -> list[str]:
+        """The annotation namespaces that accept ``#verbatim`` blocks, sorted by name."""
+        return sorted(name for name, namespace in self._annotation_namespaces.items() if namespace.accepts_verbatim)
 
     @property
     def output_formats(self) -> dict[str, DefinedFormat]:

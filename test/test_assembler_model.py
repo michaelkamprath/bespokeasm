@@ -395,6 +395,38 @@ class TestConfigObject(unittest.TestCase):
         with self.assertRaises(SystemExit, msg='the min version check should fail'):
             AssemblerModel(str(fp), 0, self.diagnostic_reporter)
 
+    def test_min_required_version_uses_version_ordering(self):
+        """min_version compares as versions, not text: 0.10.0 is newer than 0.9.0, and a pre-release
+        comes before its release."""
+        import tempfile
+        from unittest import mock
+        yaml = YAML()
+        fp = pkg_resources.files(config_files).joinpath('test_min_required_version_config.yaml')
+        with open(fp) as config_file:
+            config = yaml.load(config_file)
+        cases = [
+            ('0.9.0a2', '0.9.0a2', True),
+            ('0.9.0a1', '0.9.0a2', True),
+            ('0.9.0', '0.9.0a2', False),        # a pre-release is older than its release
+            ('0.10.0', '0.9.0', False),         # text order would put 0.10.0 before 0.9.0
+            ('0.9.0', '0.10.0', True),
+            ('0.6.9', '0.10.0', False),         # older than BESPOKEASM_MIN_REQUIRED_STR (0.7.0)
+            ('nine', '0.9.0', False),           # not a version number
+        ]
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            for required, running, accepted in cases:
+                with self.subTest(required=required, running=running):
+                    config['general']['min_version'] = required
+                    path = os.path.join(tmp_dir, 'config.yaml')
+                    with open(path, 'w') as config_file:
+                        yaml.dump(config, config_file)
+                    with mock.patch('bespokeasm.assembler.model.BESPOKEASM_VERSION_STR', running):
+                        if accepted:
+                            AssemblerModel(path, 0, self.diagnostic_reporter)
+                        else:
+                            with self.assertRaises(SystemExit):
+                                AssemblerModel(path, 0, self.diagnostic_reporter)
+
     def test_predefined_entities(self):
         fp = pkg_resources.files(config_files).joinpath('test_compiler_features.yaml')
         model = AssemblerModel(str(fp), 0, self.diagnostic_reporter)

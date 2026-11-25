@@ -241,13 +241,46 @@ class ByteLinesGenerator(Generator):
         return self.table.render(rows)
 
 
+class VerbatimGenerator(Generator):
+    """Every ``#verbatim`` block of one annotation namespace and part (without ``part``: the
+    blocks that name no part), in source order, joined by ``separator`` (default: one blank
+    line between blocks)."""
+    name = 'verbatim'
+    required_options = frozenset({'namespace'})
+    optional_options = frozenset({'part', 'separator'})
+
+    def configure(self, options: dict[str, Any]) -> None:
+        namespace = options['namespace']
+        spec = self.env.annotation_namespaces.get(namespace) if isinstance(namespace, str) else None
+        if spec is None or not spec.accepts_verbatim:
+            accepting = sorted(name for name, item in self.env.annotation_namespaces.items() if item.accepts_verbatim)
+            which = (
+                f'namespaces that do: {", ".join(accepting)}' if accepting
+                else 'no annotation namespace of this configuration does (set verbatim on one)'
+            )
+            self.error('namespace', f"names '{namespace}', which does not accept #verbatim blocks; {which}")
+        self.verbatim_namespace = namespace
+        self.part = options.get('part')
+        if self.part is not None and self.part not in spec.verbatim_part_names:
+            parts = spec.verbatim_part_names
+            which = f'its parts are: {", ".join(parts)}' if parts else 'it declares no parts'
+            self.error('part', f"names '{self.part}', which is not a #verbatim part of annotation '{namespace}'; {which}")
+        self.separator = options.get('separator', '\n\n')
+        if not isinstance(self.separator, str):
+            self.error('separator', 'must be a string, such as "\\n\\n"')
+
+    def render(self, context: RenderContext) -> str:
+        texts = [block.text for block in context.export_model.verbatim_for(self.verbatim_namespace, self.part) if block.text]
+        return self.separator.join(texts)
+
+
 def generator_classes() -> dict[str, type[Generator]]:
     from bespokeasm.assembler.output_format.generators.exports import ExportsGenerator
     return {
         cls.name: cls
         for cls in (
             IntelHexGenerator, HexGenerator, ByteListGenerator, ListingGenerator, RowsGenerator, ByteLinesGenerator,
-            ExportsGenerator,
+            ExportsGenerator, VerbatimGenerator,
         )
     }
 

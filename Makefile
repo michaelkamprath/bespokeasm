@@ -40,12 +40,13 @@ pyinstaller:
 		--distpath $(PYINSTALLER_DIST) --paths src --collect-all bespokeasm \
 		--add-data "src/bespokeasm/configgen/sublime/resources:bespokeasm/configgen/sublime/resources" \
 		--add-data "src/bespokeasm/configgen/vscode/resources:bespokeasm/configgen/vscode/resources" \
+		--add-data "src/bespokeasm/assembler/output_format/resources:bespokeasm/assembler/output_format/resources" \
 		--exclude-module email --exclude-module http --exclude-module urllib \
 		--exclude-module ssl --exclude-module xml --exclude-module ctypes \
 		--exclude-module ftplib --exclude-module socket --exclude-module netrc \
 		--exclude-module webbrowser --exclude-module plistlib --exclude-module calendar \
 		--exclude-module csv --exclude-module fractions \
-		--exclude-module statistics --exclude-module argparse --exclude-module uuid \
+		--exclude-module statistics --exclude-module argparse \
 		--exclude-module pre_commit \
 		src/bespokeasm/__main__.py
 	VERSION=$$($(PYTHON) -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])"); \
@@ -61,6 +62,7 @@ pyinstaller:
 	if [ "$$PLATFORM" = "windows" ]; then EXT=".exe"; fi; \
 	printf "L\nQ\n" | $(PYTHON) -m PyInstaller.utils.cliutils.archive_viewer "$(PYINSTALLER_DIST)/$(PYINSTALLER_NAME)$${EXT}" 2>/dev/null | rg -q "bespokeasm/configgen/sublime/resources/sublime-syntax\\.yaml" || { echo "ERROR: Missing Sublime resource files in PyInstaller bundle."; exit 1; }; \
 	printf "L\nQ\n" | $(PYTHON) -m PyInstaller.utils.cliutils.archive_viewer "$(PYINSTALLER_DIST)/$(PYINSTALLER_NAME)$${EXT}" 2>/dev/null | rg -q "bespokeasm/configgen/vscode/resources/package\\.json" || { echo "ERROR: Missing VS Code resource files in PyInstaller bundle."; exit 1; }; \
+	printf "L\nQ\n" | $(PYTHON) -m PyInstaller.utils.cliutils.archive_viewer "$(PYINSTALLER_DIST)/$(PYINSTALLER_NAME)$${EXT}" 2>/dev/null | rg -q "bespokeasm/assembler/output_format/resources/builtin_formats\\.yaml" || { echo "ERROR: Missing built-in output format definitions in PyInstaller bundle."; exit 1; }; \
 	SRC="$(PYINSTALLER_DIST)/$(PYINSTALLER_NAME)$${EXT}"; \
 	DEST="$(PYINSTALLER_DIST)/$(PYINSTALLER_NAME)-$${VERSION}-$${PLATFORM}-$${ARCH}$${EXT}"; \
 	mv "$$SRC" "$$DEST"
@@ -82,12 +84,14 @@ nuitka:
 		--include-package-data=bespokeasm \
 		--include-data-dir=src/bespokeasm/configgen/sublime/resources=bespokeasm/configgen/sublime/resources \
 		--include-data-dir=src/bespokeasm/configgen/vscode/resources=bespokeasm/configgen/vscode/resources \
+		--include-data-dir=src/bespokeasm/assembler/output_format/resources=bespokeasm/assembler/output_format/resources \
 		$(NUITKA_NOFOLLOW) \
 		--output-dir=$(PYINSTALLER_DIST) \
 		src/bespokeasm/__main__.py
 	@# Verify required resource files are present in the dist directory
 	@test -d "$(PYINSTALLER_DIST)/__main__.dist/bespokeasm/configgen/sublime/resources" || { echo "ERROR: Missing Sublime resource files in Nuitka bundle."; exit 1; }
 	@test -f "$(PYINSTALLER_DIST)/__main__.dist/bespokeasm/configgen/vscode/resources/package.json" || { echo "ERROR: Missing VS Code resource files in Nuitka bundle."; exit 1; }
+	@test -f "$(PYINSTALLER_DIST)/__main__.dist/bespokeasm/assembler/output_format/resources/builtin_formats.yaml" || { echo "ERROR: Missing built-in output format definitions in Nuitka bundle."; exit 1; }
 	VERSION=$$($(PYTHON) -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])"); \
 	OS_NAME=$$(uname -s); \
 	case "$$OS_NAME" in \

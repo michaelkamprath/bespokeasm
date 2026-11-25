@@ -160,13 +160,21 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         for line in sorted(line_objs, key=lambda x: (x.line_id.filename, x.line_id.line_num)):
             by_file.setdefault(line.line_id.filename, []).append(line)
         unit = 'bytes' if model.word_size == 8 else 'words'
+        # A #verbatim block is not part of any symbol, so hiding a symbol never hides one.
+        verbatim_lines = {
+            (block.line_id.filename, number)
+            for block in export_model.verbatim_blocks
+            for number in range(block.line_id.line_num, block.last_line + 1)
+        }
         for symbol in export_model.for_namespace(LISTING_NAMESPACE_NAME):
             arguments = symbol.annotations[LISTING_NAMESPACE_NAME].arguments
             filename = symbol.line_id.filename
             # The symbol's lines start at its first #annotate line, directly above its definition.
             start = min(annotation.line_id.line_num for annotation in symbol.annotations.values())
             if arguments.get('hide'):
-                plan.hidden.update(ListingPrettyPrinter._hidden_lines(by_file.get(filename, []), symbol, start))
+                plan.hidden.update(
+                    ListingPrettyPrinter._hidden_lines(by_file.get(filename, []), symbol, start) - verbatim_lines,
+                )
                 continue
             if arguments.get('page_break'):
                 plan.page_breaks.add((filename, start))

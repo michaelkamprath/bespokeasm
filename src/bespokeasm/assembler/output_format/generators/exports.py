@@ -25,6 +25,7 @@ class ExportsGenerator(Generator):
     optional_options = frozenset({
         'order', 'unique', 'reserved_names', 'name_pattern', 'lines_key', 'lines', 'value_map',
         'columns', 'separator', 'header_rule', 'rule_separator', 'comment_field', 'comment_prefix',
+        'blank_line_after',
     })
 
     def configure(self, options: dict[str, Any]) -> None:
@@ -78,6 +79,7 @@ class ExportsGenerator(Generator):
             if option in options and not uses_columns:
                 self.error(option, 'is only used with columns')
         self._configure_comment(options, uses_columns)
+        self._configure_blank_line_after(options, uses_columns)
         self.lines: dict[str, Template] | None = None
         self.table: ColumnTable | None = None
         if uses_columns:
@@ -145,6 +147,21 @@ class ExportsGenerator(Generator):
         self.comment_field = field
         self.comment_prefix = options['comment_prefix']
 
+    def _configure_blank_line_after(self, options: dict[str, Any], uses_columns: bool) -> None:
+        """``blank_line_after`` names a boolean argument: an export that sets it is followed by a
+        blank line, so the source can group exports. Line templates only, as a table has no
+        blank rows."""
+        self.blank_line_after: str | None = None
+        if 'blank_line_after' not in options:
+            return
+        if uses_columns:
+            self.error('blank_line_after', 'is only used with lines_key and lines, not with columns')
+        argument = options['blank_line_after']
+        spec = self.namespace.arguments.get(argument) if isinstance(argument, str) else None
+        if spec is None or spec.type != 'boolean':
+            self.error('blank_line_after', f"must name a boolean argument of annotation '{self.namespace.name}'")
+        self.blank_line_after = argument
+
     def _comment_lines(self, values: dict[str, Any]) -> list[str]:
         """The comment lines above one export: each line of the comment field's text, prefixed."""
         if self.comment_field is None:
@@ -205,9 +222,12 @@ class ExportsGenerator(Generator):
             keys = [symbol.annotations[self.namespace.name].arguments for symbol in symbols]
             return self.table.render(rows, keys)
         lines = []
-        for symbol, values in zip(symbols, rows):
+        for index, (symbol, values) in enumerate(zip(symbols, rows)):
             lines.extend(self._comment_lines(values))
             lines.append(self._line_template(symbol).render(values))
+            # Not after the last export: a section's text never ends with a blank line.
+            if self.blank_line_after is not None and values.get(self.blank_line_after) and index < len(rows) - 1:
+                lines.append('')
         return '\n'.join(lines)
 
     def _values(self, symbol: AnnotatedSymbol, hex_width: int) -> dict[str, Any]:

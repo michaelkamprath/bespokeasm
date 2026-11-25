@@ -5,6 +5,53 @@ The mappings provide short markdown descriptions suitable for display in
 editor hover popups.
 """
 BUILTIN_CONSTANT_DOCS: dict[str, str] = {
+    '__LANGUAGE_NAME__': (
+        '### `__LANGUAGE_NAME__` : Language Name\n\n'
+        '---\n\n'
+        'An always-defined preprocessor symbol naming the language this '
+        'instruction set defines. It compares as text with `==` or `!=`.\n\n'
+        '```\n'
+        '#require __LANGUAGE_NAME__ == my-lang\n'
+        '```'
+    ),
+    '__LANGUAGE_VERSION__': (
+        '### `__LANGUAGE_VERSION__` : Language Version\n\n'
+        '---\n\n'
+        'An always-defined preprocessor symbol holding the version of the '
+        'language this instruction set defines, such as `1.2.3`. Comparisons '
+        'use version ordering, so `1.0.10` is newer than `1.0.2`.\n\n'
+        '```\n'
+        '#require __LANGUAGE_VERSION__ >= 1.2.0\n'
+        '```'
+    ),
+    '__LANGUAGE_VERSION_MAJOR__': (
+        '### `__LANGUAGE_VERSION_MAJOR__` : Language Major Version\n\n'
+        '---\n\n'
+        'An always-defined numeric preprocessor symbol holding the major '
+        'number of the language version: `1` for `1.2.3`.'
+    ),
+    '__LANGUAGE_VERSION_MINOR__': (
+        '### `__LANGUAGE_VERSION_MINOR__` : Language Minor Version\n\n'
+        '---\n\n'
+        'An always-defined numeric preprocessor symbol holding the minor '
+        'number of the language version: `2` for `1.2.3`.'
+    ),
+    '__LANGUAGE_VERSION_PATCH__': (
+        '### `__LANGUAGE_VERSION_PATCH__` : Language Patch Version\n\n'
+        '---\n\n'
+        'An always-defined numeric preprocessor symbol holding the patch '
+        'number of the language version: `3` for `1.2.3`.'
+    ),
+    '__BESPOKEASM_VERSION__': (
+        '### `__BESPOKEASM_VERSION__` : BespokeASM Version\n\n'
+        '---\n\n'
+        'An always-defined preprocessor symbol holding the version of '
+        'BespokeASM assembling the code. Comparisons use version ordering, '
+        'and a pre-release such as `0.9.0a2` comes before `0.9.0`.\n\n'
+        '```\n'
+        '#require __BESPOKEASM_VERSION__ >= 0.9.0\n'
+        '```'
+    ),
     '__FLOW_COUNTERS_AVAILABLE__': (
         '### `__FLOW_COUNTERS_AVAILABLE__` : Flow-Counter Capability\n\n'
         '---\n\n'
@@ -15,6 +62,23 @@ BUILTIN_CONSTANT_DOCS: dict[str, str] = {
         'ISAs. Do not use `#ifdef` as the availability test because the '
         'symbol is defined in both capability states. Its value is '
         'independent of `--flow-checks` / `--no-flow-checks`.'
+    ),
+    '__OUTPUT_FORMAT__': (
+        '### `__OUTPUT_FORMAT__` : Selected Output Format\n\n'
+        '---\n\n'
+        'Names the output format selected with `-p -t` (`listing` with `-p` '
+        'alone), or is `0` without `-p`. Use it with `#if` to choose source '
+        'for one format:\n\n'
+        '```\n'
+        '#if __OUTPUT_FORMAT__ == xmin\n'
+        '.memzone XMIN_USER_CODE\n'
+        '#else\n'
+        '.org $8000\n'
+        '#endif\n'
+        '```\n\n'
+        'It compares as text with `==` or `!=`. Comparing it with a name that '
+        'is neither a built-in format nor one the configuration defines is a '
+        'warning.'
     ),
 }
 
@@ -160,7 +224,9 @@ BYTECODE_DIRECTIVE_DOCS: dict[str, str] = {
         '.cstr "string"\n'
         '```\n\n'
         'The terminator byte defaults to `0` but can be configured in '
-        'the ISA configuration. Supports escape sequences.'
+        'the ISA configuration. Supports escape sequences. Adjacent strings are one string, and a '
+        'line ending in `\\` continues on the next, so a long string can be split: '
+        '`.cstr "Hello, " \\` then `"world"`.'
     ),
     'asciiz': (
         '### `.asciiz` : Null-Terminated String\n\n'
@@ -198,11 +264,13 @@ PREPROCESSOR_DIRECTIVE_DOCS: dict[str, str] = {
         '#require "language-id >= 1.0.0"\n'
         '#require __LANGUAGE_VERSION__ >= 2.0.0\n'
         '#require __BESPOKEASM_VERSION__ >= 0.7.2\n'
+        '#require __OUTPUT_FORMAT__ == xmin\n'
         '```\n\n'
         'Supports both the legacy quoted-string format and symbol-based '
         'comparisons restricted to built-in language/BespokeASM version '
-        'symbols and literals. Complete versions use semantic-version '
-        'ordering. Use `#assert` for invariants involving user macros.'
+        'symbols, `__OUTPUT_FORMAT__`, and literals. Complete versions use '
+        'semantic-version ordering. Use `#assert` for invariants involving '
+        'user macros.'
     ),
     'define': (
         '### `#define` : Define Preprocessor Macro\n\n'
@@ -227,8 +295,9 @@ PREPROCESSOR_DIRECTIVE_DOCS: dict[str, str] = {
         '#if <expr>\n'
         '```\n\n'
         'The single-expression form implies `!= 0`. Expressions may use '
-        'preprocessor macros, built-in version symbols, and the '
-        '`__FLOW_COUNTERS_AVAILABLE__` ISA-capability symbol. '
+        'preprocessor macros, built-in version symbols, the '
+        '`__FLOW_COUNTERS_AVAILABLE__` ISA-capability symbol, and '
+        '`__OUTPUT_FORMAT__`, the selected output format. '
         'Static-analysis values are not allowed because this directive '
         'selects which source is compiled. '
         'Must be closed with `#endif`.'
@@ -369,9 +438,37 @@ PREPROCESSOR_DIRECTIVE_DOCS: dict[str, str] = {
         'and the configuration validates every argument. The line must be directly above the '
         'definition; only further `#annotate` lines, for other namespaces, may sit between them. '
         'Emits no bytes.\n\n'
+        'A line ending in `\\` continues on the next line, and adjacent quoted strings join into one '
+        'value, so a long description can span lines:\n\n'
+        '```\n'
+        '#annotate <namespace> description= \\\n'
+        '    "First line\\n" \\\n'
+        '    "second line."\n'
+        '```\n\n'
         'The `listing` namespace shapes `-t listing` output: `heading="..."` prints a heading above '
         'the symbol, `page_break` starts a new page, `collapse` shows only the first row of a '
         "label's data, and `hide` leaves the symbol's lines out. Bytes are assembled either way."
+    ),
+    'verbatim': (
+        '### `#verbatim` : Verbatim Text Block\n\n'
+        '---\n\n'
+        'Starts a block of text that is not assembled. An output format of the instruction set '
+        'copies the text into its file, such as script functions that call the assembled routines.\n\n'
+        '**Usage:**\n\n'
+        '```\n'
+        '#verbatim <namespace> [<part>]\n'
+        'text, kept exactly as written\n'
+        '#endverbatim\n'
+        '```\n\n'
+        'The namespace must be an annotation namespace of the instruction set that accepts verbatim '
+        'blocks. A part, such as `header`, must be one the namespace declares; a format places '
+        'each part where it belongs in its file. The lines in between are not preprocessed and emit '
+        'no bytes. A block inside a false `#if` branch is skipped.'
+    ),
+    'endverbatim': (
+        '### `#endverbatim` : End Verbatim Text Block\n\n'
+        '---\n\n'
+        'Ends the text block that `#verbatim` started.'
     ),
     'create-scope': (
         '### `#create-scope` : Create Named Label Scope\n\n'

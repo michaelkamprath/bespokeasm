@@ -12,6 +12,12 @@ import sublime_plugin
 
 
 WORD_PATTERN = re.compile(r'(?:##MNEMONIC_PATTERN##|##LABEL_PATTERN##)', re.IGNORECASE)
+# Built-in preprocessor symbols such as __OUTPUT_FORMAT__ begin with two underscores, which no
+# label can, so the label pattern alone would read one as _OUTPUT_FORMAT__.
+BUILTIN_SYMBOL_PATTERN = r'__[A-Za-z0-9_]+__'
+HOVER_WORD_PATTERN = re.compile(
+    r'(?:' + BUILTIN_SYMBOL_PATTERN + r'|##MNEMONIC_PATTERN##|##LABEL_PATTERN##)', re.IGNORECASE
+)
 LABEL_DEFINITION_PATTERN = re.compile(r'^\s*(?P<name>##LABEL_PATTERN##)\s*:(?!=)')
 OPERAND_LABEL_DEFINITION_PATTERN = re.compile(r'@(?P<name>##LABEL_PATTERN##):\s*')
 CONSTANT_DEFINITION_PATTERN = re.compile(r'^\s*(?P<name>##CONSTANT_PATTERN##)\s*(?:=|\bEQU\b)')
@@ -67,6 +73,15 @@ DEFAULT_HOVER_COLORS = {
     'register': '##HOVER_COLOR_REGISTER##',
     'punctuation_preprocessor': '##HOVER_COLOR_PUNCTUATION_PREPROCESSOR##',
     'operator': '##HOVER_COLOR_OPERATOR##',
+    'annotation_namespace': '##HOVER_COLOR_ANNOTATION_NAMESPACE##',
+    'annotation_argument': '##HOVER_COLOR_ANNOTATION_ARGUMENT##',
+    'annotation_value': '##HOVER_COLOR_ANNOTATION_VALUE##',
+    'string': '##HOVER_COLOR_STRING##',
+    'punctuation_string': '##HOVER_COLOR_PUNCTUATION_STRING##',
+    'comment': '##HOVER_COLOR_COMMENT##',
+    'label': '##HOVER_COLOR_LABEL##',
+    'label_colon': '##HOVER_COLOR_LABEL_COLON##',
+    'verbatim_text': '##HOVER_COLOR_VERBATIM_TEXT##',
 }
 INLINE_CODE_COLOR = DEFAULT_HOVER_COLORS['inline_code']
 TABLE_HEADER_COLOR = DEFAULT_HOVER_COLORS['table_header']
@@ -211,8 +226,87 @@ def _parse_include_path(line):
     return match.group(1) or match.group(2) or match.group(3)
 
 
+VERBATIM_START_PATTERN = re.compile(r'^\s*#verbatim(?=\s|;|$)')
+VERBATIM_END_PATTERN = re.compile(r'^\s*#endverbatim(?=\s|;|$)')
+
+
+def _mask_verbatim_blocks(lines):
+    """The text of a #verbatim block is for an output format, not assembly: replace each of its
+    lines with spaces, so symbol lookups and the semantic pass never read, for example, an xmin
+    assignment `x = 1` as a constant definition, or follow an #include written in a block. Every
+    line keeps its length, so the offsets computed from these lines still match the view."""
+    masked = []
+    in_block = False
+    for text in lines:
+        if in_block:
+            if VERBATIM_END_PATTERN.match(text):
+                in_block = False
+                masked.append(text)
+            else:
+                masked.append(' ' * len(text))
+            continue
+        if VERBATIM_START_PATTERN.match(text):
+            in_block = True
+        masked.append(text)
+    return masked
+
+
+ANNOTATE_START_PATTERN = re.compile(r'^\s*#annotate(?=\s|$)')
+
+
+def _continues_line(text):
+    """Whether a line continues onto the next: it ends with a `\\` that is outside quotes, and
+    it has no `;` comment (a continued line cannot carry one), as the assembler reads it."""
+    quote = None
+    escaped = False
+    for character in text:
+        if quote:
+            if escaped:
+                escaped = False
+            elif character == '\\':
+                escaped = True
+            elif character == quote:
+                quote = None
+        elif character in ('"', "'"):
+            quote = character
+        elif character == ';':
+            return False
+    return quote is None and text.rstrip().endswith('\\')
+
+
+def _annotate_continuation_start(get_line, row):
+    """For a later line of a continued #annotate, the row of its #annotate line; otherwise -1."""
+    k = row - 1
+    while k >= 0 and _continues_line(get_line(k)):
+        if ANNOTATE_START_PATTERN.match(get_line(k)):
+            return k
+        k -= 1
+    return -1
+
+
+def _mask_annotate_continuations(lines):
+    """The later lines of a continued #annotate hold arguments, not assembly: replace them with
+    spaces, so `description="..."` on its own line is not read as a constant definition."""
+    masked = []
+    continuing = False
+    for text in lines:
+        if continuing:
+            continuing = _continues_line(text)
+            masked.append(' ' * len(text))
+            continue
+        continuing = bool(ANNOTATE_START_PATTERN.match(text)) and _continues_line(text)
+        masked.append(text)
+    return masked
+
+
+def _mask_non_assembly_text(lines):
+    """The lines symbol lookups and the semantic pass read: #verbatim block text and #annotate
+    continuation lines become spaces, and every line keeps its length."""
+    return _mask_annotate_continuations(_mask_verbatim_blocks(lines))
+
+
 def _collect_lines(view):
-    return view.substr(sublime.Region(0, view.size())).splitlines()
+    return _mask_non_assembly_text(view.substr(sublime.Region(0, view.size())).splitlines())
 
 
 def _collect_included_files(lines, base_dir, visited=None):
@@ -230,7 +324,7 @@ def _collect_included_files(lines, base_dir, visited=None):
             continue
         try:
             with open(resolved, encoding='utf-8') as handle:
-                include_lines = handle.read().splitlines()
+                include_lines = _mask_non_assembly_text(handle.read().splitlines())
         except OSError:
             continue
         visited.add(resolved)
@@ -380,7 +474,7 @@ def _get_token_at_point(view, point):
     line_region = view.line(point)
     line_text = view.substr(line_region)
     column = point - line_region.begin()
-    for match in WORD_PATTERN.finditer(line_text):
+    for match in HOVER_WORD_PATTERN.finditer(line_text):
         if match.start() <= column <= match.end():
             return match.group(0)
     return None
@@ -567,13 +661,25 @@ def _get_directive_at_point(view, point):
 
 
 ANNOTATE_LINE_PATTERN = re.compile(r'^\s*#annotate\s+([A-Za-z][A-Za-z0-9_]*)')
+VERBATIM_LINE_PATTERN = re.compile(r'^\s*#verbatim\s+([A-Za-z][A-Za-z0-9_]*)(?:\s+([A-Za-z][A-Za-z0-9_]*))?')
 ANNOTATION_WORD_PATTERN = re.compile(r'[A-Za-z_][A-Za-z0-9_]*')
 ANNOTATION_VALUE_OF_PATTERN = re.compile(r'([A-Za-z_][A-Za-z0-9_]*)\s*=\s*$')
 
 
 def _get_annotation_doc(line_text, column, annotation_docs):
     """Hover text for a word on an `#annotate` line: the namespace, an argument name, or a
-    value (which shows its argument). Strings and comments are excluded."""
+    value (which shows its argument). On a `#verbatim` line, the namespace or the part. Strings
+    and comments are excluded."""
+    verbatim = VERBATIM_LINE_PATTERN.match(line_text)
+    if verbatim is not None:
+        namespace_docs = annotation_docs.get(verbatim.group(1))
+        if not namespace_docs:
+            return None
+        if verbatim.start(1) <= column < verbatim.end(1):
+            return namespace_docs.get('doc')
+        if verbatim.group(2) and verbatim.start(2) <= column < verbatim.end(2):
+            return (namespace_docs.get('parts') or {}).get(verbatim.group(2))
+        return None
     match = ANNOTATE_LINE_PATTERN.match(line_text)
     if match is None or not _is_offset_in_code_region(line_text, column):
         return None
@@ -646,14 +752,18 @@ def _with_hover_padding(html):
     return '<div style="padding:0 0 {}px 0;">{}</div>'.format(HOVER_EXTRA_BOTTOM_PADDING_PIXELS, html)
 
 
-def _render_markdown(markdown_text, hover_colors, heading_color=None, heading_prefix_color=None):
+def _render_markdown(markdown_text, hover_colors, heading_color=None, heading_prefix_color=None, code_renderer=None):
     return _markdown_to_minihtml(
         markdown_text, hover_colors,
-        heading_color=heading_color, heading_prefix_color=heading_prefix_color
+        heading_color=heading_color, heading_prefix_color=heading_prefix_color, code_renderer=code_renderer
     )
 
 
-def _markdown_to_minihtml(markdown_text, hover_colors, heading_color=None, heading_prefix_color=None):
+def _markdown_to_minihtml(
+    markdown_text, hover_colors, heading_color=None, heading_prefix_color=None, code_renderer=None,
+):
+    """``code_renderer``, when given, colors an inline code span: it takes the span's text and
+    returns its HTML, or None to use the usual inline code color."""
     lines = markdown_text.splitlines()
     html_parts = []
     paragraph_lines = []
@@ -666,20 +776,22 @@ def _markdown_to_minihtml(markdown_text, hover_colors, heading_color=None, headi
         if not paragraph_lines:
             return
         text = '<br>'.join(paragraph_lines)
-        html_parts.append('<p>{}</p>'.format(_render_inline(text)))
+        html_parts.append('<p>{}</p>'.format(_render_inline(text, code_renderer=code_renderer)))
         paragraph_lines[:] = []
 
     def flush_list():
         if not list_items:
             return
-        items = ''.join('<li>{}</li>'.format(_render_inline(item)) for item in list_items)
+        items = ''.join(
+            '<li>{}</li>'.format(_render_inline(item, code_renderer=code_renderer)) for item in list_items
+        )
         html_parts.append('<ul>{}</ul>'.format(items))
         list_items[:] = []
 
     def flush_table():
         if not table_rows:
             return
-        html_parts.append(_render_table(table_rows))
+        html_parts.append(_render_table(table_rows, code_renderer=code_renderer))
         table_rows[:] = []
 
     def flush_code():
@@ -728,7 +840,8 @@ def _markdown_to_minihtml(markdown_text, hover_colors, heading_color=None, headi
             content = _render_inline(
                 heading_text,
                 code_color=_heading_code_color(heading_text, hover_colors, color_override=heading_color),
-                prefix_color=heading_prefix_color
+                prefix_color=heading_prefix_color,
+                code_renderer=code_renderer,
             )
             html_parts.append('<h{0}>{1}</h{0}>'.format(level, content))
             continue
@@ -766,11 +879,19 @@ def _markdown_to_minihtml(markdown_text, hover_colors, heading_color=None, headi
     return ''.join(html_parts)
 
 
-def _render_inline(text, code_color=INLINE_CODE_COLOR, prefix_color=None):
+# A markdown link to a web page; the popup opens it in the browser (see _handle_hover_navigate).
+MARKDOWN_LINK_PATTERN = re.compile(r'\[([^\]]+)\]\((https?://[^)\s]+)\)')
+
+
+def _render_inline(text, code_color=INLINE_CODE_COLOR, prefix_color=None, code_renderer=None):
     escaped = html.escape(text)
 
     def _replace_code(match):
         content = match.group(1)
+        if code_renderer is not None:
+            rendered = code_renderer(html.unescape(content))
+            if rendered is not None:
+                return '<code>{}</code>'.format(rendered)
         if prefix_color:
             # Split directive prefix (#/.) from name for separate coloring
             prefix_match = re.match(r'^([#.])(\S+)$', content)
@@ -784,6 +905,7 @@ def _render_inline(text, code_color=INLINE_CODE_COLOR, prefix_color=None):
         return '<code style="color:{};">{}</code>'.format(code_color, content)
 
     escaped = re.sub(r'`([^`]+)`', _replace_code, escaped)
+    escaped = MARKDOWN_LINK_PATTERN.sub(r'<a href="\2">\1</a>', escaped)
     escaped = re.sub(r'\*\*([^*]+)\*\*', r'<strong>\1</strong>', escaped)
     escaped = re.sub(r'(?<!\*)\*([^*]+)\*(?!\*)', r'<em>\1</em>', escaped)
     return escaped
@@ -799,97 +921,192 @@ def _heading_code_color(heading_text, hover_colors, color_override=None):
     return hover_colors.get('instruction', DEFAULT_HOVER_COLORS['instruction'])
 
 
+# One token of a line of example code. Comments and strings come first, so a `;` or `#` inside a
+# string is part of it; directive forms (.2byte, #include) come before numbers and words.
+CODE_TOKEN_PATTERN = re.compile(
+    r'(?P<space>\s+)|'
+    r'(?P<comment>;.*)|'
+    r'(?P<string>"(?:[^"\\]|\\.)*"?|\'(?:[^\'\\]|\\.)*\'?)|'
+    r'(?P<directive>#[^\s;]+|\.\d*[A-Za-z]\w*)|'
+    r'(?P<number>0x[0-9a-fA-F]+|\$[0-9a-fA-F]+|\d+)|'
+    r'(?P<word>[A-Za-z_]\w*(?:\.\w+)*)|'      # a dotted mnemonic such as or.z is one word
+    r'(?P<other>.)'
+)
+# The instruction set's mnemonics: a line may hold several instructions, each colored as one.
+MNEMONIC_WORD_PATTERN = re.compile(r'(?:##MNEMONIC_PATTERN##)', re.IGNORECASE)
+CODE_PREPROCESSOR_NAMES = {
+    'include', 'require', 'error', 'create_memzone', 'print',
+    'define', 'if', 'elif', 'else', 'endif', 'ifdef', 'ifndef',
+    'mute', 'unmute', 'emit', 'create-scope', 'use-scope', 'deactivate-scope',
+    'annotate', 'verbatim', 'endverbatim',
+}
+CODE_COMPILER_DIRECTIVE_NAMES = {'org', 'memzone', 'align'}
+CODE_DATA_TYPE_NAMES = {
+    'fill', 'zero', 'zerountil',
+    'byte', '2byte', '4byte', '8byte', '16byte', 'cstr', 'asciiz',
+}
+
+
+def _code_colors(hover_colors):
+    """The colors of example code, as the syntax colors it in the editor."""
+    def color(key, fallback=None):
+        return hover_colors.get(key, DEFAULT_HOVER_COLORS.get(key, fallback))
+    instruction = color('instruction')
+    punctuation = color('punctuation')
+    return {
+        'instruction': instruction,
+        'parameter': color('parameter'),
+        'number': color('number'),
+        'punctuation': punctuation,
+        'preprocessor': color('preprocessor', instruction),
+        'punctuation_preprocessor': color('punctuation_preprocessor', punctuation),
+        'directive': color('directive', instruction),
+        'data_type': color('data_type', instruction),
+        'annotation_namespace': color('annotation_namespace', instruction),
+        'annotation_argument': color('annotation_argument', instruction),
+        'annotation_value': color('annotation_value', instruction),
+        'string': color('string', punctuation),
+        'punctuation_string': color('punctuation_string', punctuation),
+        'comment': color('comment', punctuation),
+        'label': color('label', instruction),
+        'label_colon': color('label_colon', punctuation),
+        'verbatim_text': color('verbatim_text', punctuation),
+    }
+
+
+def _code_span(color, text):
+    escaped = html.escape(text.replace('\t', '    ')).replace(' ', '&nbsp;')
+    return '<span style="color:{};">{}</span>'.format(color, escaped)
+
+
+def _color_code_line(line, colors, state):
+    """One line of example code as colored HTML. ``state`` carries what a line leaves open for
+    the next: a #verbatim block's text, or an #annotate line continued with a trailing \\."""
+    stripped = line.strip()
+    if state.get('in_verbatim'):
+        if not re.match(r'#endverbatim(?=\s|;|$)', stripped):
+            return _code_span(colors['verbatim_text'], line)
+        state['in_verbatim'] = False
+    annotate_continued = state.pop('annotate_continues', False)
+    if re.match(r'#annotate(?=\s|$)', stripped):
+        kind = 'annotate'
+    elif re.match(r'#verbatim(?=\s|;|$)', stripped):
+        kind = 'verbatim'
+        state['in_verbatim'] = True
+    elif annotate_continued:
+        kind = 'annotate_arguments'
+    else:
+        kind = None
+    tokens = list(CODE_TOKEN_PATTERN.finditer(line))
+    parts = []
+    seen_mnemonic = False
+    namespace_seen = False
+    previous = None            # the last token that is not space
+    label_pending = False      # a label definition's word was just written; its colon follows
+    for index, match in enumerate(tokens):
+        group, text = match.lastgroup, match.group(0)
+        if group == 'space':
+            parts.append(text.replace('\t', '    ').replace(' ', '&nbsp;'))
+            continue
+        if group == 'comment':
+            parts.append(_code_span(colors['comment'], text))
+        elif group == 'string':
+            quote = text[0]
+            closed = len(text) > 1 and text.endswith(quote)
+            parts.append(_code_span(colors['punctuation_string'], quote))
+            parts.append(_code_span(colors['string'], text[1:-1] if closed else text[1:]))
+            if closed:
+                parts.append(_code_span(colors['punctuation_string'], quote))
+        elif group == 'directive' and not seen_mnemonic and _code_directive_colors(text, colors):
+            prefix_color, name_color = _code_directive_colors(text, colors)
+            parts.append(_code_span(prefix_color, text[0]))
+            parts.append(_code_span(name_color, text[1:]))
+            seen_mnemonic = True
+        elif group == 'number':
+            parts.append(_code_span(colors['number'], text))
+        elif group == 'word' and kind in ('annotate', 'verbatim') and not namespace_seen:
+            parts.append(_code_span(colors['annotation_namespace'], text))
+            namespace_seen = True
+        elif group == 'word' and kind == 'verbatim':
+            parts.append(_code_span(colors['annotation_value'], text))       # the block's part
+        elif group == 'word' and kind in ('annotate', 'annotate_arguments'):
+            role = 'annotation_value' if previous == '=' else 'annotation_argument'
+            parts.append(_code_span(colors[role], text))
+        elif (
+            (group == 'word' or text.startswith('.')) and not seen_mnemonic
+            and _next_code_token(tokens, index) == ':'
+        ):
+            parts.append(_code_span(colors['label'], text))
+            label_pending = True
+        elif group == 'word':
+            is_instruction = not seen_mnemonic or MNEMONIC_WORD_PATTERN.fullmatch(text) is not None
+            parts.append(_code_span(colors['instruction' if is_instruction else 'parameter'], text))
+            seen_mnemonic = True
+        elif text == ':' and label_pending:
+            parts.append(_code_span(colors['label_colon'], text))
+            label_pending = False
+        else:
+            if kind in ('annotate', 'annotate_arguments') and text == '\\' and _next_code_token(tokens, index) is None:
+                state['annotate_continues'] = True
+            parts.append(_code_span(colors['punctuation'], text))
+        previous = text
+    return ''.join(parts)
+
+
+def _next_code_token(tokens, index):
+    """The text of the next token after ``tokens[index]`` that is not space, or None."""
+    for match in tokens[index + 1:]:
+        if match.lastgroup != 'space':
+            return match.group(0)
+    return None
+
+
+def _code_directive_colors(text, colors):
+    """(prefix color, name color) for a directive token such as #include or .byte, or None."""
+    name = text[1:].lower()
+    if text.startswith('#') and name in CODE_PREPROCESSOR_NAMES:
+        return colors['punctuation_preprocessor'], colors['preprocessor']
+    if text.startswith('.') and name in CODE_DATA_TYPE_NAMES:
+        return colors['data_type'], colors['data_type']
+    if text.startswith('.') and name in CODE_COMPILER_DIRECTIVE_NAMES:
+        return colors['directive'], colors['directive']
+    return None
+
+
 def _render_code_block(lines, hover_colors):
-    instruction_color = hover_colors.get('instruction', DEFAULT_HOVER_COLORS['instruction'])
-    parameter_color = hover_colors.get('parameter', DEFAULT_HOVER_COLORS['parameter'])
-    number_color = hover_colors.get('number', DEFAULT_HOVER_COLORS['number'])
-    punctuation_color = hover_colors.get('punctuation', DEFAULT_HOVER_COLORS['punctuation'])
-    preprocessor_color = hover_colors.get('preprocessor', DEFAULT_HOVER_COLORS.get('preprocessor', instruction_color))
-    directive_color = hover_colors.get('directive', DEFAULT_HOVER_COLORS.get('directive', instruction_color))
-    data_type_color = hover_colors.get('data_type', DEFAULT_HOVER_COLORS.get('data_type', instruction_color))
-    punctuation_preproc_color = hover_colors.get(
-        'punctuation_preprocessor', DEFAULT_HOVER_COLORS.get('punctuation_preprocessor', punctuation_color)
-    )
-
-    # Tokenizer: directive forms (.2byte, #include) must precede generic
-    # number/word patterns so they are captured as single tokens.
-    token_re = re.compile(
-        r'\s+|'
-        r'#\S+|'
-        r'\.\d*[A-Za-z]\w*|'
-        r'0x[0-9a-fA-F]+|\$[0-9a-fA-F]+|\d+|'
-        r'[A-Za-z_][\w\d_]*|'
-        r'.'
-    )
-
-    # Known directive names for code block coloring
-    preprocessor_names = {
-        'include', 'require', 'error', 'create_memzone', 'print',
-        'define', 'if', 'elif', 'else', 'endif', 'ifdef', 'ifndef',
-        'mute', 'unmute', 'emit', 'create-scope', 'use-scope', 'deactivate-scope',
-    }
-    compiler_directive_names = {'org', 'memzone', 'align'}
-    data_type_names = {
-        'fill', 'zero', 'zerountil',
-        'byte', '2byte', '4byte', '8byte', '16byte', 'cstr', 'asciiz',
-    }
-
-    def _classify_directive_token(token_text):
-        """Return (prefix_color, name_color) for a directive token, or None."""
-        if token_text.startswith('#'):
-            name = token_text[1:].lower()
-            if name in preprocessor_names:
-                return punctuation_preproc_color, preprocessor_color
-        elif token_text.startswith('.'):
-            name = token_text[1:].lower()
-            if name in data_type_names:
-                return data_type_color, data_type_color
-            if name in compiler_directive_names:
-                return directive_color, directive_color
-        return None
-
-    rendered_lines = []
-    for line in lines:
-        parts = []
-        seen_mnemonic = False
-
-        for match in token_re.finditer(line):
-            token = match.group(0)
-            if token.isspace():
-                token = token.replace('\t', '    ')
-                parts.append(token.replace(' ', '&nbsp;'))
-                continue
-            # Check for directive tokens (.byte, .2byte, #include, etc.)
-            if not seen_mnemonic and (token.startswith('.') or token.startswith('#')):
-                dir_colors = _classify_directive_token(token)
-                if dir_colors:
-                    prefix_color, name_color = dir_colors
-                    prefix = token[0]
-                    name = token[1:]
-                    parts.append('<span style="color:{};">{}</span>'.format(
-                        prefix_color, html.escape(prefix)
-                    ))
-                    parts.append('<span style="color:{};">{}</span>'.format(
-                        name_color, html.escape(name)
-                    ))
-                    seen_mnemonic = True
-                    continue
-            if re.match(r'^(0x[0-9a-fA-F]+|\$[0-9a-fA-F]+|\d+)$', token):
-                color = number_color
-            elif re.match(r'^[A-Za-z_][\w\d_]*$', token):
-                if not seen_mnemonic:
-                    color = instruction_color
-                    seen_mnemonic = True
-                else:
-                    color = parameter_color
-            else:
-                color = punctuation_color
-            escaped = html.escape(token)
-            parts.append('<span style="color:{};">{}</span>'.format(color, escaped))
-        rendered_lines.append(''.join(parts))
-
-    html_lines = '<br>'.join(rendered_lines)
+    colors = _code_colors(hover_colors)
+    state = {}
+    html_lines = '<br>'.join(_color_code_line(line, colors, state) for line in lines)
     return '<div style="font-family: monospace;">{}</div>'.format(html_lines)
+
+
+def _annotation_roles(annotation_docs):
+    """The annotation namespaces, argument names and enum values the docs name, by role."""
+    roles = {'namespaces': set(annotation_docs), 'arguments': set(), 'values': set()}
+    for namespace_docs in annotation_docs.values():
+        roles['arguments'].update(namespace_docs.get('arguments', {}))
+        roles['values'].update(namespace_docs.get('values', []))
+    return roles
+
+
+def _annotation_code_renderer(hover_colors, annotation_docs):
+    """Colors inline code in annotation hovers as the syntax does: a namespace, an argument or a
+    value by its role, and directive text such as `#annotate xmin kind=var` or `name=AddW` as code."""
+    colors = _code_colors(hover_colors)
+    roles = _annotation_roles(annotation_docs)
+
+    def render(content):
+        for role, color_key in (
+            ('namespaces', 'annotation_namespace'), ('arguments', 'annotation_argument'), ('values', 'annotation_value'),
+        ):
+            if content in roles[role]:
+                return _code_span(colors[color_key], content)
+        if re.match(r'#(?:annotate|verbatim|endverbatim)\b', content):
+            return _color_code_line(content, colors, {})
+        if re.match(r'[A-Za-z_]\w*=\S', content):
+            return _color_code_line(content, colors, {'annotate_continues': True})
+        return None
+    return render
 
 
 def _is_table_row(line):
@@ -924,7 +1141,7 @@ def _parse_table_row(line):
     return cells
 
 
-def _render_table(rows):
+def _render_table(rows, code_renderer=None):
     if not rows:
         return ''
     header = None
@@ -1018,7 +1235,7 @@ def _render_table(rows):
                 wrap_set.add(last_idx)
 
     def render_cell_line(line, width, is_header, is_last):
-        rendered = _render_inline(line) if line else ''
+        rendered = _render_inline(line, code_renderer=code_renderer) if line else ''
         line_len = display_length(line) if line else 0
         prefix = '&nbsp;' * TABLE_CELL_LEFT_PAD
         spacer = '&nbsp;' * TABLE_CELL_RIGHT_PAD
@@ -1202,6 +1419,30 @@ class BespokeAsmHoverListener(sublime_plugin.EventListener):
         hover_colors = _load_hover_colors(view)
         max_width = _get_hover_max_width(view, DEFAULT_HOVER_MAX_WIDTH)
 
+        # A later line of a continued #annotate holds only arguments of the namespace named on
+        # the #annotate line.
+        row = view.rowcol(point)[0]
+        annotate_row = _annotate_continuation_start(
+            lambda r: view.substr(view.line(view.text_point(r, 0))), row
+        )
+        if annotate_row >= 0:
+            header = ANNOTATE_LINE_PATTERN.match(view.substr(view.line(view.text_point(annotate_row, 0))))
+            if not (docs and hover_mnemonics and header):
+                return
+            line_region = view.line(point)
+            prefix = '#annotate {} '.format(header.group(1))
+            annotation_doc = _get_annotation_doc(
+                prefix + view.substr(line_region), len(prefix) + point - line_region.begin(),
+                docs.get('annotations', {}),
+            )
+            if annotation_doc:
+                popup_html = _render_markdown(
+                    annotation_doc, hover_colors,
+                    code_renderer=_annotation_code_renderer(hover_colors, docs.get('annotations', {})),
+                )
+                _show_popup(view, popup_html, point, max_width)
+            return
+
         # Check directives first (these have their own token patterns)
         if docs and hover_mnemonics:
             all_directives = docs.get('directives', {})
@@ -1220,9 +1461,14 @@ class BespokeAsmHoverListener(sublime_plugin.EventListener):
                         prefix_color = hover_colors.get(
                             prefix_color_key, DEFAULT_HOVER_COLORS.get(prefix_color_key)
                         ) if prefix_color_key else None
+                        code_renderer = (
+                            _annotation_code_renderer(hover_colors, docs.get('annotations', {}))
+                            if directive_name in ('annotate', 'verbatim', 'endverbatim') else None
+                        )
                         popup_html = _render_markdown(
                             category_docs[directive_name], hover_colors,
-                            heading_color=heading_color, heading_prefix_color=prefix_color
+                            heading_color=heading_color, heading_prefix_color=prefix_color,
+                            code_renderer=code_renderer,
                         )
                         _show_popup(view, popup_html, point, max_width)
                         return
@@ -1234,7 +1480,10 @@ class BespokeAsmHoverListener(sublime_plugin.EventListener):
                 view.substr(line_region), point - line_region.begin(), docs.get('annotations', {})
             )
             if annotation_doc:
-                popup_html = _render_markdown(annotation_doc, hover_colors)
+                popup_html = _render_markdown(
+                    annotation_doc, hover_colors,
+                    code_renderer=_annotation_code_renderer(hover_colors, docs.get('annotations', {})),
+                )
                 _show_popup(view, popup_html, point, max_width)
                 return
 

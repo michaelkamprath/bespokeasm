@@ -243,9 +243,11 @@ class MarkdownGenerator:
     def _declared_annotations(self) -> list[dict[str, Any]]:
         return [namespace for namespace in self.doc_model.annotations if not namespace.get('builtin')]
 
-    def _namespace_body(self, namespace: dict[str, Any], heading_level: int) -> list[str]:
+    def _namespace_body(self, namespace: dict[str, Any], heading_level: int, hover: bool = False) -> list[str]:
         """A namespace's description, where it applies, its arguments, its constraints and its
-        examples. ``heading_level`` is the level of the namespace's own heading."""
+        examples. ``heading_level`` is the level of the namespace's own heading. ``hover`` lists
+        the arguments one per line instead of in a table, which a hover is too narrow for; an
+        argument's own hover has its values' descriptions."""
         singular_unit, plural_unit = self._hover_size_units()
         parts = []
         if namespace.get('description'):
@@ -254,8 +256,23 @@ class MarkdownGenerator:
         scopes = namespace['scopes']
         scope_text = 'any scope' if len(scopes) == 3 else f"{' or '.join(scopes)} scope"
         parts.append(f'Applies to {kinds}, in {scope_text}.')
+        if namespace.get('verbatim'):
+            verbatim = f"Accepts `#verbatim {namespace['name']}` text blocks"
+            description = namespace['verbatim'].get('description')
+            parts.append(f'{verbatim}: {description}' if description else f'{verbatim}.')
+            verbatim_parts = namespace['verbatim'].get('parts') or []
+            if verbatim_parts:
+                parts.append('A block can name a part, which an output format places separately:')
+                parts.append('\n'.join(
+                    f"- `#verbatim {namespace['name']} {part['name']}`"
+                    + (f": {part['description']}" if part.get('description') else '')
+                    for part in verbatim_parts
+                ))
+        if hover and namespace['arguments']:
+            parts.append('**Arguments:**')
+            parts.append('\n'.join(self._argument_line(argument) for argument in namespace['arguments']))
         rows = []
-        for argument in namespace['arguments']:
+        for argument in namespace['arguments'] if not hover else []:
             rows.append([
                 f"`{argument['name']}`",
                 self._argument_description(argument),
@@ -273,9 +290,8 @@ class MarkdownGenerator:
         data_size = namespace.get('data_size')
         if data_size:
             parts.append(self._data_size_text(data_size, singular_unit, plural_unit))
-        value_range = namespace.get('value_range')
-        if value_range:
-            parts.append(self._value_range_text(value_range))
+        for rule in namespace.get('value_range') or []:
+            parts.append(self._value_range_text(rule))
         examples = namespace.get('examples') or []
         if examples:
             parts.append(f"{'#' * (heading_level + 1)} Examples")
@@ -286,6 +302,19 @@ class MarkdownGenerator:
                     parts.append(str(example['description']))
                 parts.append(f"```assembly\n{example['code']}\n```")
         return parts
+
+    def _argument_line(self, argument: dict[str, Any]) -> str:
+        """One argument as a list line: `kind`: enum (`addr`, `var`, `const`), required. Description."""
+        values = (
+            ', '.join(f'`{value}`' for value in argument['values']) if argument['type'] == 'enum'
+            else self._argument_values(argument)
+        )
+        facts = [f"{argument['type']} ({values})" if values else argument['type'], self._argument_presence(argument)]
+        if argument['has_default']:
+            facts.append(f"default `{argument['default']}`")
+        line = f"- `{argument['name']}`: {', '.join(facts)}."
+        description = self._argument_description(argument)
+        return f'{line} {description}' if description else line
 
     @staticmethod
     def _argument_description(argument: dict[str, Any]) -> str:
@@ -303,21 +332,41 @@ class MarkdownGenerator:
 
     def generate_annotation_hover_docs(self) -> dict[str, dict[str, Any]]:
         """Hover markdown for each annotation namespace and each of its arguments, keyed by
-        namespace: ``{'doc': ..., 'arguments': {name: ...}}``. Includes the framework's ``listing``."""
+        namespace: ``{'doc': ..., 'arguments': {name: ...}, 'values': [...], 'parts': {name: ...}}``,
+        where ``values`` are the namespace's enum values and ``parts`` its ``#verbatim`` parts.
+        Includes the framework's ``listing``."""
         docs: dict[str, dict[str, Any]] = {}
         singular_unit, plural_unit = self._hover_size_units()
         for namespace in getattr(self.doc_model, 'annotations', None) or []:
             name = namespace['name']
             heading = 'Framework Annotation' if namespace.get('builtin') else 'Annotation'
             namespace_doc = '\n\n'.join([
-                f'### `{name}` : {heading}', '---', *self._namespace_body(namespace, heading_level=3),
+                f'### `{name}` : {heading}', '---', *self._namespace_body(namespace, heading_level=3, hover=True),
             ])
             arguments = {
                 argument['name']: self._argument_hover(namespace, argument, singular_unit, plural_unit)
                 for argument in namespace['arguments']
             }
-            docs[name] = {'doc': namespace_doc, 'arguments': arguments}
+            # The enum values, so an editor can color them in a hover as the syntax does.
+            values = sorted({
+                str(value) for argument in namespace['arguments'] if argument['type'] == 'enum'
+                for value in argument['values']
+            })
+            parts = {
+                part['name']: self._verbatim_part_hover(name, part)
+                for part in (namespace.get('verbatim') or {}).get('parts') or []
+            }
+            docs[name] = {'doc': namespace_doc, 'arguments': arguments, 'values': values, 'parts': parts}
         return docs
+
+    @staticmethod
+    def _verbatim_part_hover(namespace_name: str, part: dict[str, Any]) -> str:
+        sections = [f"### `{part['name']}` : `#verbatim {namespace_name}` Part", '---']
+        sections.append(
+            str(part['description']) if part.get('description')
+            else 'An output format places these blocks separately.'
+        )
+        return '\n\n'.join(sections)
 
     def _argument_hover(
         self, namespace: dict[str, Any], argument: dict[str, Any], singular_unit: str, plural_unit: str,
@@ -344,9 +393,9 @@ class MarkdownGenerator:
         data_size = namespace.get('data_size')
         if data_size and argument['name'] in data_size.get('arguments', []):
             sections.append(self._data_size_text(data_size, singular_unit, plural_unit))
-        value_range = namespace.get('value_range')
-        if value_range and argument['name'] in value_range.get('arguments', []):
-            sections.append(self._value_range_text(value_range))
+        for rule in namespace.get('value_range') or []:
+            if argument['name'] in rule.get('arguments', []):
+                sections.append(self._value_range_text(rule))
         return '\n\n'.join(sections)
 
     @staticmethod

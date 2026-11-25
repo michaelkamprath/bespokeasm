@@ -17,6 +17,7 @@ from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.line_object.predefined_data import PredefinedDataLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.assembler.output_format import available_output_formats
 from bespokeasm.assembler.output_format import resolve_output_format
 from bespokeasm.assembler.output_format.base import OutputFormat
 from bespokeasm.assembler.output_format.base import RenderContext
@@ -125,6 +126,8 @@ class Assembler:
             self._model.predefined_symbols,
             self._model,
             diagnostic_reporter=self._diagnostic_reporter,
+            output_format=output_format.name if output_format is not None else None,
+            output_format_names=tuple(available_output_formats(self._model)),
         )
         # add any predefined macros from the command line
         preprocessor.add_cli_symbols(self._predefined_symbols)
