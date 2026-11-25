@@ -66,12 +66,9 @@ BUILTIN_CONSTANT_DOCS: dict[str, str] = {
     '__OUTPUT_FORMAT__': (
         '### `__OUTPUT_FORMAT__` : Selected Output Format\n\n'
         '---\n\n'
-        'An always-defined preprocessor symbol naming the output format '
-        'selected with `-p -t`, such as `listing` or `intel_hex`. With `-p` '
-        'and no `-t` it is `listing`; without `-p` no format is selected and '
-        'it is `0`.\n\n'
-        'Use it with `#if` or `#elif` to choose source for one build, such as '
-        'a memory zone that only one format defines:\n\n'
+        'Names the output format selected with `-p -t` (`listing` with `-p` '
+        'alone), or is `0` without `-p`. Use it with `#if` to choose source '
+        'for one format:\n\n'
         '```\n'
         '#if __OUTPUT_FORMAT__ == xmin\n'
         '.memzone XMIN_USER_CODE\n'
@@ -79,9 +76,9 @@ BUILTIN_CONSTANT_DOCS: dict[str, str] = {
         '.org $8000\n'
         '#endif\n'
         '```\n\n'
-        'It compares as text with `==` or `!=`, one comparison per directive. '
-        'Comparing it with a name that is neither a built-in format nor one '
-        'the configuration defines is a warning.'
+        'It compares as text with `==` or `!=`. Comparing it with a name that '
+        'is neither a built-in format nor one the configuration defines is a '
+        'warning.'
     ),
 }
 
