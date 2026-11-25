@@ -243,9 +243,11 @@ class MarkdownGenerator:
     def _declared_annotations(self) -> list[dict[str, Any]]:
         return [namespace for namespace in self.doc_model.annotations if not namespace.get('builtin')]
 
-    def _namespace_body(self, namespace: dict[str, Any], heading_level: int) -> list[str]:
+    def _namespace_body(self, namespace: dict[str, Any], heading_level: int, hover: bool = False) -> list[str]:
         """A namespace's description, where it applies, its arguments, its constraints and its
-        examples. ``heading_level`` is the level of the namespace's own heading."""
+        examples. ``heading_level`` is the level of the namespace's own heading. ``hover`` lists
+        the arguments one per line instead of in a table, which a hover is too narrow for; an
+        argument's own hover has its values' descriptions."""
         singular_unit, plural_unit = self._hover_size_units()
         parts = []
         if namespace.get('description'):
@@ -266,8 +268,11 @@ class MarkdownGenerator:
                     + (f": {part['description']}" if part.get('description') else '')
                     for part in verbatim_parts
                 ))
+        if hover and namespace['arguments']:
+            parts.append('**Arguments:**')
+            parts.append('\n'.join(self._argument_line(argument) for argument in namespace['arguments']))
         rows = []
-        for argument in namespace['arguments']:
+        for argument in namespace['arguments'] if not hover else []:
             rows.append([
                 f"`{argument['name']}`",
                 self._argument_description(argument),
@@ -298,6 +303,19 @@ class MarkdownGenerator:
                 parts.append(f"```assembly\n{example['code']}\n```")
         return parts
 
+    def _argument_line(self, argument: dict[str, Any]) -> str:
+        """One argument as a list line: `kind`: enum (`addr`, `var`, `const`), required. Description."""
+        values = (
+            ', '.join(f'`{value}`' for value in argument['values']) if argument['type'] == 'enum'
+            else self._argument_values(argument)
+        )
+        facts = [f"{argument['type']} ({values})" if values else argument['type'], self._argument_presence(argument)]
+        if argument['has_default']:
+            facts.append(f"default `{argument['default']}`")
+        line = f"- `{argument['name']}`: {', '.join(facts)}."
+        description = self._argument_description(argument)
+        return f'{line} {description}' if description else line
+
     @staticmethod
     def _argument_description(argument: dict[str, Any]) -> str:
         return argument.get('description') or ''
@@ -314,20 +332,26 @@ class MarkdownGenerator:
 
     def generate_annotation_hover_docs(self) -> dict[str, dict[str, Any]]:
         """Hover markdown for each annotation namespace and each of its arguments, keyed by
-        namespace: ``{'doc': ..., 'arguments': {name: ...}}``. Includes the framework's ``listing``."""
+        namespace: ``{'doc': ..., 'arguments': {name: ...}, 'values': [...]}``, where ``values`` are
+        the namespace's enum values. Includes the framework's ``listing``."""
         docs: dict[str, dict[str, Any]] = {}
         singular_unit, plural_unit = self._hover_size_units()
         for namespace in getattr(self.doc_model, 'annotations', None) or []:
             name = namespace['name']
             heading = 'Framework Annotation' if namespace.get('builtin') else 'Annotation'
             namespace_doc = '\n\n'.join([
-                f'### `{name}` : {heading}', '---', *self._namespace_body(namespace, heading_level=3),
+                f'### `{name}` : {heading}', '---', *self._namespace_body(namespace, heading_level=3, hover=True),
             ])
             arguments = {
                 argument['name']: self._argument_hover(namespace, argument, singular_unit, plural_unit)
                 for argument in namespace['arguments']
             }
-            docs[name] = {'doc': namespace_doc, 'arguments': arguments}
+            # The enum values, so an editor can color them in a hover as the syntax does.
+            values = sorted({
+                str(value) for argument in namespace['arguments'] if argument['type'] == 'enum'
+                for value in argument['values']
+            })
+            docs[name] = {'doc': namespace_doc, 'arguments': arguments, 'values': values}
         return docs
 
     def _argument_hover(

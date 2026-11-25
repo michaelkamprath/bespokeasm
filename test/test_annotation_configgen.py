@@ -149,6 +149,19 @@ def test_vscode_grammar(config_path, tmp_path):
     assert block['endCaptures']['3']['name'] == 'comment.line.semicolon'
     assert rules['string.unquoted.verbatim']['settings']['foreground'] == _color(SyntaxElement.VERBATIM_TEXT)
 
+    # A trailing \ on a data directive or embedded string: a main rule, so instruction and other
+    # directive lines, whose rules end at the line's end, never reach it.
+    assert grammar['repository']['line_continuation'] == {
+        'match': '\\\\(?=\\s*$)', 'name': 'punctuation.separator.continuation',
+    }
+    assert {'include': '#line_continuation'} in grammar['repository']['main']['patterns']
+    for name in ('instructions', 'directives'):
+        assert '#line_continuation' not in json.dumps(grammar['repository'][name])
+    continuation = re.compile(grammar['repository']['line_continuation']['match'])
+    assert continuation.search('.cstr "a" \\').start() == len('.cstr "a" ')
+    assert continuation.search('"world" \\  ').start() == len('"world" ')
+    assert continuation.search('.cstr "a\\" x') is None
+
 
 def test_sublime_syntax(config_path, tmp_path):
     generator, destination = _generator(SublimeConfigGenerator, config_path, tmp_path)
@@ -194,6 +207,14 @@ def test_sublime_syntax(config_path, tmp_path):
     ]
     assert 'string.unquoted.verbatim' in color_scheme
     assert 'variable.parameter.annotation' in color_scheme
+    # A trailing \ on a data directive or embedded string, in main and in the data directive.
+    assert contexts['line_continuation'] == [
+        {'match': '\\\\(?=\\s*$)', 'scope': 'punctuation.separator.continuation'},
+    ]
+    assert {'include': 'line_continuation'} in contexts['main']
+    data_directive = next(rule for rule in contexts['data_types_directives'] if 'push' in rule)
+    assert {'include': 'line_continuation'} in data_directive['push']
+    assert re.search(contexts['line_continuation'][0]['match'], '.byte 1, \\ ').start() == len('.byte 1, ')
 
 
 def test_vim_syntax(config_path, tmp_path):
@@ -283,6 +304,51 @@ def test_vim_verbatim_block_highlighting(config_path, tmp_path):
     assert 'Verbatim' not in groups[4]
     assert groups[5] == ['VerbatimPunc', 'VerbatimDirective', 'VerbatimNamespace', 'VerbatimPart', 'VerbatimComment']
     assert groups[6] == ['Verbatim']
+
+
+def test_vim_continued_data_line_highlighting(config_path, tmp_path):
+    """In Vim, the trailing \\ of a data directive or embedded string is Continuation; on an
+    instruction, an #annotate line or in a comment, it keeps that line's group."""
+    import shutil
+    import subprocess
+    vim = shutil.which('vim')
+    if not vim:
+        pytest.skip('vim is not available')
+    generator, destination = _generator(VimConfigGenerator, config_path, tmp_path)
+    generator.generate()
+    vim_ft = generator.language_id.replace('-', '').lower()
+    source = tmp_path / 'continued.testasm'
+    source.write_text(
+        'msg: .cstr "ab" \\\n'
+        '      "cd" \\\n'
+        '      "e"   ; done\n'
+        '.byte 1, 2, \\\n'
+        '  3\n'
+        '  ld a, b, c \\\n'
+        '#annotate xmin kind=var \\\n'
+        '   count=2\n'
+        '; C:\\dir\\\n'
+    )
+    output = tmp_path / 'groups.out'
+    script = tmp_path / 'groups.vim'
+    script.write_text('\n'.join([
+        'let out = []',
+        'for lnum in range(1, 9)',
+        "  let col = match(getline(lnum), '\\\\\\s*$') + 1",
+        "  call add(out, col > 0 ? synIDattr(synID(lnum, col, 1), 'name') : '-')",
+        'endfor',
+        f"call writefile(out, '{output}')",
+    ]) + '\n')
+    subprocess.run(
+        [vim, '-u', 'NONE', '-N', '-es', '-c', f'set rtp={destination},$VIMRUNTIME', '-c', 'syntax on',
+         '-c', f'set ft={vim_ft}', '-c', f'source {script}', '-c', 'qa!', str(source)],
+        capture_output=True, text=True, timeout=60,
+    )
+    groups = [line.replace(vim_ft, '') for line in output.read_text().splitlines()]
+    assert groups == [
+        'Continuation', 'Continuation', '-', 'Continuation', '-',
+        'InstrLine', 'AnnotationPunct', '-', 'Comment',
+    ]
 
 
 # ---- hover lookups on #annotate lines --------------------------------------------------
@@ -384,6 +450,275 @@ def test_vscode_annotation_hover_lookup(config_path, tmp_path):
     )
 
 
+# A source whose #verbatim block assigns xmin variables and has an #include: neither is assembly.
+VERBATIM_SOURCE = [
+    'PORT = $10',
+    '#verbatim xmin header ; the block',
+    'prvBeg = start',
+    '#include "inside.asm"',
+    '#endverbatim',
+    'LIMIT = 4',
+]
+# Each block line becomes spaces of its own length, so offsets computed from the lines stay exact.
+MASKED_VERBATIM_SOURCE = [
+    'PORT = $10', '#verbatim xmin header ; the block', ' ' * len('prvBeg = start'),
+    ' ' * len('#include "inside.asm"'), '#endverbatim', 'LIMIT = 4',
+]
+
+
+# Symbols used after a #verbatim block. A semantic pass that lost the block's line lengths would
+# place its highlights early, on other text.
+SEMANTIC_SOURCE = [
+    '#verbatim xmin header',
+    '# a long line of block text, which an empty mask would drop from the offsets',
+    'prvBeg = start',
+    '#endverbatim',
+    'LIMIT = 4',
+    'start:',
+    '  .byte LIMIT, start   ; start and LIMIT',
+]
+
+
+def _generated_sublime_plugin(config_path, tmp_path):
+    """The generated Sublime plugin, with its symbol patterns filled in from the configuration."""
+    import importlib.util
+    import sys
+    import types
+    sys.modules.setdefault('sublime', types.SimpleNamespace())
+    sys.modules.setdefault('sublime_plugin', types.SimpleNamespace(EventListener=object))
+    generator, destination = _generator(SublimeConfigGenerator, config_path, tmp_path)
+    generator.generate()
+    with zipfile.ZipFile(destination / 'test-lang.sublime-package') as package:
+        (name,) = (item for item in package.namelist() if item.startswith('bespokeasm_hover'))
+        module_path = tmp_path / name
+        module_path.write_bytes(package.read(name))
+    spec = importlib.util.spec_from_file_location(f'bespokeasm_hover_{tmp_path.name}', str(module_path))
+    hover = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(hover)
+    return hover
+
+
+def test_sublime_plugin_ignores_verbatim_block_text(config_path, tmp_path):
+    """The Sublime plugin's symbol lookups and semantic pass do not read a #verbatim block's text."""
+    import pathlib
+    hover = _generated_sublime_plugin(config_path, tmp_path)
+    assert hover._mask_verbatim_blocks(VERBATIM_SOURCE) == MASKED_VERBATIM_SOURCE
+    (tmp_path / 'inside.asm').write_text('INSIDE = 1\n')
+    (tmp_path / 'lib.asm').write_text('\n'.join(VERBATIM_SOURCE) + '\n')
+    entries = hover._collect_included_files(['#include "lib.asm"'], str(tmp_path))
+    assert [pathlib.Path(entry['path']).name for entry in entries] == ['lib.asm']   # not inside.asm
+    assert entries[0]['lines'] == MASKED_VERBATIM_SOURCE
+    constants = hover._build_definition_map([{'path': 'main.asm', 'lines': MASKED_VERBATIM_SOURCE}], 'constant')
+    assert sorted(constants) == ['LIMIT', 'PORT']
+
+
+def test_sublime_semantic_regions_cover_their_symbols(config_path, tmp_path):
+    """Each usage region the Sublime plugin draws covers exactly the symbol it marks, after a
+    #verbatim block too: the regions are placed by offsets computed from the lines."""
+    import types
+    hover = _generated_sublime_plugin(config_path, tmp_path)
+
+    class Region:
+        def __init__(self, a, b):
+            self.a, self.b = a, b
+
+    class View:
+        def __init__(self, text):
+            self.text, self.regions = text, {}
+
+        def id(self):
+            return 1
+
+        def change_count(self):
+            return 1
+
+        def file_name(self):
+            return None
+
+        def size(self):
+            return len(self.text)
+
+        def substr(self, region):
+            return self.text[region.a:region.b]
+
+        def add_regions(self, key, regions, scope=None, flags=0):
+            self.regions[key] = [(region.a, self.text[region.a:region.b]) for region in regions]
+
+        def erase_regions(self, key):
+            self.regions.pop(key, None)
+
+    hover.sublime = types.SimpleNamespace(Region=Region, DRAW_SOLID_UNDERLINE=0)
+    hover._is_bespokeasm_view = lambda view: True
+    hover._get_semantic_setting = lambda view: True
+    text = '\n'.join(SEMANTIC_SOURCE) + '\n'
+    view = View(text)
+    hover._update_semantic_regions(view)
+    usage_line = text.index('  .byte')
+    # One usage each: none in the block, the comment, or the definitions.
+    assert view.regions['bespokeasm_constant_usages'] == [(text.index('LIMIT', usage_line), 'LIMIT')]
+    assert view.regions['bespokeasm_label_usages'] == [(text.index('start', usage_line), 'start')]
+
+
+SEMANTIC_NODE_PROBE = r'''
+const Module = require('module');
+const fs = require('fs');
+const path = require('path');
+const extensionDir = process.argv[2];
+const lines = JSON.parse(process.argv[3]);
+const original = Module._load;
+Module._load = function (request, ...rest) {
+  if (request === 'vscode') {
+    return {
+      SemanticTokensLegend: class { constructor(types, modifiers) { this.types = types; this.modifiers = modifiers; } },
+      SemanticTokensBuilder: class {
+        constructor() { this.tokens = []; }
+        push(line, character, length, type, modifiers) { this.tokens.push([line, character, length, type, modifiers]); }
+        build() { return this.tokens; }
+      },
+    };
+  }
+  return original.call(this, request, ...rest);
+};
+const source = fs.readFileSync(path.join(extensionDir, 'extension.js'), 'utf8')
+  + '\nmodule.exports.__probe = { buildSemanticTokens, semanticLegend };\n';
+const probePath = path.join(extensionDir, '__semantic_probe.js');
+fs.writeFileSync(probePath, source);
+const { buildSemanticTokens, semanticLegend } = require(probePath).__probe;
+const document = {
+  lineCount: lines.length,
+  lineAt: (i) => ({ text: lines[i] }),
+  uri: { fsPath: '' },
+};
+const tokens = buildSemanticTokens(document).map(([line, character, length, type, modifiers]) => ({
+  line, text: lines[line].slice(character, character + length), type: semanticLegend.types[type], modifiers,
+}));
+console.log(JSON.stringify(tokens));
+'''
+
+
+def test_vscode_semantic_tokens_cover_their_symbols(config_path, tmp_path):
+    """Each semantic token the VS Code extension gives covers exactly the symbol it marks, and none
+    falls in a #verbatim block, whose `prvBeg = start` is not a constant definition."""
+    import shutil
+    import subprocess
+    node = shutil.which('node')
+    if not node:
+        pytest.skip('node is not available to run the VS Code extension code')
+    generator, destination = _generator(VSCodeConfigGenerator, config_path, tmp_path)
+    generator.generate()
+    probe = tmp_path / 'semantic_probe.js'
+    probe.write_text(SEMANTIC_NODE_PROBE)
+    result = subprocess.run(
+        [node, str(probe), str(destination / 'extensions' / 'test-lang'), json.dumps(SEMANTIC_SOURCE)],
+        capture_output=True, text=True, check=True,
+    )
+    tokens = [
+        (token['line'], token['text'], token['type'], token['modifiers'] != 0)
+        for token in json.loads(result.stdout)
+    ]
+    assert tokens == [
+        (4, 'LIMIT', 'constant', True),       # the definitions
+        (5, 'start', 'label', True),
+        (6, 'LIMIT', 'constant', False),      # the usages: none in the block or the comment
+        (6, 'start', 'label', False),
+    ]
+
+
+def test_sublime_code_block_colors_each_instruction_on_a_line(config_path, tmp_path):
+    """The generated plugin knows the instruction set's mnemonics, so every instruction on a line
+    gets the instruction color, as in the editor, not only the first."""
+    hover = _generated_sublime_plugin(config_path, tmp_path)
+    colors = {'instruction': '#000001', 'parameter': '#000002'}
+    rendered = hover._render_code_block(['  ld a, b, c  mv a, b'], colors)
+    words = re.findall(r'<span style="color:([^;]+);">(\w+)</span>', rendered)
+    assert words == [
+        ('#000001', 'ld'), ('#000002', 'a'), ('#000002', 'b'), ('#000002', 'c'),
+        ('#000001', 'mv'), ('#000002', 'a'), ('#000002', 'b'),
+    ]
+
+
+FENCE_NODE_PROBE = r'''
+const Module = require('module');
+const fs = require('fs');
+const path = require('path');
+const extensionDir = process.argv[2];
+const original = Module._load;
+Module._load = function (request, ...rest) {
+  if (request === 'vscode') {
+    return { SemanticTokensLegend: class { constructor(types) { this.types = types; } } };
+  }
+  return original.call(this, request, ...rest);
+};
+const source = fs.readFileSync(path.join(extensionDir, 'extension.js'), 'utf8')
+  + '\nmodule.exports.__probe = withHoverCodeLanguage;\n';
+const probePath = path.join(extensionDir, '__fence_probe.js');
+fs.writeFileSync(probePath, source);
+console.log(JSON.stringify(require(probePath).__probe(process.argv[3], 'test-lang')));
+'''
+
+
+def test_vscode_hover_code_fences_use_the_extensions_language(config_path, tmp_path):
+    """VS Code colors fenced code in a hover with the grammar of the fence's language, so the
+    extension names its own language on the docs' assembly fences; other fences are unchanged."""
+    import shutil
+    import subprocess
+    node = shutil.which('node')
+    if not node:
+        pytest.skip('node is not available to run the VS Code extension code')
+    generator, destination = _generator(VSCodeConfigGenerator, config_path, tmp_path)
+    generator.generate()
+    probe = tmp_path / 'fence_probe.js'
+    probe.write_text(FENCE_NODE_PROBE)
+    doc = 'Example:\n\n```assembly\nld a\n```\n\n```asm\nmv a\n```\n\n```\n#annotate <namespace>\n```'
+    result = subprocess.run(
+        [node, str(probe), str(destination / 'extensions' / 'test-lang'), doc],
+        capture_output=True, text=True, check=True,
+    )
+    assert json.loads(result.stdout) == doc.replace('```assembly', '```test-lang').replace('```asm', '```test-lang')
+
+
+VERBATIM_NODE_PROBE = r'''
+const path = require('path');
+const extensionDir = process.argv[2];
+const includeFiles = require(path.join(extensionDir, 'include_files.js'));
+const constantsHover = require(path.join(extensionDir, 'constants_hover.js'));
+const source = JSON.parse(process.argv[3]);
+const masked = includeFiles.maskVerbatimBlocks(source);
+const included = includeFiles.collectIncludedFiles(['#include "lib.asm"'], process.argv[4]);
+const constants = constantsHover.buildConstantDefinitionMapFromFiles([{ lines: masked }]);
+console.log(JSON.stringify({
+  masked,
+  included: included.map((entry) => [path.basename(entry.path), entry.lines]),
+  constants: [...constants.keys()].sort(),
+}));
+'''
+
+
+def test_vscode_extension_ignores_verbatim_block_text(config_path, tmp_path):
+    """The VS Code extension's symbol lookups and semantic tokens do not read a #verbatim block's text."""
+    import shutil
+    import subprocess
+    node = shutil.which('node')
+    if not node:
+        pytest.skip('node is not available to run the VS Code extension code')
+    generator, destination = _generator(VSCodeConfigGenerator, config_path, tmp_path)
+    generator.generate()
+    extension = destination / 'extensions' / 'test-lang'
+    assert 'return includeFiles.maskVerbatimBlocks(lines);' in (extension / 'extension.js').read_text()
+    (tmp_path / 'inside.asm').write_text('INSIDE = 1\n')
+    (tmp_path / 'lib.asm').write_text('\n'.join(VERBATIM_SOURCE) + '\n')
+    probe = tmp_path / 'probe.js'
+    probe.write_text(VERBATIM_NODE_PROBE)
+    result = subprocess.run(
+        [node, str(probe), str(extension), json.dumps(VERBATIM_SOURCE), str(tmp_path)],
+        capture_output=True, text=True, check=True,
+    )
+    found = json.loads(result.stdout)
+    assert found['masked'] == MASKED_VERBATIM_SOURCE
+    assert found['included'] == [['lib.asm', MASKED_VERBATIM_SOURCE + ['']]]   # not inside.asm
+    assert found['constants'] == ['LIMIT', 'PORT']
+
+
 def test_vim_annotation_docs_lookup(config_path, tmp_path):
     import shutil
     import subprocess
@@ -424,3 +759,24 @@ def test_vim_annotation_docs_lookup(config_path, tmp_path):
     )
     found = [line[1:] for line in output.read_text().splitlines() if line.startswith('|')]
     assert found == [expected for _, expected in ANNOTATE_LOOKUPS[1:5]] + ['', '### `xmin` : Annotation']
+
+
+def test_hover_colors_are_the_syntax_colors():
+    """Hover code uses the colors the editor's syntax highlighting uses for the same text."""
+    from bespokeasm.configgen.color_scheme import build_hover_color_map
+    from bespokeasm.configgen.color_scheme import DEFAULT_COLOR_SCHEME
+    hover_colors = build_hover_color_map(DEFAULT_COLOR_SCHEME)
+    for key, element in (
+        ('annotation_namespace', SyntaxElement.ANNOTATION_NAMESPACE),
+        ('annotation_argument', SyntaxElement.ANNOTATION_ARGUMENT),
+        ('annotation_value', SyntaxElement.ANNOTATION_VALUE),
+        ('string', SyntaxElement.STRING),
+        ('punctuation_string', SyntaxElement.PUNCTUATION_STRING),
+        ('comment', SyntaxElement.COMMENT),
+        ('label', SyntaxElement.LABEL_DEFINITION),
+        ('label_colon', SyntaxElement.PUNCTUATION_LABEL_COLON),
+        ('verbatim_text', SyntaxElement.VERBATIM_TEXT),
+        ('preprocessor', SyntaxElement.PREPROCESSOR),
+        ('punctuation_preprocessor', SyntaxElement.PUNCTUATION_PREPROCESSOR),
+    ):
+        assert hover_colors[key] == DEFAULT_COLOR_SCHEME.get_color(element), key

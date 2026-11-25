@@ -133,6 +133,7 @@ class VimConfigGenerator(LanguageConfigGenerator):
             (f'{lang_group}AnnotationPunct', SyntaxElement.PUNCTUATION_SEPARATOR),
             (f'{lang_group}AnnotationValue', SyntaxElement.ANNOTATION_VALUE),
             (f'{lang_group}Separator', SyntaxElement.PUNCTUATION_SEPARATOR),
+            (f'{lang_group}Continuation', SyntaxElement.PUNCTUATION_SEPARATOR),
             (f'{lang_group}Instruction', SyntaxElement.INSTRUCTION),
             (f'{lang_group}Macro', SyntaxElement.MACRO),
             (f'{lang_group}Register', SyntaxElement.REGISTER),
@@ -455,13 +456,17 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
                 fr'end=/\s*\ze;\|$/ oneline '
                 fr'contains={directive_contains}'
             )
+        # A trailing \ continues a data directive or an embedded string on the next line. The
+        # match is top level, for the continuation lines, and in the data directive region; an
+        # instruction or other directive region does not contain it.
+        lines.append(fr'syn match {lang_group}Continuation /\\\ze\s*$/')
         for w in datatypes_words:
             lines.append(
                 fr'syn region {lang_group}DataTypeLine '
                 fr'matchgroup={lang_group}DataType '
                 fr'start=/\s*\.{self._vim_escape(w)}\>/ '
                 fr'end=/\s*\ze;\|$/ oneline '
-                fr'contains={directive_contains}'
+                fr'contains={directive_contains},{lang_group}Continuation'
             )
         # Preprocessor
         if preproc_alt:
@@ -634,6 +639,7 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         lines.append(f'hi def link {lang_group}DoubleBracket Delimiter')
         lines.append(f'hi def link {lang_group}Paren Delimiter')
         lines.append(f'hi def link {lang_group}Separator Delimiter')
+        lines.append(f'hi def link {lang_group}Continuation Delimiter')
         lines.append(f'hi def link {lang_group}Param Identifier')
         lines.append(f'hi def link {lang_group}AnnotationNamespace Identifier')
         lines.append(f'hi def link {lang_group}AnnotationArgument Identifier')

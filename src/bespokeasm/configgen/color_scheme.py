@@ -196,6 +196,15 @@ HOVER_COLOR_ELEMENT_MAP: dict[str, SyntaxElement] = {
     'register': SyntaxElement.REGISTER,
     'punctuation_preprocessor': SyntaxElement.PUNCTUATION_PREPROCESSOR,
     'operator': SyntaxElement.OPERATOR,
+    'annotation_namespace': SyntaxElement.ANNOTATION_NAMESPACE,
+    'annotation_argument': SyntaxElement.ANNOTATION_ARGUMENT,
+    'annotation_value': SyntaxElement.ANNOTATION_VALUE,
+    'string': SyntaxElement.STRING,
+    'punctuation_string': SyntaxElement.PUNCTUATION_STRING,
+    'comment': SyntaxElement.COMMENT,
+    'label': SyntaxElement.LABEL_DEFINITION,
+    'label_colon': SyntaxElement.PUNCTUATION_LABEL_COLON,
+    'verbatim_text': SyntaxElement.VERBATIM_TEXT,
 }
 
 

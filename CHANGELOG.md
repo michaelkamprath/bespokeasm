@@ -26,7 +26,9 @@ Changes that are planned but not implemented yet:
 * The built-in `hex` and `intel_hex` formats are now defined in YAML, in the same schema as configuration formats. On an ISA without 8-bit words, selecting one reports the format's word-size requirement, and the generated documentation marks it unusable.
 * **Breaking change:** `minhex` is no longer a built-in format. The Minimal CPU example configuration now defines it; other configurations can copy that definition.
 * The Minimal 64x4 and Redux example configurations add `xmin` and `xmin_listing` formats for exporting to Extended Min scripts (including `#verbatim xmin` script text, `#verbatim xmin header` comments at the top of the file, a `gap` argument for a blank line after a declaration, and `kind=addr` constants such as I/O register addresses), and the KENBAK-1 configuration adds a `kenbak1` octal listing format. These configurations, and the Minimal CPU's, now require BespokeASM 0.9.0.
-* Generated ISA documentation lists output formats and annotation namespaces. Editor extensions highlight `#annotate` lines and show hover documentation for them.
+* Generated ISA documentation lists output formats and annotation namespaces. Editor extensions highlight `#annotate` lines and `#verbatim` blocks and show hover documentation for them.
+* Sublime Text hovers color code examples as the editor colors source, and their links are clickable. VS Code hovers color code examples with the extension's syntax.
+* Fixed `general.min_version` comparing versions as text: `0.10.0` now counts as newer than `0.9.0`, and a pre-release such as `0.9.0a2` as older than `0.9.0`.
 * Fixed spurious `assembly file included multiple times` errors when one process assembles several programs that include the same file.
 
 ## [0.8.1]

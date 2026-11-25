@@ -225,6 +225,9 @@ def test_namespace_and_argument_descriptions_are_both_kept(model):
 def test_annotation_hover_text(model):
     hover = build_hover_docs(model, 0)['annotations']
     assert set(hover) == {'listing', 'xmin'}
+    # The enum values, which an editor colors as values in the hover.
+    assert hover['xmin']['values'] == ['char', 'const', 'int', 'str', 'var']
+    assert hover['listing']['values'] == []
     assert hover['xmin']['doc'].startswith('### `xmin` : Annotation\n\n---\n\nExport a symbol to an xmin script.')
     assert hover['listing']['doc'].startswith('### `listing` : Framework Annotation')
     kind = hover['xmin']['arguments']['kind']
@@ -235,6 +238,22 @@ def test_annotation_hover_text(model):
     assert '**Value range**' in hover['xmin']['arguments']['type']
     assert '**Data size**' not in hover['xmin']['arguments']['note']
     assert 'Leaves the symbol\'s lines out of the listing' in hover['listing']['arguments']['hide']
+
+
+def test_namespace_hover_lists_the_arguments(model):
+    """A hover is too narrow for the arguments table, so the namespace hover lists one argument per
+    line: type and values, when it is needed, its default, then its description. Each value's own
+    description is in the argument's hover. The generated ISA docs keep the table."""
+    doc = build_hover_docs(model, 0)['annotations']['xmin']['doc']
+    assert '| Argument |' not in doc and '<br>' not in doc
+    assert (
+        '**Arguments:**\n\n'
+        '- `kind`: enum (`var`, `const`), required. What the export declares.\n'
+        '- `type`: enum (`char`, `int`, `str`), required when `kind` is `var` or `const`.\n'
+        '- `count`: integer (1 or more), optional; only when `kind` is `var`.\n'
+        '- `array`: boolean (a bare flag, or `true`/`false`), optional; only when `kind` is `var`.\n'
+        '- `note`: string, optional, default `none`.'
+    ) in doc
 
 
 def _load_error(tmp_path, annotations) -> str:

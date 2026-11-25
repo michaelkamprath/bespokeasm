@@ -549,6 +549,9 @@
     "main": {
       "patterns": [
         {
+          "include": "#line_continuation"
+        },
+        {
           "include": "#counter_coordinates"
         },
         {
@@ -677,6 +680,10 @@
           "name": "constant.character.escape"
         }
       ]
+    },
+    "line_continuation": {
+      "match": "\\\\(?=\\s*$)",
+      "name": "punctuation.separator.continuation"
     }
   },
   "scopeName": "source.asm"

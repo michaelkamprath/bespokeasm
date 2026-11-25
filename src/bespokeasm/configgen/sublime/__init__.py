@@ -528,6 +528,15 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             '##HOVER_COLOR_REGISTER##': hover_colors['register'],
             '##HOVER_COLOR_PUNCTUATION_PREPROCESSOR##': hover_colors['punctuation_preprocessor'],
             '##HOVER_COLOR_OPERATOR##': hover_colors['operator'],
+            '##HOVER_COLOR_ANNOTATION_NAMESPACE##': hover_colors['annotation_namespace'],
+            '##HOVER_COLOR_ANNOTATION_ARGUMENT##': hover_colors['annotation_argument'],
+            '##HOVER_COLOR_ANNOTATION_VALUE##': hover_colors['annotation_value'],
+            '##HOVER_COLOR_STRING##': hover_colors['string'],
+            '##HOVER_COLOR_PUNCTUATION_STRING##': hover_colors['punctuation_string'],
+            '##HOVER_COLOR_COMMENT##': hover_colors['comment'],
+            '##HOVER_COLOR_LABEL##': hover_colors['label'],
+            '##HOVER_COLOR_LABEL_COLON##': hover_colors['label_colon'],
+            '##HOVER_COLOR_VERBATIM_TEXT##': hover_colors['verbatim_text'],
         }
         for token, color in hover_color_tokens.items():
             self._replace_token_in_file(hover_plugin_fp, token, color)

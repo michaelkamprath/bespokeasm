@@ -35,11 +35,17 @@ function getLanguageId(context) {
   return packageJson?.contributes?.languages?.[0]?.id || null;
 }
 
-function buildLabelDefinitionMap(document) {
+// The document's lines, with #verbatim block text replaced by spaces (see maskVerbatimBlocks).
+function documentLines(document) {
   const lines = [];
   for (let i = 0; i < document.lineCount; i += 1) {
     lines.push(document.lineAt(i).text);
   }
+  return includeFiles.maskVerbatimBlocks(lines);
+}
+
+function buildLabelDefinitionMap(document) {
+  const lines = documentLines(document);
 
   const entries = [{ uri: document.uri, lines }];
   const baseDir = document.uri.fsPath ? path.dirname(document.uri.fsPath) : null;
@@ -55,10 +61,7 @@ function buildLabelDefinitionMap(document) {
 }
 
 function buildConstantDefinitionMap(document) {
-  const lines = [];
-  for (let i = 0; i < document.lineCount; i += 1) {
-    lines.push(document.lineAt(i).text);
-  }
+  const lines = documentLines(document);
 
   const entries = [{ uri: document.uri, lines }];
   const baseDir = document.uri.fsPath ? path.dirname(document.uri.fsPath) : null;
@@ -195,10 +198,7 @@ function buildCoordinateDefinitionSet(document) {
   if (!DECLARATION_OPERATOR) {
     return coordinates;
   }
-  const lines = [];
-  for (let i = 0; i < document.lineCount; i += 1) {
-    lines.push(document.lineAt(i).text);
-  }
+  const lines = documentLines(document);
   const entries = [{ lines }];
   const baseDir = document.uri.fsPath ? path.dirname(document.uri.fsPath) : null;
   if (baseDir) {
@@ -223,12 +223,7 @@ function buildSemanticTokens(document) {
   const constantMap = buildConstantDefinitionMap(document);
   const constants = new Set(constantMap.keys());
   const coordinates = buildCoordinateDefinitionSet(document);
-  const lines = [];
-
-  for (let i = 0; i < document.lineCount; i += 1) {
-    const text = document.lineAt(i).text;
-    lines.push(text);
-  }
+  const lines = documentLines(document);
 
   const builder = new vscode.SemanticTokensBuilder(semanticLegend);
   const labelType = tokenTypes.get('label');
@@ -302,8 +297,17 @@ function getHoverSettings(document, languageId) {
   };
 }
 
+// Code fences in the hover docs name a generic assembly language. Naming this extension's own
+// language instead has VS Code color the code with its grammar, as in the editor.
+let hoverCodeLanguage = null;
+const ASSEMBLY_FENCE_RE = /^(\s*)```(?:assembly|asm)[ \t]*$/gm;
+
+function withHoverCodeLanguage(doc, language = hoverCodeLanguage) {
+  return language ? doc.replace(ASSEMBLY_FENCE_RE, `$1\`\`\`${language}`) : doc;
+}
+
 function buildMarkdownHover(doc) {
-  const markdown = new vscode.MarkdownString(doc);
+  const markdown = new vscode.MarkdownString(withHoverCodeLanguage(doc));
   markdown.isTrusted = false;
   return markdown;
 }
@@ -487,10 +491,7 @@ function findReferences(document, token) {
     }
   }
 
-  const lines = [];
-  for (let i = 0; i < document.lineCount; i += 1) {
-    lines.push(document.lineAt(i).text);
-  }
+  const lines = documentLines(document);
   scanLines(lines, document.uri);
 
   const baseDir = document.uri.fsPath ? path.dirname(document.uri.fsPath) : null;
@@ -566,6 +567,7 @@ function activate(context) {
   if (!languageId) {
     return;
   }
+  hoverCodeLanguage = languageId;
 
   const hoverDocs = loadInstructionDocs(context);
   if (!hoverDocs) {
