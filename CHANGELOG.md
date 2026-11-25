@@ -14,6 +14,8 @@ Changes that are planned but not implemented yet:
 
 
 ## [Unreleased]
+
+## [0.9.0]
 * Added label annotations: `#annotate <namespace> key=value ...` attaches validated metadata to the next label or constant. Configurations declare namespaces in a new `annotations` section, with typed arguments and checks on a label's data size or a constant's value. An `#annotate` line ending in `\` continues on the next line, and adjacent quoted strings join into one value. See [Annotations](https://github.com/michaelkamprath/bespokeasm/wiki/Annotations).
 * Added `#verbatim <namespace>` ... `#endverbatim` blocks: text that is not assembled, which a format writes with the new `verbatim` generator. A namespace accepts blocks when its configuration sets `verbatim`, and can declare parts (`#verbatim xmin header`) that a format places separately.
 * Data directives (`.byte` through `.16byte`, `.cstr`, `.asciiz`) and embedded strings can continue on the next line with a trailing `\`, and adjacent quoted strings are one string, so a long string can be written one piece per line: `.cstr "Hello, " \` then `"world"`.
@@ -267,7 +269,9 @@ First tracked released
 * Enabled the `reverse_argument_order` instruction option be applied to a specific operand configuration. This slightly changed the configuration file format.
 * Added ability for instructions with operands to have a single "empty operand" variant, e.g., `pop`
 
-[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/michaelkamprath/bespokeasm/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.8.1...v0.9.0
+[0.8.1]: https://github.com/michaelkamprath/bespokeasm/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/michaelkamprath/bespokeasm/compare/v0.7.3...v0.8.0
 [0.7.3]: https://github.com/michaelkamprath/bespokeasm/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/michaelkamprath/bespokeasm/compare/v0.7.1...v0.7.2

@@ -9,7 +9,7 @@ general:
     name: slu4-mincpu-asm
     version: "1.6.0"
     extension: min-asm
-  min_version: 0.9.0a2
+  min_version: 0.9.0
 operand_sets:
   immediate:
     operand_values:
