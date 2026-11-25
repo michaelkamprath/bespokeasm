@@ -12,7 +12,7 @@ BASE_PREPROCESSOR_DIRECTIVES_SET = {
     'define', 'if', 'elif', 'else', 'endif', 'ifdef', 'ifndef',
     'mute', 'unmute', 'emit',
     'create-scope', 'use-scope', 'deactivate-scope',
-    'annotate',
+    'annotate', 'verbatim', 'endverbatim',
 }
 
 FLOW_PREPROCESSOR_DIRECTIVES_SET = {

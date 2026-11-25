@@ -4,7 +4,7 @@ Annotations are recorded on the ``LabelLine`` that defines the symbol while sour
 parsed. After the first assembly pass assigns addresses, ``ExportModel.build`` collects
 every annotated symbol, measures each label's data run, checks ``data_size``, and
 resolves ``symbol``-typed arguments. A data run's words are read only on request, after
-the second pass has generated them.
+the second pass has generated them. It also holds the ``#verbatim`` blocks, in source order.
 """
 from __future__ import annotations
 
@@ -23,6 +23,7 @@ from bespokeasm.assembler.line_object.directive_line.fill_data import FillDataLi
 from bespokeasm.assembler.line_object.directive_line.fill_data import FillUntilDataLine
 from bespokeasm.assembler.line_object.emdedded_string import EmbeddedString
 from bespokeasm.assembler.line_object.label_line import LabelLine
+from bespokeasm.assembler.line_object.preprocessor_line.verbatim import VerbatimLine
 from bespokeasm.assembler.symbol_scope import SymbolScopeType
 
 DATA_LINE_TYPES = (DataLine, FillDataLine, FillUntilDataLine, EmbeddedString)
@@ -101,9 +102,27 @@ class AnnotatedSymbol:
         return [word for line in self.data_run for word in line.get_words()]
 
 
+@dataclass(frozen=True)
+class VerbatimBlock:
+    """One ``#verbatim`` block: its namespace, where it starts, and its text as formats write it."""
+    namespace: str
+    line_id: LineIdentifier
+    text: str
+    last_line: int                    # the line number of its #endverbatim
+
+
 class ExportModel:
-    def __init__(self, symbols: list[AnnotatedSymbol]) -> None:
+    def __init__(self, symbols: list[AnnotatedSymbol], verbatim_blocks: list[VerbatimBlock] | None = None) -> None:
         self._symbols = symbols
+        self._verbatim_blocks = verbatim_blocks or []
+
+    @property
+    def verbatim_blocks(self) -> list[VerbatimBlock]:
+        """Every ``#verbatim`` block, in source order (included files where they are included)."""
+        return list(self._verbatim_blocks)
+
+    def verbatim_for(self, namespace: str) -> list[VerbatimBlock]:
+        return [block for block in self._verbatim_blocks if block.namespace == namespace]
 
     @property
     def symbols(self) -> list[AnnotatedSymbol]:
@@ -135,7 +154,12 @@ class ExportModel:
     def build(cls, line_objects: list[LineObject]) -> ExportModel:
         """Collect annotated symbols from source-ordered line objects after the first pass."""
         symbols: list[AnnotatedSymbol] = []
+        blocks: list[VerbatimBlock] = []
         for index, line in enumerate(line_objects):
+            if isinstance(line, VerbatimLine) and line.compilable:
+                last_line = line.line_id.line_num + len(line.text_lines) + 1
+                blocks.append(VerbatimBlock(line.namespace, line.line_id, line.text, last_line))
+                continue
             if not isinstance(line, LabelLine) or not line.compilable or not line.annotations:
                 continue
             name = line.get_label()
@@ -154,7 +178,7 @@ class ExportModel:
                     cls._check_data_size(symbol, annotation)
                 cls._resolve_symbol_arguments(line, annotation)
             symbols.append(symbol)
-        return ExportModel(symbols)
+        return ExportModel(symbols, blocks)
 
     @staticmethod
     def _data_run(line_objects: list[LineObject], label_index: int) -> tuple[LineWithWords, ...]:

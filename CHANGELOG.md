@@ -14,15 +14,16 @@ Changes that are planned but not implemented yet:
 
 
 ## [Unreleased]
-* Added label annotations: `#annotate <namespace> key=value ...` attaches validated metadata to the next label or constant. Configurations declare namespaces in a new `annotations` section, with typed arguments and checks on a label's data size or a constant's value. See [Annotations](https://github.com/michaelkamprath/bespokeasm/wiki/Annotations).
+* Added label annotations: `#annotate <namespace> key=value ...` attaches validated metadata to the next label or constant. Configurations declare namespaces in a new `annotations` section, with typed arguments and checks on a label's data size or a constant's value. An `#annotate` line ending in `\` continues on the next line, and adjacent quoted strings join into one value. See [Annotations](https://github.com/michaelkamprath/bespokeasm/wiki/Annotations).
+* Added `#verbatim <namespace>` ... `#endverbatim` blocks: text that is not assembled, which a format writes with the new `verbatim` generator. A namespace accepts blocks when its configuration sets `verbatim`.
 * Added the built-in `listing` annotation namespace, whose `heading`, `page_break`, `collapse` and `hide` arguments shape `-t listing` output.
-* **Behavior change:** `annotate` is now a reserved word in every ISA; rename any label or constant with that name.
+* **Behavior change:** `annotate`, `verbatim` and `endverbatim` are now reserved words in every ISA; rename any label or constant with one of those names.
 * Added the `-t symbols` format: every label and constant, with its annotations, as JSON.
 * Added configuration-defined output formats (`output_formats` and `output_format_shared`): templates whose sections are filled by generators (`intel_hex`, `hex`, `byte_list`, `listing`, `rows`, `byte_lines`, and `exports` for annotated symbols), plus memory zones and constants that exist only while a format is selected. See [Output Formats](https://github.com/michaelkamprath/bespokeasm/wiki/Output-Formats).
 * **Behavior change:** `-t` names are checked after the configuration loads, so an unknown name is an assembler error listing the available formats rather than a usage error. `-t` without `-p` now warns.
 * The built-in `hex` and `intel_hex` formats are now defined in YAML, in the same schema as configuration formats. On an ISA without 8-bit words, selecting one reports the format's word-size requirement, and the generated documentation marks it unusable.
 * **Breaking change:** `minhex` is no longer a built-in format. The Minimal CPU example configuration now defines it; other configurations can copy that definition.
-* The Minimal 64x4 and Redux example configurations add `xmin` and `xmin_listing` formats for exporting to Extended Min scripts, and the KENBAK-1 configuration adds a `kenbak1` octal listing format. These configurations, and the Minimal CPU's, now require BespokeASM 0.9.0.
+* The Minimal 64x4 and Redux example configurations add `xmin` and `xmin_listing` formats for exporting to Extended Min scripts (including `#verbatim xmin` script text, and `kind=addr` constants such as I/O register addresses), and the KENBAK-1 configuration adds a `kenbak1` octal listing format. These configurations, and the Minimal CPU's, now require BespokeASM 0.9.0.
 * Generated ISA documentation lists output formats and annotation namespaces. Editor extensions highlight `#annotate` lines and show hover documentation for them.
 * Fixed spurious `assembly file included multiple times` errors when one process assembles several programs that include the same file.
 

@@ -1087,6 +1087,11 @@ class AssemblerModel:
         return namespaces, arguments
 
     @property
+    def verbatim_namespaces(self) -> list[str]:
+        """The annotation namespaces that accept ``#verbatim`` blocks, sorted by name."""
+        return sorted(name for name, namespace in self._annotation_namespaces.items() if namespace.accepts_verbatim)
+
+    @property
     def output_formats(self) -> dict[str, DefinedFormat]:
         """Output formats the configuration defines (``output_formats``), keyed by ``-t`` name."""
         return self._output_formats

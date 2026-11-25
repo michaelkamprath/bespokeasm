@@ -993,6 +993,23 @@ def test_column_chooses_its_field_by_an_argument(tmp_path):
     ]
 
 
+def test_column_field_list_shows_the_first_field_with_a_value(tmp_path):
+    columns = [
+        {'field': 'name', 'header': 'name'},
+        {'field': ['value', 'address'], 'header': 'number', 'format': '#06x'},
+        {'header': 'addr', 'by': 'kind', 'cases': {'addr': {'field': ['address', 'value']}}},
+    ]
+    output, _ = _run(tmp_path, SOURCE, _write_config(tmp_path, _columns_with(columns)))
+    assert output.split('\n') == [
+        'name    number  addr',
+        'AddW    0x0100  256',
+        'pa      0x0103',
+        'buf     0x0105',
+        'MAXARG  0x00c8',
+        '',
+    ]
+
+
 def test_column_chooses_by_the_source_value_before_value_map(tmp_path):
     output_format = _columns_with(BY_KIND_COLUMNS, value_map={'kind': {'addr': 'int'}})
     output_format['xmin']['sections']['symbols']['columns'].append({'field': 'kind', 'header': 'kind'})
@@ -1035,6 +1052,22 @@ def test_column_chooses_by_the_source_value_before_value_map(tmp_path):
     ),
 ])
 def test_by_column_config_errors(tmp_path, column, expected):
+    assert expected in _config_error(tmp_path, _columns_with([column]))
+
+
+@pytest.mark.parametrize(('column', 'expected'), [
+    ({'field': []}, f'{SECTION}.columns[0].field must be a field name, or a list of field names'),
+    ({'field': ['value', 'adress']}, f'{SECTION}.columns[0].field names unknown field "adress"'),
+    (
+        {'field': ['value', 'name'], 'format': '04x'},
+        f'{SECTION}.columns[0].format gives field "name" the format spec "04x"',
+    ),
+    (
+        {'by': 'kind', 'cases': {'var': {'field': ['address', 3]}}},
+        f'{SECTION}.columns[0].cases.var.field must be a field name, or a list of field names',
+    ),
+])
+def test_field_list_config_errors(tmp_path, column, expected):
     assert expected in _config_error(tmp_path, _columns_with([column]))
 
 
@@ -1436,7 +1469,30 @@ def test_the_xmin_examples_in_the_config_assemble(tmp_path):
     for example in examples:
         output, warnings = _run(tmp_path, example['code'] + '\n', config)
         assert warnings == '', example['title']
-        assert output.strip().endswith(('int pr @ 0x0117', 'char banner[5] @ 0x0108', 'int MAXARG := 1000'))
+        assert output.strip().endswith(('int pr @ 0x0117', 'char banner[5] @ 0x0108', 'int kPort := 0xfec0'))
+
+
+def test_xmin_addr_constant_is_a_16_bit_address(tmp_path):
+    """In the Minimal 64x4 config, kind=addr on a constant writes its value in hex, as kind=addr
+    on a label writes its address, so an I/O register above 0x7fff exports as an xmin int."""
+    config = str(pkg_resources.files(config_files).joinpath('xmin', 'slu4-minimal-64x4.yaml'))
+    source = (
+        '.memzone XMIN_USER_CODE\n'
+        '#annotate xmin kind=addr name=Go\ngo: RTS\n'
+        '#annotate xmin kind=addr name=kReg\nREG = $FEC0\n'
+        '#annotate xmin kind=const type=int\nLIMIT = -5\n'
+    )
+    output, warnings = _run(tmp_path, source, config)
+    assert warnings == ''
+    assert output.strip().split('\n')[-3:] == ['int Go := 0x0100', 'int kReg := 0xfec0', 'int LIMIT := -5']
+    listing, _ = _run(tmp_path, source, config, fmt='xmin_listing')
+    assert listing.strip().split('\n')[-3:] == [
+        'Go     addr                        0x0100',
+        'kReg   addr                        0xfec0',
+        'LIMIT  const  int                  -5',
+    ]
+    message = _error(tmp_path, '#annotate xmin kind=addr name=kReg\nREG = $10000\n', config)
+    assert "'REG' value 65536 is outside 0 to 65535, the range of kind=addr" in message
 
 
 # ---- built-in format definitions -----------------------------------------------------------

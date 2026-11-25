@@ -126,6 +126,7 @@ class VimConfigGenerator(LanguageConfigGenerator):
             (f'{lang_group}StringPunc', SyntaxElement.PUNCTUATION_STRING),
             (f'{lang_group}Escape', SyntaxElement.STRING_ESCAPE),
             (f'{lang_group}Comment', SyntaxElement.COMMENT),
+            (f'{lang_group}Verbatim', SyntaxElement.VERBATIM_TEXT),
             (f'{lang_group}Param', SyntaxElement.PARAMETER),
             (f'{lang_group}AnnotationNamespace', SyntaxElement.ANNOTATION_NAMESPACE),
             (f'{lang_group}AnnotationArgument', SyntaxElement.ANNOTATION_ARGUMENT),
@@ -541,10 +542,56 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
             fr'syn match {lang_group}AnnotationValue '
             r'/\%(^\s*#annotate\>[^;]*=\s*\)\@<=\h\w*\>/'
         )
+        # A continued #annotate: from the first line's trailing \ to the end of the first line
+        # that does not end in \. The rules above only match on the #annotate line itself, so
+        # contained copies highlight the continuation lines.
+        annotation_parts = ','.join(
+            f'{lang_group}{group}' for group in (
+                'AnnotationArgument', 'AnnotationPunct', 'AnnotationValue', 'String', 'Comment',
+                'HexNumber', 'BinNumber', 'DecNumber', 'CharNumber',
+            )
+        )
+        lines.append(
+            fr'syn region {lang_group}AnnotationContinued matchgroup={lang_group}AnnotationPunct '
+            r'start=/\%(^\s*#annotate\>[^;]*\)\@<=\\\s*$/ end=/\%(\\\s*\)\@<!$/ '
+            f'contains={annotation_parts}'
+        )
+        lines.append(
+            fr'syn match {lang_group}AnnotationArgument /\<{self._alternation(arguments)}\>/ contained'
+        )
+        lines.append(fr'syn match {lang_group}AnnotationPunct /=\|\\\s*$/ contained')
+        lines.append(fr'syn match {lang_group}AnnotationValue /\%(=\s*\)\@<=\h\w*\>/ contained')
+        # #verbatim blocks: every line between the directives is one group, with nothing
+        # highlighted inside. The region starts at the #verbatim line, whose parts contained rules
+        # anchored to that line highlight, and ends before #endverbatim, so the usual rules apply there.
+        verbatim_namespaces = self.model.verbatim_namespaces
+        if verbatim_namespaces:
+            verbatim_alt = self._alternation(verbatim_namespaces)
+            head = fr'^\s*#verbatim\s\+{verbatim_alt}\>'
+            lines.append(fr'syn match {lang_group}AnnotationNamespace /\%(^\s*#verbatim\s\+\)\@<={verbatim_alt}\>/')
+            lines.append(fr'syn match {lang_group}VerbatimPunc /^\s*\zs#\ze\%(verbatim\)\>/ contained')
+            lines.append(fr'syn match {lang_group}VerbatimDirective /\%(^\s*#\)\@<=verbatim\>/ contained')
+            lines.append(
+                fr'syn match {lang_group}VerbatimNamespace /\%(^\s*#verbatim\s\+\)\@<={verbatim_alt}\>/ contained'
+            )
+            lines.append(fr'syn match {lang_group}VerbatimComment /\%({head}\s*\)\@<=;.*/ contained')
+            verbatim_parts = ','.join(
+                f'{lang_group}{group}'
+                for group in ('VerbatimPunc', 'VerbatimDirective', 'VerbatimNamespace', 'VerbatimComment')
+            )
+            lines.append(
+                fr'syn region {lang_group}Verbatim start=/^\ze\s*#verbatim\s\+{verbatim_alt}\>/ '
+                fr'end=/^\ze\s*#endverbatim\>/ contains={verbatim_parts}'
+            )
         lines.append('')
         # Base links (fallbacks if explicit colors below are not supported)
         lines.append(f'hi def link {lang_group}Comment Comment')
         lines.append(f'hi def link {lang_group}String String')
+        lines.append(f'hi def link {lang_group}Verbatim String')
+        lines.append(f'hi def link {lang_group}VerbatimPunc {lang_group}PreProcPunc')
+        lines.append(f'hi def link {lang_group}VerbatimDirective {lang_group}PreProc')
+        lines.append(f'hi def link {lang_group}VerbatimNamespace {lang_group}AnnotationNamespace')
+        lines.append(f'hi def link {lang_group}VerbatimComment {lang_group}Comment')
         lines.append(f'hi def link {lang_group}StringPunc Delimiter')
         lines.append(f'hi def link {lang_group}HexNumber Number')
         lines.append(f'hi def link {lang_group}BinNumber Number')
@@ -745,6 +792,11 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
             '" On an #annotate line: the namespace, an argument name, or a value (its argument).',
             'function! s:AnnotationKey(word) abort',
             "  let l:line = getline('.')",
+            '  " The namespace of a #verbatim line shows the namespace, as on an #annotate line.',
+            "  let l:verbatim = matchstr(l:line, '^\\s*#verbatim\\s\\+\\zs\\h\\w*')",
+            "  if l:verbatim !=# '' && a:word ==# l:verbatim && stridx(l:line[: col('.') - 1], ';') < 0",
+            "    return has_key(s:docs, 'annotate:' . l:verbatim) ? 'annotate:' . l:verbatim : ''",
+            '  endif',
             "  let l:namespace = matchstr(l:line, '^\\s*#annotate\\s\\+\\zs\\h\\w*')",
             "  if l:namespace ==# '' || stridx(l:line[: col('.') - 1], ';') >= 0",
             "    return ''",

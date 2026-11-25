@@ -1,4 +1,5 @@
 """Generated ISA docs cover annotations, output formats and format-scoped zones and constants."""
+import copy
 import importlib.resources as pkg_resources
 import json
 
@@ -172,6 +173,21 @@ def test_annotations_section(markdown):
     ) in section
     # The framework's listing namespace is mentioned, not documented as a config namespace.
     assert '## `listing`' not in section
+
+
+def test_each_value_range_rule_is_documented(tmp_path):
+    with open(pkg_resources.files(config_files).joinpath('test_instruction_operands.yaml')) as handle:
+        config = YAML(typ='safe').load(handle)
+    annotations = copy.deepcopy(ANNOTATIONS)
+    xmin = annotations['xmin']
+    xmin['value_range'] = [xmin['value_range'], {'when': {'kind': ['var']}, 'range': [0, 65535]}]
+    config['annotations'] = annotations
+    path = tmp_path / 'isa.json'
+    path.write_text(json.dumps(config))
+    markdown = MarkdownGenerator(DocumentationModel(AssemblerModel(str(path), 0, DiagnosticReporter()))).generate()
+    section = _section(markdown, '# Annotations')
+    assert "**Value range** (a constant's value, when `kind` is `const`): by `type`:" in section
+    assert "**Value range** (a constant's value, when `kind` is `var`): 0 to 65535." in section
 
 
 def test_output_formats_list_the_annotations_they_export(markdown):

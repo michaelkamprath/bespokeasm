@@ -449,7 +449,7 @@ KNOWN_KEYS = {
     },
     'output_format': {'documentation', 'requires_word_size', 'template', 'sections', 'shared', 'predefined'},
     'output_format_shared': {'requires_word_size', 'sections', 'predefined'},
-    'annotation': {'documentation', 'applies_to', 'scopes', 'arguments', 'data_size', 'value_range'},
+    'annotation': {'documentation', 'applies_to', 'scopes', 'arguments', 'data_size', 'value_range', 'verbatim'},
     'annotation_argument': {
         'type', 'values', 'min', 'max', 'pattern', 'required', 'required_when', 'allowed_when', 'default',
         'documentation',
@@ -599,7 +599,12 @@ class ConfigAdvisor:
             for arg_name, argument in (namespace.get('arguments') or {}).items():
                 self._check_keys(argument, 'annotation_argument', f'{path}.arguments.{arg_name}')
             self._check_keys(namespace.get('data_size'), 'annotation_data_size', f'{path}.data_size')
-            self._check_keys(namespace.get('value_range'), 'annotation_value_range', f'{path}.value_range')
+            value_range = namespace.get('value_range')
+            if isinstance(value_range, list):
+                for index, rule in enumerate(value_range):
+                    self._check_keys(rule, 'annotation_value_range', f'{path}.value_range[{index}]')
+            else:
+                self._check_keys(value_range, 'annotation_value_range', f'{path}.value_range')
 
         for section, kind in (('output_formats', 'output_format'), ('output_format_shared', 'output_format_shared')):
             formats = config.get(section)

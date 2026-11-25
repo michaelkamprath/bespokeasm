@@ -356,10 +356,20 @@ function getDirectiveAtPosition(lineText, character) {
 }
 
 const ANNOTATE_LINE_RE = /^\s*#annotate\s+([A-Za-z][A-Za-z0-9_]*)/;
+const VERBATIM_LINE_RE = /^\s*#verbatim\s+([A-Za-z][A-Za-z0-9_]*)/;
 
 // Hover text for a word on an `#annotate` line: the namespace, an argument name, or a
-// value (which shows its argument). Strings and comments are excluded.
+// value (which shows its argument). On a `#verbatim` line, the namespace. Strings and
+// comments are excluded.
 function getAnnotationDocAtPosition(lineText, character, annotationDocs) {
+  const verbatim = VERBATIM_LINE_RE.exec(lineText);
+  if (verbatim) {
+    const namespaceStart = verbatim[0].length - verbatim[1].length;
+    const namespaceDocs = annotationDocs[verbatim[1]];
+    return namespaceDocs && character >= namespaceStart && character < verbatim[0].length
+      ? namespaceDocs.doc
+      : null;
+  }
   const match = ANNOTATE_LINE_RE.exec(lineText);
   if (!match || !isOffsetInCodeRegion(lineText, character)) {
     return null;

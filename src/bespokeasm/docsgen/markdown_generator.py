@@ -254,6 +254,10 @@ class MarkdownGenerator:
         scopes = namespace['scopes']
         scope_text = 'any scope' if len(scopes) == 3 else f"{' or '.join(scopes)} scope"
         parts.append(f'Applies to {kinds}, in {scope_text}.')
+        if namespace.get('verbatim'):
+            verbatim = f"Accepts `#verbatim {namespace['name']}` text blocks"
+            description = namespace['verbatim'].get('description')
+            parts.append(f'{verbatim}: {description}' if description else f'{verbatim}.')
         rows = []
         for argument in namespace['arguments']:
             rows.append([
@@ -273,9 +277,8 @@ class MarkdownGenerator:
         data_size = namespace.get('data_size')
         if data_size:
             parts.append(self._data_size_text(data_size, singular_unit, plural_unit))
-        value_range = namespace.get('value_range')
-        if value_range:
-            parts.append(self._value_range_text(value_range))
+        for rule in namespace.get('value_range') or []:
+            parts.append(self._value_range_text(rule))
         examples = namespace.get('examples') or []
         if examples:
             parts.append(f"{'#' * (heading_level + 1)} Examples")
@@ -344,9 +347,9 @@ class MarkdownGenerator:
         data_size = namespace.get('data_size')
         if data_size and argument['name'] in data_size.get('arguments', []):
             sections.append(self._data_size_text(data_size, singular_unit, plural_unit))
-        value_range = namespace.get('value_range')
-        if value_range and argument['name'] in value_range.get('arguments', []):
-            sections.append(self._value_range_text(value_range))
+        for rule in namespace.get('value_range') or []:
+            if argument['name'] in rule.get('arguments', []):
+                sections.append(self._value_range_text(rule))
         return '\n\n'.join(sections)
 
     @staticmethod

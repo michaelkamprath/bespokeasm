@@ -17,9 +17,13 @@
           "name": "keyword.control.preprocessor"
         }
       },
-      "end": "(?=(?:\\s*\\;|\\s*$))",
+      "end": "(?=\\s*\\;)|(?<![\\\\\\s])(?=\\s*$)",
       "name": "meta.annotation",
       "patterns": [
+        {
+          "match": "\\\\(?=\\s*$)",
+          "name": "punctuation.separator.continuation.annotation"
+        },
         {
           "match": "\\G(\\s+)(##ANNOTATION_NAMESPACES##)\\b",
           "captures": {

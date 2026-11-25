@@ -11,6 +11,10 @@ import os
 import re
 
 from bespokeasm.assembler.annotations.binding import AnnotationBinder
+from bespokeasm.assembler.annotations.continuation import ContinuedDirective
+from bespokeasm.assembler.annotations.continuation import is_annotate_line
+from bespokeasm.assembler.annotations.continuation import read_continued_annotate
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
@@ -25,6 +29,11 @@ from bespokeasm.assembler.line_object.preprocessor_line.condition_line import Co
 from bespokeasm.assembler.line_object.preprocessor_line.create_scope import CreateScopeLine
 from bespokeasm.assembler.line_object.preprocessor_line.deactivate_scope import DeactivateScopeLine
 from bespokeasm.assembler.line_object.preprocessor_line.use_scope import UseScopeLine
+from bespokeasm.assembler.line_object.preprocessor_line.verbatim import EndVerbatimLine
+from bespokeasm.assembler.line_object.preprocessor_line.verbatim import is_end_verbatim_line
+from bespokeasm.assembler.line_object.preprocessor_line.verbatim import is_verbatim_line
+from bespokeasm.assembler.line_object.preprocessor_line.verbatim import read_verbatim_block
+from bespokeasm.assembler.line_object.preprocessor_line.verbatim import VerbatimLine
 from bespokeasm.assembler.memory_zone.manager import GLOBAL_ZONE_NAME
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
@@ -90,10 +99,38 @@ class AssemblyFile:
                 condition_stack = ConditionStack(self._diagnostic_reporter)
                 active_named_scopes = ActiveNamedScopeList(self._named_scope_manager)
                 annotation_binder = AnnotationBinder()
-                for line in f:
+                source_lines = f.readlines()
+                while line_num < len(source_lines):
+                    line_str = source_lines[line_num].strip()
                     line_num += 1
                     line_id = LineIdentifier(line_num, filename=self.filename)
-                    line_str = line.strip()
+                    # A #verbatim block is read as a unit: its lines are text, never preprocessed.
+                    if is_verbatim_line(line_str):
+                        annotation_binder.interrupt(line_id, 'a #verbatim block')
+                        block_objects = self._verbatim_block_objects(
+                            source_lines, line_id, isa_model, current_memzone,
+                            condition_stack.currently_active(preprocessor),
+                        )
+                        line_num = block_objects[-1].line_id.line_num
+                        for lobj in block_objects:
+                            lobj.compilable = condition_stack.currently_active(preprocessor)
+                            lobj.is_muted = condition_stack.is_muted
+                            lobj.symbol_scope = current_scope
+                            lobj.active_named_scopes = active_named_scopes
+                            lobj.diagnostic_reporter = self._diagnostic_reporter
+                        line_objects.extend(block_objects)
+                        continue
+                    if is_end_verbatim_line(line_str) and condition_stack.currently_active(preprocessor):
+                        raise AssemblerError(line_id, '#endverbatim without a #verbatim block')
+                    # A continued #annotate is one directive, in or out of an #if as a whole.
+                    continued = (
+                        read_continued_annotate(source_lines, line_num - 1, line_id)
+                        if is_annotate_line(line_str) else None
+                    )
+                    continuation_lines: list[LineObject] = []
+                    if continued is not None:
+                        line_num += len(continued.continuation)
+                        continuation_lines = self._continuation_line_objects(continued, current_memzone)
                     if len(line_str) == 0:
                         annotation_binder.interrupt(line_id, 'a blank line')
                     if len(line_str) > 0:
@@ -133,21 +170,32 @@ class AssemblyFile:
                             line_obj.compilable = False
                             line_obj.is_muted = condition_stack.is_muted
                             line_objects.append(line_obj)
+                            for continuation_line in continuation_lines:
+                                continuation_line.compilable = False
+                                continuation_line.is_muted = condition_stack.is_muted
+                                line_objects.append(continuation_line)
                             continue
-                        # parse the line
-                        lobj_list.extend(LineOjectFactory.parse_line(
-                            line_id,
-                            line_str,
-                            isa_model,
-                            current_scope,
-                            active_named_scopes,
-                            current_memzone,
-                            memzone_manager,
-                            preprocessor,
-                            condition_stack,
-                            log_verbosity,
-                            self._filename,
-                        ))
+                        if continued is not None:
+                            lobj_list.append(AnnotationLine(
+                                line_id, continued.first_line, '', current_memzone, isa_model,
+                                directive=continued.text,
+                            ))
+                            # The continuation lines are part of the directive: listed, not bound to.
+                            lobj_list.extend(continuation_lines)
+                        else:
+                            lobj_list.extend(LineOjectFactory.parse_line(
+                                line_id,
+                                line_str,
+                                isa_model,
+                                current_scope,
+                                active_named_scopes,
+                                current_memzone,
+                                memzone_manager,
+                                preprocessor,
+                                condition_stack,
+                                log_verbosity,
+                                self._filename,
+                            ))
                         self._track_annotations(annotation_binder, lobj_list, line_id)
                         for lobj in lobj_list:
                             if not isinstance(lobj, ConditionLine):
@@ -251,6 +299,40 @@ class AssemblyFile:
             )
         self._emit_missing_scope_warnings()
         return line_objects
+
+    def _verbatim_block_objects(
+        self,
+        source_lines: list[str],
+        line_id: LineIdentifier,
+        isa_model: AssemblerModel,
+        memzone,
+        active: bool,
+    ) -> list[LineObject]:
+        """A block's line objects: the ``VerbatimLine`` carrying its text, an inert line object per
+        text line, so a listing shows each line, and the ``EndVerbatimLine``."""
+        block = read_verbatim_block(source_lines, line_id.line_num - 1, line_id)
+        if active:
+            VerbatimLine.check_namespace(line_id, block.namespace, isa_model.annotation_namespaces)
+        objects: list[LineObject] = [VerbatimLine(
+            line_id, block.header[0], block.header[1], memzone,
+            block.namespace or '', tuple(text for _, text in block.body),
+        )]
+        for number, text in block.body:
+            objects.append(LineObject(LineIdentifier(number, filename=self.filename), text, '', memzone))
+        objects.append(EndVerbatimLine(LineIdentifier(block.end_line, filename=self.filename), *block.end, memzone))
+        return objects
+
+    def _continuation_line_objects(self, continued: ContinuedDirective, memzone) -> list[LineObject]:
+        """Inert line objects for a continued directive's later lines, so a listing shows each
+        physical line as written. Only the last can carry a comment."""
+        objects = []
+        for index, (number, text) in enumerate(continued.continuation):
+            is_last = index == len(continued.continuation) - 1
+            code = split_line_comment(text)[0].strip() if is_last else text
+            objects.append(LineObject(
+                LineIdentifier(number, filename=self.filename), code, continued.comment if is_last else '', memzone,
+            ))
+        return objects
 
     @staticmethod
     def _track_annotations(

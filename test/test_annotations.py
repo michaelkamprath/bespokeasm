@@ -502,6 +502,40 @@ def test_value_range(tmp_path):
     assert assembler.export_model.symbols[0].value == -5
 
 
+def _ranged_config(tmp_path) -> str:
+    """xmin with a list of value_range rules: consts by type, then addresses as 16-bit values."""
+    annotation = copy.deepcopy(XMIN_ANNOTATION)
+    annotation['value_range'] = [annotation['value_range'], {'when': {'kind': ['addr']}, 'range': [0, 0xffff]}]
+    return _write_config(tmp_path, {'xmin': annotation})
+
+
+@pytest.mark.parametrize(('source', 'expected'), [
+    ('#annotate xmin kind=addr\nREG = $FEC0\n', 0xFEC0),
+    ('#annotate xmin kind=const type=int\nLIMIT = -5\n', -5),
+])
+def test_value_range_rules_in_order(tmp_path, source, expected):
+    """The first rule whose `when` holds applies: an addr constant may use all 16 bits."""
+    assembler, _, _ = _assemble(tmp_path, source, _ranged_config(tmp_path))
+    assert assembler.export_model.symbols[0].value == expected
+
+
+@pytest.mark.parametrize(('source', 'expected'), [
+    ('#annotate xmin kind=addr\nREG = $10000\n', "'REG' value 65536 is outside 0 to 65535, the range of kind=addr"),
+    (
+        '#annotate xmin kind=const type=int\nREG = $FEC0\n',
+        "'REG' value 65216 is outside -32768 to 32767, the range of type=int",
+    ),
+])
+def test_value_range_rules_check_their_own_range(tmp_path, source, expected):
+    assert expected in _assemble_error(tmp_path, source, _ranged_config(tmp_path))
+
+
+def test_value_range_rules_without_a_match_check_nothing(tmp_path):
+    """A label never has a value range, and no rule applies to kind=var."""
+    assembler, _, _ = _assemble(tmp_path, '#annotate xmin kind=var type=char\nx: .byte 0\n', _ranged_config(tmp_path))
+    assert assembler.export_model.symbols[0].size == 1
+
+
 def test_annotate_is_a_reserved_word(tmp_path):
     message = _assemble_error(tmp_path, 'annotate:\n    ld a, b, c\n', _write_config(tmp_path))
     assert '"annotate" is an assembler keyword' in message
@@ -572,6 +606,15 @@ def test_annotate_is_a_reserved_word(tmp_path):
         'annotations.ns.value_range only applies to constants',
     ),
     ({'ns': {'scopes': ['global', 'named']}}, 'annotations.ns.scopes must contain only global, file, local'),
+    ({'ns': {'value_range': []}}, 'annotations.ns.value_range must be a rule or a non-empty list of rules'),
+    (
+        {'ns': {'value_range': [{'range': [0, 1]}, {'range': [2, 1]}]}},
+        'annotations.ns.value_range[1].range must be a [min, max] pair',
+    ),
+    (
+        {'ns': {'applies_to': ['label'], 'value_range': [{'range': [0, 1]}]}},
+        'annotations.ns.value_range only applies to constants',
+    ),
 ])
 def test_config_errors(tmp_path, annotations, expected):
     assert expected in _config_error(tmp_path, annotations)
@@ -589,3 +632,96 @@ def test_xmin_spec_example_config_loads(tmp_path):
     assert os.path.exists(config_path)
     _, warnings, _ = _assemble(tmp_path, 'ld a, b, c\n', config_path)
     assert warnings == ''
+
+
+# ---- continuing an #annotate line ----------------------------------------------------------
+
+NOTE_ANNOTATION = {'arguments': {'note': {'type': 'string'}, 'n': {'type': 'integer'}}}
+
+
+def _note_config(tmp_path) -> str:
+    return _write_config(tmp_path, {'ns': NOTE_ANNOTATION})
+
+
+def _note(tmp_path, source: str) -> dict:
+    assembler, _, _ = _assemble(tmp_path, source, _note_config(tmp_path))
+    return assembler.export_model.symbols[0].annotations['ns'].arguments
+
+
+def test_value_split_across_continued_lines(tmp_path):
+    source = '#annotate ns n=3 note= \\\n    "one\\n" \\\n  "two" \\\n    n=4\nx: .byte 0\n'
+    with pytest.raises(SystemExit) as exc_info:
+        _assemble(tmp_path, source, _note_config(tmp_path))
+    # The joined directive is one line, so n given twice is an error, reported on line 1.
+    assert 'line 1' in str(exc_info.value) and "argument 'n' is given more than once" in str(exc_info.value)
+    SymbolScope._global_scope = None
+    source = '#annotate ns n=3 note= \\\n    "one\\n" \\\n  "two"\nx: .byte 0\n'
+    assert _note(tmp_path, source) == {'n': 3, 'note': 'one\ntwo'}
+
+
+@pytest.mark.parametrize(('written', 'expected'), [
+    ('"ab" "cd"', 'abcd'),
+    ('"a\\"b"   "\\tc"', 'a"b\tc'),
+    ('"a;b" "c"', 'a;bc'),
+])
+def test_adjacent_strings_are_one_value(tmp_path, written, expected):
+    assert _note(tmp_path, f'#annotate ns note={written} n=1\nx: .byte 0\n') == {'note': expected, 'n': 1}
+
+
+def test_comment_on_the_last_line_only(tmp_path):
+    # A comment on the last line is allowed; on an earlier line it hides the \, ending the directive.
+    assert _note(tmp_path, '#annotate ns \\\n    note="x" ; a comment \\\nx: .byte 0\n') == {'note': 'x'}
+    SymbolScope._global_scope = None
+    # Line 2 is not part of the directive, so it is parsed as code of its own.
+    message = _assemble_error(tmp_path, '#annotate ns ; see C:\\dir\\\n    note="x"\nx: .byte 0\n', _note_config(tmp_path))
+    assert 'line 2 - constant "note" is missing a value' in message
+
+
+def test_backslash_inside_quotes_does_not_continue(tmp_path):
+    message = _assemble_error(tmp_path, '#annotate ns note="abc \\\n    def"\nx: .byte 0\n', _note_config(tmp_path))
+    assert "annotation 'ns': cannot parse argument" in message and 'line 1' in message
+
+
+@pytest.mark.parametrize(('source', 'expected'), [
+    ('#annotate ns \\\n\nx: .byte 0\n', '#annotate ends with \\ but line 2 is blank'),
+    ('.byte 0\n#annotate ns note="a" \\\n', '#annotate ends with \\ but the file ends at line 2'),
+    ('#annotate ns \\\n  note="a" \\\n   \nx: .byte 0\n', '#annotate ends with \\ but line 3 is blank'),
+])
+def test_continuation_needs_a_next_line(tmp_path, source, expected):
+    message = _assemble_error(tmp_path, source, _note_config(tmp_path))
+    assert expected in message
+    first = source.split('\n').index(next(line for line in source.split('\n') if line.startswith('#annotate')))
+    assert f'line {first + 1}' in message
+
+
+def test_continued_annotation_binds_after_its_last_line(tmp_path):
+    source = '#annotate ns \\\n    note="a"\n#annotate listing \\\n    heading="H"\nx: .byte 0\n'
+    assembler, _, _ = _assemble(tmp_path, source, _note_config(tmp_path))
+    symbol = assembler.export_model.symbols[0]
+    assert symbol.name == 'x' and set(symbol.annotations) == {'ns', 'listing'}
+
+
+@pytest.mark.parametrize(('condition', 'annotated'), [('1', True), ('0', False)])
+def test_continued_annotation_in_a_conditional_block(tmp_path, condition, annotated):
+    # The continuation line `#endif \` is text of the directive, never a preprocessor line.
+    source = f'#if {condition}\n#annotate ns note= \\\n    "#endif"\nx: .byte 0\n#endif\ny: .byte 0\n'
+    assembler, _, _ = _assemble(tmp_path, source, _note_config(tmp_path))
+    names = [symbol.name for symbol in assembler.export_model.symbols]
+    assert names == (['x'] if annotated else [])
+
+
+def test_listing_shows_each_physical_line(tmp_path):
+    source = '#annotate ns note= \\\n    "a" \\\n    "b" ; done\nx: .byte 7\n'
+    source_path = tmp_path / 'main.asm'
+    source_path.write_text(source)
+    output_path = tmp_path / 'main.lst'
+    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+        Assembler(
+            str(source_path), _note_config(tmp_path), False, None, 0, None, 0,
+            True, 'listing', str(output_path), 0, [], [],
+        ).assemble_bytecode()
+    rows = [line for line in output_path.read_text().split('\n') if line.strip()[:1].isdigit()]
+    assert [row.split('|')[0].strip() for row in rows] == ['1', '2', '3', '4', '4']
+    assert '#annotate ns note= \\' in rows[0]
+    assert '"b"' in rows[2] and 'done' in rows[2]
+    assert rows[1].split('|')[2].strip() == '' and rows[2].split('|')[2].strip() == ''

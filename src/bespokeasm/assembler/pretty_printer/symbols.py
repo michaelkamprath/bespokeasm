@@ -49,6 +49,16 @@ class SymbolsPrettyPrinter(PrettyPrinterBase):
             },
             'source_file': os.path.basename(self._main_filename),
             'symbols': self._predefined_symbols() + self._source_symbols(),
+            # Every #verbatim block, in source order, with its text as formats write it.
+            'verbatim': [
+                {
+                    'namespace': block.namespace,
+                    'file': self._display_path(block.line_id.filename),
+                    'line': block.line_id.line_num,
+                    'text': block.text,
+                }
+                for block in self._export_model.verbatim_blocks
+            ],
         }
         return json.dumps(document, indent=2)
 

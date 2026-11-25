@@ -661,7 +661,7 @@ class TestConfigurationGeneration(unittest.TestCase):
                 'include', 'require', 'error', 'create_memzone', 'print', 'assert', 'define', 'if',
                 'elif', 'else', 'endif', 'ifdef', 'ifndef',
                 'mute', 'unmute', 'emit',
-                'create-scope', 'use-scope', 'deactivate-scope', 'annotate',
+                'create-scope', 'use-scope', 'deactivate-scope', 'annotate', 'verbatim', 'endverbatim',
             ],
             'preprocessor directives'
         )
@@ -784,7 +784,7 @@ class TestConfigurationGeneration(unittest.TestCase):
                 'include', 'require', 'error', 'create_memzone', 'print', 'assert', 'define',
                 'if', 'elif', 'else', 'endif', 'ifdef', 'ifndef',
                 'mute', 'unmute', 'emit',
-                'create-scope', 'use-scope', 'deactivate-scope', 'annotate',
+                'create-scope', 'use-scope', 'deactivate-scope', 'annotate', 'verbatim', 'endverbatim',
             ],
             'preprocessor directives'
         )

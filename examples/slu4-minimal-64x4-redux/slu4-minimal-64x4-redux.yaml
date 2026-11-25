@@ -497,11 +497,20 @@ annotations:
             primes: .2byte 2, 3, 5, 7
             #annotate xmin kind=var type=str
             banner: .cstr "Hello"
-        - title: A constant
-          description: Exported as `int MAXARG := 1000`.
+        - title: Constants
+          description: >-
+            Exported as `int MAXARG := 1000` and `int kPort := 0xfec0`. A constant with `kind=addr`
+            is written in hex, so it can be any 16-bit address.
           code: |
             #annotate xmin kind=const type=int
             MAXARG = 1000
+            #annotate xmin kind=addr name=kPort
+            PORT_REG = $FEC0
+    verbatim:
+      documentation:
+        description: >-
+          xmin source, such as functions that set a routine's parameters and call it, written
+          after the exported symbols in the xmin file.
     applies_to: [label, constant]
     scopes: [global]
     arguments:
@@ -510,7 +519,9 @@ annotations:
         values:
           addr:
             documentation:
-              description: the label's address, as an int constant, for `call AddW` or a binding `@ AddW`
+              description: >-
+                an address, as an int constant in hex, for `call AddW` or a binding `@ AddW`: a label's
+                address, or a constant's value, such as an I/O register address
           var:
             documentation:
               description: a variable bound to the label's data (`int pa @ 0x0113`)
@@ -568,9 +579,12 @@ annotations:
       # are counted, not terminated, so `.cstr "hello"` exports as `char msg[5]`.
       terminated_when: { type: [str] }
     value_range:
-      when: { kind: [const] }
       # A constant cannot be a str.
-      range: { type: { char: [0, 255], int: [-32768, 32767], long: [-2147483648, 2147483647], str: null } }
+      - when: { kind: [const] }
+        range: { type: { char: [0, 255], int: [-32768, 32767], long: [-2147483648, 2147483647], str: null } }
+      # An address is written in hex, where xmin reads all 16 bits as an int.
+      - when: { kind: [addr] }
+        range: [0, 65535]
 
 output_format_shared:
   xmin:
@@ -609,7 +623,9 @@ output_formats:
       asm
       {code}
 
-      {symbols}
+      {symbols}{?
+
+      {script}}
     sections:
       code:
         generator: intel_hex
@@ -617,11 +633,14 @@ output_formats:
         order: address
         lines_key: kind
         lines:
-          addr: "int {name} := 0x{address:04x}"
+          addr: "int {name} := 0x{?{address:04x}}{?{value:04x}}"   # a label's address or a constant's value
           var: "{type} {name}{?[{count}]} @ 0x{address:04x}"
           const: "{type} {name} := {value}"
         comment_field: description    # the description argument, as # comment lines above the declaration
         comment_prefix: "# "
+      script:                         # the source's #verbatim xmin blocks, after the declarations
+        generator: verbatim
+        namespace: xmin
   xmin_listing:
     shared: xmin
     documentation:
@@ -648,7 +667,7 @@ output_formats:
           - header: value
             by: kind
             cases:
-              addr: { field: address, format: "#06x" }
+              addr: { field: [address, value], format: "#06x" }
               const: { field: value }
 
 instructions:

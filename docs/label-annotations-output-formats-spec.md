@@ -22,8 +22,8 @@ Goals:
 - Formats are declarative (templates and rules in YAML). A config never ships executable code.
 - Annotations emit no bytes and don't change the assembled image.
 - Only explicitly annotated symbols are exported. Nothing is inferred from label scope or naming.
-- **Stretch goal: verbatim text blocks.** Source can carry text that is not assembled, such as xmin functions that wrap an assembly routine, for an output format to copy into its file (see "Stretch: verbatim text blocks").
-- **Stretch goal: continued `#annotate` lines.** A long quoted value, such as a multi-line `description`, can be split across source lines (see "Stretch: continuing an `#annotate` line").
+- **Stretch goal: verbatim text blocks.** Source can carry text that is not assembled, such as xmin functions that wrap an assembly routine, for an output format to copy into its file (see "Stretch: verbatim text blocks"). Implemented.
+- **Stretch goal: continued `#annotate` lines.** A long quoted value, such as a multi-line `description`, can be split across source lines (see "Stretch: continuing an `#annotate` line"). Implemented.
 - **Stretch goal: polymorphic output formats.** Every format, built-in or config, implements one `OutputFormat` interface: a name, documentation, requirements (such as word size) and a render step. There are two implementations. A Python format is a class, as the printers are now. A defined format is a template plus sections, loaded from a definition file (YAML or JSON) in the schema of this spec. Built-in formats can be either kind; config formats are always defined formats. One registry holds both kinds, and `-t` and the docs generator use only the interface. Implemented: `hex` and `intel_hex` ship as definitions in `output_format/resources/builtin_formats.yaml`, and `listing` and `symbols` stay Python (see open question 6).
 
 Non-goals:
@@ -127,8 +127,10 @@ annotations:
       words: { type: { char: 1, int: 2, long: 4, str: 1 }, times: count, infer_times: array }
       terminated_when: { type: [str] }   # a str's data ends with a terminator that count leaves out
     value_range:                   # constraint: range the constant's value must lie in
-      when: { kind: [const] }
-      range: { type: { char: [0, 255], int: [-32768, 32767], long: [-2147483648, 2147483647], str: null } }
+      - when: { kind: [const] }
+        range: { type: { char: [0, 255], int: [-32768, 32767], long: [-2147483648, 2147483647], str: null } }
+      - when: { kind: [addr] }     # an address constant, written in hex
+        range: [0, 65535]
 ```
 
 Schema:
@@ -146,7 +148,7 @@ Schema:
 | `values` as a mapping | for an enum, instead of a list: each value maps to an optional `documentation` block with a `description` of what the value means, as `addr: { documentation: { description: ... } }`. |
 | `data_size` | constraint: the exact word count of the label's data run, from argument values (`words`). A mismatch is a compile error. In `words`, `times` names an integer argument that multiplies the selected size, and `infer_times` names a boolean argument that, when true, sets the `times` argument from the data instead. `terminated_when` is a condition on enum arguments; when it holds, the data sets `times` and must end with a terminator element that `times` leaves out (see below). |
 | table entries | `words` and `range` select their value by one enum argument and list every value of it. A `null` entry means that value is not allowed where the rule applies: `str: null` in `value_range` makes `kind=const type=str` an error. |
-| `value_range` | constraint: the inclusive range a constant's value must lie in, from argument values. A value outside it is a compile error. |
+| `value_range` | constraint: the inclusive range a constant's value must lie in, from argument values. A value outside it is a compile error. It may also be a list of such rules, each with its own `when`: the first rule whose `when` holds applies, and a constant that no rule applies to is not checked. |
 
 The framework records the result on the symbol: namespace, validated arguments with defaults applied, the symbol's value (address or constant), its scope, and for labels the size (in words) and the words of its data run. Formats read this export model; they never re-parse source.
 
@@ -185,7 +187,7 @@ output_formats:
         value_map: { type: { str: char } }   # xmin writes a string as a char array
         lines_key: kind             # annotation argument that selects the line template
         lines:
-          addr:  "int {name} := 0x{address:04x}"
+          addr:  "int {name} := 0x{?{address:04x}}{?{value:04x}}"   # a label's address or a constant's value
           var:   "{type} {name}{?[{count}]} @ 0x{address:04x}"   # [count] only when count is present
           const: "{type} {name} := {value}"
 ```
@@ -213,7 +215,7 @@ Generators:
 | `byte_lines` | a table with one line per assembled byte | `columns`, `separator`, `header_rule`, `rule_separator` |
 | `exports` | one line per symbol that carries the annotation | `annotation`, `order`, `unique`, `reserved_names`, `name_pattern`, `value_map`, then either `lines_key` + `lines` (with optional `comment_field` + `comment_prefix`), or `columns` + `separator` + `header_rule` + `rule_separator` |
 
-Tables. `byte_lines`, and `exports` with `columns`, use one column model. `columns` is a list in output order. Each entry names a `field`, and it can set `header` (default empty), `format` (a Python format spec, for example `03o` for octal), `align` (`left` or `right`, default `left`) and `min_width` (default 0). In `exports`, a column can instead choose its field per row, the table counterpart of `lines_key`: `by` names an enum argument, and `cases` maps its values to `{field, format}`. A row whose value has no case gets an empty cell. The lookup uses the source value, before `value_map`. `xmin_listing` uses this to show a `var`'s address under `address` and an `addr` export's address under `value`, as the xmin lines do. The generator writes a header row from the headers, unless all headers are empty, and then one row per item. A header is aligned like its column's values. `exports` takes either `lines_key` and `lines` or `columns`, never both, and `separator`, `header_rule` and `rule_separator` only with `columns`. A column entry takes only `field`, `by`, `cases`, `header`, `format`, `align` and `min_width`; any other key is a config error. A column has either `field` or `by` with `cases`, not both. A `by` column sets `format` in each case instead of on the column, and a case takes only `field` and `format`. Export names are checked (`name_pattern`, `reserved_names`, `unique`) the same way in both modes.
+Tables. `byte_lines`, and `exports` with `columns`, use one column model. `columns` is a list in output order. Each entry names a `field` (or a list of fields, of which the cell shows the first that has a value), and it can set `header` (default empty), `format` (a Python format spec, for example `03o` for octal), `align` (`left` or `right`, default `left`) and `min_width` (default 0). In `exports`, a column can instead choose its field per row, the table counterpart of `lines_key`: `by` names an enum argument, and `cases` maps its values to `{field, format}`. A row whose value has no case gets an empty cell. The lookup uses the source value, before `value_map`. `xmin_listing` uses this to show a `var`'s address under `address` and an `addr` export's address under `value`, as the xmin lines do. The generator writes a header row from the headers, unless all headers are empty, and then one row per item. A header is aligned like its column's values. `exports` takes either `lines_key` and `lines` or `columns`, never both, and `separator`, `header_rule` and `rule_separator` only with `columns`. A column entry takes only `field`, `by`, `cases`, `header`, `format`, `align` and `min_width`; any other key is a config error. A column has either `field` or `by` with `cases`, not both. A `by` column sets `format` in each case instead of on the column, and a case takes only `field` and `format`. Export names are checked (`name_pattern`, `reserved_names`, `unique`) the same way in both modes.
 
 Column widths adjust to the content, as in the built-in `-t listing`. The generator formats every value first. Each column is then as wide as the largest of its `min_width`, its header, and its widest value. Columns are joined with `separator` (default two spaces). The `header_rule` option (one character, such as `-`) draws a line of that character under the header row: each column is filled to its width, including the last. Between columns, the rows use `separator` and the rule uses `rule_separator`, each exactly as written. When only one is configured, the other follows its width: with only `rule_separator`, the rows' gap is that many spaces; with only `separator`, the rule's gap is that many rule characters, so the rule is a solid line. With neither, both gaps are two spaces. With `separator: " | "`, `header_rule: "-"` and `rule_separator: "-+-"`, the rule reads `------+-----+------`, as in `-t listing`. Keeping the two the same width, and their joints in line, is up to the config: when both are configured and their widths differ, that is a config warning, because the rule then does not line up. `header_rule` has no effect without a header row, which is also a config warning, and `rule_separator` needs `header_rule`. The last column gets no padding, and the generator removes trailing spaces from each line, but not the rest of a separator: with `separator: " | "`, a row whose last cell is empty ends in `|`.
 
@@ -377,6 +379,7 @@ print(pr)
 Notes:
 
 - `name=AddW` keeps the assembly label `add_w`, which isn't a legal xmin identifier, without renaming it silently. kind=addr exports only the address as an int constant, so the script can call AddW or bind a variable to it with @ AddW.
+- kind=addr also applies to a constant that holds an address, such as an I/O register: `#annotate xmin kind=addr name=kPort` on `PORT = $FEC0` writes `int kPort := 0xfec0`. xmin reads a hex literal as a 16-bit int bit pattern, while a decimal literal of 32768 or more is a long, so `kind=const type=int` (written in decimal, range -32768 to 32767) cannot export such a value.
 - `pa`, `pb` and `pr` are assembled as `.2byte 0`, so the `asm` block zero-fills the parameter block. `data_size` checks that each is 2 words (2 bytes on this 8-bit machine).
 - A Redux build compiles Redux source (no `ACB` there) against the Redux config and produces that machine's file. The format knows nothing about which machine it is on beyond `isa_name` in the header.
 
@@ -497,7 +500,7 @@ Details:
 
 ## Stretch: continuing an `#annotate` line
 
-Status: specified, not implemented. Planned for 0.9.0.
+Status: implemented in 0.9.0.
 
 A `description` that spans several comment lines is written with `\n` escapes, which can make one source line very long. This stretch feature lets an `#annotate` line continue onto the next lines, and joins adjacent quoted strings:
 
@@ -526,13 +529,13 @@ Rules:
 4. **Adjacent strings.** Two quoted strings separated only by spaces are one value: `"ab" "cd"` is `"abcd"`. Escapes (`\n`, `\t`, `\"`, `\\`) apply within each string. Joining applies wherever a quoted value may appear, on one line or across continued lines.
 5. **Conditional compilation.** The whole directive is inside or outside an `#if` block together; a continuation line is never treated as a separate line by the preprocessor.
 6. **Diagnostics.** Errors about the directive report the line where `#annotate` starts.
-7. **Listings.** `-t listing` shows each physical line as written, so line numbers stay continuous. The continuation lines have no address or bytes, like the `#annotate` line itself. Generated editor syntax highlights a continued directive as an `#annotate` line throughout.
+7. **Listings.** `-t listing` shows each physical line as written, so line numbers stay continuous. The continuation lines have no bytes, like the `#annotate` line itself. Generated editor syntax highlights a continued directive as an `#annotate` line throughout, and the trailing `\` as punctuation.
 
 Tests would cover: a value split across lines, adjacent strings on one line, a comment on the last line only, a `\` inside quotes (not a continuation), a blank or end-of-file line after `\` (error), binding to the definition after the last line, an `#if` around a continued directive, and the listing's line numbers.
 
 ## Stretch: verbatim text blocks
 
-Status: specified, not implemented. Planned for 0.9.0.
+Status: implemented in 0.9.0.
 
 An output format often needs more than the assembly's bytes and symbols. An xmin file is a script, so the routines that call the machine code belong in it too, next to the declarations they use. A verbatim block lets the assembly source carry that text:
 
@@ -592,9 +595,9 @@ The new `verbatim` generator writes a namespace's blocks:
 
 | Generator | Output | Options |
 | --- | --- | --- |
-| `verbatim` | every block of one namespace, in source order (included files where they are included), separated by one blank line | `namespace` (required), `separator` (text between blocks, default one blank line) |
+| `verbatim` | every block of one namespace, in source order (included files where they are included), separated by one blank line | `namespace` (required), `separator` (the exact text between two blocks, default `"\n\n"`: one blank line) |
 
-Each block's lines are written as they are, except that trailing spaces are removed, and blank lines at the start and end of a block are dropped, so the section never starts or ends with a blank line. A section with no blocks is empty. The xmin template places the blocks after the declarations, in an optional group so a source without blocks gets no extra blank lines:
+Each block's lines are written as they are, except that trailing spaces are removed, and blank lines at the start and end of a block are dropped, so the section never starts or ends with a blank line. A block with no text is skipped. A section with no blocks is empty. The xmin template places the blocks after the declarations, in an optional group so a source without blocks gets no extra blank lines:
 
 ```yaml
 template: |
@@ -611,13 +614,13 @@ sections:
     namespace: xmin
 ```
 
-(The optional group around a section field is new: today an optional group holds line fields, and a section field is always written. A section counts as having a value when its text is not empty.)
+(An optional group may hold a section field: the section counts as having a value when its text is not empty. The built-in `hex` and `intel_hex` definitions use the same rule.)
 
 ### Elsewhere
 
-- `-t listing` shows a block's lines as source lines with no address or bytes, and `#annotate listing hide` on the symbol before a block does not hide it, since a block is not part of a symbol.
+- `-t listing` shows a block's lines as source lines with no bytes, and `#annotate listing hide` on the symbol before a block does not hide it, since a block is not part of a symbol.
 - `-t symbols` adds `verbatim`: a list of `{namespace, file, line, text}` objects, in source order.
-- Generated editor syntax highlights `#verbatim` and `#endverbatim` as directives and the namespace name as an annotation namespace; every line between them gets one scope, `string.unquoted.verbatim.<namespace>` (Vim: a region linked to `String`), with no assembly highlighting inside, so a block is one uniform color that differs from comments. A `;` comment after `#verbatim` or `#endverbatim` keeps the comment scope; the region starts on the line after `#verbatim` and ends before `#endverbatim`. Hover over the namespace on a `#verbatim` line shows the namespace's `verbatim.documentation`.
+- Generated editor syntax highlights `#verbatim` and `#endverbatim` as directives and the namespace name as an annotation namespace; every line between them gets one scope, `string.unquoted.verbatim.<namespace>` (Vim: a region linked to `String`), with no assembly highlighting inside, so a block is one uniform color that differs from comments. The generated BespokeASM themes give it its own color. A `;` comment after `#verbatim` or `#endverbatim` keeps the comment scope; the region starts on the line after `#verbatim` and ends before `#endverbatim`. Hover over the namespace on a `#verbatim` line shows the namespace's `verbatim.documentation`.
 - Generated ISA docs list, for each namespace that opts in, that it accepts verbatim blocks, with the `verbatim.documentation` description.
 
 ### Errors
@@ -726,8 +729,8 @@ As built:
 8. The listing namespace in the listing printer.
 9. Documentation generation, hover text, and the VS Code, Sublime Text and Vim syntax for #annotate.
 10. Stretch, done: built-in formats shipped as definitions (`hex` and `intel_hex`).
-11. Stretch: continuing an `#annotate` line, with adjacent quoted strings joined (see "Stretch: continuing an `#annotate` line").
-12. Stretch: verbatim text blocks (see "Stretch: verbatim text blocks").
+11. Stretch, done: continuing an `#annotate` line, with adjacent quoted strings joined (see "Stretch: continuing an `#annotate` line").
+12. Stretch, done: verbatim text blocks (see "Stretch: verbatim text blocks").
 
 The worked example's golden test follows the same rule as the minhex and KENBAK-1 tests: copy `addw.min64x4` and the Minimal 64x4 config, with the xmin annotation and format, into a fixture directory under `test/`.
 

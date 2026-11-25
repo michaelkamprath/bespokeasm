@@ -2,7 +2,8 @@
 
 An annotation namespace declares which arguments a ``#annotate <namespace>`` line may
 carry, which symbols it may be attached to, and the constraints (``data_size`` and
-``value_range``) the annotated symbol must satisfy. The framework's own ``listing``
+``value_range``) the annotated symbol must satisfy. A namespace can also opt in to
+``#verbatim <namespace>`` text blocks with ``verbatim``. The framework's own ``listing``
 namespace exists for every ISA and may not be declared by a configuration.
 
 Configuration problems are reported through an ``error(path, problem)`` callable that
@@ -170,10 +171,14 @@ class AnnotationNamespace:
     scopes: tuple[str, ...]
     arguments: dict[str, ArgumentSpec]
     data_size: SelectedRule | None = None
-    value_range: SelectedRule | None = None
+    # In order: the first rule whose ``when`` holds is the one that applies.
+    value_range: tuple[SelectedRule, ...] = ()
     is_builtin: bool = False
     # From ``documentation.examples``: each a mapping of ``title``, ``description`` and ``code``.
     examples: tuple[dict[str, str], ...] = ()
+    # Whether source may carry ``#verbatim <namespace>`` blocks, and what they are for.
+    accepts_verbatim: bool = False
+    verbatim_description: str | None = None
 
     # ---- source validation -------------------------------------------------
 
@@ -292,11 +297,14 @@ class AnnotationNamespace:
             return None
         return self.data_size.evaluate(self.name, values)
 
+    def _value_range_rule(self, values: dict[str, Any]) -> SelectedRule | None:
+        """The first ``value_range`` rule that applies to these arguments, or None."""
+        return next((rule for rule in self.value_range if rule.applies(values)), None)
+
     def allowed_range(self, values: dict[str, Any]) -> tuple[int, int] | None:
         """The ``value_range`` these arguments require of a constant, or None."""
-        if self.value_range is None:
-            return None
-        return self.value_range.evaluate(self.name, values)
+        rule = self._value_range_rule(values)
+        return rule.evaluate(self.name, values) if rule is not None else None
 
     def element_words(self, values: dict[str, Any]) -> int | None:
         """The ``data_size`` of one element when the data sets ``times`` for these arguments, else None."""
@@ -314,7 +322,8 @@ class AnnotationNamespace:
 
     def value_range_basis(self, values: dict[str, Any]) -> str:
         """The arguments that chose the ``value_range``, for messages."""
-        return self.value_range.basis(values) if self.value_range is not None else ''
+        rule = self._value_range_rule(values)
+        return rule.basis(values) if rule is not None else ''
 
 
 def _parse_integer(text: str, default_numeric_base: str) -> int | None:
@@ -439,10 +448,10 @@ class _NamespaceLoader:
             )
 
         data_size = self._selected_rule('data_size', 'words', arguments, self._words_value)
-        value_range = self._selected_rule('value_range', 'range', arguments, self._range_value)
+        value_range = self._value_range_rules(arguments)
         if data_size is not None and 'label' not in applies_to:
             self._error(f'{self._path}.data_size', 'only applies to labels, but applies_to does not include label')
-        if value_range is not None and 'constant' not in applies_to:
+        if value_range and 'constant' not in applies_to:
             self._error(
                 f'{self._path}.value_range',
                 'only applies to constants, but applies_to does not include constant',
@@ -456,7 +465,36 @@ class _NamespaceLoader:
             data_size=data_size,
             value_range=value_range,
             examples=examples,
+            **self._verbatim(),
         )
+
+    def _verbatim(self) -> dict[str, Any]:
+        """``verbatim`` opts the namespace in to ``#verbatim`` blocks: a mapping whose only key is
+        the optional ``documentation`` (a ``description``)."""
+        if 'verbatim' not in self._config:
+            return {}
+        path = f'{self._path}.verbatim'
+        config = self._config['verbatim']
+        if not isinstance(config, dict):
+            self._error(path, 'must be a mapping, such as {} or {documentation: {description: ...}}')
+        for key in config:
+            if key != 'documentation':
+                self._error(f'{path}.{key}', 'is not a verbatim setting; verbatim takes documentation')
+        description = None
+        documentation = config.get('documentation')
+        if documentation is not None:
+            if not isinstance(documentation, dict):
+                self._error(f'{path}.documentation', 'must be a mapping')
+            for key in documentation:
+                if key != 'description':
+                    self._error(
+                        f'{path}.documentation.{key}',
+                        'is not a documentation setting; verbatim documentation takes description',
+                    )
+            description = documentation.get('description')
+            if description is not None and not isinstance(description, str):
+                self._error(f'{path}.documentation.description', 'must be a string')
+        return {'accepts_verbatim': True, 'verbatim_description': description}
 
     def _examples(self, examples: Any, path: str) -> tuple[dict[str, str], ...]:
         """Usage examples, as instructions have: each a ``code`` block with an optional ``title``
@@ -691,17 +729,38 @@ class _NamespaceLoader:
             self._error(path, 'must be a [min, max] pair of integers with min no greater than max')
         return (value[0], value[1])
 
+    def _value_range_rules(self, arguments: dict[str, ArgumentSpec]) -> tuple[SelectedRule, ...]:
+        """``value_range`` is one rule, or a list of rules of which the first whose ``when``
+        holds applies, so that different arguments can select their range differently."""
+        config = self._config.get('value_range')
+        if config is None:
+            return ()
+        if not isinstance(config, list):
+            return (self._selected_rule('value_range', 'range', arguments, self._range_value),)
+        if not config:
+            self._error(f'{self._path}.value_range', 'must be a rule or a non-empty list of rules')
+        return tuple(
+            self._selected_rule(
+                'value_range', 'range', arguments, self._range_value,
+                rule=rule, rule_path=f'{self._path}.value_range[{index}]',
+            )
+            for index, rule in enumerate(config)
+        )
+
     def _selected_rule(
         self,
         key: str,
         value_key: str,
         arguments: dict[str, ArgumentSpec],
         convert: Callable[[Any, str], Any],
+        rule: Any = None,
+        rule_path: str | None = None,
     ) -> SelectedRule | None:
-        if key not in self._config:
-            return None
-        rule_path = f'{self._path}.{key}'
-        rule = self._config[key]
+        if rule is None:
+            if key not in self._config:
+                return None
+            rule = self._config[key]
+        rule_path = rule_path or f'{self._path}.{key}'
         if not isinstance(rule, dict):
             self._error(rule_path, 'must be a mapping')
         argument_basics = {name: {'type': spec.type, 'values': spec.values} for name, spec in arguments.items()}

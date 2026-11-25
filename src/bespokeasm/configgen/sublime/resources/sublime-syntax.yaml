@@ -102,7 +102,10 @@ contexts:
     - match: (?<==)\s*([A-Za-z_][A-Za-z0-9_]*)\b
       captures:
         1: constant.other.annotation.value
-    - match: (?=(?:\s*\;|\s*$))
+    # A line ending in \ continues the directive onto the next line.
+    - match: \\(?=\s*$)
+      scope: punctuation.separator.continuation.annotation
+    - match: (?=\s*\;)|(?<![\\\s])(?=\s*$)
       pop: true
 
   flow_operators:

@@ -567,13 +567,21 @@ def _get_directive_at_point(view, point):
 
 
 ANNOTATE_LINE_PATTERN = re.compile(r'^\s*#annotate\s+([A-Za-z][A-Za-z0-9_]*)')
+VERBATIM_LINE_PATTERN = re.compile(r'^\s*#verbatim\s+([A-Za-z][A-Za-z0-9_]*)')
 ANNOTATION_WORD_PATTERN = re.compile(r'[A-Za-z_][A-Za-z0-9_]*')
 ANNOTATION_VALUE_OF_PATTERN = re.compile(r'([A-Za-z_][A-Za-z0-9_]*)\s*=\s*$')
 
 
 def _get_annotation_doc(line_text, column, annotation_docs):
     """Hover text for a word on an `#annotate` line: the namespace, an argument name, or a
-    value (which shows its argument). Strings and comments are excluded."""
+    value (which shows its argument). On a `#verbatim` line, the namespace. Strings and
+    comments are excluded."""
+    verbatim = VERBATIM_LINE_PATTERN.match(line_text)
+    if verbatim is not None:
+        namespace_docs = annotation_docs.get(verbatim.group(1))
+        if namespace_docs and verbatim.start(1) <= column < verbatim.end(1):
+            return namespace_docs.get('doc')
+        return None
     match = ANNOTATE_LINE_PATTERN.match(line_text)
     if match is None or not _is_offset_in_code_region(line_text, column):
         return None

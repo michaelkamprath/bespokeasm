@@ -20,6 +20,7 @@ from test import config_files
 
 ANNOTATIONS = {
     'xmin': {
+        'verbatim': {'documentation': {'description': 'xmin script text.'}},
         'arguments': {
             'kind': {'type': 'enum', 'values': ['addr', 'var'], 'required': True},
             'count': {'type': 'integer'},
@@ -101,7 +102,16 @@ def test_vscode_grammar(config_path, tmp_path):
 
     annotation = grammar['repository']['annotation_directive']
     assert annotation['beginCaptures']['1']['name'] == 'keyword.control.preprocessor'
-    namespace_rule, argument_rule, strings, numbers, value_rule = annotation['patterns']
+    continuation_rule, namespace_rule, argument_rule, strings, numbers, value_rule = annotation['patterns']
+    assert continuation_rule == {
+        'match': '\\\\(?=\\s*$)', 'name': 'punctuation.separator.continuation.annotation',
+    }
+    # The directive ends before a comment, or at the end of a line that does not end in \.
+    end = re.compile(annotation['end'])
+    assert end.search('#annotate xmin kind=var ; note').start() == len('#annotate xmin kind=var')
+    assert end.search('#annotate xmin kind=var  ').start() == len('#annotate xmin kind=var')
+    assert end.search('#annotate xmin kind=var \\') is None
+    assert end.search('#annotate xmin kind=var \\  ') is None
     assert namespace_rule['match'] == '\\G(\\s+)(listing|xmin)\\b'
     assert namespace_rule['captures']['2']['name'] == 'entity.name.namespace.annotation'
     assert argument_rule['match'] == '\\b(page_break|collapse|heading|count|hide|kind)\\b(?:\\s*(=))?'
@@ -124,6 +134,18 @@ def test_vscode_grammar(config_path, tmp_path):
     for scope, element in ANNOTATION_SCOPES.items():
         assert rules[scope]['settings']['foreground'] == _color(element)
 
+    # A #verbatim block: first in main, so its lines are never read as assembly.
+    assert grammar['repository']['main']['patterns'][0] == {'include': '#verbatim_blocks'}
+    (block,) = grammar['repository']['verbatim_blocks']['patterns']
+    assert block['contentName'] == 'string.unquoted.verbatim.xmin'
+    begin, end = re.compile(block['begin']), re.compile(block['end'])
+    assert begin.search('  #verbatim xmin ; why').groups() == ('#', 'verbatim', 'xmin', '; why')
+    assert begin.search('#verbatim listing') is None
+    assert end.search('#endverbatim ; done').groups() == ('#', 'endverbatim', '; done')
+    assert block['beginCaptures']['3']['name'] == 'entity.name.namespace.annotation'
+    assert block['endCaptures']['3']['name'] == 'comment.line.semicolon'
+    assert rules['string.unquoted.verbatim']['settings']['foreground'] == _color(SyntaxElement.VERBATIM_TEXT)
+
 
 def test_sublime_syntax(config_path, tmp_path):
     generator, destination = _generator(SublimeConfigGenerator, config_path, tmp_path)
@@ -137,7 +159,12 @@ def test_sublime_syntax(config_path, tmp_path):
     namespace_rule = contexts['annotation_namespace'][1]
     assert namespace_rule['match'] == '\\s*\\b(listing|xmin)\\b'
     assert namespace_rule['captures'][1] == 'entity.name.namespace.annotation'
-    _, argument_rule, strings, numbers, value_rule, pop_rule = contexts['annotation_arguments']
+    _, argument_rule, strings, numbers, value_rule, continuation_rule, pop_rule = contexts['annotation_arguments']
+    assert continuation_rule == {
+        'match': '\\\\(?=\\s*$)', 'scope': 'punctuation.separator.continuation.annotation',
+    }
+    assert re.search(pop_rule['match'], '#annotate xmin kind=var \\') is None
+    assert re.search(pop_rule['match'], '#annotate xmin kind=var').start() == len('#annotate xmin kind=var')
     assert argument_rule['match'] == '\\b(page_break|collapse|heading|count|hide|kind)\\b(?:\\s*(=))?'
     assert argument_rule['captures'] == {
         1: 'variable.parameter.annotation', 2: 'punctuation.separator.key-value.annotation',
@@ -151,6 +178,16 @@ def test_sublime_syntax(config_path, tmp_path):
     assert 'XMIN_CODE' in contexts['compiler_labels'][0]['match']
     assert 'entity.name.namespace.annotation' in color_scheme
     assert 'constant.other.annotation.value' in color_scheme
+    assert contexts['main'][0] == {'include': 'verbatim_blocks'}
+    (block,) = contexts['verbatim_blocks']
+    assert re.match(block['match'], '  #verbatim xmin ; why') and not re.match(block['match'], '#verbatim listing')
+    assert block['captures'][3] == 'entity.name.namespace.annotation'
+    assert block['push'] == ['verbatim_body_xmin', 'verbatim_header']
+    assert contexts['verbatim_body_xmin'] == [
+        {'meta_content_scope': 'string.unquoted.verbatim.xmin'},
+        {'match': '^(?=\\s*\\#endverbatim\\b)', 'pop': True},
+    ]
+    assert 'string.unquoted.verbatim' in color_scheme
     assert 'variable.parameter.annotation' in color_scheme
 
 
@@ -171,6 +208,16 @@ def test_vim_syntax(config_path, tmp_path):
     ) in syntax
     assert f'syn match {vim_ft}AnnotationPunct ' r'/\%(^\s*#annotate\>[^;]*\)\@<==/' in syntax
     assert f'syn match {vim_ft}AnnotationValue ' r'/\%(^\s*#annotate\>[^;]*=\s*\)\@<=\h\w*\>/' in syntax
+    # A continued directive: a region from the trailing \ holds contained copies of the rules.
+    assert (
+        f'syn region {vim_ft}AnnotationContinued matchgroup={vim_ft}AnnotationPunct '
+        r'start=/\%(^\s*#annotate\>[^;]*\)\@<=\\\s*$/ end=/\%(\\\s*\)\@<!$/ '
+        f'contains={vim_ft}AnnotationArgument,{vim_ft}AnnotationPunct,{vim_ft}AnnotationValue,'
+    ) in syntax
+    assert (
+        f'syn match {vim_ft}AnnotationArgument '
+        r'/\<\%(page_break\|collapse\|heading\|count\|hide\|kind\)\>/ contained'
+    ) in syntax
     # Defined after the instruction rules, so a value such as `int` is not taken as a mnemonic.
     assert syntax.index(f'syn match {vim_ft}AnnotationValue') > syntax.index(f'syn region {vim_ft}InstrLine')
     for group, element in (
@@ -181,11 +228,59 @@ def test_vim_syntax(config_path, tmp_path):
         assert re.search(rf'^hi {vim_ft}{group} guifg={_color(element)}', syntax, re.MULTILINE | re.IGNORECASE)
     assert re.search(rf'^hi def link {vim_ft}AnnotationArgument Identifier$', syntax, re.MULTILINE)
     assert 'XMIN_CODE' in syntax and 'XMIN_DEBUG' in syntax
+    assert (
+        f'syn region {vim_ft}Verbatim start=/^\\ze\\s*#verbatim\\s\\+\\%(xmin\\)\\>/ '
+        f'end=/^\\ze\\s*#endverbatim\\>/ contains='
+    ) in syntax
+    assert re.search(rf'^hi {vim_ft}Verbatim guifg={_color(SyntaxElement.VERBATIM_TEXT)}', syntax, re.MULTILINE | re.I)
+    assert re.search(rf'^hi def link {vim_ft}Verbatim String$', syntax, re.MULTILINE)
+
+
+def test_vim_verbatim_block_highlighting(config_path, tmp_path):
+    """In Vim, every line of a block is the Verbatim group, while the directive lines keep their own."""
+    import shutil
+    import subprocess
+    vim = shutil.which('vim')
+    if not vim:
+        pytest.skip('vim is not available')
+    generator, destination = _generator(VimConfigGenerator, config_path, tmp_path)
+    generator.generate()
+    vim_ft = generator.language_id.replace('-', '').lower()
+    source = tmp_path / 'block.testasm'
+    source.write_text('#verbatim xmin ; why\n  x = 1 ; text\n#if kind\n#endverbatim ; done\n  ld a, b, c\n')
+    output = tmp_path / 'groups.out'
+    script = tmp_path / 'groups.vim'
+    script.write_text('\n'.join([
+        'let out = []',
+        'for lnum in range(1, 5)',
+        '  let groups = []',
+        '  for col in range(1, len(getline(lnum)))',
+        "    if getline(lnum)[col - 1] !~# '\\s'",
+        "      call add(groups, synIDattr(synID(lnum, col, 1), 'name'))",
+        '    endif',
+        '  endfor',
+        "  call add(out, join(uniq(groups), ','))",
+        'endfor',
+        f"call writefile(out, '{output}')",
+    ]) + '\n')
+    subprocess.run(
+        [vim, '-u', 'NONE', '-N', '-es', '-c', f'set rtp={destination},$VIMRUNTIME', '-c', 'syntax on',
+         '-c', f'set ft={vim_ft}', '-c', f'source {script}', '-c', 'qa!', str(source)],
+        capture_output=True, text=True, timeout=60,
+    )
+    groups = [line.replace(vim_ft, '').split(',') for line in output.read_text().splitlines()]
+    assert groups[0] == ['VerbatimPunc', 'VerbatimDirective', 'VerbatimNamespace', 'VerbatimComment']
+    assert groups[1] == ['Verbatim'] and groups[2] == ['Verbatim']
+    assert 'Verbatim' not in groups[3] and 'PreProc' in groups[3] and 'Comment' in groups[3]
+    assert 'Verbatim' not in groups[4]
 
 
 # ---- hover lookups on #annotate lines --------------------------------------------------
 
 ANNOTATE_LINE = '#annotate xmin kind=var count=3 ; kind in a comment'
+VERBATIM_LINE = '#verbatim xmin ; xmin in a comment'
+# On a #verbatim line, only the namespace has annotation hover text.
+VERBATIM_LOOKUPS = [(2, None), (11, '### `xmin` : Annotation'), (19, None)]
 # (column, expected first line of the hover text, or None)
 ANNOTATE_LOOKUPS = [
     (2, None),                                              # the directive itself has its own hover
@@ -221,6 +316,8 @@ def test_sublime_annotation_hover_lookup(config_path):
     for column, expected in ANNOTATE_LOOKUPS:
         assert _first_line(hover._get_annotation_doc(ANNOTATE_LINE, column, docs)) == expected, column
     assert hover._get_annotation_doc('#if kind == 1', 5, docs) is None
+    for column, expected in VERBATIM_LOOKUPS:
+        assert _first_line(hover._get_annotation_doc(VERBATIM_LINE, column, docs)) == expected, column
     listing = '#annotate listing heading="kind" hide'
     assert _first_line(hover._get_annotation_doc(listing, listing.index('kind') + 1, docs)) is None
     assert _first_line(hover._get_annotation_doc(listing, listing.index('hide') + 1, docs)) == (
@@ -264,12 +361,17 @@ def test_vscode_annotation_hover_lookup(config_path, tmp_path):
     generator.generate()
     probe = tmp_path / 'probe.js'
     probe.write_text(NODE_PROBE)
-    cases = [[ANNOTATE_LINE, column] for column, _ in ANNOTATE_LOOKUPS] + [['#if kind == 1', 5]]
+    cases = (
+        [[ANNOTATE_LINE, column] for column, _ in ANNOTATE_LOOKUPS] + [['#if kind == 1', 5]]
+        + [[VERBATIM_LINE, column] for column, _ in VERBATIM_LOOKUPS]
+    )
     result = subprocess.run(
         [node, str(probe), str(destination / 'extensions' / 'test-lang'), json.dumps(cases)],
         capture_output=True, text=True, check=True,
     )
-    assert json.loads(result.stdout) == [expected for _, expected in ANNOTATE_LOOKUPS] + [None]
+    assert json.loads(result.stdout) == (
+        [expected for _, expected in ANNOTATE_LOOKUPS] + [None] + [expected for _, expected in VERBATIM_LOOKUPS]
+    )
 
 
 def test_vim_annotation_docs_lookup(config_path, tmp_path):
@@ -285,10 +387,10 @@ def test_vim_annotation_docs_lookup(config_path, tmp_path):
     if not vim:
         pytest.skip('vim is not available to run the docs lookup')
     source = tmp_path / 'probe.testasm'
-    source.write_text(ANNOTATE_LINE + '\n#if kind == 1\n')
+    source.write_text(ANNOTATE_LINE + '\n#if kind == 1\n' + VERBATIM_LINE + '\n')
     output = tmp_path / 'probe.out'
     script = tmp_path / 'probe.vim'
-    cases = [(1, column + 1) for column, _ in ANNOTATE_LOOKUPS[1:5]] + [(2, 6)]
+    cases = [(1, column + 1) for column, _ in ANNOTATE_LOOKUPS[1:5]] + [(2, 6), (3, 12)]
     script.write_text('\n'.join([
         f"redir! > {output}",
         f'for [lnum, col] in {[list(case) for case in cases]}',
@@ -311,4 +413,4 @@ def test_vim_annotation_docs_lookup(config_path, tmp_path):
         capture_output=True, text=True, timeout=60,
     )
     found = [line[1:] for line in output.read_text().splitlines() if line.startswith('|')]
-    assert found == [expected for _, expected in ANNOTATE_LOOKUPS[1:5]] + ['']
+    assert found == [expected for _, expected in ANNOTATE_LOOKUPS[1:5]] + ['', '### `xmin` : Annotation']

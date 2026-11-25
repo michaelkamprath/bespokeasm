@@ -369,9 +369,36 @@ PREPROCESSOR_DIRECTIVE_DOCS: dict[str, str] = {
         'and the configuration validates every argument. The line must be directly above the '
         'definition; only further `#annotate` lines, for other namespaces, may sit between them. '
         'Emits no bytes.\n\n'
+        'A line ending in `\\` continues on the next line, and adjacent quoted strings join into one '
+        'value, so a long description can span lines:\n\n'
+        '```\n'
+        '#annotate <namespace> description= \\\n'
+        '    "First line\\n" \\\n'
+        '    "second line."\n'
+        '```\n\n'
         'The `listing` namespace shapes `-t listing` output: `heading="..."` prints a heading above '
         'the symbol, `page_break` starts a new page, `collapse` shows only the first row of a '
         "label's data, and `hide` leaves the symbol's lines out. Bytes are assembled either way."
+    ),
+    'verbatim': (
+        '### `#verbatim` : Verbatim Text Block\n\n'
+        '---\n\n'
+        'Starts a block of text that is not assembled. An output format of the instruction set '
+        'copies the text into its file, such as script functions that call the assembled routines.\n\n'
+        '**Usage:**\n\n'
+        '```\n'
+        '#verbatim <namespace>\n'
+        'text, kept exactly as written\n'
+        '#endverbatim\n'
+        '```\n\n'
+        'The namespace must be an annotation namespace of the instruction set that accepts verbatim '
+        'blocks. The lines in between are not preprocessed and emit no bytes. A block inside a false '
+        '`#if` branch is skipped.'
+    ),
+    'endverbatim': (
+        '### `#endverbatim` : End Verbatim Text Block\n\n'
+        '---\n\n'
+        'Ends the text block that `#verbatim` started.'
     ),
     'create-scope': (
         '### `#create-scope` : Create Named Label Scope\n\n'

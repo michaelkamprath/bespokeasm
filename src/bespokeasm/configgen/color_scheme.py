@@ -45,6 +45,9 @@ class SyntaxElement(Enum):
     # Comments
     COMMENT = 'comment'
 
+    # Text of a #verbatim block: not assembly, so one color throughout
+    VERBATIM_TEXT = 'verbatim_text'
+
     # Instructions and functions
     INSTRUCTION = 'instruction'
     MACRO = 'macro'
@@ -131,6 +134,9 @@ DEFAULT_COLOR_SCHEME = ColorScheme(
 
         # Comments
         SyntaxElement.COMMENT: '#568c3b',
+
+        # Text of a #verbatim block
+        SyntaxElement.VERBATIM_TEXT: '#9ecfc4',
 
         # Instructions and functions
         SyntaxElement.INSTRUCTION: '#ffa83f',

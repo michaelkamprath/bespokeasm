@@ -68,6 +68,7 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.PUNCTUATION_STRING, 'punctuation.definition.string', 'String Punctuation'),
             (SyntaxElement.STRING, 'string.quoted', 'Strings'),
             (SyntaxElement.STRING_ESCAPE, 'constant.character.escape', 'Strings - Escaped Characters'),
+            (SyntaxElement.VERBATIM_TEXT, 'string.unquoted.verbatim', 'Verbatim Text Blocks'),
             (SyntaxElement.COMMENT, 'comment.line', 'Comments'),
             (SyntaxElement.PARAMETER, 'variable.parameter', 'Parameters'),
             (SyntaxElement.ANNOTATION_NAMESPACE, 'entity.name.namespace.annotation', 'Annotation Namespaces'),
@@ -200,6 +201,39 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
     def _hover_plugin_filename(self) -> str:
         safe_name = re.sub(r'[^0-9A-Za-z_]', '_', self.language_name or 'bespokeasm')
         return f'bespokeasm_hover_{safe_name}.py'
+
+    def _add_verbatim_contexts(self, contexts: dict) -> None:
+        """`#verbatim <namespace>` ... `#endverbatim` blocks, for namespaces that accept them: the
+        `#verbatim` line as a preprocessor line (with any comment), then every line up to
+        `#endverbatim` as `string.unquoted.verbatim.<namespace>`, with nothing highlighted inside."""
+        namespaces = self.model.verbatim_namespaces
+        if not namespaces:
+            return
+        contexts['main'].insert(0, {'include': 'verbatim_blocks'})
+        contexts['verbatim_blocks'] = [
+            {
+                'match': rf'^\s*(\#)(verbatim)\s+({re.escape(namespace)})\b',
+                'captures': {
+                    1: 'punctuation.definition.preprocessor',
+                    2: 'keyword.control.preprocessor',
+                    3: 'entity.name.namespace.annotation',
+                },
+                # The rest of the #verbatim line first, then the block.
+                'push': [f'verbatim_body_{namespace}', 'verbatim_header'],
+            }
+            for namespace in namespaces
+        ]
+        contexts['verbatim_header'] = [
+            {'meta_scope': 'meta.preprocessor'},
+            {'match': r'\;', 'scope': 'punctuation.definition.comment', 'push': 'line_comment'},
+            {'match': r'\n', 'pop': True},
+        ]
+        for namespace in namespaces:
+            contexts[f'verbatim_body_{namespace}'] = [
+                {'meta_content_scope': f'string.unquoted.verbatim.{namespace}'},
+                # #endverbatim is left to the preprocessor rules.
+                {'match': r'^(?=\s*\#endverbatim\b)', 'pop': True},
+            ]
 
     def generate(self) -> None:
         if self.verbose >= 1:
@@ -369,6 +403,7 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
                     rule['match'] = rule['match'].replace(
                         '##ANNOTATION_NAMESPACES##', '|'.join(namespaces),
                     ).replace('##ANNOTATION_ARGUMENTS##', '|'.join(arguments))
+        self._add_verbatim_contexts(syntax_dict['contexts'])
 
         # expression functions
         func_regex = '|'.join(expression_functions_for_isa(self.model.flow_counters_enabled))
