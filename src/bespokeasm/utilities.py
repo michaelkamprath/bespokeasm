@@ -1,4 +1,5 @@
 import re
+from dataclasses import dataclass
 
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
@@ -27,13 +28,62 @@ DEFAULT_NUMERIC_BASE_RADIX = {
     'octal': 8,
     'binary': 2,
 }
+LOW_HIGH_OPERATOR_STYLES = ('tight', 'whole_expression')
+CURRENT_ADDRESS_STYLES = ('instruction_start', 'value_address')
+
+
+@dataclass(frozen=True)
+class ExpressionSyntax:
+    """How an instruction set's source writes numbers and expressions.
+
+    Anywhere a ``default_numeric_base`` is accepted, an ``ExpressionSyntax`` may be passed
+    instead. Helpers that only need the base read ``default_numeric_base`` from it; the
+    expression parser also reads the instruction set's optional expression features:
+
+    * ``low_high_operators``: ``None`` (not available), ``'tight'`` (``<``/``>`` apply to the
+      term that follows, so ``<lab+1`` is ``(<lab)+1``), or ``'whole_expression'`` (they may
+      only lead an expression and apply to all of it, so ``<lab+1`` is ``<(lab+1)``). ``<``
+      gives the low word of a value and ``>`` the word above it, so with 8-bit words they
+      are the low and high byte.
+    * ``word_size``: the instruction set's word size in bits, which ``<`` and ``>`` split by.
+    * ``current_address``: ``None`` (not available), ``'instruction_start'`` (``*`` in an
+      instruction operand is the instruction's first word) or ``'value_address'`` (it is the
+      address of the operand's own words). In a data directive ``*`` is always the address
+      of the value being written.
+    """
+
+    default_numeric_base: str = 'decimal'
+    low_high_operators: str | None = None
+    current_address: str | None = None
+    word_size: int = 8
+
+
+def expression_syntax_of(syntax: 'ExpressionSyntax | str | None') -> ExpressionSyntax:
+    """Return ``syntax`` as an ``ExpressionSyntax``; a plain base name has no optional features."""
+    if isinstance(syntax, ExpressionSyntax):
+        return syntax
+    return ExpressionSyntax(default_numeric_base=normalize_default_numeric_base(syntax))
+
+
 PATTERN_HEX = r'(?:\$|0x)[0-9a-fA-F]+|[0-9a-fA-F]+H\b'
+# Octal: `0o17`, or Intel's `17Q` / `17O` suffix forms. `Q` and `O` are not hex digits, so
+# these never collide with a bare number under any default base.
+PATTERN_OCTAL = r'0o[0-7]+|[0-7]+[QO]\b'
+# Binary with Intel's `B` suffix (`1010B`). `B` is a hex digit, so under a hex default base
+# `1010B` stays a bare hex number and this form does not apply.
+PATTERN_BINARY_SUFFIX = r'[01]+B\b'
 PATTERN_CHARACTER_ORDINAL = r"'(?:[^'\\]|\\.)'"
-PATTERN_NUMERIC = fr'(?:{PATTERN_HEX}|(?:b|%)[01]+|\d+|{PATTERN_CHARACTER_ORDINAL})'
+PATTERN_NUMERIC = (
+    fr'(?:{PATTERN_HEX}|{PATTERN_OCTAL}|{PATTERN_BINARY_SUFFIX}|(?:b|%)[01]+|\d+|{PATTERN_CHARACTER_ORDINAL})'
+)
 PATTERN_NUMERIC_COMPILED = re.compile(f'^({PATTERN_NUMERIC})$', flags=re.IGNORECASE | re.MULTILINE)
-PATTERN_EXPLICIT_NUMERIC = fr'(?:{PATTERN_HEX}|(?:b|%)[01]+|{PATTERN_CHARACTER_ORDINAL})'
+PATTERN_EXPLICIT_NUMERIC = fr'(?:{PATTERN_HEX}|{PATTERN_OCTAL}|(?:b|%)[01]+|{PATTERN_CHARACTER_ORDINAL})'
 PATTERN_EXPLICIT_NUMERIC_COMPILED = re.compile(
     f'^({PATTERN_EXPLICIT_NUMERIC})$',
+    flags=re.IGNORECASE | re.MULTILINE,
+)
+PATTERN_EXPLICIT_NUMERIC_WITH_BINARY_SUFFIX_COMPILED = re.compile(
+    f'^({PATTERN_EXPLICIT_NUMERIC}|{PATTERN_BINARY_SUFFIX})$',
     flags=re.IGNORECASE | re.MULTILINE,
 )
 PATTERN_CHARACTER_ORDINAL_COMPILED = re.compile(
@@ -42,13 +92,15 @@ PATTERN_CHARACTER_ORDINAL_COMPILED = re.compile(
 )
 
 
-def normalize_default_numeric_base(default_numeric_base: str | None) -> str:
+def normalize_default_numeric_base(default_numeric_base: 'str | ExpressionSyntax | None') -> str:
     """Resolve a base name (or alias) to its canonical form: 'decimal', 'hex', 'octal', 'binary'.
 
     `None` resolves to 'decimal'. Matching is case-insensitive and tolerates surrounding
     whitespace. Aliases (e.g. 'hexadecimal', 'base16', 'base8', 'base2') map to their
-    canonical name. Unknown values raise `ValueError`.
+    canonical name. An `ExpressionSyntax` resolves to its base. Unknown values raise `ValueError`.
     """
+    if isinstance(default_numeric_base, ExpressionSyntax):
+        default_numeric_base = default_numeric_base.default_numeric_base
     if default_numeric_base is None:
         return 'decimal'
     normalized_base = str(default_numeric_base).strip().lower()
@@ -57,15 +109,26 @@ def normalize_default_numeric_base(default_numeric_base: str | None) -> str:
     return DEFAULT_NUMERIC_BASE_ALIASES[normalized_base]
 
 
-def is_explicit_numeric_string(value_str: str) -> bool:
-    """True iff `value_str` carries an explicit base prefix/suffix (`0x`, `$`, `b`, `%`,
-    trailing `H`) or is a single-character ordinal (e.g. `'A'`).
+def _binary_suffix_allowed(default_numeric_base: 'str | ExpressionSyntax | None') -> bool:
+    """The `B` binary suffix applies unless bare numbers are hex, where `1010B` is a hex number."""
+    return normalize_default_numeric_base(default_numeric_base) != 'hex'
+
+
+def is_explicit_numeric_string(value_str: str, default_numeric_base: 'str | ExpressionSyntax' = 'decimal') -> bool:
+    """True iff `value_str` carries an explicit base prefix/suffix (`0x`, `$`, trailing `H`;
+    `0o`, trailing `Q`/`O`; `b`, `%`, and trailing `B` unless the default base is hex) or is a
+    single-character ordinal (e.g. `'A'`).
 
     Whitespace-only and empty strings return False.
     """
     if value_str.isspace():
         return False
-    match = re.match(PATTERN_EXPLICIT_NUMERIC_COMPILED, value_str.strip())
+    pattern = (
+        PATTERN_EXPLICIT_NUMERIC_WITH_BINARY_SUFFIX_COMPILED
+        if _binary_suffix_allowed(default_numeric_base)
+        else PATTERN_EXPLICIT_NUMERIC_COMPILED
+    )
+    match = re.match(pattern, value_str.strip())
     return match is not None and len(match.groups()) > 0
 
 
@@ -85,7 +148,8 @@ def is_unprefixed_numeric_string(value_str: str, default_numeric_base: str = 'de
 def parse_numeric_string(numeric_str: str, default_numeric_base: str = 'decimal') -> int:
     """Return the integer value of `numeric_str`.
 
-    Supports explicit prefixes/suffixes (`0x`, `$`, trailing `H` for hex; `0b`, `b`, `%` for binary),
+    Supports explicit prefixes/suffixes (`0x`, `$`, trailing `H` for hex; `0o`, trailing `Q`/`O`
+    for octal; `0b`, `b`, `%`, and trailing `B` unless the default base is hex, for binary),
     single-character ordinals (e.g. `'A'`, `'\\n'`), and an optional leading `+`/`-` sign.
     Bare digit tokens are interpreted in `default_numeric_base` (decimal/hex/octal/binary).
     Surrounding whitespace is tolerated.
@@ -119,6 +183,12 @@ def parse_numeric_string(numeric_str: str, default_numeric_base: str = 'decimal'
         return sign * int(unsigned_numeric[2:], 2)
     elif (lowered_numeric.startswith('b') or unsigned_numeric.startswith('%')) and len(unsigned_numeric) > 1:
         return sign * int(unsigned_numeric[1:], 2)
+    elif lowered_numeric.startswith('0o') and len(unsigned_numeric) > 2:
+        return sign * int(unsigned_numeric[2:], 8)
+    elif re.fullmatch(r'[0-7]+[qo]', lowered_numeric):
+        return sign * int(unsigned_numeric[:-1], 8)
+    elif re.fullmatch(r'[01]+b', lowered_numeric) and _binary_suffix_allowed(normalized_base):
+        return sign * int(unsigned_numeric[:-1], 2)
     elif unsigned_numeric.startswith('\'') or unsigned_numeric.startswith('"'):
         match = re.match(PATTERN_CHARACTER_ORDINAL_COMPILED, unsigned_numeric)
         if match is None:
@@ -144,7 +214,7 @@ def is_string_numeric(value_str: str, default_numeric_base: str = 'decimal') -> 
         # strings of only whitespace don't play well with the regex
         return False
     stripped_value = value_str.strip()
-    return is_explicit_numeric_string(stripped_value) or is_unprefixed_numeric_string(
+    return is_explicit_numeric_string(stripped_value, default_numeric_base) or is_unprefixed_numeric_string(
         stripped_value,
         default_numeric_base,
     )

@@ -17,6 +17,7 @@ from bespokeasm.assembler.model.operand import ParsedOperand
 from bespokeasm.assembler.model.operand.types.numeric_expression import NumericExpressionOperand
 from bespokeasm.assembler.symbol_scope import SymbolScope
 from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
+from bespokeasm.utilities import ExpressionSyntax
 
 
 class AddressByteCodePart(ExpressionByteCodePartInMemoryZone):
@@ -34,6 +35,7 @@ class AddressByteCodePart(ExpressionByteCodePartInMemoryZone):
         match_on_argument_bytcode: bool,
         word_size: int,
         word_segment_size: int,
+        default_numeric_base: str | ExpressionSyntax = 'decimal',
     ) -> None:
         """Creates a new address bytecode part that is bound to a memory zone.
            The address value is sliced into the least significant bit(s) if `is_lsb_bytes` is true,
@@ -48,6 +50,7 @@ class AddressByteCodePart(ExpressionByteCodePartInMemoryZone):
             line_id,
             word_size,
             word_segment_size,
+            default_numeric_base,
         )
         self._is_lsb_bytes = is_lsb_bytes
         self._match_address_msb = match_address_msb
@@ -200,6 +203,7 @@ class AddressOperand(NumericExpressionOperand):
             self.match_on_argument_bytcode,
             self._word_size,
             self._word_segment_size,
+            self.default_numeric_base,
         )
         if arg_part.contains_register_labels(register_labels):
             return None

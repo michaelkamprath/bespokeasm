@@ -998,6 +998,10 @@ class MarkdownGenerator:
         if string_section:
             table_sections.append(string_section)
 
+        expression_section = self._generate_expression_syntax_section(general.get('expression_syntax', {}))
+        if expression_section:
+            table_sections.append(expression_section)
+
         if table_sections:
             sections.append('\n\n---\n\n'.join(table_sections))
 
@@ -1352,6 +1356,38 @@ class MarkdownGenerator:
             return ''
 
         return self._generate_attribute_table('String Handling', rows)
+
+    _BARE_NUMBER_BASES = {'hex': 'Hexadecimal', 'octal': 'Octal', 'binary': 'Binary'}
+    _LOW_HIGH_OPERATOR_TEXT = {
+        'tight': 'Low and high {unit} of the term that follows: `<label+1` is `(<label)+1`',
+        'whole_expression': (
+            'Low and high {unit} of everything after the operator, written at the start of an '
+            'expression or parenthesis: `<label+1` is `<(label+1)`'
+        ),
+    }
+    _CURRENT_ADDRESS_TEXT = {
+        'instruction_start': "The instruction's first byte; in data, the value's own address",
+        'value_address': "The address of the operand's own bytes; in data, the value's own address",
+    }
+
+    def _generate_expression_syntax_section(self, syntax: dict[str, Any]) -> str:
+        """Generate the Expression Syntax subsection: only what differs from the defaults, so an
+        instruction set with decimal bare numbers and no optional operators shows nothing."""
+        rows: list[tuple[str, str]] = []
+        base = self._BARE_NUMBER_BASES.get(str(syntax.get('default_numeric_base') or 'decimal'))
+        if base:
+            rows.append(('Bare Numbers', base))
+        if syntax.get('low_high_operators') in self._LOW_HIGH_OPERATOR_TEXT:
+            unit = 'byte' if syntax.get('word_size', 8) == 8 else f"{syntax['word_size']}-bit word"
+            rows.append((
+                '`<` and `>`',
+                self._LOW_HIGH_OPERATOR_TEXT[syntax['low_high_operators']].format(unit=unit),
+            ))
+        if syntax.get('current_address') in self._CURRENT_ADDRESS_TEXT:
+            rows.append(('`*`', self._CURRENT_ADDRESS_TEXT[syntax['current_address']]))
+        if not rows:
+            return ''
+        return self._generate_attribute_table('Expression Syntax', rows)
 
     def _generate_registers_section(self, registers: list[dict[str, Any]]) -> str:
         """Generate the Register Set subsection."""

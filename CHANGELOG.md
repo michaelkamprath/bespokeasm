@@ -14,6 +14,14 @@ Changes that are planned but not implemented yet:
 
 
 ## [Unreleased]
+* Added octal literals (`0o17`, `17Q`, `17O`) and the binary `B` suffix (`1010B`). Under `default_numeric_base: hex`, `1010B` stays a hex number.
+* Added the `~` bitwise complement operator.
+* Added two instruction set settings: `general.low_high_operators` turns on `<` and `>` (the low and high word of a value, which with 8-bit words are the low and high byte), and `general.current_address` turns on `*` (the current address) in instruction operands and data values. Each setting chooses its meaning, `tight` or `whole_expression` and `instruction_start` or `value_address`, so source ported from another assembler keeps its bytes.
+* The Minimal CPU, Minimal 64, Minimal 64x4 and Redux example configurations turn on `<`, `>` and `*` with the meaning Carsten Herting's assemblers give them, and now require BespokeASM 0.9.1.
+* **Behavior change:** unary minus now applies only to the term after it, so `-1+2` is `1`; it used to negate the rest of the expression and give `-3`. Add parentheses where an expression relied on the old reading.
+* Fixed address, relative-address and numeric-enumeration operands reading bare numbers as decimal under a non-decimal `default_numeric_base`.
+* Generated ISA documentation describes the instruction set's expression syntax where it differs from the defaults.
+* Editor extensions color `*` as the current address and `<`/`>` as the low and high operators with their own scopes (`variable.language.current-address`, `keyword.operator.low-high`), apart from multiplication, shifts and comparisons, in instruction sets that turn them on.
 
 ## [0.9.0]
 * Added label annotations: `#annotate <namespace> key=value ...` attaches validated metadata to the next label or constant. Configurations declare namespaces in a new `annotations` section, with typed arguments and checks on a label's data size or a constant's value. An `#annotate` line ending in `\` continues on the next line, and adjacent quoted strings join into one value. See [Annotations](https://github.com/michaelkamprath/bespokeasm/wiki/Annotations).

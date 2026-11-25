@@ -21,6 +21,7 @@ from bespokeasm.assembler.output_format.defined import DefinedFormat
 from bespokeasm.assembler.output_format.defined import format_scoped_names
 from bespokeasm.assembler.symbol_scope import SymbolScope
 from bespokeasm.assembler.symbol_scope import SymbolScopeType
+from bespokeasm.utilities import ExpressionSyntax
 from bespokeasm.utilities import is_unprefixed_numeric_string
 from bespokeasm.utilities import is_valid_label
 from bespokeasm.utilities import normalize_default_numeric_base
@@ -133,7 +134,7 @@ class AssemblerModel:
             self.word_size,
             self.word_segment_size,
             self._diagnostic_reporter,
-            default_numeric_base=self.default_numeric_base,
+            default_numeric_base=self.expression_syntax,
         )
         self._instructions = InstructionSet(
                 self._config['instructions'],
@@ -141,7 +142,7 @@ class AssemblerModel:
                 self._operand_sets,
                 self.multi_word_endianness,
                 self.intra_word_endianness,
-                self.default_numeric_base,
+                self.expression_syntax,
                 self.registers,
                 self.word_size,
                 self.word_segment_size,
@@ -908,6 +909,18 @@ class AssemblerModel:
     @property
     def default_numeric_base(self) -> Literal['decimal', 'hex', 'octal', 'binary']:
         return self._config['general'].get('default_numeric_base', 'decimal')
+
+    @property
+    def expression_syntax(self) -> ExpressionSyntax:
+        '''How this instruction set's source writes numbers and expressions: the default numeric
+        base, plus the optional `<`/`>` low and high operators and `*` current address.'''
+        general = self._config['general']
+        return ExpressionSyntax(
+            default_numeric_base=self.default_numeric_base,
+            low_high_operators=general.get('low_high_operators'),
+            current_address=general.get('current_address'),
+            word_size=self.word_size,
+        )
 
     @property
     def registers(self) -> set[str]:

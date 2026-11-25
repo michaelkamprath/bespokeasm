@@ -928,7 +928,7 @@ CODE_TOKEN_PATTERN = re.compile(
     r'(?P<comment>;.*)|'
     r'(?P<string>"(?:[^"\\]|\\.)*"?|\'(?:[^\'\\]|\\.)*\'?)|'
     r'(?P<directive>#[^\s;]+|\.\d*[A-Za-z]\w*)|'
-    r'(?P<number>0x[0-9a-fA-F]+|\$[0-9a-fA-F]+|\d+)|'
+    r'(?P<number>0x[0-9a-fA-F]+|\$[0-9a-fA-F]+|0o[0-7]+|%[01]+|[0-7]+[qQoO]\b|[01]+[bB]\b|\d+)|'
     r'(?P<word>[A-Za-z_]\w*(?:\.\w+)*)|'      # a dotted mnemonic such as or.z is one word
     r'(?P<other>.)'
 )

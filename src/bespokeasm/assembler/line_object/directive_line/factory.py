@@ -83,7 +83,7 @@ class DirectiveLine:
                 value_str,
                 memzone_name,
                 memzone_manager,
-                isa_model.default_numeric_base,
+                isa_model.expression_syntax,
             )
 
         # .memzone
@@ -108,7 +108,7 @@ class DirectiveLine:
                 isa_model.word_segment_size,
                 isa_model.intra_word_endianness,
                 isa_model.multi_word_endianness,
-                isa_model.default_numeric_base,
+                isa_model.expression_syntax,
             )
 
         # .zero
@@ -128,7 +128,7 @@ class DirectiveLine:
                 isa_model.word_segment_size,
                 isa_model.intra_word_endianness,
                 isa_model.multi_word_endianness,
-                isa_model.default_numeric_base,
+                isa_model.expression_syntax,
             )
 
         # .zerountil
@@ -146,7 +146,7 @@ class DirectiveLine:
                 isa_model.word_segment_size,
                 isa_model.intra_word_endianness,
                 isa_model.multi_word_endianness,
-                isa_model.default_numeric_base,
+                isa_model.expression_syntax,
             )
 
         # .page
@@ -158,7 +158,7 @@ class DirectiveLine:
                 comment,
                 current_memzone,
                 isa_model.page_size,
-                isa_model.default_numeric_base,
+                isa_model.expression_syntax,
             )
 
         # nothing was matched here. pass to data directive
@@ -174,5 +174,5 @@ class DirectiveLine:
             isa_model.cstr_terminator,
             isa_model.string_byte_packing,
             isa_model.string_byte_packing_fill,
-            isa_model.default_numeric_base,
+            isa_model.expression_syntax,
             diagnostic_reporter=isa_model.diagnostic_reporter)

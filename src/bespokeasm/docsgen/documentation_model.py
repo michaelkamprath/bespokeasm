@@ -112,6 +112,14 @@ class DocumentationModel:
             # String and data handling
             'string_config': string_config,
 
+            # How source writes numbers and expressions, where it differs from the defaults
+            'expression_syntax': {
+                'default_numeric_base': general_config.get('default_numeric_base', 'decimal'),
+                'low_high_operators': general_config.get('low_high_operators'),
+                'word_size': general_config.get('word_size', 8),
+                'current_address': general_config.get('current_address'),
+            },
+
             # Register set
             'registers': self._parse_registers_documentation(general_config),
 

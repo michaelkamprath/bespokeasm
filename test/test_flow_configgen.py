@@ -300,7 +300,7 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
             'COORDINATE COUNTER'
         ) in generated
         assert (
-            r'Operator /==\|!=\|>=\|<=\|>>\|<<\|>\|<\|[+\-*/&|^]/'
+            r'Operator /==\|!=\|>=\|<=\|>>\|<<\|>\|<\|[+\-*/&|^~]/'
             in generated
         )
 

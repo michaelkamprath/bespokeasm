@@ -14,6 +14,7 @@ from bespokeasm.assembler.model.operand.operand_label import parse_operand_label
 from bespokeasm.assembler.symbol_scope import SymbolScope
 from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.expression import EXPRESSION_PARTS_PATTERN
+from bespokeasm.utilities import ExpressionSyntax
 from bespokeasm.utilities import PATTERN_SYMBOL
 
 
@@ -32,6 +33,7 @@ class RelativeAddressByteCodePart(ExpressionByteCodePartInMemoryZone):
                 offset_from_instruction_end: bool,
                 word_size: int,
                 word_segment_size: int,
+                default_numeric_base: str | ExpressionSyntax = 'decimal',
             ) -> None:
         super().__init__(
             memzone,
@@ -43,6 +45,7 @@ class RelativeAddressByteCodePart(ExpressionByteCodePartInMemoryZone):
             line_id,
             word_size,
             word_segment_size,
+            default_numeric_base,
         )
         self._min_relative_value = min_relative_value
         self._max_relative_value = max_relative_value
@@ -190,6 +193,7 @@ class RelativeAddressOperand(OperandWithArgument):
                 self.offset_from_instruction_end,
                 self._word_size,
                 self._word_segment_size,
+                self.default_numeric_base,
             )
         except SyntaxError:
             return None

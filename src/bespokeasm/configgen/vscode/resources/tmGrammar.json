@@ -608,8 +608,12 @@
           "name": "constant.numeric.integer.hexadecimal"
         },
         {
-          "match": "(?<!\\w)(?:(?:b|%)[01]+)\\b",
+          "match": "(?<!\\w)(?:(?:b|%)[01]+|[01]+[bB])\\b",
           "name": "constant.numeric.integer.binary"
+        },
+        {
+          "match": "(?<!\\w)(?:0o[0-7]+|[0-7]+[qQoO])\\b",
+          "name": "constant.numeric.integer.octal"
         },
         {
           "match": "(?<!\\w)(?:\\d+)\\b",
@@ -638,7 +642,7 @@
           "name": "keyword.operator.arithmetic"
         },
         {
-          "match": "[\\&\\|\\^]{1}",
+          "match": "[\\&\\|\\^\\~]{1}",
           "name": "keyword.operator.logical"
         },
         {

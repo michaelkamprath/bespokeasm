@@ -7,6 +7,8 @@ from bespokeasm.assembler.analysis import InstructionAnalysisRecord
 from bespokeasm.assembler.analysis import OperandSemanticKind
 from bespokeasm.assembler.analysis import SourceIdentity
 from bespokeasm.assembler.bytecode.assembled import AssembledInstruction
+from bespokeasm.assembler.bytecode.parts import ByteCodePart
+from bespokeasm.assembler.bytecode.parts import CompositeByteCodePart
 from bespokeasm.assembler.bytecode.parts import ExpressionByteCodePart
 from bespokeasm.assembler.bytecode.parts import NumericByteCodePart
 from bespokeasm.assembler.diagnostic_reporter import AssemblerError
@@ -33,6 +35,19 @@ class InstructionBytecodeGenerator:
                 total_bits += word_size - total_bits % word_size
             total_bits += part.value_size
         return math.ceil(total_bits / word_size)
+
+    @classmethod
+    def _part_word_offset(cls, parts, target, word_size: int) -> int | None:
+        """The word offset of ``target`` from the start of ``parts``, laid out as emission lays
+        them out; ``None`` if ``target`` is not among them."""
+        for part, offset in ByteCodePart._iter_parts_with_bytecode_addresses(parts, word_size, 0):
+            if part is target:
+                return offset
+            if isinstance(part, CompositeByteCodePart):
+                inner = cls._part_word_offset(part._parts_list, target, word_size)
+                if inner is not None:
+                    return offset + inner
+        return None
 
     @classmethod
     def generate_bytecode_parts(
@@ -87,7 +102,7 @@ class InstructionBytecodeGenerator:
                 split_operands(operands),
                 isa_model.registers,
                 memzone_manager,
-                isa_model.default_numeric_base,
+                isa_model.expression_syntax,
             ),
         )
 
@@ -180,6 +195,11 @@ class InstructionBytecodeGenerator:
                     if expression_part is not None
                     else None
                 )
+                current_address_offset = 0
+                if expression_part is not None and isa_model.expression_syntax.current_address == 'value_address':
+                    current_address_offset = cls._part_word_offset(
+                        machine_code, expression_part, isa_model.word_size,
+                    ) or 0
                 if 'REGISTER' in parsed_operand.operand.type.name:
                     semantic_kind = OperandSemanticKind.RUNTIME_REGISTER
                 elif expression is not None:
@@ -193,6 +213,7 @@ class InstructionBytecodeGenerator:
                         source_text=parsed_operand.operand_string,
                         semantic_kind=semantic_kind,
                         expression=expression,
+                        current_address_offset=current_address_offset,
                     )
                 )
             analysis_record = InstructionAnalysisRecord(

@@ -126,6 +126,9 @@ class AnalysisOperand:
     semantic_kind: OperandSemanticKind
     expression: FrozenExpression | None
     expression_context: ExpressionUseContext = ExpressionUseContext.OPERAND_VALUE
+    # Words from the instruction's first word to the address `*` means in this operand: 0 when
+    # `*` is the instruction's start, the operand value's own offset when it is the value's address.
+    current_address_offset: int = 0
 
 
 @dataclass(frozen=True)

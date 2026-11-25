@@ -19,7 +19,9 @@ from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.output_format.defined import DefinedFormat
 from bespokeasm.assembler.output_format.defined import load_output_formats
 from bespokeasm.assembler.output_format.generators import LoadEnvironment
+from bespokeasm.utilities import CURRENT_ADDRESS_STYLES
 from bespokeasm.utilities import is_valid_label
+from bespokeasm.utilities import LOW_HIGH_OPERATOR_STYLES
 
 ENDIAN_VALUES = ('big', 'little')
 ENDIAN_KEYS = (
@@ -207,6 +209,8 @@ class ConfigValidator:
             )
         for key in ENDIAN_KEYS:
             self.require_choice(general, key, path, ENDIAN_VALUES)
+        self.require_choice(general, 'low_high_operators', path, LOW_HIGH_OPERATOR_STYLES)
+        self.require_choice(general, 'current_address', path, CURRENT_ADDRESS_STYLES)
         registers = general.get('registers')
         if registers is not None and not isinstance(registers, (list, dict)):
             self.error(
@@ -457,8 +461,9 @@ KNOWN_KEYS = {
     'annotation_data_size': {'when', 'words', 'terminated_when'},
     'annotation_value_range': {'when', 'range'},
     'general': {
-        'address_size', 'allow_embedded_strings', 'cstr_terminator', 'default_numeric_base', 'documentation',
-        'endian', 'endianness', 'flags', 'identifier', 'intra_word_endian', 'intra_word_endianness',
+        'address_size', 'allow_embedded_strings', 'cstr_terminator', 'current_address',
+        'default_numeric_base', 'documentation', 'endian', 'endianness', 'flags', 'identifier',
+        'intra_word_endian', 'intra_word_endianness', 'low_high_operators',
         'min_version', 'multi_word_endian', 'multi_word_endianness', 'origin', 'page_size', 'registers',
         'string_byte_packing', 'string_byte_packing_fill', 'word_size', 'word_segment_size',
     },

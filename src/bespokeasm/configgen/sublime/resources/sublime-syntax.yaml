@@ -178,8 +178,10 @@ contexts:
   numbers:
     - match: (?<!\w)(?:\$[0-9a-fA-F]+|0x[0-9a-fA-F]+|[0-9a-fA-F]+H)\b
       scope: constant.numeric.integer.hexadecimal
-    - match: (?<!\w)(?:(?:b|%)[01]+)\b
+    - match: (?<!\w)(?:(?:b|%)[01]+|[01]+[bB])\b
       scope: constant.numeric.integer.binary
+    - match: (?<!\w)(?:0o[0-7]+|[0-7]+[qQoO])\b
+      scope: constant.numeric.integer.octal
     - match: (?<!\w)(?:\d+)\b
       scope: constant.numeric.integer.decimal
     - match: (?:\'.\')
@@ -198,7 +200,7 @@ contexts:
     - include: compiler_labels
     - match: "[\\+\\-\\*\\/]{1}"
       scope: keyword.operator.arithmetic
-    - match: "[\\&\\|\\^]{1}"
+    - match: "[\\&\\|\\^\\~]{1}"
       scope: keyword.operator.logical
     - match: (?:>>|<<)
       scope: keyword.operator.bitwise

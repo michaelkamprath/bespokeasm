@@ -9,6 +9,8 @@ from bespokeasm.assembler.keywords import preprocessor_directives_for_isa
 from bespokeasm.configgen import LanguageConfigGenerator
 from bespokeasm.configgen.color_scheme import DEFAULT_COLOR_SCHEME
 from bespokeasm.configgen.color_scheme import SyntaxElement
+from bespokeasm.configgen.expression_scopes import VIM_CURRENT_ADDRESS_PATTERN
+from bespokeasm.configgen.expression_scopes import VIM_LOW_HIGH_OPERATOR_PATTERN
 from bespokeasm.configgen.hover_docs import build_hover_docs
 
 
@@ -115,6 +117,7 @@ class VimConfigGenerator(LanguageConfigGenerator):
             (f'{lang_group}HexNumber', SyntaxElement.HEX_NUMBER),
             (f'{lang_group}BinNumber', SyntaxElement.BINARY_NUMBER),
             (f'{lang_group}DecNumber', SyntaxElement.DECIMAL_NUMBER),
+            (f'{lang_group}OctNumber', SyntaxElement.OCTAL_NUMBER),
             (f'{lang_group}CharNumber', SyntaxElement.CHARACTER_NUMBER),
             (f'{lang_group}LabelName', SyntaxElement.LABEL_NAME),
             (f'{lang_group}LabelUsage', SyntaxElement.LABEL_USAGE),
@@ -152,6 +155,8 @@ class VimConfigGenerator(LanguageConfigGenerator):
             (f'{lang_group}PreProcPunc', SyntaxElement.PUNCTUATION_PREPROCESSOR),
             (f'{lang_group}DataType', SyntaxElement.DATA_TYPE),
             (f'{lang_group}Operator', SyntaxElement.OPERATOR),
+            (f'{lang_group}LowHighOperator', SyntaxElement.LOW_HIGH_OPERATOR),
+            (f'{lang_group}CurrentAddress', SyntaxElement.CURRENT_ADDRESS),
             (f'{lang_group}AssignOp', SyntaxElement.OPERATOR),
             (f'{lang_group}Directive', SyntaxElement.DIRECTIVE),
         ]
@@ -312,11 +317,14 @@ ctermbg=NONE gui=bold cterm=bold')
             f'{lang_group}HexNumber',
             f'{lang_group}BinNumber',
             f'{lang_group}DecNumber',
+            f'{lang_group}OctNumber',
             f'{lang_group}CharNumber',
             f'{lang_group}CompilerLabel',
             f'{lang_group}OperandLabelAt',
             f'{lang_group}OperandLabelName',
             f'{lang_group}Operator',
+            f'{lang_group}LowHighOperator',
+            f'{lang_group}CurrentAddress',
             f'{lang_group}DoubleBracketExpr',
             f'{lang_group}BracketExpr',
             f'{lang_group}ParenExpr',
@@ -329,11 +337,14 @@ ctermbg=NONE gui=bold cterm=bold')
             f'{lang_group}HexNumber',
             f'{lang_group}BinNumber',
             f'{lang_group}DecNumber',
+            f'{lang_group}OctNumber',
             f'{lang_group}CharNumber',
             f'{lang_group}CompilerLabel',
             f'{lang_group}OperandLabelAt',
             f'{lang_group}OperandLabelName',
             f'{lang_group}Operator',
+            f'{lang_group}LowHighOperator',
+            f'{lang_group}CurrentAddress',
             f'{lang_group}Separator',
             f'{lang_group}DoubleBracketExpr',
             f'{lang_group}BracketExpr',
@@ -346,9 +357,12 @@ ctermbg=NONE gui=bold cterm=bold')
             f'{lang_group}HexNumber',
             f'{lang_group}BinNumber',
             f'{lang_group}DecNumber',
+            f'{lang_group}OctNumber',
             f'{lang_group}CharNumber',
             f'{lang_group}CompilerLabel',
             f'{lang_group}Operator',
+            f'{lang_group}LowHighOperator',
+            f'{lang_group}CurrentAddress',
             f'{lang_group}DoubleBracketExpr',
             f'{lang_group}BracketExpr',
             f'{lang_group}ParenExpr',
@@ -384,6 +398,8 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         lines.append(fr'syn match {lang_group}HexNumber /\<0x\x\+\>/')
         lines.append(fr'syn match {lang_group}HexNumber /\<[0-9A-Fa-f]\+H\>/')
         lines.append(fr'syn match {lang_group}BinNumber /\%\(b\|%\)[01]\+\>/')
+        lines.append(fr'syn match {lang_group}BinNumber /\<[01]\+[bB]\>/')
+        lines.append(fr'syn match {lang_group}OctNumber /\<\%\(0o[0-7]\+\|[0-7]\+[qQoO]\)\>/')
         lines.append(fr'syn match {lang_group}DecNumber /\<\d\+\>/')
         lines.append(f"syn match {lang_group}CharNumber /'.'/")
         # Labels
@@ -481,8 +497,15 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         # Operators
         lines.append(
             rf'syn match {lang_group}Operator '
-            r'/==\|!=\|>=\|<=\|>>\|<<\|>\|<\|[+\-*/&|^]/'
+            r'/==\|!=\|>=\|<=\|>>\|<<\|>\|<\|[+\-*/&|^~]/'
         )
+        # `*` as the current address and `<`/`>` as the low and high operators, where the
+        # instruction set turns them on; defined after Operator so they win where both match.
+        syntax = self.model.expression_syntax
+        if syntax.current_address is not None:
+            lines.append(f'syn match {lang_group}CurrentAddress /{VIM_CURRENT_ADDRESS_PATTERN}/')
+        if syntax.low_high_operators is not None:
+            lines.append(f'syn match {lang_group}LowHighOperator /{VIM_LOW_HIGH_OPERATOR_PATTERN}/')
         lines.append(
             f'syn keyword {lang_group}FlowOperator COORDINATE COUNTER'
         )
@@ -611,6 +634,9 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         lines.append(f'hi def link {lang_group}HexNumber Number')
         lines.append(f'hi def link {lang_group}BinNumber Number')
         lines.append(f'hi def link {lang_group}DecNumber Number')
+        lines.append(f'hi def link {lang_group}OctNumber Number')
+        lines.append(f'hi def link {lang_group}LowHighOperator Operator')
+        lines.append(f'hi def link {lang_group}CurrentAddress Special')
         lines.append(f'hi def link {lang_group}CharNumber Number')
         lines.append(f'hi def link {lang_group}LabelName Label')
         lines.append(f'hi def link {lang_group}LabelUsage Identifier')

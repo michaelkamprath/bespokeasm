@@ -17,6 +17,8 @@ from bespokeasm.configgen import LanguageConfigGenerator
 from bespokeasm.configgen.color_scheme import build_hover_color_map
 from bespokeasm.configgen.color_scheme import DEFAULT_COLOR_SCHEME
 from bespokeasm.configgen.color_scheme import SyntaxElement
+from bespokeasm.configgen.expression_scopes import CURRENT_ADDRESS_SCOPE
+from bespokeasm.configgen.expression_scopes import LOW_HIGH_OPERATOR_SCOPE
 from bespokeasm.configgen.hover_docs import build_hover_docs
 from ruamel.yaml import YAML
 
@@ -46,6 +48,7 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.HEX_NUMBER, 'constant.numeric.integer.hexadecimal', 'Numbers - Hex'),
             (SyntaxElement.BINARY_NUMBER, 'constant.numeric.integer.binary', 'Numbers - Binary'),
             (SyntaxElement.DECIMAL_NUMBER, 'constant.numeric.integer.decimal', 'Numbers - Decimal'),
+            (SyntaxElement.OCTAL_NUMBER, 'constant.numeric.integer.octal', 'Numbers - Octal'),
             (SyntaxElement.CHARACTER_NUMBER, 'constant.numeric.character', 'Numbers - Character'),
             (SyntaxElement.LABEL_DEFINITION, 'variable.other.label.definition', 'Labels - Definitions'),
             (
@@ -104,6 +107,8 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.PREPROCESSOR, 'keyword.control.preprocessor', 'Keyword - Preprocessor'),
             (SyntaxElement.DATA_TYPE, 'storage.type', 'Data Types'),
             (SyntaxElement.OPERATOR, 'keyword.operator', 'Keyword - Operators'),
+            (SyntaxElement.LOW_HIGH_OPERATOR, LOW_HIGH_OPERATOR_SCOPE, 'Keyword - Low and High Operators'),
+            (SyntaxElement.CURRENT_ADDRESS, CURRENT_ADDRESS_SCOPE, 'Current Address'),
             (
                 SyntaxElement.FLOW_OPERATOR,
                 'keyword.operator.flow',
@@ -297,6 +302,12 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         # handle instructions
         update_instructions = False
         update_macros = False
+        # `*` as the current address and `<`/`>` as the low and high operators, where the
+        # instruction set turns them on. They go first so they win over multiply and comparison.
+        syntax_dict['contexts']['numerical_expressions'][:0] = [
+            {'match': pattern, 'scope': scope}
+            for pattern, scope in self._expression_operator_rules()
+        ]
         syntax_dict['file_extensions'] = [self.code_extension]
         syntax_dict['scope'] = f'source.bespokeasm.{self.code_extension}'
         for idx, instr_dict in enumerate(syntax_dict['contexts']['instructions']):

@@ -14,6 +14,7 @@ from bespokeasm.assembler.symbol_scope import SymbolScope
 from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.expression import ExpressionUseContext
 from bespokeasm.expression import parse_expression
+from bespokeasm.utilities import expression_syntax_of
 
 from .packed_bits import PackedBits
 
@@ -375,6 +376,8 @@ class ExpressionByteCodePart(ByteCodePart):
             default_numeric_base,
             context=ExpressionUseContext.OPERAND_VALUE,
         )
+        # What `*` means in this operand: the instruction's first word, or this value's own words.
+        self._current_address_style = expression_syntax_of(default_numeric_base).current_address
 
     @property
     def instruction_string(self) -> str:
@@ -396,10 +399,14 @@ class ExpressionByteCodePart(ByteCodePart):
         instruction_size: int,
         bytecode_address: int | None = None,
     ) -> int:
+        current_address = instruction_address
+        if self._current_address_style == 'value_address' and bytecode_address is not None:
+            current_address = bytecode_address
         value = self._parsed_expression.get_value(
             symbol_scope,
             active_named_scopes,
             self.line_id,
+            current_address,
         )
         if isinstance(value, str):
             raise AssemblerError(
@@ -539,6 +546,7 @@ class ExpressionEnumerationByteCodePart(ExpressionByteCodePart):
                 line_id: LineIdentifier,
                 word_size: int,
                 segment_size: int,
+                default_numeric_base: str = 'decimal',
             ) -> None:
         super().__init__(
             value_expression,
@@ -549,6 +557,7 @@ class ExpressionEnumerationByteCodePart(ExpressionByteCodePart):
             line_id,
             word_size,
             segment_size,
+            default_numeric_base,
         )
         self._value_dict = value_dict
 

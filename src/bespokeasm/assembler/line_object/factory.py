@@ -286,7 +286,7 @@ class LineOjectFactory:
                     symbol_scope,
                     active_named_scopes,
                     current_memzone,
-                    default_numeric_base=model.default_numeric_base,
+                    default_numeric_base=model.expression_syntax,
                 )
                 if line_obj is not None:
                     if label_seen:

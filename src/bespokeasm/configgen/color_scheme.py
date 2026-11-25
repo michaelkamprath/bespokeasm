@@ -26,6 +26,7 @@ class SyntaxElement(Enum):
     HEX_NUMBER = 'hex_number'
     BINARY_NUMBER = 'binary_number'
     DECIMAL_NUMBER = 'decimal_number'
+    OCTAL_NUMBER = 'octal_number'
     CHARACTER_NUMBER = 'character_number'
 
     # Labels and identifiers
@@ -76,6 +77,9 @@ class SyntaxElement(Enum):
     # Operators
     OPERATOR = 'operator'
     FLOW_OPERATOR = 'flow_operator'
+    # `<`/`>` as the low and high operators, and `*` as the current address
+    LOW_HIGH_OPERATOR = 'low_high_operator'
+    CURRENT_ADDRESS = 'current_address'
 
     # Punctuation
     PUNCTUATION_SEPARATOR = 'punctuation_separator'
@@ -117,6 +121,7 @@ DEFAULT_COLOR_SCHEME = ColorScheme(
         SyntaxElement.HEX_NUMBER: '#ffe80b',
         SyntaxElement.BINARY_NUMBER: '#d6d300',
         SyntaxElement.DECIMAL_NUMBER: '#fffd80',
+        SyntaxElement.OCTAL_NUMBER: '#fffd80',
         SyntaxElement.CHARACTER_NUMBER: '#FFE880',
 
         # Labels and identifiers
@@ -166,6 +171,8 @@ DEFAULT_COLOR_SCHEME = ColorScheme(
         # Operators
         SyntaxElement.OPERATOR: '#cc99ff',
         SyntaxElement.FLOW_OPERATOR: '#e08ae4',
+        SyntaxElement.LOW_HIGH_OPERATOR: '#5fe0d0',
+        SyntaxElement.CURRENT_ADDRESS: '#ff0084',
 
         # Punctuation
         SyntaxElement.PUNCTUATION_SEPARATOR: '#ed80a2',

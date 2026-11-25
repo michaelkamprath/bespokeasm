@@ -297,18 +297,27 @@ class DataLine(LineWithWords):
                 )
             return
         # Default behavior
-        for arg_item in self._arg_value_list:
+        value_size = DataLine.DIRECTIVE_VALUE_BYTE_SIZE[self._directive]
+        value_word_bytes = self._word_size // 8
+        words_per_value = (
+            1 if value_word_bytes == 0 or value_size <= value_word_bytes
+            else math.ceil(value_size / value_word_bytes)
+        )
+        for item_index, arg_item in enumerate(self._arg_value_list):
             if isinstance(arg_item, int):
                 arg_val = arg_item
             elif isinstance(arg_item, ExpressionNode):
+                # `*` in a data value is the address of the value being written, so
+                # `.2byte *, *` writes two different addresses.
+                item_address = None if self.address is None else self.address + item_index * words_per_value
                 arg_val = arg_item.get_value(
                     self.symbol_scope,
                     self.active_named_scopes,
                     self.line_id,
+                    item_address,
                 )
             else:
                 self.diagnostic_reporter.error(self.line_id, f'unknown data item "{arg_item}"')
-            value_size = DataLine.DIRECTIVE_VALUE_BYTE_SIZE[self._directive]
             value_mask = DataLine.DIRECTIVE_VALUE_MASK[self._directive]
             masked_val = arg_val & value_mask
             if (

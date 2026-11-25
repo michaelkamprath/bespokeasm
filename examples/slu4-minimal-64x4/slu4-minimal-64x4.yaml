@@ -24,7 +24,12 @@ general:
     name: slu4-min64x4-asm
     version: "1.1.0"
     extension: min64x4
-  min_version: "0.9.0"
+  min_version: '0.9.1a1'
+  # As in Carsten Herting's assembler: `<` and `>` lead an expression and take the low or
+  # high byte of all of it, so `<label+1` is the low byte of `label+1`.
+  low_high_operators: whole_expression
+  # As in Carsten Herting's assembler: `*` is the address of the operand's own bytes.
+  current_address: value_address
   allow_embedded_strings: true
   documentation:
     description: slu4 Minimal 64x4 Home Computer
