@@ -1663,22 +1663,13 @@ class MarkdownGenerator:
                 table_style=table_style
             ))
 
-        # Effective flow metadata can differ per version. Keep these derived
-        # tables after every hand-authored modifies table so generated rows
-        # never reorder or duplicate authored documentation.
+        # Effective flow metadata can differ per version. One table, after every
+        # hand-authored modifies table, so generated rows never reorder or
+        # duplicate authored documentation.
         if multi_version:
-            for version in versions:
-                flow_modifies = version.get('flow_modifies', [])
-                if not flow_modifies:
-                    continue
-                sections.append(self._generate_modifies_table(
-                    flow_modifies,
-                    table_style=table_style,
-                    heading=(
-                        f"Modifies — Version {version.get('index')} "
-                        'Counter Effects'
-                    ),
-                ))
+            counter_table = self._generate_version_counter_table(versions, table_style)
+            if counter_table:
+                sections.append(counter_table)
 
         # Examples
         if instruction_doc.get('examples'):
@@ -1830,6 +1821,23 @@ class MarkdownGenerator:
         if table_style == 'ascii':
             return self._generate_ascii_table(headers, rows)
         return self._generate_markdown_table(headers, rows, column_alignments=alignments)
+
+    def _generate_version_counter_table(self, versions: list[dict[str, Any]], table_style: str) -> str:
+        """One table of every version's flow-counter effects, each row naming its version."""
+        rows = []
+        for version in versions:
+            title = version.get('title')
+            label = f"{version.get('index')} ({title})" if title else str(version.get('index'))
+            for modify in version.get('flow_modifies', []):
+                rows.append([label, modify.get('target', ''), modify.get('description', '').replace('\n', '<br>')])
+        if not rows:
+            return ''
+        headers = ['Version', 'Counter', 'Effect']
+        table = (
+            self._generate_ascii_table(headers, rows) if table_style == 'ascii'
+            else self._generate_markdown_table(headers, rows)
+        )
+        return '\n\n'.join(['#### Counter Effects', table]) if table else ''
 
     def _generate_modifies_table(
         self,

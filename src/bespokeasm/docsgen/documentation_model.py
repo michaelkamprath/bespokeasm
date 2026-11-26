@@ -1290,9 +1290,8 @@ class DocumentationModel:
                 rows.append({
                     'type': 'counter',
                     'target': counter_name,
-                    'description': (
-                        f'{self._format_flow_delta(delta)} physical effect.'
-                    ),
+                    # The instruction's own effect, as `+3` or `taken +3 / fall-through +2`.
+                    'description': self._format_flow_delta(delta),
                 })
 
             if counter_name in invalidated_classes:

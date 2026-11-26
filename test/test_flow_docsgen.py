@@ -2,6 +2,7 @@
 import copy
 import difflib
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -318,10 +319,8 @@ def test_m5_1_non_flow_docs_are_inert(tmp_path):
             and line[2:] not in flow_section_lines
             and line[2:] not in modifies_scaffolding
             and not line[2:].startswith('| Counter |')
-            and not (
-                line[2:].startswith('#### Modifies — Version ')
-                and line[2:].endswith(' Counter Effects')
-            )
+            and line[2:] not in ('#### Counter Effects', '| Version | Counter | Effect |')
+            and not re.match(r'^\| \d+(?: \(.*\))? \| ', line[2:])
         )
     ]
     assert not unexpected_additions
@@ -415,10 +414,7 @@ def test_m5_1_edge_map_deltas_have_intentional_stable_rendering(tmp_path):
     markdown = _generate_markdown(tmp_path, config)
     branch = _instruction_section(markdown, 'branch_cycles')
 
-    assert (
-        '| Counter | cycles | taken +3 / fall-through +2 physical effect. |'
-        in branch
-    )
+    assert '| Counter | cycles | taken +3 / fall-through +2 |' in branch
     assert "{'taken':" not in branch
 
     config['instructions']['branch_cycles']['documentation']['cycles'] = {
@@ -445,19 +441,9 @@ def test_m5_1_versions_use_effective_merged_semantics_and_alias_hover(
     variant_markdown = hover_docs['instructions']['VARIANTOP']
 
     for rendered in (markdown_variant, variant_markdown):
-        version_1 = rendered.split(
-            '#### Modifies — Version 1 Counter Effects',
-            1,
-        )[1].split(
-            '#### Modifies — Version 2 Counter Effects',
-            1,
-        )[0]
-        version_2 = rendered.split(
-            '#### Modifies — Version 2 Counter Effects',
-            1,
-        )[1]
-        assert '| Counter | stack | +1' in version_1
-        assert '| Counter | stack | +2' in version_2
+        counter_effects = rendered.split('#### Counter Effects', 1)[1]
+        assert '| 1 | stack | +1 |' in counter_effects
+        assert '| 2 | stack | +2 |' in counter_effects
     assert variant_markdown.count('| Flag | z | Updates zero. |') == 1
     assert hover_docs['instructions']['ALIASOP'] == variant_markdown
 
@@ -471,8 +457,8 @@ def test_m5_1_multi_version_counter_rows_follow_all_manual_modifies(
 
     manual_index = variant.index('| Flag | z | Updates zero. |')
     counter_indexes = [
-        variant.index('| Counter | stack | +1'),
-        variant.index('| Counter | stack | +2'),
+        variant.index('| 1 | stack | +1 |'),
+        variant.index('| 2 | stack | +2 |'),
     ]
     assert all(manual_index < index for index in counter_indexes)
 
@@ -497,9 +483,8 @@ def test_m5_1_variants_only_root_aligns_docs_with_effective_configs(
     markdown = _generate_markdown(tmp_path, config)
     variant = _instruction_section(markdown, 'variants_only')
 
-    assert '#### Modifies — Version 2 Counter Effects' in variant
-    assert '| Counter | stack | +2 physical effect. |' in variant
-    assert '| Counter | stack | +1 physical effect. |' not in variant
+    assert '| 2 | stack | +2 |' in variant.split('#### Counter Effects', 1)[1]
+    assert '| 1 | stack | +1 |' not in variant
 
 
 def test_m5_1_non_flow_hover_does_not_add_alias_entries(tmp_path):
