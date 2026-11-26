@@ -337,6 +337,20 @@ class ConfigValidator:
                     f'is only available on indirect_indexed_numeric operands, not {type_str} operands',
                 )
             self.require_choice(operand, 'index_separator', path, tuple(INDEX_SEPARATORS))
+        if 'select_by_value' in operand:
+            self.require_bool(operand, 'select_by_value', path)
+            if type_str != 'address':
+                self.error(
+                    f'{path}.select_by_value',
+                    f'is only available on address operands, not {type_str} operands',
+                )
+            elif operand['select_by_value'] is True and not (
+                isinstance(operand.get('argument'), dict) and 'memory_zone' in operand['argument']
+            ):
+                self.error(
+                    f'{path}.select_by_value',
+                    'needs argument.memory_zone, the zone whose values select this operand',
+                )
         if 'offset_base' in operand:
             if type_str != 'relative_address':
                 self.error(
@@ -560,7 +574,8 @@ KNOWN_KEYS = {
         'type', 'argument', 'bytecode', 'decorator', 'documentation', 'enclosure', 'index_operands', 'index_separator',
         # `use_curly_braces` is legacy: undocumented, the same as `enclosure: braces`.
         # `offset_from_instruction_end` is legacy: undocumented, replaced by `offset_base`.
-        'offset', 'offset_base', 'offset_from_instruction_end', 'prefix', 'register', 'use_curly_braces',
+        'offset', 'offset_base', 'offset_from_instruction_end', 'prefix', 'register', 'select_by_value',
+        'use_curly_braces',
     },
     'operand_argument': {
         'size', 'word_align', 'endian', 'multi_word_endian', 'intra_word_endian', 'valid_address', 'memory_zone',

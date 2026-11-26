@@ -181,7 +181,16 @@ class SymbolScope:
                 f"coordinate '{coordinate.label}' is too low of scope for available scopes at this line"
             )
 
-    def set_label_value(self, label: str, value: int, line_id: LineIdentifier, scope: SymbolScopeType = None) -> None:
+    def set_label_value(
+        self,
+        label: str,
+        value: int,
+        line_id: LineIdentifier,
+        scope: SymbolScopeType = None,
+        relocating: bool = False,
+    ) -> None:
+        """Define ``label``. With ``relocating``, a label this line already defined takes its new
+        value: pass 1 runs again when relaxation changes an instruction's size."""
         symbol_scope = SymbolScopeType.get_symbol_scope(label) if scope is None else scope
         # first check to see if label name is a keyword
         # remove label prefix for checking
@@ -192,13 +201,15 @@ class SymbolScope:
                 f'"{label}" cannot be used as a label or constant name because "{base_label}" is an assembler keyword',
             )
         if symbol_scope.value < self.type.value:
-            self.parent.set_label_value(label, value, line_id)
+            self.parent.set_label_value(label, value, line_id, relocating=relocating)
         elif symbol_scope == self.type:
-            if label not in self._defined_symbol_names:
+            existing = self._labels.get(label)
+            if relocating and existing is not None and existing.line_id == line_id:
+                self._labels[label] = SymbolScope.LabelInfo(label, value, line_id)
+            elif label not in self._defined_symbol_names:
                 self._labels[label] = SymbolScope.LabelInfo(label, value, line_id)
                 self._defined_symbol_names.add(label)
             else:
-                existing = self._labels.get(label)
                 where = (
                     f'first defined at {existing.line_id}' if existing is not None
                     else 'already defined as a counter coordinate'

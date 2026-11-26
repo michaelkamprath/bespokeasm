@@ -294,6 +294,15 @@ Found while building section 2:
 - **Legacy key undocumented.** `offset_from_instruction_end` is gone from the wiki and still accepted as `offset_base: last_word`, as `use_curly_braces` is for `enclosure: braces`. The Mostek 3870 config now says `offset_base: last_word`, with `min_version: '0.9.1a1'` (set to `0.9.1` at release), since an older BespokeASM would ignore the key and measure from the instruction's start.
 - **Relative addresses in macros were measured from the macro.** Every part of a macro's expansion was resolved against the macro line's address and total size, so a branch that wasn't the macro's first instruction got the wrong offset, and `offset_from_instruction_end` measured from the macro's end. A macro now tells each relative part where its own instruction is, nested macros included. `*` in a macro's operands still means the macro line's address, as written. No shipped example was affected.
 
+## Milestone 5 notes (Nov 26, 2026)
+
+- **Matching under a value selection.** A line is first matched with value-selected operands deferred, so it takes its other form. A line with no other form, such as a zero-page-only instruction, takes the value-selected form at once, and pass 2 checks its value. After each pass-1 run, deferred lines are re-matched with their operand values evaluated against the symbols set so far; a line that takes a value-selected form keeps it. The selection is carried in a context variable, so operand types, operand sets and macros need no new parameters; outside line matching, as when explaining a mismatch, value-selected operands match on syntax alone.
+- **No fixed cap of 64 rounds.** A round that changes a size switches at least one line for good, so rounds can't exceed the number of deferred lines plus one; that bound is the internal-error guard. A fixed cap could stop a long but valid chain.
+- **Size rule checked when a line switches, not in config validation.** Comparing form sizes statically across operand sets, variants and macros is fragile. A value-selected form longer than the form it would replace is reported at the line that would switch.
+- **Re-running pass 1.** Zone cursors are reset each round, and a label a line already defined takes its new value (`relocating`) rather than being a duplicate; duplicates still fail in the first round. Pass-1 errors and warnings are reported only for the final layout, since a provisional one can overflow a zone that the final one fits. The analysis source index is built after relaxation, from the final forms.
+- **Forward references.** Labels placed in the zone select it wherever they are defined. A pair of lines that would fit only if both shrank at once stays in the longer form, since lines only shrink one round at a time from the longer layout.
+- **Final-check message.** `"$1FF - t" is $0101, outside memory zone ZERO_PAGE, after its instruction was sized for that zone`.
+
 ## The 6502 config
 
 - `examples/mos6502/mos6502.yaml`: 16-bit addresses, 8-bit words, little-endian.

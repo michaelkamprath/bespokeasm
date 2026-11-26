@@ -1069,6 +1069,17 @@ class TestDocumentationModel(unittest.TestCase):
             '[base, [a + offset]]',
         )
 
+    def test_value_selected_address_notes_say_when_it_is_used(self):
+        argument = {'size': 8, 'word_align': True, 'memory_zone': 'ZERO_PAGE'}
+        selected = DocumentationModel._derive_operand_auto_details(
+            'address', {'type': 'address', 'select_by_value': True, 'argument': argument}, False,
+        )
+        self.assertEqual(selected, [
+            "Used when the address is in the `ZERO_PAGE` memory zone; other addresses use the instruction's other forms.",
+        ])
+        plain = DocumentationModel._derive_operand_auto_details('address', {'type': 'address', 'argument': argument}, False)
+        self.assertEqual(plain, ['Valid within `ZERO_PAGE` memory zone.'])
+
     def test_relative_address_syntax_shows_the_enclosure(self):
         byte = {'size': 8, 'word_align': True}
         operands = {

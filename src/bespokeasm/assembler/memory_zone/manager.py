@@ -14,6 +14,7 @@ class MemoryZoneManager:
         """``format_scoped_zones`` maps each zone that only output formats define to those
         formats, so a reference to one that is not selected gets a helpful error."""
         self._address_bits = address_bits
+        self._default_origin = default_origin
         self._format_scoped_zones = dict(format_scoped_zones or {})
 
         self._zones: dict[str, MemoryZone] = {
@@ -29,6 +30,13 @@ class MemoryZoneManager:
     @property
     def global_zone(self) -> MemoryZone:
         return self._zones[GLOBAL_ZONE_NAME]
+
+    def reset_current_addresses(self) -> None:
+        """Move every zone's current address back to where pass 1 starts it, so pass 1 can run
+        again after relaxation changes an instruction's size."""
+        for zone in self._zones.values():
+            zone.current_address = zone.start
+        self._zones[GLOBAL_ZONE_NAME].current_address = self._default_origin
 
     def zone(self, name: str) -> MemoryZone:
         return self._zones.get(name, None)

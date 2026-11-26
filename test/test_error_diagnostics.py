@@ -250,6 +250,25 @@ class TestConfigurationSchemaErrors:
                 'operand_sets.imm.operand_values.ind.argument is required',
             ),
             (
+                lambda c: c['operand_sets']['imm']['operand_values']['u8'].update(select_by_value=True),
+                'operand_sets.imm.operand_values.u8.select_by_value is only available on address operands, '
+                'not numeric operands',
+            ),
+            (
+                lambda c: c['operand_sets']['imm']['operand_values'].update(zp={
+                    'type': 'address', 'select_by_value': True, 'argument': {'size': 8, 'word_align': True},
+                }),
+                'operand_sets.imm.operand_values.zp.select_by_value needs argument.memory_zone, the zone whose values '
+                'select this operand',
+            ),
+            (
+                lambda c: c['operand_sets']['imm']['operand_values'].update(zp={
+                    'type': 'address', 'select_by_value': 'yes',
+                    'argument': {'size': 8, 'word_align': True, 'memory_zone': 'GLOBAL'},
+                }),
+                'operand_sets.imm.operand_values.zp.select_by_value must be true or false, not the string "yes"',
+            ),
+            (
                 lambda c: c['operand_sets']['imm']['operand_values'].update(rel={
                     'type': 'relative_address', 'offset_base': 'end', 'argument': {'size': 8, 'word_align': True},
                 }),

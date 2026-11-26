@@ -1035,7 +1035,12 @@ class DocumentationModel:
             argument_config = operand_config.get('argument', {})
             if isinstance(argument_config, dict):
                 memory_zone = argument_config.get('memory_zone')
-                if memory_zone:
+                if memory_zone and operand_config.get('select_by_value'):
+                    notes.append(
+                        f'Used when the address is in the `{memory_zone}` memory zone; '
+                        'other addresses use the instruction\'s other forms.'
+                    )
+                elif memory_zone:
                     notes.append(f'Valid within `{memory_zone}` memory zone.')
 
                 if argument_config.get('slice_lsb'):

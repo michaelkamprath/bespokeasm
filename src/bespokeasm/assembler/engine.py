@@ -6,6 +6,7 @@ from bespokeasm.assembler.annotations.model import ExportModel
 from bespokeasm.assembler.assembly_file import AssemblyFile
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
+from bespokeasm.assembler.diagnostic_reporter import InternalAssemblerError
 from bespokeasm.assembler.flow_analysis import FlowGraphAnalyzer
 from bespokeasm.assembler.flow_analysis import FlowLinearAnalyzer
 from bespokeasm.assembler.line_identifier import LineIdentifier
@@ -203,52 +204,38 @@ class Assembler:
             )
 
         compilable_line_obs: list[LineObject] = [lobj for lobj in line_obs if lobj.compilable]
+        # First pass: assign addresses to labels. A line with a `select_by_value` form starts in its
+        # other form; relaxation re-matches it against the addresses pass 1 assigned and runs pass 1
+        # again, until no line's size changes. Only the last run reports, since an earlier layout
+        # is provisional: its longer forms can overflow a zone that the final layout fits.
+        relaxable_lines = [
+            lobj for lobj in compilable_line_obs if isinstance(lobj, InstructionLine) and lobj.relaxable
+        ]
+        if relaxable_lines:
+            self._assign_addresses(compilable_line_obs, named_scope_manager, report=False, relocating=False)
+            # A round that changes a size relaxes at least one line for good, and a relaxed line
+            # never changes back, so this many rounds always suffice.
+            round_limit = len(relaxable_lines) + 1
+            for _ in range(round_limit):
+                sizes_changed = False
+                for lobj in relaxable_lines:
+                    sizes_changed = lobj.relax() or sizes_changed
+                if not sizes_changed:
+                    break
+                memzone_manager.reset_current_addresses()
+                self._assign_addresses(compilable_line_obs, named_scope_manager, report=False, relocating=True)
+            else:
+                raise InternalAssemblerError(None, f'pass 1 did not settle after {round_limit} rounds')
+            memzone_manager.reset_current_addresses()
+        self._assign_addresses(
+            compilable_line_obs, named_scope_manager, report=True, relocating=bool(relaxable_lines),
+        )
         if self._model.analysis_records_enabled:
             self._analysis_source_index = AnalysisSourceIndex.from_line_objects(
                 lobj
                 for lobj in compilable_line_obs
                 if isinstance(lobj, InstructionLine)
             )
-        # First pass: assign addresses to labels
-        for lobj in compilable_line_obs:
-            lobj.set_start_address(lobj.memory_zone.current_address)
-            if lobj.address is None:
-                diagnostic_reporter.error(
-                    lobj.line_id,
-                    f'INTERNAL line object address is None. Memory zone = {lobj.memory_zone}',
-                )
-
-            try:
-                word_count = lobj.word_count
-                if isinstance(lobj, InstructionLine) and lobj.has_operand_labels:
-                    lobj.register_operand_labels(named_scope_manager)
-                if isinstance(lobj, FillUntilDataLine) and word_count == 0:
-                    diagnostic_reporter.warn(
-                        lobj.line_id,
-                        '.zerountil target address is before the current address; no bytes emitted',
-                    )
-                lobj.memory_zone.current_address = lobj.address + word_count
-            except ValueError as e:
-                diagnostic_reporter.error(
-                    lobj.line_id,
-                    str(e),
-                )
-
-            if isinstance(lobj, LabelLine) and not lobj.is_constant:
-                # Address labels: try to add to named scope first (only if in same file as scope creation)
-                # is_constant=False by default for address labels
-                if not named_scope_manager.set_label_value(
-                    lobj.get_label(),
-                    lobj.get_value(),
-                    lobj.line_id,
-                    lobj.active_named_scopes
-                ):
-                    # if not in an active named scope, set to the current scope
-                    lobj.symbol_scope.set_label_value(
-                        lobj.get_label(),
-                        lobj.get_value(),
-                        lobj.line_id,
-                    )
 
         # Addresses are final, so annotated labels' data runs and symbol arguments can be checked.
         self._export_model = ExportModel.build(line_obs)
@@ -390,6 +377,60 @@ class Assembler:
             else:
                 with open(self._pretty_print_output, 'w') as f:
                     f.write(pretty_str)
+
+    def _assign_addresses(
+        self,
+        line_objects: list[LineObject],
+        named_scope_manager: NamedScopeManager,
+        report: bool,
+        relocating: bool,
+    ) -> None:
+        """Pass 1: give each line its address and each address label its value. ``report`` says
+        whether this run's layout is final, so its problems are reported; ``relocating`` lets a
+        label that an earlier run defined take its new value."""
+        diagnostic_reporter = self._diagnostic_reporter
+        for lobj in line_objects:
+            lobj.set_start_address(lobj.memory_zone.current_address)
+            if lobj.address is None:
+                diagnostic_reporter.error(
+                    lobj.line_id,
+                    f'INTERNAL line object address is None. Memory zone = {lobj.memory_zone}',
+                )
+
+            try:
+                word_count = lobj.word_count
+                if isinstance(lobj, InstructionLine) and lobj.has_operand_labels:
+                    lobj.register_operand_labels(named_scope_manager, relocating=relocating)
+                if report and isinstance(lobj, FillUntilDataLine) and word_count == 0:
+                    diagnostic_reporter.warn(
+                        lobj.line_id,
+                        '.zerountil target address is before the current address; no bytes emitted',
+                    )
+                lobj.memory_zone.current_address = lobj.address + word_count
+            except ValueError as e:
+                if report:
+                    diagnostic_reporter.error(
+                        lobj.line_id,
+                        str(e),
+                    )
+
+            if isinstance(lobj, LabelLine) and not lobj.is_constant:
+                # Address labels: try to add to named scope first (only if in same file as scope creation)
+                # is_constant=False by default for address labels
+                if not named_scope_manager.set_label_value(
+                    lobj.get_label(),
+                    lobj.get_value(),
+                    lobj.line_id,
+                    lobj.active_named_scopes,
+                    relocating=relocating,
+                ):
+                    # if not in an active named scope, set to the current scope
+                    lobj.symbol_scope.set_label_value(
+                        lobj.get_label(),
+                        lobj.get_value(),
+                        lobj.line_id,
+                        relocating=relocating,
+                    )
 
     def _select_output_format(self) -> OutputFormat | None:
         """The ``-t`` format when ``-p`` is given; a warning if ``-t`` was given without ``-p``."""
