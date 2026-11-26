@@ -1,4 +1,5 @@
 import importlib.resources as pkg_resources
+import re
 import unittest
 from pathlib import Path
 
@@ -13,6 +14,7 @@ from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.assembler.model.operand.types.numeric_expression import NumericExpressionOperand
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
 from bespokeasm.assembler.symbol_scope import GlobalSymbolScope
@@ -2027,3 +2029,52 @@ class TestInstructionParsing(unittest.TestCase):
             [Word(0x40, 8, 8, 'big'), Word(0x09, 8, 8, 'big')],
             'labels take precedence over bare literals in configured base mode',
         )
+
+    def _numeric_operand(self, **config) -> NumericExpressionOperand:
+        return NumericExpressionOperand(
+            'imm', {'type': 'numeric', 'argument': {'size': 8, 'word_align': True}, **config},
+            'big', 'big', 8, 8, self.diagnostic_reporter,
+        )
+
+    def test_numeric_operand_prefix_parsing(self):
+        memzone_mngr = MemoryZoneManager(16, 0)
+        line_id = LineIdentifier(1, 'test_numeric_operand_prefix_parsing')
+        prefixed = self._numeric_operand(prefix='#')
+        bare = self._numeric_operand()
+
+        def argument(operand, text):
+            parsed = operand.parse_operand(line_id, text, set(), memzone_mngr)
+            return None if parsed is None else parsed.operand_argument_string
+
+        # With a prefix, the operand takes only `#value`; the argument is the value after it.
+        self.assertEqual(argument(prefixed, '#$10'), '$10')
+        self.assertEqual(argument(prefixed, '  #  $10 '), '$10')
+        self.assertEqual(argument(prefixed, '#(label+1)*2'), '(label+1)*2')
+        self.assertIsNone(argument(prefixed, '$10'))
+        self.assertIsNone(argument(prefixed, '#'))
+        self.assertIsNone(argument(prefixed, '##1'))
+        # Without one, it never takes text starting with `#`, and surrounding space is dropped.
+        self.assertIsNone(argument(bare, '#$10'))
+        self.assertIsNone(argument(bare, ' # $10'))
+        self.assertEqual(argument(bare, '  $10 '), '$10')
+
+    def test_numeric_operand_prefix_match_pattern(self):
+        # Indexed-register operands build their patterns from their index operands' patterns.
+        prefixed = self._numeric_operand(prefix='#').match_pattern
+        bare = self._numeric_operand().match_pattern
+        for text in ['#$10', '# $10', '#(label+1)', '@count: #5']:
+            self.assertIsNotNone(re.fullmatch(prefixed, text), text)
+        for text in ['$10', 'label']:
+            self.assertIsNone(re.fullmatch(prefixed, text), text)
+            self.assertIsNotNone(re.fullmatch(bare, text), text)
+        self.assertIsNone(re.fullmatch(bare, '#$10'))
+
+    def test_numeric_operand_prefix_with_an_operand_label(self):
+        memzone_mngr = MemoryZoneManager(16, 0)
+        line_id = LineIdentifier(1, 'test_numeric_operand_prefix_with_an_operand_label')
+        prefixed = self._numeric_operand(prefix='#')
+        parsed = prefixed.parse_operand(line_id, '@count: #$10', set(), memzone_mngr)
+        self.assertEqual((parsed.operand_label, parsed.operand_argument_string), ('count', '$10'))
+        # The label goes before the `#`, as it goes before any operand.
+        with self.assertRaisesRegex(Exception, 'must appear at the start of the operand expression'):
+            prefixed.parse_operand(line_id, '#@count: $10', set(), memzone_mngr)

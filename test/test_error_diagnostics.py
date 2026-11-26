@@ -186,6 +186,45 @@ class TestConfigurationSchemaErrors:
                 lambda c: c.update(predefined={'memory_zones': [{'name': 'hi', 'start': 0, 'end': 0x20000}]}),
                 r'predefined.memory_zones\[hi\] end address 131072 is outside the 16-bit address space',
             ),
+            (
+                lambda c: c['operand_sets']['imm']['operand_values']['u8'].update(prefix='!'),
+                'operand_sets.imm.operand_values.u8.prefix must be "#", the only supported prefix, not the string "!"',
+            ),
+            (
+                lambda c: c['operand_sets']['reg']['operand_values']['ra'].update(prefix='#'),
+                'operand_sets.reg.operand_values.ra.prefix is only available on numeric operands, not register operands',
+            ),
+            (lambda c: c['general'].update(directive_aliases=['word']), 'general.directive_aliases must be a mapping'),
+            (
+                lambda c: c['general'].update(directive_aliases={'org': 'fill'}),
+                'general.directive_aliases.org is already the name of the .org directive',
+            ),
+            (
+                lambda c: c['general'].update(directive_aliases={'byte': '2byte'}),
+                'general.directive_aliases.byte is already the name of the .byte directive',
+            ),
+            (
+                lambda c: c['general'].update(directive_aliases={'word': 'org'}),
+                r'general.directive_aliases.word must name a data or fill directive \(byte, 2byte, .*zerountil\), '
+                'not the string "org"',
+            ),
+            (
+                lambda c: c['general'].update(directive_aliases={'inc': 'include'}),
+                'general.directive_aliases.inc must name a data or fill directive',
+            ),
+            (
+                lambda c: c['general'].update(directive_aliases={'.word': '2byte'}),
+                r'general.directive_aliases..word is not a valid directive name; write it without the period',
+            ),
+            (
+                lambda c: c['general'].update(directive_aliases={'word': '.2byte'}),
+                r'general.directive_aliases.word must name a data or fill directive .*, '
+                'not the string ".2byte"; write it without the period',
+            ),
+            (
+                lambda c: c['general'].update(directive_aliases={'Word': '2byte', 'word': '2byte'}),
+                r'general.directive_aliases.word is defined more than once \(directive names ignore case\)',
+            ),
         ],
     )
     def test_malformed_configuration_names_the_offending_path(self, tmp_path, mutate, pattern):
@@ -241,6 +280,25 @@ class TestOperandMismatchExplanations:
         assembler = assemble(tmp_path, '  ld a, 5\n  mov a, b\n  ld2 7\n  jmp 0\n')
         assert assembler is not None
 
+    @pytest.mark.parametrize(
+        'source, pattern',
+        [
+            ('  ld a, #\n', r'operand 2 "#" of instruction "ld": "#" must be followed by a value'),
+            ('  ld a, 5\n', r'operand 2 "5" of instruction "ld" is not valid; expected a "#" immediate value'),
+            ('  ld a, #(1+\n', r'operand 2 "#\(1\+" of instruction "ld": expression ends unexpectedly'),
+        ],
+    )
+    def test_mismatch_with_an_immediate_prefix(self, tmp_path, source, pattern):
+        config_path = write_config(tmp_path, lambda c: c['operand_sets']['imm']['operand_values']['u8'].update(prefix='#'))
+        assert_error(tmp_path, source, pattern, config_path)
+
+    def test_a_prefix_where_the_operand_takes_none(self, tmp_path):
+        assert_error(
+            tmp_path, '  jmp #5\n',
+            r'operand 1 "#5" of instruction "jmp" is not valid; "#" marks an immediate value, which this operand '
+            r'does not take; expected a numeric value or expression$',
+        )
+
 
 class TestUnparsableLineMessages:
     @pytest.mark.parametrize(
@@ -254,7 +312,7 @@ class TestUnparsableLineMessages:
             ('  .bytes 1, 2\n', r'unknown directive "\.bytes"; did you mean "\.byte"'),
             ('  .frobnicate\n', r'unknown directive "\.frobnicate"$'),
             ('  .org\n', r'\.org directive requires an address'),
-            ('  .fill 10\n', r'\.fill directive requires a count and a fill value'),
+            ('  .fill\n', r'\.fill directive requires a count and an optional fill value'),
             ('  .byte\n', r'\.byte directive requires at least one value'),
             ('X EQU\n  nop\n', r'constant "X" is missing a value after "="'),
             ('X =\n  nop\n', r'constant "X" is missing a value after "="'),
@@ -265,6 +323,19 @@ class TestUnparsableLineMessages:
     )
     def test_unparsable_text_is_classified(self, tmp_path, source, pattern):
         assert_error(tmp_path, source, pattern)
+
+    @pytest.mark.parametrize(
+        'source, pattern',
+        [
+            ('  .word\n', r'\.word directive requires at least one value, for example "\.word 0x1234"'),
+            ('  .res\n', r'\.res directive requires a count and an optional fill value, for example "\.res 16"'),
+            ('  .wrd 5\n', r'unknown directive "\.wrd"; did you mean "\.word"\?'),
+            ('  .word "hi"\n', r'\.word data directive used with string value'),
+        ],
+    )
+    def test_messages_name_a_directive_alias_as_written(self, tmp_path, source, pattern):
+        config_path = write_config(tmp_path, lambda c: c['general'].update(directive_aliases={'word': '2byte', 'res': 'fill'}))
+        assert_error(tmp_path, source, pattern, config_path)
 
 
 class TestLabelMessages:
@@ -403,6 +474,13 @@ class TestConfigurationAdvisories:
 
     def test_clean_configuration_has_no_advisories(self, tmp_path):
         assert 'WARNING' not in assemble_capturing_warnings(tmp_path, '  nop\n')
+
+    def test_prefix_and_directive_aliases_are_recognized_settings(self, tmp_path):
+        def mutate(config):
+            config['operand_sets']['imm']['operand_values']['u8']['prefix'] = '#'
+            config['general']['directive_aliases'] = {'word': '2byte'}
+        config_path = write_config(tmp_path, mutate)
+        assert 'WARNING' not in assemble_capturing_warnings(tmp_path, '  jmp #0\n  .word 1\n', config_path)
 
     def test_advisory_becomes_error_with_warnings_as_errors(self, tmp_path):
         config_path = write_config(tmp_path, lambda c: c.update(instruction={}))

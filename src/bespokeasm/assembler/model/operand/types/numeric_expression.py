@@ -44,9 +44,15 @@ class NumericExpressionOperand(OperandWithArgument):
         return OperandType.NUMERIC
 
     @property
+    def prefix(self) -> str | None:
+        """The text that must come before the value, as `#` in `#$10`, or None."""
+        return self.config.get('prefix')
+
+    @property
     def match_pattern(self) -> str:
         base_pattern = r'(?:[\$\%\w\(\)\+\-\s]*[\w\)])'
-        return fr'(?:@(?:{PATTERN_SYMBOL}):\s*)?{base_pattern}'
+        prefix_pattern = fr'{re.escape(self.prefix)}\s*' if self.prefix else ''
+        return fr'(?:@(?:{PATTERN_SYMBOL}):\s*)?{prefix_pattern}{base_pattern}'
 
     @property
     def enforce_argument_valid_address(self) -> bool:
@@ -116,6 +122,13 @@ class NumericExpressionOperand(OperandWithArgument):
     ) -> ParsedOperand:
         parsed_operand_label = parse_operand_label_annotation(line_id, operand, register_labels, self.type)
         operand = parsed_operand_label.operand_expression
+        # With a prefix the operand matches only `#value`. Without one it never matches text
+        # starting with `#`, which is not an expression token, so `lda #$10` can't select a
+        # form written `lda $10`.
+        if self.prefix:
+            if not operand.startswith(self.prefix):
+                return None
+            operand = operand[len(self.prefix):].lstrip()
         operand_without_char_literals = re.sub(PATTERN_CHARACTER_ORDINAL, '', operand)
         # do not match if expression contains square brack or curly braces
         punctuation_match = re.search(r'[\[\]\{\}]+', operand_without_char_literals)

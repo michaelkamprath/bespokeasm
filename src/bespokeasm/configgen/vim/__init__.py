@@ -274,7 +274,7 @@ ctermbg=NONE gui=bold cterm=bold')
 
         # Directives and datatypes prefixed with '.'
         compiler_directives = ['.' + d for d in COMPILER_DIRECTIVES_SET]
-        data_types = ['.' + d for d in BYTECODE_DIRECTIVES_SET]
+        data_types = ['.' + d for d in sorted(BYTECODE_DIRECTIVES_SET | set(self.model.directive_aliases))]
 
         # Preprocessor directives (sorted by length desc to avoid prefix shadowing)
         preproc_directives = sorted(

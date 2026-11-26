@@ -394,7 +394,7 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             directives_str.replace('##DIRECTIVES##', directives_regex)
 
         # data types
-        datatypes_regex = '|'.join(['\\.'+d for d in BYTECODE_DIRECTIVES_SET])
+        datatypes_regex = '|'.join(['\\.'+d for d in sorted(BYTECODE_DIRECTIVES_SET | set(self.model.directive_aliases))])
         datatypes_str = syntax_dict['contexts']['data_types_directives'][0]['match']
         syntax_dict['contexts']['data_types_directives'][0]['match'] = datatypes_str.replace('##DATATYPES##', datatypes_regex)
 
@@ -515,6 +515,9 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             self._constant_pattern(),
         )
         self._replace_token_in_file(hover_plugin_fp, '##MNEMONIC_PATTERN##', self._mnemonic_pattern())
+        self._replace_token_in_file(
+            hover_plugin_fp, '##DATA_TYPE_ALIASES##', ' '.join(sorted(self.model.directive_aliases)),
+        )
         if self.model.registers:
             register_regex = self._replace_token_with_regex_list(
                 '##REGISTERS##', '##REGISTERS##', self.model.registers

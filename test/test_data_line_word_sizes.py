@@ -1,3 +1,5 @@
+import contextlib
+import io
 import unittest
 
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
@@ -12,7 +14,7 @@ class TestDataLineWordSizes(unittest.TestCase):
         self.symbol_scope = GlobalSymbolScope(set())
         self.diagnostic_reporter = DiagnosticReporter()
 
-    def _make_data(self, line_str, word_size, intra_word_endianness, multi_word_endianness):
+    def _make_data(self, line_str, word_size, intra_word_endianness, multi_word_endianness, directive_name=None):
         return DataLine.factory(
             1,
             line_str,
@@ -24,6 +26,7 @@ class TestDataLineWordSizes(unittest.TestCase):
             multi_word_endianness,
             0,
             diagnostic_reporter=self.diagnostic_reporter,
+            directive_name=directive_name,
         )
 
     def test_byte_directive_16bit_word(self):
@@ -192,6 +195,40 @@ class TestDataLineWordSizes(unittest.TestCase):
         d = self._make_data('.cstr "A"', 32, 'big', 'big')
         d.symbol_scope = self.symbol_scope
         self.assertEqual(d.word_count, 2)  # 'A', terminator
+
+    def test_upper_case_directives(self):
+        # These used to fail with a KeyError: the size and mask tables are keyed in lower case.
+        for line_str, values in [
+            ('.BYTE $01, $02', [0x01, 0x02]),
+            ('.2Byte $1234', [0x12, 0x34]),
+            ('.CSTR "a"', [0x61, 0x00]),
+        ]:
+            d = self._make_data(line_str, 8, 'big', 'big')
+            d.symbol_scope = self.symbol_scope
+            d.generate_words()
+            self.assertEqual([w.value for w in d.get_words()], values, line_str)
+
+    def _warnings(self):
+        return [diag.message for diag in self.diagnostic_reporter.diagnostics if diag.level == 'warning']
+
+    def test_messages_name_the_directive_as_written(self):
+        # An alias passes its name as written, so `.word` reports `.word`, not `.2byte`.
+        with self.assertRaises(SystemExit) as info:
+            self._make_data('.2byte "hi"', 8, 'big', 'big', directive_name='.word')
+        self.assertIn('.word data directive used with string value', str(info.exception))
+
+        with contextlib.redirect_stderr(io.StringIO()):
+            d = self._make_data('.2byte -1', 8, 'big', 'big', directive_name='.word')
+            d.symbol_scope = self.symbol_scope
+            d.generate_words()
+            self._make_data('.2byte 1,', 8, 'big', 'big', directive_name='.word')
+            # without an alias, the directive is named as written
+            self._make_data('.BYTE 1,', 8, 'big', 'big')
+        self.assertEqual(self._warnings(), [
+            'Data value -1 truncated to 65535 for .word',
+            'trailing comma in .word directive is ignored',
+            'trailing comma in .BYTE directive is ignored',
+        ])
 
 
 if __name__ == '__main__':

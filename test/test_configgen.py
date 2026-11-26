@@ -973,6 +973,67 @@ class TestConfigurationGeneration(unittest.TestCase):
                 f'Sublime: {mnemonic} should be present',
             )
 
+    def test_directive_aliases_in_generated_grammars(self):
+        base_data_types = ['fill', 'zero', 'zerountil', 'byte', '2byte', '4byte', '8byte', '16byte', 'cstr', 'asciiz']
+        source = pkg_resources.files(config_files).joinpath('test_instruction_line_creation_little_endian.yaml')
+        with open(source) as handle:
+            config = YAML(typ='safe').load(handle)
+        test_dir = tempfile.mkdtemp()
+
+        def write(aliases):
+            config['general']['directive_aliases'] = aliases
+            path = os.path.join(test_dir, f'isa-{len(aliases)}.yaml')
+            with open(path, 'w') as handle:
+                YAML().dump(config, handle)
+            return path
+
+        def vscode_data_types(config_path):
+            out_dir = tempfile.mkdtemp(dir=test_dir)
+            VSCodeConfigGenerator(config_path, 0, out_dir, None, None, 'asmtest').generate()
+            ext_dir = next(pl.Path(out_dir, 'extensions').iterdir())
+            grammar = json.loads((ext_dir / 'syntaxes' / 'tmGrammar.json').read_text())
+            docs = json.loads((ext_dir / 'instruction-docs.json').read_text())
+            match = next(
+                item['match'] for item in grammar['repository']['directives']['patterns']
+                if item.get('name') == 'storage.type'
+            )
+            return match, docs['directives']['data_type']
+
+        aliases = {'word': '2byte', 'res': 'fill'}
+        expected = ['\\.' + name for name in base_data_types + list(aliases)]
+        # VS Code: the aliases join the data types, and get the hover docs of their directive.
+        match, hover_docs = vscode_data_types(write({}))
+        self._assert_grouped_item_list(match, ['\\.' + name for name in base_data_types], 'vscode data types')
+        self.assertNotIn('word', hover_docs)
+        match, hover_docs = vscode_data_types(write(aliases))
+        self._assert_grouped_item_list(match, expected, 'vscode data types with aliases')
+        self.assertTrue(hover_docs['word'].startswith('### `.word` : Same as `.2byte`'))
+
+        # Sublime Text: the syntax, and the hover plugin's code colorer.
+        config_path = write(aliases)
+        out_dir = tempfile.mkdtemp(dir=test_dir)
+        configgen = SublimeConfigGenerator(config_path, 0, out_dir, None, None, 'asmtest')
+        configgen._generate_files_in_dir(out_dir)
+        with open(os.path.join(out_dir, 'bespokeasm-test.sublime-syntax')) as yaml_file:
+            syntax_dict = YAML().load(yaml_file)
+        self._assert_grouped_item_list(
+            syntax_dict['contexts']['data_types_directives'][0]['match'], expected, 'sublime data types',
+        )
+        plugin = next(pl.Path(out_dir).glob('bespokeasm_hover_*.py')).read_text()
+        self.assertIn("} | set('res word'.split())", plugin)
+
+        # Vim
+        out_dir = tempfile.mkdtemp(dir=test_dir)
+        configgen = VimConfigGenerator(config_path, 0, out_dir, None, None, 'asmtest')
+        configgen.generate()
+        vim_ft = configgen.language_id.replace('-', '').lower()
+        syn = pl.Path(out_dir, 'syntax', f'{vim_ft}.vim').read_text()
+        for name in base_data_types + list(aliases):
+            self.assertIn(
+                f'syn region {vim_ft}DataTypeLine matchgroup={vim_ft}DataType start=/\\s*\\.{name}\\>/', syn, name,
+            )
+        shutil.rmtree(test_dir)
+
     def test_vim_configgen_no_registers(self):
         test_dir = tempfile.mkdtemp()
         config_file = pkg_resources.files(config_files).joinpath('test_instruction_line_creation_little_endian.yaml')

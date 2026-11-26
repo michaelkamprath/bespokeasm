@@ -923,6 +923,13 @@ class AssemblerModel:
         )
 
     @property
+    def directive_aliases(self) -> dict[str, str]:
+        '''Other names for data and fill directives, lowercase and without the period, mapped to
+        the directive they stand for: `{'word': '2byte'}` makes `.word` the same as `.2byte`.'''
+        aliases = self._config['general'].get('directive_aliases') or {}
+        return {str(alias).lower(): str(target).lower() for alias, target in aliases.items()}
+
+    @property
     def registers(self) -> set[str]:
         return self._registers
 

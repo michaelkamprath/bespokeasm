@@ -139,6 +139,19 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.assertIn('| `A` | Accumulator | Primary register. | 8 |', result)
         self.assertIn('| `X` |  |  |  |', result)
 
+    def test_generate_directive_aliases_table(self):
+        """Aliases get their own table, sorted by alias; without aliases there is no table."""
+        self.mock_doc_model.general_docs['directive_aliases'] = {'word': '2byte', 'res': 'fill'}
+        result = MarkdownGenerator(self.mock_doc_model, verbose=0).generate()
+        self.assertIn(
+            '| Directive Aliases Attribute | Value |\n|:--|:--|\n'
+            '| **`.res`** | Same as `.fill` |\n| **`.word`** | Same as `.2byte` |',
+            result,
+        )
+
+        self.mock_doc_model.general_docs['directive_aliases'] = {}
+        self.assertNotIn('Directive Aliases', MarkdownGenerator(self.mock_doc_model, verbose=0).generate())
+
     def test_generate_register_table_with_documentation(self):
         """Registers with documentation produce a table with optional columns."""
         self.mock_doc_model.general_docs['registers'] = [

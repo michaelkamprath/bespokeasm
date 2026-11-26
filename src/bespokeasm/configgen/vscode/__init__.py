@@ -390,7 +390,9 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
                 directives_str = item['begin']
                 item['begin'] = directives_str.replace('##DIRECTIVES##', directives_regex)
             elif 'storage.type' == item['name']:
-                datatypes_regex = '|'.join(['\\.'+d for d in BYTECODE_DIRECTIVES_SET])
+                datatypes_regex = '|'.join(
+                    ['\\.'+d for d in sorted(BYTECODE_DIRECTIVES_SET | set(self.model.directive_aliases))]
+                )
                 datatypes_str = item['match']
                 item['match'] = datatypes_str.replace('##DATATYPES##', datatypes_regex)
             elif 'meta.preprocessor' == item['name']:

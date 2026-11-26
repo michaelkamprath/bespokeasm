@@ -190,8 +190,9 @@ BYTECODE_DIRECTIVE_DOCS: dict[str, str] = {
         '**Usage:**\n\n'
         '```\n'
         '.fill <count>, <value>\n'
+        '.fill <count>\n'
         '```\n\n'
-        'Emits `<count>` words, each set to `<value>`.'
+        'Emits `<count>` words, each set to `<value>`. Without a value, the words are zero.'
     ),
     'zero': (
         '### `.zero` : Fill with Zeros\n\n'
@@ -711,3 +712,19 @@ ALL_DIRECTIVE_DOCS: dict[str, str] = {
     **PREPROCESSOR_DIRECTIVE_DOCS,
     **COUNTER_COORDINATE_DOCS,
 }
+
+
+def directive_alias_docs(aliases: dict[str, str]) -> dict[str, str]:
+    """Hover documentation for an instruction set's directive aliases: each alias gets the
+    documentation of the directive it stands for, under its own heading."""
+    docs = {}
+    for alias, target in aliases.items():
+        target_doc = BYTECODE_DIRECTIVE_DOCS[target]
+        body = target_doc.split('---\n\n', 1)[1] if '---\n\n' in target_doc else target_doc
+        docs[alias] = (
+            f'### `.{alias}` : Same as `.{target}`\n\n'
+            '---\n\n'
+            f'In this instruction set, `.{alias}` is another name for `.{target}`.\n\n'
+            f'{body}'
+        )
+    return docs

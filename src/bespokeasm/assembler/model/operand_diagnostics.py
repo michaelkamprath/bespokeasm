@@ -17,6 +17,7 @@ from bespokeasm.assembler.model.operand import Operand
 from bespokeasm.assembler.model.operand import OperandType
 from bespokeasm.assembler.model.operand_parser import OperandParser
 from bespokeasm.expression import parse_expression
+from bespokeasm.utilities import IMMEDIATE_PREFIX
 
 _EXPRESSION_OPERAND_TYPES = {
     OperandType.NUMERIC,
@@ -74,7 +75,10 @@ def describe_operands(operands: list[Operand]) -> str:
         elif kind == OperandType.INDIRECT_INDEXED_REGISTER:
             text = f'[{operand.register} + index]'
         elif kind == OperandType.NUMERIC:
-            text = 'a numeric value or expression'
+            text = (
+                f'a "{operand.prefix}" immediate value' if getattr(operand, 'prefix', None)
+                else 'a numeric value or expression'
+            )
         elif kind == OperandType.NUMERIC_BYTECODE:
             text = f'a numeric value from {operand.bytecode_min} to {operand.bytecode_max}'
         elif kind == OperandType.ADDRESS:
@@ -197,6 +201,16 @@ class OperandMismatchExplainer:
         operand_text = self._operands[position]
         prefix = f'operand {position + 1} {_quote(operand_text)} of {self._subject}'
         expects_expression = any(candidate.type in _EXPRESSION_OPERAND_TYPES for candidate in candidates)
+        if operand_text.startswith(IMMEDIATE_PREFIX):
+            if not any(getattr(candidate, 'prefix', None) for candidate in candidates):
+                expected = describe_operands(candidates)
+                return (
+                    f'{prefix} is not valid; "{IMMEDIATE_PREFIX}" marks an immediate value, which this operand '
+                    f'does not take' + (f'; expected {expected}' if expected else '')
+                )
+            operand_text = operand_text[len(IMMEDIATE_PREFIX):].strip()
+            if not operand_text:
+                return f'{prefix}: "{IMMEDIATE_PREFIX}" must be followed by a value'
         if expects_expression:
             expression_text = operand_text
             for opener, closer in (('[[', ']]'), ('[', ']')):

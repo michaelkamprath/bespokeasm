@@ -22,6 +22,10 @@ Changes that are planned but not implemented yet:
 * Fixed address, relative-address and numeric-enumeration operands reading bare numbers as decimal under a non-decimal `default_numeric_base`.
 * Generated ISA documentation describes the instruction set's expression syntax where it differs from the defaults.
 * Editor extensions color `*` as the current address and `<`/`>` as the low and high operators with their own scopes (`variable.language.current-address`, `keyword.operator.low-high`), apart from multiplication, shifts and comparisons, in instruction sets that turn them on.
+* Added the `prefix: '#'` option for `numeric` operands, so an instruction set can write immediate values as `lda #$10`. A numeric operand without a prefix never matches text starting with `#`.
+* Added `general.directive_aliases`, which gives data and fill directives other names, such as `.word` for `.2byte` or `.res` for `.fill`. Aliases appear in listings, error messages, editor highlighting, hovers and generated documentation.
+* `.fill` accepts a count alone and fills with zero: `.fill 16` is `.fill 16, 0`.
+* Fixed data directives written in upper case, such as `.BYTE`, failing with an internal error.
 
 ## [0.9.0]
 * Added label annotations: `#annotate <namespace> key=value ...` attaches validated metadata to the next label or constant. Configurations declare namespaces in a new `annotations` section, with typed arguments and checks on a label's data size or a constant's value. An `#annotate` line ending in `\` continues on the next line, and adjacent quoted strings join into one value. See [Annotations](https://github.com/michaelkamprath/bespokeasm/wiki/Annotations).

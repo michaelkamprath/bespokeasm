@@ -968,6 +968,43 @@ class TestDocumentationModel(unittest.TestCase):
         operand = signature['operands'][0]
         self.assertEqual(operand['value'], 'numeric expression valued between 1 and 0xA expressed as 8 bit value')
 
+    def test_numeric_operand_syntax_shows_the_prefix(self):
+        """A numeric operand with `prefix: '#'` is written `#name`; one without stays `name`."""
+        self.mock_isa_model._config = {
+            'instructions': {
+                'lda': {
+                    'operands': {
+                        'count': 1,
+                        'specific_operands': {
+                            'imm': {'list': {'value': {
+                                'type': 'numeric', 'prefix': '#', 'argument': {'size': 8, 'word_align': True},
+                            }}},
+                            'abs': {'list': {'addr': {
+                                'type': 'numeric', 'argument': {'size': 16, 'word_align': True},
+                            }}},
+                        }
+                    }
+                }
+            }
+        }
+
+        model = DocumentationModel(self.mock_isa_model, verbose=0)
+        syntaxes = sorted(
+            signature['operands'][0]['syntax']
+            for version in model.instruction_docs['lda']['versions']
+            for signature in version['signatures']
+        )
+        self.assertEqual(syntaxes, ['#value', 'addr'])
+
+    def test_general_docs_list_directive_aliases(self):
+        """Aliases are listed lower case, without periods; none gives an empty mapping."""
+        self.mock_isa_model._config = {'general': {'directive_aliases': {'Word': '2BYTE', 'res': 'fill'}}}
+        model = DocumentationModel(self.mock_isa_model, verbose=0)
+        self.assertEqual(model.general_docs['directive_aliases'], {'word': '2byte', 'res': 'fill'})
+
+        self.mock_isa_model._config = {'general': {}}
+        self.assertEqual(DocumentationModel(self.mock_isa_model, verbose=0).general_docs['directive_aliases'], {})
+
     def test_invalid_documentation_formats(self):
         """Test handling of invalid documentation formats."""
         self.mock_isa_model._config = {

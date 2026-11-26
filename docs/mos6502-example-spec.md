@@ -191,13 +191,14 @@ general:
 
 ## 7. Directive aliases
 
-A config can give data and fill directives other names:
+A config can give data and fill directives other names, in `general`:
 
 ```yaml
-directive_aliases:
-  word: 2byte
-  res: fill
-  text: byte
+general:
+  directive_aliases:
+    word: 2byte
+    res: fill
+    text: byte
 ```
 
 - Targets are limited to data directives (`.byte` through `.16byte`, `.cstr`, `.asciiz`) and `.fill`, `.zero` and `.zerountil`. An alias for a compiler or preprocessor directive is a config error. Porting `.include` and `.if` is `bespokeasm migrate`'s job (decided Nov 25, 2026).
@@ -245,6 +246,19 @@ Found while building sections 5, 6, 8 and 9:
   - `<`/`>` are the operators when a value follows with no space, which leaves shifts, `<=`/`>=` and `#if` comparisons alone.
   - Checked in VS Code's TextMate engine, Sublime Text and Vim.
 - **For milestone 2.** The Sublime hover code colorer treats `#...` as a directive. A 6502 `#$10` operand in hover code examples needs to stay an operand.
+
+## Milestone 2 notes (Nov 25, 2026)
+
+Found while building sections 1 and 7:
+
+- **Aliases live in `general`**, next to the other source-syntax settings (`low_high_operators`, `allow_embedded_strings`).
+- **Aliases are resolved before parsing, and listed as written.** The directive factory swaps a leading alias for its directive, then lists the line with the alias. The line factory removes each parsed object's text from the line, so a line object must keep text that appears in the source; without that, the line loops forever.
+- **Flow rules follow the target.** `.res COUNTER(stack)` is rejected as a fill count, as `.fill` is. Without resolving the alias first, the flow check missed it and the user saw an internal-sounding error.
+- **Messages name the alias.** `.word "hi"` reports `.word data directive used with string value`, and `.word` alone suggests `.word 0x1234`.
+- **Upper-case data directives fixed.** `.BYTE 5` failed with a `KeyError`, because the size and mask tables are keyed in lower case. Directive names now ignore case everywhere, as aliases do.
+- **`#` diagnostics.** `lda #` says `"#" must be followed by a value`. In an ISA without the prefix, `ldi #5` says `"#" marks an immediate value, which this operand does not take`. A prefixed operand given a bare value expects `a "#" immediate value`.
+- **Hover code.** The Sublime colorer treats `#name` as a directive only before a mnemonic, so `lda #$10` colors `#` as punctuation and `$10` as a number.
+- **Highlighting.** All three editors anchor preprocessor directives to the start of the line, so `#` inside an operand needed no grammar change. Checked in VS Code's TextMate engine, Sublime Text and Vim, with alias highlighting and hovers.
 
 ## The 6502 config
 

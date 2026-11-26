@@ -70,7 +70,10 @@ def build_hover_docs(assembler_model: AssemblerModel, verbose: int = 0) -> dict:
         'predefined': predefined_docs,
         'directives': {
             'compiler': directive_docs.COMPILER_DIRECTIVE_DOCS,
-            'data_type': directive_docs.BYTECODE_DIRECTIVE_DOCS,
+            'data_type': {
+                **directive_docs.BYTECODE_DIRECTIVE_DOCS,
+                **directive_docs.directive_alias_docs(assembler_model.directive_aliases),
+            },
             'preprocessor': preprocessor_docs,
             'counter_coordinate': (
                 directive_docs.COUNTER_COORDINATE_DOCS

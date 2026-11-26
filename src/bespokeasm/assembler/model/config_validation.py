@@ -10,16 +10,21 @@ from __future__ import annotations
 
 import difflib
 import os
+import re
 from collections.abc import Callable
 
 from bespokeasm.assembler.annotations.schema import AnnotationNamespace
 from bespokeasm.assembler.annotations.schema import BUILTIN_NAMESPACES
 from bespokeasm.assembler.annotations.schema import load_annotation_namespaces
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
+from bespokeasm.assembler.keywords import BYTECODE_DIRECTIVES_SET
+from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET
+from bespokeasm.assembler.keywords import DIRECTIVE_ALIAS_TARGETS
 from bespokeasm.assembler.output_format.defined import DefinedFormat
 from bespokeasm.assembler.output_format.defined import load_output_formats
 from bespokeasm.assembler.output_format.generators import LoadEnvironment
 from bespokeasm.utilities import CURRENT_ADDRESS_STYLES
+from bespokeasm.utilities import IMMEDIATE_PREFIX
 from bespokeasm.utilities import is_valid_label
 from bespokeasm.utilities import LOW_HIGH_OPERATOR_STYLES
 
@@ -211,6 +216,7 @@ class ConfigValidator:
             self.require_choice(general, key, path, ENDIAN_VALUES)
         self.require_choice(general, 'low_high_operators', path, LOW_HIGH_OPERATOR_STYLES)
         self.require_choice(general, 'current_address', path, CURRENT_ADDRESS_STYLES)
+        self._validate_directive_aliases(general, path)
         registers = general.get('registers')
         if registers is not None and not isinstance(registers, (list, dict)):
             self.error(
@@ -235,6 +241,31 @@ class ConfigValidator:
         if identifier is not None:
             self.require_str(identifier, 'name', f'{path}.identifier')
             self.require_str(identifier, 'extension', f'{path}.identifier')
+
+    def _validate_directive_aliases(self, general: dict, path: str) -> None:
+        aliases = self.require_dict(general, 'directive_aliases', path)
+        if aliases is None:
+            return
+        path = f'{path}.directive_aliases'
+        targets = ', '.join(DIRECTIVE_ALIAS_TARGETS)
+        seen: set[str] = set()
+        for alias, target in aliases.items():
+            alias_path = f'{path}.{alias}'
+            if not isinstance(alias, str) or re.fullmatch(r'[A-Za-z_]\w*', alias) is None:
+                hint = '; write it without the period' if isinstance(alias, str) and alias.startswith('.') else ''
+                self.error(alias_path, f'is not a valid directive name{hint}')
+            name = alias.lower()
+            if name in COMPILER_DIRECTIVES_SET | BYTECODE_DIRECTIVES_SET:
+                self.error(alias_path, f'is already the name of the .{name} directive')
+            if name in seen:
+                self.error(alias_path, 'is defined more than once (directive names ignore case)')
+            seen.add(name)
+            if not isinstance(target, str) or target.lower() not in DIRECTIVE_ALIAS_TARGETS:
+                hint = '; write it without the period' if isinstance(target, str) and target.startswith('.') else ''
+                self.error(
+                    alias_path,
+                    f'must name a data or fill directive ({targets}), not {self._describe(target)}{hint}',
+                )
 
     def _validate_operand_sets(self, operand_sets: dict | None) -> None:
         if operand_sets is None:
@@ -271,6 +302,14 @@ class ConfigValidator:
                 self.require_int(argument, 'size', f'{path}.argument', minimum=0)
         if type_str in OPERAND_TYPES_WITH_REGISTER:
             self.require_str(operand, 'register', path, required=True)
+        if 'prefix' in operand:
+            if type_str != 'numeric':
+                self.error(f'{path}.prefix', f'is only available on numeric operands, not {type_str} operands')
+            elif operand['prefix'] != IMMEDIATE_PREFIX:
+                self.error(
+                    f'{path}.prefix',
+                    f'must be "{IMMEDIATE_PREFIX}", the only supported prefix, not {self._describe(operand["prefix"])}',
+                )
         offset = self.require_dict(operand, 'offset', path)
         if offset is not None:
             self.require_int(offset, 'size', f'{path}.offset', minimum=0)
@@ -462,7 +501,7 @@ KNOWN_KEYS = {
     'annotation_value_range': {'when', 'range'},
     'general': {
         'address_size', 'allow_embedded_strings', 'cstr_terminator', 'current_address',
-        'default_numeric_base', 'documentation', 'endian', 'endianness', 'flags', 'identifier',
+        'default_numeric_base', 'directive_aliases', 'documentation', 'endian', 'endianness', 'flags', 'identifier',
         'intra_word_endian', 'intra_word_endianness', 'low_high_operators',
         'min_version', 'multi_word_endian', 'multi_word_endianness', 'origin', 'page_size', 'registers',
         'string_byte_packing', 'string_byte_packing_fill', 'word_size', 'word_segment_size',
@@ -478,7 +517,7 @@ KNOWN_KEYS = {
     'specific_operands': {'list', 'reverse_argument_order', 'reverse_bytecode_order'},
     'operand': {
         'type', 'argument', 'bytecode', 'decorator', 'documentation', 'index_operands', 'offset',
-        'offset_from_instruction_end', 'register', 'use_curly_braces',
+        'offset_from_instruction_end', 'prefix', 'register', 'use_curly_braces',
     },
     'operand_argument': {
         'size', 'word_align', 'endian', 'multi_word_endian', 'intra_word_endian', 'valid_address', 'memory_zone',

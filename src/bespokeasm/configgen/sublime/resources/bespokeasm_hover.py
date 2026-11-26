@@ -922,12 +922,13 @@ def _heading_code_color(heading_text, hover_colors, color_override=None):
 
 
 # One token of a line of example code. Comments and strings come first, so a `;` or `#` inside a
-# string is part of it; directive forms (.2byte, #include) come before numbers and words.
+# string is part of it; directive forms (.2byte, #include) come before numbers and words. A `#`
+# before anything but a name, as in the immediate value `#$10`, is punctuation.
 CODE_TOKEN_PATTERN = re.compile(
     r'(?P<space>\s+)|'
     r'(?P<comment>;.*)|'
     r'(?P<string>"(?:[^"\\]|\\.)*"?|\'(?:[^\'\\]|\\.)*\'?)|'
-    r'(?P<directive>#[^\s;]+|\.\d*[A-Za-z]\w*)|'
+    r'(?P<directive>#[A-Za-z_][\w-]*|\.\d*[A-Za-z]\w*)|'
     r'(?P<number>0x[0-9a-fA-F]+|\$[0-9a-fA-F]+|0o[0-7]+|%[01]+|[0-7]+[qQoO]\b|[01]+[bB]\b|\d+)|'
     r'(?P<word>[A-Za-z_]\w*(?:\.\w+)*)|'      # a dotted mnemonic such as or.z is one word
     r'(?P<other>.)'
@@ -944,7 +945,7 @@ CODE_COMPILER_DIRECTIVE_NAMES = {'org', 'memzone', 'align'}
 CODE_DATA_TYPE_NAMES = {
     'fill', 'zero', 'zerountil',
     'byte', '2byte', '4byte', '8byte', '16byte', 'cstr', 'asciiz',
-}
+} | set('##DATA_TYPE_ALIASES##'.split())   # the instruction set's directive aliases
 
 
 def _code_colors(hover_colors):
@@ -1022,6 +1023,10 @@ def _color_code_line(line, colors, state):
             parts.append(_code_span(prefix_color, text[0]))
             parts.append(_code_span(name_color, text[1:]))
             seen_mnemonic = True
+        elif group == 'directive' and text.startswith('#') and seen_mnemonic:
+            # An immediate value written with a name, such as `lda #count`.
+            parts.append(_code_span(colors['punctuation'], text[0]))
+            parts.append(_code_span(colors['parameter'], text[1:]))
         elif group == 'number':
             parts.append(_code_span(colors['number'], text))
         elif group == 'word' and kind in ('annotate', 'verbatim') and not namespace_seen:

@@ -908,6 +908,32 @@ def test_sublime_code_block_colors_labels_strings_and_comments():
     ]
 
 
+def test_sublime_code_block_colors_an_immediate_value_as_an_operand():
+    # A `#` before a value is the immediate prefix, not a preprocessor directive.
+    hover = _load_sublime_hover_module()
+    lines = ['lda #$10', 'lda # count', 'lda #count', '#include "x"', '  #if X']
+    assert _roles(hover._render_code_block(lines, ROLE_COLORS)) == [
+        ('lda', 'instruction'), ('#', 'punctuation'), ('$10', 'number'),
+        ('lda', 'instruction'), ('#', 'punctuation'), ('count', 'parameter'),
+        ('lda', 'instruction'), ('#', 'punctuation'), ('count', 'parameter'),
+        ('#', 'punctuation_preprocessor'), ('include', 'preprocessor'),
+        ('"', 'punctuation_string'), ('x', 'string'), ('"', 'punctuation_string'),
+        ('#', 'punctuation_preprocessor'), ('if', 'preprocessor'), ('X', 'parameter'),
+    ]
+
+
+def test_sublime_code_block_colors_directive_aliases_as_data_types():
+    hover = _load_sublime_hover_module()
+    # The generator fills in the instruction set's aliases; until then the template has none.
+    assert 'word' not in hover.CODE_DATA_TYPE_NAMES
+    assert ('word', 'data_type') not in _roles(hover._render_code_block(['.word 1'], ROLE_COLORS))
+    hover.CODE_DATA_TYPE_NAMES = hover.CODE_DATA_TYPE_NAMES | set('res word'.split())
+    assert _roles(hover._render_code_block(['.word 1', '.res 4'], ROLE_COLORS)) == [
+        ('.', 'data_type'), ('word', 'data_type'), ('1', 'number'),
+        ('.', 'data_type'), ('res', 'data_type'), ('4', 'number'),
+    ]
+
+
 def test_sublime_markdown_links_become_hyperlinks():
     hover = _load_sublime_hover_module()
     rendered = hover._render_inline('See [Extended Min](https://github.com/example/extended-min) and `[x](y)`.')

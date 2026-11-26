@@ -28,6 +28,9 @@ DEFAULT_NUMERIC_BASE_RADIX = {
     'octal': 8,
     'binary': 2,
 }
+# The only operand prefix an instruction set may configure, as in `lda #$10`.
+IMMEDIATE_PREFIX = '#'
+
 LOW_HIGH_OPERATOR_STYLES = ('tight', 'whole_expression')
 CURRENT_ADDRESS_STYLES = ('instruction_start', 'value_address')
 

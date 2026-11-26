@@ -1002,6 +1002,10 @@ class MarkdownGenerator:
         if expression_section:
             table_sections.append(expression_section)
 
+        aliases_section = self._generate_directive_aliases_section(general.get('directive_aliases', {}))
+        if aliases_section:
+            table_sections.append(aliases_section)
+
         if table_sections:
             sections.append('\n\n---\n\n'.join(table_sections))
 
@@ -1388,6 +1392,14 @@ class MarkdownGenerator:
         if not rows:
             return ''
         return self._generate_attribute_table('Expression Syntax', rows)
+
+    def _generate_directive_aliases_section(self, aliases: dict[str, str]) -> str:
+        """Generate the Directive Aliases subsection: the other names this instruction set gives
+        data and fill directives, such as `.word` for `.2byte`."""
+        rows = [(f'`.{alias}`', f'Same as `.{target}`') for alias, target in sorted(aliases.items())]
+        if not rows:
+            return ''
+        return self._generate_attribute_table('Directive Aliases', rows)
 
     def _generate_registers_section(self, registers: list[dict[str, Any]]) -> str:
         """Generate the Register Set subsection."""

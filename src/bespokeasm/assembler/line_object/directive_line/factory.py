@@ -20,11 +20,25 @@ from .page_align import PageAlignLine
 #
 #   .org X          - (re)sets the current address to X but does not pad. Shou;d be used at top of code.
 #   .byte X         - Emits byte or set of bytes
-#   .fill X, Y      - Fills X bytes from curent address with (Y&0xFF)
+#   .fill X, Y      - Fills X bytes from curent address with (Y&0xFF); ".fill X" fills with 0
 #   .zero X         - shorthand for ".fill X, 0"
 #   .zerountil X    - fill with 0 value until and including address X
 #   .memzone X      - sets the current memory zone to X
 #   .align [X]      - aligns the current address to the next page boundary
+#
+# An instruction set may give data and fill directives other names (`general.directive_aliases`),
+# such as `.word` for `.2byte`.
+
+
+def resolve_directive_alias(text: str, aliases: dict[str, str]) -> tuple[str, str | None]:
+    """Return ``text`` with a leading directive alias replaced by the directive it stands for,
+    and the alias as written (None when ``text`` doesn't start with an alias)."""
+    if not aliases:
+        return text, None
+    match = re.match(r'\.(\w+)(?=\s|$)', text)
+    if match is None or match.group(1).lower() not in aliases:
+        return text, None
+    return f'.{aliases[match.group(1).lower()]}{text[match.end():]}', match.group(0)
 
 
 class DirectiveLine:
@@ -46,6 +60,11 @@ class DirectiveLine:
         r'^(?:\.fill)\s+({})\s*\,\s*({})'.format(
             INSTRUCTION_EXPRESSION_PATTERN, INSTRUCTION_EXPRESSION_PATTERN
         ),
+        flags=re.IGNORECASE | re.MULTILINE
+    )
+
+    PATTERN_FILL_ZERO_DIRECTIVE = re.compile(
+        fr'^(?:\.fill)\s+({INSTRUCTION_EXPRESSION_PATTERN})',
         flags=re.IGNORECASE | re.MULTILINE
     )
 
@@ -71,6 +90,26 @@ class DirectiveLine:
         cleaned_line_str = line_str.strip()
         if not cleaned_line_str.startswith('.'):
             return None
+        resolved_line_str, alias = resolve_directive_alias(cleaned_line_str, isa_model.directive_aliases)
+        line_obj = DirectiveLine._directive_line(
+            line_id, resolved_line_str, comment, current_memzone, memzone_manager, isa_model, alias,
+        )
+        if line_obj is not None and alias is not None:
+            # List the line as written: `.word $1234`, not `.2byte $1234`.
+            rest_length = len(cleaned_line_str) - len(alias)
+            target_length = len(resolved_line_str) - rest_length
+            line_obj.list_as(alias + line_obj.instruction[target_length:])
+        return line_obj
+
+    def _directive_line(
+        line_id: LineIdentifier,
+        cleaned_line_str: str,
+        comment: str,
+        current_memzone: MemoryZone,
+        memzone_manager: MemoryZoneManager,
+        isa_model: AssemblerModel,
+        alias: str | None,
+    ) -> LineObject | None:
         # first, the .org
         line_match = re.search(DirectiveLine.PATTERN_ORG_DIRECTIVE, cleaned_line_str)
         if line_match is not None and len(line_match.groups()) >= 1:
@@ -103,6 +142,23 @@ class DirectiveLine:
                 comment,
                 count_str,
                 value_str,
+                current_memzone,
+                isa_model.word_size,
+                isa_model.word_segment_size,
+                isa_model.intra_word_endianness,
+                isa_model.multi_word_endianness,
+                isa_model.expression_syntax,
+            )
+
+        # .fill with only a count fills with zero
+        line_match = re.search(DirectiveLine.PATTERN_FILL_ZERO_DIRECTIVE, cleaned_line_str)
+        if line_match is not None and len(line_match.groups()) == 1:
+            return FillDataLine(
+                line_id,
+                line_match.group(0),
+                comment,
+                line_match.group(1),
+                '0',
                 current_memzone,
                 isa_model.word_size,
                 isa_model.word_segment_size,
@@ -164,7 +220,7 @@ class DirectiveLine:
         # nothing was matched here. pass to data directive
         return DataLine.factory(
             line_id,
-            line_str,
+            cleaned_line_str,
             comment,
             current_memzone,
             isa_model.word_size,
@@ -175,4 +231,5 @@ class DirectiveLine:
             isa_model.string_byte_packing,
             isa_model.string_byte_packing_fill,
             isa_model.expression_syntax,
-            diagnostic_reporter=isa_model.diagnostic_reporter)
+            diagnostic_reporter=isa_model.diagnostic_reporter,
+            directive_name=alias)

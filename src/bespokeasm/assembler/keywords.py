@@ -19,6 +19,12 @@ FLOW_PREPROCESSOR_DIRECTIVES_SET = {
     'endtrack', 'entry', 'resume', 'set', 'suspend', 'track',
 }
 
+# The directives an instruction set may give another name with `general.directive_aliases`:
+# data and fill directives only. Porting other directives is `bespokeasm migrate`'s job.
+DIRECTIVE_ALIAS_TARGETS = (
+    'byte', '2byte', '4byte', '8byte', '16byte', 'cstr', 'asciiz', 'fill', 'zero', 'zerountil',
+)
+
 PREPROCESSOR_DIRECTIVES_SET = (
     BASE_PREPROCESSOR_DIRECTIVES_SET
     .union(FLOW_PREPROCESSOR_DIRECTIVES_SET)

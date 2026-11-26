@@ -120,6 +120,12 @@ class DocumentationModel:
                 'current_address': general_config.get('current_address'),
             },
 
+            # Other names for data and fill directives, such as `.word` for `.2byte`
+            'directive_aliases': {
+                str(alias).lower(): str(target).lower()
+                for alias, target in (general_config.get('directive_aliases') or {}).items()
+            },
+
             # Register set
             'registers': self._parse_registers_documentation(general_config),
 
@@ -744,7 +750,7 @@ class DocumentationModel:
             syntax = operand_name or 'integer'
         elif operand_type == 'numeric':
             placeholder = operand_name or 'numeric_expression'
-            syntax = placeholder
+            syntax = f'{operand_config.get("prefix") or ""}{placeholder}'
         elif operand_type == 'indirect_numeric':
             placeholder = operand_name or 'numeric_expression'
             syntax = f'[{placeholder}]'
