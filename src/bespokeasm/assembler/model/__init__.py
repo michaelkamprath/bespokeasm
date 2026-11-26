@@ -945,6 +945,18 @@ class AssemblerModel:
         return forms
 
     @property
+    def uses_immediate_prefix(self) -> bool:
+        '''Whether any operand is written after the `#` immediate prefix, as in `lda #$10`.'''
+        def visit(node) -> bool:
+            if isinstance(node, dict):
+                return 'prefix' in node or any(visit(value) for value in node.values())
+            if isinstance(node, list):
+                return any(visit(value) for value in node)
+            return False
+
+        return any(visit(self._config.get(section)) for section in ('operand_sets', 'instructions', 'macros'))
+
+    @property
     def directive_aliases(self) -> dict[str, str]:
         '''Other names for data and fill directives, lowercase and without the period, mapped to
         the directive they stand for: `{'word': '2byte'}` makes `.word` the same as `.2byte`.'''

@@ -10,6 +10,7 @@ from bespokeasm.configgen import LanguageConfigGenerator
 from bespokeasm.configgen.color_scheme import DEFAULT_COLOR_SCHEME
 from bespokeasm.configgen.color_scheme import SyntaxElement
 from bespokeasm.configgen.expression_scopes import VIM_CURRENT_ADDRESS_PATTERN
+from bespokeasm.configgen.expression_scopes import VIM_IMMEDIATE_PREFIX_PATTERN
 from bespokeasm.configgen.expression_scopes import VIM_LOW_HIGH_OPERATOR_PATTERN
 from bespokeasm.configgen.hover_docs import build_hover_docs
 
@@ -157,6 +158,7 @@ class VimConfigGenerator(LanguageConfigGenerator):
             (f'{lang_group}Operator', SyntaxElement.OPERATOR),
             (f'{lang_group}LowHighOperator', SyntaxElement.LOW_HIGH_OPERATOR),
             (f'{lang_group}CurrentAddress', SyntaxElement.CURRENT_ADDRESS),
+            (f'{lang_group}ImmediatePrefix', SyntaxElement.IMMEDIATE_PREFIX),
             (f'{lang_group}AssignOp', SyntaxElement.OPERATOR),
             (f'{lang_group}Directive', SyntaxElement.DIRECTIVE),
         ]
@@ -350,6 +352,7 @@ ctermbg=NONE gui=bold cterm=bold')
             f'{lang_group}OperandLabelName',
             f'{lang_group}Operator',
             f'{lang_group}LowHighOperator',
+            f'{lang_group}ImmediatePrefix',
             f'{lang_group}CurrentAddress',
             f'{lang_group}Separator',
             f'{lang_group}DoubleBracketExpr',
@@ -512,6 +515,8 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
             lines.append(f'syn match {lang_group}CurrentAddress /{VIM_CURRENT_ADDRESS_PATTERN}/')
         if syntax.low_high_operators is not None:
             lines.append(f'syn match {lang_group}LowHighOperator /{VIM_LOW_HIGH_OPERATOR_PATTERN}/')
+        if self.model.uses_immediate_prefix:
+            lines.append(f'syn match {lang_group}ImmediatePrefix /{VIM_IMMEDIATE_PREFIX_PATTERN}/')
         lines.append(
             f'syn keyword {lang_group}FlowOperator COORDINATE COUNTER'
         )

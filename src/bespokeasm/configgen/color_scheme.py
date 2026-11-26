@@ -80,6 +80,8 @@ class SyntaxElement(Enum):
     # `<`/`>` as the low and high operators, and `*` as the current address
     LOW_HIGH_OPERATOR = 'low_high_operator'
     CURRENT_ADDRESS = 'current_address'
+    # `#` before an immediate value
+    IMMEDIATE_PREFIX = 'immediate_prefix'
 
     # Punctuation
     PUNCTUATION_SEPARATOR = 'punctuation_separator'
@@ -173,6 +175,7 @@ DEFAULT_COLOR_SCHEME = ColorScheme(
         SyntaxElement.FLOW_OPERATOR: '#e08ae4',
         SyntaxElement.LOW_HIGH_OPERATOR: '#5fe0d0',
         SyntaxElement.CURRENT_ADDRESS: '#ff0084',
+        SyntaxElement.IMMEDIATE_PREFIX: '#cc99ff',
 
         # Punctuation
         SyntaxElement.PUNCTUATION_SEPARATOR: '#ed80a2',

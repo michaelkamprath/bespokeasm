@@ -408,19 +408,45 @@ def test_low_high_highlighting_tells_operators_from_shifts_and_comparisons(sourc
     assert [m.start() for m in re.finditer(LOW_HIGH_OPERATOR_PATTERN, source)] == operators
 
 
+@pytest.mark.parametrize(('line', 'positions'), [
+    ('  lda #$10', [6]),
+    ('  lda # $10', [6]),
+    ('  lda #<msg', [6]),
+    ('  sta $10, #1', [11]),
+    ('#if FOO', []),                   # a preprocessor directive starts the line
+    ('  nop ; #1 in a comment', [8]),  # editors scope comments before operands
+    ('  lda $10#', []),
+    ('  lda #', []),
+])
+def test_the_immediate_prefix_pattern_matches_where_an_operand_starts(line, positions):
+    import re
+
+    from bespokeasm.configgen.expression_scopes import IMMEDIATE_PREFIX_PATTERN
+    assert [match.start() for match in re.finditer(IMMEDIATE_PREFIX_PATTERN, line)] == positions
+
+
 @pytest.mark.parametrize('enabled', [False, True])
 def test_generated_grammars_scope_the_isa_dependent_operators_only_when_enabled(tmp_path, enabled):
     import json
     import zipfile
 
     from bespokeasm.configgen.expression_scopes import CURRENT_ADDRESS_SCOPE
+    from bespokeasm.configgen.expression_scopes import IMMEDIATE_PREFIX_SCOPE
     from bespokeasm.configgen.expression_scopes import LOW_HIGH_OPERATOR_SCOPE
     from bespokeasm.configgen.sublime import SublimeConfigGenerator
     from bespokeasm.configgen.vim import VimConfigGenerator
     from bespokeasm.configgen.vscode import VSCodeConfigGenerator
 
     settings = {'low_high_operators': 'tight', 'current_address': 'instruction_start'} if enabled else {}
-    config_path = write_json_config(_config(MINCPU_CONFIG, **settings), tmp_path)
+    config = _config(MINCPU_CONFIG, **settings)
+    if enabled:
+        # An operand written after `#` turns on the immediate prefix's rule.
+        numeric = next(
+            operand for operand_set in config['operand_sets'].values()
+            for operand in operand_set['operand_values'].values() if operand.get('type') == 'numeric'
+        )
+        numeric['prefix'] = '#'
+    config_path = write_json_config(config, tmp_path)
 
     def generate(cls, name):
         InstructionLine.reset_instruction_pattern_cache()
@@ -436,12 +462,13 @@ def test_generated_grammars_scope_the_isa_dependent_operators_only_when_enabled(
     with zipfile.ZipFile(next(generate(SublimeConfigGenerator, 'sublime').glob('*.sublime-package'))) as package:
         syntax = package.read(next(n for n in package.namelist() if n.endswith('.sublime-syntax'))).decode()
     vim_files = '\n'.join(path.read_text() for path in generate(VimConfigGenerator, 'vim').rglob('*.vim'))
-    for scope in (CURRENT_ADDRESS_SCOPE, LOW_HIGH_OPERATOR_SCOPE):
+    for scope in (CURRENT_ADDRESS_SCOPE, LOW_HIGH_OPERATOR_SCOPE, IMMEDIATE_PREFIX_SCOPE):
         assert (scope in scopes) == enabled
         assert (scope in syntax) == enabled
         assert scope in theme                    # the color rule is harmless when unused
     if enabled:
         # They come first, so they win over multiplication and comparison.
-        assert scopes[:2] == [CURRENT_ADDRESS_SCOPE, LOW_HIGH_OPERATOR_SCOPE]
+        assert scopes[:3] == [CURRENT_ADDRESS_SCOPE, LOW_HIGH_OPERATOR_SCOPE, IMMEDIATE_PREFIX_SCOPE]
     assert ('syn match' in vim_files and 'CurrentAddress /' in vim_files) == enabled
     assert ('LowHighOperator /' in vim_files) == enabled
+    assert ('ImmediatePrefix /' in vim_files) == enabled

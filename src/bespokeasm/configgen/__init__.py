@@ -4,6 +4,8 @@ from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.configgen.expression_scopes import CURRENT_ADDRESS_PATTERN
 from bespokeasm.configgen.expression_scopes import CURRENT_ADDRESS_SCOPE
+from bespokeasm.configgen.expression_scopes import IMMEDIATE_PREFIX_PATTERN
+from bespokeasm.configgen.expression_scopes import IMMEDIATE_PREFIX_SCOPE
 from bespokeasm.configgen.expression_scopes import LOW_HIGH_OPERATOR_PATTERN
 from bespokeasm.configgen.expression_scopes import LOW_HIGH_OPERATOR_SCOPE
 from bespokeasm.utilities import PATTERN_CONSTANT_SYMBOL
@@ -109,14 +111,16 @@ class LanguageConfigGenerator:
         return PATTERN_LOCAL_SYMBOL
 
     def _expression_operator_rules(self) -> list[tuple[str, str]]:
-        """(regex, scope) rules for `*` as the current address and `<`/`>` as the low and high
-        operators, for the features this instruction set turns on."""
+        """(regex, scope) rules for `*` as the current address, `<`/`>` as the low and high
+        operators and `#` as the immediate prefix, for the features this instruction set uses."""
         syntax = self.model.expression_syntax
         rules = []
         if syntax.current_address is not None:
             rules.append((CURRENT_ADDRESS_PATTERN, CURRENT_ADDRESS_SCOPE))
         if syntax.low_high_operators is not None:
             rules.append((LOW_HIGH_OPERATOR_PATTERN, LOW_HIGH_OPERATOR_SCOPE))
+        if self.model.uses_immediate_prefix:
+            rules.append((IMMEDIATE_PREFIX_PATTERN, IMMEDIATE_PREFIX_SCOPE))
         return rules
 
     def _enclosed_addressing_patterns(self) -> list[tuple[str, int, str, str]]:

@@ -19,6 +19,7 @@ from bespokeasm.configgen.color_scheme import build_hover_color_map
 from bespokeasm.configgen.color_scheme import DEFAULT_COLOR_SCHEME
 from bespokeasm.configgen.color_scheme import SyntaxElement
 from bespokeasm.configgen.expression_scopes import CURRENT_ADDRESS_SCOPE
+from bespokeasm.configgen.expression_scopes import IMMEDIATE_PREFIX_SCOPE
 from bespokeasm.configgen.expression_scopes import LOW_HIGH_OPERATOR_SCOPE
 from bespokeasm.configgen.hover_docs import build_hover_docs
 from ruamel.yaml import YAML
@@ -110,6 +111,7 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.OPERATOR, 'keyword.operator', 'Keyword - Operators'),
             (SyntaxElement.LOW_HIGH_OPERATOR, LOW_HIGH_OPERATOR_SCOPE, 'Keyword - Low and High Operators'),
             (SyntaxElement.CURRENT_ADDRESS, CURRENT_ADDRESS_SCOPE, 'Current Address'),
+            (SyntaxElement.IMMEDIATE_PREFIX, IMMEDIATE_PREFIX_SCOPE, 'Keyword - Immediate Prefix'),
             (
                 SyntaxElement.FLOW_OPERATOR,
                 'keyword.operator.flow',
