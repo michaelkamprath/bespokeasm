@@ -185,11 +185,9 @@ class InstructionLine(LineWithWords):
         line's size changed."""
         if not self._relaxable:
             return False
+        # The line matched a form before, and known values only add forms, so this matches too.
         evaluating = ValueSelection.evaluating(self._known_value)
-        try:
-            assembled = self._match(evaluating)
-        except (AssemblerError, SystemExit):
-            return False
+        assembled = self._match(evaluating)
         if not evaluating.selected_any(assembled.parts):
             return False
         if assembled.word_count > self.word_count:

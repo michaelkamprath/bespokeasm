@@ -201,3 +201,10 @@ def test_a_provisional_layout_may_overflow_a_zone_that_the_final_layout_fits(tmp
 
 def test_an_undefined_label_is_reported_as_unknown(tmp_path):
     assert 'unknown label "nowhere"' in _error(tmp_path, 'lda nowhere\n')
+
+
+def test_relaxation_that_never_settles_is_an_internal_error(tmp_path, monkeypatch):
+    """Lines only ever shrink, so relaxation settles; if a bug broke that, it stops, not hangs."""
+    monkeypatch.setattr(InstructionLine, 'relax', lambda self: True)
+    message = _error(tmp_path, 'lda $10\nlda $20\n')
+    assert 'INTERNAL: pass 1 did not settle after 3 rounds' in message
