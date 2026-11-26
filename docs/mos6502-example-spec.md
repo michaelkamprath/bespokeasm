@@ -43,7 +43,7 @@ Non-goals:
 | 1 | `lda #$10` | `#` is an invalid token | [Immediate prefix](#1-immediate-prefix) |
 | 2 | `(zp),y`, `(zp,x)`, `jmp (abs)` | indirect is `[...]` only | [Parenthesized indirect operands](#2-parenthesized-indirect-operands) |
 | 3 | `lda $10` vs `lda $1234` | the first syntactic match wins | [Value-selected operands](#3-value-selected-operands-and-pass-1-relaxation) |
-| 4 | branch offset from the next instruction | offset from the instruction's last byte | [Relative offset base](#4-relative-offset-base) |
+| 4 | branch offset from the next instruction | offset from the instruction's last word | [Relative offset base](#4-relative-offset-base) |
 | 5 | `#<msg`, `#>msg` | invalid tokens | [Low and high operators](#5-low-and-high-operators) (per-ISA precedence) |
 | 6 | `jmp *`, `bne *-3` | `*` is only multiply | [Current address `*`](#6-current-address-) (per-ISA meaning) |
 | 7 | `.word`, `.res` | unknown directives | [Directive aliases](#7-directive-aliases) |
@@ -147,10 +147,10 @@ lda:
 | Value | Offset measured from | Used by |
 |:--|:--|:--|
 | `instruction_start` (default) | the instruction's first byte | |
-| `last_byte` | the instruction's last byte | Mostek 3870 (today's `offset_from_instruction_end: true`) |
-| `next_instruction` | the byte after the instruction | 6502 branches |
+| `last_word` | the instruction's last word | Mostek 3870 (formerly `offset_from_instruction_end: true`) |
+| `next_instruction` | the word after the instruction | 6502 branches |
 
-`offset_from_instruction_end: true` stays as an alias for `last_byte`. Setting both keys is a config error. `here: bne here` then assembles to `D0 FE`, as on the 6502.
+`offset_from_instruction_end: true` stays as an undocumented alias for `last_word`. Setting both keys is a config error. `here: bne here` then assembles to `D0 FE`, as on the 6502.
 
 ## 5. Low and high operators
 
@@ -287,6 +287,12 @@ Found while building section 2:
 - **Bit packing bug.** `compact_parts_to_words` wrote a whole-word part that isn't `word_align`ed straight out, ahead of partial bits still waiting: a 4-bit operand bytecode followed by an 8-bit one gave `ef a9 20` instead of `ef 2a 90`. It now packs after them. No shipped config was affected.
 - **Docs tables.** A Value cell listing alternatives, as in `(x | y)`, broke the generated Markdown table row; `|` is now escaped in both operand tables.
 - **Highlighting is per ISA.** A grammar can't apply the per-instruction rule, so in an ISA with `( )` forms a parenthesized group that is a whole operand (after whitespace or a comma, followed by a comma, comment or line end) is colored as addressing, `(( ))` as double addressing. `ldx ($10)` is colored as addressing even though it assembles as absolute. Checked in VS Code's TextMate engine, Sublime Text and Vim.
+
+## Milestone 4 notes (Nov 26, 2026)
+
+- **`last_word`, not `last_byte`.** Offsets count in words, so the name doesn't assume 8-bit words, as with `low_high_operators`.
+- **Legacy key undocumented.** `offset_from_instruction_end` is gone from the wiki and still accepted as `offset_base: last_word`, as `use_curly_braces` is for `enclosure: braces`. The Mostek 3870 config now says `offset_base: last_word`, with `min_version: '0.9.1a1'` (set to `0.9.1` at release), since an older BespokeASM would ignore the key and measure from the instruction's start.
+- **Relative addresses in macros were measured from the macro.** Every part of a macro's expansion was resolved against the macro line's address and total size, so a branch that wasn't the macro's first instruction got the wrong offset, and `offset_from_instruction_end` measured from the macro's end. A macro now tells each relative part where its own instruction is, nested macros included. `*` in a macro's operands still means the macro line's address, as written. No shipped example was affected.
 
 ## The 6502 config
 

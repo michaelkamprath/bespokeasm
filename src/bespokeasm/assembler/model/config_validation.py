@@ -29,6 +29,7 @@ from bespokeasm.utilities import IMMEDIATE_PREFIX
 from bespokeasm.utilities import INDEX_SEPARATORS
 from bespokeasm.utilities import is_valid_label
 from bespokeasm.utilities import LOW_HIGH_OPERATOR_STYLES
+from bespokeasm.utilities import OFFSET_BASES
 from bespokeasm.utilities import OPERAND_TYPES_WITH_ENCLOSURE
 
 ENDIAN_VALUES = ('big', 'little')
@@ -336,6 +337,20 @@ class ConfigValidator:
                     f'is only available on indirect_indexed_numeric operands, not {type_str} operands',
                 )
             self.require_choice(operand, 'index_separator', path, tuple(INDEX_SEPARATORS))
+        if 'offset_base' in operand:
+            if type_str != 'relative_address':
+                self.error(
+                    f'{path}.offset_base',
+                    f'is only available on relative_address operands, not {type_str} operands',
+                )
+            self.require_choice(operand, 'offset_base', path, OFFSET_BASES)
+            # Legacy: `offset_from_instruction_end` is the undocumented old spelling of `offset_base`.
+            if 'offset_from_instruction_end' in operand:
+                self.error(
+                    f'{path}.offset_from_instruction_end',
+                    'must be left out when offset_base is set; offset_base replaces it '
+                    '(offset_from_instruction_end: true is offset_base: last_word)',
+                )
         offset = self.require_dict(operand, 'offset', path)
         if offset is not None:
             self.require_int(offset, 'size', f'{path}.offset', minimum=0)
@@ -544,7 +559,8 @@ KNOWN_KEYS = {
     'operand': {
         'type', 'argument', 'bytecode', 'decorator', 'documentation', 'enclosure', 'index_operands', 'index_separator',
         # `use_curly_braces` is legacy: undocumented, the same as `enclosure: braces`.
-        'offset', 'offset_from_instruction_end', 'prefix', 'register', 'use_curly_braces',
+        # `offset_from_instruction_end` is legacy: undocumented, replaced by `offset_base`.
+        'offset', 'offset_base', 'offset_from_instruction_end', 'prefix', 'register', 'use_curly_braces',
     },
     'operand_argument': {
         'size', 'word_align', 'endian', 'multi_word_endian', 'intra_word_endian', 'valid_address', 'memory_zone',

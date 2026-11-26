@@ -62,6 +62,24 @@ def operand_config_enclosure(config: dict) -> tuple[str, int] | None:
     return None
 
 
+# Where a `relative_address` operand's offset is measured from: its instruction's first word,
+# its instruction's last word, or the word after its instruction.
+OFFSET_BASES = ('instruction_start', 'last_word', 'next_instruction')
+DEFAULT_OFFSET_BASE = 'instruction_start'
+
+
+def operand_config_offset_base(config: dict) -> str:
+    """Where a `relative_address` operand configuration measures its offset from."""
+    if 'offset_base' in config:
+        return config['offset_base']
+    # Legacy: `offset_from_instruction_end: true` predates `offset_base` and means
+    # `offset_base: last_word`. It is no longer documented, but still accepted so existing
+    # configurations keep working.
+    if config.get('offset_from_instruction_end', False):
+        return 'last_word'
+    return DEFAULT_OFFSET_BASE
+
+
 LOW_HIGH_OPERATOR_STYLES = ('tight', 'whole_expression')
 CURRENT_ADDRESS_STYLES = ('instruction_start', 'value_address')
 

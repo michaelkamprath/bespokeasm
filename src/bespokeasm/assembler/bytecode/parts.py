@@ -100,6 +100,11 @@ class ByteCodePart:
     def instruction_string(self) -> str:
         raise NotImplementedError(f'fetching ByteCodePart instruction string unimplemented for: {self}')
 
+    def place_in_instruction(self, word_offset: int, instruction_size: int) -> None:
+        """Tells a part of a macro's expansion where its own instruction is: ``word_offset`` words
+        after the macro line's address, ``instruction_size`` words long. Only parts measured from
+        their instruction, such as relative addresses, use it."""
+
     def get_value(
         self,
         _symbol_scope: SymbolScope,

@@ -249,6 +249,27 @@ class TestConfigurationSchemaErrors:
                 }),
                 'operand_sets.imm.operand_values.ind.argument is required',
             ),
+            (
+                lambda c: c['operand_sets']['imm']['operand_values'].update(rel={
+                    'type': 'relative_address', 'offset_base': 'end', 'argument': {'size': 8, 'word_align': True},
+                }),
+                'operand_sets.imm.operand_values.rel.offset_base must be "instruction_start" or "last_word" or '
+                '"next_instruction", not the string "end"',
+            ),
+            (
+                lambda c: c['operand_sets']['imm']['operand_values']['u8'].update(offset_base='last_word'),
+                'operand_sets.imm.operand_values.u8.offset_base is only available on relative_address operands, '
+                'not numeric operands',
+            ),
+            (
+                # Legacy `offset_from_instruction_end` alongside `offset_base`.
+                lambda c: c['operand_sets']['imm']['operand_values'].update(rel={
+                    'type': 'relative_address', 'offset_base': 'last_word', 'offset_from_instruction_end': True,
+                    'argument': {'size': 8, 'word_align': True},
+                }),
+                'operand_sets.imm.operand_values.rel.offset_from_instruction_end must be left out when offset_base is '
+                'set; offset_base replaces it',
+            ),
             (lambda c: c['general'].update(directive_aliases=['word']), 'general.directive_aliases must be a mapping'),
             (
                 lambda c: c['general'].update(directive_aliases={'org': 'fill'}),
