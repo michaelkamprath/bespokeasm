@@ -1,5 +1,6 @@
 import importlib.resources as pkg_resources
 import re
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -14,6 +15,7 @@ from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.assembler.model.operand.factory import OperandFactory
 from bespokeasm.assembler.model.operand.types.numeric_expression import NumericExpressionOperand
 from bespokeasm.assembler.preprocessor import Preprocessor
 from bespokeasm.assembler.preprocessor.condition_stack import ConditionStack
@@ -24,6 +26,7 @@ from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedSco
 from bespokeasm.assembler.symbol_scope.named_scope_manager import NamedScopeManager
 
 from test import config_files
+from test.isa_configs import json_config_copy
 
 
 class TestInstructionParsing(unittest.TestCase):
@@ -1441,7 +1444,8 @@ class TestInstructionParsing(unittest.TestCase):
             / 'slu4-minimal-64x4'
             / 'slu4-minimal-64x4.yaml'
         )
-        isa_model = AssemblerModel(str(minimal_fp), 0, self.diagnostic_reporter)
+        with tempfile.TemporaryDirectory() as config_dir:
+            isa_model = AssemblerModel(json_config_copy(minimal_fp, config_dir), 0, self.diagnostic_reporter)
         memzone_mngr = MemoryZoneManager(
             isa_model.address_size,
             isa_model.default_origin,
@@ -2078,3 +2082,146 @@ class TestInstructionParsing(unittest.TestCase):
         # The label goes before the `#`, as it goes before any operand.
         with self.assertRaisesRegex(Exception, 'must appear at the start of the operand expression'):
             prefixed.parse_operand(line_id, '#@count: $10', set(), memzone_mngr)
+
+    def _operand(self, operand_type: str, **config):
+        """An operand built the way an operand set builds it, with registers a, x and hl."""
+        return OperandFactory.factory(
+            'op', {'type': operand_type, **config}, 'big', 'big', {'a', 'x', 'hl'}, 8, 8, self.diagnostic_reporter,
+        )
+
+    def _argument(self, operand, text: str) -> str | None:
+        parsed = operand.parse_operand(LineIdentifier(1, 'enclosure'), text, {'a', 'x', 'hl'}, MemoryZoneManager(16, 0))
+        return None if parsed is None else parsed.operand_argument_string
+
+    def test_indirect_numeric_enclosures(self):
+        argument = {'argument': {'size': 8, 'word_align': True}}
+        brackets = self._operand('indirect_numeric', **argument)
+        parentheses = self._operand('indirect_numeric', enclosure='parentheses', **argument)
+        self.assertEqual((brackets.enclosure, brackets.enclosure_depth), ('brackets', 1))
+        self.assertEqual((parentheses.enclosure, parentheses.enclosure_depth), ('parentheses', 1))
+        # Each takes only its own enclosure, wrapped around the whole operand.
+        self.assertEqual(self._argument(brackets, '[ $10 ]'), '$10')
+        self.assertIsNone(self._argument(brackets, '($10)'))
+        self.assertEqual(self._argument(parentheses, '( $10 )'), '$10')
+        self.assertIsNone(self._argument(parentheses, '[$10]'))
+        for text in ['($10)+($20)', '($10+1)*2', '($10', '()', '(a)', '($10,x)']:
+            self.assertIsNone(self._argument(parentheses, text), text)
+        # Inside, any expression; parentheses there are grouping.
+        self.assertEqual(self._argument(parentheses, '((1+2)*3)'), '(1+2)*3')
+        self.assertEqual(self._argument(parentheses, '((5))'), '(5)')
+        self.assertEqual(self._argument(parentheses, '(@ptr: vec)'), 'vec')
+        # Brackets and braces inside belong to other operand forms.
+        for text in ['[[vec]]', '[{vec}]', '([vec])']:
+            self.assertIsNone(self._argument(brackets, text) or self._argument(parentheses, text), text)
+
+    def test_indirect_numeric_takes_any_expression(self):
+        # The inner text used to be limited to `$ % ( ) + -`, letters, digits and spaces.
+        operand = self._operand('indirect_numeric', argument={'size': 16, 'word_align': True})
+        for text in ['[vec*2]', '[vec/2]', '[vec & $FF]', "['A']", '[vec << 1]', '[0o17]']:
+            self.assertEqual(self._argument(operand, text), text[1:-1], text)
+
+    def test_indirect_indexed_numeric(self):
+        operand = self._operand(
+            'indirect_indexed_numeric', enclosure='parentheses', argument={'size': 8, 'word_align': True},
+            index_operands={'x': {'type': 'register', 'register': 'x'}},
+        )
+        self.assertEqual(operand.enclosure_depth, 1)
+        self.assertEqual(self._argument(operand, '($10,x)'), '$10')
+        self.assertEqual(self._argument(operand, '( $10 , X )'), '$10')    # registers ignore case
+        self.assertEqual(self._argument(operand, '((1+2)*3,x)'), '(1+2)*3')
+        for text in ['($10)', '($10,a)', '($10),x', '($10,x,x)', '(,x)', '(x)']:
+            self.assertIsNone(self._argument(operand, text), text)
+        # It works the same in brackets.
+        bracketed = self._operand(
+            'indirect_indexed_numeric', argument={'size': 8, 'word_align': True},
+            index_operands={'x': {'type': 'register', 'register': 'x'}},
+        )
+        self.assertEqual(self._argument(bracketed, '[$10, x]'), '$10')
+        self.assertEqual(self._argument(bracketed, '[@ptr: $10, x]'), '$10')       # takes operand labels
+        # A plain indirect operand never takes the register.
+        plain = self._operand('indirect_numeric', enclosure='parentheses', argument={'size': 8, 'word_align': True})
+        self.assertIsNone(self._argument(plain, '($10,x)'))
+
+    def test_deferred_numeric_enclosures(self):
+        argument = {'argument': {'size': 8, 'word_align': True}}
+        brackets = self._operand('deferred_numeric', **argument)
+        parentheses = self._operand('deferred_numeric', enclosure='parentheses', **argument)
+        self.assertEqual(brackets.enclosure_depth, 2)
+        self.assertEqual(self._argument(brackets, '[ [ vec ] ]'), 'vec')
+        self.assertEqual(self._argument(parentheses, '((vec))'), 'vec')
+        self.assertEqual(self._argument(parentheses, '(((1+2)*3))'), '(1+2)*3')
+        for text in ['(vec)', '((vec)+1)', '((a)+(b))', '[[vec]]']:
+            self.assertIsNone(self._argument(parentheses, text), text)
+        self.assertIsNone(self._argument(brackets, '[vec]'))
+
+    def test_indirect_register_enclosures(self):
+        offset = {'offset': {'size': 8, 'word_align': True}}
+        brackets = self._operand('indirect_register', register='hl', **offset)
+        parentheses = self._operand('indirect_register', register='hl', enclosure='parentheses', **offset)
+        self.assertEqual(parentheses.enclosure_depth, 1)
+        self.assertIsNotNone(brackets.parse_operand(LineIdentifier(1, 'r'), '[hl + 5]', {'hl'}, MemoryZoneManager(16, 0)))
+        for text, accepted in [('(hl)', True), ('( hl + 5 )', True), ('(hl+(2*3))', True), ('[hl]', False),
+                               ('(hl+5)+(3)', False), ('(hl)+(3)', False)]:
+            parsed = parentheses.parse_operand(LineIdentifier(1, 'r'), text, {'hl'}, MemoryZoneManager(16, 0))
+            self.assertEqual(parsed is not None, accepted, text)
+
+    def test_indirect_indexed_register_enclosures(self):
+        config = {'register': 'hl', 'index_operands': {'a': {'type': 'register', 'register': 'a'}}}
+        brackets = self._operand('indirect_indexed_register', **config)
+        parentheses = self._operand('indirect_indexed_register', enclosure='parentheses', **config)
+        self.assertEqual(parentheses.enclosure_depth, 1)
+
+        def accepts(operand, text):
+            return operand.parse_operand(LineIdentifier(1, 'r'), text, {'a', 'hl'}, MemoryZoneManager(16, 0)) is not None
+
+        self.assertTrue(accepts(brackets, '[hl + a]'))
+        self.assertFalse(accepts(brackets, '(hl + a)'))
+        self.assertTrue(accepts(parentheses, '( hl + a )'))
+        self.assertFalse(accepts(parentheses, '[hl + a]'))
+        numeric_index = self._operand('indirect_indexed_register', register='hl', enclosure='parentheses', index_operands={
+            'n': {'type': 'numeric', 'argument': {'size': 8, 'word_align': True}},
+        })
+        self.assertTrue(accepts(numeric_index, '(hl + (2+3))'))
+        self.assertFalse(accepts(numeric_index, '(hl+5)+(3)'))
+
+    def test_enumeration_operand_requires_an_argument(self):
+        # It used to fail with "'bool' object has no attribute 'error'" instead of saying so.
+        with self.assertRaisesRegex(SystemExit, 'does not have an argument configuration'):
+            self._operand('enumeration', bytecode={'size': 8, 'value_dict': {'nz': 1, 'z': 2}})
+
+    def test_only_indirect_operands_have_an_enclosure_depth(self):
+        argument = {'argument': {'size': 8, 'word_align': True}}
+        self.assertEqual(self._operand('numeric', **argument).enclosure_depth, 0)
+        self.assertEqual(self._operand('register', register='a').enclosure_depth, 0)
+
+    def test_indirect_numeric_in_braces(self):
+        argument = {'argument': {'size': 8, 'word_align': True}}
+        indirect = self._operand('indirect_numeric', enclosure='braces', **argument)
+        deferred = self._operand('deferred_numeric', enclosure='braces', **argument)
+        self.assertEqual(self._argument(indirect, '{ vec+1 }'), 'vec+1')
+        self.assertEqual(self._argument(indirect, '{(1+2)*3}'), '(1+2)*3')
+        self.assertEqual(self._argument(deferred, '{{vec}}'), 'vec')
+        # Braces don't group, so `{{vec}}` is not an indirect `{vec}` inside braces.
+        for text in ['{{vec}}', '{a}+{b}', '[vec]', '(vec)', '{vec']:
+            self.assertIsNone(self._argument(indirect, text), text)
+        self.assertIsNone(self._argument(deferred, '{vec}'))
+
+    def test_relative_address_enclosures(self):
+        argument = {'argument': {'size': 8, 'word_align': True}}
+        bare = self._operand('relative_address', **argument)
+        curly = self._operand('relative_address', use_curly_braces=True, **argument)
+        braces = self._operand('relative_address', enclosure='braces', **argument)
+        parentheses = self._operand('relative_address', enclosure='parentheses', **argument)
+        brackets = self._operand('relative_address', enclosure='brackets', **argument)
+        self.assertEqual((bare.enclosure_depth, curly.enclosure_depth), (0, 1))
+        # Legacy: the undocumented `use_curly_braces` is the same as `enclosure: braces`.
+        self.assertEqual((curly.enclosure, braces.enclosure), ('braces', 'braces'))
+        for operand, text in [(curly, '{loop}'), (braces, '{ loop }'), (parentheses, '(loop)'), (brackets, '[loop]'),
+                              (bare, 'loop')]:
+            self.assertEqual(self._argument(operand, text), text.strip('{}()[] '), text)
+        # Bare, parentheses are grouping.
+        self.assertEqual(self._argument(bare, '(loop)'), '(loop)')
+        for operand, text in [(parentheses, 'loop'), (parentheses, '(a)+(b)'), (parentheses, '{loop}'),
+                              (brackets, '[[loop]]'), (braces, 'loop'), (bare, '{loop}'), (bare, '[loop]')]:
+            self.assertIsNone(self._argument(operand, text), text)
+        self.assertEqual(self._argument(parentheses, '((loop+2)*2)'), '(loop+2)*2')

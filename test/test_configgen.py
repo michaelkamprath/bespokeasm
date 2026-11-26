@@ -16,6 +16,7 @@ from bespokeasm.configgen.vscode import VSCodeConfigGenerator
 from ruamel.yaml import YAML
 
 from test import config_files
+from test.isa_configs import json_config_copy
 
 
 class TestConfigurationGeneration(unittest.TestCase):
@@ -1034,6 +1035,148 @@ class TestConfigurationGeneration(unittest.TestCase):
             )
         shutil.rmtree(test_dir)
 
+    def test_parenthesized_addressing_in_generated_grammars(self):
+        """An instruction set with `( )` and `(( ))` indirect operands colors a parenthesized
+        whole operand like brackets; one without them keeps parentheses as grouping."""
+        source = pkg_resources.files(config_files).joinpath('test_instruction_line_creation_little_endian.yaml')
+        with open(source) as handle:
+            config = YAML(typ='safe').load(handle)
+        test_dir = tempfile.mkdtemp()
+        plain_path = os.path.join(test_dir, 'plain.yaml')
+        with open(plain_path, 'w') as handle:
+            YAML().dump(config, handle)
+        byte = {'size': 8, 'word_align': True}
+        config['operand_sets']['enclosed'] = {'operand_values': {
+            'ind': {'type': 'indirect_numeric', 'enclosure': 'parentheses', 'bytecode': {'value': 1, 'size': 2},
+                    'argument': byte},
+            'def': {'type': 'deferred_numeric', 'enclosure': 'parentheses', 'bytecode': {'value': 2, 'size': 2},
+                    'argument': byte},
+        }}
+        config['instructions']['jind'] = {
+            'bytecode': {'value': 0x3F, 'size': 6}, 'operands': {'count': 1, 'operand_sets': {'list': ['enclosed']}},
+        }
+        paren_path = os.path.join(test_dir, 'paren.yaml')
+        with open(paren_path, 'w') as handle:
+            YAML().dump(config, handle)
+
+        # The shared patterns: a whole operand only, the deeper form first.
+        patterns = VimConfigGenerator(paren_path, 0, test_dir, None, None, 'asmtest')._enclosed_addressing_patterns()
+        self.assertEqual([form[:2] for form in patterns], [('parentheses', 2), ('parentheses', 1)])
+        (_, _, deferred, deferred_end), (_, _, indirect, indirect_end) = patterns
+        self.assertEqual((deferred_end, indirect_end), (r'\)\)', r'\)'))
+        for line, deferred_at, indirect_at in [
+            ('jind ((vec))', 5, 5), ('jind (vec)', None, 5), ('jind ($10,x)', None, 5), ('jind ($10),y', None, 5),
+            ('jind ((5)+1)', None, 5), ('jind ($10+1)*2', None, None), ('jind #($10)', None, None),
+            ('jind ((a)+(b)) ; c', None, 5),
+        ]:
+            for pattern, expected in [(deferred, deferred_at), (indirect, indirect_at)]:
+                match = re.search(pattern, line)
+                self.assertEqual(match.start() if match else None, expected, f'{pattern} on {line}')
+
+        def vscode_repository(config_path):
+            out_dir = tempfile.mkdtemp(dir=test_dir)
+            VSCodeConfigGenerator(config_path, 0, out_dir, None, None, 'asmtest').generate()
+            ext_dir = next(pl.Path(out_dir, 'extensions').iterdir())
+            return json.loads((ext_dir / 'syntaxes' / 'tmGrammar.json').read_text())['repository']
+
+        repository = vscode_repository(paren_path)
+        self.assertEqual(repository['deferred-addressing-parentheses']['begin'], deferred)
+        self.assertEqual(repository['indirect-addressing-parentheses']['end'], indirect_end)
+        self.assertEqual(
+            repository['indirect-addressing-parentheses']['beginCaptures'],
+            repository['indirect-addressing']['beginCaptures'],
+        )
+        includes = [pattern.get('include') for pattern in repository['instructions']['patterns']]
+        position = includes.index('#expressions')
+        self.assertEqual(
+            includes[position - 2:position],
+            ['#deferred-addressing-parentheses', '#indirect-addressing-parentheses'],
+        )
+        plain = vscode_repository(plain_path)
+        self.assertNotIn('indirect-addressing-parentheses', plain)
+        self.assertNotIn('#indirect-addressing-parentheses', json.dumps(plain))
+
+        def sublime_contexts(config_path):
+            out_dir = tempfile.mkdtemp(dir=test_dir)
+            SublimeConfigGenerator(config_path, 0, out_dir, None, None, 'asmtest')._generate_files_in_dir(out_dir)
+            with open(os.path.join(out_dir, 'bespokeasm-test.sublime-syntax')) as yaml_file:
+                return YAML().load(yaml_file)['contexts']
+
+        contexts = sublime_contexts(paren_path)
+        self.assertEqual([rule['match'] for rule in contexts['enclosed_addressing']], [deferred, indirect])
+        self.assertEqual(contexts['enclosed_addressing'][1]['scope'], 'punctuation.section.brackets.begin')
+        push = contexts['instructions'][0]['push']
+        self.assertEqual(
+            push.index({'include': 'enclosed_addressing'}) + 1, push.index({'include': 'numerical_expressions'}),
+        )
+        self.assertNotIn('enclosed_addressing', sublime_contexts(plain_path))
+
+        def vim_syntax(config_path):
+            out_dir = tempfile.mkdtemp(dir=test_dir)
+            configgen = VimConfigGenerator(config_path, 0, out_dir, None, None, 'asmtest')
+            configgen.generate()
+            vim_ft = configgen.language_id.replace('-', '').lower()
+            return vim_ft, pl.Path(out_dir, 'syntax', f'{vim_ft}.vim').read_text()
+
+        vim_ft, syn = vim_syntax(paren_path)
+        indirect_rule = syn.index(f'syn region {vim_ft}ParenAddressExpr matchgroup={vim_ft}Bracket ')
+        deferred_rule = syn.index(f'syn region {vim_ft}DoubleParenAddressExpr matchgroup={vim_ft}DoubleBracket ')
+        # Vim prefers the item defined last: grouping, then indirect, then deferred.
+        self.assertLess(syn.index(f'syn region {vim_ft}ParenExpr '), indirect_rule)
+        self.assertLess(indirect_rule, deferred_rule)
+        self.assertIn('oneline contained', syn[indirect_rule:].splitlines()[0])
+        self.assertIn(f'contains={vim_ft}DoubleParenAddressExpr,{vim_ft}ParenAddressExpr,', syn)
+        self.assertNotIn('ParenAddressExpr', vim_syntax(plain_path)[1])
+        shutil.rmtree(test_dir)
+
+    def test_brace_addressing_in_generated_grammars(self):
+        """Operands in braces, here a curly-brace relative address and a deferred `{{vec}}`, are
+        colored like brackets; braces never group, so no whole-operand check is needed."""
+        source = pkg_resources.files(config_files).joinpath('test_instruction_line_creation_little_endian.yaml')
+        with open(source) as handle:
+            config = YAML(typ='safe').load(handle)
+        byte = {'size': 8, 'word_align': True}
+        config['operand_sets']['braced'] = {'operand_values': {
+            'rel': {'type': 'relative_address', 'use_curly_braces': True, 'bytecode': {'value': 1, 'size': 2},
+                    'argument': byte},
+            'def': {'type': 'deferred_numeric', 'enclosure': 'braces', 'bytecode': {'value': 2, 'size': 2},
+                    'argument': byte},
+        }}
+        config['instructions']['jbr'] = {
+            'bytecode': {'value': 0x3F, 'size': 6}, 'operands': {'count': 1, 'operand_sets': {'list': ['braced']}},
+        }
+        test_dir = tempfile.mkdtemp()
+        config_path = os.path.join(test_dir, 'braces.yaml')
+        with open(config_path, 'w') as handle:
+            YAML().dump(config, handle)
+
+        patterns = VimConfigGenerator(config_path, 0, test_dir, None, None, 'asmtest')._enclosed_addressing_patterns()
+        self.assertEqual(patterns, [('braces', 2, r'\{\{', r'\}\}'), ('braces', 1, r'\{', r'\}')])
+
+        out_dir = tempfile.mkdtemp(dir=test_dir)
+        VSCodeConfigGenerator(config_path, 0, out_dir, None, None, 'asmtest').generate()
+        ext_dir = next(pl.Path(out_dir, 'extensions').iterdir())
+        repository = json.loads((ext_dir / 'syntaxes' / 'tmGrammar.json').read_text())['repository']
+        self.assertEqual(repository['deferred-addressing-braces']['begin'], r'\{\{')
+        self.assertEqual(repository['indirect-addressing-braces']['end'], r'\}')
+
+        out_dir = tempfile.mkdtemp(dir=test_dir)
+        configgen = VimConfigGenerator(config_path, 0, out_dir, None, None, 'asmtest')
+        configgen.generate()
+        vim_ft = configgen.language_id.replace('-', '').lower()
+        syn = pl.Path(out_dir, 'syntax', f'{vim_ft}.vim').read_text()
+        self.assertIn(
+            f'syn region {vim_ft}BraceAddressExpr matchgroup={vim_ft}Bracket start=/{{/ end=/}}/ oneline contained', syn,
+        )
+        self.assertIn(
+            f'syn region {vim_ft}DoubleBraceAddressExpr matchgroup={vim_ft}DoubleBracket start=/{{{{/ end=/}}}}/ oneline',
+            syn,
+        )
+        self.assertLess(
+            syn.index(f'{vim_ft}BraceAddressExpr matchgroup'), syn.index(f'{vim_ft}DoubleBraceAddressExpr matchgroup'),
+        )
+        shutil.rmtree(test_dir)
+
     def test_vim_configgen_no_registers(self):
         test_dir = tempfile.mkdtemp()
         config_file = pkg_resources.files(config_files).joinpath('test_instruction_line_creation_little_endian.yaml')
@@ -1599,7 +1742,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         )
         test_dir = tempfile.mkdtemp()
         configgen = VSCodeConfigGenerator(
-            str(config_file),
+            json_config_copy(config_file, test_dir),
             0,
             str(test_dir),
             None,

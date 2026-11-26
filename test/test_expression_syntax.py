@@ -6,7 +6,6 @@ Minimal 64x4 Revision 1.1 assembler (asm.cpp) and his Minimal UART CPU assembler
 the tests never run those assemblers.
 """
 import contextlib
-import copy
 import importlib.resources as pkg_resources
 import io
 
@@ -18,9 +17,10 @@ from bespokeasm.expression import parse_expression
 from bespokeasm.utilities import ExpressionSyntax
 from bespokeasm.utilities import is_explicit_numeric_string
 from bespokeasm.utilities import parse_numeric_string
-from ruamel.yaml import YAML
 
 from test import config_files
+from test.isa_configs import load_config
+from test.isa_configs import write_json_config
 
 TIGHT = ExpressionSyntax(low_high_operators='tight', current_address='instruction_start')
 WHOLE = ExpressionSyntax(low_high_operators='whole_expression', current_address='value_address')
@@ -50,9 +50,7 @@ def _error(expression: str, syntax=TIGHT, current_address=None) -> str:
 
 
 def _config(path, **general) -> dict:
-    with open(path) as handle:
-        config = YAML(typ='safe').load(handle)
-    config = copy.deepcopy(config)
+    config = load_config(path)
     config['general'].update(general)
     return config
 
@@ -61,9 +59,7 @@ def _assemble(tmp_path, config: dict, source: str, start: int = 0, extension: st
     """The binary of ``source``, starting at address ``start``."""
     InstructionLine.reset_instruction_pattern_cache()
     SymbolScope._global_scope = None
-    config_path = tmp_path / 'isa.yaml'
-    with open(config_path, 'w') as handle:
-        YAML().dump(config, handle)
+    config_path = write_json_config(config, tmp_path)
     (tmp_path / f'main.{extension}').write_text(source)
     assembler = Assembler(
         str(tmp_path / f'main.{extension}'), str(config_path), True, str(tmp_path / 'out.bin'), start, None, 0,
@@ -379,15 +375,14 @@ def test_generated_docs_describe_the_expression_syntax(tmp_path):
     plain = docs(MINCPU_CONFIG)
     assert 'Expression Syntax' not in plain            # nothing differs from the defaults
     assert '| **Bare Numbers** | Hexadecimal |' in docs(HEX_BASE_CONFIG)
-    config_path = tmp_path / 'isa.yaml'
-    with open(config_path, 'w') as handle:
-        YAML().dump(_config(MINCPU_CONFIG, low_high_operators='whole_expression', current_address='value_address'), handle)
+    config_path = write_json_config(
+        _config(MINCPU_CONFIG, low_high_operators='whole_expression', current_address='value_address'), tmp_path,
+    )
     described = docs(config_path)
     assert '`<label+1` is `<(label+1)`' in described
     assert "The address of the operand's own bytes" in described
     assert 'Low and high byte of everything after the operator' in described
-    with open(config_path, 'w') as handle:
-        YAML().dump(_config(SIXTEEN_BIT_CONFIG, low_high_operators='tight'), handle)
+    config_path = write_json_config(_config(SIXTEEN_BIT_CONFIG, low_high_operators='tight'), tmp_path)
     assert 'Low and high 16-bit word of the term that follows' in docs(config_path)
 
 
@@ -425,9 +420,7 @@ def test_generated_grammars_scope_the_isa_dependent_operators_only_when_enabled(
     from bespokeasm.configgen.vscode import VSCodeConfigGenerator
 
     settings = {'low_high_operators': 'tight', 'current_address': 'instruction_start'} if enabled else {}
-    config_path = tmp_path / 'isa.yaml'
-    with open(config_path, 'w') as handle:
-        YAML().dump(_config(MINCPU_CONFIG, **settings), handle)
+    config_path = write_json_config(_config(MINCPU_CONFIG, **settings), tmp_path)
 
     def generate(cls, name):
         InstructionLine.reset_instruction_pattern_cache()

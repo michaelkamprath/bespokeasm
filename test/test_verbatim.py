@@ -16,6 +16,7 @@ from bespokeasm.docsgen.markdown_generator import MarkdownGenerator
 from ruamel.yaml import YAML
 
 from test import config_files
+from test.isa_configs import json_config_copy
 
 SCRIPT_ANNOTATION = {
     'verbatim': {'documentation': {'description': 'Script text copied into the script file.'}},
@@ -355,7 +356,7 @@ def test_generated_docs_say_which_namespaces_accept_blocks(tmp_path):
 def test_xmin_format_writes_the_header_part_after_the_generated_line(tmp_path):
     """The Minimal 64x4 xmin format, from the copied config: a header block, wherever it is in
     the source, comes right after the generated-by line, then a blank line and the declarations."""
-    config = str(pkg_resources.files(config_files).joinpath('xmin', 'slu4-minimal-64x4.yaml'))
+    config = json_config_copy(pkg_resources.files(config_files).joinpath('xmin', 'slu4-minimal-64x4.yaml'), tmp_path)
     source = (
         '.memzone XMIN_USER_CODE\n'
         '#annotate xmin kind=addr name=Go\ngo: RTS\n'
@@ -370,7 +371,7 @@ def test_xmin_format_writes_the_header_part_after_the_generated_line(tmp_path):
 
 def test_xmin_format_writes_blocks_between_the_declarations_and_the_asm_block(tmp_path):
     """The Minimal 64x4 xmin format, from the copied config."""
-    config = str(pkg_resources.files(config_files).joinpath('xmin', 'slu4-minimal-64x4.yaml'))
+    config = json_config_copy(pkg_resources.files(config_files).joinpath('xmin', 'slu4-minimal-64x4.yaml'), tmp_path)
     source = (
         '.memzone XMIN_USER_CODE\n'
         '#annotate xmin kind=addr name=Go\ngo: RTS\n'

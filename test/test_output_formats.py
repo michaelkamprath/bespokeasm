@@ -27,6 +27,7 @@ from click.testing import CliRunner
 from ruamel.yaml import YAML
 
 from test import config_files
+from test.isa_configs import json_config_copy
 
 XMIN_ANNOTATION = {
     'applies_to': ['label', 'constant'],
@@ -772,7 +773,7 @@ def test_xmin_worked_example(tmp_path):
     stderr = io.StringIO()
     with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(stderr):
         Assembler(
-            str(source), str(fixture.joinpath('slu4-minimal-64x4.yaml')), False, None, 0, None, 0,
+            str(source), json_config_copy(fixture.joinpath('slu4-minimal-64x4.yaml'), tmp_path), False, None, 0, None, 0,
             True, 'xmin', str(output_path), 0, [], [],
         ).assemble_bytecode()
     assert stderr.getvalue() == ''
@@ -950,7 +951,8 @@ def test_xmin_listing_worked_example(tmp_path, monkeypatch):
     stderr = io.StringIO()
     with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(stderr):
         Assembler(
-            'addw.min64x4', 'slu4-minimal-64x4.yaml', False, None, 0, None, 0,
+            'addw.min64x4', json_config_copy(fixture.joinpath('slu4-minimal-64x4.yaml'), tmp_path), False, None, 0,
+            None, 0,
             True, 'xmin_listing', str(output_path), 0, [], [],
         ).assemble_bytecode()
     assert stderr.getvalue() == ''
@@ -1504,7 +1506,7 @@ def test_the_xmin_examples_in_the_config_assemble(tmp_path):
     """Every example in the xmin annotation's documentation compiles with -t xmin, with no warnings."""
     from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
     from bespokeasm.assembler.model import AssemblerModel
-    config = str(pkg_resources.files(config_files).joinpath('xmin', 'slu4-minimal-64x4.yaml'))
+    config = json_config_copy(pkg_resources.files(config_files).joinpath('xmin', 'slu4-minimal-64x4.yaml'), tmp_path)
     examples = AssemblerModel(config, 0, DiagnosticReporter()).annotation_namespaces['xmin'].examples
     assert len(examples) == 3
     for example in examples:
@@ -1518,7 +1520,7 @@ def test_the_xmin_examples_in_the_config_assemble(tmp_path):
 def test_xmin_addr_constant_is_a_16_bit_address(tmp_path):
     """In the Minimal 64x4 config, kind=addr on a constant writes its value in hex, as kind=addr
     on a label writes its address, so an I/O register above 0x7fff exports as an xmin int."""
-    config = str(pkg_resources.files(config_files).joinpath('xmin', 'slu4-minimal-64x4.yaml'))
+    config = json_config_copy(pkg_resources.files(config_files).joinpath('xmin', 'slu4-minimal-64x4.yaml'), tmp_path)
     source = (
         '.memzone XMIN_USER_CODE\n'
         '#annotate xmin kind=addr name=Go\ngo: RTS\n'
