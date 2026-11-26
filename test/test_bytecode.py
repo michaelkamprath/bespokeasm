@@ -197,6 +197,34 @@ class TestBytecodeObjects(unittest.TestCase):
             'words should match',
         )
 
+    def test_compact_parts_keeps_order_when_a_whole_word_part_follows_partial_bits(self):
+        """A part that is a whole number of words but not word-aligned packs right after
+        partial bits still waiting to be written, rather than being written ahead of them."""
+        test_line_id = LineIdentifier(1, 'test_compact_parts_keeps_order')
+        label_values = GlobalSymbolScope({'a'})
+        scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
+
+        # 8-bit words: an opcode, a 4-bit field, an unaligned byte, then an aligned argument.
+        parts = [
+            NumericByteCodePart(0xEF, 8, False, 'big', 'big', test_line_id, 8, 8),
+            NumericByteCodePart(0x2, 4, False, 'big', 'big', test_line_id, 8, 8),
+            NumericByteCodePart(0xA9, 8, False, 'big', 'big', test_line_id, 8, 8),
+            NumericByteCodePart(0x55, 8, True, 'big', 'big', test_line_id, 8, 8),
+        ]
+        words = CompositeByteCodePart.compact_parts_to_words(parts, 8, 8, 'big', label_values, scopes, 0x8000, 4)
+        self.assertEqual(
+            words,
+            [Word(0xEF, 8, 8, 'big'), Word(0x2A, 8, 8, 'big'), Word(0x90, 8, 8, 'big'), Word(0x55, 8, 8, 'big')],
+        )
+
+        # A two-word part after partial bits is packed the same way.
+        parts = [
+            NumericByteCodePart(0xF, 4, False, 'big', 'big', test_line_id, 8, 8),
+            NumericByteCodePart(0x1234, 16, False, 'big', 'big', test_line_id, 8, 8),
+        ]
+        words = CompositeByteCodePart.compact_parts_to_words(parts, 8, 8, 'big', label_values, scopes, 0x8000, 3)
+        self.assertEqual(words, [Word(0xF1, 8, 8, 'big'), Word(0x23, 8, 8, 'big'), Word(0x40, 8, 8, 'big')])
+
     def test_bytecode_assembly_16bit_word(self):
         register_labels = {'a', 'i'}
         label_values = GlobalSymbolScope(register_labels)

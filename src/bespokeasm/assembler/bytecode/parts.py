@@ -282,7 +282,9 @@ class ByteCodePart:
                         # Flush accumulated WordSlices before word-aligned part
                         if current_word_slices:
                             words.extend(flush_word_slices(word_size, segment_size, multi_word_endianness))
-                    if value_representation.bit_size % word_size == 0:
+                    # A whole-word part is written directly only when no partial bits are waiting;
+                    # otherwise it packs after them, or it would be written ahead of them.
+                    if value_representation.bit_size % word_size == 0 and not current_word_slices:
                         value = Value.from_word_slices(
                             [value_representation],
                             word_size,
