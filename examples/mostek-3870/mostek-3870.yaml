@@ -77,7 +77,6 @@ operand_sets:
     operand_values:
       offset_addr:
         type: relative_address
-        use_curly_braces: false
         offset_from_instruction_end: true
         argument:
           size: 8
@@ -332,7 +331,6 @@ instructions:
                 min: 0
             relative_addr:
               type: relative_address
-              use_curly_braces: false
               argument:
                 size: 8
                 word_align: true
@@ -423,7 +421,6 @@ instructions:
                 min: 0
             relative_addr:
               type: relative_address
-              use_curly_braces: false
               argument:
                 size: 8
                 word_align: true

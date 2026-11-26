@@ -14,7 +14,9 @@ from bespokeasm.assembler.model.operand.operand_label import parse_operand_label
 from bespokeasm.assembler.symbol_scope import SymbolScope
 from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.expression import EXPRESSION_PARTS_PATTERN
+from bespokeasm.utilities import DEFAULT_ENCLOSURE
 from bespokeasm.utilities import ExpressionSyntax
+from bespokeasm.utilities import operand_config_enclosure
 from bespokeasm.utilities import PATTERN_SYMBOL
 
 
@@ -125,14 +127,21 @@ class RelativeAddressOperand(OperandWithArgument):
             fr'(?:{EXPRESSION_PARTS_PATTERN}|\s)+'
             r')'
         )
-        if self.uses_curly_braces:
-            return fr'\{{\s*{base_match_str}\s*\}}'
+        if self.enclosure_depth:
+            opener, closer = (re.escape(delimiter) for delimiter in self.enclosure_delimiters)
+            return fr'{opener}\s*{base_match_str}\s*{closer}'
         else:
             return base_match_str
 
     @property
-    def uses_curly_braces(self) -> bool:
-        return self.config.get('use_curly_braces', False)
+    def enclosure(self) -> str:
+        """What the operand is written in, if anything. The legacy `use_curly_braces: true`
+        means braces; see `operand_config_enclosure`."""
+        return (operand_config_enclosure(self.config) or (DEFAULT_ENCLOSURE, 0))[0]
+
+    @property
+    def enclosure_depth(self) -> int:
+        return 0 if operand_config_enclosure(self.config) is None else 1
 
     @property
     def max_offset(self) -> int:
@@ -153,6 +162,8 @@ class RelativeAddressOperand(OperandWithArgument):
         register_labels: set[str],
         memzone_manager: MemoryZoneManager,
     ) -> ParsedOperand:
+        # An enclosure that doesn't wrap the whole operand, as in `(a)+(b)`, leaves unbalanced
+        # text such as `a)+(b`, which is not an expression.
         match = re.match(fr'^{self.match_pattern}$', operand.strip())
         if match is None:
             return None

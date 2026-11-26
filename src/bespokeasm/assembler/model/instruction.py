@@ -4,6 +4,7 @@ from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.model.decorators import apply_decorator_symbol
 from bespokeasm.assembler.model.instruction_base import InstructionBase
 from bespokeasm.assembler.model.operand_parser import OperandParser
+from bespokeasm.assembler.model.operand_parser import share_enclosed_forms
 from bespokeasm.assembler.model.operand_set import OperandSetCollection
 from bespokeasm.assembler.model.semantics import merge_instruction_semantics
 
@@ -212,6 +213,7 @@ class Instruction(InstructionBase):
                 )
         if len(self._variants) == 0:
             diagnostic_reporter.error(None, f'Configuration for instruction "{mnemonic}" has no valid variant.')
+        share_enclosed_forms([variant._operand_parser for variant in self._variants])
 
     @property
     def variants(self) -> list[InstructionVariant]:

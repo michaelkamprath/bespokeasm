@@ -24,9 +24,12 @@ from bespokeasm.assembler.output_format.defined import DefinedFormat
 from bespokeasm.assembler.output_format.defined import load_output_formats
 from bespokeasm.assembler.output_format.generators import LoadEnvironment
 from bespokeasm.utilities import CURRENT_ADDRESS_STYLES
+from bespokeasm.utilities import ENCLOSURES
 from bespokeasm.utilities import IMMEDIATE_PREFIX
+from bespokeasm.utilities import INDEX_SEPARATORS
 from bespokeasm.utilities import is_valid_label
 from bespokeasm.utilities import LOW_HIGH_OPERATOR_STYLES
+from bespokeasm.utilities import OPERAND_TYPES_WITH_ENCLOSURE
 
 ENDIAN_VALUES = ('big', 'little')
 ENDIAN_KEYS = (
@@ -42,6 +45,7 @@ OPERAND_TYPES_WITH_ARGUMENT = {
     'relative_address',
     'indirect_numeric',
     'deferred_numeric',
+    'indirect_indexed_numeric',
 }
 OPERAND_TYPES_WITH_REGISTER = {
     'register',
@@ -310,6 +314,28 @@ class ConfigValidator:
                     f'{path}.prefix',
                     f'must be "{IMMEDIATE_PREFIX}", the only supported prefix, not {self._describe(operand["prefix"])}',
                 )
+        if 'enclosure' in operand:
+            if type_str not in OPERAND_TYPES_WITH_ENCLOSURE:
+                self.error(
+                    f'{path}.enclosure',
+                    f'is only available on {", ".join(OPERAND_TYPES_WITH_ENCLOSURE)} operands, not {type_str} operands',
+                )
+            self.require_choice(operand, 'enclosure', path, tuple(ENCLOSURES))
+            # Legacy: `use_curly_braces` is the undocumented old spelling of `enclosure: braces`.
+            if operand.get('use_curly_braces') is True and operand['enclosure'] != 'braces':
+                self.error(
+                    f'{path}.enclosure',
+                    f'must be "braces" or left out, since use_curly_braces is true, not "{operand["enclosure"]}"',
+                )
+        if type_str == 'indirect_indexed_numeric':
+            self.require_dict(operand, 'index_operands', path, required=True)
+        if 'index_separator' in operand:
+            if type_str != 'indirect_indexed_numeric':
+                self.error(
+                    f'{path}.index_separator',
+                    f'is only available on indirect_indexed_numeric operands, not {type_str} operands',
+                )
+            self.require_choice(operand, 'index_separator', path, tuple(INDEX_SEPARATORS))
         offset = self.require_dict(operand, 'offset', path)
         if offset is not None:
             self.require_int(offset, 'size', f'{path}.offset', minimum=0)
@@ -516,8 +542,9 @@ KNOWN_KEYS = {
     'operand_sets_ref': {'list', 'disallowed_pairs', 'reverse_argument_order', 'reverse_bytecode_order'},
     'specific_operands': {'list', 'reverse_argument_order', 'reverse_bytecode_order'},
     'operand': {
-        'type', 'argument', 'bytecode', 'decorator', 'documentation', 'index_operands', 'offset',
-        'offset_from_instruction_end', 'prefix', 'register', 'use_curly_braces',
+        'type', 'argument', 'bytecode', 'decorator', 'documentation', 'enclosure', 'index_operands', 'index_separator',
+        # `use_curly_braces` is legacy: undocumented, the same as `enclosure: braces`.
+        'offset', 'offset_from_instruction_end', 'prefix', 'register', 'use_curly_braces',
     },
     'operand_argument': {
         'size', 'word_align', 'endian', 'multi_word_endian', 'intra_word_endian', 'valid_address', 'memory_zone',

@@ -331,7 +331,13 @@ ctermbg=NONE gui=bold cterm=bold')
             f'{lang_group}Param',
             f'{lang_group}LabelUsage',
         ] + flow_contains)
-        operand_contains = ','.join([
+        # Operands in parentheses or braces, colored like brackets.
+        enclosed_forms = [(enclosure, depth) for enclosure, depth, _, _ in self._enclosed_addressing_patterns()]
+
+        def enclosed_group(enclosure: str, depth: int) -> str:
+            return f'{"Double" if depth == 2 else ""}{"Paren" if enclosure == "parentheses" else "Brace"}AddressExpr'
+
+        operand_contains = ','.join([f'{lang_group}{enclosed_group(*form)}' for form in enclosed_forms] + [
             f'{lang_group}String',
             f'{lang_group}Register',
             f'{lang_group}HexNumber',
@@ -552,6 +558,24 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
             fr'start=/(/ end=/)/ oneline '
             fr'contains={bracket_contains}'
         )
+        # Defined after ParenExpr so they win there, the deeper form last so `((vec))` is deferred.
+        # A parenthesized group counts when it is a whole operand: after whitespace or a comma,
+        # and followed by a comma, a comment or the end of the line. Braces never group.
+        paren_body = r'\%(\%([^();]\|([^();]*)\)*'
+        for enclosure, depth in sorted(enclosed_forms, key=lambda form: form[1]):
+            bracket_group = 'DoubleBracket' if depth == 2 else 'Bracket'
+            if enclosure == 'parentheses':
+                start = fr'\%([^[:space:],]\)\@1<!{"(" * depth}{paren_body}{")" * depth}\s*\%([,;]\|$\)\)\@='
+                end = ')' * depth
+            else:
+                start, end = '{' * depth, '}' * depth
+            lines.append(
+                fr'syn region {lang_group}{enclosed_group(enclosure, depth)} '
+                fr'matchgroup={lang_group}{bracket_group} '
+                fr'start=/{start}/ '
+                fr'end=/{end}/ oneline contained '
+                fr'contains={bracket_contains}'
+            )
 
         # #annotate: the namespace, argument names, '=' and word values, up to any comment.
         # Defined after the instruction, macro and label rules so these win a same-position tie

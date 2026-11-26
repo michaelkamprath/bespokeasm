@@ -1,3 +1,4 @@
+import copy
 import importlib.resources as pkg_resources
 import json
 import os
@@ -204,6 +205,24 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             'tokenColors': token_colors
         }
 
+    def _add_enclosed_addressing(self, repository: dict) -> None:
+        """Color operands written in parentheses or braces like those in brackets, where the
+        instruction set has them. The rules go ahead of `#expressions` in operands, which would
+        otherwise read parentheses as grouping."""
+        includes = []
+        for enclosure, depth, begin, end in self._enclosed_addressing_patterns():
+            bracket_rule = 'deferred-addressing' if depth == 2 else 'indirect-addressing'
+            rule = copy.deepcopy(repository[bracket_rule])
+            rule['begin'] = begin
+            rule['end'] = end
+            repository[f'{bracket_rule}-{enclosure}'] = rule
+            includes.append({'include': f'#{bracket_rule}-{enclosure}'})
+        for context in ('instructions', 'macros'):
+            if includes and context in repository:
+                patterns = repository[context]['patterns']
+                position = patterns.index({'include': '#expressions'})
+                patterns[position:position] = copy.deepcopy(includes)
+
     @staticmethod
     def _verbatim_block_rule(namespace: str, parts: tuple[str, ...] = ()) -> dict:
         """A `#verbatim <namespace> [<part>]` ... `#endverbatim` block: the directives as
@@ -365,6 +384,7 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
         else:
             # remove the registers syntax
             del grammar_json['repository']['registers']
+        self._add_enclosed_addressing(grammar_json['repository'])
 
         # handled predefined labels and built-in constants
         from bespokeasm.assembler.keywords import BUILTIN_CONSTANTS_SET

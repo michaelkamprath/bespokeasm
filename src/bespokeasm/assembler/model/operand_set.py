@@ -1,11 +1,14 @@
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.model.operand import allowed_by_enclosure
+from bespokeasm.assembler.model.operand import EnclosureRequirement
 from bespokeasm.assembler.model.operand import Operand
 from bespokeasm.assembler.model.operand import ParsedOperand
 from bespokeasm.assembler.model.operand.factory import OperandFactory
 from bespokeasm.assembler.model.operand.operand_label import contains_operand_label_annotation
 from bespokeasm.assembler.model.operand.operand_label import OperandLabelError
 from bespokeasm.assembler.model.operand.operand_label import supports_operand_labels
+from bespokeasm.assembler.model.operand.operand_label import UNSUPPORTED_OPERAND_LABEL_MESSAGE
 
 
 class OperandSet:
@@ -69,9 +72,12 @@ class OperandSet:
         operand_str: str,
         register_labels: set[str],
         memzone_manager: MemoryZoneManager,
+        enclosure_requirement: EnclosureRequirement | None = None,
     ) -> ParsedOperand | None:
         operand_label_error: OperandLabelError | None = None
         for operand in self._ordered_operand_list:
+            if not allowed_by_enclosure(operand, enclosure_requirement):
+                continue
             try:
                 op: ParsedOperand = operand.parse_operand(line_id, operand_str, register_labels, memzone_manager)
             except OperandLabelError as e:
@@ -89,8 +95,7 @@ class OperandSet:
         ):
             raise OperandLabelError(
                 line_id,
-                'Operand labels are only supported for operand types: '
-                'numeric, indirect_numeric, deferred_numeric, address, relative_address.',
+                UNSUPPORTED_OPERAND_LABEL_MESSAGE,
             )
         return None
 

@@ -6,6 +6,8 @@ from bespokeasm.assembler.bytecode.parts import ByteCodePart
 from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.model.operand import allowed_by_enclosure
+from bespokeasm.assembler.model.operand import EnclosureRequirement
 from bespokeasm.assembler.model.operand import Operand
 from bespokeasm.assembler.model.operand import OperandBytecodePositionType
 from bespokeasm.assembler.model.operand import ParsedOperand
@@ -13,8 +15,11 @@ from bespokeasm.assembler.model.operand.factory import OperandFactory
 from bespokeasm.assembler.model.operand.operand_label import contains_operand_label_annotation
 from bespokeasm.assembler.model.operand.operand_label import OperandLabelError
 from bespokeasm.assembler.model.operand.operand_label import supports_operand_labels
+from bespokeasm.assembler.model.operand.operand_label import UNSUPPORTED_OPERAND_LABEL_MESSAGE
 from bespokeasm.assembler.model.operand_set import OperandSet
 from bespokeasm.assembler.model.operand_set import OperandSetCollection
+from bespokeasm.assembler.parsing import enclosure_depth
+from bespokeasm.utilities import ENCLOSURES
 
 # Operand Parser
 #
@@ -98,6 +103,7 @@ class OperandSetsModel:
         operands: list[str],
         register_labels: set[str],
         memzone_manager: MemoryZoneManager,
+        enclosure_requirements: list[EnclosureRequirement | None] | None = None,
     ) -> MatchedOperandSet:
         '''attempts to find a operand match based on an operand set combination. Returns
            None if no match is found, or a MatchedOperandSet if a valid match is found.
@@ -112,6 +118,7 @@ class OperandSetsModel:
                 operands[i],
                 register_labels,
                 memzone_manager,
+                enclosure_requirement=enclosure_requirements[i] if enclosure_requirements else None,
             )
             if operand is not None:
                 matched_operands.append(operand)
@@ -236,6 +243,7 @@ class SpecificOperandsModel:
         target_operand_count: int,
         register_labels: set[str],
         memzone_manager: MemoryZoneManager,
+        enclosure_requirements: list[EnclosureRequirement | None] | None = None,
     ) -> MatchedOperandSet:
         '''attempts to find a operand match based on any specific operand configuration.
            Returns None if no match is found, or a MatchedOperandSet if a valid match is found.
@@ -262,20 +270,23 @@ class SpecificOperandsModel:
                         # instruction had too few operand present
                         return None
                     raw_operand = operands[operand_index]
-                    operand = configured_operands[i].parse_operand(
-                        line_id,
-                        raw_operand,
-                        register_labels,
-                        memzone_manager,
-                    )
+                    requirement = enclosure_requirements[operand_index] if enclosure_requirements else None
+                    if allowed_by_enclosure(configured_operands[i], requirement):
+                        operand = configured_operands[i].parse_operand(
+                            line_id,
+                            raw_operand,
+                            register_labels,
+                            memzone_manager,
+                        )
+                    else:
+                        operand = None
                     if operand is None \
                             and contains_operand_label_annotation(raw_operand) \
                             and not supports_operand_labels(configured_operands[i].type):
                         if operand_label_error is None:
                             operand_label_error = OperandLabelError(
                                 line_id,
-                                'Operand labels are only supported for operand types: '
-                                'numeric, indirect_numeric, deferred_numeric, address, relative_address.',
+                                UNSUPPORTED_OPERAND_LABEL_MESSAGE,
                             )
                 operand_index += 1
 
@@ -348,6 +359,7 @@ class OperandParser:
             )
         else:
             self._operand_sets_model = None
+        self._instruction_enclosed_forms = self.enclosed_forms()
 
     def __repr__(self) -> str:
         return str(self)
@@ -406,6 +418,35 @@ class OperandParser:
                     candidates.append(source_operands[position])
         return candidates
 
+    def enclosed_forms(self) -> dict[tuple[int, int], set[EnclosureRequirement]]:
+        '''The enclosed operand forms this parser accepts, by source operand count and position:
+        `{(1, 0): {('parentheses', 1)}}` when the only operand may be written `(vec)`.'''
+        forms: dict[tuple[int, int], set[EnclosureRequirement]] = {}
+        for count in self.source_operand_counts():
+            for position in range(count):
+                for operand in self.candidate_operands(position, count):
+                    if operand.enclosure_depth > 0:
+                        forms.setdefault((count, position), set()).add((operand.enclosure, operand.enclosure_depth))
+        return forms
+
+    def use_instruction_enclosed_forms(self, forms: dict[tuple[int, int], set[EnclosureRequirement]]) -> None:
+        '''Read enclosures by the forms of the whole instruction, all variants together, rather
+        than this parser's own.'''
+        self._instruction_enclosed_forms = forms
+
+    def enclosure_requirements(self, operands: list[str]) -> list[EnclosureRequirement | None]:
+        '''For each source operand, the enclosed form it must be read as: the deepest form the
+        instruction configures at its position that wraps the whole operand, or None.'''
+        requirements: list[EnclosureRequirement | None] = []
+        for position, operand_text in enumerate(operands):
+            forms = self._instruction_enclosed_forms.get((len(operands), position), ())
+            deepest_first = sorted(forms, key=lambda form: form[1], reverse=True)
+            requirements.append(next(
+                (form for form in deepest_first if enclosure_depth(operand_text, *ENCLOSURES[form[0]]) >= form[1]),
+                None,
+            ))
+        return requirements
+
     def disallowed_combination(
         self,
         line_id: LineIdentifier,
@@ -419,9 +460,12 @@ class OperandParser:
         if model is None or 'disallowed_pairs' not in model._config or len(operands) != model.operand_count:
             return None
         operand_ids: list[str] = []
-        for operand_set, operand_text in zip(model._operand_sets, operands):
+        requirements = self.enclosure_requirements(operands)
+        for operand_set, operand_text, requirement in zip(model._operand_sets, operands, requirements):
             try:
-                parsed = operand_set.parse_operand(line_id, operand_text, register_labels, memzone_manager)
+                parsed = operand_set.parse_operand(
+                    line_id, operand_text, register_labels, memzone_manager, enclosure_requirement=requirement,
+                )
             except Exception:
                 return None
             if parsed is None:
@@ -445,6 +489,7 @@ class OperandParser:
 
         if self.operand_count == 0 and len(operands) == 0:
             return MatchedOperandSet([], False, False)
+        requirements = self.enclosure_requirements(operands)
 
         # Step 1 - Look for specific operand matches
         if self._specific_operands_model is not None:
@@ -455,6 +500,7 @@ class OperandParser:
                         self.operand_count,
                         register_labels,
                         memzone_manager,
+                        enclosure_requirements=requirements,
                     )
             if matched_operands is not None:
                 return matched_operands
@@ -462,12 +508,27 @@ class OperandParser:
         # Step 2 - Find an allowed combination match from an operand set
         if self._has_operand_sets:
             matched_operands = \
-                self._operand_sets_model.find_operands_from_operand_sets(line_id, operands, register_labels, memzone_manager)
+                self._operand_sets_model.find_operands_from_operand_sets(
+                    line_id, operands, register_labels, memzone_manager, enclosure_requirements=requirements,
+                )
             if matched_operands is not None:
                 return matched_operands
 
         # if we are here, it's because no operands were parsed
         return None
+
+
+def share_enclosed_forms(parsers: list[OperandParser | None]) -> None:
+    '''Give each of an instruction's variant parsers the enclosed forms of all of them, so an
+    enclosure means the same thing whichever variant is being tried.'''
+    forms: dict[tuple[int, int], set[EnclosureRequirement]] = {}
+    for parser in parsers:
+        if parser is not None:
+            for key, parser_forms in parser.enclosed_forms().items():
+                forms.setdefault(key, set()).update(parser_forms)
+    for parser in parsers:
+        if parser is not None:
+            parser.use_instruction_enclosed_forms(forms)
 
 
 class MatchedOperandSet:
@@ -506,9 +567,10 @@ class MatchedOperandSet:
         if base_bytecode_suffix is not None:
             machine_code.append(base_bytecode_suffix)
         # now add arguments
-        arguments = [op.argument for op in self._operands if op.argument is not None]
+        # Reversing the argument order reverses the operands; one operand's arguments keep their order.
+        operand_arguments = [op.arguments for op in self._operands]
         if self._reverse_arg_order:
-            arguments.reverse()
-        for arg in arguments:
-            machine_code.append(arg)
+            operand_arguments.reverse()
+        for arguments in operand_arguments:
+            machine_code.extend(arguments)
         return machine_code

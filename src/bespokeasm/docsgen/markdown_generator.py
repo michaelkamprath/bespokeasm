@@ -1250,7 +1250,8 @@ class MarkdownGenerator:
 
             value_text = operand.get('value') or ''
             if value_text:
-                value_text = str(value_text).replace('\n', '<br>')
+                # A `|` would end the table cell, as in an index list like `(x | y)`.
+                value_text = str(value_text).replace('|', r'\|').replace('\n', '<br>')
             value_cell = value_text
 
             mode_value = operand.get('mode') or ''
@@ -1820,6 +1821,10 @@ class MarkdownGenerator:
             else:
                 description_cell = str(description_value).replace('\n', '<br>')
 
+            if table_style != 'ascii':
+                # A `|` would end the table cell, as in an index list like `(x | y)`.
+                operand_cell = operand_cell.replace('|', r'\|')
+                value_cell = value_cell.replace('|', r'\|')
             rows.append([operand_cell, operand_type, value_cell, description_cell])
 
         if table_style == 'ascii':

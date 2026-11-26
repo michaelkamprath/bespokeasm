@@ -1,3 +1,4 @@
+import copy
 import importlib.resources as pkg_resources
 import json
 import os
@@ -263,6 +264,23 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
 
         shutil.rmtree(tmp_dir)
 
+    def _add_enclosed_addressing(self, contexts: dict) -> None:
+        """Color operands written in parentheses or braces like those in brackets, where the
+        instruction set has them. The rules go ahead of `numerical_expressions` in operands,
+        which would otherwise read parentheses as grouping."""
+        rules = []
+        for _, depth, begin, end in self._enclosed_addressing_patterns():
+            rule = copy.deepcopy(contexts['deferred_addressing' if depth == 2 else 'indirect_addressing'][0])
+            rule['match'] = begin
+            rule['push'][-1]['match'] = end
+            rules.append(rule)
+        if not rules:
+            return
+        contexts['enclosed_addressing'] = rules
+        for instruction_rule in contexts['instructions']:
+            push = instruction_rule['push']
+            push.insert(push.index({'include': 'numerical_expressions'}), {'include': 'enclosed_addressing'})
+
     def _generate_files_in_dir(self, destination_dir: str) -> None:
         if self.verbose >= 3:
             print(f'  Constructing files into temp dir: {destination_dir}')
@@ -308,6 +326,7 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             {'match': pattern, 'scope': scope}
             for pattern, scope in self._expression_operator_rules()
         ]
+        self._add_enclosed_addressing(syntax_dict['contexts'])
         syntax_dict['file_extensions'] = [self.code_extension]
         syntax_dict['scope'] = f'source.bespokeasm.{self.code_extension}'
         for idx, instr_dict in enumerate(syntax_dict['contexts']['instructions']):

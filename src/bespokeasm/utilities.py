@@ -31,6 +31,37 @@ DEFAULT_NUMERIC_BASE_RADIX = {
 # The only operand prefix an instruction set may configure, as in `lda #$10`.
 IMMEDIATE_PREFIX = '#'
 
+# What an operand is written in, chosen by its `enclosure` setting: `[vec]`, `(vec)` or `{vec}`.
+ENCLOSURES = {'brackets': ('[', ']'), 'parentheses': ('(', ')'), 'braces': ('{', '}')}
+DEFAULT_ENCLOSURE = 'brackets'
+# What an indirect_indexed_numeric operand's `index_separator` names: the character written
+# between its value and its index, as in `($40,x)` and `[$1234 + [a+6]]`.
+INDEX_SEPARATORS = {'comma': ',', 'plus': '+'}
+DEFAULT_INDEX_SEPARATOR = 'comma'
+# Indirect operand types, which are always enclosed, `brackets` by default.
+INDIRECT_OPERAND_TYPES = (
+    'indirect_numeric', 'deferred_numeric', 'indirect_indexed_numeric', 'indirect_register', 'indirect_indexed_register',
+)
+# `relative_address` is bare unless it sets an enclosure.
+OPERAND_TYPES_WITH_ENCLOSURE = INDIRECT_OPERAND_TYPES + ('relative_address',)
+
+
+def operand_config_enclosure(config: dict) -> tuple[str, int] | None:
+    """The enclosure an operand configuration is written in and its depth, as
+    `('parentheses', 1)` for `(vec)` or `('brackets', 2)` for `[[vec]]`; None when it is bare."""
+    operand_type = config.get('type')
+    if operand_type in INDIRECT_OPERAND_TYPES:
+        return config.get('enclosure', DEFAULT_ENCLOSURE), 2 if operand_type == 'deferred_numeric' else 1
+    if operand_type == 'relative_address':
+        if 'enclosure' in config:
+            return config['enclosure'], 1
+        # Legacy: `use_curly_braces: true` predates `enclosure` and means `enclosure: braces`. It is
+        # no longer documented, but still accepted so existing configurations keep working.
+        if config.get('use_curly_braces', False):
+            return 'braces', 1
+    return None
+
+
 LOW_HIGH_OPERATOR_STYLES = ('tight', 'whole_expression')
 CURRENT_ADDRESS_STYLES = ('instruction_start', 'value_address')
 

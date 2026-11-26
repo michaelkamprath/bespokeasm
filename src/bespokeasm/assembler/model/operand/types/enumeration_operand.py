@@ -32,8 +32,8 @@ class EnumerationOperand(OperandWithArgument):
             default_intra_word_endian,
             word_size,
             word_segment_size,
-            True,
             diagnostic_reporter,
+            require_arg=True,
         )
         self._bytecode_dictionary = None
         if self.has_bytecode:

@@ -294,6 +294,36 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.assertIn('#### Examples', result)
         self.assertIn('```assembly\nlda a\n```', result)
 
+    def test_operand_table_escapes_pipes_in_the_value(self):
+        """An index list such as `(x | y)` in the Value column must not end the table cell."""
+        instruction_doc = {
+            'documented': True,
+            'versions': [{
+                'index': 1,
+                'documented': True,
+                'signatures': [{'operands': [{
+                    'name': 'ind',
+                    'type': 'indirect_indexed_numeric',
+                    'syntax': '(ind, (x | y))',
+                    'value': 'numeric expression, indexed by `(x | y)`',
+                    'include_in_code': True,
+                }]}],
+            }],
+        }
+        generator = MarkdownGenerator(self.mock_doc_model, verbose=0)
+        result = generator.generate_instruction_markdown('lda', instruction_doc)
+        self.assertIn(
+            '| `(ind, (x \\| y))` | indirect_indexed_numeric | numeric expression, indexed by `(x \\| y)` |', result,
+        )
+
+    def test_operand_set_table_escapes_pipes_in_the_value(self):
+        generator = MarkdownGenerator(self.mock_doc_model, verbose=0)
+        result = generator._generate_operand_set_table([{
+            'name': 'ind', 'syntax': '(ind, (x | y))', 'value': 'numeric expression, indexed by `(x | y)`',
+            'mode': 'Indirect Indexed Numeric',
+        }])
+        self.assertIn('| `(ind, (x \\| y))` | numeric expression, indexed by `(x \\| y)` |', result)
+
     def test_generate_instruction_markdown_missing_docs(self):
         """Instruction markdown includes missing documentation notice."""
         instruction_doc = {

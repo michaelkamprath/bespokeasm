@@ -70,27 +70,36 @@ immediate:
 
 ## 2. Parenthesized indirect operands
 
-A config can write indirect operands with parentheses:
+Each indirect operand chooses what it is written in:
 
 ```yaml
-general:
-  indirect_notation: parentheses     # default: brackets
+izx:
+  type: indirect_numeric
+  enclosure: parentheses       # default: brackets
 ```
 
-- The setting applies to `indirect_numeric`, `deferred_numeric`, `indirect_register` and `indirect_indexed_register` operands throughout the ISA. One ISA uses one notation. The Z80 uses parentheses too, so this is not 6502-specific.
-- **Rule:** with parentheses, an operand that is wholly enclosed in one matching pair of parentheses is an indirect operand. It never matches a plain numeric operand. So `jmp (vec)` is always indirect, and `lda ($10)` on the NMOS 6502 is an error, as in ca65 ("Illegal addressing mode"). An expression that only starts with a parenthesis, such as `lda ($10+2)*2`, is still a numeric expression.
-- Brackets stay the default, so existing configs don't change.
+- `enclosure` is `brackets` (the default), `parentheses` or `braces`, and applies to `indirect_numeric`, `deferred_numeric`, `indirect_indexed_numeric`, `indirect_register` and `indirect_indexed_register` operands. It is per operand, not per ISA (decided Nov 26, 2026), so `[ ]`, `( )`, `{ }` and their doubled forms can all appear in one ISA, with the same meaning or different ones. The Z80 uses parentheses too, so this is not 6502-specific.
+- `relative_address` takes `enclosure` too, with no default: without it the operand is bare. The old `use_curly_braces: true` is removed from the documentation but still accepted, as `enclosure: braces` (decided Nov 26, 2026); setting both to different things is a config error. An enclosed relative address counts as an enclosed form of depth 1, so another variant's `{vec}` form doesn't shut out `{label}`.
+- **Rule, per instruction:** where an instruction configures an enclosed form at an operand position, in any variant, an operand there that is wrapped wholly in that enclosure is read as that form, and the deepest configured form wins. So `jmp (vec)` is indirect, and `lda ($10)` on the NMOS 6502 is an error, as in ca65 ("Illegal addressing mode"), because `lda` has `($10,x)` and `($10),y`. An instruction with no `( )` form reads the parentheses as grouping: `ldx ($10)` is `ldx $10`. An expression that only starts with a parenthesis, such as `lda ($10+2)*2`, is always a numeric expression, and so is anything after `#`.
+- `((x))` is deferred only where a `(( ))` form is configured. Elsewhere it is indirect, with `(x)` inside.
+- Under brackets the rule never changes a match, because plain operands already reject `[` and `[ ]` rejects `[[`. Existing configs assemble byte-identically.
+- Brackets stay the default.
 
-`(zp),y` is already expressible as two operands: an indirect operand and register `y` (`lda [$10],y` works today). `(zp,x)` needs the index register inside the parentheses. `indirect_numeric` gains an optional inner index register:
+`(zp),y` is already expressible as two operands: an indirect operand and register `y`. `(zp,x)` needs the register inside the parentheses, so a new operand type, `indirect_indexed_numeric`, takes a value, a separator and an index (decided Nov 26, 2026: a type of its own rather than an option on `indirect_numeric`, configured like `indirect_indexed_register` with `index_operands`):
 
 ```yaml
 indexed_indirect:
   operand_values:
     zp_x:
-      type: indirect_numeric
-      index_register: x            # matches (expr,x); the register emits no bytes
-      argument: {size: 8, word_align: true}
+      type: indirect_indexed_numeric
+      enclosure: parentheses
+      bytecode: {value: 0xA1, size: 8}
+      argument: {size: 8, word_align: true}    # the value before the comma
+      index_operands:                          # matches (expr,x)
+        x: {type: register, register: x}       # no bytecode here, so x emits no bits
 ```
+
+Each index operand's bytecode follows the operand's own, so the 6809's `[n,X]`/`[n,Y]` postbyte bits can come from the index. The index may be any operand type (decided Nov 26, 2026), and an index's own argument follows the value's: with `index_separator: plus` (default `comma`), `[$1234 + [a+6]]` takes an `indirect_register` index with an offset and emits the value, then the offset. With `plus`, the index is the last top-level `+` term that reads as an index, so the value can contain `+` itself.
 
 The operand splitter already keeps commas inside parentheses together, so `($10,x)` arrives as one operand.
 
@@ -260,6 +269,25 @@ Found while building sections 1 and 7:
 - **Hover code.** The Sublime colorer treats `#name` as a directive only before a mnemonic, so `lda #$10` colors `#` as punctuation and `$10` as a number.
 - **Highlighting.** All three editors anchor preprocessor directives to the start of the line, so `#` inside an operand needed no grammar change. Checked in VS Code's TextMate engine, Sublime Text and Vim, with alias highlighting and hovers.
 
+
+## Milestone 3 notes (Nov 26, 2026)
+
+Found while building section 2:
+
+- **Per operand, not per ISA.** The first plan was a global `general.indirect_notation`. Making it an operand setting lets `[ ]` and `( )` coexist, so nothing global changes.
+- **The rule is per instruction, across variants.** Each instruction collects the `(enclosure, depth)` forms of all its variants and macro variants, by operand count and position, and gives them to every variant's operand parser. A variant whose own forms have no parentheses still refuses `lda ($10)`. Operand sets are shared between instructions, so the rule is passed into matching, not stored on operands.
+- **Depth alone decides.** A form is excluded when it has fewer enclosure layers than the operand requires. An enclosed operand takes only its own enclosure, and registers and enumeration keys never match a parenthesized operand (enumeration keys are matched as words), so the enclosure itself needs no check.
+- **Inner expressions widened.** `indirect_numeric` matched its inner text with a pattern that allowed only `$ % ( ) + -`, letters, digits and spaces, so `[vec*2]`, `[<vec]` and `['A']` were rejected. It now strips the enclosure and lets the expression parser decide, which also rejects the commas, brackets and braces of other forms. Register forms keep their patterns. `indirect_register` adds a balance check so `(hl+5)+(3)` is not `(hl + "5)+(3")`, because its offset is not parsed until later; `indirect_indexed_register`'s index operands already reject unbalanced text.
+- **Enumeration constructor bug.** `EnumerationOperand` passed `True` where the diagnostic reporter goes, so an enumeration without an `argument` failed with `'bool' object has no attribute 'error'`. It now reports that the argument is required, as documented.
+- **Index bytecode was dropped without the operand's own.** An operand with no `bytecode` had no bytecode position, so the generator discarded what its index operands emitted: `[hl + a]` lost `a`'s bits. Positions now default to suffix, as documented. No shipped config was affected.
+- **Macros pass the argument, not the operand.** `@ARG(0)` of `($10,x)` is `$10`, as it is for brackets, so a macro writes `lda (@ARG(0),x)`.
+- **Diagnostics.** `lda ($10)` says parentheses around the whole operand select another form here, and names the enclosed forms. `($10,y)` lists the expected forms, `(address, x)` among them, instead of reporting the comma as a bad token.
+- **Braces and relative addresses (added on request).** `braces` joined the enclosures, and `relative_address` gained `enclosure`. Braces never group, so the expression parser rejects a `{` inside, and editors color every operand brace as addressing without a whole-operand check. The mismatch message no longer says "indirect", since the enclosed form may be a relative address.
+- **The index can be any operand (added on request).** `ld [$1234 + [a+6]]` is an `indirect_indexed_numeric` whose index is an `indirect_register` with an offset. `index_separator: comma | plus` picks the separator. An index's argument is a trailing argument of the operand, not merged into one composite part, which would byte-swap the pair on little-endian ISAs; `argument` stays the value, so `@ARG`, operand labels and flow analysis are unchanged, and `reverse_argument_order` keeps one operand's arguments together.
+- **Bit packing bug.** `compact_parts_to_words` wrote a whole-word part that isn't `word_align`ed straight out, ahead of partial bits still waiting: a 4-bit operand bytecode followed by an 8-bit one gave `ef a9 20` instead of `ef 2a 90`. It now packs after them. No shipped config was affected.
+- **Docs tables.** A Value cell listing alternatives, as in `(x | y)`, broke the generated Markdown table row; `|` is now escaped in both operand tables.
+- **Highlighting is per ISA.** A grammar can't apply the per-instruction rule, so in an ISA with `( )` forms a parenthesized group that is a whole operand (after whitespace or a comma, followed by a comma, comment or line end) is colored as addressing, `(( ))` as double addressing. `ldx ($10)` is colored as addressing even though it assembles as absolute. Checked in VS Code's TextMate engine, Sublime Text and Vim.
+
 ## The 6502 config
 
 - `examples/mos6502/mos6502.yaml`: 16-bit addresses, 8-bit words, little-endian.
@@ -398,6 +426,8 @@ Its rules are `split_statements`, `rename_directives: {org: '.org'}`, `bare_data
 | relaxation doesn't settle | internal error | `pass 1 did not settle after 64 rounds` |
 | `*` in a constant or preprocessor condition | error | `"*" (the current address) is not available here; use a label` |
 | `prefix` on a non-numeric operand, or an unsupported prefix | config error | by config path |
+| `enclosure` on another operand type or with another value, or contradicting `use_curly_braces`; an `indirect_indexed_numeric` without `index_operands`; `index_separator` on another operand type or with another value | config error | by config path |
+| `lda ($10)` where `lda` gives parentheses a meaning but has no `($10)` form | error | `parentheses around the whole operand select another form here; expected (address, x)` |
 | an alias targeting a non-data directive, or shadowing a directive | config error | by config path |
 | `offset_base` and `offset_from_instruction_end` both set | config error | by config path |
 | `--from` names a dialect the config doesn't declare | error | lists the config's dialects |
@@ -410,7 +440,7 @@ Each milestone ends with tests, pre-commit, and byte comparison of all existing 
 
 1. Expressions and literals: `low_high_operators` and `current_address`, with both semantics each; octal literals and the `B` suffix; `~`. Turn them on in the Minimal CPU, Minimal 64, Minimal 64x4 and Redux configs, byte-compared against Carsten's assembler.
 2. Immediate `prefix` and directive aliases (with `.fill N`).
-3. `indirect_notation: parentheses` and `index_register`.
+3. Per-operand `enclosure` and the `indirect_indexed_numeric` type.
 4. `offset_base`.
 5. `select_by_value` and pass-1 relaxation.
 6. The 6502 config, with every opcode byte-compared against ca65 fixtures.

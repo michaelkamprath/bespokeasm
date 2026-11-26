@@ -25,6 +25,7 @@ from bespokeasm.utilities import ExpressionSyntax
 from bespokeasm.utilities import is_unprefixed_numeric_string
 from bespokeasm.utilities import is_valid_label
 from bespokeasm.utilities import normalize_default_numeric_base
+from bespokeasm.utilities import operand_config_enclosure
 from packaging import version
 from ruamel.yaml import YAML
 
@@ -921,6 +922,27 @@ class AssemblerModel:
             current_address=general.get('current_address'),
             word_size=self.word_size,
         )
+
+    @property
+    def enclosed_operand_forms(self) -> set[tuple[str, int]]:
+        '''The enclosures operands are written in anywhere in the instruction set, each with its
+        depth: `('parentheses', 1)` for `(vec)`, `('brackets', 2)` for `[[vec]]`.'''
+        forms: set[tuple[str, int]] = set()
+
+        def visit(node) -> None:
+            if isinstance(node, dict):
+                form = operand_config_enclosure(node)
+                if form is not None:
+                    forms.add(form)
+                for value in node.values():
+                    visit(value)
+            elif isinstance(node, list):
+                for value in node:
+                    visit(value)
+
+        for section in ('operand_sets', 'instructions', 'macros'):
+            visit(self._config.get(section))
+        return forms
 
     @property
     def directive_aliases(self) -> dict[str, str]:

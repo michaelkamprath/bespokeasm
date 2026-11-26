@@ -15,9 +15,14 @@ _SUPPORTED_OPERAND_LABEL_TYPES = {
     OperandType.NUMERIC,
     OperandType.INDIRECT_NUMERIC,
     OperandType.DEFERRED_NUMERIC,
+    OperandType.INDIRECT_INDEXED_NUMERIC,
     OperandType.ADDRESS,
     OperandType.RELATIVE_ADDRESS,
 }
+UNSUPPORTED_OPERAND_LABEL_MESSAGE = (
+    'Operand labels are only supported for operand types: numeric, indirect_numeric, deferred_numeric, '
+    'indirect_indexed_numeric, address, relative_address.'
+)
 
 
 class OperandLabelError(ValueError):

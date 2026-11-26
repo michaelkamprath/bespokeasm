@@ -124,10 +124,11 @@ class TestInstruction(unittest.TestCase):
         # Patch InstructionVariant so we can record each instantiation without relying on its implementation.
         base_config = {'bytecode': {'size': 1, 'value': 0x10}}
         extra_variant = {'bytecode': {'size': 1, 'value': 0x11}}
-        with patch('bespokeasm.assembler.model.instruction.InstructionVariant', side_effect=['base', 'alt']) as mock_variant:
-            # side_effect list returns 'base' for the first (default) variant and 'alt' for the extra entry.
+        base, alt = MagicMock(_operand_parser=None), MagicMock(_operand_parser=None)
+        with patch('bespokeasm.assembler.model.instruction.InstructionVariant', side_effect=[base, alt]) as mock_variant:
+            # side_effect list returns `base` for the first (default) variant and `alt` for the extra entry.
             instruction = self._make_instruction({**base_config, 'variants': [extra_variant]})
-        self.assertEqual(instruction.variants, ['base', 'alt'])
+        self.assertEqual(instruction.variants, [base, alt])
         self.assertIn('Instruction<OP>', str(instruction))
         self.assertEqual(mock_variant.call_count, 2)
 

@@ -1,16 +1,18 @@
 import re
-from functools import cached_property
 
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model.operand import OperandType
 from bespokeasm.assembler.model.operand import ParsedOperand
 from bespokeasm.assembler.model.operand.operand_label import parse_operand_label_annotation
+from bespokeasm.assembler.parsing import encloses_whole
 
 from .numeric_expression import NumericExpressionOperand
 
 
 class IndirectNumericOperand(NumericExpressionOperand):
+    """A numeric expression in the operand's enclosure, `[vec]`, `(vec)` or `{vec}`."""
+
     def __init__(
         self,
         operand_id: str,
@@ -39,9 +41,27 @@ class IndirectNumericOperand(NumericExpressionOperand):
     def type(self) -> OperandType:
         return OperandType.INDIRECT_NUMERIC
 
-    @cached_property
+    @property
+    def enclosure_depth(self) -> int:
+        return 1
+
+    @property
     def match_pattern(self) -> str:
-        return fr'\[\s*({super().match_pattern})\s*\]'
+        opener, closer = (re.escape(delimiter) for delimiter in self.enclosure_delimiters)
+        return fr'{opener * self.enclosure_depth}.+{closer * self.enclosure_depth}'
+
+    def _enclosed_expression(self, operand: str) -> str | None:
+        """The text inside the operand's enclosure, or None when ``operand`` isn't written in it.
+        The expression parser then decides whether the text is an expression: it rejects an
+        empty one, and the commas, brackets and braces of other operand forms, such as
+        `[[vec]]` read as `[vec]`."""
+        opener, closer = self.enclosure_delimiters
+        text = operand.strip()
+        for _ in range(self.enclosure_depth):
+            if not encloses_whole(text, opener, closer):
+                return None
+            text = text[1:-1].strip()
+        return text
 
     def parse_operand(
         self,
@@ -50,24 +70,28 @@ class IndirectNumericOperand(NumericExpressionOperand):
         register_labels: set[str],
         memzone_manager: MemoryZoneManager,
     ) -> ParsedOperand:
-        # First use the configured match_pattern, then parse optional operand-label annotation.
-        match = re.match(fr'^{self.match_pattern}$', operand.strip())
-        if match is not None and len(match.groups()) > 0:
-            parsed_operand_label = parse_operand_label_annotation(
+        expression = self._enclosed_expression(operand)
+        if expression is None:
+            return None
+        return self._parse_value(line_id, expression, register_labels, memzone_manager)
+
+    def _parse_value(
+        self,
+        line_id: LineIdentifier,
+        expression: str,
+        register_labels: set[str],
+        memzone_manager: MemoryZoneManager,
+    ) -> ParsedOperand | None:
+        """The operand's bytecode and argument for ``expression``, which may carry an operand
+        label, or None when it isn't a numeric expression."""
+        parsed_operand_label = parse_operand_label_annotation(line_id, expression, register_labels, self.type)
+        try:
+            return self._parse_bytecode_parts(
                 line_id,
-                match.group(1).strip(),
+                parsed_operand_label.operand_expression,
                 register_labels,
-                self.type,
+                memzone_manager,
+                operand_label=parsed_operand_label.label_name,
             )
-            try:
-                return self._parse_bytecode_parts(
-                    line_id,
-                    parsed_operand_label.operand_expression,
-                    register_labels,
-                    memzone_manager,
-                    operand_label=parsed_operand_label.label_name,
-                )
-            except SyntaxError:
-                return None
-        else:
+        except SyntaxError:
             return None

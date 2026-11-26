@@ -4,6 +4,11 @@ import click
 from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.model.decorators import apply_decorator_symbol
 from bespokeasm.assembler.model.decorators import get_decorator_symbol
+from bespokeasm.utilities import DEFAULT_ENCLOSURE
+from bespokeasm.utilities import DEFAULT_INDEX_SEPARATOR
+from bespokeasm.utilities import ENCLOSURES
+from bespokeasm.utilities import INDEX_SEPARATORS
+from bespokeasm.utilities import operand_config_enclosure
 
 
 class DocumentationModel:
@@ -685,6 +690,7 @@ class DocumentationModel:
             'indexed_register': 'Indexed Register',
             'indirect_register': 'Indirect Register',
             'indirect_indexed_register': 'Indirect Indexed Register',
+            'indirect_indexed_numeric': 'Indirect Indexed Numeric',
             'enumeration': 'Enumeration',
             'numeric_enumeration': 'Numeric Enumeration',
             'numeric_bytecode': 'Numeric Bytecode',
@@ -718,6 +724,7 @@ class DocumentationModel:
             return syntax_example.strip()
 
         syntax: str
+        opener, closer = ENCLOSURES[operand_config.get('enclosure', DEFAULT_ENCLOSURE)]
         if operand_type == 'register':
             register_label = operand_config.get('register')
             syntax = register_label if register_label else 'register_label'
@@ -731,13 +738,13 @@ class DocumentationModel:
         elif operand_type == 'indirect_register':
             register_label = operand_config.get('register', 'register_label')
             offset_suffix = ' + offset' if operand_config.get('offset') else ''
-            syntax = f'[{register_label}{offset_suffix}]'
+            syntax = f'{opener}{register_label}{offset_suffix}{closer}'
         elif operand_type == 'indirect_indexed_register':
             register_label = operand_config.get('register', 'register_label')
             index_syntax = self._build_index_operand_syntax(operand_config)
             if not index_syntax:
                 index_syntax = 'offset_operand'
-            syntax = f'[{register_label} + {index_syntax}]'
+            syntax = f'{opener}{register_label} + {index_syntax}{closer}'
         elif operand_type == 'enumeration':
             literal_tokens = self._collect_enumeration_literals(operand_config)
             if literal_tokens:
@@ -753,17 +760,25 @@ class DocumentationModel:
             syntax = f'{operand_config.get("prefix") or ""}{placeholder}'
         elif operand_type == 'indirect_numeric':
             placeholder = operand_name or 'numeric_expression'
-            syntax = f'[{placeholder}]'
+            syntax = f'{opener}{placeholder}{closer}'
+        elif operand_type == 'indirect_indexed_numeric':
+            placeholder = operand_name or 'numeric_expression'
+            index_syntax = self._build_index_operand_syntax(operand_config) or 'index_operand'
+            separator = INDEX_SEPARATORS[operand_config.get('index_separator', DEFAULT_INDEX_SEPARATOR)]
+            syntax = f'{opener}{placeholder}{", " if separator == "," else " + "}{index_syntax}{closer}'
         elif operand_type == 'deferred_numeric':
             placeholder = operand_name or 'numeric_expression'
-            syntax = f'[[{placeholder}]]'
+            syntax = f'{opener * 2}{placeholder}{closer * 2}'
         elif operand_type == 'address':
             placeholder = operand_name or 'numeric_expression'
             syntax = placeholder
         elif operand_type == 'relative_address':
             placeholder = operand_name or 'numeric_expression'
-            use_curly = bool(operand_config.get('use_curly_braces', False))
-            syntax = f'{{{placeholder}}}' if use_curly else placeholder
+            enclosure = operand_config_enclosure(operand_config)
+            syntax = placeholder
+            if enclosure is not None:
+                relative_opener, relative_closer = ENCLOSURES[enclosure[0]]
+                syntax = f'{relative_opener}{placeholder}{relative_closer}'
         elif operand_type == 'empty':
             syntax = ''
         else:
@@ -842,6 +857,10 @@ class DocumentationModel:
             register_label = operand_config.get('register', 'register_label')
             return f'register `{register_label}`'
 
+        if operand_type == 'indirect_indexed_numeric':
+            index_syntax = self._build_index_operand_syntax(operand_config) or 'index_operand'
+            return f'numeric expression, indexed by `{index_syntax}`'
+
         if operand_type in ('numeric', 'indirect_numeric', 'deferred_numeric', 'address'):
             # Value column uses a generic placeholder for numeric/address types
             placeholder = 'numeric expression'
@@ -894,8 +913,12 @@ class DocumentationModel:
             return placeholder
 
         if operand_type == 'relative_address':
-            use_curly = bool(operand_config.get('use_curly_braces', False))
-            placeholder = '{numeric_expression}' if use_curly else 'numeric expression'
+            enclosure = operand_config_enclosure(operand_config) if isinstance(operand_config, dict) else None
+            if enclosure is None:
+                placeholder = 'numeric expression'
+            else:
+                relative_opener, relative_closer = ENCLOSURES[enclosure[0]]
+                placeholder = f'{relative_opener}numeric_expression{relative_closer}'
 
             argument_config = operand_config.get('argument', {}) if isinstance(operand_config, dict) else {}
             min_value = max_value = size = None
@@ -1025,8 +1048,9 @@ class DocumentationModel:
                         notes.append('High address bits are taken from the current instruction address.')
 
         if operand_type == 'relative_address':
-            if operand_config.get('use_curly_braces'):
-                notes.append('Relative address operand uses curly brace notation.')
+            enclosure = operand_config_enclosure(operand_config)
+            if enclosure is not None:
+                notes.append(f'Relative address operand is written in {enclosure[0]}.')
 
         if operand_type == 'numeric_enumeration' and not has_manual_description:
             literals = DocumentationModel._collect_enumeration_literals(operand_config)

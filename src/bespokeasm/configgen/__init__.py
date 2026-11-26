@@ -119,6 +119,31 @@ class LanguageConfigGenerator:
             rules.append((LOW_HIGH_OPERATOR_PATTERN, LOW_HIGH_OPERATOR_SCOPE))
         return rules
 
+    def _enclosed_addressing_patterns(self) -> list[tuple[str, int, str, str]]:
+        """(enclosure, depth, begin, end) regexes for operands written in parentheses or braces,
+        deepest first, for the forms this instruction set configures. Brackets have rules of
+        their own in every grammar.
+
+        Braces never appear in an expression, so any `{` in an operand opens one. Parentheses
+        also group, and a grammar can't tell `(vec)` from grouping the way the assembler does,
+        per instruction, so it colors a parenthesized group as addressing when the group is a
+        whole operand: it follows whitespace or a comma and is followed by a comma, a comment or
+        the end of the line. `($10+1)*2` stays grouping. One level of inner parentheses is
+        recognized."""
+        body = r'(?:[^();\n]|\([^();\n]*\))*'
+        forms = sorted(
+            (form for form in self.model.enclosed_operand_forms if form[0] in ('parentheses', 'braces')),
+            key=lambda form: (-form[1], form[0]),
+        )
+        patterns = []
+        for enclosure, depth in forms:
+            if enclosure == 'parentheses':
+                begin = fr'(?<![^\s,]){"\\(" * depth}(?={body}{"\\)" * depth}\s*(?:[,;]|$))'
+                patterns.append((enclosure, depth, begin, r'\)' * depth))
+            else:
+                patterns.append((enclosure, depth, r'\{' * depth, r'\}' * depth))
+        return patterns
+
     def _replace_symbol_pattern_tokens(self, value):
         """Replace canonical symbol-pattern placeholders recursively."""
         replacements = {

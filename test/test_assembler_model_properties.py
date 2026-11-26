@@ -166,6 +166,36 @@ class TestAssemblerModelDefaults(unittest.TestCase):
                 temp.close()
                 os.unlink(temp.name)
 
+    def test_enclosed_operand_forms(self):
+        byte = {'size': 8, 'word_align': True}
+        config = {
+            'general': {'address_size': 16, 'min_version': '0.7.0', 'registers': ['hl']},
+            'operand_sets': {'ops': {'operand_values': {
+                'ind': {'type': 'indirect_numeric', 'argument': byte},
+                'pdef': {'type': 'deferred_numeric', 'enclosure': 'parentheses', 'argument': byte},
+                'imm': {'type': 'numeric', 'argument': byte},
+                'rel': {'type': 'relative_address', 'argument': byte},
+                'curly': {'type': 'relative_address', 'use_curly_braces': True, 'argument': byte},
+            }}},
+            'instructions': {
+                'ld': {'bytecode': {'value': 1, 'size': 8}, 'operands': {'count': 1, 'operand_sets': {'list': ['ops']}}},
+                'jp': {'bytecode': {'value': 2, 'size': 8}, 'operands': {'count': 1, 'specific_operands': {
+                    'hl': {'list': {'hl': {'type': 'indirect_register', 'register': 'hl', 'enclosure': 'parentheses'}}},
+                }}},
+            },
+        }
+        temp = tempfile.NamedTemporaryFile('w+', delete=False, suffix='.yaml')
+        self.yaml.dump(config, temp)
+        temp.flush()
+        model = AssemblerModel(temp.name, 0, self.diagnostic_reporter)
+        self.assertEqual(
+            model.enclosed_operand_forms, {('brackets', 1), ('parentheses', 2), ('parentheses', 1), ('braces', 1)},
+            'operand sets and specific operands both count; bare operands do not',
+        )
+        temp.close()
+        os.unlink(temp.name)
+        self.assertEqual(AssemblerModel(self.tempfile.name, 0, self.diagnostic_reporter).enclosed_operand_forms, set())
+
 
 if __name__ == '__main__':
     unittest.main()
