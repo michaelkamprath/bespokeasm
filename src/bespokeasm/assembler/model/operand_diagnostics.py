@@ -193,7 +193,12 @@ class OperandMismatchExplainer:
                     )
                 continue
             if best_failure is None or failure[0] > best_failure[0]:
-                best_failure = failure
+                best_failure = (failure[0], list(failure[1]), failure[2])
+            elif failure[0] == best_failure[0]:
+                # Variants failing at the same position all say what it could have been, as for
+                # an instruction with one variant per addressing mode.
+                known = {id(candidate) for candidate in best_failure[1]}
+                best_failure[1].extend(candidate for candidate in failure[1] if id(candidate) not in known)
 
         if best_failure is None:
             return (

@@ -1,0 +1,1454 @@
+# MOS 6502 (NMOS): the 151 documented opcodes, byte-identical to ca65 2.18.
+description: MOS 6502
+general:
+  address_size: 16
+  multi_word_endian: little
+  registers:
+    a:
+      title: Accumulator
+      description: The 8-bit accumulator. Written `a` for the accumulator addressing mode, as in `asl a`.
+    x:
+      title: X Index Register
+      description: 8-bit index register, used by the `,x` and `(address,x)` addressing modes.
+    y:
+      title: Y Index Register
+      description: 8-bit index register, used by the `,y` and `(address),y` addressing modes.
+    # No operand names `s` or `p`, so source may use them as labels.
+    s:
+      title: Stack Pointer
+      description: The low byte of the stack address; the stack occupies page one (`$0100`–`$01FF`) and grows downward.
+      reserved: false
+    p:
+      title: Processor Status
+      description: The status flags N, V, B, D, I, Z and C.
+      reserved: false
+  flags:
+    N:
+      description: 'Negative: bit 7 of the last result.'
+    V:
+      description: 'Overflow: signed overflow from `adc` or `sbc`, or bit 6 copied by `bit`.'
+    B:
+      description: 'Break: set in the status byte pushed by `brk` and `php`, clear when an interrupt pushes it.'
+    D:
+      description: 'Decimal mode: `adc` and `sbc` work in BCD when set.'
+    I:
+      description: 'Interrupt disable: IRQ is masked when set.'
+    Z:
+      description: 'Zero: set when the last result was zero.'
+    C:
+      description: 'Carry: carry out of, or borrow into, an add, subtract, compare or shift.'
+  identifier:
+    name: mos6502
+    version: "1.0.0"
+    extension: a65
+  min_version: '0.9.1a1'
+  # As in ca65: `<` and `>` take the low and high byte of the term that follows,
+  # and `*` is the address of the instruction.
+  low_high_operators: tight
+  current_address: instruction_start
+  # ca65 names for data and fill directives.
+  directive_aliases:
+    word: 2byte
+    addr: 2byte
+    res: fill
+    text: byte
+  documentation:
+    description: >-
+      The NMOS MOS 6502: an 8-bit CPU with a 16-bit address space, an accumulator, X and Y index
+      registers, and a stack in page one. Little-endian. The 151 documented opcodes are supported;
+      the undocumented ones are not.
+    addressing_modes:
+      implied:
+        title: 'Implied'
+        description: 'The instruction names everything it uses; there is no operand.'
+      accumulator:
+        title: 'Accumulator'
+        description: 'Operates on the accumulator, written `a`. The operand may be left out, as in `asl`.'
+      immediate:
+        title: 'Immediate'
+        description: 'An 8-bit value written after `#`, as in `lda #$10` or `lda #<message`.'
+      zero_page:
+        title: 'Zero Page'
+        description: 'An address in page zero (`$0000`–`$00FF`), stored in one byte. Chosen automatically when the address is in zero page; otherwise the absolute form is used.'
+      absolute:
+        title: 'Absolute'
+        description: 'A full 16-bit address, stored low byte first.'
+      zero_page_x:
+        title: 'Zero Page,X'
+        description: 'A zero-page address plus X. The sum wraps within page zero.'
+      absolute_x:
+        title: 'Absolute,X'
+        description: 'A 16-bit address plus X. Reads take one more cycle when the sum crosses a page.'
+      zero_page_y:
+        title: 'Zero Page,Y'
+        description: 'A zero-page address plus Y. The sum wraps within page zero.'
+      absolute_y:
+        title: 'Absolute,Y'
+        description: 'A 16-bit address plus Y. Reads take one more cycle when the sum crosses a page.'
+      indexed_indirect:
+        title: 'Indexed Indirect'
+        description: 'X is added to a zero-page address, and the 16-bit pointer stored there is the effective address.'
+      indirect_indexed:
+        title: 'Indirect Indexed'
+        description: 'The 16-bit pointer stored at a zero-page address, plus Y, is the effective address. Reads take one more cycle when adding Y crosses a page.'
+      indirect:
+        title: 'Indirect'
+        description: 'The operand is the address of a 16-bit pointer, low byte first. Used only by `jmp`.'
+      relative:
+        title: 'Relative'
+        description: 'A branch target within −128 to +127 bytes of the next instruction, stored as a signed offset from it. A taken branch takes one more cycle, or two if the target is on another page.'
+    examples:
+      - title: Zero page and absolute
+        description: The same mnemonic uses the shorter zero-page form when the address is in page zero.
+        code: |-
+          counter = $10
+          lda counter       ; zero page: A5 10
+          sta $0200         ; absolute: 8D 00 02
+      - title: Pointers
+        description: The `(address),y` mode reads a 16-bit pointer from zero page.
+        code: |-
+          ptr = $20
+          lda #<message
+          sta ptr
+          lda #>message
+          sta ptr+1
+          ldy #0
+          lda (ptr),y
+predefined:
+  memory_zones:
+    - name: ZERO_PAGE
+      start: 0x0000
+      end: 0x00FF
+      documentation:
+        title: Zero Page
+        description: Page zero. Instructions use their shorter zero-page forms for addresses here.
+    - name: STACK
+      start: 0x0100
+      end: 0x01FF
+      documentation:
+        title: Stack
+        description: Page one, which holds the hardware stack.
+# Flow counters (see the wiki's Flow Counters section): opt-in static analysis with `#track`.
+# They don't change the assembled bytes.
+flow_counters:
+  stack:
+    documentation:
+      title: Hardware Stack Depth
+      description: >-
+        Bytes the tracked region has pushed on the page-one stack. Pushes add one and pulls
+        subtract one; `jsr` and `rts` move the 2-byte return address, and an interrupt or `rti`
+        the return address and status byte. S points at the next free byte, so
+        `COORDINATE(stack, N)` names the byte at `$0100 + S + N` for N ≥ 1.
+    min_value: 0
+    max_value: 256
+    default_init: 0
+    exit_policy: balanced
+    coordinate_offsets: positive
+    allow_zero_offset: false
+    unknown_instructions: error
+    entry_modes:
+      called:
+        init: 0
+        exit: 0
+        description: >-
+          A subroutine entered with `jsr`. The return address is at coordinates 1 and 2, so
+          the counter must be back at 0 when `rts` runs.
+      interrupt:
+        init: 0
+        exit: 0
+        description: >-
+          An interrupt handler. The status byte and return address are at coordinates 1 to 3,
+          so the counter must be back at 0 when `rti` runs.
+      jumped:
+        init: 0
+        description: >-
+          Code entered by `jmp` or a branch, with no return address on the stack.
+  cycles:
+    source: documentation.cycles
+    documentation:
+      title: Clock Cycles
+      description: >-
+        Clock cycles, from each instruction's documented count. Extra cycles for crossing a
+        page are not counted.
+    min_value: 0
+    default_init: 0
+    exit_policy: none
+    unknown_instructions: error
+operand_sets:
+  accumulator:
+    operand_values:
+      a:
+        type: register
+        register: a
+        documentation:
+          title: 'Accumulator'
+          mode: accumulator
+    documentation:
+      title: 'Accumulator'
+  immediate:
+    operand_values:
+      value:
+        type: numeric
+        prefix: '#'
+        argument: {size: 8, word_align: true}
+        documentation:
+          title: 'Immediate'
+          mode: immediate
+    documentation:
+      title: 'Immediate'
+  zero_page:
+    operand_values:
+      address:
+        type: address
+        select_by_value: true
+        argument: {size: 8, word_align: true, memory_zone: ZERO_PAGE}
+        documentation:
+          title: 'Zero Page'
+          mode: zero_page
+    documentation:
+      title: 'Zero Page'
+  zero_page_x:
+    operand_values:
+      address:
+        type: address
+        select_by_value: true
+        argument: {size: 8, word_align: true, memory_zone: ZERO_PAGE}
+        documentation:
+          title: 'Zero Page,X'
+          mode: zero_page_x
+    documentation:
+      title: 'Zero Page,X'
+  zero_page_y:
+    operand_values:
+      address:
+        type: address
+        select_by_value: true
+        argument: {size: 8, word_align: true, memory_zone: ZERO_PAGE}
+        documentation:
+          title: 'Zero Page,Y'
+          mode: zero_page_y
+    documentation:
+      title: 'Zero Page,Y'
+  absolute:
+    operand_values:
+      address:
+        type: address
+        argument: {size: 16, word_align: true}
+        documentation:
+          title: 'Absolute'
+          mode: absolute
+    documentation:
+      title: 'Absolute'
+  absolute_x:
+    operand_values:
+      address:
+        type: address
+        argument: {size: 16, word_align: true}
+        documentation:
+          title: 'Absolute,X'
+          mode: absolute_x
+    documentation:
+      title: 'Absolute,X'
+  absolute_y:
+    operand_values:
+      address:
+        type: address
+        argument: {size: 16, word_align: true}
+        documentation:
+          title: 'Absolute,Y'
+          mode: absolute_y
+    documentation:
+      title: 'Absolute,Y'
+  x_index:
+    operand_values:
+      x:
+        type: register
+        register: x
+        documentation:
+          title: 'X Index'
+    documentation:
+      title: 'X Index'
+  y_index:
+    operand_values:
+      y:
+        type: register
+        register: y
+        documentation:
+          title: 'Y Index'
+    documentation:
+      title: 'Y Index'
+  indirect_absolute:
+    operand_values:
+      pointer:
+        type: indirect_numeric
+        enclosure: parentheses
+        argument: {size: 16, word_align: true}
+        documentation:
+          title: 'Indirect'
+          mode: indirect
+    documentation:
+      title: 'Indirect'
+  indexed_indirect:
+    operand_values:
+      pointer:
+        type: indirect_indexed_numeric
+        enclosure: parentheses
+        argument: {size: 8, word_align: true}
+        index_operands: {x: {type: register, register: x}}
+        documentation:
+          title: 'Indexed Indirect'
+          mode: indexed_indirect
+    documentation:
+      title: 'Indexed Indirect'
+  indirect_zero_page:
+    operand_values:
+      pointer:
+        type: indirect_numeric
+        enclosure: parentheses
+        argument: {size: 8, word_align: true}
+        documentation:
+          title: 'Indirect Indexed'
+          mode: indirect_indexed
+    documentation:
+      title: 'Indirect Indexed'
+  relative:
+    operand_values:
+      target:
+        type: relative_address
+        offset_base: next_instruction
+        argument: {size: 8, word_align: true, min: -128, max: 127}
+        documentation:
+          title: 'Relative'
+          mode: relative
+    documentation:
+      title: 'Relative'
+instructions:
+  # Load/Store
+  lda:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    documentation:
+      category: 'Load/Store'
+      title: 'Load Accumulator'
+      description: 'Loads a byte from memory into A.'
+      modifies:
+        - register: a
+          description: Loaded
+        - flag: N
+          description: 'Set to bit 7 of the result'
+        - flag: Z
+          description: 'Set if the result is zero'
+    variants:
+      - bytecode: {value: 0xA9, size: 8}
+        operands: {count: 1, operand_sets: {list: [immediate]}}
+        documentation: {title: 'Immediate', cycles: 2}
+      - bytecode: {value: 0xA5, size: 8}
+        operands: {count: 1, operand_sets: {list: [zero_page]}}
+        documentation: {title: 'Zero Page', cycles: 3}
+      - bytecode: {value: 0xAD, size: 8}
+        operands: {count: 1, operand_sets: {list: [absolute]}}
+        documentation: {title: 'Absolute', cycles: 4}
+      - bytecode: {value: 0xB5, size: 8}
+        operands: {count: 2, operand_sets: {list: [zero_page_x, x_index]}}
+        documentation: {title: 'Zero Page,X', cycles: 4}
+      - bytecode: {value: 0xBD, size: 8}
+        operands: {count: 2, operand_sets: {list: [absolute_x, x_index]}}
+        documentation: {title: 'Absolute,X', cycles: 4}
+      - bytecode: {value: 0xB9, size: 8}
+        operands: {count: 2, operand_sets: {list: [absolute_y, y_index]}}
+        documentation: {title: 'Absolute,Y', cycles: 4}
+      - bytecode: {value: 0xA1, size: 8}
+        operands: {count: 1, operand_sets: {list: [indexed_indirect]}}
+        documentation: {title: 'Indexed Indirect', cycles: 6}
+      - bytecode: {value: 0xB1, size: 8}
+        operands: {count: 2, operand_sets: {list: [indirect_zero_page, y_index]}}
+        documentation: {title: 'Indirect Indexed', cycles: 5}
+  ldx:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    documentation:
+      category: 'Load/Store'
+      title: 'Load X Register'
+      description: 'Loads a byte from memory into X.'
+      modifies:
+        - register: x
+          description: Loaded
+        - flag: N
+          description: 'Set to bit 7 of the result'
+        - flag: Z
+          description: 'Set if the result is zero'
+    variants:
+      - bytecode: {value: 0xA2, size: 8}
+        operands: {count: 1, operand_sets: {list: [immediate]}}
+        documentation: {title: 'Immediate', cycles: 2}
+      - bytecode: {value: 0xA6, size: 8}
+        operands: {count: 1, operand_sets: {list: [zero_page]}}
+        documentation: {title: 'Zero Page', cycles: 3}
+      - bytecode: {value: 0xAE, size: 8}
+        operands: {count: 1, operand_sets: {list: [absolute]}}
+        documentation: {title: 'Absolute', cycles: 4}
+      - bytecode: {value: 0xB6, size: 8}
+        operands: {count: 2, operand_sets: {list: [zero_page_y, y_index]}}
+        documentation: {title: 'Zero Page,Y', cycles: 4}
+      - bytecode: {value: 0xBE, size: 8}
+        operands: {count: 2, operand_sets: {list: [absolute_y, y_index]}}
+        documentation: {title: 'Absolute,Y', cycles: 4}
+  ldy:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    documentation:
+      category: 'Load/Store'
+      title: 'Load Y Register'
+      description: 'Loads a byte from memory into Y.'
+      modifies:
+        - register: y
+          description: Loaded
+        - flag: N
+          description: 'Set to bit 7 of the result'
+        - flag: Z
+          description: 'Set if the result is zero'
+    variants:
+      - bytecode: {value: 0xA0, size: 8}
+        operands: {count: 1, operand_sets: {list: [immediate]}}
+        documentation: {title: 'Immediate', cycles: 2}
+      - bytecode: {value: 0xA4, size: 8}
+        operands: {count: 1, operand_sets: {list: [zero_page]}}
+        documentation: {title: 'Zero Page', cycles: 3}
+      - bytecode: {value: 0xAC, size: 8}
+        operands: {count: 1, operand_sets: {list: [absolute]}}
+        documentation: {title: 'Absolute', cycles: 4}
+      - bytecode: {value: 0xB4, size: 8}
+        operands: {count: 2, operand_sets: {list: [zero_page_x, x_index]}}
+        documentation: {title: 'Zero Page,X', cycles: 4}
+      - bytecode: {value: 0xBC, size: 8}
+        operands: {count: 2, operand_sets: {list: [absolute_x, x_index]}}
+        documentation: {title: 'Absolute,X', cycles: 4}
+  sta:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    documentation:
+      category: 'Load/Store'
+      title: 'Store Accumulator'
+      description: 'Stores A in memory.'
+    variants:
+      - bytecode: {value: 0x85, size: 8}
+        operands: {count: 1, operand_sets: {list: [zero_page]}}
+        documentation: {title: 'Zero Page', cycles: 3}
+      - bytecode: {value: 0x8D, size: 8}
+        operands: {count: 1, operand_sets: {list: [absolute]}}
+        documentation: {title: 'Absolute', cycles: 4}
+      - bytecode: {value: 0x95, size: 8}
+        operands: {count: 2, operand_sets: {list: [zero_page_x, x_index]}}
+        documentation: {title: 'Zero Page,X', cycles: 4}
+      - bytecode: {value: 0x9D, size: 8}
+        operands: {count: 2, operand_sets: {list: [absolute_x, x_index]}}
+        documentation: {title: 'Absolute,X', cycles: 5}
+      - bytecode: {value: 0x99, size: 8}
+        operands: {count: 2, operand_sets: {list: [absolute_y, y_index]}}
+        documentation: {title: 'Absolute,Y', cycles: 5}
+      - bytecode: {value: 0x81, size: 8}
+        operands: {count: 1, operand_sets: {list: [indexed_indirect]}}
+        documentation: {title: 'Indexed Indirect', cycles: 6}
+      - bytecode: {value: 0x91, size: 8}
+        operands: {count: 2, operand_sets: {list: [indirect_zero_page, y_index]}}
+        documentation: {title: 'Indirect Indexed', cycles: 6}
+  stx:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    documentation:
+      category: 'Load/Store'
+      title: 'Store X Register'
+      description: 'Stores X in memory.'
+    variants:
+      - bytecode: {value: 0x86, size: 8}
+        operands: {count: 1, operand_sets: {list: [zero_page]}}
+        documentation: {title: 'Zero Page', cycles: 3}
+      - bytecode: {value: 0x8E, size: 8}
+        operands: {count: 1, operand_sets: {list: [absolute]}}
+        documentation: {title: 'Absolute', cycles: 4}
+      - bytecode: {value: 0x96, size: 8}
+        operands: {count: 2, operand_sets: {list: [zero_page_y, y_index]}}
+        documentation: {title: 'Zero Page,Y', cycles: 4}
+  sty:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    documentation:
+      category: 'Load/Store'
+      title: 'Store Y Register'
+      description: 'Stores Y in memory.'
+    variants:
+      - bytecode: {value: 0x84, size: 8}
+        operands: {count: 1, operand_sets: {list: [zero_page]}}
+        documentation: {title: 'Zero Page', cycles: 3}
+      - bytecode: {value: 0x8C, size: 8}
+        operands: {count: 1, operand_sets: {list: [absolute]}}
+        documentation: {title: 'Absolute', cycles: 4}
+      - bytecode: {value: 0x94, size: 8}
+        operands: {count: 2, operand_sets: {list: [zero_page_x, x_index]}}
+        documentation: {title: 'Zero Page,X', cycles: 4}
+  # Register Transfer
+  tax:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    bytecode: {value: 0xAA, size: 8}
+    documentation:
+      category: 'Register Transfer'
+      title: 'Transfer A to X'
+      description: 'Copies A to X.'
+      modifies:
+        - register: x
+          description: Set to A
+        - flag: N
+          description: 'Set to bit 7 of the result'
+        - flag: Z
+          description: 'Set if the result is zero'
+      cycles: 2
+  tay:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    bytecode: {value: 0xA8, size: 8}
+    documentation:
+      category: 'Register Transfer'
+      title: 'Transfer A to Y'
+      description: 'Copies A to Y.'
+      modifies:
+        - register: y
+          description: Set to A
+        - flag: N
+          description: 'Set to bit 7 of the result'
+        - flag: Z
+          description: 'Set if the result is zero'
+      cycles: 2
+  txa:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    bytecode: {value: 0x8A, size: 8}
+    documentation:
+      category: 'Register Transfer'
+      title: 'Transfer X to A'
+      description: 'Copies X to A.'
+      modifies:
+        - register: a
+          description: Set to X
+        - flag: N
+          description: 'Set to bit 7 of the result'
+        - flag: Z
+          description: 'Set if the result is zero'
+      cycles: 2
+  tya:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    bytecode: {value: 0x98, size: 8}
+    documentation:
+      category: 'Register Transfer'
+      title: 'Transfer Y to A'
+      description: 'Copies Y to A.'
+      modifies:
+        - register: a
+          description: Set to Y
+        - flag: N
+          description: 'Set to bit 7 of the result'
+        - flag: Z
+          description: 'Set if the result is zero'
+      cycles: 2
+  # Stack
+  tsx:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    bytecode: {value: 0xBA, size: 8}
+    documentation:
+      category: 'Stack'
+      title: 'Transfer Stack Pointer to X'
+      description: 'Copies the stack pointer S to X.'
+      modifies:
+        - register: x
+          description: Set to S
+        - flag: N
+          description: 'Set to bit 7 of the result'
+        - flag: Z
+          description: 'Set if the result is zero'
+      cycles: 2
+  txs:
+    flow_invalidates: [stack]
+    flow_transfer: none
+    bytecode: {value: 0x9A, size: 8}
+    documentation:
+      category: 'Stack'
+      title: 'Transfer X to Stack Pointer'
+      description: 'Copies X to the stack pointer S.'
+      modifies:
+        - register: s
+          description: Set to X
+      cycles: 2
+  pha:
+    flow_effects: {stack: 1}
+    flow_transfer: none
+    bytecode: {value: 0x48, size: 8}
+    documentation:
+      category: 'Stack'
+      title: 'Push Accumulator'
+      description: 'Pushes A onto the stack.'
+      cycles: 3
+  php:
+    flow_effects: {stack: 1}
+    flow_transfer: none
+    bytecode: {value: 0x08, size: 8}
+    documentation:
+      category: 'Stack'
+      title: 'Push Processor Status'
+      description: 'Pushes the status register P onto the stack, with B and bit 5 set in the pushed copy.'
+      cycles: 3
+  pla:
+    flow_effects: {stack: -1}
+    flow_transfer: none
+    bytecode: {value: 0x68, size: 8}
+    documentation:
+      category: 'Stack'
+      title: 'Pull Accumulator'
+      description: 'Pulls a byte from the stack into A.'
+      modifies:
+        - register: a
+          description: Pulled
+        - flag: N
+          description: 'Set to bit 7 of the result'
+        - flag: Z
+          description: 'Set if the result is zero'
+      cycles: 4
+  plp:
+    flow_effects: {stack: -1}
+    flow_transfer: none
+    bytecode: {value: 0x28, size: 8}
+    documentation:
+      category: 'Stack'
+      title: 'Pull Processor Status'
+      description: 'Pulls the status register P from the stack. B and bit 5 are ignored.'
+      modifies:
+        - flag: N
+          description: 'Pulled from the stack'
+        - flag: V
+          description: 'Pulled from the stack'
+        - flag: D
+          description: 'Pulled from the stack'
+        - flag: I
+          description: 'Pulled from the stack'
+        - flag: Z
+          description: 'Pulled from the stack'
+        - flag: C
+          description: 'Pulled from the stack'
+      cycles: 4
+  # Logical
+  and:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    documentation:
+      category: 'Logical'
+      title: 'Logical AND'
+      description: 'A = A AND M.'
+      modifies:
+        - register: a
+          description: Result
+        - flag: N
+          description: 'Set to bit 7 of the result'
+        - flag: Z
+          description: 'Set if the result is zero'
+    variants:
+      - bytecode: {value: 0x29, size: 8}
+        operands: {count: 1, operand_sets: {list: [immediate]}}
+        documentation: {title: 'Immediate', cycles: 2}
+      - bytecode: {value: 0x25, size: 8}
+        operands: {count: 1, operand_sets: {list: [zero_page]}}
+        documentation: {title: 'Zero Page', cycles: 3}
+      - bytecode: {value: 0x2D, size: 8}
+        operands: {count: 1, operand_sets: {list: [absolute]}}
+        documentation: {title: 'Absolute', cycles: 4}
+      - bytecode: {value: 0x35, size: 8}
+        operands: {count: 2, operand_sets: {list: [zero_page_x, x_index]}}
+        documentation: {title: 'Zero Page,X', cycles: 4}
+      - bytecode: {value: 0x3D, size: 8}
+        operands: {count: 2, operand_sets: {list: [absolute_x, x_index]}}
+        documentation: {title: 'Absolute,X', cycles: 4}
+      - bytecode: {value: 0x39, size: 8}
+        operands: {count: 2, operand_sets: {list: [absolute_y, y_index]}}
+        documentation: {title: 'Absolute,Y', cycles: 4}
+      - bytecode: {value: 0x21, size: 8}
+        operands: {count: 1, operand_sets: {list: [indexed_indirect]}}
+        documentation: {title: 'Indexed Indirect', cycles: 6}
+      - bytecode: {value: 0x31, size: 8}
+        operands: {count: 2, operand_sets: {list: [indirect_zero_page, y_index]}}
+        documentation: {title: 'Indirect Indexed', cycles: 5}
+  eor:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    documentation:
+      category: 'Logical'
+      title: 'Exclusive OR'
+      description: 'A = A XOR M.'
+      modifies:
+        - register: a
+          description: Result
+        - flag: N
+          description: 'Set to bit 7 of the result'
+        - flag: Z
+          description: 'Set if the result is zero'
+    variants:
+      - bytecode: {value: 0x49, size: 8}
+        operands: {count: 1, operand_sets: {list: [immediate]}}
+        documentation: {title: 'Immediate', cycles: 2}
+      - bytecode: {value: 0x45, size: 8}
+        operands: {count: 1, operand_sets: {list: [zero_page]}}
+        documentation: {title: 'Zero Page', cycles: 3}
+      - bytecode: {value: 0x4D, size: 8}
+        operands: {count: 1, operand_sets: {list: [absolute]}}
+        documentation: {title: 'Absolute', cycles: 4}
+      - bytecode: {value: 0x55, size: 8}
+        operands: {count: 2, operand_sets: {list: [zero_page_x, x_index]}}
+        documentation: {title: 'Zero Page,X', cycles: 4}
+      - bytecode: {value: 0x5D, size: 8}
+        operands: {count: 2, operand_sets: {list: [absolute_x, x_index]}}
+        documentation: {title: 'Absolute,X', cycles: 4}
+      - bytecode: {value: 0x59, size: 8}
+        operands: {count: 2, operand_sets: {list: [absolute_y, y_index]}}
+        documentation: {title: 'Absolute,Y', cycles: 4}
+      - bytecode: {value: 0x41, size: 8}
+        operands: {count: 1, operand_sets: {list: [indexed_indirect]}}
+        documentation: {title: 'Indexed Indirect', cycles: 6}
+      - bytecode: {value: 0x51, size: 8}
+        operands: {count: 2, operand_sets: {list: [indirect_zero_page, y_index]}}
+        documentation: {title: 'Indirect Indexed', cycles: 5}
+  ora:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    documentation:
+      category: 'Logical'
+      title: 'Logical Inclusive OR'
+      description: 'A = A OR M.'
+      modifies:
+        - register: a
+          description: Result
+        - flag: N
+          description: 'Set to bit 7 of the result'
+        - flag: Z
+          description: 'Set if the result is zero'
+    variants:
+      - bytecode: {value: 0x09, size: 8}
+        operands: {count: 1, operand_sets: {list: [immediate]}}
+        documentation: {title: 'Immediate', cycles: 2}
+      - bytecode: {value: 0x05, size: 8}
+        operands: {count: 1, operand_sets: {list: [zero_page]}}
+        documentation: {title: 'Zero Page', cycles: 3}
+      - bytecode: {value: 0x0D, size: 8}
+        operands: {count: 1, operand_sets: {list: [absolute]}}
+        documentation: {title: 'Absolute', cycles: 4}
+      - bytecode: {value: 0x15, size: 8}
+        operands: {count: 2, operand_sets: {list: [zero_page_x, x_index]}}
+        documentation: {title: 'Zero Page,X', cycles: 4}
+      - bytecode: {value: 0x1D, size: 8}
+        operands: {count: 2, operand_sets: {list: [absolute_x, x_index]}}
+        documentation: {title: 'Absolute,X', cycles: 4}
+      - bytecode: {value: 0x19, size: 8}
+        operands: {count: 2, operand_sets: {list: [absolute_y, y_index]}}
+        documentation: {title: 'Absolute,Y', cycles: 4}
+      - bytecode: {value: 0x01, size: 8}
+        operands: {count: 1, operand_sets: {list: [indexed_indirect]}}
+        documentation: {title: 'Indexed Indirect', cycles: 6}
+      - bytecode: {value: 0x11, size: 8}
+        operands: {count: 2, operand_sets: {list: [indirect_zero_page, y_index]}}
+        documentation: {title: 'Indirect Indexed', cycles: 5}
+  bit:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    documentation:
+      category: 'Logical'
+      title: 'Bit Test'
+      description: 'Tests A AND M without changing A. Z is set if the result is zero; N and V are copied from bits 7 and 6 of M.'
+      modifies:
+        - flag: N
+          description: 'Set to bit 7 of M'
+        - flag: V
+          description: 'Set to bit 6 of M'
+        - flag: Z
+          description: 'Set if A AND M is zero'
+    variants:
+      - bytecode: {value: 0x24, size: 8}
+        operands: {count: 1, operand_sets: {list: [zero_page]}}
+        documentation: {title: 'Zero Page', cycles: 3}
+      - bytecode: {value: 0x2C, size: 8}
+        operands: {count: 1, operand_sets: {list: [absolute]}}
+        documentation: {title: 'Absolute', cycles: 4}
+  # Arithmetic
+  adc:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    documentation:
+      category: 'Arithmetic'
+      title: 'Add with Carry'
+      description: 'A = A + M + C. Clear C with `clc` before adding the low bytes. With D set, A and M are BCD.'
+      modifies:
+        - register: a
+          description: Sum
+        - flag: N
+          description: 'Set to bit 7 of the result'
+        - flag: V
+          description: 'Set on signed overflow'
+        - flag: Z
+          description: 'Set if the result is zero'
+        - flag: C
+          description: 'Set on carry out of bit 7'
+    variants:
+      - bytecode: {value: 0x69, size: 8}
+        operands: {count: 1, operand_sets: {list: [immediate]}}
+        documentation: {title: 'Immediate', cycles: 2}
+      - bytecode: {value: 0x65, size: 8}
+        operands: {count: 1, operand_sets: {list: [zero_page]}}
+        documentation: {title: 'Zero Page', cycles: 3}
+      - bytecode: {value: 0x6D, size: 8}
+        operands: {count: 1, operand_sets: {list: [absolute]}}
+        documentation: {title: 'Absolute', cycles: 4}
+      - bytecode: {value: 0x75, size: 8}
+        operands: {count: 2, operand_sets: {list: [zero_page_x, x_index]}}
+        documentation: {title: 'Zero Page,X', cycles: 4}
+      - bytecode: {value: 0x7D, size: 8}
+        operands: {count: 2, operand_sets: {list: [absolute_x, x_index]}}
+        documentation: {title: 'Absolute,X', cycles: 4}
+      - bytecode: {value: 0x79, size: 8}
+        operands: {count: 2, operand_sets: {list: [absolute_y, y_index]}}
+        documentation: {title: 'Absolute,Y', cycles: 4}
+      - bytecode: {value: 0x61, size: 8}
+        operands: {count: 1, operand_sets: {list: [indexed_indirect]}}
+        documentation: {title: 'Indexed Indirect', cycles: 6}
+      - bytecode: {value: 0x71, size: 8}
+        operands: {count: 2, operand_sets: {list: [indirect_zero_page, y_index]}}
+        documentation: {title: 'Indirect Indexed', cycles: 5}
+  sbc:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    documentation:
+      category: 'Arithmetic'
+      title: 'Subtract with Carry'
+      description: 'A = A − M − (1 − C). Set C with `sec` before subtracting the low bytes. With D set, A and M are BCD.'
+      modifies:
+        - register: a
+          description: Difference
+        - flag: N
+          description: 'Set to bit 7 of the result'
+        - flag: V
+          description: 'Set on signed overflow'
+        - flag: Z
+          description: 'Set if the result is zero'
+        - flag: C
+          description: 'Cleared on borrow, set otherwise'
+    variants:
+      - bytecode: {value: 0xE9, size: 8}
+        operands: {count: 1, operand_sets: {list: [immediate]}}
+        documentation: {title: 'Immediate', cycles: 2}
+      - bytecode: {value: 0xE5, size: 8}
+        operands: {count: 1, operand_sets: {list: [zero_page]}}
+        documentation: {title: 'Zero Page', cycles: 3}
+      - bytecode: {value: 0xED, size: 8}
+        operands: {count: 1, operand_sets: {list: [absolute]}}
+        documentation: {title: 'Absolute', cycles: 4}
+      - bytecode: {value: 0xF5, size: 8}
+        operands: {count: 2, operand_sets: {list: [zero_page_x, x_index]}}
+        documentation: {title: 'Zero Page,X', cycles: 4}
+      - bytecode: {value: 0xFD, size: 8}
+        operands: {count: 2, operand_sets: {list: [absolute_x, x_index]}}
+        documentation: {title: 'Absolute,X', cycles: 4}
+      - bytecode: {value: 0xF9, size: 8}
+        operands: {count: 2, operand_sets: {list: [absolute_y, y_index]}}
+        documentation: {title: 'Absolute,Y', cycles: 4}
+      - bytecode: {value: 0xE1, size: 8}
+        operands: {count: 1, operand_sets: {list: [indexed_indirect]}}
+        documentation: {title: 'Indexed Indirect', cycles: 6}
+      - bytecode: {value: 0xF1, size: 8}
+        operands: {count: 2, operand_sets: {list: [indirect_zero_page, y_index]}}
+        documentation: {title: 'Indirect Indexed', cycles: 5}
+  cmp:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    documentation:
+      category: 'Arithmetic'
+      title: 'Compare Accumulator'
+      description: 'Compares A with M by computing A − M, without changing A.'
+      modifies:
+        - flag: N
+          description: 'Set to bit 7 of A − M'
+        - flag: Z
+          description: 'Set if A = M'
+        - flag: C
+          description: 'Set if A ≥ M (unsigned)'
+    variants:
+      - bytecode: {value: 0xC9, size: 8}
+        operands: {count: 1, operand_sets: {list: [immediate]}}
+        documentation: {title: 'Immediate', cycles: 2}
+      - bytecode: {value: 0xC5, size: 8}
+        operands: {count: 1, operand_sets: {list: [zero_page]}}
+        documentation: {title: 'Zero Page', cycles: 3}
+      - bytecode: {value: 0xCD, size: 8}
+        operands: {count: 1, operand_sets: {list: [absolute]}}
+        documentation: {title: 'Absolute', cycles: 4}
+      - bytecode: {value: 0xD5, size: 8}
+        operands: {count: 2, operand_sets: {list: [zero_page_x, x_index]}}
+        documentation: {title: 'Zero Page,X', cycles: 4}
+      - bytecode: {value: 0xDD, size: 8}
+        operands: {count: 2, operand_sets: {list: [absolute_x, x_index]}}
+        documentation: {title: 'Absolute,X', cycles: 4}
+      - bytecode: {value: 0xD9, size: 8}
+        operands: {count: 2, operand_sets: {list: [absolute_y, y_index]}}
+        documentation: {title: 'Absolute,Y', cycles: 4}
+      - bytecode: {value: 0xC1, size: 8}
+        operands: {count: 1, operand_sets: {list: [indexed_indirect]}}
+        documentation: {title: 'Indexed Indirect', cycles: 6}
+      - bytecode: {value: 0xD1, size: 8}
+        operands: {count: 2, operand_sets: {list: [indirect_zero_page, y_index]}}
+        documentation: {title: 'Indirect Indexed', cycles: 5}
+  cpx:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    documentation:
+      category: 'Arithmetic'
+      title: 'Compare X Register'
+      description: 'Compares X with M by computing X − M, without changing X.'
+      modifies:
+        - flag: N
+          description: 'Set to bit 7 of X − M'
+        - flag: Z
+          description: 'Set if X = M'
+        - flag: C
+          description: 'Set if X ≥ M (unsigned)'
+    variants:
+      - bytecode: {value: 0xE0, size: 8}
+        operands: {count: 1, operand_sets: {list: [immediate]}}
+        documentation: {title: 'Immediate', cycles: 2}
+      - bytecode: {value: 0xE4, size: 8}
+        operands: {count: 1, operand_sets: {list: [zero_page]}}
+        documentation: {title: 'Zero Page', cycles: 3}
+      - bytecode: {value: 0xEC, size: 8}
+        operands: {count: 1, operand_sets: {list: [absolute]}}
+        documentation: {title: 'Absolute', cycles: 4}
+  cpy:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    documentation:
+      category: 'Arithmetic'
+      title: 'Compare Y Register'
+      description: 'Compares Y with M by computing Y − M, without changing Y.'
+      modifies:
+        - flag: N
+          description: 'Set to bit 7 of Y − M'
+        - flag: Z
+          description: 'Set if Y = M'
+        - flag: C
+          description: 'Set if Y ≥ M (unsigned)'
+    variants:
+      - bytecode: {value: 0xC0, size: 8}
+        operands: {count: 1, operand_sets: {list: [immediate]}}
+        documentation: {title: 'Immediate', cycles: 2}
+      - bytecode: {value: 0xC4, size: 8}
+        operands: {count: 1, operand_sets: {list: [zero_page]}}
+        documentation: {title: 'Zero Page', cycles: 3}
+      - bytecode: {value: 0xCC, size: 8}
+        operands: {count: 1, operand_sets: {list: [absolute]}}
+        documentation: {title: 'Absolute', cycles: 4}
+  # Increment/Decrement
+  inc:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    documentation:
+      category: 'Increment/Decrement'
+      title: 'Increment Memory'
+      description: 'Adds one to M.'
+      modifies:
+        - flag: N
+          description: 'Set to bit 7 of the result'
+        - flag: Z
+          description: 'Set if the result is zero'
+    variants:
+      - bytecode: {value: 0xE6, size: 8}
+        operands: {count: 1, operand_sets: {list: [zero_page]}}
+        documentation: {title: 'Zero Page', cycles: 5}
+      - bytecode: {value: 0xEE, size: 8}
+        operands: {count: 1, operand_sets: {list: [absolute]}}
+        documentation: {title: 'Absolute', cycles: 6}
+      - bytecode: {value: 0xF6, size: 8}
+        operands: {count: 2, operand_sets: {list: [zero_page_x, x_index]}}
+        documentation: {title: 'Zero Page,X', cycles: 6}
+      - bytecode: {value: 0xFE, size: 8}
+        operands: {count: 2, operand_sets: {list: [absolute_x, x_index]}}
+        documentation: {title: 'Absolute,X', cycles: 7}
+  inx:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    bytecode: {value: 0xE8, size: 8}
+    documentation:
+      category: 'Increment/Decrement'
+      title: 'Increment X Register'
+      description: 'Adds one to X.'
+      modifies:
+        - register: x
+          description: Incremented
+        - flag: N
+          description: 'Set to bit 7 of the result'
+        - flag: Z
+          description: 'Set if the result is zero'
+      cycles: 2
+  iny:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    bytecode: {value: 0xC8, size: 8}
+    documentation:
+      category: 'Increment/Decrement'
+      title: 'Increment Y Register'
+      description: 'Adds one to Y.'
+      modifies:
+        - register: y
+          description: Incremented
+        - flag: N
+          description: 'Set to bit 7 of the result'
+        - flag: Z
+          description: 'Set if the result is zero'
+      cycles: 2
+  dec:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    documentation:
+      category: 'Increment/Decrement'
+      title: 'Decrement Memory'
+      description: 'Subtracts one from M.'
+      modifies:
+        - flag: N
+          description: 'Set to bit 7 of the result'
+        - flag: Z
+          description: 'Set if the result is zero'
+    variants:
+      - bytecode: {value: 0xC6, size: 8}
+        operands: {count: 1, operand_sets: {list: [zero_page]}}
+        documentation: {title: 'Zero Page', cycles: 5}
+      - bytecode: {value: 0xCE, size: 8}
+        operands: {count: 1, operand_sets: {list: [absolute]}}
+        documentation: {title: 'Absolute', cycles: 6}
+      - bytecode: {value: 0xD6, size: 8}
+        operands: {count: 2, operand_sets: {list: [zero_page_x, x_index]}}
+        documentation: {title: 'Zero Page,X', cycles: 6}
+      - bytecode: {value: 0xDE, size: 8}
+        operands: {count: 2, operand_sets: {list: [absolute_x, x_index]}}
+        documentation: {title: 'Absolute,X', cycles: 7}
+  dex:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    bytecode: {value: 0xCA, size: 8}
+    documentation:
+      category: 'Increment/Decrement'
+      title: 'Decrement X Register'
+      description: 'Subtracts one from X.'
+      modifies:
+        - register: x
+          description: Decremented
+        - flag: N
+          description: 'Set to bit 7 of the result'
+        - flag: Z
+          description: 'Set if the result is zero'
+      cycles: 2
+  dey:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    bytecode: {value: 0x88, size: 8}
+    documentation:
+      category: 'Increment/Decrement'
+      title: 'Decrement Y Register'
+      description: 'Subtracts one from Y.'
+      modifies:
+        - register: y
+          description: Decremented
+        - flag: N
+          description: 'Set to bit 7 of the result'
+        - flag: Z
+          description: 'Set if the result is zero'
+      cycles: 2
+  # Shift
+  asl:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    documentation:
+      category: 'Shift'
+      title: 'Arithmetic Shift Left'
+      description: 'Shifts A or M left one bit. Bit 7 goes to C, and bit 0 becomes 0.'
+      modifies:
+        - flag: N
+          description: 'Set to bit 7 of the result'
+        - flag: Z
+          description: 'Set if the result is zero'
+        - flag: C
+          description: 'Set to the old bit 7'
+    variants:
+      - bytecode: {value: 0x0A, size: 8}
+        documentation: {title: 'Accumulator (operand omitted)', cycles: 2}
+      - bytecode: {value: 0x0A, size: 8}
+        operands: {count: 1, operand_sets: {list: [accumulator]}}
+        documentation: {title: 'Accumulator', cycles: 2}
+      - bytecode: {value: 0x06, size: 8}
+        operands: {count: 1, operand_sets: {list: [zero_page]}}
+        documentation: {title: 'Zero Page', cycles: 5}
+      - bytecode: {value: 0x0E, size: 8}
+        operands: {count: 1, operand_sets: {list: [absolute]}}
+        documentation: {title: 'Absolute', cycles: 6}
+      - bytecode: {value: 0x16, size: 8}
+        operands: {count: 2, operand_sets: {list: [zero_page_x, x_index]}}
+        documentation: {title: 'Zero Page,X', cycles: 6}
+      - bytecode: {value: 0x1E, size: 8}
+        operands: {count: 2, operand_sets: {list: [absolute_x, x_index]}}
+        documentation: {title: 'Absolute,X', cycles: 7}
+  lsr:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    documentation:
+      category: 'Shift'
+      title: 'Logical Shift Right'
+      description: 'Shifts A or M right one bit. Bit 0 goes to C, and bit 7 becomes 0.'
+      modifies:
+        - flag: N
+          description: 'Cleared'
+        - flag: Z
+          description: 'Set if the result is zero'
+        - flag: C
+          description: 'Set to the old bit 0'
+    variants:
+      - bytecode: {value: 0x4A, size: 8}
+        documentation: {title: 'Accumulator (operand omitted)', cycles: 2}
+      - bytecode: {value: 0x4A, size: 8}
+        operands: {count: 1, operand_sets: {list: [accumulator]}}
+        documentation: {title: 'Accumulator', cycles: 2}
+      - bytecode: {value: 0x46, size: 8}
+        operands: {count: 1, operand_sets: {list: [zero_page]}}
+        documentation: {title: 'Zero Page', cycles: 5}
+      - bytecode: {value: 0x4E, size: 8}
+        operands: {count: 1, operand_sets: {list: [absolute]}}
+        documentation: {title: 'Absolute', cycles: 6}
+      - bytecode: {value: 0x56, size: 8}
+        operands: {count: 2, operand_sets: {list: [zero_page_x, x_index]}}
+        documentation: {title: 'Zero Page,X', cycles: 6}
+      - bytecode: {value: 0x5E, size: 8}
+        operands: {count: 2, operand_sets: {list: [absolute_x, x_index]}}
+        documentation: {title: 'Absolute,X', cycles: 7}
+  rol:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    documentation:
+      category: 'Shift'
+      title: 'Rotate Left'
+      description: 'Rotates A or M left one bit through C: C goes to bit 0, and bit 7 goes to C.'
+      modifies:
+        - flag: N
+          description: 'Set to bit 7 of the result'
+        - flag: Z
+          description: 'Set if the result is zero'
+        - flag: C
+          description: 'Set to the old bit 7'
+    variants:
+      - bytecode: {value: 0x2A, size: 8}
+        documentation: {title: 'Accumulator (operand omitted)', cycles: 2}
+      - bytecode: {value: 0x2A, size: 8}
+        operands: {count: 1, operand_sets: {list: [accumulator]}}
+        documentation: {title: 'Accumulator', cycles: 2}
+      - bytecode: {value: 0x26, size: 8}
+        operands: {count: 1, operand_sets: {list: [zero_page]}}
+        documentation: {title: 'Zero Page', cycles: 5}
+      - bytecode: {value: 0x2E, size: 8}
+        operands: {count: 1, operand_sets: {list: [absolute]}}
+        documentation: {title: 'Absolute', cycles: 6}
+      - bytecode: {value: 0x36, size: 8}
+        operands: {count: 2, operand_sets: {list: [zero_page_x, x_index]}}
+        documentation: {title: 'Zero Page,X', cycles: 6}
+      - bytecode: {value: 0x3E, size: 8}
+        operands: {count: 2, operand_sets: {list: [absolute_x, x_index]}}
+        documentation: {title: 'Absolute,X', cycles: 7}
+  ror:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    documentation:
+      category: 'Shift'
+      title: 'Rotate Right'
+      description: 'Rotates A or M right one bit through C: C goes to bit 7, and bit 0 goes to C.'
+      modifies:
+        - flag: N
+          description: 'Set to bit 7 of the result'
+        - flag: Z
+          description: 'Set if the result is zero'
+        - flag: C
+          description: 'Set to the old bit 0'
+    variants:
+      - bytecode: {value: 0x6A, size: 8}
+        documentation: {title: 'Accumulator (operand omitted)', cycles: 2}
+      - bytecode: {value: 0x6A, size: 8}
+        operands: {count: 1, operand_sets: {list: [accumulator]}}
+        documentation: {title: 'Accumulator', cycles: 2}
+      - bytecode: {value: 0x66, size: 8}
+        operands: {count: 1, operand_sets: {list: [zero_page]}}
+        documentation: {title: 'Zero Page', cycles: 5}
+      - bytecode: {value: 0x6E, size: 8}
+        operands: {count: 1, operand_sets: {list: [absolute]}}
+        documentation: {title: 'Absolute', cycles: 6}
+      - bytecode: {value: 0x76, size: 8}
+        operands: {count: 2, operand_sets: {list: [zero_page_x, x_index]}}
+        documentation: {title: 'Zero Page,X', cycles: 6}
+      - bytecode: {value: 0x7E, size: 8}
+        operands: {count: 2, operand_sets: {list: [absolute_x, x_index]}}
+        documentation: {title: 'Absolute,X', cycles: 7}
+  # Jump/Call
+  jmp:
+    documentation:
+      category: 'Jump/Call'
+      title: 'Jump'
+      description: 'Continues execution at the target address. The indirect form reads the target from memory, low byte first. A pointer at `$xxFF` takes its high byte from `$xx00`, not the next page.'
+    variants:
+      - bytecode: {value: 0x4C, size: 8}
+        operands: {count: 1, operand_sets: {list: [absolute]}}
+        flow_effects: {stack: 0}
+        flow_transfer: unconditional
+        flow_target_operand: 0
+        documentation: {title: 'Absolute', cycles: 3}
+      - bytecode: {value: 0x6C, size: 8}
+        operands: {count: 1, operand_sets: {list: [indirect_absolute]}}
+        flow_effects: {stack: 0}
+        flow_transfer: indirect
+        documentation: {title: 'Indirect', cycles: {taken: 6, fall_through: 5}}
+  jsr:
+    flow_effects: {stack: 2}
+    flow_transfer: call
+    flow_target_operand: 0
+    flow_call_effects: {stack: 0}
+    bytecode: {value: 0x20, size: 8}
+    operands: {count: 1, operand_sets: {list: [absolute]}}
+    documentation:
+      category: 'Jump/Call'
+      title: 'Jump to Subroutine'
+      description: 'Pushes the address of its own last byte, then jumps. `rts` returns to the instruction after the `jsr`.'
+      cycles: 6
+  rts:
+    flow_effects: {stack: -2}
+    flow_terminal: {stack: before_effect}
+    flow_transfer: return
+    bytecode: {value: 0x60, size: 8}
+    documentation:
+      category: 'Jump/Call'
+      title: 'Return from Subroutine'
+      description: 'Pulls the return address pushed by `jsr`, adds one, and continues there.'
+      cycles: 6
+  # Branch
+  bcc:
+    flow_effects: {stack: 0}
+    flow_transfer: conditional
+    flow_target_operand: 0
+    bytecode: {value: 0x90, size: 8}
+    operands: {count: 1, operand_sets: {list: [relative]}}
+    documentation:
+      category: 'Branch'
+      title: 'Branch if Carry Clear'
+      description: 'Branches if C is clear.'
+      cycles: {taken: 3, fall_through: 2}
+  bcs:
+    flow_effects: {stack: 0}
+    flow_transfer: conditional
+    flow_target_operand: 0
+    bytecode: {value: 0xB0, size: 8}
+    operands: {count: 1, operand_sets: {list: [relative]}}
+    documentation:
+      category: 'Branch'
+      title: 'Branch if Carry Set'
+      description: 'Branches if C is set.'
+      cycles: {taken: 3, fall_through: 2}
+  beq:
+    flow_effects: {stack: 0}
+    flow_transfer: conditional
+    flow_target_operand: 0
+    bytecode: {value: 0xF0, size: 8}
+    operands: {count: 1, operand_sets: {list: [relative]}}
+    documentation:
+      category: 'Branch'
+      title: 'Branch if Equal'
+      description: 'Branches if Z is set.'
+      cycles: {taken: 3, fall_through: 2}
+  bne:
+    flow_effects: {stack: 0}
+    flow_transfer: conditional
+    flow_target_operand: 0
+    bytecode: {value: 0xD0, size: 8}
+    operands: {count: 1, operand_sets: {list: [relative]}}
+    documentation:
+      category: 'Branch'
+      title: 'Branch if Not Equal'
+      description: 'Branches if Z is clear.'
+      cycles: {taken: 3, fall_through: 2}
+  bmi:
+    flow_effects: {stack: 0}
+    flow_transfer: conditional
+    flow_target_operand: 0
+    bytecode: {value: 0x30, size: 8}
+    operands: {count: 1, operand_sets: {list: [relative]}}
+    documentation:
+      category: 'Branch'
+      title: 'Branch if Minus'
+      description: 'Branches if N is set.'
+      cycles: {taken: 3, fall_through: 2}
+  bpl:
+    flow_effects: {stack: 0}
+    flow_transfer: conditional
+    flow_target_operand: 0
+    bytecode: {value: 0x10, size: 8}
+    operands: {count: 1, operand_sets: {list: [relative]}}
+    documentation:
+      category: 'Branch'
+      title: 'Branch if Plus'
+      description: 'Branches if N is clear.'
+      cycles: {taken: 3, fall_through: 2}
+  bvc:
+    flow_effects: {stack: 0}
+    flow_transfer: conditional
+    flow_target_operand: 0
+    bytecode: {value: 0x50, size: 8}
+    operands: {count: 1, operand_sets: {list: [relative]}}
+    documentation:
+      category: 'Branch'
+      title: 'Branch if Overflow Clear'
+      description: 'Branches if V is clear.'
+      cycles: {taken: 3, fall_through: 2}
+  bvs:
+    flow_effects: {stack: 0}
+    flow_transfer: conditional
+    flow_target_operand: 0
+    bytecode: {value: 0x70, size: 8}
+    operands: {count: 1, operand_sets: {list: [relative]}}
+    documentation:
+      category: 'Branch'
+      title: 'Branch if Overflow Set'
+      description: 'Branches if V is set.'
+      cycles: {taken: 3, fall_through: 2}
+  # Status Flag
+  clc:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    bytecode: {value: 0x18, size: 8}
+    documentation:
+      category: 'Status Flag'
+      title: 'Clear Carry Flag'
+      description: 'Clears C.'
+      modifies:
+        - flag: C
+          description: 'Cleared'
+      cycles: 2
+  cld:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    bytecode: {value: 0xD8, size: 8}
+    documentation:
+      category: 'Status Flag'
+      title: 'Clear Decimal Mode'
+      description: 'Clears D, so `adc` and `sbc` work in binary.'
+      modifies:
+        - flag: D
+          description: 'Cleared'
+      cycles: 2
+  cli:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    bytecode: {value: 0x58, size: 8}
+    documentation:
+      category: 'Status Flag'
+      title: 'Clear Interrupt Disable'
+      description: 'Clears I, allowing IRQ interrupts.'
+      modifies:
+        - flag: I
+          description: 'Cleared'
+      cycles: 2
+  clv:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    bytecode: {value: 0xB8, size: 8}
+    documentation:
+      category: 'Status Flag'
+      title: 'Clear Overflow Flag'
+      description: 'Clears V.'
+      modifies:
+        - flag: V
+          description: 'Cleared'
+      cycles: 2
+  sec:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    bytecode: {value: 0x38, size: 8}
+    documentation:
+      category: 'Status Flag'
+      title: 'Set Carry Flag'
+      description: 'Sets C.'
+      modifies:
+        - flag: C
+          description: 'Set'
+      cycles: 2
+  sed:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    bytecode: {value: 0xF8, size: 8}
+    documentation:
+      category: 'Status Flag'
+      title: 'Set Decimal Mode'
+      description: 'Sets D, so `adc` and `sbc` work in BCD.'
+      modifies:
+        - flag: D
+          description: 'Set'
+      cycles: 2
+  sei:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    bytecode: {value: 0x78, size: 8}
+    documentation:
+      category: 'Status Flag'
+      title: 'Set Interrupt Disable'
+      description: 'Sets I, masking IRQ interrupts. NMI is not affected.'
+      modifies:
+        - flag: I
+          description: 'Set'
+      cycles: 2
+  # System
+  brk:
+    flow_effects: {stack: 3}
+    flow_transfer: indirect
+    bytecode: {value: 0x00, size: 8}
+    documentation:
+      category: 'System'
+      title: 'Force Interrupt'
+      description: 'Pushes the address two bytes after the `brk` and the status register (with B set), sets I, and jumps through the IRQ/BRK vector at `$FFFE`.'
+      modifies:
+        - flag: I
+          description: 'Set'
+      cycles: 7
+  nop:
+    flow_effects: {stack: 0}
+    flow_transfer: none
+    bytecode: {value: 0xEA, size: 8}
+    documentation:
+      category: 'System'
+      title: 'No Operation'
+      description: 'Does nothing.'
+      cycles: 2
+  rti:
+    flow_effects: {stack: -3}
+    flow_terminal: {stack: before_effect}
+    flow_transfer: return
+    bytecode: {value: 0x40, size: 8}
+    documentation:
+      category: 'System'
+      title: 'Return from Interrupt'
+      description: 'Pulls the status register, then the return address, and continues there.'
+      modifies:
+        - flag: N
+          description: 'Pulled from the stack'
+        - flag: V
+          description: 'Pulled from the stack'
+        - flag: D
+          description: 'Pulled from the stack'
+        - flag: I
+          description: 'Pulled from the stack'
+        - flag: Z
+          description: 'Pulled from the stack'
+        - flag: C
+          description: 'Pulled from the stack'
+      cycles: 6

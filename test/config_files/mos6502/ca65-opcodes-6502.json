@@ -1,0 +1,627 @@
+{
+  "cpu": "6502",
+  "assembler": "ca65 2.18",
+  "origin": 512,
+  "lines": [
+    {
+      "source": "adc #$56",
+      "bytes": "69 56"
+    },
+    {
+      "source": "adc $12",
+      "bytes": "65 12"
+    },
+    {
+      "source": "adc $12,x",
+      "bytes": "75 12"
+    },
+    {
+      "source": "adc $1234",
+      "bytes": "6D 34 12"
+    },
+    {
+      "source": "adc $1234,x",
+      "bytes": "7D 34 12"
+    },
+    {
+      "source": "adc $1234,y",
+      "bytes": "79 34 12"
+    },
+    {
+      "source": "adc ($12,x)",
+      "bytes": "61 12"
+    },
+    {
+      "source": "adc ($12),y",
+      "bytes": "71 12"
+    },
+    {
+      "source": "and #$56",
+      "bytes": "29 56"
+    },
+    {
+      "source": "and $12",
+      "bytes": "25 12"
+    },
+    {
+      "source": "and $12,x",
+      "bytes": "35 12"
+    },
+    {
+      "source": "and $1234",
+      "bytes": "2D 34 12"
+    },
+    {
+      "source": "and $1234,x",
+      "bytes": "3D 34 12"
+    },
+    {
+      "source": "and $1234,y",
+      "bytes": "39 34 12"
+    },
+    {
+      "source": "and ($12,x)",
+      "bytes": "21 12"
+    },
+    {
+      "source": "and ($12),y",
+      "bytes": "31 12"
+    },
+    {
+      "source": "asl a",
+      "bytes": "0A"
+    },
+    {
+      "source": "asl",
+      "bytes": "0A"
+    },
+    {
+      "source": "asl $12",
+      "bytes": "06 12"
+    },
+    {
+      "source": "asl $12,x",
+      "bytes": "16 12"
+    },
+    {
+      "source": "asl $1234",
+      "bytes": "0E 34 12"
+    },
+    {
+      "source": "asl $1234,x",
+      "bytes": "1E 34 12"
+    },
+    {
+      "source": "bcc *+$20",
+      "bytes": "90 1E"
+    },
+    {
+      "source": "bcs *+$20",
+      "bytes": "B0 1E"
+    },
+    {
+      "source": "beq *+$20",
+      "bytes": "F0 1E"
+    },
+    {
+      "source": "bit $12",
+      "bytes": "24 12"
+    },
+    {
+      "source": "bit $1234",
+      "bytes": "2C 34 12"
+    },
+    {
+      "source": "bmi *+$20",
+      "bytes": "30 1E"
+    },
+    {
+      "source": "bne *+$20",
+      "bytes": "D0 1E"
+    },
+    {
+      "source": "bpl *+$20",
+      "bytes": "10 1E"
+    },
+    {
+      "source": "brk",
+      "bytes": "00"
+    },
+    {
+      "source": "bvc *+$20",
+      "bytes": "50 1E"
+    },
+    {
+      "source": "bvs *+$20",
+      "bytes": "70 1E"
+    },
+    {
+      "source": "clc",
+      "bytes": "18"
+    },
+    {
+      "source": "cld",
+      "bytes": "D8"
+    },
+    {
+      "source": "cli",
+      "bytes": "58"
+    },
+    {
+      "source": "clv",
+      "bytes": "B8"
+    },
+    {
+      "source": "cmp #$56",
+      "bytes": "C9 56"
+    },
+    {
+      "source": "cmp $12",
+      "bytes": "C5 12"
+    },
+    {
+      "source": "cmp $12,x",
+      "bytes": "D5 12"
+    },
+    {
+      "source": "cmp $1234",
+      "bytes": "CD 34 12"
+    },
+    {
+      "source": "cmp $1234,x",
+      "bytes": "DD 34 12"
+    },
+    {
+      "source": "cmp $1234,y",
+      "bytes": "D9 34 12"
+    },
+    {
+      "source": "cmp ($12,x)",
+      "bytes": "C1 12"
+    },
+    {
+      "source": "cmp ($12),y",
+      "bytes": "D1 12"
+    },
+    {
+      "source": "cpx #$56",
+      "bytes": "E0 56"
+    },
+    {
+      "source": "cpx $12",
+      "bytes": "E4 12"
+    },
+    {
+      "source": "cpx $1234",
+      "bytes": "EC 34 12"
+    },
+    {
+      "source": "cpy #$56",
+      "bytes": "C0 56"
+    },
+    {
+      "source": "cpy $12",
+      "bytes": "C4 12"
+    },
+    {
+      "source": "cpy $1234",
+      "bytes": "CC 34 12"
+    },
+    {
+      "source": "dec $12",
+      "bytes": "C6 12"
+    },
+    {
+      "source": "dec $12,x",
+      "bytes": "D6 12"
+    },
+    {
+      "source": "dec $1234",
+      "bytes": "CE 34 12"
+    },
+    {
+      "source": "dec $1234,x",
+      "bytes": "DE 34 12"
+    },
+    {
+      "source": "dex",
+      "bytes": "CA"
+    },
+    {
+      "source": "dey",
+      "bytes": "88"
+    },
+    {
+      "source": "eor #$56",
+      "bytes": "49 56"
+    },
+    {
+      "source": "eor $12",
+      "bytes": "45 12"
+    },
+    {
+      "source": "eor $12,x",
+      "bytes": "55 12"
+    },
+    {
+      "source": "eor $1234",
+      "bytes": "4D 34 12"
+    },
+    {
+      "source": "eor $1234,x",
+      "bytes": "5D 34 12"
+    },
+    {
+      "source": "eor $1234,y",
+      "bytes": "59 34 12"
+    },
+    {
+      "source": "eor ($12,x)",
+      "bytes": "41 12"
+    },
+    {
+      "source": "eor ($12),y",
+      "bytes": "51 12"
+    },
+    {
+      "source": "inc $12",
+      "bytes": "E6 12"
+    },
+    {
+      "source": "inc $12,x",
+      "bytes": "F6 12"
+    },
+    {
+      "source": "inc $1234",
+      "bytes": "EE 34 12"
+    },
+    {
+      "source": "inc $1234,x",
+      "bytes": "FE 34 12"
+    },
+    {
+      "source": "inx",
+      "bytes": "E8"
+    },
+    {
+      "source": "iny",
+      "bytes": "C8"
+    },
+    {
+      "source": "jmp $1234",
+      "bytes": "4C 34 12"
+    },
+    {
+      "source": "jmp ($1234)",
+      "bytes": "6C 34 12"
+    },
+    {
+      "source": "jsr $1234",
+      "bytes": "20 34 12"
+    },
+    {
+      "source": "lda #$56",
+      "bytes": "A9 56"
+    },
+    {
+      "source": "lda $12",
+      "bytes": "A5 12"
+    },
+    {
+      "source": "lda $12,x",
+      "bytes": "B5 12"
+    },
+    {
+      "source": "lda $1234",
+      "bytes": "AD 34 12"
+    },
+    {
+      "source": "lda $1234,x",
+      "bytes": "BD 34 12"
+    },
+    {
+      "source": "lda $1234,y",
+      "bytes": "B9 34 12"
+    },
+    {
+      "source": "lda ($12,x)",
+      "bytes": "A1 12"
+    },
+    {
+      "source": "lda ($12),y",
+      "bytes": "B1 12"
+    },
+    {
+      "source": "ldx #$56",
+      "bytes": "A2 56"
+    },
+    {
+      "source": "ldx $12",
+      "bytes": "A6 12"
+    },
+    {
+      "source": "ldx $12,y",
+      "bytes": "B6 12"
+    },
+    {
+      "source": "ldx $1234",
+      "bytes": "AE 34 12"
+    },
+    {
+      "source": "ldx $1234,y",
+      "bytes": "BE 34 12"
+    },
+    {
+      "source": "ldy #$56",
+      "bytes": "A0 56"
+    },
+    {
+      "source": "ldy $12",
+      "bytes": "A4 12"
+    },
+    {
+      "source": "ldy $12,x",
+      "bytes": "B4 12"
+    },
+    {
+      "source": "ldy $1234",
+      "bytes": "AC 34 12"
+    },
+    {
+      "source": "ldy $1234,x",
+      "bytes": "BC 34 12"
+    },
+    {
+      "source": "lsr a",
+      "bytes": "4A"
+    },
+    {
+      "source": "lsr",
+      "bytes": "4A"
+    },
+    {
+      "source": "lsr $12",
+      "bytes": "46 12"
+    },
+    {
+      "source": "lsr $12,x",
+      "bytes": "56 12"
+    },
+    {
+      "source": "lsr $1234",
+      "bytes": "4E 34 12"
+    },
+    {
+      "source": "lsr $1234,x",
+      "bytes": "5E 34 12"
+    },
+    {
+      "source": "nop",
+      "bytes": "EA"
+    },
+    {
+      "source": "ora #$56",
+      "bytes": "09 56"
+    },
+    {
+      "source": "ora $12",
+      "bytes": "05 12"
+    },
+    {
+      "source": "ora $12,x",
+      "bytes": "15 12"
+    },
+    {
+      "source": "ora $1234",
+      "bytes": "0D 34 12"
+    },
+    {
+      "source": "ora $1234,x",
+      "bytes": "1D 34 12"
+    },
+    {
+      "source": "ora $1234,y",
+      "bytes": "19 34 12"
+    },
+    {
+      "source": "ora ($12,x)",
+      "bytes": "01 12"
+    },
+    {
+      "source": "ora ($12),y",
+      "bytes": "11 12"
+    },
+    {
+      "source": "pha",
+      "bytes": "48"
+    },
+    {
+      "source": "php",
+      "bytes": "08"
+    },
+    {
+      "source": "pla",
+      "bytes": "68"
+    },
+    {
+      "source": "plp",
+      "bytes": "28"
+    },
+    {
+      "source": "rol a",
+      "bytes": "2A"
+    },
+    {
+      "source": "rol",
+      "bytes": "2A"
+    },
+    {
+      "source": "rol $12",
+      "bytes": "26 12"
+    },
+    {
+      "source": "rol $12,x",
+      "bytes": "36 12"
+    },
+    {
+      "source": "rol $1234",
+      "bytes": "2E 34 12"
+    },
+    {
+      "source": "rol $1234,x",
+      "bytes": "3E 34 12"
+    },
+    {
+      "source": "ror a",
+      "bytes": "6A"
+    },
+    {
+      "source": "ror",
+      "bytes": "6A"
+    },
+    {
+      "source": "ror $12",
+      "bytes": "66 12"
+    },
+    {
+      "source": "ror $12,x",
+      "bytes": "76 12"
+    },
+    {
+      "source": "ror $1234",
+      "bytes": "6E 34 12"
+    },
+    {
+      "source": "ror $1234,x",
+      "bytes": "7E 34 12"
+    },
+    {
+      "source": "rti",
+      "bytes": "40"
+    },
+    {
+      "source": "rts",
+      "bytes": "60"
+    },
+    {
+      "source": "sbc #$56",
+      "bytes": "E9 56"
+    },
+    {
+      "source": "sbc $12",
+      "bytes": "E5 12"
+    },
+    {
+      "source": "sbc $12,x",
+      "bytes": "F5 12"
+    },
+    {
+      "source": "sbc $1234",
+      "bytes": "ED 34 12"
+    },
+    {
+      "source": "sbc $1234,x",
+      "bytes": "FD 34 12"
+    },
+    {
+      "source": "sbc $1234,y",
+      "bytes": "F9 34 12"
+    },
+    {
+      "source": "sbc ($12,x)",
+      "bytes": "E1 12"
+    },
+    {
+      "source": "sbc ($12),y",
+      "bytes": "F1 12"
+    },
+    {
+      "source": "sec",
+      "bytes": "38"
+    },
+    {
+      "source": "sed",
+      "bytes": "F8"
+    },
+    {
+      "source": "sei",
+      "bytes": "78"
+    },
+    {
+      "source": "sta $12",
+      "bytes": "85 12"
+    },
+    {
+      "source": "sta $12,x",
+      "bytes": "95 12"
+    },
+    {
+      "source": "sta $1234",
+      "bytes": "8D 34 12"
+    },
+    {
+      "source": "sta $1234,x",
+      "bytes": "9D 34 12"
+    },
+    {
+      "source": "sta $1234,y",
+      "bytes": "99 34 12"
+    },
+    {
+      "source": "sta ($12,x)",
+      "bytes": "81 12"
+    },
+    {
+      "source": "sta ($12),y",
+      "bytes": "91 12"
+    },
+    {
+      "source": "stx $12",
+      "bytes": "86 12"
+    },
+    {
+      "source": "stx $12,y",
+      "bytes": "96 12"
+    },
+    {
+      "source": "stx $1234",
+      "bytes": "8E 34 12"
+    },
+    {
+      "source": "sty $12",
+      "bytes": "84 12"
+    },
+    {
+      "source": "sty $12,x",
+      "bytes": "94 12"
+    },
+    {
+      "source": "sty $1234",
+      "bytes": "8C 34 12"
+    },
+    {
+      "source": "tax",
+      "bytes": "AA"
+    },
+    {
+      "source": "tay",
+      "bytes": "A8"
+    },
+    {
+      "source": "tsx",
+      "bytes": "BA"
+    },
+    {
+      "source": "txa",
+      "bytes": "8A"
+    },
+    {
+      "source": "txs",
+      "bytes": "9A"
+    },
+    {
+      "source": "tya",
+      "bytes": "98"
+    }
+  ]
+}

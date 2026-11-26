@@ -17,6 +17,7 @@ Two of the features, the `<`/`>` low and high operators and `*`, also appear in 
 Goals:
 
 - A generic NMOS 6502 config (`examples/mos6502/mos6502.yaml`) covering all 151 documented opcodes and 13 addressing modes, with instruction documentation for hovers and `bespokeasm docs`.
+- A WDC W65C02S config (`examples/mos6502/w65c02.yaml`, extension `.a65c`) covering all 212 opcodes: the 65C02 additions, the Rockwell bit instructions and WDC's `wai` and `stp` (added Nov 26, 2026; the Ben Eater computer's CPU is a W65C02S).
 - Example programs for the Ben Eater 6502 (ROM `$8000`–`$FFFF`, 65C22 VIA at `$6000`), written in conventional 6502 style.
 - Every opcode and addressing mode byte-identical to ca65. Tests compare against bytes captured from ca65 and stored as fixtures. Tests and CI never run ca65.
 - A `bespokeasm migrate` command that rewrites source from another assembler into BespokeASM syntax. The rules for each source assembler are declared in the ISA config.
@@ -33,7 +34,7 @@ Non-goals:
     - `z:` is dropped, because relaxation already selects zero page for any value that fits, forward references included, and a value that doesn't fit is still a range error.
     - `a:` (force absolute) is reported, because BespokeASM has no way yet to opt an operand out of value selection.
   - **Segments and linker configs:** reported. Relocatable blocks, with addresses resolved at link time or even at run time, are a possible future project.
-- The 65C02, 65816 and undocumented NMOS opcodes. The config is built so a 65C02 config can extend it later.
+- The 65816 and undocumented NMOS opcodes.
 - Platform constants (VIA, LCD, ACIA registers) in the config. Ben Eater's source defines `PORTB = $6000` itself, and a predefined `PORTB` would collide with that definition. They go in an include file next to the programs.
 
 ## Gap summary
@@ -324,17 +325,30 @@ Found while building section 2:
 - **Documentation:** each instruction gets a title, description, flags modified and cycle count, so hovers are useful.
 - **Extension:** `.a65`. Generated editor extensions would otherwise claim every `.s` file (decided Nov 25, 2026).
 
+## Milestone 6 notes (Nov 26, 2026)
+
+- **Two configs.** `mos6502.yaml` (`.a65`) and `w65c02.yaml` (`.a65c`); different extensions so both editor extensions can be installed. There is no config include mechanism, so the W65C02S config repeats the NMOS instructions; both are generated from the same data, and the NMOS test program assembles identically on both.
+- **Sources.** Opcodes from ca65 2.18 itself: every mnemonic assembled in every addressing-mode syntax, keeping only what ca65 accepts at the mode's natural size (`lda $12,y` is ca65 promoting to absolute,y, not a mode). This agrees with masswerk's table for all 151 NMOS opcodes. NMOS flags and cycles from masswerk; W65C02S additions and retimings from Bruce Clark's 65C02 opcodes tutorial on 6502.org. Obelisk's 65C02 page has gaps (no `lda (zp)` cycle count, `bbr` as 2 cycles) and wasn't used for cycles.
+- **Fixtures.** `test/config_files/mos6502/` holds copies of both configs, every opcode with ca65's bytes, and one program per CPU with ca65 + ld65's bytes. Tests never run ca65.
+- **ca65's `*` in `bbr`/`bbs`.** Inside a `bbr`/`bbs` operand, ca65's `*` is the address of the offset byte, two bytes into the instruction; everywhere else it is the instruction's start. The fixtures use label targets there, where both assemblers agree. BespokeASM keeps `*` as the instruction's start throughout.
+- **One variant per addressing mode.** Each instruction's root holds its documentation (category, title, description, flags) and shared flow metadata; each addressing mode is a variant titled with the mode and carrying its cycle count, so generated docs name every form ("Version 2 : Zero Page"). `jmp`'s variants each carry their own flow metadata, since an indirect jump has no direct target.
+- **Cycles as flow-counter data.** `documentation.cycles` is an integer, or `{taken, fall_through}` for conditional branches, so a `cycles` flow counter can read it. Extra cycles for crossing a page (and, on the 65C02, decimal-mode `adc`/`sbc`) can't be known statically; the addressing-mode and instruction descriptions say so. The analyzer doesn't evaluate edge-map effects yet, so tracking `cycles` across a conditional branch is an error until it does; stack tracking works everywhere.
+- **Flow metadata.** `stack` counter: pushes +1, pulls −1, `jsr` call (+2, net 0), `rts` return (−2), `rti` return (−3), `brk` indirect (+3), `txs` invalidates. Entry modes `called`, `interrupt` and `jumped`.
+- **Zero page.** Forms with a zero-page variant select it by value. The bit instructions (`rmbN`, `smbN`, `bbrN`, `bbsN`) have only a zero-page form, so their address is checked rather than selected; so is `stx address,y`, which has no absolute form, so `stx $1234,y` is an error.
+- **`ina`/`dea` not aliased.** ca65 accepts them on the 65C02, but an alias applies to every form of `inc`/`dec`; `inc a` and `inc` alone are supported, and `bespokeasm migrate` can convert the rest.
+- **Diagnostics.** A mismatch explanation now merges the candidates of every variant that fails at the same operand, so `sta #$10` lists `an address, or (address, x)` rather than only the first variant's form.
+
 ## Ben Eater 6502 example programs
 
-Directory `examples/mos6502/ben-eater/`, with the following files. These are original programs in the style of the platform, not copies of published code.
+Directory `examples/mos6502/ben-eater/`, with the following files. The platform's CPU is the W65C02S, so the programs use `w65c02.yaml` and the `.a65c` extension. These are original programs in the style of the platform, not copies of published code.
 
 - `ben-eater.inc`:
   - `#create_memzone` for RAM (`$0000`–`$3FFF`) and ROM (`$8000`–`$FFFF`);
   - the VIA register constants (`PORTB`, `PORTA`, `DDRB`, `DDRA`, `PCR`, `IFR`, `IER`);
   - the LCD control bits.
-- `blink.a65`: VIA port B LED pattern, the first program on the platform.
-- `hello-lcd.a65`: prints a string on the HD44780 LCD, with a busy-flag wait subroutine.
-- `counter-irq.a65`: an interrupt-driven counter. It uses zero-page variables declared as labels in `#mute`d `ZERO_PAGE` code, which exercises relaxation, plus `<`/`>` and `.word` vectors.
+- `blink.a65c`: VIA port B LED pattern, the first program on the platform.
+- `hello-lcd.a65c`: prints a string on the HD44780 LCD, with a busy-flag wait subroutine.
+- `counter-irq.a65c`: an interrupt-driven counter. It uses zero-page variables declared as labels in `#mute`d `ZERO_PAGE` code, which exercises relaxation, plus `<`/`>` and `.word` vectors.
 
 Each program builds a 32 KB EEPROM image (a 28C256) for `$8000`–`$FFFF`. File offset 0 is `$8000`, and the NMI, reset and IRQ vectors are the last six bytes, at `$FFFA`–`$FFFF`. The space between the code and the vectors is filled with zeros, as vasm `-Fbin` fills it.
 
@@ -349,7 +363,7 @@ What BespokeASM does today (checked Nov 25, 2026):
 Changes (milestone 7):
 
 - `-s`, `-e` and `-f` accept the same number forms as source: `0x8000`, `$8000`, `8000H`, and decimal. `$8000` needs shell quoting, which the help text notes.
-- The example README gives the exact build command: `bespokeasm compile -c mos6502.yaml -s 0x8000 blink.a65`.
+- The example README gives the exact build command: `bespokeasm compile -c w65c02.yaml -s 0x8000 blink.a65c`.
 
 ## Migration: `bespokeasm migrate`
 
@@ -458,7 +472,7 @@ Each milestone ends with tests, pre-commit, and byte comparison of all existing 
 3. Per-operand `enclosure` and the `indirect_indexed_numeric` type.
 4. `offset_base`.
 5. `select_by_value` and pass-1 relaxation.
-6. The 6502 config, with every opcode byte-compared against ca65 fixtures.
-7. Ben Eater programs, platform include, `-s`/`-e`/`-f` number forms, docs, wiki and editor checks.
+6. The 6502 and W65C02S configs, with every opcode byte-compared against ca65 fixtures.
+7. Ben Eater programs, platform include, docs, wiki and editor checks. (The `-s`/`-e`/`-f` number forms were added early, during milestone 6.)
 8. `bespokeasm migrate`: the rule engine and the 6502 `ca65` and `vasm` dialects.
 9. The `slu4` dialect in the Minimal CPU, Minimal 64, Minimal 64x4 and Redux configs, byte-compared against Carsten's assemblers.
