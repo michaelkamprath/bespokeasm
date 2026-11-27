@@ -1,0 +1,34 @@
+; Bounces one lit LED back and forth across the eight LEDs on VIA port B.
+#include "ben-eater.a65c"
+
+.org $8000
+reset:  ldx #$FF
+        txs
+        lda #$FF
+        sta DDRB            ; port B: all outputs
+        lda #%00000001
+left:   sta PORTB
+        jsr pause
+        asl a               ; move the lit LED one place to the left
+        cmp #%10000000
+        bne left
+right:  sta PORTB
+        jsr pause
+        lsr a               ; and back to the right
+        cmp #%00000001
+        bne right
+        bra left
+
+; Waits about 0.2 seconds with a 1 MHz clock. Keeps A.
+pause:  ldy #160
+.outer: ldx #0
+.inner: dex                 ; 256 times 5 cycles
+        bne .inner
+        dey
+        bne .outer
+        rts
+
+.org $FFFA
+        .word reset         ; NMI
+        .word reset         ; reset
+        .word reset         ; IRQ

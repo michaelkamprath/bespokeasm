@@ -71,6 +71,9 @@ copy:   pha                 ; 3 cycles, 1 byte pushed
         rts                 ; checks the stack is back where it started
 ```
 
+## Examples
+The [`ben-eater-6502`](./ben-eater-6502/) directory has example programs for [Ben Eater's 6502 breadboard computer](https://eater.net/6502): an LED pattern, text on the LCD, and an interrupt-driven button counter. Its [README](./ben-eater-6502/README.md) describes the hardware they expect and how to build them.
+
 ## Compiling Code
 To compile code, use the configuration for your CPU, `mos6502.yaml` for `.a65` files or `w65c02.yaml` for `.a65c` files. For a computer with a 32 KB ROM at `$8000`–`$FFFF`, such as an AT28C256 EEPROM, a typical compilation command will look like:
 

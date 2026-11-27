@@ -1,0 +1,30 @@
+; Prints two lines of text on the LCD.
+#include "ben-eater.a65c"
+
+.org $8000
+reset:  ldx #$FF
+        txs
+        jsr lcd_init
+        lda #<greeting      ; point text_ptr at the first line's text
+        sta text_ptr
+        lda #>greeting
+        sta text_ptr+1
+        jsr lcd_print
+        lda #%11000000      ; set the display address to $40, the start of line 2
+        jsr lcd_command
+        lda #<subtitle
+        sta text_ptr
+        lda #>subtitle
+        sta text_ptr+1
+        jsr lcd_print
+        stp                 ; stop the processor until the next reset
+
+greeting: .asciiz "Hello, world!"
+subtitle: .asciiz "From BespokeASM"
+
+#include "lcd.a65c"
+
+        .org $FFFA
+        .word reset         ; NMI
+        .word reset         ; reset
+        .word reset         ; IRQ

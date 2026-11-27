@@ -1,0 +1,22 @@
+; Ben Eater's 6502 breadboard computer: memory map and I/O registers.
+;
+;   $0000-$3FFF  RAM    62256 SRAM
+;   $6000-$600F  VIA    W65C22 versatile interface adapter
+;   $8000-$FFFF  ROM    28C256 EEPROM
+; Memory zones for programs that place code or data by zone, as `.memzone RAM`.
+#create_memzone RAM $0000 $3FFF
+#create_memzone ROM $8000 $FFFF
+
+; W65C22 VIA registers
+PORTB = $6000           ; port B data: the LCD's data bus, or eight LEDs
+PORTA = $6001           ; port A data: the LCD's control lines
+DDRB  = $6002           ; port B data direction: a 1 bit is an output
+DDRA  = $6003           ; port A data direction
+PCR   = $600C           ; peripheral control: which CA1, CA2, CB1 and CB2 edges count
+IFR   = $600D           ; interrupt flags
+IER   = $600E           ; interrupt enable: bit 7 set enables, clear disables, the other set bits
+
+; HD44780 LCD control lines, on port A
+E  = %10000000          ; enable: the LCD reads or writes while E is high
+RW = %01000000          ; 1 reads from the LCD, 0 writes to it
+RS = %00100000          ; 1 selects the data register, 0 the instruction register

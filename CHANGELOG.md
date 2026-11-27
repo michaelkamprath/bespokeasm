@@ -40,9 +40,15 @@ Changes that are planned but not implemented yet:
 * **Behavior change:** a relative address in an instruction macro now measures its offset from its own instruction, not from the macro's start or end. Branches that weren't the macro's first instruction (or, with `last_word`, its last) assembled to the wrong offset; reassemble any source that uses them.
 * Added `select_by_value` for `address` operands: a form that applies only when the operand's value lies in its `memory_zone`, such as a 6502 zero-page form. Lines start in their other form and switch once their values are known, forward references included; pass 1 repeats until no line changes size.
 * Added the MOS 6502 and WDC W65C02S example instruction sets, `examples/mos6502/mos6502.yaml` (`.a65`) and `w65c02.yaml` (`.a65c`). All 151 and 212 opcodes are byte-identical to ca65, and every instruction is documented with its flags and, per addressing mode, its cycle count. Both configs have `stack` and `cycles` flow counters.
+* Added example programs for Ben Eater's 6502 computer in `examples/mos6502/ben-eater-6502/`: an LED pattern, text on the LCD, and an interrupt-driven button counter, with an include file for the computer's memory map and I/O.
 * Operand mismatch errors list the forms of every variant that fails at the same operand, so an instruction with one variant per addressing mode names them all.
 * Generated documentation and hovers show flow-counter effects more concisely: an effect reads `+3` or `taken +3 / fall-through +2`, and an instruction with several forms gets one Counter Effects table that names each form, instead of a table per form.
 * Editor extensions color the `#` immediate prefix, in instruction sets whose operands use it.
+* Generated VS Code extensions for instruction sets that write immediate values after `#` turn off color swatches for their language, so `#160` isn't shown as a color.
+* Fixed generated VS Code and Sublime Text extensions highlighting, hovering and finding references to a symbol inside a number, such as the `E` of `$600E` when a constant `E` exists.
+* Fixed generated Sublime Text packages acting on files of every installed BespokeASM language rather than only their own, which drew another ISA's semantic highlighting and hovers over the right one. Regenerate every installed package to fix it.
+* Fixed generated Sublime Text packages keeping each closed file's parsed contents in memory for the rest of the session.
+* Editor extensions color memory zone names where `#create_memzone` defines one, `.memzone` selects one, and `.org` counts from one, with a color scheme entry of their own.
 * `compile`'s `--binary-min-address`, `--binary-max-address` and `--binary-fill` options accept any numeric literal, such as `0x8000` or `$8000`, not only decimal.
 
 ## [0.9.0]

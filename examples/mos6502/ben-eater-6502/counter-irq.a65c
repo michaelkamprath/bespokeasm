@@ -1,0 +1,80 @@
+; Counts presses of a button wired to the VIA's CA1 input, and shows the count in decimal on the
+; LCD. Each press raises an interrupt; the handler counts it and the main loop prints the count.
+; A bouncing button can count more than once per press.
+#include "ben-eater.a65c"
+
+.org $8000
+reset:  ldx #$FF
+        txs
+        stz presses
+        stz presses+1
+        jsr lcd_init
+        stz PCR             ; CA1 interrupts on a falling edge, as the button is pressed
+        lda #%10000010
+        sta IER             ; enable the CA1 interrupt
+        cli
+show:   lda #%00000010      ; move the cursor home
+        jsr lcd_command
+        sei                 ; copy both bytes of the count before the next press changes them
+        lda presses
+        sta value
+        lda presses+1
+        sta value+1
+        cli
+        jsr print_decimal
+        bra show
+
+; Prints the 16-bit number in value in decimal. Changes value.
+print_decimal:
+        ldx #0              ; the number of digits
+.digit: jsr divide_by_10
+        ora #'0'            ; the remainder is the lowest remaining digit
+        pha
+        inx
+        lda value
+        ora value+1
+        bne .digit          ; until the quotient is zero
+.out:   pla                 ; the digits come off the stack highest first
+        jsr lcd_char
+        dex
+        bne .out
+        rts
+
+; Divides the 16-bit value by 10: value gets the quotient and A the remainder. Changes Y.
+divide_by_10:
+        lda #0              ; the remainder
+        ldy #16             ; one step per bit
+.step:  asl value           ; shift the next bit of the dividend into the remainder
+        rol value+1
+        rol a
+        cmp #10
+        bcc .next
+        sbc #10             ; C is set, so this subtracts exactly 10
+        inc value           ; and the quotient bit, bit 0, is 1
+.next:  dey
+        bne .step
+        rts
+
+; The CA1 interrupt: count the press. Reading port A clears the interrupt flag. Only `inc` and
+; `bit` run, so no registers need saving.
+irq:    inc presses
+        bne .counted
+        inc presses+1
+.counted:
+        bit PORTA
+        rti
+
+#include "lcd.a65c"
+
+        .org $FFFA
+        .word reset         ; NMI
+        .word reset         ; reset
+        .word irq           ; IRQ
+
+; Variables in zero page. They are RAM, so they emit no bytes, and the code above refers to them
+; before they are defined: BespokeASM still uses zero-page addressing for them.
+#mute
+.memzone ZERO_PAGE
+presses: .res 2             ; button presses, counted by the interrupt handler
+value:   .res 2             ; the number print_decimal is printing
+#unmute

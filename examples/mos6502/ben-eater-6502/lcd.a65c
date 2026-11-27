@@ -1,0 +1,74 @@
+; HD44780 LCD routines for Ben Eater's 6502 computer. The LCD's data lines are on VIA port B
+; and its E, RW and RS lines on port A. Include ben-eater.a65c first, and this file where the
+; routines should go in ROM.
+
+; Sets up the VIA ports and the LCD: 8-bit interface, two lines, 5x8 characters, display on
+; without a cursor, the cursor moving right, and the display cleared.
+lcd_init:
+        lda #$FF
+        sta DDRB            ; port B: all outputs
+        lda #E | RW | RS
+        sta DDRA            ; port A: the three control lines are outputs
+        lda #%00111000      ; function set: 8-bit interface, 2 lines, 5x8 font
+        jsr lcd_command
+        lda #%00001100      ; display on, cursor off, blink off
+        jsr lcd_command
+        lda #%00000110      ; entry mode: move the cursor right, don't shift the display
+        jsr lcd_command
+        lda #%00000001      ; clear the display
+        jmp lcd_command     ; and return from there
+
+; Waits until the LCD has finished its last operation. Keeps A.
+lcd_wait:
+        pha
+        stz DDRB            ; port B: all inputs, to read the busy flag
+.busy:  lda #RW
+        sta PORTA
+        lda #RW | E
+        sta PORTA
+        bit PORTB           ; N is the busy flag, bit 7
+        bmi .busy
+        lda #RW
+        sta PORTA           ; E low again
+        lda #$FF
+        sta DDRB            ; port B: outputs again
+        pla
+        rts
+
+; Sends the instruction in A to the LCD. Changes A.
+lcd_command:
+        jsr lcd_wait
+        sta PORTB
+        stz PORTA           ; RS = 0 for an instruction, RW = 0 to write
+        lda #E
+        sta PORTA           ; the LCD latches the instruction as E falls
+        stz PORTA
+        rts
+
+; Writes the character in A at the cursor. Changes A.
+lcd_char:
+        jsr lcd_wait
+        sta PORTB
+        lda #RS             ; RS = 1 for data, RW = 0 to write
+        sta PORTA
+        lda #RS | E
+        sta PORTA
+        lda #RS
+        sta PORTA
+        rts
+
+; Prints the zero-terminated string whose address is in text_ptr. Changes A and Y.
+lcd_print:
+        ldy #0
+.next:  lda (text_ptr),y
+        beq .done
+        jsr lcd_char
+        iny
+        bne .next
+.done:  rts
+
+; The pointer lives in zero page, which (address),y requires. It is RAM, so it emits no bytes.
+#mute
+.memzone ZERO_PAGE
+text_ptr: .res 2
+#unmute

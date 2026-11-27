@@ -340,9 +340,9 @@ Found while building section 2:
 
 ## Ben Eater 6502 example programs
 
-Directory `examples/mos6502/ben-eater/`, with the following files. The platform's CPU is the W65C02S, so the programs use `w65c02.yaml` and the `.a65c` extension. These are original programs in the style of the platform, not copies of published code.
+Directory `examples/mos6502/ben-eater-6502/`, with the following files. The platform's CPU is the W65C02S, so the programs use `w65c02.yaml` and the `.a65c` extension. These are original programs in the style of the platform, not copies of published code.
 
-- `ben-eater.inc`:
+- `ben-eater.a65c`:
   - `#create_memzone` for RAM (`$0000`–`$3FFF`) and ROM (`$8000`–`$FFFF`);
   - the VIA register constants (`PORTB`, `PORTA`, `DDRB`, `DDRA`, `PCR`, `IFR`, `IER`);
   - the LCD control bits.
@@ -364,6 +364,15 @@ Changes (milestone 7):
 
 - `-s`, `-e` and `-f` accept the same number forms as source: `0x8000`, `$8000`, `8000H`, and decimal. `$8000` needs shell quoting, which the help text notes.
 - The example README gives the exact build command: `bespokeasm compile -c w65c02.yaml -s 0x8000 blink.a65c`.
+
+## Milestone 7 notes (Nov 26, 2026)
+
+- **`lcd.a65c` added.** `hello-lcd` and `counter-irq` share the LCD routines (set up, busy wait, instruction, character, string), so they live in an include rather than being repeated.
+- **Include files use the language's extension.** `ben-eater.a65c` and `lcd.a65c`, not `.inc`, as the other examples' includes do, so editor extensions highlight them; an extension can't claim `.inc`, which other languages use. BespokeASM rejects including a file twice, so `lcd.a65c` doesn't include `ben-eater.a65c` itself; programs include both. (An `#ifndef` guard was tried and found broken: in an included file, a guard whose block `#define`s its own symbol hides the whole block.)
+- **Conventional `.org` layout.** The programs place code with `.org $8000` and the vectors with `.org $FFFA`, both absolute, as 6502 source usually does. With `.memzone ROM` active, an absolute `.org` warns, and the ROM zone protects nothing that `GLOBAL` doesn't. `ben-eater.a65c` still creates the `RAM` and `ROM` zones, documenting the memory map, for programs that place code or data by zone.
+- **Zero-page variables at the end.** `counter-irq` declares its variables in `#mute`d `ZERO_PAGE` code after the code that uses them; relaxation still gives them zero-page addressing.
+- **Verification.** Each program was translated to ca65 (includes inlined, local labels as `@name`, segments for code, vectors and zero page, with the zero-page segment first so ca65 sees the symbols before use) and linked with ld65 into a 32 KB image filled with zeros. All three images are identical to BespokeASM's. `divide_by_10` and `print_decimal` were checked for all 65,536 values by mirroring them in Python; running the images in a 65C02 simulator (py65) was not done.
+- **`print` is a keyword.** A local label `.print` is rejected, as `print` is reserved for `#print`.
 
 ## Migration: `bespokeasm migrate`
 
