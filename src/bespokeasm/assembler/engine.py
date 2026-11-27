@@ -12,7 +12,9 @@ from bespokeasm.assembler.flow_analysis import FlowLinearAnalyzer
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object import LineWithWords
+from bespokeasm.assembler.line_object.directive_line.address import AddressOrgLine
 from bespokeasm.assembler.line_object.directive_line.fill_data import FillUntilDataLine
+from bespokeasm.assembler.line_object.directive_line.phase import PhaseLine
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.line_object.predefined_data import PredefinedDataLine
@@ -271,7 +273,9 @@ class Assembler:
                 None,
                 'source file contains no compilable lines',
             )
-        compilable_line_obs.sort(key=lambda x: x.address)
+        # Bytes go in the image in order of their image positions, which differ from their
+        # addresses only inside a .phase.
+        compilable_line_obs.sort(key=lambda x: x.image_address)
         emitted_line_objects = [
             line_object
             for line_object in compilable_line_obs
@@ -279,15 +283,27 @@ class Assembler:
             and line_object.word_count > 0
             and not line_object.is_muted
         ]
+        address_space_end = memzone_manager.global_zone.end
+        for line_object in emitted_line_objects:
+            if (
+                line_object.image_address != line_object.address
+                and line_object.image_address + line_object.word_count - 1 > address_space_end
+            ):
+                diagnostic_reporter.error(
+                    line_object.line_id,
+                    f'the bytes of this line would go at image position {hex(line_object.image_address)}, '
+                    f'past the end of the address space ({hex(address_space_end)}); a .phase moves '
+                    'addresses, not where the bytes go',
+                )
         max_generated_address = max(
             (
-                line_object.address + line_object.word_count - 1
+                line_object.image_address + line_object.word_count - 1
                 for line_object in emitted_line_objects
             ),
             default=0,
         )
         line_dict = {
-            lobj.address: lobj
+            lobj.image_address: lobj
             for lobj in compilable_line_obs
             if isinstance(lobj, LineWithWords) and not lobj.is_muted
         }
@@ -323,12 +339,16 @@ class Assembler:
                     f'Processing {lobj.line_id} = {lobj} at address ${lobj.address:x}',
                     min_verbosity=3,
                 )
-            if isinstance(lobj, LineWithWords):
-                if last_line is not None and (last_line.address + last_line.word_count) > lobj.address:
+            # A muted line puts no bytes in the image, so it can't overlap another line's.
+            if isinstance(lobj, LineWithWords) and not lobj.is_muted and lobj.word_count > 0:
+                if (
+                    last_line is not None
+                    and (last_line.image_address + last_line.word_count) > lobj.image_address
+                ):
                     diagnostic_reporter.error(
                         lobj.line_id,
                         'Address of byte code at this line overlaps with bytecode from '
-                        f'line <{last_line.line_id}> at address {hex(lobj.address)}\n'
+                        f'line <{last_line.line_id}> at address {hex(lobj.image_address)}\n'
                         f'  memory zone of current line <{lobj.line_id}> = {lobj.memory_zone}\n'
                         f'  memory zone of other line <{last_line.line_id}> = {last_line.memory_zone}',
                     )
@@ -390,7 +410,21 @@ class Assembler:
         label that an earlier run defined take its new value."""
         diagnostic_reporter = self._diagnostic_reporter
         for lobj in line_objects:
-            lobj.set_start_address(lobj.memory_zone.current_address)
+            zone = lobj.memory_zone
+            if isinstance(lobj, PhaseLine):
+                try:
+                    image_position = zone.current_address + zone.phase_offset
+                    address = image_position if lobj.is_dephase else lobj.phase_address()
+                    zone.current_address = address
+                    zone.phase_offset = image_position - address
+                except ValueError as e:
+                    if report:
+                        diagnostic_reporter.error(lobj.line_id, str(e))
+            elif isinstance(lobj, AddressOrgLine):
+                # `.org` places code at its address, ending any phase in the zone.
+                zone.phase_offset = 0
+            lobj.set_start_address(zone.current_address)
+            lobj.set_image_offset(zone.phase_offset)
             if lobj.address is None:
                 diagnostic_reporter.error(
                     lobj.line_id,

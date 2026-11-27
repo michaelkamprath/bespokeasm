@@ -83,6 +83,25 @@ contexts:
         1: keyword.control.preprocessor
       push: annotation_namespace
 
+  # `#output-format <format> <option>=<value> ...`: the format's name, then its options and values.
+  output_format_directive:
+    - match: (?<=\#)(output-format)\b(?:\s+([A-Za-z_][A-Za-z0-9_]*))?
+      captures:
+        1: keyword.control.preprocessor
+        2: entity.name.output-format
+      push: output_format_options
+
+  output_format_options:
+    - meta_scope: meta.output-format
+    - match: \b([A-Za-z_][A-Za-z0-9_]*)\b(?:(=)(?:([A-Za-z_][A-Za-z0-9_]*)|(\d+))?)?
+      captures:
+        1: variable.parameter.output-format
+        2: punctuation.separator.key-value.output-format
+        3: constant.other.output-format.value
+        4: constant.numeric.integer.decimal
+    - match: (?=\s*\;|\s*$)
+      pop: true
+
   annotation_namespace:
     - meta_scope: meta.annotation
     - match: \s*\b(##ANNOTATION_NAMESPACES##)\b
@@ -184,7 +203,7 @@ contexts:
       scope: constant.numeric.integer.octal
     - match: (?<!\w)(?:\d+)\b
       scope: constant.numeric.integer.decimal
-    - match: (?:\'.\')
+    - match: '''(?:\\.|[^''\\])'''
       scope: constant.numeric.character
 
   comparison_operators:
@@ -278,11 +297,27 @@ contexts:
       push:
         - meta_scope: meta.directive
         - include: pop_instruction_end
+        - include: directive_label_definitions
         - include: quoted_memory_zone
         - include: strings
         - include: numerical_expressions
         - match: (?=(?:\s*\;|\s*$))
           pop: true
+
+  # A label after an origin or zone directive's argument: `.org $10 name:`.
+  directive_label_definitions:
+    - match: (?<=\s)(##GLOBAL_SYMBOL_PATTERN##)\s*(\:)(?!=)
+      captures:
+        1: variable.other.label.global variable.other.label.definition
+        2: punctuation.definition.variable.colon.label
+    - match: (?<=\s)(##LOCAL_SYMBOL_PATTERN##)\s*(\:)(?!=)
+      captures:
+        1: variable.other.label.local variable.other.label.definition
+        2: punctuation.definition.variable.colon.label
+    - match: (?<=\s)(##FILE_SYMBOL_PATTERN##)\s*(\:)(?!=)
+      captures:
+        1: variable.other.label.file variable.other.label.definition
+        2: punctuation.definition.variable.colon.label
 
   data_types_directives:
     - match: (?<!\w)(?:##DATATYPES##)\b
@@ -306,6 +341,7 @@ contexts:
         - meta_scope: meta.preprocessor
         - include: flow_counter_directives
         - include: annotation_directive
+        - include: output_format_directive
         - include: memory_zone_names
         - match: (?<=\#)(?:##PREPROCESSOR##)\b
           scope: keyword.control.preprocessor

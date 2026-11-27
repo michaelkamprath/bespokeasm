@@ -36,6 +36,7 @@ class MemoryZoneManager:
         again after relaxation changes an instruction's size."""
         for zone in self._zones.values():
             zone.current_address = zone.start
+            zone.phase_offset = 0
         self._zones[GLOBAL_ZONE_NAME].current_address = self._default_origin
 
     def zone(self, name: str) -> MemoryZone:

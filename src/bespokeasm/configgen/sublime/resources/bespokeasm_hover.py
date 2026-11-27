@@ -24,7 +24,10 @@ HOVER_WORD_PATTERN = re.compile(
 # when written as a call, NAME(...); otherwise it may be a label or constant of the same name.
 EXPRESSION_FUNCTION_NAMES = frozenset('##EXPRESSION_FUNCTION_NAMES##'.upper().split('|'))
 CALL_FOLLOWS_PATTERN = re.compile(r'\s*\(')
-LABEL_DEFINITION_PATTERN = re.compile(r'^\s*(?P<name>##LABEL_PATTERN##)\s*:(?!=)')
+# A label starts a line, or follows an origin or zone directive: `.org $10 name:`.
+LABEL_DEFINITION_PATTERN = re.compile(
+    r'^\s*(?:(?i:\.(?:org|memzone|phase|dephase))\b[^;:]*?\s)?(?P<name>##LABEL_PATTERN##)\s*:(?!=)'
+)
 OPERAND_LABEL_DEFINITION_PATTERN = re.compile(r'@(?P<name>##LABEL_PATTERN##):\s*')
 CONSTANT_DEFINITION_PATTERN = re.compile(r'^\s*(?P<name>##CONSTANT_PATTERN##)\s*(?:=|\bEQU\b)')
 CONSTANT_VALUE_PATTERN = re.compile(r'^\s*##CONSTANT_PATTERN##\s*(?:=|\bEQU\b)\s*(?P<value>.+?)(?:\s*;.*)?$')
@@ -962,9 +965,9 @@ CODE_PREPROCESSOR_NAMES = {
     'include', 'require', 'error', 'create_memzone', 'print',
     'define', 'if', 'elif', 'else', 'endif', 'ifdef', 'ifndef',
     'mute', 'unmute', 'emit', 'create-scope', 'use-scope', 'deactivate-scope',
-    'annotate', 'verbatim', 'endverbatim',
+    'annotate', 'verbatim', 'endverbatim', 'output-format',
 }
-CODE_COMPILER_DIRECTIVE_NAMES = {'org', 'memzone', 'align'}
+CODE_COMPILER_DIRECTIVE_NAMES = {'org', 'memzone', 'align', 'phase', 'dephase'}
 CODE_DATA_TYPE_NAMES = {
     'fill', 'zero', 'zerountil',
     'byte', '2byte', '4byte', '8byte', '16byte', 'cstr', 'asciiz',

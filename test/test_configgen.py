@@ -802,7 +802,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertFalse(('registers' in syntax_dict['contexts']), 'no registers should be found')
         self._assert_grouped_item_list(
             syntax_dict['contexts']['compiler_directives'][0]['match'],
-            ['\\.org', '\\.memzone', '\\.align',],
+            ['\\.org', '\\.memzone', '\\.align', '\\.phase', '\\.dephase'],
             'compiler directives'
         )
         self._assert_grouped_item_list(
@@ -829,7 +829,7 @@ class TestConfigurationGeneration(unittest.TestCase):
                 'include', 'require', 'error', 'create_memzone', 'print', 'assert', 'define', 'if',
                 'elif', 'else', 'endif', 'ifdef', 'ifndef',
                 'mute', 'unmute', 'emit',
-                'create-scope', 'use-scope', 'deactivate-scope', 'annotate', 'verbatim', 'endverbatim',
+                'create-scope', 'use-scope', 'deactivate-scope', 'annotate', 'verbatim', 'endverbatim', 'output-format',
             ],
             'preprocessor directives'
         )
@@ -930,7 +930,7 @@ class TestConfigurationGeneration(unittest.TestCase):
         )
         self._assert_grouped_item_list(
             syntax_dict['contexts']['compiler_directives'][0]['match'],
-            ['\\.org', '\\.memzone', '\\.align',],
+            ['\\.org', '\\.memzone', '\\.align', '\\.phase', '\\.dephase'],
             'compiler directives'
         )
         self._assert_grouped_item_list(
@@ -952,7 +952,7 @@ class TestConfigurationGeneration(unittest.TestCase):
                 'include', 'require', 'error', 'create_memzone', 'print', 'assert', 'define',
                 'if', 'elif', 'else', 'endif', 'ifdef', 'ifndef',
                 'mute', 'unmute', 'emit',
-                'create-scope', 'use-scope', 'deactivate-scope', 'annotate', 'verbatim', 'endverbatim',
+                'create-scope', 'use-scope', 'deactivate-scope', 'annotate', 'verbatim', 'endverbatim', 'output-format',
             ],
             'preprocessor directives'
         )
@@ -1294,6 +1294,139 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertIn('oneline contained', syn[indirect_rule:].splitlines()[0])
         self.assertIn(f'contains={vim_ft}DoubleParenAddressExpr,{vim_ft}ParenAddressExpr,', syn)
         self.assertNotIn('ParenAddressExpr', vim_syntax(plain_path)[1])
+        shutil.rmtree(test_dir)
+
+    def test_character_literals_with_escapes_in_generated_grammars(self):
+        """`'\\''` and `'\\\\'` are character literals, and a string ends at a quote after an escaped
+        backslash: `'\\\\'` used to start a string that ran to the end of the line."""
+        config_path = str(pkg_resources.files(config_files).joinpath('test_instruction_line_creation_little_endian.yaml'))
+        test_dir = tempfile.mkdtemp()
+        line = ".byte 0, '\\'', 0, '\\\\', 0, 'a', ' ', 'ab' ; comment"
+        characters = ["'\\''", "'\\\\'", "'a'", "' '"]
+
+        VSCodeConfigGenerator(config_path, 0, test_dir, None, None, 'asmtest').generate()
+        ext_dir = next(pl.Path(test_dir, 'extensions').iterdir())
+        grammar = json.loads((ext_dir / 'syntaxes' / 'tmGrammar.json').read_text())['repository']
+        character = next(
+            p['match'] for p in grammar['numeric-values']['patterns'] if p['name'] == 'constant.numeric.character'
+        )
+        self.assertEqual([m.group(0) for m in re.finditer(character, line)], characters)
+        self.assertEqual(grammar['strings']['end'], '\\1')
+        # A bracket in a character literal, `')'`, is not matched against code brackets.
+        package = json.loads((ext_dir / 'package.json').read_text())
+        self.assertEqual(package['contributes']['grammars'][0]['tokenTypes'], {'constant.numeric.character': 'string'})
+
+        sublime_dir = tempfile.mkdtemp(dir=test_dir)
+        SublimeConfigGenerator(config_path, 0, sublime_dir, None, None, 'asmtest')._generate_files_in_dir(sublime_dir)
+        with open(os.path.join(sublime_dir, 'bespokeasm-test.sublime-syntax')) as yaml_file:
+            contexts = YAML().load(yaml_file)['contexts']
+        character = next(rule['match'] for rule in contexts['numbers'] if rule.get('scope') == 'constant.numeric.character')
+        self.assertEqual([m.group(0) for m in re.finditer(character, line)], characters)
+
+        vim_dir = tempfile.mkdtemp(dir=test_dir)
+        configgen = VimConfigGenerator(config_path, 0, vim_dir, None, None, 'asmtest')
+        configgen.generate()
+        vim_ft = configgen.language_id.replace('-', '').lower()
+        syn = pl.Path(vim_dir, 'syntax', f'{vim_ft}.vim').read_text()
+        self.assertIn(f"syn match {vim_ft}CharNumber /'\\%(\\\\.\\|[^'\\\\]\\)'/", syn)
+        shutil.rmtree(test_dir)
+
+    def test_labels_after_origin_directives_in_generated_extensions(self):
+        """`.org $10 name:` defines a label, as the assembler allows: every editor's grammar and
+        definition scanner find it, and Vim's scanner finds operand labels anywhere on a line."""
+        config_path = str(pkg_resources.files(config_files).joinpath('test_instruction_line_creation_little_endian.yaml'))
+        test_dir = tempfile.mkdtemp()
+        line = '.org $001e     HEIGHT:    ; screen height'
+
+        VSCodeConfigGenerator(config_path, 0, test_dir, None, None, 'asmtest').generate()
+        ext_dir = next(pl.Path(test_dir, 'extensions').iterdir())
+        grammar = json.loads((ext_dir / 'syntaxes' / 'tmGrammar.json').read_text())['repository']
+        self.assertEqual(grammar['directives']['patterns'][1]['patterns'][0], {'include': '#directive_label_definitions'})
+        global_rule = grammar['directive_label_definitions']['patterns'][0]['match']
+        self.assertEqual([m.group(1) for m in re.finditer(global_rule, line)], ['HEIGHT'])
+        scanner = (ext_dir / 'label_hover.js').read_text()
+        self.assertIn(r'(?:\.(?:org|memzone|phase|dephase)\b[^;:]*?\s)?', scanner)
+
+        sublime_dir = tempfile.mkdtemp(dir=test_dir)
+        SublimeConfigGenerator(config_path, 0, sublime_dir, None, None, 'asmtest')._generate_files_in_dir(sublime_dir)
+        with open(os.path.join(sublime_dir, 'bespokeasm-test.sublime-syntax')) as yaml_file:
+            contexts = YAML().load(yaml_file)['contexts']
+        self.assertIn({'include': 'directive_label_definitions'}, contexts['compiler_directives'][0]['push'])
+        global_rule = contexts['directive_label_definitions'][0]['match']
+        self.assertEqual([m.group(1) for m in re.finditer(global_rule, line)], ['HEIGHT'])
+        plugin = next(pl.Path(sublime_dir).glob('bespokeasm_hover*.py')).read_text()
+        pattern = re.search(r"LABEL_DEFINITION_PATTERN = re\.compile\(\s*(r'.*?')\s*\)", plugin, re.S).group(1)
+        definition = re.compile(eval(pattern))
+        self.assertEqual(definition.match(line).group('name'), 'HEIGHT')
+        self.assertIsNone(definition.match('  .align x:'))
+
+        vim_dir = tempfile.mkdtemp(dir=test_dir)
+        configgen = VimConfigGenerator(config_path, 0, vim_dir, None, None, 'asmtest')
+        configgen.generate()
+        vim_ft = configgen.language_id.replace('-', '').lower()
+        syn = pl.Path(vim_dir, 'syntax', f'{vim_ft}.vim').read_text()
+        org_region = next(rule for rule in syn.splitlines() if r'start=/\s*\.org\>/' in rule)
+        self.assertIn(f'{vim_ft}DirectiveLabelName,{vim_ft}LabelColon', org_region)
+        ftplugin = pl.Path(vim_dir, 'ftplugin', f'{vim_ft}.vim').read_text()
+        self.assertIn(r'\%(\.\%(org\|memzone\|phase\|dephase\)\>[^;:]*\s\)\=', ftplugin)
+        self.assertIn("call substitute(l:line, '@", ftplugin)
+        shutil.rmtree(test_dir)
+
+    def test_output_format_directive_arguments_in_generated_extensions(self):
+        """`#output-format listing overflow=wrap`: the format's name, the option and the value each
+        get their own scope, colored like a memory zone's name and #annotate's arguments."""
+        config_path = str(pkg_resources.files(config_files).joinpath('test_instruction_line_creation_little_endian.yaml'))
+        test_dir = tempfile.mkdtemp()
+        line = '#output-format listing overflow=wrap'
+        expected = [
+            ('entity.name.output-format', 'listing'),
+            ('variable.parameter.output-format', 'overflow'),
+            ('constant.other.output-format.value', 'wrap'),
+        ]
+        colors = {
+            'entity.name.output-format': '#ff00a2',
+            'variable.parameter.output-format': '#c080ff',
+            'constant.other.output-format.value': '#89c616',
+        }
+
+        VSCodeConfigGenerator(config_path, 0, test_dir, None, None, 'asmtest').generate()
+        ext_dir = next(pl.Path(test_dir, 'extensions').iterdir())
+        rule = json.loads((ext_dir / 'syntaxes' / 'tmGrammar.json').read_text())['repository']['output_format_directive']
+        begin = re.search(rule['begin'], line)
+        option = re.search(rule['patterns'][0]['match'], line[begin.end():])
+        self.assertEqual(
+            [(rule['beginCaptures']['2']['name'], begin.group(2))]
+            + [(rule['patterns'][0]['captures'][str(i)]['name'], option.group(i)) for i in (1, 3)],
+            expected,
+        )
+        self.assertEqual(option.group(2), '=')
+        theme = json.loads(next(ext_dir.glob('*-theme.json')).read_text())
+        self.assertEqual(
+            {t['scope']: t['settings']['foreground'] for t in theme['tokenColors'] if t['scope'] in colors}, colors,
+        )
+
+        sublime_dir = tempfile.mkdtemp(dir=test_dir)
+        SublimeConfigGenerator(config_path, 0, sublime_dir, None, None, 'asmtest')._generate_files_in_dir(sublime_dir)
+        with open(os.path.join(sublime_dir, 'bespokeasm-test.sublime-syntax')) as yaml_file:
+            contexts = YAML().load(yaml_file)['contexts']
+        rule = contexts['output_format_directive'][0]
+        begin = re.search(rule['match'], line)
+        option_rule = contexts['output_format_options'][1]
+        option = re.search(option_rule['match'], line[begin.end():])
+        self.assertEqual(
+            [(rule['captures'][2], begin.group(2))] + [(option_rule['captures'][i], option.group(i)) for i in (1, 3)],
+            expected,
+        )
+        self.assertIn({'include': 'output_format_directive'}, contexts['preprocessor_directives'][0]['push'])
+
+        vim_dir = tempfile.mkdtemp(dir=test_dir)
+        configgen = VimConfigGenerator(config_path, 0, vim_dir, None, None, 'asmtest')
+        configgen.generate()
+        vim_ft = configgen.language_id.replace('-', '').lower()
+        syn = pl.Path(vim_dir, 'syntax', f'{vim_ft}.vim').read_text()
+        for group in ('OutputFormatName', 'OutputFormatOption', 'OutputFormatPunct', 'OutputFormatValue'):
+            self.assertIn(f'syn match {vim_ft}{group} ', syn)
+        self.assertIn(f'hi {vim_ft}OutputFormatName guifg=#ff00a2', syn)
         shutil.rmtree(test_dir)
 
     def test_brace_addressing_in_generated_grammars(self):

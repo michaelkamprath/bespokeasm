@@ -50,16 +50,19 @@ function isOffsetInCodeRegion(line, offset) {
   return false;
 }
 
+// A label starts a line, or follows an origin or zone directive: `.org $10 name:`.
+const LINE_LABEL_RE = /^(\s*(?:\.(?:org|memzone|phase|dephase)\b[^;:]*?\s)?)(##LABEL_PATTERN##)\s*:(?!=)/i;
+
 function findLineLabelDefinition(line) {
-  const match = line.match(/^\s*(##LABEL_PATTERN##)\s*:(?!=)/);
+  const match = line.match(LINE_LABEL_RE);
   if (!match) {
     return null;
   }
-  const character = line.indexOf(match[1]);
+  const character = match[1].length;
   if (!isOffsetInCodeRegion(line, character)) {
     return null;
   }
-  return { name: match[1], character };
+  return { name: match[2], character };
 }
 
 function findOperandLabelDefinitions(line) {

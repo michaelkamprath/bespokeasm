@@ -14,6 +14,7 @@ from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import Flow
 from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowSetLine
 from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowSuspendLine
 from bespokeasm.assembler.line_object.preprocessor_line.flow_counter import FlowTrackLine
+from bespokeasm.assembler.line_object.preprocessor_line.output_format_line import OutputFormatLine
 from bespokeasm.assembler.line_object.preprocessor_line.print_line import PrintLine
 from bespokeasm.assembler.line_object.preprocessor_line.required_language import RequiredLanguageLine
 from bespokeasm.assembler.line_object.preprocessor_line.use_scope import UseScopeLine
@@ -184,6 +185,14 @@ class PreprocessorLineFactory:
                     memzone_manager,
                     isa_model,
                     preprocessor,
+                )
+            case ('#output-format', _):
+                line_object = OutputFormatLine(
+                    line_id,
+                    instruction,
+                    comment,
+                    current_memzone,
+                    isa_model,
                 )
             case ('#print', True):
                 line_object = PrintLine(

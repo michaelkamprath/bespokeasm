@@ -384,7 +384,7 @@ bespokeasm migrate -c mos6502.yaml --from ca65 reset.s -o reset.a65
 
 - **What the config declares:** which source assemblers ("dialects") it can migrate from, and the rules for each. The rule kinds are a fixed library implemented in BespokeASM, as output-format generators are, so a config never ships code.
 - **Help and docs:** `migrate` without `--from` (short `-f`), or with a dialect the config doesn't declare, lists the config's dialects with their descriptions. Shell completion offers them, read from the config's `migrations` section the way `-t` completion reads `output_formats`. Generated ISA docs list them in a **Source Migration** section.
-- **Input and output:** one file per run. It never overwrites its input: it writes to `-o` or to stdout, and `-o` naming the source file is a usage error. Output line N is input line N, so a report's line number works in both files, and the source's line endings (LF or CRLF) and final newline are kept. Includes are not followed: each included file is listed as a note in the summary, to be migrated on its own.
+- **Input and output:** one file per run. It never overwrites its input: it writes to `-o` or to stdout, and `-o` naming the source file is a usage error. Output line N is input line N, so a report's line number works in both files, unless a rule puts a statement that shared a line on a line of its own (`split_statements`, milestone 9); reports always give the input line, and the source's line endings (LF or CRLF) and final newline are kept. Includes are not followed: each included file is listed as a note in the summary, to be migrated on its own.
 - **Lines it can't convert:** they are kept as `; MIGRATE: <reason>: <original line>`, so nothing is dropped silently. Search for the marker to find what needs a hand port. A dropped directive's line becomes a plain comment, `; .setcpu "65C02"`, after the line's indentation.
 - **Summary:** printed to stderr: the lines each rule changed (a rename to the directive already written, such as `.org` → `.org`, is no change), every reported line with file and line (a reported block by its first line), and the notes. The exit status is 0 when nothing was reported and 1 otherwise; notes, such as includes, don't count.
 - **Shell completion:** like the other commands, it stays lightweight at import time; the rule engine loads inside the handler.
@@ -416,18 +416,20 @@ Rules run in the order listed, each over the whole file (anonymous labels need e
 | `rename_directives` | map of source name → BespokeASM directive | `.include` → `#include`, `#org` → `.org`. Source names match with or without a leading `.` or `#`, case-insensitively. Arguments are kept. A bare word matches only where it can't be one of the ISA's mnemonics or the symbol of an assignment (`name =`, `name equ`). A target must be a BespokeASM directive written with its `.` or `#`, or one of the config's directive aliases (`.word`). |
 | `drop_directives` | list | Removes directives with no BespokeASM meaning (`.setcpu`, `.p02`). The line becomes a comment. |
 | `unsupported` | list of names or `{start: end}` blocks | Keeps the line as a `; MIGRATE:` comment, reported. A block reports every line from its start to its end directive (`end` may be a list), and later lines using the block's name. |
-| `split_statements` (milestone 9) | none | Puts each directive, and data that follows an instruction, on its own line (`#mute #org 0x0080`). |
-| `bare_data` (milestone 9) | `sizing` (`slu4`) | Data written without a directive becomes `.byte`/`.2byte`, sized by the named strategy. |
+| `split_statements` (milestone 9) | none | For element syntax, where whitespace and commas separate elements: puts each directive, each run of data and each label not at the start of its line on its own line (`#mute #org 0x0080`). Instructions sharing a line stay together, and get commas between operands. Operands on the next line join their instruction; a label before an operand (self-modifying code) becomes an [operand label](https://github.com/michaelkamprath/bespokeasm/wiki/Assembly-Language-Syntax#operand-labels), `@name: value`. A mnemonic used as a value becomes its opcode. Needs the ISA's operand counts. |
+| `bare_data` (milestone 9) | `sizing` (`slu4`) | Data written without a directive becomes `.byte`/`.2byte`, sized by the named strategy; elements of one size share a directive. |
 | `char_literals` (milestone 9) | `double_quoted: true` | A single character in double quotes used as a number, `"a"` → `'a'`. |
+| `terminated_strings` (milestone 9) | none | String data ending in the ISA's terminator → `.cstr`; split off an instruction, it goes back on that line as an embedded string where the ISA has them (`JPS _Print "READY.\n"`). Strings with tab, line-feed and carriage-return bytes only. |
+| `muted_origin` (milestone 9) | `image_start` (optional) | Carsten's two addresses: `#mute`, `#org X`, `#emit` → `.phase X`. A `*` in a phase gets a `.dephase` first when nothing after it depends on addresses; otherwise reported. Unlabelled data after a phased program's end label and before the next `#mute` (the next file's header) gets a `.dephase` as well. `#mute` doesn't nest there, so a second one is dropped. `image_start`: where bytes go before the first `#org`. |
 | `local_labels` | `prefix` or `suffix` | ca65 `@loop` → `.loop` with `prefix: '@'`; vasm `loop$` and `1$` → `.loop` and `.1` with `suffix: '$'`. BespokeASM local labels have the same scope rule. A label that would become a directive's name (`@byte` → `.byte`) is reported. |
 | `anonymous_labels` | none | `:` with `:+`/`:-` (and `:>`/`:<`) → generated local labels `.anon_N`. ca65 and vasm oldstyle use the same syntax, so there is no `style`. A reference that crosses another label is reported. |
 | `colonless_labels` | none | A label at column 0 without a colon (vasm) → `label:`, including a `$` local that starts with a digit (`1$`). A name followed by `=`, `equ`, `eq` or `set` is an assignment and is left alone, as is a dotted BespokeASM directive at column 0. |
 | `origin_assignment` | `symbol` (default `*`) | `*= $8000` → `.org $8000`. |
+| `origin_phases` (milestone 9) | none | For ca65, whose `.org` sets only the address code is assembled for: a `.org` before any bytes stays `.org`, a later one becomes `.phase`. Runs after the renames. |
 | `assignment_operators` | list | `COUNT := 3` → `COUNT = 3`. Added in milestone 8: ca65's `:=` is BespokeASM's counter-coordinate operator. |
 | `operand_prefixes` | `drop` list, `unsupported` list | Matched in the operands only, so a label named `z` is safe. ca65 `z:` is dropped, since relaxation picks zero page anyway. `a:` and `f:` are reported. |
 | `current_address_symbol` | `symbol` | A standalone `$` (Intel, many Z80 assemblers) → `*`. `$7C` stays a hex literal. No dialect in this effort uses it; it is included because it is a simple rewrite that later dialects need. |
-| `string_escapes` | `doubled_quotes: true` | `'IT''S'` → `'IT\'S'`. Included for the same reason. |
-| `predefined_symbols` (milestone 9) | `drop_matching: true` | Removes a definition of a name the config predefines with the same value, such as `#org 0xf003 _Prompt:` in Carsten's programs. A different value is reported. |
+| `string_escapes` | `doubled_quotes: true`, `backslash: literal` | `'IT''S'` → `'IT\'S'`. Included for the same reason. `backslash: literal` (milestone 9): `"C:\"` → `"C:\\"`, for an assembler with no escapes. |
 
 A new rule kind needs a stated reason, in the same spirit as directive aliases.
 
@@ -435,9 +437,9 @@ A new rule kind needs a stated reason, in the same spirit as directive aliases.
 
 **6502 and W65C02S (`mos6502.yaml` and `w65c02.yaml`, the same dialects in both):**
 
-- `ca65`: the rules in the example above, with longer lists: renames for the `.if` family, `.define`, `.error` (`#error`) and `.out` (`#print`); drops for `.setcpu`, `.p02`, `.pc02`, `.psc02`, `.debuginfo`, `.smart`, `.list`, `.listbytes`, `.autoimport` and `.case`; and as unsupported the blocks `.macro`, `.mac`, `.repeat`, `.struct`, `.union` and `.enum`, plus `.proc`, `.scope`, segments and their shorthands (`.code`, `.zeropage`, …), imports and exports, `.macpack`, `.feature`, `.charmap`, `.incbin`, `.dbyt`, `.align`, `.local`, `.set`, `.tag`, `.assert`, `.warning`, `.fatal` and the `.ifblank`/`.ifconst`/`.ifref`/`.ifp02` family.
-- `vasm` (oldstyle, Ben Eater's): `colonless_labels`, `origin_assignment: {symbol: '*'}`, `local_labels: {suffix: '$'}`, `anonymous_labels`, and `rename_directives` for its include and conditional directives and its data and space directives. Its `.org`, `.word` and `.asciiz` already assemble.
-- vasm's unsupported list: the `macro`/`mac`, `rept`/`repeat`, `struct`, `dsect` and `inline` blocks, `section`, the symbol-visibility directives, `binary`/`incbin`, `rorg`/`phase`, `align`/`even`, `cond` and the `ifeq` family, `assert`, `str`, `abyte`, the word- and long-sized space directives and `set`.
+- `ca65`: the rules in the example above, with longer lists: renames for the `.if` family, `.define`, `.error` and `.fatal` (`#error`), `.out` (`#print`), `.align`, and `.reloc` (`.dephase`, milestone 9); `origin_phases` (milestone 9); drops for `.setcpu`, `.p02`, `.pc02`, `.psc02`, `.debuginfo`, `.smart`, `.list`, `.listbytes`, `.autoimport` and `.case`; and as unsupported the blocks `.macro`, `.mac`, `.repeat`, `.struct`, `.union` and `.enum`, plus `.proc`, `.scope`, segments and their shorthands (`.code`, `.zeropage`, …), imports and exports, `.macpack`, `.feature`, `.charmap`, `.incbin`, `.dbyt`, `.local`, `.set`, `.tag`, `.assert`, `.warning` and the `.ifblank`/`.ifconst`/`.ifref`/`.ifp02` family.
+- `vasm` (oldstyle, Ben Eater's): `colonless_labels`, `origin_assignment: {symbol: '*'}`, `local_labels: {suffix: '$'}`, `anonymous_labels`, and `rename_directives` for its include and conditional directives (`cond` and `ifne` as `#if`), `rorg`/`rend` (`.phase`/`.dephase`), `even` (`.align 2`), `align N` (`.align 1 << N`: vasm's argument is a bit count), and its data and space directives. Its `.org`, `.word` and `.asciiz` already assemble.
+- vasm's unsupported list: the `macro`/`mac`, `rept`/`repeat`, `struct`, `dsect` and `inline` blocks, `section`, the symbol-visibility directives, `binary`/`incbin`, the `ifeq` family except `ifne`, `assert`, `str`, `abyte`, the word- and long-sized space directives and `set`.
 - `.if` conditions are carried over as written. BespokeASM's `#ifdef` tests preprocessor symbols, not labels or constants as ca65's and vasm's do; milestone 11 addresses this.
 
 **Minimal CPU, Minimal 64, Minimal 64x4 and Redux: `slu4`, Carsten Herting's assemblers.** Each config's rules match the assembler for that machine and revision. The dialect has these features:
@@ -448,16 +450,17 @@ A new rule kind needs a stated reason, in the same spirit as directive aliases.
 - Data has no directive. Its size comes from the element: hex with more than two digits, a symbol or `*` is a word; other numbers and characters are bytes; strings are bytes. Data may follow an instruction on the same line (`JPS 0xf045 "Hello, World!", 0`).
 - OS entry points are declared as `#org 0xf003 _Prompt:` under `#mute`, and the configs already predefine those names.
 
-Its rules are `split_statements`, `rename_directives: {org: '.org'}`, `bare_data: {sizing: slu4}`, `char_literals: {double_quoted: true}` and `predefined_symbols: {drop_matching: true}`.
+Its rules, as built in milestone 9: `split_statements`, `bare_data: {sizing: slu4}`, `string_escapes: {backslash: literal}`, `char_literals: {double_quoted: true}`, `terminated_strings`, `muted_origin` and `rename_directives: {org: '.org', page: '.align'}`. The Redux's `muted_origin` has `image_start: 0x2000`; the Minimal CPU's has `image_start: 0x0000`, renames `#end`/`#begin` to `#mute`/`#emit` first, and has no `char_literals` or `#page`.
 
-- `<`, `>` and `*` need no rule, because those configs turn them on with Carsten's meaning (sections 5 and 6).
-- Carsten's `#mute` doesn't nest and BespokeASM's does. A second `#mute` before an `#emit` is reported.
+- `<`, `>` and `*` need no rule, because those configs turn them on with Carsten's meaning (sections 5 and 6), except that his `*` is where the bytes go, which `muted_origin` handles inside a phase.
+- Carsten's `#mute` doesn't nest and BespokeASM's does. A second `#mute` before an `#emit` is dropped.
+- OS entry points declared as `#org 0xf003 _Prompt:` need no rule: a label in source already takes precedence over a predefined constant of the same name. The planned `predefined_symbols` rule was dropped.
 
 ### Testing and verification
 
 - **Unit tests:** the rule engine and each rule kind are tested in `test/`, with dialect fixtures in `test/config_files/`. Rules are checked on small sources, migrated and then assembled.
 - **6502:** migrate sample ca65 and vasm programs, assemble each with ca65 and with BespokeASM, and compare the bytes.
-- **Minimal:** migrate Carsten's own programs, such as `stars.asm` and `os.asm` for the Redux. Assemble each with his assembler, built locally, and with BespokeASM, and compare the bytes.
+- **Minimal:** migrate Carsten's own programs, such as `stars.asm` and `os.asm`. Assemble each with his assembler, built locally, and with BespokeASM, and compare the bytes.
   - This is a manual check; the programs aren't copied into the repository.
   - Small samples with bytes captured from his assembler become test fixtures.
 
@@ -473,6 +476,45 @@ Its rules are `split_statements`, `rename_directives: {org: '.org'}`, `bare_data
 - **The M9 rule kinds** (`split_statements`, `bare_data`, `char_literals`, `predefined_symbols`) are left for milestone 9, with the `slu4` dialect.
 - **Verification.** Ben Eater's Wozmon gist and smart-t's be-wozmon migrate from `vasm` unchanged, with nothing reported, and assemble to the same bytes as a ca65 port linked by ld65; vasm itself couldn't be built here. Small ca65 and vasm samples covering every rule are test fixtures, with bytes from ca65. msbasic migrates file by file with segments, macros, `.feature` and `.macpack` reported; making it assemble is [milestone 11](#milestone-11-migrating-microsoft-basic).
 
+## Milestone 9 notes (Nov 27, 2026)
+
+**Goal reached:** Carsten Herting's MinOS for the Minimal 64x4 (Revision 1.1, `Programs/asm/os.asm`) migrates with `--from slu4` with nothing reported and assembles to the same 9,168 bytes as his assembler. So do the other 13 Revision 1.1 programs, and every program in the Redux, Minimal 64 and Minimal CPU repositories: 56 programs on four machines, each byte-compared against his assembler for that machine, built locally (asm.cpp for the 64x4, Redux and Minimal 64; asm.py for the Minimal CPU).
+
+**`.phase` and `.dephase` (new directives).** MinOS stores its kernel and each program of its file system in the boot image while assembling them for another address: `#mute #org 0xfc00 #emit` moves only the address labels see, because Carsten's assemblers keep it apart from where the bytes go. BespokeASM placed every byte at its address, so it gained a phase: `.phase X` assembles for X from there while the bytes continue in place; another `.phase` re-phases from the image position; `.dephase` and `.org` end it. The user chose the name over an `.org` option or a memory-zone setting (decided Nov 27, 2026). Each line now has an image position as well as its address: the binary image, Intel HEX and byte outputs, sorting and the overlap check use the image position; labels, `*`, listings and flow analysis use the address. A phase belongs to its memory zone, like the zone's current address. vasm's `rorg`/`phase` and `rend`/`dephase` now convert instead of being reported.
+
+**The file system.** Each MinOS program is stored as a header (name, run address, size) followed by its code. The header is ordinary data before the `#mute`, so it lands after the previous program's bytes; its run address is a label in the phase and its size a difference of two, which is the byte count because a phase's bytes are contiguous. The last line, a filler file sized `0x3000-*-2`, uses `*` as the image position, which is what Carsten's `*` always is; `muted_origin` puts a `.dephase` before it, since nothing after it depends on addresses. Every other header gets a `.dephase` too (the user's call, Nov 27, 2026): it is file-system data in the image, not part of the program before it, so the listing shows its image position, and a label put on a header later gets that position rather than the previous program's run address.
+
+**Other assembler changes found on the way:**
+
+- **Directive names are no longer reserved** (decided Nov 27, 2026, the open question from milestone 8): mandel.asm has a label `entry` and the Minimal CPU's textloader one named `error`. Directives are always written with their `.` or `#`. Only the built-in symbols stay reserved, for registers and mnemonics.
+- **`.align` keeps an address already on a boundary.** It used to skip a whole page. This changes the 64x4 and Redux `math32lib` and `stringlib` examples, which started a page late; no other example changes.
+- **Muted lines don't overlap.** The overlap check compared muted lines too, so MinOS's muted zero-page variables at 0x80 collided with the image's bytes there.
+- **A tab may separate a mnemonic from its operands.**
+- **An `address_lsb` operand written as a low byte, `<expr`, skips the page check**, as in Carsten's assemblers. Self-modifying code writes a placeholder fast-jump target this way (`FPA <0xcc` in the Redux MinOS).
+- **Redux config:** `mbr`, `mrb` and `mrr` had two 8-bit operands; Carsten's argument table and the instructions' titles give two addresses. The 64x4 and Redux configs gained the undotted spellings Carsten's assembler also accepts (`zxr` for `xr.z`), and the 64x4's `sul` its `su.l`/`lsu`.
+
+**Migration:**
+
+- **Line splitting.** A BespokeASM line holds instructions, or one directive or run of data, with at most one label, so `split_statements` puts the rest on lines of their own; `.org X name:` and an instruction followed by an embedded string still share a line (see the review below). That breaks milestone 8's "output line N is input line N" for this dialect; reports keep the input line. MinOS's 1,541 lines migrate to 1,568.
+- **Self-modifying code** labels an instruction's operand on the next line (`lenloop: LDI` / `lenterm: 0xff`). BespokeASM's operand labels say the same thing, so it becomes `lenloop: LDI @lenterm: 0xff`, and references are unchanged. (A first version moved the label to the instruction and added the operand's offset to every reference; the user pointed out operand labels.)
+- **A mnemonic used as a value is its opcode** (`MIB AIW+0,dyvert` in the line drawer, `LDI INW` on the Minimal 64). BespokeASM has no such expression, so the opcode is written, with a note.
+- **`image_start`.** The Redux assembler writes bytes from 0x2000 before the first `#org` while addresses start at 0; the Minimal CPU's starts at 0 where its config's origin is 0x8000.
+- **`predefined_symbols` was dropped**: a label in source already takes precedence over a predefined constant.
+
+**Review against existing syntax (Nov 27, 2026).** After the user pointed out operand labels, the whole syntax page was reviewed for other features the migration should use rather than work around. Adopted:
+
+- **Operand labels** for self-modifying code (above).
+- **`{directive} label:`**: `.org X name:` is one line in BespokeASM, so `#org 0x0080 PtrA:` (most of the mid-line labels) stays on its line. `.phase` and `.dephase` now take a trailing label too, like `.org`.
+- **Embedded strings and `.cstr`**: the 64x4 and Redux configs have `allow_embedded_strings` with terminator 0, so `JPS _Print "READY.", 10, 0` stays one line as `JPS _Print "READY.\n"`, and `"autostart", 0` is `.cstr "autostart"`: the new `terminated_strings` rule.
+- **`.align`**, now that it keeps an aligned address: ca65's `.align`, vasm's `even` (as `.align 2`) and vasm's `align N`, whose argument is a bit count (as `.align 1 << N`: the rename keeps `N` after the target), convert instead of being reported. `rename_directives` targets may now carry fixed arguments for this.
+- **`#error`, `#if` and `.dephase`** for ca65's `.fatal` and `.reloc` and vasm's `cond` and `ifne`.
+
+Considered and left: ca65's `.warning` as `#print yellow` (it needs an argument inserted, and warns only); writing Carsten's muted `#org X name:` declarations as constants (`name = X`), a style choice, since the converted form is valid BespokeASM; vasm's `dsw`-style word reservations as `.zero` (they need the count doubled).
+
+**ca65's `.org` is BespokeASM's `.phase`.** ca65 assembles what follows for the address but leaves the bytes where the segment puts them (checked with ca65 2.18: `jmp here` after `.org $C000` assembles at $8001 in a segment loaded at $8000, and `.reloc` returns to the segment's addresses). Milestone 8 mapped `.org` to `.org`, which is right only when the segment is loaded at that address. The user chose (Nov 27, 2026) to keep a `.org` before any bytes as `.org` and make later ones `.phase`: the new `origin_phases` rule. A sample with a RAM routine after ROM code migrates to the same bytes as ca65 and ld65. See milestone 11.6 for the linker configuration.
+
+**Testing.** `test/config_files/slu4/` holds a subset of the 64x4 config and a sample in Carsten's syntax with the Intel HEX his assembler produced; the tests migrate and assemble it and compare. The corpus check over his repositories is manual, since the programs aren't copied into this repository.
+
 ## Milestone 11: migrating Microsoft BASIC
 
 **Goal:** Ben Eater's [msbasic](https://github.com/beneater/msbasic), mist64's reconstruction of Microsoft BASIC with Ben's `eater` target, migrated with `bespokeasm migrate --from ca65` and assembled with `w65c02.yaml`, gives the same ROM image as `ca65 -D eater msbasic.s` linked with `ld65 -C eater.cfg`. Decided Nov 26, 2026: milestone 8 only reports what msbasic needs; this milestone builds it, after milestone 9.
@@ -486,7 +528,7 @@ Its rules are `split_statements`, `rename_directives: {org: '.org'}`, `bare_data
 | 11.3 | `name := <(* - start)`, a value computed from addresses | constants, resolved the way labels are |
 | 11.4 | `.macpack longbranch` (`jeq` and so on) | the config's instruction macros, and `select_by_value` |
 | 11.5 | `.macro`, `.repeat`, `.strlen`, `.strat` | new: source macros; string encodings extend the data directives |
-| 11.6 | `.segment` and the ld65 config | memory zones |
+| 11.6 | `.segment`, the ld65 config, `load`/`run`, generated symbols | memory zones (chained, stored in another zone, in their own address space), with `ZONE_*()` functions; no linker |
 
 **What msbasic uses** (66 source files, about 11,800 lines, surveyed Nov 26, 2026; one build assembles the files `msbasic.s` includes for its target):
 
@@ -562,6 +604,23 @@ msbasic uses `.repeat`, `.strlen()` and `.strat()` only inside two macros, `htas
 
 **Decided Nov 26, 2026: BespokeASM gets no separate segment feature. ld65-style segments are built by extending memory zones**, so the configuration and syntax stay one concept rather than two parallel ones. `bespokeasm migrate` converts ca65's `.segment "NAME"` to `.memzone NAME`.
 
+**Decisions made Nov 27, 2026:**
+
+1. **No linker and no relocatable object format.** ld65 exists because ca65 assembles each file separately: its object files carry holes for addresses that the linker fills once it has placed each segment. BespokeASM assembles the whole program at once through `#include`, so every address is known before any byte is written, and layout happens inside the assembler. msbasic is built the same way: `msbasic.s` includes every other file into one ca65 run, and ld65 only places that one object's segments, so what it needs from ld65 is layout, not separate assembly.
+2. **One zone concept, in two roles.** A memory zone stays a named address range. For any code, the zone it is assembled in is its **run zone**, and its addresses come from there. A zone may also be **stored in** another zone: its code keeps its own addresses while its bytes go at the storage zone's current position, as ld65's `load = ROM, run = RAM` does. Without that, a zone is stored at its own addresses, as now. Sketch, syntax to be designed: `#create_memzone RAMCODE 0x0200 0x02ff stored_in ROM`.
+3. **`.phase` is the inline form of the same thing.** Milestone 9 gave every line a run address and a storage position; a stored-in zone sets that pair for a whole zone, and `.phase` for a block inside one (each MinOS program at 0xfc00). Both stay.
+4. **The roles are checked differently.** Run ranges may overlap: MinOS's twelve programs all run at 0xfc00, and overlays share one RAM area. Storage may not, since each position holds one byte; milestone 9's overlap check already compares storage positions. Fill (ld65's `fill = yes`) belongs to storage.
+5. **A copier gets its numbers from expression functions**, called like `LSB()`: the run address, storage position and size of a zone, sketched as `ZONE_START(name)`, `ZONE_LOAD(name)` and `ZONE_SIZE(name)`. They replace the symbols ld65 generates with `define = yes` (`__DATA_RUN__`, `__DATA_LOAD__`, `__DATA_SIZE__`), which cc65's `copydata` uses, without magic label names. Their values are known only after layout, so they resolve the way 11.3's address-dependent constants do. Names to be settled in the design.
+6. **A zone may declare an address space other than the CPU's.** Every zone lives in an address space, by default the CPU's, which `GLOBAL` spans. A zone may instead declare another space with its own size, such as the Minimal 64x4's 512KB flash (sketch: `#create_memzone FLASH 0x00000 0x7ffff space=flash`), and an ISA config can predefine spaces next to its predefined zones.
+   - Code runs only in the CPU's space: a zone in another space can be a storage target but not a run zone. Its labels are still values, so `LSB(table)`, `BYTE1(table)` and `BYTE2(table)` give a flash address's bytes for an instruction such as `RZP`.
+   - Each space has its own image: the overlap check, fill and output work per space. Intel HEX has extended-address records for images beyond 64KB. With more than one non-CPU space, each would want its own output file, as ld65's `file =` gives a memory area.
+   - There is no mapping between spaces: a space is a separate numbering, not a window onto the CPU's addresses. Code is copied between them at run time.
+   - With it, MinOS's layout says what it means: its flash banks become zones in a `FLASH` space, and the kernel, tables and file system are stored in them, instead of the source encoding banks in `#org 0x1000`-style addresses. Milestone 9's check that a storage position fits the CPU's address space becomes a check against the storage zone's space.
+7. **`migrate` reads the linker configuration.** A `--linker-config` option (name to be settled) converts an ld65 configuration into zone declarations: memory areas into zones, segment placement into chained zones, `run` addresses into stored-in zones, and `file = ""` areas into muted zones. msbasic needs `eater.cfg` converted this way.
+8. **Relocation when a program is loaded, if it is ever wanted, is an output format, not a linker.** A loader that places a program wherever there is room needs the offsets of every word that holds an address, as o65 and CP/M's PRL files list them. BespokeASM knows which operands are addresses, so it could write such a table with the image. Not planned; recorded as the direction for the "relocatable blocks" the user wants eventually.
+
+**ca65's `.org` (decided Nov 27, 2026, built in milestone 9).** ca65's `.org` is BespokeASM's `.phase`: ca65 resolves the addresses of what follows, and the linker still decides where its bytes go (checked with ca65 2.18; see the [milestone 9 notes](#milestone-9-notes-nov-27-2026)). The `ca65` dialect's `origin_phases` rule keeps a `.org` before any bytes as `.org`, since it states where the code is loaded, and makes a later one `.phase`; `.reloc` becomes `.dephase`. A program with a RAM routine after its ROM code migrates to the same bytes as ca65 and ld65. With the linker configuration available (decision 7), the first `.org` can be checked against the real load address.
+
 ld65 places segments from a linker configuration: each memory area (`BASROM: start = $8000, size = $7E00, fill = yes`) holds its segments in the listed order, each starting where the previous one ends. The source switches segments freely, and the code for one segment is the concatenation, in source order, of every stretch written to it. msbasic's `keyword_rts` macro writes to `VECTORS`, `KEYWORDS` and `DUMMY` in one call.
 
 What memory zones already provide:
@@ -569,16 +628,17 @@ What memory zones already provide:
 - **Switching back and forth.** Separate stretches of code in one zone are assembled as if concatenated in source order, which is how a segment collects its code.
 - **A named target.** `.memzone NAME` is the counterpart of `.segment "NAME"`.
 - **Address checks**, and the zones `select_by_value` tests against.
-- **Space with no output.** `#mute` assembles without emitting, which covers ld65 memory with `file = ""` (`ZEROPAGE`, `INPUT_BUFFER`) and msbasic's `DUMMY` token counter, where each `define_token` reserves a byte and a token's value is its offset (with 11.3).
-- **Fill.** `-s`, `-e` and `-f` pad the whole image, which is all a single ROM needs; ld65's per-area `fill = yes` needs nothing more.
+- **Space with no output.** `#mute` assembles without emitting, which covers ld65 memory with `file = ""` (`ZEROPAGE`, `INPUT_BUFFER`) and msbasic's `DUMMY` token counter, where each `define_token` reserves a byte and a token's value is its offset (with 11.3). Muted code may share addresses with other code: since milestone 9 a muted line puts no bytes in the image, so it overlaps nothing (msbasic's `DUMMY` and `ZEROPAGE` both start at `$0000`).
+- **Fill.** `-s`, `-e` and `-f` pad the whole image, which is all a single ROM needs.
+- **A run address apart from storage**, per line, since milestone 9's `.phase`.
 
-What memory zones need for this:
+What memory zones need for this, besides decisions 2 to 6:
 
 - **A floating start.** A zone placed after another zone, so that a chain of zones lays out like an ld65 memory area: each zone starts where the previous one's content ends. Syntax to be designed; a sketch is `#create_memzone KEYWORDS after VECTORS`. Starts then depend on sizes, so they are settled in pass-1 relaxation (milestone 5), which already reruns address assignment until nothing changes. An end bound (ld65's area `size`) is still checked.
 - **A zone selection that persists past its file.** An included file starts in `GLOBAL` and the includer's zone returns afterwards; ld65's active segment carries across includes, and a macro can switch it for its caller (`keyword_rts` leaves the caller in `KEYWORDS`). Needed once macros switch zones, so designed with 11.5.
-- **Checks to confirm:** whether muted code in two overlapping zones at the same addresses passes the rule that two bytes at one address are an error (msbasic's `DUMMY` and `ZEROPAGE` both start at `$0000`), and what `.org` means inside a zone with a floating start.
+- **To confirm in the design:** what `.org` means inside a zone with a floating start, and inside a stored-in zone.
 
-Where the layout lives follows from this: as `#create_memzone` lines, in source or in the ISA config's `predefined.memory_zones`, like any other zone. `migrate` could also convert an ld65 configuration into those lines.
+Where the layout lives follows from this: as `#create_memzone` lines, in source or in the ISA config's `predefined.memory_zones`, like any other zone, written by hand or converted from an ld65 configuration (decision 7).
 
 ### 11.7 Smaller items
 
@@ -604,6 +664,8 @@ Where the layout lives follows from this: as `#create_memzone` lines, in source 
 | `offset_base` and `offset_from_instruction_end` both set | config error | by config path |
 | `--from` left out, or naming a dialect the config doesn't declare | usage error | lists the config's dialects |
 | `-o` names the source file | usage error | `--output-file is the source file; migrate never overwrites its input` |
+| `.phase` outside the address space | error | `.phase address 65536 (0x10000) is outside the address space (0x0 to 0xffff)` |
+| a phased line's bytes past the end of the address space | error | `the bytes of this line would go at image position …, past the end of the address space` |
 | a `migrations` rule kind BespokeASM doesn't have, or a bad parameter | config error | by config path |
 | a line a migration rule can't convert | reported | `; MIGRATE: <reason>: <line>` in the output, plus the summary |
 | an included file | note | `includes <file>; migrate it separately`, in the summary only |
@@ -620,6 +682,6 @@ Each milestone ends with tests, pre-commit, and byte comparison of all existing 
 6. The 6502 and W65C02S configs, with every opcode byte-compared against ca65 fixtures.
 7. Ben Eater programs, platform include, docs, wiki and editor checks. (The `-s`/`-e`/`-f` number forms were added early, during milestone 6.)
 8. `bespokeasm migrate`: the rule engine and the 6502 `ca65` and `vasm` dialects.
-9. The `slu4` dialect in the Minimal CPU, Minimal 64, Minimal 64x4 and Redux configs, byte-compared against Carsten's assemblers.
+9. The `slu4` dialect in the Minimal CPU, Minimal 64, Minimal 64x4 and Redux configs, byte-compared against Carsten's assemblers, with `.phase`/`.dephase` for MinOS.
 10. *(Not yet assigned.)*
-11. [Migrating Microsoft BASIC](#milestone-11-migrating-microsoft-basic), extending existing features where possible: `#ifdef` on labels and constants, boolean operators and `defined()` in expressions, constants computed from addresses, long branches as instruction macros, source macros with string encodings on the data directives, and memory zones that place code the way ld65 places segments.
+11. [Migrating Microsoft BASIC](#milestone-11-migrating-microsoft-basic), extending existing features where possible: `#ifdef` on labels and constants, boolean operators and `defined()` in expressions, constants computed from addresses, long branches as instruction macros, source macros with string encodings on the data directives, and memory zones that place code the way ld65 places segments, including code stored apart from where it runs and storage in its own address space, with `migrate` reading the ld65 configuration. No linker.

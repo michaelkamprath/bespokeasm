@@ -17,9 +17,23 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from bespokeasm.migrate import element_rules
 from bespokeasm.migrate.rules import LoadEnvironment
 from bespokeasm.migrate.rules import Rule
-from bespokeasm.migrate.rules import RULE_KINDS
+from bespokeasm.migrate.rules import RULE_KINDS as LINE_RULE_KINDS
+
+RULE_KINDS = {
+    **LINE_RULE_KINDS,
+    **{
+        rule.kind: rule
+        for rule in (
+            element_rules.SplitStatements,
+            element_rules.BareData,
+            element_rules.CharLiterals,
+            element_rules.MutedOrigin,
+        )
+    },
+}
 
 DIALECT_KEYS = {'description', 'rules'}
 
@@ -34,6 +48,11 @@ class Dialect:
     def doubled_quotes(self) -> bool:
         """Whether a doubled quote inside a string is part of it, as in `'IT''S'`."""
         return any(getattr(rule, 'doubled_quotes', False) for rule in self.rules)
+
+    @property
+    def literal_backslashes(self) -> bool:
+        """Whether a backslash in the source's strings is a plain character, as in `"\\"`."""
+        return any(getattr(rule, 'literal_backslashes', False) for rule in self.rules)
 
 
 def load_migrations(section, env: LoadEnvironment) -> dict[str, Dialect]:

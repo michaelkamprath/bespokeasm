@@ -7,8 +7,7 @@ general:
     - a
     - b
     - mar
-    - byte
-    - org
+    - __LANGUAGE_NAME__
 operand_sets:
   interger:
     operand_values:

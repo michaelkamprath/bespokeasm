@@ -177,8 +177,10 @@ def test_unterminated_block_is_an_error_even_when_excluded(tmp_path):
     assert '#verbatim block started on line 5 has no #endverbatim' in message
 
 
-def test_verbatim_is_a_reserved_word(tmp_path):
-    assert '"verbatim" is an assembler keyword' in _error(tmp_path, 'verbatim:\n    ld a, b, c\n')
+def test_verbatim_can_name_a_label(tmp_path):
+    """Directives are written with their `#`, so their names aren't reserved."""
+    _, stderr, _ = _run(tmp_path, 'verbatim:\n    ld a, b, c\n', _write_config(tmp_path))
+    assert 'keyword' not in stderr
 
 
 # ---- configuration ---------------------------------------------------------------------------

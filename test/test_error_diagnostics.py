@@ -519,12 +519,9 @@ class TestLabelMessages:
     def test_local_label_before_global_label(self, tmp_path):
         assert_error(tmp_path, '.loop:\n  nop\n', r'local label "\.loop" must come after a global label')
 
-    def test_keyword_as_label(self, tmp_path):
-        assert_error(
-            tmp_path,
-            'byte = 5\n  nop\n',
-            r'"byte" cannot be used as a label or constant name because "byte" is an assembler keyword',
-        )
+    def test_directive_name_as_label(self, tmp_path):
+        """Directives are written with their `.` or `#`, so their names may be labels and constants."""
+        assert 'keyword' not in assemble_capturing_warnings(tmp_path, 'byte = 5\nerror:\n  nop\n')
 
     def test_bytecode_past_end_of_zone(self, tmp_path):
         assert_error(

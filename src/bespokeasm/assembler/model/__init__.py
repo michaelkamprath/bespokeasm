@@ -974,6 +974,11 @@ class AssemblerModel:
         return self._registers
 
     @property
+    def config(self) -> dict:
+        '''the instruction set configuration as loaded'''
+        return self._config
+
+    @property
     def operation_mnemonics(self) -> list[str]:
         '''returns list of all mnemonics, including instruction aliases and macros'''
         return self._instructions.operation_mnemonics

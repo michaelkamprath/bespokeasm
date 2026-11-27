@@ -10,7 +10,9 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
+from dataclasses import field
 
+from bespokeasm.migrate.isa import InstructionShape
 from bespokeasm.migrate.lexer import directive_name
 from bespokeasm.migrate.lexer import Line
 
@@ -31,6 +33,11 @@ class MigrationContext:
     mnemonics: frozenset[str]
     # BespokeASM's directive names, in lower case, without their `.` or `#`.
     directive_names: frozenset[str]
+    # Each mnemonic's operand count and opcode, by lower-case mnemonic.
+    shapes: dict[str, InstructionShape] = field(default_factory=dict)
+    # The byte `.cstr` ends a string with, and whether the instruction set has embedded strings.
+    string_terminator: int = 0
+    embedded_strings: bool = False
 
 
 class Rule:
@@ -111,7 +118,8 @@ def _directive_at(line: Line, names: dict[str, object], context: MigrationContex
 
 
 class RenameDirectives(Rule):
-    """Renames directives: `.include "x"` becomes `#include "x"`. Arguments are kept."""
+    """Renames directives: `.include "x"` becomes `#include "x"`. Arguments are kept. A target
+    may add fixed arguments: with `{even: '.align 2'}`, `even` becomes `.align 2`."""
     kind = 'rename_directives'
 
     def __init__(self, renames: dict[str, str]) -> None:
@@ -123,7 +131,8 @@ class RenameDirectives(Rule):
         for source, target in _mapping(params, path, env).items():
             if not isinstance(source, str) or directive_name(source) is None:
                 env.error(f'{path}.{source}', 'must be a directive name')
-            if target not in env.directive_spellings:
+            # A target may give the directive fixed arguments, as `.align 2` does for `even`.
+            if not isinstance(target, str) or not target.split() or target.split()[0] not in env.directive_spellings:
                 env.error(
                     f'{path}.{source}',
                     f'must name a BespokeASM directive, such as ".org" or "#include", not {target!r}',
@@ -446,17 +455,27 @@ class CurrentAddressSymbol(Rule):
 
 
 class StringEscapes(Rule):
-    """Converts a quote written twice inside a string, `'IT''S'`, to an escaped one, `'IT\\'S'`."""
+    """Converts other ways of writing a character inside a string to BespokeASM's escapes. With
+    `doubled_quotes: true`, a quote written twice, `'IT''S'`, becomes `'IT\\'S'`. With
+    `backslash: literal`, for a source where a backslash is a plain character, `"C:\\"`
+    becomes `"C:\\\\"`."""
     kind = 'string_escapes'
-    doubled_quotes = True
+
+    def __init__(self, doubled_quotes: bool, literal_backslashes: bool) -> None:
+        self.doubled_quotes = doubled_quotes
+        self.literal_backslashes = literal_backslashes
 
     @classmethod
     def load(cls, params, path, env):
         params = _mapping(params, path, env)
-        _check_keys(params, {'doubled_quotes'}, path, env)
-        if params.get('doubled_quotes') is not True:
+        _check_keys(params, {'doubled_quotes', 'backslash'}, path, env)
+        if 'doubled_quotes' in params and params['doubled_quotes'] is not True:
             env.error(f'{path}.doubled_quotes', 'must be true')
-        return cls()
+        if 'backslash' in params and params['backslash'] != 'literal':
+            env.error(f'{path}.backslash', 'must be "literal"')
+        if not params:
+            env.error(path, 'takes "doubled_quotes: true" or "backslash: literal"')
+        return cls('doubled_quotes' in params, 'backslash' in params)
 
     def apply(self, lines, context):
         for line in lines:
@@ -466,10 +485,15 @@ class StringEscapes(Rule):
             for start, end in line.strings():
                 quote = line.text[start]
                 inner = line.text[start + 1:end - 1]
-                if quote * 2 in inner:
-                    edits.append((start + 1, end - 1, inner.replace(quote * 2, '\\' + quote)))
-            if edits:
-                line.replace(edits)
+                converted = inner.replace('\\', '\\\\') if self.literal_backslashes else inner
+                if self.doubled_quotes:
+                    converted = converted.replace(quote * 2, '\\' + quote)
+                if converted != inner:
+                    edits.append((start + 1, end - 1, converted))
+            if self.literal_backslashes:
+                # From here on, a backslash in this line's strings is an escape.
+                line.literal_backslashes = False
+            line.replace(edits)
 
 
 class AssignmentOperators(Rule):
@@ -498,6 +522,103 @@ class AssignmentOperators(Rule):
                 line.replace([(match.end(1), match.end(), '=')])
 
 
+class OriginPhases(Rule):
+    """For an assembler whose `.org` sets only the address code is assembled for, leaving where
+    its bytes go to the linker, as ca65's does: a `.org` before any bytes states where the code
+    is loaded and stays `.org`; a later one becomes `.phase`. Runs after the renames, on `.org`."""
+    kind = 'origin_phases'
+
+    def apply(self, lines, context):
+        from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET
+        from bespokeasm.assembler.keywords import PREPROCESSOR_DIRECTIVES_SET
+        not_bytes = (COMPILER_DIRECTIVES_SET | PREPROCESSOR_DIRECTIVES_SET) - {'align'}
+        seen_bytes = False
+        for line in lines:
+            if not line.active:
+                continue
+            statement = line.statement()
+            head = statement.head
+            if head is None:
+                continue
+            name = directive_name(head)
+            if head[0] == '.' and name == 'org':
+                if seen_bytes:
+                    line.replace([(*statement.head_span, '.phase')])
+            elif head.lower() in context.mnemonics or (
+                head[0] == '.' and name in context.directive_names and name not in not_bytes
+            ):
+                seen_bytes = True
+
+
+class TerminatedStrings(Rule):
+    """Writes string data that ends in the instruction set's string terminator as the `.cstr`
+    it is: `.byte "Ready", 10, 0` becomes `.cstr "Ready\\n"`. Where another rule split such data
+    off an instruction and the instruction set has embedded strings, it goes back on the
+    instruction's line as one: `jps print "Ready\\n"`. Only strings and the bytes for a tab, a
+    line feed or a carriage return are joined; other data stays `.byte`."""
+    kind = 'terminated_strings'
+    _ESCAPES = {9: '\\t', 10: '\\n', 13: '\\r'}
+    _NUMBER = re.compile(r'0[xX][0-9a-fA-F]+|\d+')
+
+    def apply(self, lines, context):
+        index = 0
+        while index < len(lines):
+            line = lines[index]
+            index += 1
+            if not line.active or line.literal_backslashes:
+                continue
+            statement = line.statement()
+            if statement.head is None or statement.head.lower() != '.byte':
+                continue
+            literal = self._string(line, statement.operands_start, context.string_terminator)
+            if literal is None:
+                continue
+            previous = lines[index - 2] if index >= 2 else None
+            if (
+                context.embedded_strings and statement.label is None and previous is not None
+                and previous.number == line.number and previous.active
+                and (previous.statement().head or '').lower() in context.mnemonics
+            ):
+                # Back on its instruction's line, as an embedded string.
+                comment = line.text[line.comment_start:]
+                code = previous.text[:previous.comment_start].rstrip() + ' ' + literal
+                rest = previous.text[previous.comment_start:] or comment
+                gap = max(previous.comment_start - len(code), 1) if rest else 0
+                previous.replace([(0, len(previous.text), code + ' ' * gap + rest if rest else code)])
+                del lines[index - 1]
+                index -= 1
+                continue
+            head = statement.head_span
+            line.replace([(head[0], len(line.code.rstrip()), f'.cstr {literal}')])
+
+    def _string(self, line: Line, start: int, terminator: int) -> str | None:
+        """The values after `start` as one double-quoted string without its terminator, or None."""
+        masked, text = line.code, line.text
+        values, begin = [], start
+        for position in range(start, len(masked) + 1):
+            if position == len(masked) or masked[position] == ',':
+                values.append(text[begin:position].strip())
+                begin = position + 1
+        pieces, has_string = [], False
+        for number, value in enumerate(values):
+            last = number == len(values) - 1
+            if len(value) >= 2 and value[0] in '"\'' and value[-1] == value[0]:
+                inner = value[1:-1]
+                if value[0] == "'":
+                    inner = re.sub(r'(?<!\\)"', '\\"', inner)
+                pieces.append(inner)
+                has_string = True
+            elif self._NUMBER.fullmatch(value) and not last and int(value, 0) in self._ESCAPES:
+                pieces.append(self._ESCAPES[int(value, 0)])
+            elif self._NUMBER.fullmatch(value) and last and int(value, 0) == terminator:
+                pass
+            else:
+                return None
+        if not has_string or not values or not self._NUMBER.fullmatch(values[-1]):
+            return None
+        return '"' + ''.join(pieces) + '"'
+
+
 RULE_KINDS: dict[str, type[Rule]] = {
     rule.kind: rule
     for rule in (
@@ -512,5 +633,7 @@ RULE_KINDS: dict[str, type[Rule]] = {
         CurrentAddressSymbol,
         StringEscapes,
         AssignmentOperators,
+        OriginPhases,
+        TerminatedStrings,
     )
 }

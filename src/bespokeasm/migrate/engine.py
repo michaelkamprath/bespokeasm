@@ -47,12 +47,16 @@ class MigrationResult:
 
 def migrate(text: str, dialect: Dialect, context: MigrationContext) -> MigrationResult:
     source_lines = text.splitlines()
-    lines = [Line(number, line, dialect.doubled_quotes) for number, line in enumerate(source_lines, start=1)]
+    lines = [
+        Line(number, line, dialect.doubled_quotes, dialect.literal_backslashes)
+        for number, line in enumerate(source_lines, start=1)
+    ]
     counts = []
     for rule in dialect.rules:
-        before = [_state(line) for line in lines]
+        before = _states(lines)
         rule.apply(lines, context)
-        changed = sum(1 for line, state in zip(lines, before) if _state(line) != state)
+        after = _states(lines)
+        changed = sum(1 for number, state in after.items() if before.get(number) != state)
         counts.append(RuleCount(rule.kind, changed))
     for line in lines:
         statement = line.statement()
@@ -64,5 +68,9 @@ def migrate(text: str, dialect: Dialect, context: MigrationContext) -> Migration
     return MigrationResult(lines, counts, text.endswith(('\n', '\r')), newline)
 
 
-def _state(line: Line) -> tuple:
-    return line.text, len(line.reports), line.dropped
+def _states(lines: list[Line]) -> dict[int, tuple]:
+    """Each source line's state, by its number: a rule may split a line into several."""
+    states: dict[int, tuple] = {}
+    for line in lines:
+        states[line.number] = states.get(line.number, ()) + ((line.text, len(line.reports), line.dropped),)
+    return states

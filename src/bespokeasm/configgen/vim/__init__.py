@@ -139,6 +139,10 @@ class VimConfigGenerator(LanguageConfigGenerator):
             (f'{lang_group}AnnotationArgument', SyntaxElement.ANNOTATION_ARGUMENT),
             (f'{lang_group}AnnotationPunct', SyntaxElement.PUNCTUATION_SEPARATOR),
             (f'{lang_group}AnnotationValue', SyntaxElement.ANNOTATION_VALUE),
+            (f'{lang_group}OutputFormatName', SyntaxElement.OUTPUT_FORMAT_NAME),
+            (f'{lang_group}OutputFormatOption', SyntaxElement.OUTPUT_FORMAT_OPTION),
+            (f'{lang_group}OutputFormatValue', SyntaxElement.OUTPUT_FORMAT_VALUE),
+            (f'{lang_group}OutputFormatPunct', SyntaxElement.PUNCTUATION_SEPARATOR),
             (f'{lang_group}Separator', SyntaxElement.PUNCTUATION_SEPARATOR),
             (f'{lang_group}Continuation', SyntaxElement.PUNCTUATION_SEPARATOR),
             (f'{lang_group}Instruction', SyntaxElement.INSTRUCTION),
@@ -413,13 +417,18 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         lines.append(fr'syn match {lang_group}BinNumber /\<[01]\+[bB]\>/')
         lines.append(fr'syn match {lang_group}OctNumber /\<\%\(0o[0-7]\+\|[0-7]\+[qQoO]\)\>/')
         lines.append(fr'syn match {lang_group}DecNumber /\<\d\+\>/')
-        lines.append(f"syn match {lang_group}CharNumber /'.'/")
+        lines.append(f"syn match {lang_group}CharNumber /'\\%(\\\\.\\|[^'\\\\]\\)'/")
         # Labels
         lines.append(
             fr'syn match {lang_group}LabelName '
             fr'/^\s*{symbol_pattern}\s*\ze:/ contained'
         )
         lines.append(fr'syn match {lang_group}LabelColon /:/ contained')
+        # A label after an origin or zone directive's argument: `.org $10 name:`.
+        lines.append(
+            fr'syn match {lang_group}DirectiveLabelName '
+            fr'/\%(\s\)\@<={symbol_pattern}\ze\s*:\%(=\)\@!/ contained'
+        )
         lines.append(
             fr'syn match {lang_group}LabelName '
             fr'/^\s*{symbol_pattern}\s*:/ '
@@ -483,7 +492,8 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
                 fr'start=/\s*\.{self._vim_escape(w)}\>/ '
                 fr'end=/\s*\ze;\|$/ oneline '
                 # Only compiler directives name memory zones: `.memzone RAM`, `.org $10 "RAM"`.
-                fr'contains={directive_contains},{lang_group}MemoryZoneName,{lang_group}MemoryZoneQuoted'
+                fr'contains={directive_contains},{lang_group}MemoryZoneName,{lang_group}MemoryZoneQuoted,'
+                fr'{lang_group}DirectiveLabelName,{lang_group}LabelColon'
             )
         # A trailing \ continues a data directive or an embedded string on the next line. The
         # match is top level, for the continuation lines, and in the data directive region; an
@@ -600,6 +610,14 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
             fr'/\%(^\s*#annotate\>[^;]*\)\@<=\<{self._alternation(arguments)}\>/'
         )
         lines.append(fr'syn match {lang_group}AnnotationPunct /\%(^\s*#annotate\>[^;]*\)\@<==/')
+        # #output-format <format> <option>=<value> ...: the format's name, then its options and values.
+        lines.append(fr'syn match {lang_group}OutputFormatName /\%(^\s*#output-format\s\+\)\@<=\h\w*/')
+        lines.append(
+            fr'syn match {lang_group}OutputFormatOption '
+            fr'/\%(^\s*#output-format\s\+\h\w*\s[^;]*\)\@<=\%(=\)\@<!\<\h\w*\>/'
+        )
+        lines.append(fr'syn match {lang_group}OutputFormatPunct /\%(^\s*#output-format\>[^;]*\)\@<==/')
+        lines.append(fr'syn match {lang_group}OutputFormatValue /\%(^\s*#output-format\>[^;]*=\)\@<=\w\+/')
         # A memory zone's name where a line defines or selects it, or `.org` counts from it.
         # Defined after the label and string rules so these win where both match.
         lines.append(fr'syn match {lang_group}MemoryZone /\%(^\s*#create_memzone\s\+\)\@<=\h\w*/')
@@ -681,6 +699,7 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         lines.append(f'hi def link {lang_group}CurrentAddress Special')
         lines.append(f'hi def link {lang_group}CharNumber Number')
         lines.append(f'hi def link {lang_group}LabelName Label')
+        lines.append(f'hi def link {lang_group}DirectiveLabelName {lang_group}LabelName')
         lines.append(f'hi def link {lang_group}LabelUsage Identifier')
         lines.append(f'hi def link {lang_group}LabelColon Delimiter')
         lines.append(f'hi def link {lang_group}OperandLabelAt Delimiter')
@@ -716,6 +735,10 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         lines.append(f'hi def link {lang_group}AnnotationArgument Identifier')
         lines.append(f'hi def link {lang_group}AnnotationPunct Delimiter')
         lines.append(f'hi def link {lang_group}AnnotationValue Constant')
+        lines.append(f'hi def link {lang_group}OutputFormatName Identifier')
+        lines.append(f'hi def link {lang_group}OutputFormatOption Identifier')
+        lines.append(f'hi def link {lang_group}OutputFormatValue Constant')
+        lines.append(f'hi def link {lang_group}OutputFormatPunct Delimiter')
         # BespokeASM color scheme from central configuration
         color_lines = self._generate_vim_color_lines(lang_group)
         lines.extend(color_lines)
@@ -764,15 +787,19 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
             "  for l:lnum in range(1, line('$'))",
             '    let l:line = getline(l:lnum)',
             "    let l:line = substitute(l:line, ';.*$', '', '')",
-            f"    let l:m = matchlist(l:line, '^\\s*\\({symbol_pattern}\\)\\s*:')",
+            # A label starts a line, or follows an origin or zone directive: `.org $10 name:`.
+            "    let l:m = matchlist(l:line, '\\c^\\s*\\%(\\.\\%(org\\|memzone\\|phase\\|dephase\\)\\>[^;:]*\\s\\)\\="
+            f"\\({symbol_pattern}\\)\\s*:\\%(=\\)\\@!')",
             '    if !empty(l:m)',
             '      let l:globals[l:m[1]] = 1',
-            '      continue',
             '    endif',
-            f"    let l:m = matchlist(l:line, '^\\s*@\\({symbol_pattern}\\)\\s*:')",
-            '    if !empty(l:m)',
-            '      let l:locals[l:m[1]] = 1',
-            '    endif',
+            # Operand labels may be anywhere on a line, and are referred to by their plain name.
+            '    let l:found = []',
+            f"    call substitute(l:line, '@\\({symbol_pattern}\\)\\s*:', '\\=add(l:found, submatch(1))', 'g')",
+            '    for l:name in l:found',
+            '      let l:locals[l:name] = 1',
+            '      let l:globals[l:name] = 1',
+            '    endfor',
             '  endfor',
             f'  let b:bespokeasm_{vim_filetype}_globals = keys(l:globals)',
             f'  let b:bespokeasm_{vim_filetype}_locals = keys(l:locals)',
@@ -782,7 +809,8 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
             f'  silent! syntax clear {vim_filetype}LabelUsage',
             f"  if !empty(get(b:, 'bespokeasm_{vim_filetype}_globals', []))",
             f"    let l:alt = join(map(copy(b:bespokeasm_{vim_filetype}_globals), 'escape(v:val, ''/\\.'')'), '\\|')",
-            f"    execute 'syntax match {vim_filetype}LabelUsage /\\<\\%(' . l:alt . '\\)\\>/ contained'",
+            # Not after `@`: that is an operand label's definition, which the next rule handles.
+            f"    execute 'syntax match {vim_filetype}LabelUsage /\\%(@\\)\\@<!\\<\\%(' . l:alt . '\\)\\>/ contained'",
             '  endif',
             f"  if !empty(get(b:, 'bespokeasm_{vim_filetype}_locals', []))",
             f"    let l:alt = join(map(copy(b:bespokeasm_{vim_filetype}_locals), 'escape(v:val, ''/\\.'')'), '\\|')",

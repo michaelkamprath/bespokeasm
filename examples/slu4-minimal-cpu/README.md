@@ -46,9 +46,18 @@ One important note here is that the calling convention that was designed for the
 * **BespokeASM** used a different syntax for some directives, notably the `.org` directive, which has the `#org` syntax in the Minimal CPU assembly. **BespokeASM** also has [a richer set of directives available](https://github.com/michaelkamprath/bespokeasm/wiki/Assembly-Language-Syntax#directives).
 * The Minimal CPU's assembler has no data type directives. Instead, the assembler directly converts numeric values and strings to byte code exactly where it sits in the code. In **BespokeASM** one must declare a data type using [a data directive](https://github.com/michaelkamprath/bespokeasm/wiki/Assembly-Language-Syntax#data) when defining data in the byte code.
 * The Minimal CPU assembler emits byte code in the order it was in the original assembly code, while **BespokeASM** emits byte code in address order. For the most part, these two orderings can be pretty much the same, however, differences will show up if multiple `.org` directives are use or multiple additional source files are included.
-* The Minimal CPU uses a `<` and `>` to do byte slicing of constant values, with `<` meaning least significant byte and `>` meaning most significant byte. **BespokeASM** using `BYTE0(..)` and `BYTE1(..)` [to accomplish the same goals](https://github.com/michaelkamprath/bespokeasm/wiki/Assembly-Language-Syntax#numeric-expressions) (respectively).
+* Carsten's `<` and `>`, the low and high byte of everything after them (`<label+1` is the low byte of `label+1`), work the same way in this configuration. `BYTE0(..)` and `BYTE1(..)` [do the same](https://github.com/michaelkamprath/bespokeasm/wiki/Assembly-Language-Syntax#numeric-expressions).
 
 There are several other features that **BespokeASM** provides over the Minimal CPU assembly syntax such as math expressions for constant values, but the differences listed above are the ones that require code written for the Minimal CPU assembler to be altered to be assembled with **BespokeASM**.
+
+### Migrating Carsten Herting's Programs
+`bespokeasm migrate` converts programs written for his Minimal CPU assembler (`asm.py`) to this configuration's syntax:
+
+```sh
+bespokeasm migrate -c slu4-minimal-cpu.yaml --from slu4 os.asm -o os.min-asm
+```
+
+The `slu4` dialect puts each directive, run of data and label that shares a line with other statements on a line of its own; gives data its `.byte` or `.2byte` directive, sized the way his assembler sizes it; converts `"a"` character literals and backslashes in strings; writes a string ending in 0 as `.cstr`; and turns `#mute #org 0xfc00 #emit`, which assembles what follows for 0xfc00 while storing it where the bytes were going, into [`.phase 0xfc00`](https://github.com/michaelkamprath/bespokeasm/wiki/Assembly-Language-Syntax#phase). `#end` and `#begin` become `#mute` and `#emit`, and a program that emits bytes before its first `#org` gets the `.org 0x0000` his assembler starts at. All 14 programs in the repository's `Programs` directory, the operating system included, migrate with nothing reported and assemble to the same bytes as his assembler. A label that self-modifying code puts on an instruction's operand becomes an [operand label](https://github.com/michaelkamprath/bespokeasm/wiki/Assembly-Language-Syntax#operand-labels), `LDI @value: 0xff`, and a mnemonic used as a value becomes its opcode, which the command's summary notes.
 
 ### Predefined Compiler Constants
 The standard operating system provided call vectors for a suite of API functions and system subroutines that are made available to user written programs. These API function labels are documented in the "API Functions" section of the Minimal CPU user guide. All documented API functions are implemented as predefined constants in this **BepsokeASM** port.

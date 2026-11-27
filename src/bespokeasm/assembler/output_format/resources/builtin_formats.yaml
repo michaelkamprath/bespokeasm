@@ -1,9 +1,18 @@
 # The built-in output formats that are defined, not written in Python. Each one uses the
 # schema of a configuration's output_formats section and is a -t value for every ISA.
 #
-# listing and symbols stay in Python (pretty_printer/): the listing's file headers and blank
-# lines are not a template, and a template does not escape JSON strings. A built-in format
-# may not use exports sections, because no annotation namespace exists for every ISA.
+# symbols stays in Python (pretty_printer/), since a template does not escape JSON strings. A
+# built-in format may not use exports sections, because no annotation namespace exists for
+# every ISA. A configuration may define its own listing, replacing this one: that is how an
+# ISA sets the listing's defaults, such as its overflow and width.
+listing:
+  documentation:
+    description: Source listing with addresses and assembled bytes.
+  template: "{?\n\n{listing}\n}"     # the blank lines -t listing has always had
+  sections:
+    listing:
+      generator: listing      # overflow none: the instruction column is as wide as the source
+
 hex:
   documentation:
     description: Text hex dump of the assembled bytes.

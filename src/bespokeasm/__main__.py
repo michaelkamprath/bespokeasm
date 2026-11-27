@@ -120,12 +120,9 @@ def _migrate_handler(source_file, config_file, dialect_name, output_file, verbos
 
     import click
     from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
-    from bespokeasm.assembler.keywords import BYTECODE_DIRECTIVES_SET
-    from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET
-    from bespokeasm.assembler.keywords import PREPROCESSOR_DIRECTIVES_SET
     from bespokeasm.assembler.model import AssemblerModel
     from bespokeasm.migrate.engine import migrate
-    from bespokeasm.migrate.rules import MigrationContext
+    from bespokeasm.migrate.isa import migration_context
 
     model = AssemblerModel(os.path.abspath(os.path.expanduser(config_file)), verbose, DiagnosticReporter())
     dialects = model.migrations
@@ -146,13 +143,7 @@ def _migrate_handler(source_file, config_file, dialect_name, output_file, verbos
 
     with open(source_file, encoding='utf-8', errors='surrogateescape', newline='') as handle:
         text = handle.read()
-    context = MigrationContext(
-        mnemonics=frozenset(name.lower() for name in model.operation_mnemonics),
-        directive_names=frozenset(
-            COMPILER_DIRECTIVES_SET | BYTECODE_DIRECTIVES_SET | PREPROCESSOR_DIRECTIVES_SET | set(model.directive_aliases)
-        ),
-    )
-    result = migrate(text, dialects[dialect_name], context)
+    result = migrate(text, dialects[dialect_name], migration_context(model))
     if output_file is None:
         click.echo(result.text, nl=False)
     else:

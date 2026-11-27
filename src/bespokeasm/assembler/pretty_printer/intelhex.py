@@ -25,7 +25,7 @@ class IntelHexPrettyPrinter(PrettyPrinterBase):
         for lobj in self.line_objects:
             if isinstance(lobj, LineWithWords) and not lobj.is_muted:
                 line_bytes = Word.words_to_bytes(lobj.get_words()).decode(encoding='latin-')
-                self._intel_hex.puts(lobj.address, line_bytes)
+                self._intel_hex.puts(lobj.image_address, line_bytes)
 
             elif isinstance(lobj, AddressOrgLine):
                 pass

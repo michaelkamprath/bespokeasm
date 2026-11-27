@@ -35,6 +35,8 @@ class Line:
     number: int
     text: str
     doubled_quotes: bool = False
+    # A backslash in a string is a plain character, not an escape, until a rule converts it.
+    literal_backslashes: bool = False
     # Why the line can't be converted. A reported line is written out as a comment.
     reports: list[str] = field(default_factory=list)
     # The line is written out as a comment, without a report.
@@ -50,7 +52,7 @@ class Line:
         self._lex()
 
     def _lex(self) -> None:
-        self._masked, self._comment_start = mask_line(self.text, self.doubled_quotes)
+        self._masked, self._comment_start = mask_line(self.text, self.doubled_quotes, self.literal_backslashes)
 
     @property
     def code(self) -> str:
@@ -67,12 +69,24 @@ class Line:
         return not self.reports and not self.dropped
 
     def replace(self, edits: list[tuple[int, int, str]]) -> None:
-        """Replace each (start, end) span of the line's text, then lex it again."""
+        """Replace each (start, end) span of the line's text, then lex it again. A comment
+        after code keeps its column where the spaces before it allow."""
         text = self.text
+        comment_column = self._comment_start if self._comment_start < len(self.text) else None
         for start, end, replacement in sorted(edits, key=lambda edit: edit[0], reverse=True):
             text = text[:start] + replacement + text[end:]
         self.text = text
         self._lex()
+        if comment_column is not None and self._comment_start < len(self.text) and self.code.strip():
+            code = self.text[:self._comment_start].rstrip()
+            if code.strip() and self._comment_start != comment_column:
+                gap = max(comment_column - len(code), 1)
+                self.text = code + ' ' * gap + self.text[self._comment_start:]
+                self._lex()
+
+    def derive(self, text: str) -> Line:
+        """A new line with this one's number and lexing, for a rule that splits a line."""
+        return Line(self.number, text, self.doubled_quotes, self.literal_backslashes)
 
     def statement(self) -> Statement:
         return parse_statement(self.code)
@@ -100,12 +114,13 @@ class Line:
         return self.text
 
 
-def mask_line(text: str, doubled_quotes: bool = False) -> tuple[str, int]:
+def mask_line(text: str, doubled_quotes: bool = False, literal_backslashes: bool = False) -> tuple[str, int]:
     """The line with each string literal replaced by MASK characters, and where its comment
     begins (the line's length when it has none).
 
-    A string is quoted with `"` or `'`, and a backslash escapes the next character. With
-    ``doubled_quotes``, a doubled quote inside a string, as in `'IT''S'`, is part of it.
+    A string is quoted with `"` or `'`, and a backslash escapes the next character unless
+    ``literal_backslashes``. With ``doubled_quotes``, a doubled quote inside a string, as in
+    `'IT''S'`, is part of it.
     """
     chars = list(text)
     index = 0
@@ -114,7 +129,7 @@ def mask_line(text: str, doubled_quotes: bool = False) -> tuple[str, int]:
         if char == COMMENT_CHAR:
             return ''.join(chars), index
         if char in '"\'':
-            end = _string_end(text, index, doubled_quotes)
+            end = _string_end(text, index, doubled_quotes, literal_backslashes)
             if end is None:
                 # An unterminated quote: a lone character literal, as in `lda #'A`, or a mistake.
                 # Either way, the rest of the line is not masked.
@@ -128,12 +143,12 @@ def mask_line(text: str, doubled_quotes: bool = False) -> tuple[str, int]:
     return ''.join(chars), len(text)
 
 
-def _string_end(text: str, start: int, doubled_quotes: bool) -> int | None:
+def _string_end(text: str, start: int, doubled_quotes: bool, literal_backslashes: bool = False) -> int | None:
     quote = text[start]
     index = start + 1
     while index < len(text):
         char = text[index]
-        if char == '\\':
+        if char == '\\' and not literal_backslashes:
             index += 2
             continue
         if char == quote:
@@ -170,3 +185,42 @@ def directive_name(word: str | None) -> str | None:
     if not word:
         return None
     return word.lstrip('.#').lower() or None
+
+
+@dataclass(frozen=True)
+class Element:
+    """One element of a line in an element-syntax source, where whitespace and commas separate
+    elements and a string can't contain a line break: its text and where it is in the line."""
+    start: int
+    end: int
+    text: str
+
+    @property
+    def is_label(self) -> bool:
+        return len(self.text) > 1 and self.text.endswith(':') and self.text[0] not in '"\''
+
+    @property
+    def is_quoted(self) -> bool:
+        return self.text[0] in '"\''
+
+
+def elements(code: str) -> list[Element]:
+    """The elements of a line's code, as Carsten Herting's assemblers read them: separated by
+    whitespace and commas, with `"` and `'` quoting text that may contain either, and no escapes.
+    ``code`` is the line before its comment."""
+    found = []
+    index = 0
+    while index < len(code):
+        if code[index] <= ' ' or code[index] == ',':
+            index += 1
+            continue
+        start = index
+        while index < len(code) and not (code[index] <= ' ' or code[index] in ',;'):
+            if code[index] in '"\'':
+                quote = code[index]
+                end = code.find(quote, index + 1)
+                index = len(code) if end < 0 else end + 1
+            else:
+                index += 1
+        found.append(Element(start, index, code[start:index]))
+    return found

@@ -69,6 +69,9 @@ class SyntaxElement(Enum):
     MEMORY_ZONE = 'memory_zone'
     ANNOTATION_ARGUMENT = 'annotation_argument'
     ANNOTATION_VALUE = 'annotation_value'
+    OUTPUT_FORMAT_NAME = 'output_format_name'
+    OUTPUT_FORMAT_OPTION = 'output_format_option'
+    OUTPUT_FORMAT_VALUE = 'output_format_value'
 
     # Preprocessor and directives
     PREPROCESSOR = 'preprocessor'
@@ -166,6 +169,11 @@ DEFAULT_COLOR_SCHEME = ColorScheme(
         SyntaxElement.MEMORY_ZONE: '#ff00a2',
         SyntaxElement.ANNOTATION_ARGUMENT: '#c080ff',
         SyntaxElement.ANNOTATION_VALUE: '#89c616',
+        # `#output-format <format> <option> <value>`: colored as a memory zone's name and
+        # #annotate's argument names and values are.
+        SyntaxElement.OUTPUT_FORMAT_NAME: '#ff00a2',
+        SyntaxElement.OUTPUT_FORMAT_OPTION: '#c080ff',
+        SyntaxElement.OUTPUT_FORMAT_VALUE: '#89c616',
 
         # Preprocessor and directives
         SyntaxElement.PREPROCESSOR: '#c080ff',

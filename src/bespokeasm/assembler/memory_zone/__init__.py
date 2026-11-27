@@ -10,6 +10,8 @@ class MemoryZone:
         self._end = end
         self._name = name
         self._current_address = start
+        # How far the image position is ahead of the current address inside a `.phase`; 0 outside one.
+        self.phase_offset = 0
         # validate passed values
         if end > ((2**address_bits)-1):
             raise ValueError(

@@ -1632,3 +1632,17 @@ macros:
           - "nob @ARG(0)+3"
           - "ldi 0"
           - "acb @ARG(0)+3"
+
+# Source migration (`bespokeasm migrate --from slu4`): converts programs written for Carsten
+# Herting's Minimal 64 assembler (asm.cpp) to this language.
+migrations:
+  slu4:
+    description: Carsten Herting's Minimal 64 assembler (asm.cpp)
+    rules:
+      - split_statements
+      - bare_data: {sizing: slu4}
+      - string_escapes: {backslash: literal}
+      - char_literals: {double_quoted: true}
+      - terminated_strings
+      - muted_origin
+      - rename_directives: {org: '.org'}

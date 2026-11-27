@@ -1,5 +1,6 @@
 import io
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 from dataclasses import field
 
@@ -64,7 +65,11 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         model: AssemblerModel,
         main_filename: str,
         export_model: ExportModel | None = None,
+        overflow: Callable[[LineObject], tuple[str, int]] | None = None,
     ) -> None:
+        """``overflow`` gives a line's overflow mode (`wrap`, `truncate` or `none`) and width: how
+        its source text is shown when wider than the width. Without it, every line is `none`."""
+        self._overflow = overflow or (lambda line: ('none', 0))
         self._plan = ListingPrettyPrinter._plan_annotations(line_objs, model, export_model)
         # Column widths come from the lines that are printed.
         visible = [line for line in line_objs if _key(line) not in self._plan.hidden]
@@ -92,6 +97,10 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         )
         if self._flow_width:
             self._flow_width = max(self._flow_width, len('flow'))
+        # A line wider than its overflow width takes only that much of the instruction column.
+        self._max_instruction_width = max(
+            (self._column_width(line) for line in visible), default=0,
+        )
         # A collapsed run shows its first row of words; the summary row counts the rest.
         for key, collapse in list(self._plan.collapses.items()):
             collapse.shown = min(collapse.first_words, self._bytes_per_line)
@@ -316,6 +325,29 @@ class ListingPrettyPrinter(PrettyPrinterBase):
             + '\n'
         )
 
+    def _column_width(self, lobj: LineObject) -> int:
+        width = len(lobj.instruction) + ListingPrettyPrinter.INSTRUCTION_INDENT
+        mode, limit = self._overflow(lobj)
+        return width if mode == 'none' else min(width, limit)
+
+    def _instruction_rows(self, lobj: LineObject, instruction_str: str) -> list[str]:
+        """The instruction text as rows: one row, unless it is wider than the line's overflow
+        width, where it is cut short (`truncate`) or continued on the rows below (`wrap`)."""
+        mode, limit = self._overflow(lobj)
+        if mode == 'none' or len(instruction_str) <= limit:
+            return [instruction_str]
+        if mode == 'truncate':
+            return [instruction_str[:limit - 3].rstrip() + '...']
+        indent = ' ' * (len(instruction_str) - len(instruction_str.lstrip()) + 2)
+        rows = []
+        text = instruction_str
+        while len(text) > limit:
+            cut = _wrap_point(text, limit, len(text) - len(text.lstrip()))
+            rows.append(text[:cut].rstrip())
+            text = indent + text[cut:].lstrip()
+        rows.append(text)
+        return rows
+
     def _print_line_object(
         self,
         output: io.StringIO,
@@ -372,7 +404,8 @@ class ListingPrettyPrinter(PrettyPrinterBase):
             instruction_str = ' '*ListingPrettyPrinter.INSTRUCTION_INDENT + lobj.instruction
         else:
             instruction_str = lobj.instruction
-        output.write(f'{instruction_str: <{self.max_instruction_width}} | ')
+        instruction_rows = self._instruction_rows(lobj, instruction_str)
+        output.write(f'{instruction_rows[0]: <{self.max_instruction_width}} | ')
 
         flow_annotations = (
             lobj.flow_annotation_lines
@@ -397,9 +430,11 @@ class ListingPrettyPrinter(PrettyPrinterBase):
             return
         remaining_byte_rows = line_bytes[1:] if line_bytes is not None else ()
         remaining_flow_rows = flow_annotations[1:]
+        remaining_instruction_rows = instruction_rows[1:]
         continuation_count = max(
             len(remaining_byte_rows),
             len(remaining_flow_rows),
+            len(remaining_instruction_rows),
         )
         for index in range(continuation_count):
             self._print_continuation_row(
@@ -415,6 +450,11 @@ class ListingPrettyPrinter(PrettyPrinterBase):
                     if index < len(remaining_flow_rows)
                     else ''
                 ),
+                instruction=(
+                    remaining_instruction_rows[index]
+                    if index < len(remaining_instruction_rows)
+                    else ''
+                ),
             )
 
     def _print_continuation_row(
@@ -424,8 +464,9 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         *,
         line_bytes: str = '',
         flow_annotation: str = '',
+        instruction: str = '',
     ) -> None:
-        """Print an aligned row whose source-level fields are intentionally blank."""
+        """Print an aligned row below a line: its further bytes, flow annotations or wrapped text."""
         byte_width = self._bytes_per_line * (hex_width + 1)
         output.write(
             ' ' * (self.max_line_num_width + 1)
@@ -434,7 +475,7 @@ class ListingPrettyPrinter(PrettyPrinterBase):
             + ' | '
             + f'{line_bytes:<{byte_width}}'
             + '| '
-            + ' ' * self.max_instruction_width
+            + f'{instruction:<{self.max_instruction_width}}'
             + ' | '
             + (
                 f'{flow_annotation:<{self._flow_width}} | '
@@ -482,3 +523,30 @@ class ListingPrettyPrinter(PrettyPrinterBase):
         if cur_str is not None:
             results.append(f'{cur_str:<{words_per_str*(hex_width+1)}}')
         return results
+
+
+def _wrap_point(text: str, limit: int, minimum: int) -> int:
+    """Where to break text that is wider than ``limit``: just after the last comma, else the
+    last space, outside quotes and after ``minimum``; else at ``limit``."""
+    comma = space = -1
+    quote = None
+    index = 0
+    while index < limit:
+        char = text[index]
+        if quote:
+            if char == '\\':
+                index += 1
+            elif char == quote:
+                quote = None
+        elif char in '"\'':
+            quote = char
+        elif char == ',' and index + 1 > minimum:
+            comma = index + 1
+        elif char == ' ' and index > minimum:
+            space = index
+        index += 1
+    if comma > 0:
+        return comma
+    if space > 0:
+        return space
+    return limit

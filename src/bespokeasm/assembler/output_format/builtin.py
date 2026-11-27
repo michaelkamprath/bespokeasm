@@ -1,8 +1,8 @@
 """Built-in output formats: the formats every ISA accepts.
 
-``hex`` and ``intel_hex`` are defined, in ``resources/builtin_formats.yaml``, in the same
-schema as a configuration's ``output_formats`` section. ``listing`` and ``symbols`` are
-Python: the listing's file headers and spacing are not a template, and a template cannot
+``listing``, ``hex`` and ``intel_hex`` are defined, in ``resources/builtin_formats.yaml``, in
+the same schema as a configuration's ``output_formats`` section; a configuration may define its
+own ``listing``, which replaces the built-in one. ``symbols`` is Python, since a template cannot
 escape JSON strings. Both kinds implement ``OutputFormat``, so ``-t``, the docs and the
 format registry treat them alike.
 """
@@ -16,11 +16,12 @@ from bespokeasm.assembler.output_format.base import OutputFormat
 from bespokeasm.assembler.output_format.base import RenderContext
 
 BUILTIN_DEFINITIONS_FILE = 'builtin_formats.yaml'
-# Python formats, with their descriptions. listing comes before the defined formats, symbols after.
+# Python formats, with their descriptions. They come after the defined formats.
 PYTHON_FORMAT_DESCRIPTIONS = {
-    'listing': 'Source listing with addresses and assembled bytes.',
     'symbols': 'Every label and constant, with annotations, as JSON.',
 }
+# Built-in formats a configuration may replace with its own definition.
+REPLACEABLE_BUILTINS = frozenset({'listing'})
 
 
 class BuiltinFormatError(Exception):
@@ -81,7 +82,7 @@ def load_builtin_definitions(text: str) -> dict[str, OutputFormat]:
 
 @functools.cache
 def builtin_formats() -> dict[str, OutputFormat]:
-    """Every built-in format by name: listing, the defined formats, then symbols."""
+    """Every built-in format by name: the defined formats, listing first, then symbols."""
     from bespokeasm.assembler.output_format import resources
 
     text = pkg_resources.files(resources).joinpath(BUILTIN_DEFINITIONS_FILE).read_text()
@@ -89,7 +90,7 @@ def builtin_formats() -> dict[str, OutputFormat]:
     for name in PYTHON_FORMAT_DESCRIPTIONS:
         if name in defined:
             raise BuiltinFormatError(f"built-in output format '{name}' is both defined and written in Python")
-    return {'listing': PrinterFormat('listing'), **defined, 'symbols': PrinterFormat('symbols')}
+    return {**defined, 'symbols': PrinterFormat('symbols')}
 
 
 def builtin_format_names() -> tuple[str, ...]:

@@ -246,6 +246,9 @@
           "name": "meta.directive",
           "patterns": [
             {
+              "include": "#directive_label_definitions"
+            },
+            {
               "include": "#quoted_memory_zone"
             },
             {
@@ -284,6 +287,9 @@
             },
             {
               "include": "#annotation_directive"
+            },
+            {
+              "include": "#output_format_directive"
             },
             {
               "include": "#memory_zone_names"
@@ -632,7 +638,7 @@
           "name": "constant.numeric.integer.decimal"
         },
         {
-          "match": "(?<!\\w)(?:\\'.\\')\\b",
+          "match": "(?<!\\w)'(?:\\\\.|[^'\\\\])'",
           "name": "constant.numeric.character"
         }
       ]
@@ -683,7 +689,7 @@
         }
       },
       "contentName": "string.quoted",
-      "end": "(?<!\\\\)\\1",
+      "end": "\\1",
       "endCaptures": {
         "0": {
           "name": "punctuation.definition.string.end"
@@ -743,6 +749,77 @@
           "name": "punctuation.definition.string.end"
         }
       }
+    },
+    "directive_label_definitions": {
+      "comment": "A label after an origin or zone directive's argument: `.org $10 name:`.",
+      "patterns": [
+        {
+          "captures": {
+            "1": {
+              "name": "variable.other.label.definition"
+            },
+            "2": {
+              "name": "punctuation.definition.variable.colon.label"
+            }
+          },
+          "match": "(?<=\\s)(##GLOBAL_SYMBOL_PATTERN##)\\s*(\\:)(?!=)"
+        },
+        {
+          "captures": {
+            "1": {
+              "name": "variable.other.label.definition"
+            },
+            "2": {
+              "name": "punctuation.definition.variable.colon.label"
+            }
+          },
+          "match": "(?<=\\s)(##LOCAL_SYMBOL_PATTERN##)\\s*(\\:)(?!=)"
+        },
+        {
+          "captures": {
+            "1": {
+              "name": "variable.other.label.definition"
+            },
+            "2": {
+              "name": "punctuation.definition.variable.colon.label"
+            }
+          },
+          "match": "(?<=\\s)(##FILE_SYMBOL_PATTERN##)\\s*(\\:)(?!=)"
+        }
+      ]
+    },
+    "output_format_directive": {
+      "comment": "`#output-format <format> <option>=<value> ...`: the format's name, then its options and values.",
+      "begin": "(?<=\\#)(output-format)\\b(?:\\s+([A-Za-z_][A-Za-z0-9_]*))?",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.control.preprocessor"
+        },
+        "2": {
+          "name": "entity.name.output-format"
+        }
+      },
+      "end": "(?=\\s*;|\\s*$)",
+      "name": "meta.output-format",
+      "patterns": [
+        {
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\b(?:(=)(?:([A-Za-z_][A-Za-z0-9_]*)|(\\d+))?)?",
+          "captures": {
+            "1": {
+              "name": "variable.parameter.output-format"
+            },
+            "2": {
+              "name": "punctuation.separator.key-value.output-format"
+            },
+            "3": {
+              "name": "constant.other.output-format.value"
+            },
+            "4": {
+              "name": "constant.numeric.integer.decimal"
+            }
+          }
+        }
+      ]
     }
   },
   "scopeName": "source.asm"

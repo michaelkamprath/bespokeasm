@@ -536,9 +536,10 @@ def test_value_range_rules_without_a_match_check_nothing(tmp_path):
     assert assembler.export_model.symbols[0].size == 1
 
 
-def test_annotate_is_a_reserved_word(tmp_path):
-    message = _assemble_error(tmp_path, 'annotate:\n    ld a, b, c\n', _write_config(tmp_path))
-    assert '"annotate" is an assembler keyword' in message
+def test_annotate_can_name_a_label(tmp_path):
+    """Directives are written with their `#`, so their names aren't reserved."""
+    _, stderr, _ = _assemble(tmp_path, 'annotate:\n    ld a, b, c\n', _write_config(tmp_path))
+    assert 'keyword' not in stderr
 
 
 # ---- configuration errors -------------------------------------------------------

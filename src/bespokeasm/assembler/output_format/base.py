@@ -5,6 +5,7 @@ import os
 from abc import ABC
 from abc import abstractmethod
 from dataclasses import dataclass
+from typing import Any
 from typing import TYPE_CHECKING
 
 from bespokeasm.assembler.annotations.model import ExportModel
@@ -58,6 +59,10 @@ class OutputFormat(ABC):
     @property
     def is_builtin(self) -> bool:
         return self._is_builtin
+
+    def source_options(self) -> list[tuple[Any, Any]]:
+        """The options source may set for this format with `#output-format`, each with its default."""
+        return []
 
     @property
     def predefined_memory_zones(self) -> list[dict]:

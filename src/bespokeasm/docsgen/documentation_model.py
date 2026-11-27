@@ -386,6 +386,16 @@ class DocumentationModel:
                     item['name']
                     for item in output_format.predefined_memory_zones + output_format.predefined_constants
                 ],
+                # The options source can set with #output-format, with this ISA's defaults.
+                'options': [
+                    {
+                        'name': option.name,
+                        'values': option.values,
+                        'default': default,
+                        'description': option.description,
+                    }
+                    for option, default in output_format.source_options()
+                ],
             })
         return formats
 

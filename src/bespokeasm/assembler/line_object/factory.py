@@ -112,6 +112,8 @@ class LineOjectFactory:
 
     _DIRECTIVE_ARGUMENT_HINTS = {
         '.org': 'requires an address, for example ".org 0x100"',
+        '.phase': 'requires the address to assemble for, for example ".phase 0xfc00"',
+        '.dephase': 'takes no arguments',
         '.memzone': 'requires the name of a memory zone, for example ".memzone GLOBAL"',
         '.fill': 'requires a count and an optional fill value, for example ".fill 16" or ".fill 16, $FF"',
         '.zero': 'requires a count, for example ".zero 16"',

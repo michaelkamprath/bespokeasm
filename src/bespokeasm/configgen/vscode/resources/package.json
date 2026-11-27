@@ -8,7 +8,10 @@
       {
         "language": "putey1-assembly",
         "path": "./syntaxes/tmGrammar.json",
-        "scopeName": "source.asm"
+        "scopeName": "source.asm",
+        "tokenTypes": {
+          "constant.numeric.character": "string"
+        }
       }
     ],
     "languages": [

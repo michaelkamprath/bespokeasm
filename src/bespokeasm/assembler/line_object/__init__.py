@@ -15,12 +15,18 @@ INSTRUCTION_EXPRESSION_PATTERN = r'(?:{}|(?:[ \t]*)(?!(?:[ \t]*\;|[ \t]*\v)|{}))
 )
 
 
+NO_FORMAT_SETTINGS: dict[str, dict] = {}
+
+
 class LineObject:
     def __init__(self, line_id: LineIdentifier, instruction: str, comment: str, memzone: MemoryZone):
         self._line_id = line_id
         self._instruction = instruction.strip()
         self._comment = comment.strip()
         self._address = None
+        self._image_offset = 0
+        # The output-format options source set for this line, by format name (`#output-format`).
+        self.format_settings: dict[str, dict] = NO_FORMAT_SETTINGS
         self._symbol_scope = None
         self._memzone = memzone
         self._compilable = True
@@ -57,6 +63,16 @@ class LineObject:
         If this object consists of multiple bytes, address pertains to first byte.
         """
         return self._address
+
+    @property
+    def image_address(self) -> int:
+        """Where this line's words go in the assembled image. The same as ``address`` except
+        inside a ``.phase``, where ``address`` is the address the code is assembled for."""
+        return None if self.address is None else self.address + self._image_offset
+
+    def set_image_offset(self, offset: int) -> None:
+        """Set how far this line's image position is ahead of its address (pass 1)."""
+        self._image_offset = offset
 
     @property
     def word_count(self) -> int:

@@ -20,6 +20,7 @@ from bespokeasm.assembler.model.operand.types.numeric_expression import NumericE
 from bespokeasm.assembler.model.operand.value_selection import selects
 from bespokeasm.assembler.symbol_scope import SymbolScope
 from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
+from bespokeasm.expression import TokenType
 from bespokeasm.utilities import ExpressionSyntax
 
 
@@ -91,7 +92,11 @@ class AddressByteCodePart(ExpressionByteCodePartInMemoryZone):
             bytecode_address,
         )
 
-        if self._is_lsb_bytes and self._match_address_msb:
+        if self._is_lsb_bytes and self._match_address_msb and self._written_as_low_part():
+            # An operand written as a low byte, `<expr`, is that byte as given: self-modifying
+            # code writes a placeholder target this way. Its page isn't checked.
+            final_value = value & ((1 << self.value_size) - 1)
+        elif self._is_lsb_bytes and self._match_address_msb:
             # mask out the MSBs of the address value. The`value_size` is interpreted as the number of LSB bytes
             mask = (1 << self.value_size) - 1
             final_value = value & mask
@@ -112,6 +117,9 @@ class AddressByteCodePart(ExpressionByteCodePartInMemoryZone):
         else:
             final_value = value
         return final_value
+
+    def _written_as_low_part(self) -> bool:
+        return self._parsed_expression.token_type == TokenType.T_LOW_PART
 
     def _check_selected_value(self, value: int) -> None:
         # The value was in the zone when relaxation chose this form, but a value can move out as

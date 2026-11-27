@@ -19,6 +19,7 @@ from bespokeasm.cli import build_cli
 from bespokeasm.cli import config_migration_names
 from bespokeasm.migrate.dialects import load_migrations
 from bespokeasm.migrate.engine import migrate
+from bespokeasm.migrate.isa import migration_context
 from bespokeasm.migrate.lexer import mask_line
 from bespokeasm.migrate.rules import LoadEnvironment
 from bespokeasm.migrate.rules import MigrationContext
@@ -80,10 +81,7 @@ def _assemble(tmp_path, source: str, start: int) -> bytes:
 
 
 def _model_context(model: AssemblerModel) -> MigrationContext:
-    return MigrationContext(
-        mnemonics=frozenset(name.lower() for name in model.operation_mnemonics),
-        directive_names=DIRECTIVES | frozenset(model.directive_aliases),
-    )
+    return migration_context(model)
 
 
 # ---- the 6502 dialects ------------------------------------------------------------------
@@ -133,6 +131,20 @@ def test_rename_directives():
     ]
     # `.org` was already `.org`; the assignment and the operand are not directives.
     assert [count.lines for count in result.rule_counts] == [3]
+
+
+def test_a_rename_may_give_its_target_fixed_arguments():
+    assert _migrate('  even\n', {'rename_directives': {'even': '.align 2'}}).text == '  .align 2\n'
+    with pytest.raises(ConfigError, match='must name a BespokeASM directive'):
+        _migrate('', {'rename_directives': {'even': 'align 2'}})
+
+
+def test_an_origin_after_bytes_becomes_a_phase():
+    source = '; top\n.org $8000\n#include "x.s"\n.org $8000\n  lda 1\n.org $0200\nram: .byte 1\n.dephase\n.org $9000\n'
+    assert _migrate(source, 'origin_phases').text.splitlines() == [
+        '; top', '.org $8000', '#include "x.s"', '.org $8000', '  lda 1', '.phase $0200', 'ram: .byte 1', '.dephase',
+        '.phase $9000',
+    ]
 
 
 def test_a_bare_word_that_is_a_mnemonic_is_not_renamed():
@@ -265,10 +277,12 @@ def test_bad_migrations_are_config_errors(section, message):
 
 def test_the_model_reports_a_bad_migration_by_config_path(tmp_path):
     config = load_config(W65C02)
-    config['migrations']['ca65']['rules'].append({'rename_directives': {'org': '.origin'}})
+    rules = config['migrations']['ca65']['rules']
+    rules.append({'rename_directives': {'org': '.origin'}})
     with pytest.raises(SystemExit) as info:
         AssemblerModel(write_json_config(config, tmp_path), 0, DiagnosticReporter())
-    assert 'migrations.ca65.rules[7].rename_directives.org must name a BespokeASM directive' in str(info.value)
+    path = f'migrations.ca65.rules[{len(rules) - 1}].rename_directives.org'
+    assert f'{path} must name a BespokeASM directive' in str(info.value)
 
 
 def test_a_rename_may_target_a_directive_alias(tmp_path):

@@ -214,6 +214,24 @@ class MarkdownGenerator:
             rows,
             column_alignments=['left'] * 5,
         ))
+        for output_format in self.doc_model.output_formats:
+            options = output_format.get('options') or []
+            if not isinstance(options, list) or not options:
+                continue
+            name = output_format['name']
+            sections.append(f'## `{name}` Options')
+            sections.append(
+                f'Source can set these for the lines after it with `#output-format {name} <option>=<value>`, '
+                f'and return one to its default with `#output-format {name} <option>`.'
+            )
+            sections.append(self._generate_markdown_table(
+                ['Option', 'Values', 'Default', 'Effect'],
+                [
+                    [f"`{option['name']}`", option['values'], f"`{option['default']}`", option['description']]
+                    for option in options
+                ],
+                column_alignments=['left'] * 4,
+            ))
         return '\n\n'.join(sections)
 
     def _generate_migrations_section(self) -> str:

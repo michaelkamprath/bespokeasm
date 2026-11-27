@@ -28,6 +28,7 @@ from bespokeasm.assembler.line_object.preprocessor_line.condition_line import CO
 from bespokeasm.assembler.line_object.preprocessor_line.condition_line import ConditionLine
 from bespokeasm.assembler.line_object.preprocessor_line.create_scope import CreateScopeLine
 from bespokeasm.assembler.line_object.preprocessor_line.deactivate_scope import DeactivateScopeLine
+from bespokeasm.assembler.line_object.preprocessor_line.output_format_line import OutputFormatLine
 from bespokeasm.assembler.line_object.preprocessor_line.use_scope import UseScopeLine
 from bespokeasm.assembler.line_object.preprocessor_line.verbatim import EndVerbatimLine
 from bespokeasm.assembler.line_object.preprocessor_line.verbatim import is_end_verbatim_line
@@ -301,7 +302,20 @@ class AssemblyFile:
                 'File ended while muted; bytecode emission remains suppressed',
             )
         self._emit_missing_scope_warnings()
+        self._apply_format_settings(line_objects)
         return line_objects
+
+    def _apply_format_settings(self, line_objects: list[LineObject]) -> None:
+        """Give each of this file's lines the output-format options set by the active
+        `#output-format` lines above it. An included file applies its own, starting from none."""
+        settings: dict[str, dict] = {}
+        for lobj in line_objects:
+            if lobj.line_id.filename != self.filename:
+                continue
+            # The directive's own line shows under the settings before it.
+            lobj.format_settings = settings
+            if isinstance(lobj, OutputFormatLine) and lobj.compilable:
+                settings = lobj.applied_to(settings)
 
     def _verbatim_block_objects(
         self,
