@@ -305,6 +305,60 @@ class TestConfigurationGeneration(unittest.TestCase):
         self.assertRegex(vim_text, r'syn match \w+MemoryZone /\\%\(\^\\s\*#create_memzone')
         self.assertRegex(vim_text, rf'hi \w+MemoryZone guifg={zone_color}')
 
+    def test_function_names_are_functions_only_as_calls(self):
+        """LSB, BYTE0, COUNTER and COORDINATE are functions only when written as a call, so every
+        editor colors them as functions only before a parenthesis, and a symbol of the same name
+        is colored as a symbol."""
+        config_file = str(pkg_resources.files(config_files).joinpath('mos6502/w65c02.yaml'))
+        calls = ('LSB(start)', 'BYTE1 (start)', 'COUNTER(stack)', 'COORDINATE(stack, 1)')
+        symbols = ('inc COUNTER', 'lda #LSB', '.byte BYTE0, COORDINATE')
+
+        def check(patterns):
+            for pattern in patterns:
+                regex = re.compile(pattern)
+                self.assertFalse(any(regex.search(text) for text in symbols), pattern)
+            self.assertTrue(all(any(re.search(p, text) for p in patterns) for text in calls))
+
+        test_dir = tempfile.mkdtemp()
+        VSCodeConfigGenerator(config_file, 0, test_dir, None, None, 'a65c').generate()
+        extension_dir = next(pl.Path(test_dir).glob('extensions/*'))
+        grammar = json.loads((extension_dir / 'syntaxes' / 'tmGrammar.json').read_text())
+        extension_js = (extension_dir / 'extension.js').read_text()
+        shutil.rmtree(test_dir)
+        repository = grammar['repository']
+        check([
+            repository['flow_operators']['match'].replace('(?i)', ''),
+            next(p['match'] for p in repository['operators']['patterns'] if p.get('name') == 'keyword.operator.word'),
+        ])
+        preprocessor = next(p for p in repository['directives']['patterns'] if p.get('name') == 'meta.preprocessor')
+        self.assertIn({'include': '#flow_counter_usages'}, preprocessor['patterns'])
+        self.assertNotIn('##EXPRESSION_FUNCTION_NAMES##', extension_js)
+        self.assertRegex(extension_js, r"new Set\('[^']*\bCOUNTER\b[^']*\bLSB\b[^']*'")
+        # The semantic tokens, references and hover each skip a function call.
+        self.assertEqual(extension_js.count('isFunctionCall('), 4)
+
+        sublime_dir = tempfile.mkdtemp()
+        SublimeConfigGenerator(config_file, 0, sublime_dir, None, None, 'a65c').generate()
+        package = next(pl.Path(sublime_dir).glob('*.sublime-package'))
+        with zipfile.ZipFile(package) as archive:
+            syntax = YAML().load(archive.read(next(n for n in archive.namelist() if n.endswith('.sublime-syntax'))))
+        shutil.rmtree(sublime_dir)
+        check([
+            syntax['contexts']['flow_operators'][0]['match'].replace('(?i)', ''),
+            next(
+                rule['match'] for rule in syntax['contexts']['numerical_expressions']
+                if rule.get('scope') == 'keyword.operator.word'
+            ),
+        ])
+
+        vim_dir = tempfile.mkdtemp()
+        VimConfigGenerator(config_file, 0, vim_dir, None, None, 'a65c').generate()
+        vim_text = ''.join(path.read_text() for path in pl.Path(vim_dir).rglob('*.vim'))
+        shutil.rmtree(vim_dir)
+        self.assertRegex(vim_text, r'syn match \w+FlowOperator /\\<\\%\(COORDINATE\\\|COUNTER\\\)\\>\\ze\\s\*\(/')
+        self.assertRegex(vim_text, r'syn match \w+Operator /\\<\\%\([^/]*LSB[^/]*\\>\\ze\\s\*\(/')
+        self.assertNotIn('syn keyword', re.search(r'.*FlowOperator.*', vim_text).group(0))
+
     def test_vscode_symbol_scanning_skips_names_inside_numbers(self):
         """The extension's semantic highlighting, references and hovers find symbols by pattern;
         a symbol can't start inside a number or character literal, so the E of $600E is not a

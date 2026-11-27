@@ -110,7 +110,7 @@ contexts:
       pop: true
 
   flow_operators:
-    - match: (?i)\b(?:COORDINATE|COUNTER)\b
+    - match: (?i)\b(?:COORDINATE|COUNTER)\b(?=\s*\()
       scope: keyword.operator.flow
 
   instructions:
@@ -205,7 +205,7 @@ contexts:
     - match: (?:>>|<<)
       scope: keyword.operator.bitwise
     - include: comparison_operators
-    - match: \b(?:##EXPRESSION_FUNCTIONS##)\b
+    - match: \b(?:##EXPRESSION_FUNCTIONS##)\b(?=\s*\()
       scope: keyword.operator.word
     - include: operands_variables
     - match: \(

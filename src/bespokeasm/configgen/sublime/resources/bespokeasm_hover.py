@@ -20,6 +20,10 @@ BUILTIN_SYMBOL_PATTERN = r'__[A-Za-z0-9_]+__'
 HOVER_WORD_PATTERN = re.compile(
     SYMBOL_START + r'(?:' + BUILTIN_SYMBOL_PATTERN + r'|##MNEMONIC_PATTERN##|##LABEL_PATTERN##)', re.IGNORECASE
 )
+# The instruction set's expression functions, such as LSB and COUNTER. A name is a function only
+# when written as a call, NAME(...); otherwise it may be a label or constant of the same name.
+EXPRESSION_FUNCTION_NAMES = frozenset('##EXPRESSION_FUNCTION_NAMES##'.upper().split('|'))
+CALL_FOLLOWS_PATTERN = re.compile(r'\s*\(')
 LABEL_DEFINITION_PATTERN = re.compile(r'^\s*(?P<name>##LABEL_PATTERN##)\s*:(?!=)')
 OPERAND_LABEL_DEFINITION_PATTERN = re.compile(r'@(?P<name>##LABEL_PATTERN##):\s*')
 CONSTANT_DEFINITION_PATTERN = re.compile(r'^\s*(?P<name>##CONSTANT_PATTERN##)\s*(?:=|\bEQU\b)')
@@ -474,6 +478,21 @@ def _get_view_state(view):
     return state
 
 
+def _is_function_call(text, word, end):
+    """Whether ``word``, ending at ``end`` in ``text``, is an expression function call."""
+    return word.upper() in EXPRESSION_FUNCTION_NAMES and CALL_FOLLOWS_PATTERN.match(text, end) is not None
+
+
+def _is_function_call_at_point(view, point):
+    line_region = view.line(point)
+    line_text = view.substr(line_region)
+    column = point - line_region.begin()
+    for match in HOVER_WORD_PATTERN.finditer(line_text):
+        if match.start() <= column <= match.end():
+            return _is_function_call(line_text, match.group(0), match.end())
+    return False
+
+
 def _get_token_at_point(view, point):
     line_region = view.line(point)
     line_text = view.substr(line_region)
@@ -539,7 +558,7 @@ def _find_references(token, state):
             for start, end in _get_code_regions(text):
                 segment = text[start:end]
                 for match in WORD_PATTERN.finditer(segment):
-                    if match.group(0) != token:
+                    if match.group(0) != token or _is_function_call(segment, token, match.end()):
                         continue
                     col = start + match.start()
                     if label_defs is None:
@@ -1373,6 +1392,8 @@ def _update_semantic_regions(view):
             segment = text[region_start:region_end]
             for match in WORD_PATTERN.finditer(segment):
                 word = match.group(0)
+                if _is_function_call(segment, word, match.end()):
+                    continue
                 col = region_start + match.start()
                 if word in constants:
                     if (word, col) in constant_definition_starts:
@@ -1527,8 +1548,8 @@ class BespokeAsmHoverListener(sublime_plugin.EventListener):
                 _show_popup(view, popup_html, point, max_width)
                 return
 
-        # Check expression functions (BYTE0, LSB, etc.)
-        if docs and hover_mnemonics:
+        # Check expression functions (BYTE0, LSB, etc.), written as calls
+        if docs and hover_mnemonics and _is_function_call_at_point(view, point):
             expr_func_docs = docs.get('expression_functions', {})
             doc = expr_func_docs.get(token.upper())
             if doc:

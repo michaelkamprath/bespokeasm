@@ -255,6 +255,9 @@ function buildSemanticTokens(document) {
       let match;
       while ((match = regex.exec(segment)) !== null) {
         const word = match[1];
+        if (isFunctionCall(segment, word, match.index + word.length)) {
+          continue;
+        }
         const offset = range.start + match.index;
         if (constants.has(word)) {
           if (!(constDef && word === constDef && offset === constDefStart)) {
@@ -317,6 +320,13 @@ function buildMarkdownHover(doc) {
 const COMPILER_DIRECTIVE_RE = /\.(\w+)\b/gi;
 const PREPROCESSOR_DIRECTIVE_RE = /#(\S+)\b/gi;
 const REGISTER_RE = /(?:##REGISTERS##)/gi;
+// The instruction set's expression functions, such as LSB and COUNTER. A name is a function only
+// when written as a call, NAME(...); otherwise it may be a label or constant of the same name.
+const EXPRESSION_FUNCTION_NAMES = new Set('##EXPRESSION_FUNCTION_NAMES##'.toUpperCase().split('|'));
+
+function isFunctionCall(text, word, end) {
+  return EXPRESSION_FUNCTION_NAMES.has(word.toUpperCase()) && /^\s*\(/.test(text.slice(end));
+}
 const CONSTANT_VALUE_RE = /^\s*##CONSTANT_PATTERN##\s*(?:=|\bEQU\b)\s*(.+?)(?:\s*;.*)?$/;
 // Replaced at generation time: the coordinate operator spelling for a
 // flow-counter-enabled ISA, or the empty string when the feature is disabled
@@ -469,7 +479,7 @@ function findReferences(document, token) {
         wordPattern.lastIndex = 0;
         let match;
         while ((match = wordPattern.exec(segment)) !== null) {
-          if (match[0] !== token) {
+          if (match[0] !== token || isFunctionCall(segment, token, match.index + token.length)) {
             continue;
           }
           const offset = range.start + match.index;
@@ -672,7 +682,7 @@ function activate(context) {
           return new vscode.Hover(buildMarkdownHover(doc), range);
         }
         const exprDoc = exprFuncDocs[key];
-        if (exprDoc) {
+        if (exprDoc && isFunctionCall(lineText, token, range.end.character)) {
           return new vscode.Hover(buildMarkdownHover(exprDoc), range);
         }
       }

@@ -349,7 +349,7 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             preprocessor['patterns'] = [
                 pattern
                 for pattern in preprocessor['patterns']
-                if pattern.get('include') != '#flow_counter_directives'
+                if pattern.get('include') not in {'#flow_counter_directives', '#flow_counter_usages'}
             ]
         # handle instructions
         grammar_json['repository']['instructions']['begin'] = self._replace_token_with_regex_list(
@@ -529,6 +529,10 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             self._constant_pattern(),
         )
         self._replace_token_in_file(extension_fp, '##MNEMONIC_PATTERN##', mnemonic_pattern)
+        self._replace_token_in_file(
+            extension_fp, '##EXPRESSION_FUNCTION_NAMES##',
+            '|'.join(sorted(expression_functions_for_isa(self.model.flow_counters_enabled))),
+        )
         self._replace_token_in_file(extension_fp, '##REGISTERS##', register_pattern)
         self._replace_token_in_file(label_hover_fp, '##LABEL_PATTERN##', label_pattern)
         self._replace_token_in_file(constants_hover_fp, '##LABEL_PATTERN##', label_pattern)

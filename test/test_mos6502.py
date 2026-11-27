@@ -138,6 +138,27 @@ def test_flow_counters_track_the_stack_and_cycles(tmp_path, cpu):
     assert stderr == ''
 
 
+def test_function_names_can_name_symbols(tmp_path):
+    """LSB, BYTE0 and the flow functions COUNTER and COORDINATE are functions only when written
+    as a call, so 6502 source may use their names for its own labels and constants."""
+    source = (
+        'COUNTER = $2E\n'
+        'LSB = $10\n'
+        '.org $0200\n'
+        '#track stack mode=called\n'
+        'BYTE0:  inc COUNTER\n'
+        '        lda #LSB(BYTE0)\n'
+        '        lda #BYTE1(COORDINATE)\n'
+        '        pha\n'
+        '#assert COUNTER(stack) == 1\n'
+        '        pla\n'
+        '        rts\n'
+        'COORDINATE: .byte LSB\n'
+    )
+    binary, _ = _assemble(tmp_path, '65C02', source, start=0x0200)
+    assert binary.hex(' ') == 'e6 2e a9 00 a9 02 48 68 60 10'
+
+
 def test_an_unbalanced_subroutine_is_reported(tmp_path):
     source = '.org $8000\n#track stack mode=called\nsub: pha\n    rts\n'
     assert 'flow counter "stack"' in _error(tmp_path, '6502', source)

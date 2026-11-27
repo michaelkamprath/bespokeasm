@@ -179,7 +179,7 @@
       ]
     },
     "flow_operators": {
-      "match": "(?i)\\b(?:COORDINATE|COUNTER)\\b",
+      "match": "(?i)\\b(?:COORDINATE|COUNTER)\\b(?=\\s*\\()",
       "name": "keyword.operator.flow"
     },
     "deferred-addressing": {
@@ -287,6 +287,9 @@
             },
             {
               "include": "#memory_zone_names"
+            },
+            {
+              "include": "#flow_counter_usages"
             },
             {
               "match": "(?<=\\#)(?:##PREPROCESSOR##)\\b",
@@ -659,7 +662,7 @@
           "name": "keyword.operator.bitwise"
         },
         {
-          "match": "\\b(?:##EXPRESSION_FUNCTIONS##)\\b",
+          "match": "\\b(?:##EXPRESSION_FUNCTIONS##)\\b(?=\\s*\\()",
           "name": "keyword.operator.word"
         },
         {

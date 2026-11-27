@@ -498,6 +498,19 @@ def _generated_sublime_plugin(config_path, tmp_path):
     return hover
 
 
+def test_sublime_plugin_skips_function_calls_but_not_symbols_of_the_same_name(config_path, tmp_path):
+    """LSB is a function only when written as a call, so with a constant named LSB, the plugin
+    marks the constant's uses but not the name of an LSB(...) call."""
+    hover = _generated_sublime_plugin(config_path, tmp_path)
+    text = 'LSB = 5\n  .byte LSB, LSB(LSB), LSB (LSB)\n'
+    regions = _sublime_semantic_regions(hover, text)
+    line = text.index('  .byte')
+    usages = [offset - line for offset, _ in regions['bespokeasm_constant_usages']]
+    assert usages == [8, 17, 28]
+    state = {'lines': text.splitlines(), 'current_path': None}
+    assert [ref['col'] for ref in hover._find_references('LSB', state)] == [8, 17, 28]
+
+
 def test_generated_sublime_plugin_only_handles_its_own_package(config_path, tmp_path):
     """A generated plugin acts only on views of its own syntax. Every installed BespokeASM package
     has a plugin, and views of another ISA's syntax also match source.bespokeasm; a plugin acting

@@ -56,11 +56,12 @@ BUILTIN_CONSTANTS_SET = {
     '__OUTPUT_FORMAT__',
 }
 
+# Expression functions such as LSB() and COUNTER() are not reserved: they are functions only when
+# written as a call, NAME(...), so a label or constant may have the same name.
 ASSEMBLER_KEYWORD_SET = (
     COMPILER_DIRECTIVES_SET
     .union(BYTECODE_DIRECTIVES_SET)
     .union(PREPROCESSOR_DIRECTIVES_SET)
-    .union(EXPRESSION_FUNCTIONS_SET)
     .union(BUILTIN_CONSTANTS_SET)
 )
 
@@ -71,12 +72,10 @@ def assembler_keywords_for_isa(flow_counters_enabled: bool) -> set[str]:
         COMPILER_DIRECTIVES_SET
         .union(BYTECODE_DIRECTIVES_SET)
         .union(BASE_PREPROCESSOR_DIRECTIVES_SET)
-        .union(BASE_EXPRESSION_FUNCTIONS_SET)
         .union(BUILTIN_CONSTANTS_SET)
     )
     if flow_counters_enabled:
         keywords.update(FLOW_PREPROCESSOR_DIRECTIVES_SET)
-        keywords.update(FLOW_EXPRESSION_FUNCTIONS_SET)
     return keywords
 
 

@@ -296,8 +296,7 @@ def test_flow_tokens_and_hover_docs_are_generated_for_enabled_isa(
         assert r'\<as\s*=\s*\zs' in generated
         assert r'\<mode\s*=\s*\zs' in generated
         assert (
-            'syn keyword flowm1testassemblyFlowOperator '
-            'COORDINATE COUNTER'
+            r'syn match flowm1testassemblyFlowOperator /\<\%(COORDINATE\|COUNTER\)\>\ze\s*(/'
         ) in generated
         assert (
             r'Operator /==\|!=\|>=\|<=\|>>\|<<\|>\|<\|[+\-*/&|^~]/'

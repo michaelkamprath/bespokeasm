@@ -506,7 +506,7 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
                 lines.append(fr'syn match {lang_group}PreProc /\<' + self._vim_escape(w) + r'\>/ contained')
         # Expression functions
         if expr_funcs_alt:
-            lines.append(fr'syn match {lang_group}Operator /\<' + expr_funcs_alt + r'\>/')
+            lines.append(fr'syn match {lang_group}Operator /\<' + expr_funcs_alt + r'\>\ze\s*(/')
         # Operators
         lines.append(
             rf'syn match {lang_group}Operator '
@@ -522,7 +522,8 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         if self.model.uses_immediate_prefix:
             lines.append(f'syn match {lang_group}ImmediatePrefix /{VIM_IMMEDIATE_PREFIX_PATTERN}/')
         lines.append(
-            f'syn keyword {lang_group}FlowOperator COORDINATE COUNTER'
+            # Function names are functions only as calls, so a symbol may share the name.
+            fr'syn match {lang_group}FlowOperator /\<\%(COORDINATE\|COUNTER\)\>\ze\s*(/'
         )
         # Registers
         if registers_kw:

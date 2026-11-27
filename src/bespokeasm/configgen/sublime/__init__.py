@@ -530,6 +530,10 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             'variable.other.flow.coordinate.usage' if self.model.flow_counters_enabled else '',
         )
         self._replace_token_in_file(hover_plugin_fp, '##PACKAGE_NAME##', self.language_name)
+        self._replace_token_in_file(
+            hover_plugin_fp, '##EXPRESSION_FUNCTION_NAMES##',
+            '|'.join(sorted(expression_functions_for_isa(self.model.flow_counters_enabled))),
+        )
         self._replace_token_in_file(hover_plugin_fp, '##LABEL_PATTERN##', self._label_pattern())
         self._replace_token_in_file(
             hover_plugin_fp,
