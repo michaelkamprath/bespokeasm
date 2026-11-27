@@ -339,35 +339,6 @@ def test_the_current_address_inside_a_phase_is_dephased_or_reported():
     assert reported.reported[0].reports == ['"*" here is where the bytes go, which is not the address inside this .phase']
 
 
-def test_a_file_header_after_a_phased_program_is_dephased():
-    source = (
-        '#org 0x2000\n'
-        '"one", 0, OneStart\n'
-        '#mute #org 0xfc00 #emit\n'
-        'OneStart: NOP\n'
-        'OneEnd:\n'
-        '\n'
-        '"two", 0, TwoStart\n'
-        '#mute #org 0xfc00 #emit\n'
-        'TwoStart: NOP\n'
-    )
-    lines = _migrate(source, 'split_statements', {'bare_data': {'sizing': 'slu4'}}, 'muted_origin').text.splitlines()
-    # The first header follows an origin, not a phase, so it needs nothing.
-    assert lines.count('.dephase') == 1
-    assert lines[lines.index('.dephase') + 1] == '.byte "two", 0'
-    assert lines[lines.index('.dephase') - 2] == 'OneEnd:'
-
-
-@pytest.mark.parametrize('between', [
-    'NOP\n"hdr", 0\n',              # data straight after an instruction is the instruction's
-    'OneEnd: "hdr", 0\n',            # labelled data belongs to its label
-])
-def test_other_data_after_a_phased_program_stays_in_the_phase(between):
-    source = '#mute #org 0xfc00 #emit\nOneStart: NOP\n' + between + '#mute #org 0xfc00 #emit\nTwo: NOP\n'
-    text = _migrate(source, 'split_statements', {'bare_data': {'sizing': 'slu4'}}, 'muted_origin').text
-    assert '.dephase' not in text
-
-
 def test_image_start_places_bytes_before_the_first_origin():
     assert _muted('NOP\n', image_start=0x2000).text.splitlines() == ['.org 0x2000', '.phase 0x0000', 'NOP']
     assert _muted('0x12\n', image_start=0x2000).text.splitlines() == ['.org 0x2000', '0x12']

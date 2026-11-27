@@ -510,9 +510,6 @@ class MutedOrigin(Rule):
                 if muted:
                     line.dropped = True
                 else:
-                    if phased and self._dephase_trailing_data(lines, index):
-                        index += 1
-                        phased = False
                     muted, region = True, [index]
             elif kind == 'emit':
                 if not muted:
@@ -540,34 +537,6 @@ class MutedOrigin(Rule):
                         '"*" here is where the bytes go, which is not the address inside this .phase'
                     )
             index += 1
-
-    def _dephase_trailing_data(self, lines, mute: int) -> bool:
-        """Before the #mute at ``mute``, data that follows a phased program's end label, such as
-        the next file's header in a file system, belongs to the image, not to that program: put a
-        `.dephase` before it. Only data with no labels or instructions, which nothing can refer to,
-        so the bytes can't change; data straight after an instruction stays the instruction's."""
-        first = None
-        index = mute - 1
-        while index >= 0:
-            line = lines[index]
-            statement = line.statement() if line.active else None
-            if statement is None or (statement.head is None and statement.label is None):
-                index -= 1          # a comment, a blank or a dropped line
-                continue
-            if statement.label is not None:
-                if statement.head is not None or line.code[statement.operands_start:].strip():
-                    return False    # labelled data or code
-                break               # the program's end label
-            head = statement.head
-            if head is None or head[0] != '.' or directive_name(head) in ('org', 'phase', 'dephase', 'memzone', 'align'):
-                return False        # an instruction, or anything but data
-            first = index
-            index -= 1
-        if first is None or index < 0:
-            return False
-        indent = lines[first].text[:len(lines[first].text) - len(lines[first].text.lstrip())]
-        lines.insert(first, lines[first].derive(f'{indent}.dephase'))
-        return True
 
     def _close_region(self, lines, region: list[int], context) -> bool:
         """Convert a muted region that moved the address, at its #emit. True if a phase begins."""
