@@ -11,12 +11,14 @@ import sublime
 import sublime_plugin
 
 
-WORD_PATTERN = re.compile(r'(?:##MNEMONIC_PATTERN##|##LABEL_PATTERN##)', re.IGNORECASE)
+# A symbol can't start inside a number or character literal: the E of $600E is not a symbol E.
+SYMBOL_START = r"(?<![\w$%'])"
+WORD_PATTERN = re.compile(SYMBOL_START + r'(?:##MNEMONIC_PATTERN##|##LABEL_PATTERN##)', re.IGNORECASE)
 # Built-in preprocessor symbols such as __OUTPUT_FORMAT__ begin with two underscores, which no
 # label can, so the label pattern alone would read one as _OUTPUT_FORMAT__.
 BUILTIN_SYMBOL_PATTERN = r'__[A-Za-z0-9_]+__'
 HOVER_WORD_PATTERN = re.compile(
-    r'(?:' + BUILTIN_SYMBOL_PATTERN + r'|##MNEMONIC_PATTERN##|##LABEL_PATTERN##)', re.IGNORECASE
+    SYMBOL_START + r'(?:' + BUILTIN_SYMBOL_PATTERN + r'|##MNEMONIC_PATTERN##|##LABEL_PATTERN##)', re.IGNORECASE
 )
 LABEL_DEFINITION_PATTERN = re.compile(r'^\s*(?P<name>##LABEL_PATTERN##)\s*:(?!=)')
 OPERAND_LABEL_DEFINITION_PATTERN = re.compile(r'@(?P<name>##LABEL_PATTERN##):\s*')
@@ -115,7 +117,9 @@ def _is_bespokeasm_view(view):
 
 
 def _get_expected_package_name():
-    if not PACKAGE_NAME or '##PACKAGE_NAME##' in PACKAGE_NAME:
+    # Test for the unfilled placeholder without spelling it out: the generator replaces every
+    # occurrence of it, which would turn this check into one that is always true.
+    if not PACKAGE_NAME or PACKAGE_NAME.startswith('##'):
         return None
     return PACKAGE_NAME
 
@@ -1600,3 +1604,13 @@ class BespokeAsmSemanticListener(sublime_plugin.EventListener):
 
     def on_post_save_async(self, view):
         _schedule_semantic_update(view)
+
+    def on_close(self, view):
+        _forget_view(view.id())
+
+
+def _forget_view(view_id):
+    """Drop a closed view's cached state, so a later view given the same id can't read its
+    lines, and cancel its pending semantic update."""
+    _VIEW_CACHE.pop(view_id, None)
+    _PENDING_SEMANTIC.pop(view_id, None)

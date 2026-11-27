@@ -498,6 +498,26 @@ def _generated_sublime_plugin(config_path, tmp_path):
     return hover
 
 
+def test_generated_sublime_plugin_only_handles_its_own_package(config_path, tmp_path):
+    """A generated plugin acts only on views of its own syntax. Every installed BespokeASM package
+    has a plugin, and views of another ISA's syntax also match source.bespokeasm; a plugin acting
+    on them would draw its regions and hovers over the owning plugin's."""
+    import types
+    hover = _generated_sublime_plugin(config_path, tmp_path)
+    assert hover._get_expected_package_name() == 'test-lang'
+
+    def view(syntax):
+        settings = {'syntax': syntax}
+        return types.SimpleNamespace(
+            is_scratch=lambda: False,
+            match_selector=lambda point, selector: True,
+            settings=lambda: types.SimpleNamespace(get=lambda key, default=None: settings.get(key, default)),
+        )
+
+    assert hover._is_bespokeasm_view(view('Packages/test-lang/test-lang.sublime-syntax'))
+    assert not hover._is_bespokeasm_view(view('Packages/other-isa/other-isa.sublime-syntax'))
+
+
 def test_sublime_plugin_ignores_verbatim_block_text(config_path, tmp_path):
     """The Sublime plugin's symbol lookups and semantic pass do not read a #verbatim block's text."""
     import pathlib
@@ -512,11 +532,9 @@ def test_sublime_plugin_ignores_verbatim_block_text(config_path, tmp_path):
     assert sorted(constants) == ['LIMIT', 'PORT']
 
 
-def test_sublime_semantic_regions_cover_their_symbols(config_path, tmp_path):
-    """Each usage region the Sublime plugin draws covers exactly the symbol it marks, after a
-    #verbatim block too: the regions are placed by offsets computed from the lines."""
+def _sublime_semantic_regions(hover, text: str) -> dict:
+    """The usage regions the Sublime plugin draws for ``text``, as (offset, text) pairs per key."""
     import types
-    hover = _generated_sublime_plugin(config_path, tmp_path)
 
     class Region:
         def __init__(self, a, b):
@@ -550,13 +568,35 @@ def test_sublime_semantic_regions_cover_their_symbols(config_path, tmp_path):
     hover.sublime = types.SimpleNamespace(Region=Region, DRAW_SOLID_UNDERLINE=0)
     hover._is_bespokeasm_view = lambda view: True
     hover._get_semantic_setting = lambda view: True
-    text = '\n'.join(SEMANTIC_SOURCE) + '\n'
     view = View(text)
     hover._update_semantic_regions(view)
+    return view.regions
+
+
+def test_sublime_semantic_regions_cover_their_symbols(config_path, tmp_path):
+    """Each usage region the Sublime plugin draws covers exactly the symbol it marks, after a
+    #verbatim block too: the regions are placed by offsets computed from the lines."""
+    hover = _generated_sublime_plugin(config_path, tmp_path)
+    text = '\n'.join(SEMANTIC_SOURCE) + '\n'
+    regions = _sublime_semantic_regions(hover, text)
     usage_line = text.index('  .byte')
     # One usage each: none in the block, the comment, or the definitions.
-    assert view.regions['bespokeasm_constant_usages'] == [(text.index('LIMIT', usage_line), 'LIMIT')]
-    assert view.regions['bespokeasm_label_usages'] == [(text.index('start', usage_line), 'start')]
+    assert regions['bespokeasm_constant_usages'] == [(text.index('LIMIT', usage_line), 'LIMIT')]
+    assert regions['bespokeasm_label_usages'] == [(text.index('start', usage_line), 'start')]
+
+
+def test_sublime_semantic_regions_skip_names_inside_numbers(config_path, tmp_path):
+    """A symbol can't start inside a number or character literal: with a constant E, the E of
+    $600E, 0x1E and 'E' is not a usage of it, while `E` and `#E` are."""
+    hover = _generated_sublime_plugin(config_path, tmp_path)
+    text = "E = %10000000\nIER = $600E\n  .byte $600E, 0x1E, %1110, 'E', E, E+1\n"
+    regions = _sublime_semantic_regions(hover, text)
+    usages = [offset for offset, _ in regions['bespokeasm_constant_usages']]
+    data_line = text.index('  .byte')
+    assert usages == [text.index(', E,', data_line) + 2, text.index('E+1', data_line)]
+    # Hovers read the word under the cursor the same way.
+    assert hover.HOVER_WORD_PATTERN.search('$600E') is None
+    assert hover.HOVER_WORD_PATTERN.search('lda #E').group(0) == 'lda'
 
 
 SEMANTIC_NODE_PROBE = r'''

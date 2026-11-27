@@ -254,12 +254,31 @@ contexts:
       - match: $
         pop: true
 
+  # A memory zone's name where a line defines or selects it, or `.org` counts from it.
+  memory_zone_names:
+    - match: (?<=\#)(create_memzone)\s+([A-Za-z_][A-Za-z0-9_]*)
+      captures:
+        1: keyword.control.preprocessor
+        2: entity.name.section.memory-zone
+    - match: (?<!\w)(\.memzone)\s+([A-Za-z_][A-Za-z0-9_]*)
+      captures:
+        1: keyword.other.directive
+        2: entity.name.section.memory-zone
+
+  quoted_memory_zone:
+    - match: (")([A-Za-z_][A-Za-z0-9_]*)(")
+      captures:
+        1: punctuation.definition.string.begin
+        2: entity.name.section.memory-zone
+        3: punctuation.definition.string.end
+
   compiler_directives:
     - match: (?<!\w)(?:##DIRECTIVES##)\b
       scope: keyword.other.directive
       push:
         - meta_scope: meta.directive
         - include: pop_instruction_end
+        - include: quoted_memory_zone
         - include: strings
         - include: numerical_expressions
         - match: (?=(?:\s*\;|\s*$))
@@ -287,6 +306,7 @@ contexts:
         - meta_scope: meta.preprocessor
         - include: flow_counter_directives
         - include: annotation_directive
+        - include: memory_zone_names
         - match: (?<=\#)(?:##PREPROCESSOR##)\b
           scope: keyword.control.preprocessor
         - include: strings
@@ -300,6 +320,7 @@ contexts:
       scope: punctuation.separator.continuation
 
   directives:
+    - include: memory_zone_names
     - include: compiler_directives
     - include: data_types_directives
     - include: preprocessor_directives

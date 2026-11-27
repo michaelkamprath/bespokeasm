@@ -66,6 +66,7 @@ class SyntaxElement(Enum):
     COMPILER_LABEL = 'compiler_label'
     PARAMETER = 'parameter'
     ANNOTATION_NAMESPACE = 'annotation_namespace'
+    MEMORY_ZONE = 'memory_zone'
     ANNOTATION_ARGUMENT = 'annotation_argument'
     ANNOTATION_VALUE = 'annotation_value'
 
@@ -162,6 +163,7 @@ DEFAULT_COLOR_SCHEME = ColorScheme(
         SyntaxElement.COMPILER_LABEL: '#abedc1',
         SyntaxElement.PARAMETER: '#abd7ed',
         SyntaxElement.ANNOTATION_NAMESPACE: '#ff00a2',
+        SyntaxElement.MEMORY_ZONE: '#ff00a2',
         SyntaxElement.ANNOTATION_ARGUMENT: '#c080ff',
         SyntaxElement.ANNOTATION_VALUE: '#89c616',
 

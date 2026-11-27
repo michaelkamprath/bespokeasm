@@ -71,6 +71,7 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.COMMENT, 'comment.line', 'Comments'),
             (SyntaxElement.PARAMETER, 'variable.parameter', 'Parameters'),
             (SyntaxElement.ANNOTATION_NAMESPACE, 'entity.name.namespace.annotation', 'Annotation Namespaces'),
+            (SyntaxElement.MEMORY_ZONE, 'entity.name.section.memory-zone', 'Memory Zones'),
             (SyntaxElement.ANNOTATION_ARGUMENT, 'variable.parameter.annotation', 'Annotation Arguments'),
             (SyntaxElement.ANNOTATION_VALUE, 'constant.other.annotation.value', 'Annotation Values'),
             (SyntaxElement.INSTRUCTION, 'variable.function.instruction', 'Functions - Instruction'),
@@ -274,6 +275,12 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
         package_json['contributes']['grammars'][0]['language'] = self.language_id
         package_json['contributes']['grammars'][0]['scopeName'] = scope_name
         package_json['contributes']['snippets'][0]['language'] = self.language_id
+        # VS Code shows a color swatch and picker for anything that looks like a CSS color, such as
+        # `#160` where `#` marks an immediate value. Turn that off for languages that use the prefix.
+        if self.model.uses_immediate_prefix:
+            package_json['contributes']['configurationDefaults'] = {
+                f'[{self.language_id}]': {'editor.colorDecorators': False},
+            }
         package_json['activationEvents'] = [f'onLanguage:{self.language_id}']
         package_json['main'] = './extension.js'
         if 'semanticTokenScopes' in package_json['contributes']:
@@ -407,17 +414,17 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
 
         # handle bespokeasm directives
         for item in grammar_json['repository']['directives']['patterns']:
-            if 'meta.directive' == item['name']:
+            if 'meta.directive' == item.get('name'):
                 directives_regex = '|'.join(['\\.'+d for d in COMPILER_DIRECTIVES_SET])
                 directives_str = item['begin']
                 item['begin'] = directives_str.replace('##DIRECTIVES##', directives_regex)
-            elif 'storage.type' == item['name']:
+            elif 'storage.type' == item.get('name'):
                 datatypes_regex = '|'.join(
                     ['\\.'+d for d in sorted(BYTECODE_DIRECTIVES_SET | set(self.model.directive_aliases))]
                 )
                 datatypes_str = item['match']
                 item['match'] = datatypes_str.replace('##DATATYPES##', datatypes_regex)
-            elif 'meta.preprocessor' == item['name']:
+            elif 'meta.preprocessor' == item.get('name'):
                 for pattern in item['patterns']:
                     if 'name' in pattern and 'keyword.control.preprocessor' == pattern['name']:
                         # Sort by length (desc) to avoid prefix matches like 'if' matching 'ifdef'

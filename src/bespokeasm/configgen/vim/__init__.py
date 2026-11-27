@@ -133,6 +133,9 @@ class VimConfigGenerator(LanguageConfigGenerator):
             (f'{lang_group}Verbatim', SyntaxElement.VERBATIM_TEXT),
             (f'{lang_group}Param', SyntaxElement.PARAMETER),
             (f'{lang_group}AnnotationNamespace', SyntaxElement.ANNOTATION_NAMESPACE),
+            (f'{lang_group}MemoryZone', SyntaxElement.MEMORY_ZONE),
+            (f'{lang_group}MemoryZoneName', SyntaxElement.MEMORY_ZONE),
+            (f'{lang_group}MemoryZoneQuoted', SyntaxElement.MEMORY_ZONE),
             (f'{lang_group}AnnotationArgument', SyntaxElement.ANNOTATION_ARGUMENT),
             (f'{lang_group}AnnotationPunct', SyntaxElement.PUNCTUATION_SEPARATOR),
             (f'{lang_group}AnnotationValue', SyntaxElement.ANNOTATION_VALUE),
@@ -479,7 +482,8 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
                 fr'matchgroup={lang_group}Directive '
                 fr'start=/\s*\.{self._vim_escape(w)}\>/ '
                 fr'end=/\s*\ze;\|$/ oneline '
-                fr'contains={directive_contains}'
+                # Only compiler directives name memory zones: `.memzone RAM`, `.org $10 "RAM"`.
+                fr'contains={directive_contains},{lang_group}MemoryZoneName,{lang_group}MemoryZoneQuoted'
             )
         # A trailing \ continues a data directive or an embedded string on the next line. The
         # match is top level, for the continuation lines, and in the data directive region; an
@@ -595,6 +599,14 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
             fr'/\%(^\s*#annotate\>[^;]*\)\@<=\<{self._alternation(arguments)}\>/'
         )
         lines.append(fr'syn match {lang_group}AnnotationPunct /\%(^\s*#annotate\>[^;]*\)\@<==/')
+        # A memory zone's name where a line defines or selects it, or `.org` counts from it.
+        # Defined after the label and string rules so these win where both match.
+        lines.append(fr'syn match {lang_group}MemoryZone /\%(^\s*#create_memzone\s\+\)\@<=\h\w*/')
+        lines.append(fr'syn match {lang_group}MemoryZoneName /\%(\.memzone\s\+\)\@<=\h\w*/ contained')
+        lines.append(
+            fr'syn region {lang_group}MemoryZoneQuoted matchgroup={lang_group}StringPunc '
+            r'start=/"\ze\h\w*"/ end=/"/ oneline contained'
+        )
         lines.append(
             fr'syn match {lang_group}AnnotationValue '
             r'/\%(^\s*#annotate\>[^;]*=\s*\)\@<=\h\w*\>/'
@@ -697,6 +709,9 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         lines.append(f'hi def link {lang_group}Continuation Delimiter')
         lines.append(f'hi def link {lang_group}Param Identifier')
         lines.append(f'hi def link {lang_group}AnnotationNamespace Identifier')
+        lines.append(f'hi def link {lang_group}MemoryZone Identifier')
+        lines.append(f'hi def link {lang_group}MemoryZoneName {lang_group}MemoryZone')
+        lines.append(f'hi def link {lang_group}MemoryZoneQuoted {lang_group}MemoryZone')
         lines.append(f'hi def link {lang_group}AnnotationArgument Identifier')
         lines.append(f'hi def link {lang_group}AnnotationPunct Delimiter')
         lines.append(f'hi def link {lang_group}AnnotationValue Constant')

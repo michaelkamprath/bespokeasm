@@ -77,6 +77,7 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.COMMENT, 'comment.line', 'Comments'),
             (SyntaxElement.PARAMETER, 'variable.parameter', 'Parameters'),
             (SyntaxElement.ANNOTATION_NAMESPACE, 'entity.name.namespace.annotation', 'Annotation Namespaces'),
+            (SyntaxElement.MEMORY_ZONE, 'entity.name.section.memory-zone', 'Memory Zones'),
             (SyntaxElement.ANNOTATION_ARGUMENT, 'variable.parameter.annotation', 'Annotation Arguments'),
             (SyntaxElement.ANNOTATION_VALUE, 'constant.other.annotation.value', 'Annotation Values'),
             (SyntaxElement.INSTRUCTION, 'variable.function.instruction', 'Instruction Functions'),

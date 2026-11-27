@@ -233,6 +233,9 @@
     "directives": {
       "patterns": [
         {
+          "include": "#memory_zone_names"
+        },
+        {
           "begin": "(?<!\\w)(?:##DIRECTIVES##)\\b",
           "beginCaptures": {
             "0": {
@@ -242,6 +245,9 @@
           "end": "(?=(?:\\s*\\;|\\s*$))",
           "name": "meta.directive",
           "patterns": [
+            {
+              "include": "#quoted_memory_zone"
+            },
             {
               "include": "#numeric-values"
             },
@@ -278,6 +284,9 @@
             },
             {
               "include": "#annotation_directive"
+            },
+            {
+              "include": "#memory_zone_names"
             },
             {
               "match": "(?<=\\#)(?:##PREPROCESSOR##)\\b",
@@ -688,6 +697,49 @@
     "line_continuation": {
       "match": "\\\\(?=\\s*$)",
       "name": "punctuation.separator.continuation"
+    },
+    "memory_zone_names": {
+      "patterns": [
+        {
+          "comment": "The zone a #create_memzone line defines.",
+          "match": "(?<=\\#)(create_memzone)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "keyword.control.preprocessor"
+            },
+            "2": {
+              "name": "entity.name.section.memory-zone"
+            }
+          }
+        },
+        {
+          "comment": "The zone .memzone selects.",
+          "match": "(?<!\\w)(\\.memzone)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "keyword.other.directive"
+            },
+            "2": {
+              "name": "entity.name.section.memory-zone"
+            }
+          }
+        }
+      ]
+    },
+    "quoted_memory_zone": {
+      "comment": "The quoted zone .org counts its offset from, as in .org $10 \"RAM\".",
+      "match": "(\")([A-Za-z_][A-Za-z0-9_]*)(\")",
+      "captures": {
+        "1": {
+          "name": "punctuation.definition.string.begin"
+        },
+        "2": {
+          "name": "entity.name.section.memory-zone"
+        },
+        "3": {
+          "name": "punctuation.definition.string.end"
+        }
+      }
     }
   },
   "scopeName": "source.asm"

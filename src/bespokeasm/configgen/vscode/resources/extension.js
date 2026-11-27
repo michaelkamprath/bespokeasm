@@ -250,7 +250,8 @@ function buildSemanticTokens(document) {
     const searchRanges = getSemanticSearchRanges(text);
     for (const range of searchRanges) {
       const segment = text.slice(range.start, range.end);
-      const regex = /(##LABEL_PATTERN##)/g;
+      // A symbol can't start inside a number or character literal: the E of $600E is not E.
+      const regex = /(?<![\w$%'])(##LABEL_PATTERN##)/g;
       let match;
       while ((match = regex.exec(segment)) !== null) {
         const word = match[1];
@@ -454,7 +455,7 @@ function extractConstantValue(document, token, constantMap) {
 
 function findReferences(document, token) {
   const refs = [];
-  const wordPattern = /(?:##MNEMONIC_PATTERN##|##LABEL_PATTERN##)/gi;
+  const wordPattern = /(?<![\w$%'])(?:##MNEMONIC_PATTERN##|##LABEL_PATTERN##)/gi;
 
   function scanLines(lines, uri) {
     for (let lineIdx = 0; lineIdx < lines.length; lineIdx += 1) {
@@ -601,7 +602,7 @@ function activate(context) {
   const annotationDocs = hoverDocs.annotations || {};
   // Built-in preprocessor symbols such as __OUTPUT_FORMAT__ begin with two underscores, which
   // no label can, so the label pattern alone would read one as _OUTPUT_FORMAT__.
-  const wordPattern = /(?:__[A-Za-z0-9_]+__|##MNEMONIC_PATTERN##|##LABEL_PATTERN##)/i;
+  const wordPattern = /(?<![\w$%'])(?:__[A-Za-z0-9_]+__|##MNEMONIC_PATTERN##|##LABEL_PATTERN##)/i;
   const provider = {
     provideHover(document, position) {
       const hoverSettings = getHoverSettings(document, languageId);

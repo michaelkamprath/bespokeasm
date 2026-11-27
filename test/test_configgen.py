@@ -6,6 +6,7 @@ import re
 import shutil
 import tempfile
 import unittest
+import zipfile
 
 from bespokeasm.configgen.color_scheme import build_hover_color_map
 from bespokeasm.configgen.color_scheme import DEFAULT_COLOR_SCHEME
@@ -17,6 +18,8 @@ from ruamel.yaml import YAML
 
 from test import config_files
 from test.isa_configs import json_config_copy
+from test.isa_configs import load_config
+from test.isa_configs import write_json_config
 
 
 class TestConfigurationGeneration(unittest.TestCase):
@@ -223,6 +226,112 @@ class TestConfigurationGeneration(unittest.TestCase):
         shutil.rmtree(sublime_tmp_dir)
         shutil.rmtree(test_dir)
 
+    def test_vscode_configgen_turns_off_color_swatches_where_hash_marks_immediates(self):
+        """With a `#` immediate prefix, `#160` would look like a color to VS Code."""
+        test_dir = tempfile.mkdtemp()
+        config = load_config(pkg_resources.files(config_files).joinpath('test_instruction_line_creation_little_endian.yaml'))
+        numeric = next(
+            operand for operand_set in config['operand_sets'].values()
+            for operand in operand_set['operand_values'].values() if operand.get('type') == 'numeric'
+        )
+        numeric['prefix'] = '#'
+        configgen = VSCodeConfigGenerator(
+            write_json_config(config, test_dir), 0, str(test_dir), None, None, 'asmtest',
+        )
+        configgen.generate()
+        package_fp = os.path.join(str(test_dir), 'extensions', 'bespokeasm-test', 'package.json')
+        with open(package_fp) as json_file:
+            package_json = json.load(json_file)
+        self.assertEqual(
+            package_json['contributes']['configurationDefaults'],
+            {'[bespokeasm-test-assembly]': {'editor.colorDecorators': False}},
+        )
+        shutil.rmtree(test_dir)
+
+    def test_memory_zone_names_get_their_own_scope_and_color(self):
+        """A zone's name after #create_memzone and .memzone, and quoted in .org, is scoped as a
+        memory zone in every editor, with the color scheme's memory zone color."""
+        zone_scope = 'entity.name.section.memory-zone'
+        zone_color = DEFAULT_COLOR_SCHEME.get_color(SyntaxElement.MEMORY_ZONE)
+        self.assertEqual(zone_color, '#ff00a2')
+        config_file = str(pkg_resources.files(config_files).joinpath('test_instruction_line_creation_little_endian.yaml'))
+
+        test_dir = tempfile.mkdtemp()
+        VSCodeConfigGenerator(config_file, 0, test_dir, None, None, 'asmtest').generate()
+        extension_dir = os.path.join(test_dir, 'extensions', 'bespokeasm-test')
+        with open(os.path.join(extension_dir, 'syntaxes', 'tmGrammar.json')) as handle:
+            grammar = json.load(handle)
+        theme_text = ''.join(
+            open(os.path.join(root, name)).read()
+            for root, _, names in os.walk(extension_dir) for name in names if name.endswith('-theme.json')
+        )
+        shutil.rmtree(test_dir)
+        names, quoted = (
+            grammar['repository']['memory_zone_names']['patterns'], grammar['repository']['quoted_memory_zone'],
+        )
+        found = {}
+        for line in ('#create_memzone RAM $0000 $3FFF', '.memzone ZERO_PAGE', '.org $10 "RAM"', 'lda RAM'):
+            zone = None
+            for rule in names + [quoted]:
+                match = re.search(rule['match'], line)
+                if match:
+                    zone = match.group(2)
+            found[line] = zone
+        self.assertEqual(found, {
+            '#create_memzone RAM $0000 $3FFF': 'RAM',
+            '.memzone ZERO_PAGE': 'ZERO_PAGE',
+            '.org $10 "RAM"': 'RAM',
+            'lda RAM': None,
+        })
+        self.assertTrue(all(rule['captures']['2']['name'] == zone_scope for rule in names + [quoted]))
+        self.assertIn(zone_scope, theme_text)
+        self.assertIn(zone_color, theme_text)
+
+        sublime_dir = tempfile.mkdtemp()
+        SublimeConfigGenerator(config_file, 0, sublime_dir, None, None, 'asmtest').generate()
+        package = next(pl.Path(sublime_dir).glob('*.sublime-package'))
+        with zipfile.ZipFile(package) as archive:
+            syntax = archive.read(next(n for n in archive.namelist() if n.endswith('.sublime-syntax'))).decode()
+            scheme = archive.read(next(n for n in archive.namelist() if n.endswith('.sublime-color-scheme'))).decode()
+        shutil.rmtree(sublime_dir)
+        self.assertIn('- include: memory_zone_names', syntax)
+        self.assertIn('- include: quoted_memory_zone', syntax)
+        self.assertIn(zone_scope, scheme)
+
+        vim_dir = tempfile.mkdtemp()
+        VimConfigGenerator(config_file, 0, vim_dir, None, None, 'asmtest').generate()
+        vim_text = ''.join(path.read_text() for path in pl.Path(vim_dir).rglob('*.vim'))
+        shutil.rmtree(vim_dir)
+        self.assertRegex(vim_text, r'syn match \w+MemoryZone /\\%\(\^\\s\*#create_memzone')
+        self.assertRegex(vim_text, rf'hi \w+MemoryZone guifg={zone_color}')
+
+    def test_vscode_symbol_scanning_skips_names_inside_numbers(self):
+        """The extension's semantic highlighting, references and hovers find symbols by pattern;
+        a symbol can't start inside a number or character literal, so the E of $600E is not a
+        constant named E."""
+        test_dir = tempfile.mkdtemp()
+        config_file = pkg_resources.files(config_files).joinpath('test_instruction_line_creation_little_endian.yaml')
+        VSCodeConfigGenerator(str(config_file), 0, str(test_dir), None, None, 'asmtest').generate()
+        extension_fp = os.path.join(str(test_dir), 'extensions', 'bespokeasm-test', 'extension.js')
+        with open(extension_fp) as handle:
+            extension_js = handle.read()
+        shutil.rmtree(test_dir)
+        semantic = re.compile(re.search(r'const regex = /(.*)/g;', extension_js).group(1))
+        found = {
+            line: [match.group(1) for match in semantic.finditer(line)]
+            for line in ('IER = $600E', 'lda 0x1E', "lda #'E'", 'and #%1110', 'lda #E | RW', 'sta .loop')
+        }
+        self.assertEqual(found, {
+            'IER = $600E': ['IER'],
+            'lda 0x1E': ['lda'],
+            "lda #'E'": ['lda'],
+            'and #%1110': ['and'],
+            'lda #E | RW': ['lda', 'E', 'RW'],
+            'sta .loop': ['sta', '.loop'],
+        })
+        # References and hovers use the same guard.
+        self.assertEqual(extension_js.count("(?<![\\w$%'])"), 3)
+
     def test_vscode_configgen_no_registers(self):
         test_dir = tempfile.mkdtemp()
         config_file = pkg_resources.files(config_files).joinpath('test_instruction_line_creation_little_endian.yaml')
@@ -264,6 +373,10 @@ class TestConfigurationGeneration(unittest.TestCase):
             package_json['contributes']['languages'][0]['extensions'],
             ['.asmtest'],
             'file extension list should match'
+        )
+        self.assertNotIn(
+            'configurationDefaults', package_json['contributes'],
+            'without a `#` immediate prefix, color swatches are left as they are'
         )
         self.assertEqual(
             package_json['contributes']['grammars'][0]['language'],
@@ -1784,11 +1897,13 @@ class TestConfigurationGeneration(unittest.TestCase):
         with open(hover_fp) as hover_file:
             hover_content = hover_file.read()
         sublime_match = re.search(
-            r'WORD_PATTERN\s*=\s*re\.compile\(r\'([^\']+)\'',
+            r'^WORD_PATTERN\s*=\s*re\.compile\(SYMBOL_START \+ r\'([^\']+)\'',
             hover_content,
+            re.MULTILINE,
         )
         self.assertIsNotNone(sublime_match, 'WORD_PATTERN should be present in hover plugin')
-        sublime_word_pattern = re.compile(sublime_match.group(1), re.IGNORECASE)
+        symbol_start = re.search(r'^SYMBOL_START = r"([^"]+)"', hover_content, re.MULTILINE).group(1)
+        sublime_word_pattern = re.compile(symbol_start + sublime_match.group(1), re.IGNORECASE)
         match = sublime_word_pattern.search('  AN.Z $10')
         self.assertIsNotNone(match, 'Sublime wordPattern should match dotted mnemonic')
         self.assertEqual(match.group(0), 'AN.Z')

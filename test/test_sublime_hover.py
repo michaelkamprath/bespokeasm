@@ -570,6 +570,33 @@ class _MockView:
         return self._window
 
 
+# BespokeAsmSemanticListener.on_close
+
+
+def test_closing_a_view_forgets_its_state_and_cancels_its_pending_update(monkeypatch):
+    """Closing a view drops its cached state, so a later view given the same id can't read the
+    closed view's lines, and a semantic update scheduled before the close does not run."""
+    hover = _load_sublime_hover_module()
+    scheduled, updated = [], []
+    monkeypatch.setattr(
+        hover, 'sublime',
+        types.SimpleNamespace(set_timeout_async=lambda callback, delay=0: scheduled.append(callback)),
+    )
+    monkeypatch.setattr(hover, '_update_semantic_regions', updated.append)
+    closed, other = _MockView(view_id=7), _MockView(view_id=8)
+    hover._VIEW_CACHE.update({7: {'lines': ['old']}, 8: {'lines': ['kept']}})
+    hover._schedule_semantic_update(closed)
+    hover._schedule_semantic_update(other)
+
+    hover.BespokeAsmSemanticListener().on_close(closed)
+    for callback in scheduled:
+        callback()
+
+    assert 7 not in hover._VIEW_CACHE and 7 not in hover._PENDING_SEMANTIC
+    assert hover._VIEW_CACHE[8] == {'lines': ['kept']}
+    assert updated == [other]
+
+
 # _get_expected_package_name
 
 
