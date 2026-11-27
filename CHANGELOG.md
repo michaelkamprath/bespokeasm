@@ -50,6 +50,10 @@ Changes that are planned but not implemented yet:
 * Fixed generated Sublime Text packages keeping each closed file's parsed contents in memory for the rest of the session.
 * Editor extensions color memory zone names where `#create_memzone` defines one, `.memzone` selects one, and `.org` counts from one, with a color scheme entry of their own.
 * `compile`'s `--binary-min-address`, `--binary-max-address` and `--binary-fill` options accept any numeric literal, such as `0x8000` or `$8000`, not only decimal.
+* Labels and constants may use the names of the expression functions `LSB`, `BYTE0`–`BYTE9`, `COUNTER` and `COORDINATE`, such as a variable named `COUNTER`: those names are functions only when written as a call, `NAME(..)`. Editor extensions color them as functions only before a parenthesis.
+* Fixed generated VS Code extensions coloring the `COUNTER` of `COUNTER(name)` in a preprocessor directive, such as `#assert`, as a label rather than a flow-counter use.
+* Added `bespokeasm migrate`, which rewrites source written for another assembler into an instruction set's language. A configuration declares the assemblers it can migrate from in a new `migrations` section, built from a fixed set of rules: renaming, dropping or reporting directives, local and anonymous labels, labels without a colon, `*=` origins, operand prefixes, assignment operators, a current-address symbol and doubled-quote escapes. A line it can't convert is kept as a `; MIGRATE:` comment and reported, and the exit status is 1 when any line was. Generated ISA documentation lists the dialects.
+* The MOS 6502 and W65C02S example configurations migrate source from ca65 and from vasm's oldstyle syntax.
 
 ## [0.9.0]
 * Added label annotations: `#annotate <namespace> key=value ...` attaches validated metadata to the next label or constant. Configurations declare namespaces in a new `annotations` section, with typed arguments and checks on a label's data size or a constant's value. An `#annotate` line ending in `\` continues on the next line, and adjacent quoted strings join into one value. See [Annotations](https://github.com/michaelkamprath/bespokeasm/wiki/Annotations).

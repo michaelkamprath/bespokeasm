@@ -20,9 +20,13 @@ from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.keywords import BYTECODE_DIRECTIVES_SET
 from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET
 from bespokeasm.assembler.keywords import DIRECTIVE_ALIAS_TARGETS
+from bespokeasm.assembler.keywords import preprocessor_directives_for_isa
 from bespokeasm.assembler.output_format.defined import DefinedFormat
 from bespokeasm.assembler.output_format.defined import load_output_formats
 from bespokeasm.assembler.output_format.generators import LoadEnvironment
+from bespokeasm.migrate.dialects import Dialect
+from bespokeasm.migrate.dialects import load_migrations
+from bespokeasm.migrate.rules import LoadEnvironment as MigrationLoadEnvironment
 from bespokeasm.utilities import CURRENT_ADDRESS_STYLES
 from bespokeasm.utilities import ENCLOSURES
 from bespokeasm.utilities import IMMEDIATE_PREFIX
@@ -65,6 +69,7 @@ class ConfigValidator:
         self._reporter = diagnostic_reporter
         self.annotation_namespaces: dict[str, AnnotationNamespace] = dict(BUILTIN_NAMESPACES)
         self.output_formats: dict[str, DefinedFormat] = {}
+        self.migrations: dict[str, Dialect] = {}
 
     def error(self, path: str, problem: str) -> None:
         self._reporter.error(None, f'ISA configuration {self._config_name}: {path} {problem}')
@@ -174,6 +179,17 @@ class ConfigValidator:
             ),
             config.get('output_format_shared'),
         )
+        self.migrations = load_migrations(
+            config.get('migrations'),
+            MigrationLoadEnvironment(error=self.error, directive_spellings=self._directive_spellings(general)),
+        )
+
+    def _directive_spellings(self, general: dict) -> frozenset[str]:
+        """Every directive a migration rule may produce, as written in source."""
+        aliases = general.get('directive_aliases') or {}
+        dotted = COMPILER_DIRECTIVES_SET | BYTECODE_DIRECTIVES_SET | {str(alias).lower() for alias in aliases}
+        preprocessor = preprocessor_directives_for_isa('flow_counters' in self._config)
+        return frozenset({f'.{name}' for name in dotted} | {f'#{name}' for name in preprocessor})
 
     @staticmethod
     def _predefined_names(predefined: dict) -> dict[str, dict[str, str]]:
@@ -543,7 +559,7 @@ FLOW_METADATA_KEYS = {
 KNOWN_KEYS = {
     'root': {
         'description', 'general', 'operand_sets', 'instructions', 'macros', 'predefined', 'flow_counters',
-        'annotations', 'output_formats', 'output_format_shared',
+        'annotations', 'output_formats', 'output_format_shared', 'migrations',
     },
     'output_format': {'documentation', 'requires_word_size', 'template', 'sections', 'shared', 'predefined'},
     'output_format_shared': {'requires_word_size', 'sections', 'predefined'},

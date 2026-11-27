@@ -21,7 +21,7 @@ Goals:
 - Example programs for the Ben Eater 6502 (ROM `$8000`–`$FFFF`, 65C22 VIA at `$6000`), written in conventional 6502 style.
 - Every opcode and addressing mode byte-identical to ca65. Tests compare against bytes captured from ca65 and stored as fixtures. Tests and CI never run ca65.
 - A `bespokeasm migrate` command that rewrites source from another assembler into BespokeASM syntax. The rules for each source assembler are declared in the ISA config.
-  - The 6502 config declares ca65 and vasm.
+  - The 6502 and W65C02S configs both declare ca65 and vasm (both, because Ben Eater's code is 65C02 code).
   - The four Minimal configs declare Carsten Herting's assemblers.
   - An Intel 8085 dialect is deferred; see [intel-8085-migration-spec.md](intel-8085-migration-spec.md).
 
@@ -29,11 +29,11 @@ Non-goals:
 
 - Native support for these conventions from other assemblers. `bespokeasm migrate` converts what it can and reports the rest:
   - **Source-level macros (`.macro`):** reported. A separate project, planned to follow soon; see [source-macros-notes.md](source-macros-notes.md).
-  - **Anonymous labels (`:+`, `-`), labels without a colon, `*=` origin syntax and ca65 `@` cheap locals:** converted.
+  - **Anonymous labels (`:`, `:+`, `:-`), labels without a colon, `*=` origin syntax, ca65 `@` cheap locals, vasm `name$` locals and ca65's `:=`:** converted.
   - **Forced-width prefixes:**
     - `z:` is dropped, because relaxation already selects zero page for any value that fits, forward references included, and a value that doesn't fit is still a range error.
     - `a:` (force absolute) is reported, because BespokeASM has no way yet to opt an operand out of value selection.
-  - **Segments and linker configs:** reported. Relocatable blocks, with addresses resolved at link time or even at run time, are a possible future project.
+  - **Segments and linker configs:** reported. placing code the way ld65 places segments is part of [milestone 11](#milestone-11-migrating-microsoft-basic), by extending memory zones; relocatable blocks, with addresses resolved at link time or even at run time, are a possible project after that.
 - The 65816 and undocumented NMOS opcodes.
 - Platform constants (VIA, LCD, ACIA registers) in the config. Ben Eater's source defines `PORTB = $6000` itself, and a predefined `PORTB` would collide with that definition. They go in an include file next to the programs.
 
@@ -383,10 +383,10 @@ bespokeasm migrate -c mos6502.yaml --from ca65 reset.s -o reset.a65
 ```
 
 - **What the config declares:** which source assemblers ("dialects") it can migrate from, and the rules for each. The rule kinds are a fixed library implemented in BespokeASM, as output-format generators are, so a config never ships code.
-- **Help and docs:** `--from` lists the config's dialects, the way `-t` lists formats. Generated ISA docs list them too.
-- **Input and output:** one file per run. It never overwrites its input: it writes to `-o` or to stdout. Includes are reported, not followed, and each file is migrated on its own.
-- **Lines it can't convert:** they are kept, prefixed with `; MIGRATE: ` and a reason, so nothing is dropped silently. Search for the marker to find what needs a hand port.
-- **Summary:** the command prints counts by rule and every reported line, with file and line. The exit status is 0 when nothing was reported and 1 otherwise.
+- **Help and docs:** `migrate` without `--from` (short `-f`), or with a dialect the config doesn't declare, lists the config's dialects with their descriptions. Shell completion offers them, read from the config's `migrations` section the way `-t` completion reads `output_formats`. Generated ISA docs list them in a **Source Migration** section.
+- **Input and output:** one file per run. It never overwrites its input: it writes to `-o` or to stdout, and `-o` naming the source file is a usage error. Output line N is input line N, so a report's line number works in both files, and the source's line endings (LF or CRLF) and final newline are kept. Includes are not followed: each included file is listed as a note in the summary, to be migrated on its own.
+- **Lines it can't convert:** they are kept as `; MIGRATE: <reason>: <original line>`, so nothing is dropped silently. Search for the marker to find what needs a hand port. A dropped directive's line becomes a plain comment, `; .setcpu "65C02"`, after the line's indentation.
+- **Summary:** printed to stderr: the lines each rule changed (a rename to the directive already written, such as `.org` → `.org`, is no change), every reported line with file and line (a reported block by its first line), and the notes. The exit status is 0 when nothing was reported and 1 otherwise; notes, such as includes, don't count.
 - **Shell completion:** like the other commands, it stays lightweight at import time; the rule engine loads inside the handler.
 
 ### Config
@@ -396,43 +396,49 @@ migrations:
   ca65:
     description: cc65's ca65 assembler
     rules:
-      - rename_directives: {include: '#include', if: '#if', ifdef: '#ifdef', ifndef: '#ifndef', else: '#else', endif: '#endif', define: '#define', addr: '.word'}
-      - drop_directives: [setcpu, p02, debuginfo]
+      - rename_directives: {include: '#include', if: '#if', ifdef: '#ifdef', ifndef: '#ifndef', elseif: '#elif', else: '#else', endif: '#endif', define: '#define', byt: '.byte'}
+      - drop_directives: [setcpu, p02, pc02, debuginfo]
+      - assignment_operators: [':=']
       - local_labels: {prefix: '@'}
-      - anonymous_labels: {style: ca65}
+      - anonymous_labels
       - operand_prefixes: {drop: ['z:'], unsupported: ['a:', 'f:']}
-      - unsupported: [macro, endmacro, proc, endproc, scope, endscope, segment, import, export]
+      - unsupported: [{macro: endmacro}, proc, endproc, scope, endscope, segment, import, export]
 ```
 
-Rules run in the order listed. A rule kind that the config doesn't name never runs.
+The configs' dialects list more directives in each rule; `.addr`, `.word` and `.res` need no rename, because the configs' `directive_aliases` already accept them.
+
+Rules run in the order listed, each over the whole file (anonymous labels need every line). A rule kind that the config doesn't name never runs. A rule with no parameters may be written as its bare name, as `anonymous_labels` is. Rules work on a line's code only, never inside a string or comment, except `string_escapes`; a line already reported or dropped is left to later rules as it is.
 
 ### Rule kinds
 
 | Kind | Parameters | Converts |
 |:--|:--|:--|
-| `rename_directives` | map of source name → BespokeASM directive | `.include` → `#include`, `#org` → `.org`. Source names match with or without a leading `.` or `#`, case-insensitively. Arguments are kept. |
+| `rename_directives` | map of source name → BespokeASM directive | `.include` → `#include`, `#org` → `.org`. Source names match with or without a leading `.` or `#`, case-insensitively. Arguments are kept. A bare word matches only where it can't be one of the ISA's mnemonics or the symbol of an assignment (`name =`, `name equ`). A target must be a BespokeASM directive written with its `.` or `#`, or one of the config's directive aliases (`.word`). |
 | `drop_directives` | list | Removes directives with no BespokeASM meaning (`.setcpu`, `.p02`). The line becomes a comment. |
-| `unsupported` | list | Keeps the line as a `; MIGRATE:` comment, reported. |
-| `split_statements` | none | Puts each directive, and data that follows an instruction, on its own line (`#mute #org 0x0080`). |
-| `bare_data` | `sizing` (`slu4`) | Data written without a directive becomes `.byte`/`.2byte`, sized by the named strategy. |
-| `char_literals` | `double_quoted: true` | A single character in double quotes used as a number, `"a"` → `'a'`. |
-| `local_labels` | `prefix` | ca65 `@loop` → `.loop`. BespokeASM local labels have the same scope rule. |
-| `anonymous_labels` | `style` (`ca65`, `vasm`) | `:` with `:+`/`:-`, or `-`/`+` → generated local labels `.anon_N`. |
-| `colonless_labels` | none | A label at column 0 without a colon (vasm) → `label:`. |
-| `origin_assignment` | `symbol` | `*= $8000` → `.org $8000`. |
-| `operand_prefixes` | `drop` list, `unsupported` list | ca65 `z:` is dropped, since relaxation picks zero page anyway. `a:` and `f:` are reported. |
+| `unsupported` | list of names or `{start: end}` blocks | Keeps the line as a `; MIGRATE:` comment, reported. A block reports every line from its start to its end directive (`end` may be a list), and later lines using the block's name. |
+| `split_statements` (milestone 9) | none | Puts each directive, and data that follows an instruction, on its own line (`#mute #org 0x0080`). |
+| `bare_data` (milestone 9) | `sizing` (`slu4`) | Data written without a directive becomes `.byte`/`.2byte`, sized by the named strategy. |
+| `char_literals` (milestone 9) | `double_quoted: true` | A single character in double quotes used as a number, `"a"` → `'a'`. |
+| `local_labels` | `prefix` or `suffix` | ca65 `@loop` → `.loop` with `prefix: '@'`; vasm `loop$` and `1$` → `.loop` and `.1` with `suffix: '$'`. BespokeASM local labels have the same scope rule. A label that would become a directive's name (`@byte` → `.byte`) is reported. |
+| `anonymous_labels` | none | `:` with `:+`/`:-` (and `:>`/`:<`) → generated local labels `.anon_N`. ca65 and vasm oldstyle use the same syntax, so there is no `style`. A reference that crosses another label is reported. |
+| `colonless_labels` | none | A label at column 0 without a colon (vasm) → `label:`, including a `$` local that starts with a digit (`1$`). A name followed by `=`, `equ`, `eq` or `set` is an assignment and is left alone, as is a dotted BespokeASM directive at column 0. |
+| `origin_assignment` | `symbol` (default `*`) | `*= $8000` → `.org $8000`. |
+| `assignment_operators` | list | `COUNT := 3` → `COUNT = 3`. Added in milestone 8: ca65's `:=` is BespokeASM's counter-coordinate operator. |
+| `operand_prefixes` | `drop` list, `unsupported` list | Matched in the operands only, so a label named `z` is safe. ca65 `z:` is dropped, since relaxation picks zero page anyway. `a:` and `f:` are reported. |
 | `current_address_symbol` | `symbol` | A standalone `$` (Intel, many Z80 assemblers) → `*`. `$7C` stays a hex literal. No dialect in this effort uses it; it is included because it is a simple rewrite that later dialects need. |
 | `string_escapes` | `doubled_quotes: true` | `'IT''S'` → `'IT\'S'`. Included for the same reason. |
-| `predefined_symbols` | `drop_matching: true` | Removes a definition of a name the config predefines with the same value, such as `#org 0xf003 _Prompt:` in Carsten's programs. A different value is reported. |
+| `predefined_symbols` (milestone 9) | `drop_matching: true` | Removes a definition of a name the config predefines with the same value, such as `#org 0xf003 _Prompt:` in Carsten's programs. A different value is reported. |
 
 A new rule kind needs a stated reason, in the same spirit as directive aliases.
 
 ### Dialects
 
-**6502 (`mos6502.yaml`):**
+**6502 and W65C02S (`mos6502.yaml` and `w65c02.yaml`, the same dialects in both):**
 
-- `ca65`: the rules in the example above.
-- `vasm` (oldstyle, Ben Eater's): `colonless_labels`, `origin_assignment: {symbol: '*='}`, `anonymous_labels: {style: vasm}`, and `rename_directives` for its include and conditional directives. Its `.org`, `.word` and `.asciiz` already assemble.
+- `ca65`: the rules in the example above, with longer lists: renames for the `.if` family, `.define`, `.error` (`#error`) and `.out` (`#print`); drops for `.setcpu`, `.p02`, `.pc02`, `.psc02`, `.debuginfo`, `.smart`, `.list`, `.listbytes`, `.autoimport` and `.case`; and as unsupported the blocks `.macro`, `.mac`, `.repeat`, `.struct`, `.union` and `.enum`, plus `.proc`, `.scope`, segments and their shorthands (`.code`, `.zeropage`, …), imports and exports, `.macpack`, `.feature`, `.charmap`, `.incbin`, `.dbyt`, `.align`, `.local`, `.set`, `.tag`, `.assert`, `.warning`, `.fatal` and the `.ifblank`/`.ifconst`/`.ifref`/`.ifp02` family.
+- `vasm` (oldstyle, Ben Eater's): `colonless_labels`, `origin_assignment: {symbol: '*'}`, `local_labels: {suffix: '$'}`, `anonymous_labels`, and `rename_directives` for its include and conditional directives and its data and space directives. Its `.org`, `.word` and `.asciiz` already assemble.
+- vasm's unsupported list: the `macro`/`mac`, `rept`/`repeat`, `struct`, `dsect` and `inline` blocks, `section`, the symbol-visibility directives, `binary`/`incbin`, `rorg`/`phase`, `align`/`even`, `cond` and the `ifeq` family, `assert`, `str`, `abyte`, the word- and long-sized space directives and `set`.
+- `.if` conditions are carried over as written. BespokeASM's `#ifdef` tests preprocessor symbols, not labels or constants as ca65's and vasm's do; milestone 11 addresses this.
 
 **Minimal CPU, Minimal 64, Minimal 64x4 and Redux: `slu4`, Carsten Herting's assemblers.** Each config's rules match the assembler for that machine and revision. The dialect has these features:
 
@@ -455,6 +461,134 @@ Its rules are `split_statements`, `rename_directives: {org: '.org'}`, `bare_data
   - This is a manual check; the programs aren't copied into the repository.
   - Small samples with bytes captured from his assembler become test fixtures.
 
+## Milestone 8 notes (Nov 26, 2026)
+
+- **Function names are no longer reserved (done first, as its own change).** smart-t's be-wozmon defines `COUNTER = $2E`, which the flow-enabled 6502 configs rejected. Expression functions (`LSB`, `BYTE0`–`BYTE9`, `COUNTER`, `COORDINATE`) are functions only when written as a call, so they were taken out of the reserved words; editors color them as functions only before `(`, and the Sublime and VS Code plugins skip a call when marking symbol uses. Found on the way: VS Code didn't color `COUNTER(stack)` in `#assert` as a flow use; fixed. Directive names stay reserved in lower case (`print:`, `entry:`, `error:` are rejected as labels); that is a candidate for the same treatment.
+- **vasm's anonymous labels are ca65's.** vasm's oldstyle documentation (`doc/syntax_oldstyle.texi`) defines anonymous labels as `:` with `:+`/`:-`, not `-`/`+`, so `anonymous_labels` has no `style`. vasm local labels are `.name` or `name$`, so `local_labels` takes `prefix` or `suffix`.
+- **`assignment_operators` added.** ca65's `:=` collides with BespokeASM's `:=`; msbasic assigns every `CONFIG_*` symbol with it.
+- **Unsupported blocks.** A `.macro` body would otherwise assemble where it is defined, so `unsupported` takes `{start: end}` blocks and reports the body and later uses of the macro's name. A use of a macro defined in another file isn't detected; it fails to assemble as an unknown instruction.
+- **Output keeps line numbers and line endings.** Output line N is input line N, so a report's line number works in both files. CRLF sources stay CRLF.
+- **Includes are notes, not reports.** They don't make the exit status 1.
+- **A rename to the same directive is no change.** `.org` → `.org` doesn't count, so wozmon migrates with zero changed lines.
+- **The M9 rule kinds** (`split_statements`, `bare_data`, `char_literals`, `predefined_symbols`) are left for milestone 9, with the `slu4` dialect.
+- **Verification.** Ben Eater's Wozmon gist and smart-t's be-wozmon migrate from `vasm` unchanged, with nothing reported, and assemble to the same bytes as a ca65 port linked by ld65; vasm itself couldn't be built here. Small ca65 and vasm samples covering every rule are test fixtures, with bytes from ca65. msbasic migrates file by file with segments, macros, `.feature` and `.macpack` reported; making it assemble is [milestone 11](#milestone-11-migrating-microsoft-basic).
+
+## Milestone 11: migrating Microsoft BASIC
+
+**Goal:** Ben Eater's [msbasic](https://github.com/beneater/msbasic), mist64's reconstruction of Microsoft BASIC with Ben's `eater` target, migrated with `bespokeasm migrate --from ca65` and assembled with `w65c02.yaml`, gives the same ROM image as `ca65 -D eater msbasic.s` linked with `ld65 -C eater.cfg`. Decided Nov 26, 2026: milestone 8 only reports what msbasic needs; this milestone builds it, after milestone 9.
+
+**Approach: extend existing features.** Decided Nov 26, 2026: where BespokeASM already has a feature close to what ca65 offers, this milestone extends that feature rather than adding a parallel one, so the language and the configuration keep one concept for each job. Each part below names the feature it extends. Source macros (11.5) are the one new feature, and they are a project of their own.
+
+| Part | ca65 feature | Built by extending |
+|:--|:--|:--|
+| 11.1 | `.ifdef` on labels and constants | `#ifdef`, `#ifndef` |
+| 11.2 | `.if` with `.def()`, `&&`, `\|\|`, `!` | the expression parser, and its functions such as `LSB()` |
+| 11.3 | `name := <(* - start)`, a value computed from addresses | constants, resolved the way labels are |
+| 11.4 | `.macpack longbranch` (`jeq` and so on) | the config's instruction macros, and `select_by_value` |
+| 11.5 | `.macro`, `.repeat`, `.strlen`, `.strat` | new: source macros; string encodings extend the data directives |
+| 11.6 | `.segment` and the ld65 config | memory zones |
+
+**What msbasic uses** (66 source files, about 11,800 lines, surveyed Nov 26, 2026; one build assembles the files `msbasic.s` includes for its target):
+
+| Feature | Use | Status after milestone 8 |
+|:--|:--|:--|
+| `.ifdef`/`.ifndef`/`.if`/`.elseif`/`.else`/`.endif` | 1,199 directives; the build selects a machine with `-D eater` | renamed to `#ifdef` and so on, but see 11.1 and 11.2 |
+| `.def(X)` and `.defined(X)` in conditions, with `&&`, `\|\|`, `!` and parentheses | 95 uses, such as `.if .def(CONFIG_SMALL) && (!.def(CONFIG_2))` | not converted (11.2) |
+| `name := value` for configuration symbols | every `CONFIG_*` symbol, tested by `.ifdef` | `:=` → `=` |
+| `name := expr` with `*` or labels | `define_token`, `count_tokens` and `define_error`: `token := <(*-DUMMY_START)+$80` | `:=` → `=`, but a constant can't use `*` or labels yet (11.3) |
+| `=` as equality in a condition | `.if CONFIG_SCRTCH_ORDER = 2` | not converted (11.2) |
+| `.segment` | 67 lines, 14 segments, placed by `eater.cfg` | reported; to become `.memzone` (11.6) |
+| `.macro` | 10 macros, about 150 uses, defined in `macros.s` and used in other files | reported where defined (11.5) |
+| `.repeat count, var` with `.strlen()` and `.strat()` | inside the `htasc` and `asc80` macros only | reported, inside a macro (11.5) |
+| `.ifnblank` | inside `define_token` | reported (11.5) |
+| `.macpack longbranch` | `jeq`, `jne`, `jcc`: 7 uses | reported (11.4) |
+| `.feature force_range`, `.debuginfo +`, `.setcpu` | once each | `.feature` reported, the others dropped (11.7) |
+| `@` cheap locals, `.res`, `.addr`, `.word`, `.byte`, `<(expr)` | throughout | already work |
+
+### 11.1 Conditions on labels and constants: extend `#ifdef`
+
+ca65's `.ifdef X` and `.def(X)` are true once `X` is defined as a label or constant earlier in the source, and `-D eater` defines the assembler symbol `eater`. BespokeASM's `#ifdef` tests preprocessor symbols only (`#define`, `-D`). msbasic depends on ca65's meaning: `defines_eater.s` sets `CONFIG_2A := 1`, `defines.s` derives `CONFIG_2` from it, and the rest of the source tests those.
+
+- **Extend `#ifdef` and `#ifndef`** (and `defined()`, 11.2) to also see labels and constants defined on earlier lines. `-D` and `#define` keep working as now. This is already on the CHANGELOG's TODO list ("include detection of labels and constants"). Only definitions *before* the condition can count, because conditions are decided as the source is read; a later definition can't change one.
+- Not chosen: migrate converting a `NAME := value` that is only tested in conditions into `#define NAME value`. It would add a second way to configure source, and needs whole-project knowledge that one-file migration doesn't have.
+- Fix the include-guard bug found in milestone 7 here: a guard `#ifndef X` / `#define X` in an included file hides the whole block. msbasic includes files inside conditions.
+
+### 11.2 Boolean conditions: extend the expression parser
+
+`#if` already parses each side of its comparison with the same expression parser that instructions and data use; only its top-level `<expr> <comparison> <expr>` split is special, and it rejects mixing `&&`, `||` and grouping.
+
+- **Add comparison and logical operators** (`==`, `!=`, `<`, `<=`, `>`, `>=`, `&&`, `||`, `!`) to the expression grammar, with C precedence. `#if` and `#elif` then evaluate one expression, true when nonzero, as their implied form already does. The special case and its "mixed expressions are not supported" restriction go away, and the operators work in constants and data values too, since it is one parser.
+- **Add `defined(NAME)`** as an expression function, the way `LSB()` and `COUNTER()` are: a function only when written as a call. It is valid only in a preprocessor condition, as `COUNTER()` is valid only in some places.
+- **Migration:** a rule converts ca65's `.def(X)` and `.defined(X)` to `defined(X)`, and `=` to `==` inside a condition. Whether that is a new rule kind or a parameter of an existing one is decided with the rule's design, by the milestone 8 bar for new rule kinds.
+
+### 11.3 Constants computed from addresses: extend constants
+
+In BespokeASM, a label and a constant are the same kind of symbol (a `LabelLine`); they differ in when the value is known. A label's value is its address, known once addresses are assigned. A constant's value is evaluated when its line is read, so it may only use constants defined before it, and `*` and labels are rejected:
+
+```
+"*" (the current address) is only available in instruction operands and data values; use a label
+unknown label "here"; it is not defined in any source file, predefined constant, or data block
+```
+
+ca65's `:=` defines a label whose value is an expression, and msbasic's token tables rely on it: `token := <(*-DUMMY_START)+$80` makes a token's value its offset in the `DUMMY` zone.
+
+- **Extend constants:** a constant whose expression uses `*` or a label is resolved the way a label is, after addresses are assigned, with `*` meaning the address of the constant's own line in its memory zone. A constant that uses only constants keeps being resolved when read. The syntax stays `name = expr`, so milestone 8's `:=` → `=` conversion stays right.
+- **Limit:** such a constant has no value while the source is read, so it can't be used where a value is needed then: in a preprocessor condition (`#ifdef` still sees that it exists, 11.1), or to size something during pass 1 unless that use can be deferred the way `select_by_value` defers.
+
+### 11.4 Long branches: extend instruction macros and `select_by_value`
+
+`.macpack longbranch` gives `jeq label` and its seven siblings: a short branch when the target is in range, or the opposite branch over a `jmp` when it isn't.
+
+- **The 6502 configs define them as instruction macros** (the `macros` section), each with two variants: the short branch (`beq target`), and the opposite branch over a `jmp` (`bne *+5`, `jmp target`).
+- **Extend `select_by_value`** (milestone 5) to `relative_address` operands, choosing a form when the branch offset fits its size, as it now chooses a form when an address is in a zone. Pass-1 relaxation then picks the variant, forward references included.
+- First check that `select_by_value` works inside macro variants as it does in instruction variants.
+- Migration drops `.macpack longbranch` for a config that defines the macros.
+
+### 11.5 Source macros: new, with string encodings on the data directives
+
+`.macro name args` ... `.endmacro`, with what msbasic uses:
+
+- Arguments substituted into instructions, directives and expressions, including as the name being assigned (`token := ...`).
+- Macros that call macros, and labels defined inside a macro (`TOKEN_ADDRESS_TABLE:`).
+- `.ifnblank arg` to test for an argument given or left out.
+- Use from a file other than the one that defines the macro, so the macro library is included, not copied.
+- A macro that switches the memory zone for its caller (11.6).
+
+This is the one new feature in the milestone. Its design belongs to the source-macros project ([source-macros-notes.md](source-macros-notes.md)), which should build on what exists where it can, such as the instruction macros' expansion and their per-instruction placement of relative operands (milestone 4). This milestone takes its result and adds the ca65 conversion to the `ca65` dialect.
+
+msbasic uses `.repeat`, `.strlen()` and `.strat()` only inside two macros, `htasc` (set the high bit of a string's last byte) and `asc80` (set the high bit of every byte). Those are string encodings, like the terminator `.cstr` adds from `general.cstr_terminator`. **Extend the string data directives with an encoding option** instead of adding loops and string functions; with it, msbasic's macros need neither. Syntax and where the option lives (a directive, a directive alias, or the configuration) are decided in this part's design.
+
+### 11.6 Segments as memory zones: extend memory zones
+
+**Decided Nov 26, 2026: BespokeASM gets no separate segment feature. ld65-style segments are built by extending memory zones**, so the configuration and syntax stay one concept rather than two parallel ones. `bespokeasm migrate` converts ca65's `.segment "NAME"` to `.memzone NAME`.
+
+ld65 places segments from a linker configuration: each memory area (`BASROM: start = $8000, size = $7E00, fill = yes`) holds its segments in the listed order, each starting where the previous one ends. The source switches segments freely, and the code for one segment is the concatenation, in source order, of every stretch written to it. msbasic's `keyword_rts` macro writes to `VECTORS`, `KEYWORDS` and `DUMMY` in one call.
+
+What memory zones already provide:
+
+- **Switching back and forth.** Separate stretches of code in one zone are assembled as if concatenated in source order, which is how a segment collects its code.
+- **A named target.** `.memzone NAME` is the counterpart of `.segment "NAME"`.
+- **Address checks**, and the zones `select_by_value` tests against.
+- **Space with no output.** `#mute` assembles without emitting, which covers ld65 memory with `file = ""` (`ZEROPAGE`, `INPUT_BUFFER`) and msbasic's `DUMMY` token counter, where each `define_token` reserves a byte and a token's value is its offset (with 11.3).
+- **Fill.** `-s`, `-e` and `-f` pad the whole image, which is all a single ROM needs; ld65's per-area `fill = yes` needs nothing more.
+
+What memory zones need for this:
+
+- **A floating start.** A zone placed after another zone, so that a chain of zones lays out like an ld65 memory area: each zone starts where the previous one's content ends. Syntax to be designed; a sketch is `#create_memzone KEYWORDS after VECTORS`. Starts then depend on sizes, so they are settled in pass-1 relaxation (milestone 5), which already reruns address assignment until nothing changes. An end bound (ld65's area `size`) is still checked.
+- **A zone selection that persists past its file.** An included file starts in `GLOBAL` and the includer's zone returns afterwards; ld65's active segment carries across includes, and a macro can switch it for its caller (`keyword_rts` leaves the caller in `KEYWORDS`). Needed once macros switch zones, so designed with 11.5.
+- **Checks to confirm:** whether muted code in two overlapping zones at the same addresses passes the rule that two bytes at one address are an error (msbasic's `DUMMY` and `ZEROPAGE` both start at `$0000`), and what `.org` means inside a zone with a floating start.
+
+Where the layout lives follows from this: as `#create_memzone` lines, in source or in the ISA config's `predefined.memory_zones`, like any other zone. `migrate` could also convert an ld65 configuration into those lines.
+
+### 11.7 Smaller items
+
+- `.feature force_range`: check whether any msbasic value needs ca65's truncation of out-of-range values, and drop the directive if none does.
+- `.debuginfo +` is dropped already; `.setcpu` likewise.
+
+### Order and verification
+
+11.1 and 11.2 first (the preprocessor, and useful to native source), then 11.3 and 11.4, then 11.5 when source macros exist, then 11.6. Each part gets tests on small samples with bytes captured from ca65, as in milestone 8. The end-to-end check is manual, because msbasic isn't copied into the repository: migrate every file, assemble, and compare with the ca65 and ld65 image byte for byte.
+
 ## Errors and diagnostics
 
 | Case | Level | Message |
@@ -468,9 +602,11 @@ Its rules are `split_statements`, `rename_directives: {org: '.org'}`, `bare_data
 | `lda ($10)` where `lda` gives parentheses a meaning but has no `($10)` form | error | `parentheses around the whole operand select another form here; expected (address, x)` |
 | an alias targeting a non-data directive, or shadowing a directive | config error | by config path |
 | `offset_base` and `offset_from_instruction_end` both set | config error | by config path |
-| `--from` names a dialect the config doesn't declare | error | lists the config's dialects |
+| `--from` left out, or naming a dialect the config doesn't declare | usage error | lists the config's dialects |
+| `-o` names the source file | usage error | `--output-file is the source file; migrate never overwrites its input` |
 | a `migrations` rule kind BespokeASM doesn't have, or a bad parameter | config error | by config path |
-| a line a migration rule can't convert | reported | `; MIGRATE: <reason>` in the output, plus the summary |
+| a line a migration rule can't convert | reported | `; MIGRATE: <reason>: <line>` in the output, plus the summary |
+| an included file | note | `includes <file>; migrate it separately`, in the summary only |
 
 ## Suggested implementation order
 
@@ -485,3 +621,5 @@ Each milestone ends with tests, pre-commit, and byte comparison of all existing 
 7. Ben Eater programs, platform include, docs, wiki and editor checks. (The `-s`/`-e`/`-f` number forms were added early, during milestone 6.)
 8. `bespokeasm migrate`: the rule engine and the 6502 `ca65` and `vasm` dialects.
 9. The `slu4` dialect in the Minimal CPU, Minimal 64, Minimal 64x4 and Redux configs, byte-compared against Carsten's assemblers.
+10. *(Not yet assigned.)*
+11. [Migrating Microsoft BASIC](#milestone-11-migrating-microsoft-basic), extending existing features where possible: `#ifdef` on labels and constants, boolean operators and `defined()` in expressions, constants computed from addresses, long branches as instruction macros, source macros with string encodings on the data directives, and memory zones that place code the way ld65 places segments.

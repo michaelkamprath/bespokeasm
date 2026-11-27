@@ -207,6 +207,7 @@ class AssemblerModel:
         validator.validate()
         self._annotation_namespaces = validator.annotation_namespaces
         self._output_formats = validator.output_formats
+        self._migrations = validator.migrations
         ConfigAdvisor(self._config, self._config_file, self._diagnostic_reporter).advise()
 
         # Validate string_byte_packing option
@@ -955,6 +956,11 @@ class AssemblerModel:
             return False
 
         return any(visit(self._config.get(section)) for section in ('operand_sets', 'instructions', 'macros'))
+
+    @property
+    def migrations(self) -> dict:
+        '''The dialects source can be migrated from, by name: see `bespokeasm migrate`.'''
+        return self._migrations
 
     @property
     def directive_aliases(self) -> dict[str, str]:

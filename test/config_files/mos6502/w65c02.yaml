@@ -2016,3 +2016,174 @@ instructions:
       title: 'Wait for Interrupt'
       description: 'Sleeps until an IRQ, NMI or reset. With I set, an IRQ resumes at the next instruction instead of entering the handler.'
       cycles: 3
+
+# `bespokeasm migrate --from <dialect>` rewrites source written for these assemblers into this
+# language. Rules run in the order listed. What a rule can't convert is kept as a `; MIGRATE:`
+# comment and reported.
+migrations:
+  ca65:
+    description: >-
+      cc65's ca65 assembler. Segments, macros, `.proc` and `.scope` blocks, imports and
+      exports are reported for porting by hand.
+    rules:
+      - rename_directives:
+          include: '#include'
+          if: '#if'
+          ifdef: '#ifdef'
+          ifndef: '#ifndef'
+          elseif: '#elif'
+          else: '#else'
+          endif: '#endif'
+          define: '#define'
+          error: '#error'
+          out: '#print'
+          byt: '.byte'
+      - drop_directives: [setcpu, p02, pc02, psc02, debuginfo, smart, list, listbytes, autoimport, case]
+      - assignment_operators: [':=']
+      - local_labels: {prefix: '@'}
+      - anonymous_labels
+      - operand_prefixes: {drop: ['z:'], unsupported: ['a:', 'f:']}
+      - unsupported:
+          - {macro: endmacro}
+          - {mac: endmac}
+          - {repeat: [endrep, endrepeat]}
+          - {struct: endstruct}
+          - {union: endunion}
+          - {enum: endenum}
+          - proc
+          - endproc
+          - scope
+          - endscope
+          - segment
+          - code
+          - data
+          - rodata
+          - bss
+          - zeropage
+          - import
+          - importzp
+          - export
+          - exportzp
+          - global
+          - globalzp
+          - macpack
+          - feature
+          - charmap
+          - incbin
+          - dbyt
+          - align
+          - local
+          - set
+          - tag
+          - assert
+          - warning
+          - fatal
+          - ifblank
+          - ifnblank
+          - ifconst
+          - ifref
+          - ifnref
+          - ifp02
+          - ifpc02
+          - ifp816
+  vasm:
+    description: >-
+      vasm's oldstyle syntax module (`vasm6502_oldstyle`), with or without `-dotdir`. Macros,
+      repeats, structures and sections are reported for porting by hand.
+    rules:
+      - colonless_labels
+      - origin_assignment: {symbol: '*'}
+      - rename_directives:
+          include: '#include'
+          if: '#if'
+          ifdef: '#ifdef'
+          ifd: '#ifdef'
+          ifndef: '#ifndef'
+          ifnd: '#ifndef'
+          else: '#else'
+          el: '#else'
+          endif: '#endif'
+          endc: '#endif'
+          fi: '#endif'
+          fail: '#error'
+          org: '.org'
+          byte: '.byte'
+          byt: '.byte'
+          db: '.byte'
+          dfb: '.byte'
+          defb: '.byte'
+          fcb: '.byte'
+          ascii: '.byte'
+          asc: '.byte'
+          fcc: '.byte'
+          text: '.byte'
+          word: '.word'
+          wor: '.word'
+          wrd: '.word'
+          dw: '.word'
+          dfw: '.word'
+          defw: '.word'
+          fdb: '.word'
+          addr: '.word'
+          da: '.word'
+          asciiz: '.asciiz'
+          string: '.asciiz'
+          blk: '.fill'
+          bsz: '.fill'
+          ds: '.fill'
+          dsb: '.fill'
+          defs: '.fill'
+          zmb: '.fill'
+          reserve: '.fill'
+          spc: '.fill'
+          fill: '.fill'
+      - drop_directives: [end, list, nolist]
+      - local_labels: {suffix: '$'}
+      - anonymous_labels
+      - unsupported:
+          - {macro: [endm, endmacro, endmac]}
+          - {mac: [endm, endmacro, endmac]}
+          - {rept: [endr, endrep, endrepeat]}
+          - {repeat: [endr, endrep, endrepeat]}
+          - {struct: [endstruct, endstructure]}
+          - {structure: [endstruct, endstructure]}
+          - {dsect: dend}
+          - {inline: einline}
+          - section
+          - global
+          - xdef
+          - xref
+          - xlib
+          - extern
+          - weak
+          - local
+          - binary
+          - incbin
+          - incdir
+          - rorg
+          - phase
+          - dephase
+          - rend
+          - roffs
+          - align
+          - even
+          - cond
+          - ifeq
+          - ifne
+          - ifgt
+          - ifge
+          - iflt
+          - ifle
+          - ifused
+          - ifblank
+          - ifnblank
+          - assert
+          - str
+          - abyte
+          - blkw
+          - blkl
+          - dsw
+          - dsl
+          - dl
+          - defl
+          - set

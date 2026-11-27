@@ -18,6 +18,7 @@ class CommandHandlers(NamedTuple):
     vscode: Callable[..., Any]
     sublime: Callable[..., Any]
     vim: Callable[..., Any]
+    migrate: Callable[..., Any] | None = None
 
 
 def config_output_format_names(config_file: str) -> list[str]:
@@ -25,6 +26,18 @@ def config_output_format_names(config_file: str) -> list[str]:
 
     Used only for shell completion, so a problem reading the file yields no names.
     """
+    return config_section_names(config_file, 'output_formats')
+
+
+def config_migration_names(config_file: str) -> list[str]:
+    """The ``migrations`` dialect names in a configuration file, for shell completion."""
+    return config_section_names(config_file, 'migrations')
+
+
+def config_section_names(config_file: str, section: str) -> list[str]:
+    """The names a top-level mapping section of a configuration file defines, read without
+    loading the whole file. Used only for shell completion, so a problem reading the file
+    yields no names."""
     import re
 
     try:
@@ -35,22 +48,22 @@ def config_output_format_names(config_file: str) -> list[str]:
     if config_file.endswith('.json'):
         import json
         try:
-            formats = json.loads(text).get('output_formats')
+            entries = json.loads(text).get(section)
         except (ValueError, AttributeError):
             return []
-        return [str(name) for name in formats] if isinstance(formats, dict) else []
+        return [str(name) for name in entries] if isinstance(entries, dict) else []
     names: list[str] = []
     indent = None
     in_section = False
     for line in text.splitlines():
-        if re.match(r'^output_formats\s*:\s*(#.*)?$', line):
+        if re.match(rf'^{re.escape(section)}\s*:\s*(#.*)?$', line):
             in_section = True
             continue
         if not in_section or line.strip() == '' or line.lstrip().startswith('#'):
             continue
         if not line[0].isspace():
             break
-        match = re.match(r'^(\s+)([A-Za-z][A-Za-z0-9_]*)\s*:', line)
+        match = re.match(r'^(\s+)([A-Za-z][A-Za-z0-9_-]*)\s*:', line)
         if match is not None:
             if indent is None:
                 indent = match.group(1)
@@ -64,6 +77,12 @@ def _complete_output_formats(ctx, _param, incomplete: str):
     config_file = ctx.params.get('config_file')
     if config_file:
         names.extend(name for name in config_output_format_names(config_file) if name not in names)
+    return [name for name in names if name.startswith(incomplete)]
+
+
+def _complete_migrations(ctx, _param, incomplete: str):
+    config_file = ctx.params.get('config_file')
+    names = config_migration_names(config_file) if config_file else []
     return [name for name in names if name.startswith(incomplete)]
 
 
@@ -334,6 +353,33 @@ def build_cli(handlers: CommandHandlers):
     @click.option('--verbose', '-v', count=True, help=VERBOSE_HELP)
     def docs(config_file, output_file, verbose):
         return handlers.docs(config_file, output_file, verbose)
+
+    @main.command(cls=OptionForwardingCommand, short_help='rewrite source from another assembler into this language')
+    @click.argument('source_file', type=click.Path(dir_okay=False, exists=True))
+    @click.option(
+        '--config-file', '-c', required=True,
+        type=click.Path(dir_okay=False, exists=True),
+        help='The filepath to the instruction set configuration file (YAML or JSON).'
+    )
+    @click.option(
+        '--from', '-f', 'dialect',
+        shell_complete=_complete_migrations,
+        help='The assembler the source was written for. The choices are the dialects the '
+             'instruction set configuration\'s migrations section declares; leave it out to list them.'
+    )
+    @click.option(
+        '--output-file', '-o',
+        type=click.Path(dir_okay=False),
+        help='The filepath to write the migrated source to. Defaults to stdout. The source file '
+             'is never overwritten.'
+    )
+    @click.option('--verbose', '-v', count=True, help=VERBOSE_HELP)
+    def migrate(source_file, config_file, dialect, output_file, verbose):
+        """Rewrite SOURCE_FILE, written for another assembler, into this instruction set's
+        language. A line that can't be converted is kept as a "; MIGRATE:" comment and reported;
+        the exit status is 1 when any line was reported. Included files are listed, not followed:
+        migrate each on its own."""
+        return handlers.migrate(source_file, config_file, dialect, output_file, verbose)
 
     @main.group(cls=AutoOptionGroup, short_help='generate a language syntax highlighting extension')
     def generate_extension():

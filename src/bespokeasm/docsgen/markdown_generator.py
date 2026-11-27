@@ -70,6 +70,9 @@ class MarkdownGenerator:
         annotations = getattr(self.doc_model, 'annotations', None)
         if isinstance(annotations, list) and self._declared_annotations():
             sections.append(self._generate_annotations_section())
+        migrations = getattr(self.doc_model, 'migrations', None)
+        if isinstance(migrations, list) and migrations:
+            sections.append(self._generate_migrations_section())
 
         # Instructions section
         if self.doc_model.instruction_docs:
@@ -212,6 +215,21 @@ class MarkdownGenerator:
             column_alignments=['left'] * 5,
         ))
         return '\n\n'.join(sections)
+
+    def _generate_migrations_section(self) -> str:
+        """The assemblers whose source `bespokeasm migrate` can convert to this language."""
+        rows = [[f"`{dialect['name']}`", dialect['description']] for dialect in self.doc_model.migrations]
+        return '\n\n'.join([
+            '# Source Migration',
+            (
+                'Source written for these assemblers can be rewritten in this language with '
+                '`bespokeasm migrate -c <config> --from <dialect> <file>`. A line it can\'t convert is '
+                'kept as a `; MIGRATE:` comment and reported. See '
+                '[Migrating Source]'
+                '(https://github.com/michaelkamprath/bespokeasm/wiki/Installation-and-Usage#migrating-source).'
+            ),
+            self._generate_markdown_table(['Dialect', 'Source Assembler'], rows, column_alignments=['left'] * 2),
+        ])
 
     def _format_description(self, output_format: dict[str, Any]) -> str:
         """The format's description. A word-size requirement that this ISA meets says nothing, so

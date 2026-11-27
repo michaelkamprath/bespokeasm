@@ -38,6 +38,11 @@ class DocumentationModel:
         self._add_format_scoped_predefined()
         self.annotations = self._parse_annotation_documentation()
         self.output_formats = self._parse_output_format_documentation()
+        migrations = getattr(isa_model, 'migrations', None)
+        self.migrations = [
+            {'name': name, 'description': dialect.description}
+            for name, dialect in (migrations.items() if isinstance(migrations, dict) else ())
+        ]
         self.instruction_docs = self._parse_instruction_documentation()
         self.macro_docs = self._parse_macro_documentation()
 
