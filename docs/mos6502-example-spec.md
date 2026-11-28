@@ -644,6 +644,7 @@ Where the layout lives follows from this: as `#create_memzone` lines, in source 
 
 - `.feature force_range`: check whether any msbasic value needs ca65's truncation of out-of-range values, and drop the directive if none does.
 - `.debuginfo +` is dropped already; `.setcpu` likewise.
+- **`*` in directive arguments.** `*` is allowed only in instruction operands and data values, so `.res $FFFA - *, 0` (a common ca65 and vasm way to pad up to the vectors; the ca65 port of Wozmon uses it) and `.phase *+N` are errors. Allow it in the address and count arguments of `.org`, `.phase`, `.fill`/`.zero` and `.align` as one change, with `*` the address of the directive's own line. A count that depends on `*` must still settle during relaxation. Raised in the PR #59 review (Nov 27, 2026).
 
 ### Order and verification
 

@@ -419,14 +419,22 @@ class CharLiterals(Rule):
             for start, end in line.strings():
                 if line.text[start] != '"':
                     continue
-                inner = line.text[start + 1:end - 1]
-                char = inner if line.literal_backslashes else re.sub(r'\\(.)', r'\1', inner)
-                if len(char) != 1:
-                    continue
-                escaped = '\\' + char if char in '\\\'' else char
-                edits.append((start, end, f"'{escaped}'"))
+                literal = self._char_literal(line.text[start + 1:end - 1], line.literal_backslashes)
+                if literal is not None:
+                    edits.append((start, end, literal))
             if edits:
                 line.replace(edits)
+
+    @staticmethod
+    def _char_literal(inner: str, literal_backslashes: bool) -> str | None:
+        """The character literal for a double-quoted string's text, or None if it isn't one
+        character. Where a backslash is an escape, an escape such as `\\n` stays as written:
+        character literals take the same escapes."""
+        if not literal_backslashes and len(inner) == 2 and inner[0] == '\\':
+            return f"'{inner}'"
+        if len(inner) != 1 or (inner == '\\' and not literal_backslashes):
+            return None
+        return f"'\\{inner}'" if inner in '\\\'' else f"'{inner}'"
 
 
 # ---- origins set while muted ---------------------------------------------------------------

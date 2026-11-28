@@ -302,10 +302,11 @@ class Assembler:
             ),
             default=0,
         )
+        # A line with no words has nothing to place, and the image would never advance past it.
         line_dict = {
             lobj.image_address: lobj
             for lobj in compilable_line_obs
-            if isinstance(lobj, LineWithWords) and not lobj.is_muted
+            if isinstance(lobj, LineWithWords) and not lobj.is_muted and lobj.word_count > 0
         }
 
         # second pass: build the machine code and check for overlaps

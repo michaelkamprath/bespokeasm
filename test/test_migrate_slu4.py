@@ -249,6 +249,17 @@ def test_backslashes_become_escapes_and_single_characters_become_character_liter
     ]
 
 
+def test_an_escaped_character_keeps_its_escape_where_backslashes_are_escapes():
+    # Without `backslash: literal`, `"\n"` is a line feed, and so is `'\n'`.
+    result = _migrate(
+        '  .byte "\\n", "\\t", "\\0", "\\\\", "\\"", "\\\'", "\\", "ab"\n',
+        {'char_literals': {'double_quoted': True}},
+    )
+    assert result.text.splitlines() == [
+        "  .byte '\\n', '\\t', '\\0', '\\\\', '\\\"', '\\'', \"\\\", \"ab\"",
+    ]
+
+
 def test_string_escapes_needs_a_setting():
     with pytest.raises(ConfigError, match='string_escapes must be a mapping with at least one entry'):
         _migrate('', {'string_escapes': {}})
@@ -282,6 +293,13 @@ def test_terminated_strings_become_cstr_or_embedded_strings():
         '  NOP',
         '  .cstr "say \\"x\\""',
     ]
+
+
+def test_string_data_without_a_backslash_still_becomes_cstr():
+    # string_escapes clears a line's literal-backslash lexing even when it changes nothing;
+    # terminated_strings skips lines still lexed that way, so this line must convert too.
+    result = _strings('  "Ready", 0\n')
+    assert result.text.splitlines() == ['  .cstr "Ready"']
 
 
 def test_other_string_data_stays_byte_data():

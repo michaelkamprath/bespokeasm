@@ -11,6 +11,7 @@ from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.engine import Assembler
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.assembler.output_format import find_output_format
 from bespokeasm.assembler.output_format.builtin import builtin_format_names
 from bespokeasm.assembler.output_format.builtin import builtin_formats
 from bespokeasm.assembler.output_format.builtin import BuiltinFormatError
@@ -1655,6 +1656,16 @@ def test_a_configuration_listing_replaces_the_builtin_and_sets_its_defaults(tmp_
     assert not listing.is_builtin
     defaults = [(option.name, default) for option, default in listing.source_options()]
     assert defaults == [('overflow', 'truncate'), ('width', 20)]
+
+
+@pytest.mark.parametrize('spelling', ['Listing', 'LISTING'])
+def test_a_configuration_listing_replaces_the_builtin_under_any_case(tmp_path, spelling):
+    config = _write_config(tmp_path, {'listing': LISTING_FORMAT})
+    model = AssemblerModel(config, 0, DiagnosticReporter())
+    assert find_output_format(model, spelling) is model.output_formats['listing']
+    source = f'#output-format {spelling} width=16\nfirst: {LONG}\n'
+    rows = _listing_rows(_run(tmp_path, source, config, fmt=spelling)[0])
+    assert rows[rows.index('first:') + 1] == '    .byte 1,...'
 
 
 @pytest.mark.parametrize(('output_formats', 'expected'), [

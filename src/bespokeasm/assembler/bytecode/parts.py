@@ -617,6 +617,18 @@ class CompositeByteCodePart(ByteCodePart):
 
         # Validate that all Value-based ByteCodePart objects have consistent word and segment sizes
         self._validate_value_consistency()
+        self._reject_word_aligned_parts()
+
+    def _reject_word_aligned_parts(self):
+        """A composite packs its parts end to end, but the address each part is given assumes a
+        word-aligned part starts on the next word, so such a part would get the wrong address.
+        No operand type builds one; until one needs to, it is an error rather than wrong bytes."""
+        for part in self._parts_list:
+            if part.word_align:
+                raise AssemblerError(
+                    self.line_id,
+                    f'internal error: {part} is word-aligned, which a composite bytecode part does not support',
+                )
 
     def _validate_value_consistency(self):
         """Validate that all Value-based ByteCodePart objects have consistent word and segment sizes."""

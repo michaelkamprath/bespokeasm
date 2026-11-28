@@ -338,6 +338,19 @@ def test_migrate_never_overwrites_its_input(tmp_path):
     assert source.read_text() == '@x: dex\n'
 
 
+@pytest.mark.parametrize('spelling', ['./a.s', 'a.s', '../{dir}/a.s', 'link.s'])
+def test_migrate_never_overwrites_its_input_however_the_output_is_spelled(tmp_path, monkeypatch, spelling):
+    source = tmp_path / 'a.s'
+    source.write_text('@x: dex\n')
+    (tmp_path / 'link.s').symlink_to(source)
+    monkeypatch.chdir(tmp_path)
+    output = spelling.format(dir=tmp_path.name)
+    result = _run(['-c', str(W65C02), '--from', 'ca65', 'a.s', '-o', output])
+    assert result.exit_code == 2
+    assert 'never overwrites its input' in result.output
+    assert source.read_text() == '@x: dex\n'
+
+
 def test_dialect_names_for_shell_completion(tmp_path):
     assert config_migration_names(str(W65C02)) == ['ca65', 'vasm']
     path = tmp_path / 'isa.json'
