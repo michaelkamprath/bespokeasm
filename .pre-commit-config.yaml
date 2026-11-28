@@ -25,21 +25,13 @@ repos:
     -   id: trailing-whitespace
         args: ['--markdown-linebreak-ext=md']
         exclude: ^test/config_files/minhex/.*\.minhex$
--   repo: local
-    hooks:
-    # Compile with the oldest supported Python: flake8 runs on the developer's newer Python, and
-    # pyupgrade skips a file it can't parse, so neither reports syntax that 3.11 rejects.
-    -   id: python-311-syntax
-        name: python 3.11 syntax
-        entry: python scripts/check_python_syntax.py
-        language: python
-        language_version: python3.11
-        types: [python]
 -   repo: https://github.com/pycqa/flake8
     rev: '7.3.0'
     hooks:
     -   id: flake8
         args: [--max-line-length=127]
+        # The oldest supported Python, so syntax only newer versions accept fails here (E999).
+        language_version: python3.11
 -   repo: https://github.com/asottile/pyupgrade
     rev: v3.21.2
     hooks:
