@@ -127,7 +127,7 @@ DEFAULT_COLOR_SCHEME = ColorScheme(
         SyntaxElement.HEX_NUMBER: '#ffe80b',
         SyntaxElement.BINARY_NUMBER: '#d6d300',
         SyntaxElement.DECIMAL_NUMBER: '#fffd80',
-        SyntaxElement.OCTAL_NUMBER: '#fffd80',
+        SyntaxElement.OCTAL_NUMBER: '#ffc933',
         SyntaxElement.CHARACTER_NUMBER: '#FFE880',
 
         # Labels and identifiers
