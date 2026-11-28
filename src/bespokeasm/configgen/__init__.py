@@ -142,8 +142,9 @@ class LanguageConfigGenerator:
         patterns = []
         for enclosure, depth in forms:
             if enclosure == 'parentheses':
-                begin = fr'(?<![^\s,]){"\\(" * depth}(?={body}{"\\)" * depth}\s*(?:[,;]|$))'
-                patterns.append((enclosure, depth, begin, r'\)' * depth))
+                opens, closes = r'\(' * depth, r'\)' * depth
+                begin = fr'(?<![^\s,]){opens}(?={body}{closes}\s*(?:[,;]|$))'
+                patterns.append((enclosure, depth, begin, closes))
             else:
                 patterns.append((enclosure, depth, r'\{' * depth, r'\}' * depth))
         return patterns
