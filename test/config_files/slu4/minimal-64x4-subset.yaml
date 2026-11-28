@@ -7,7 +7,7 @@ general:
   multi_word_endian: little
   origin: 0
   identifier: {name: slu4-min64x4-subset, version: 1.0.0, extension: min64x4}
-  min_version: 0.9.1a1
+  min_version: 0.10.0a1
   low_high_operators: whole_expression
   current_address: value_address
   allow_embedded_strings: true

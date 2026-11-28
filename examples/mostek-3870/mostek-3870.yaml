@@ -34,7 +34,7 @@ general:
     name: mostek-3870-asm
     version: "0.1.0"
     extension: af8
-  min_version: '0.9.1a1'
+  min_version: '0.10.0a1'
 operand_sets:
   nval3:
     operand_values:

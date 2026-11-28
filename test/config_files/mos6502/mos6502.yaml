@@ -41,7 +41,7 @@ general:
     name: mos6502
     version: "1.0.0"
     extension: a65
-  min_version: '0.9.1a1'
+  min_version: '0.10.0a1'
   # As in ca65: `<` and `>` take the low and high byte of the term that follows,
   # and `*` is the address of the instruction.
   low_high_operators: tight

@@ -175,7 +175,7 @@ Assemblers disagree on precedence, and a wrong choice changes ported code's byte
   - With 16-bit words, `<$12345678` is `$5678` and `>$12345678` is `$1234`.
   - With 4-bit words, `<$A7` is `$7`.
   - The setting was first called `byte_operators`. It was renamed before release because the operators split by word, not by byte.
-- The 6502 config uses `tight`. The Minimal CPU, Minimal 64, Minimal 64x4 and Redux configs use `whole_expression`, so source written for Carsten's assemblers keeps its meaning. Those four configs then require BespokeASM 0.9.1.
+- The 6502 config uses `tight`. The Minimal CPU, Minimal 64, Minimal 64x4 and Redux configs use `whole_expression`, so source written for Carsten's assemblers keeps its meaning. Those four configs then require BespokeASM 0.10.0.
 - `<<` and `>>` stay shift operators.
 - Preprocessor conditions (`#if`, `#assert`, `#require`) split on comparison operators before evaluating terms. A term starting with `<` or `>` there still parses as a low or high operator; tests cover `#if >ADDR == $12`.
 
@@ -250,7 +250,7 @@ Found while building sections 5, 6, 8 and 9:
 - **Base threading fixed.** Address, relative-address and numeric-enumeration operands never received `default_numeric_base`, so they read bare numbers as decimal under any base. The base now travels in an `ExpressionSyntax` value with the `low_high_operators` and `current_address` settings. Every parameter that took a base name accepts it.
 - **`*` in flow analysis.** `*` in an operand resolves to the instruction's own address in flow analysis too, using a per-operand word offset recorded with the analysis record. So `jpa *+2` gives the right flow target and entry checks.
 - **Verified against Carsten's assemblers.** The Minimal 64x4 Rev 1.1 and Redux assemblers (`asm.cpp`, built locally), the Minimal 64 assembler and the Minimal UART CPU assembler (`asm.py`) all produced the same bytes as BespokeASM for the `<`, `>` and `*` probes. The 64x4 Rev 1.1 and UART CPU bytes are test fixtures.
-- **Config version.** The four Minimal configs say `min_version: '0.9.1a1'` until 0.9.1 ships; set it to `0.9.1` at release.
+- **Config version.** The four Minimal configs say `min_version: '0.10.0a1'` until 0.10.0 ships; set it to `0.10.0` at release. (This release was planned as 0.9.1; it became 0.10.0 on Nov 27, 2026.)
 - **Highlighting.** Editors give `*` as the current address (`variable.language.current-address`) and `<`/`>` as the low and high operators (`keyword.operator.low-high`) their own scopes and colors, where the ISA turns them on.
   - Grammars can't look back past spaces, so they decide from what follows. `*` is an address unless a value follows; `x*-2` reads as an address.
   - `<`/`>` are the operators when a value follows with no space, which leaves shifts, `<=`/`>=` and `#if` comparisons alone.
@@ -292,7 +292,7 @@ Found while building section 2:
 ## Milestone 4 notes (Nov 26, 2026)
 
 - **`last_word`, not `last_byte`.** Offsets count in words, so the name doesn't assume 8-bit words, as with `low_high_operators`.
-- **Legacy key undocumented.** `offset_from_instruction_end` is gone from the wiki and still accepted as `offset_base: last_word`, as `use_curly_braces` is for `enclosure: braces`. The Mostek 3870 config now says `offset_base: last_word`, with `min_version: '0.9.1a1'` (set to `0.9.1` at release), since an older BespokeASM would ignore the key and measure from the instruction's start.
+- **Legacy key undocumented.** `offset_from_instruction_end` is gone from the wiki and still accepted as `offset_base: last_word`, as `use_curly_braces` is for `enclosure: braces`. The Mostek 3870 config now says `offset_base: last_word`, with `min_version: '0.10.0a1'` (set to `0.10.0` at release), since an older BespokeASM would ignore the key and measure from the instruction's start.
 - **Relative addresses in macros were measured from the macro.** Every part of a macro's expansion was resolved against the macro line's address and total size, so a branch that wasn't the macro's first instruction got the wrong offset, and `offset_from_instruction_end` measured from the macro's end. A macro now tells each relative part where its own instruction is, nested macros included. `*` in a macro's operands still means the macro line's address, as written. No shipped example was affected.
 
 ## Milestone 5 notes (Nov 26, 2026)

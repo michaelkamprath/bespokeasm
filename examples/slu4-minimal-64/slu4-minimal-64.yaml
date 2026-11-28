@@ -12,7 +12,7 @@ general:
     name: slu4-min64-asm
     version: "1.2.2"
     extension: min64
-  min_version: '0.9.1a1'
+  min_version: '0.10.0a1'
   # As in Carsten Herting's assembler: `<` and `>` lead an expression and take the low or
   # high byte of all of it, so `<label+1` is the low byte of `label+1`.
   low_high_operators: whole_expression
