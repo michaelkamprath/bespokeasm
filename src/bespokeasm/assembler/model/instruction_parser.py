@@ -19,7 +19,8 @@ class InstructioParser(InstructioParserBase):
         memzone_manager: MemoryZoneManager,
         source_identity: SourceIdentity | None = None,
     ) -> AssembledInstruction:
-        instr_parts = instruction.strip().split(' ', 1)
+        # Any whitespace, a tab included, separates the mnemonic from its operands.
+        instr_parts = instruction.strip().split(None, 1)
         source_mnemonic = instr_parts[0].lower()
         if len(instr_parts) > 1:
             operands = instr_parts[1]

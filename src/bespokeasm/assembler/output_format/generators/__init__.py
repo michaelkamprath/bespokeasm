@@ -18,6 +18,9 @@ from typing import NoReturn
 
 from bespokeasm.assembler.annotations.schema import AnnotationNamespace
 from bespokeasm.assembler.output_format.base import RenderContext
+from bespokeasm.assembler.output_format.options import LISTING_DEFAULTS
+from bespokeasm.assembler.output_format.options import LISTING_OVERFLOW
+from bespokeasm.assembler.output_format.options import LISTING_WIDTH
 
 
 @dataclass
@@ -39,6 +42,8 @@ class Generator(ABC):
     required_options: ClassVar[frozenset[str]] = frozenset()
     optional_options: ClassVar[frozenset[str]] = frozenset()
     required_word_size: ClassVar[int | None] = None
+    # Options that source may also set, with `#output-format`. Each is an optional option too.
+    source_options: ClassVar[tuple] = ()
 
     def __init__(
         self,
@@ -84,6 +89,15 @@ class Generator(ABC):
     def configure(self, options: dict[str, Any]) -> None:
         """Read and check the options. Called after the common checks."""
 
+    @property
+    def source_defaults(self) -> dict[str, Any]:
+        """Each source option's value where source sets none: the definition's, else the built-in default."""
+        return {}
+
+    def source_value(self, line, option: str) -> Any:
+        """An option's value for one line: what source set for this format there, else the default."""
+        return line.format_settings.get(self.format_name, {}).get(option, self.source_defaults[option])
+
     @abstractmethod
     def render(self, context: RenderContext) -> str:
         """Return the section text, with no leading or trailing blank lines."""
@@ -123,12 +137,30 @@ class ByteListGenerator(Generator):
 
 
 class ListingGenerator(Generator):
+    """The source listing. ``overflow`` and ``width`` say how a line wider than the width is
+    shown; source can change both for its lines with `#output-format`."""
     name = 'listing'
+    optional_options = frozenset({'overflow', 'width'})
+    source_options = (LISTING_OVERFLOW, LISTING_WIDTH)
+
+    def configure(self, options: dict[str, Any]) -> None:
+        self._defaults = dict(LISTING_DEFAULTS)
+        for option in self.source_options:
+            if option.name in options:
+                try:
+                    self._defaults[option.name] = option.parse(options[option.name])
+                except ValueError as error:
+                    self.error(option.name, f'must be {error}')
+
+    @property
+    def source_defaults(self) -> dict[str, Any]:
+        return self._defaults
 
     def render(self, context: RenderContext) -> str:
         from bespokeasm.assembler.pretty_printer.listing import ListingPrettyPrinter
         return ListingPrettyPrinter(
             context.line_objects, context.model, context.source_file, context.export_model,
+            overflow=lambda line: (self.source_value(line, 'overflow'), self.source_value(line, 'width')),
         ).pretty_print().strip('\n')
 
 
@@ -233,7 +265,7 @@ class ByteLinesGenerator(Generator):
                 first = offset == 0
                 rows.append({
                     'label': ' '.join(names) if first and names else None,
-                    'address': line.address + offset,
+                    'address': line.image_address + offset,
                     'byte': value,
                     'source': line.instruction.strip() if first else None,
                     'comment': (line.comment or '').strip() if first else None,

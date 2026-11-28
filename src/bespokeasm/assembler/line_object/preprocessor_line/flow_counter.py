@@ -288,7 +288,7 @@ class FlowCounterDirectiveLine(PreprocessorLine):
                 value_expression = parse_expression(
                     self.line_id,
                     value_text,
-                    self._isa_model.default_numeric_base,
+                    self._isa_model.expression_syntax,
                 )
             except (SyntaxError, SystemExit, AssemblerError) as error:
                 self._error(str(error))
@@ -339,7 +339,7 @@ class FlowCounterDirectiveLine(PreprocessorLine):
             return parse_expression(
                 self.line_id,
                 text,
-                self._isa_model.default_numeric_base,
+                self._isa_model.expression_syntax,
                 context=ExpressionUseContext.FLOW_DIRECTIVE,
             )
         except (SyntaxError, SystemExit, AssemblerError) as error:

@@ -10,16 +10,31 @@ from __future__ import annotations
 
 import difflib
 import os
+import re
 from collections.abc import Callable
 
 from bespokeasm.assembler.annotations.schema import AnnotationNamespace
 from bespokeasm.assembler.annotations.schema import BUILTIN_NAMESPACES
 from bespokeasm.assembler.annotations.schema import load_annotation_namespaces
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
+from bespokeasm.assembler.keywords import BYTECODE_DIRECTIVES_SET
+from bespokeasm.assembler.keywords import COMPILER_DIRECTIVES_SET
+from bespokeasm.assembler.keywords import DIRECTIVE_ALIAS_TARGETS
+from bespokeasm.assembler.keywords import preprocessor_directives_for_isa
 from bespokeasm.assembler.output_format.defined import DefinedFormat
 from bespokeasm.assembler.output_format.defined import load_output_formats
 from bespokeasm.assembler.output_format.generators import LoadEnvironment
+from bespokeasm.migrate.dialects import Dialect
+from bespokeasm.migrate.dialects import load_migrations
+from bespokeasm.migrate.rules import LoadEnvironment as MigrationLoadEnvironment
+from bespokeasm.utilities import CURRENT_ADDRESS_STYLES
+from bespokeasm.utilities import ENCLOSURES
+from bespokeasm.utilities import IMMEDIATE_PREFIX
+from bespokeasm.utilities import INDEX_SEPARATORS
 from bespokeasm.utilities import is_valid_label
+from bespokeasm.utilities import LOW_HIGH_OPERATOR_STYLES
+from bespokeasm.utilities import OFFSET_BASES
+from bespokeasm.utilities import OPERAND_TYPES_WITH_ENCLOSURE
 
 ENDIAN_VALUES = ('big', 'little')
 ENDIAN_KEYS = (
@@ -35,6 +50,7 @@ OPERAND_TYPES_WITH_ARGUMENT = {
     'relative_address',
     'indirect_numeric',
     'deferred_numeric',
+    'indirect_indexed_numeric',
 }
 OPERAND_TYPES_WITH_REGISTER = {
     'register',
@@ -53,6 +69,7 @@ class ConfigValidator:
         self._reporter = diagnostic_reporter
         self.annotation_namespaces: dict[str, AnnotationNamespace] = dict(BUILTIN_NAMESPACES)
         self.output_formats: dict[str, DefinedFormat] = {}
+        self.migrations: dict[str, Dialect] = {}
 
     def error(self, path: str, problem: str) -> None:
         self._reporter.error(None, f'ISA configuration {self._config_name}: {path} {problem}')
@@ -162,6 +179,17 @@ class ConfigValidator:
             ),
             config.get('output_format_shared'),
         )
+        self.migrations = load_migrations(
+            config.get('migrations'),
+            MigrationLoadEnvironment(error=self.error, directive_spellings=self._directive_spellings(general)),
+        )
+
+    def _directive_spellings(self, general: dict) -> frozenset[str]:
+        """Every directive a migration rule may produce, as written in source."""
+        aliases = general.get('directive_aliases') or {}
+        dotted = COMPILER_DIRECTIVES_SET | BYTECODE_DIRECTIVES_SET | {str(alias).lower() for alias in aliases}
+        preprocessor = preprocessor_directives_for_isa('flow_counters' in self._config)
+        return frozenset({f'.{name}' for name in dotted} | {f'#{name}' for name in preprocessor})
 
     @staticmethod
     def _predefined_names(predefined: dict) -> dict[str, dict[str, str]]:
@@ -207,6 +235,9 @@ class ConfigValidator:
             )
         for key in ENDIAN_KEYS:
             self.require_choice(general, key, path, ENDIAN_VALUES)
+        self.require_choice(general, 'low_high_operators', path, LOW_HIGH_OPERATOR_STYLES)
+        self.require_choice(general, 'current_address', path, CURRENT_ADDRESS_STYLES)
+        self._validate_directive_aliases(general, path)
         registers = general.get('registers')
         if registers is not None and not isinstance(registers, (list, dict)):
             self.error(
@@ -231,6 +262,31 @@ class ConfigValidator:
         if identifier is not None:
             self.require_str(identifier, 'name', f'{path}.identifier')
             self.require_str(identifier, 'extension', f'{path}.identifier')
+
+    def _validate_directive_aliases(self, general: dict, path: str) -> None:
+        aliases = self.require_dict(general, 'directive_aliases', path)
+        if aliases is None:
+            return
+        path = f'{path}.directive_aliases'
+        targets = ', '.join(DIRECTIVE_ALIAS_TARGETS)
+        seen: set[str] = set()
+        for alias, target in aliases.items():
+            alias_path = f'{path}.{alias}'
+            if not isinstance(alias, str) or re.fullmatch(r'[A-Za-z_]\w*', alias) is None:
+                hint = '; write it without the period' if isinstance(alias, str) and alias.startswith('.') else ''
+                self.error(alias_path, f'is not a valid directive name{hint}')
+            name = alias.lower()
+            if name in COMPILER_DIRECTIVES_SET | BYTECODE_DIRECTIVES_SET:
+                self.error(alias_path, f'is already the name of the .{name} directive')
+            if name in seen:
+                self.error(alias_path, 'is defined more than once (directive names ignore case)')
+            seen.add(name)
+            if not isinstance(target, str) or target.lower() not in DIRECTIVE_ALIAS_TARGETS:
+                hint = '; write it without the period' if isinstance(target, str) and target.startswith('.') else ''
+                self.error(
+                    alias_path,
+                    f'must name a data or fill directive ({targets}), not {self._describe(target)}{hint}',
+                )
 
     def _validate_operand_sets(self, operand_sets: dict | None) -> None:
         if operand_sets is None:
@@ -267,6 +323,64 @@ class ConfigValidator:
                 self.require_int(argument, 'size', f'{path}.argument', minimum=0)
         if type_str in OPERAND_TYPES_WITH_REGISTER:
             self.require_str(operand, 'register', path, required=True)
+        if 'prefix' in operand:
+            if type_str != 'numeric':
+                self.error(f'{path}.prefix', f'is only available on numeric operands, not {type_str} operands')
+            elif operand['prefix'] != IMMEDIATE_PREFIX:
+                self.error(
+                    f'{path}.prefix',
+                    f'must be "{IMMEDIATE_PREFIX}", the only supported prefix, not {self._describe(operand["prefix"])}',
+                )
+        if 'enclosure' in operand:
+            if type_str not in OPERAND_TYPES_WITH_ENCLOSURE:
+                self.error(
+                    f'{path}.enclosure',
+                    f'is only available on {", ".join(OPERAND_TYPES_WITH_ENCLOSURE)} operands, not {type_str} operands',
+                )
+            self.require_choice(operand, 'enclosure', path, tuple(ENCLOSURES))
+            # Legacy: `use_curly_braces` is the undocumented old spelling of `enclosure: braces`.
+            if operand.get('use_curly_braces') is True and operand['enclosure'] != 'braces':
+                self.error(
+                    f'{path}.enclosure',
+                    f'must be "braces" or left out, since use_curly_braces is true, not "{operand["enclosure"]}"',
+                )
+        if type_str == 'indirect_indexed_numeric':
+            self.require_dict(operand, 'index_operands', path, required=True)
+        if 'index_separator' in operand:
+            if type_str != 'indirect_indexed_numeric':
+                self.error(
+                    f'{path}.index_separator',
+                    f'is only available on indirect_indexed_numeric operands, not {type_str} operands',
+                )
+            self.require_choice(operand, 'index_separator', path, tuple(INDEX_SEPARATORS))
+        if 'select_by_value' in operand:
+            self.require_bool(operand, 'select_by_value', path)
+            if type_str != 'address':
+                self.error(
+                    f'{path}.select_by_value',
+                    f'is only available on address operands, not {type_str} operands',
+                )
+            elif operand['select_by_value'] is True and not (
+                isinstance(operand.get('argument'), dict) and 'memory_zone' in operand['argument']
+            ):
+                self.error(
+                    f'{path}.select_by_value',
+                    'needs argument.memory_zone, the zone whose values select this operand',
+                )
+        if 'offset_base' in operand:
+            if type_str != 'relative_address':
+                self.error(
+                    f'{path}.offset_base',
+                    f'is only available on relative_address operands, not {type_str} operands',
+                )
+            self.require_choice(operand, 'offset_base', path, OFFSET_BASES)
+            # Legacy: `offset_from_instruction_end` is the undocumented old spelling of `offset_base`.
+            if 'offset_from_instruction_end' in operand:
+                self.error(
+                    f'{path}.offset_from_instruction_end',
+                    'must be left out when offset_base is set; offset_base replaces it '
+                    '(offset_from_instruction_end: true is offset_base: last_word)',
+                )
         offset = self.require_dict(operand, 'offset', path)
         if offset is not None:
             self.require_int(offset, 'size', f'{path}.offset', minimum=0)
@@ -445,7 +559,7 @@ FLOW_METADATA_KEYS = {
 KNOWN_KEYS = {
     'root': {
         'description', 'general', 'operand_sets', 'instructions', 'macros', 'predefined', 'flow_counters',
-        'annotations', 'output_formats', 'output_format_shared',
+        'annotations', 'output_formats', 'output_format_shared', 'migrations',
     },
     'output_format': {'documentation', 'requires_word_size', 'template', 'sections', 'shared', 'predefined'},
     'output_format_shared': {'requires_word_size', 'sections', 'predefined'},
@@ -457,8 +571,9 @@ KNOWN_KEYS = {
     'annotation_data_size': {'when', 'words', 'terminated_when'},
     'annotation_value_range': {'when', 'range'},
     'general': {
-        'address_size', 'allow_embedded_strings', 'cstr_terminator', 'default_numeric_base', 'documentation',
-        'endian', 'endianness', 'flags', 'identifier', 'intra_word_endian', 'intra_word_endianness',
+        'address_size', 'allow_embedded_strings', 'cstr_terminator', 'current_address',
+        'default_numeric_base', 'directive_aliases', 'documentation', 'endian', 'endianness', 'flags', 'identifier',
+        'intra_word_endian', 'intra_word_endianness', 'low_high_operators',
         'min_version', 'multi_word_endian', 'multi_word_endianness', 'origin', 'page_size', 'registers',
         'string_byte_packing', 'string_byte_packing_fill', 'word_size', 'word_segment_size',
     },
@@ -472,8 +587,11 @@ KNOWN_KEYS = {
     'operand_sets_ref': {'list', 'disallowed_pairs', 'reverse_argument_order', 'reverse_bytecode_order'},
     'specific_operands': {'list', 'reverse_argument_order', 'reverse_bytecode_order'},
     'operand': {
-        'type', 'argument', 'bytecode', 'decorator', 'documentation', 'index_operands', 'offset',
-        'offset_from_instruction_end', 'register', 'use_curly_braces',
+        'type', 'argument', 'bytecode', 'decorator', 'documentation', 'enclosure', 'index_operands', 'index_separator',
+        # `use_curly_braces` is legacy: undocumented, the same as `enclosure: braces`.
+        # `offset_from_instruction_end` is legacy: undocumented, replaced by `offset_base`.
+        'offset', 'offset_base', 'offset_from_instruction_end', 'prefix', 'register', 'select_by_value',
+        'use_curly_braces',
     },
     'operand_argument': {
         'size', 'word_align', 'endian', 'multi_word_endian', 'intra_word_endian', 'valid_address', 'memory_zone',

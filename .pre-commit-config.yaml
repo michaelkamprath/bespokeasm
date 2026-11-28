@@ -30,6 +30,8 @@ repos:
     hooks:
     -   id: flake8
         args: [--max-line-length=127]
+        # The oldest supported Python, so syntax only newer versions accept fails here (E999).
+        language_version: python3.11
 -   repo: https://github.com/asottile/pyupgrade
     rev: v3.21.2
     hooks:

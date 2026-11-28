@@ -1,3 +1,4 @@
+import copy
 import importlib.resources as pkg_resources
 import json
 import os
@@ -17,6 +18,9 @@ from bespokeasm.configgen import LanguageConfigGenerator
 from bespokeasm.configgen.color_scheme import build_hover_color_map
 from bespokeasm.configgen.color_scheme import DEFAULT_COLOR_SCHEME
 from bespokeasm.configgen.color_scheme import SyntaxElement
+from bespokeasm.configgen.expression_scopes import CURRENT_ADDRESS_SCOPE
+from bespokeasm.configgen.expression_scopes import IMMEDIATE_PREFIX_SCOPE
+from bespokeasm.configgen.expression_scopes import LOW_HIGH_OPERATOR_SCOPE
 from bespokeasm.configgen.hover_docs import build_hover_docs
 from ruamel.yaml import YAML
 
@@ -46,6 +50,7 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.HEX_NUMBER, 'constant.numeric.integer.hexadecimal', 'Numbers - Hex'),
             (SyntaxElement.BINARY_NUMBER, 'constant.numeric.integer.binary', 'Numbers - Binary'),
             (SyntaxElement.DECIMAL_NUMBER, 'constant.numeric.integer.decimal', 'Numbers - Decimal'),
+            (SyntaxElement.OCTAL_NUMBER, 'constant.numeric.integer.octal', 'Numbers - Octal'),
             (SyntaxElement.CHARACTER_NUMBER, 'constant.numeric.character', 'Numbers - Character'),
             (SyntaxElement.LABEL_DEFINITION, 'variable.other.label.definition', 'Labels - Definitions'),
             (
@@ -72,8 +77,12 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.COMMENT, 'comment.line', 'Comments'),
             (SyntaxElement.PARAMETER, 'variable.parameter', 'Parameters'),
             (SyntaxElement.ANNOTATION_NAMESPACE, 'entity.name.namespace.annotation', 'Annotation Namespaces'),
+            (SyntaxElement.MEMORY_ZONE, 'entity.name.section.memory-zone', 'Memory Zones'),
             (SyntaxElement.ANNOTATION_ARGUMENT, 'variable.parameter.annotation', 'Annotation Arguments'),
             (SyntaxElement.ANNOTATION_VALUE, 'constant.other.annotation.value', 'Annotation Values'),
+            (SyntaxElement.OUTPUT_FORMAT_NAME, 'entity.name.output-format', 'Output Format Names'),
+            (SyntaxElement.OUTPUT_FORMAT_OPTION, 'variable.parameter.output-format', 'Output Format Options'),
+            (SyntaxElement.OUTPUT_FORMAT_VALUE, 'constant.other.output-format.value', 'Output Format Values'),
             (SyntaxElement.INSTRUCTION, 'variable.function.instruction', 'Instruction Functions'),
             (SyntaxElement.MACRO, 'variable.function.macro', 'Macro Functions'),
             (SyntaxElement.REGISTER, 'variable.language', 'Variables - Language'),
@@ -104,6 +113,9 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.PREPROCESSOR, 'keyword.control.preprocessor', 'Keyword - Preprocessor'),
             (SyntaxElement.DATA_TYPE, 'storage.type', 'Data Types'),
             (SyntaxElement.OPERATOR, 'keyword.operator', 'Keyword - Operators'),
+            (SyntaxElement.LOW_HIGH_OPERATOR, LOW_HIGH_OPERATOR_SCOPE, 'Keyword - Low and High Operators'),
+            (SyntaxElement.CURRENT_ADDRESS, CURRENT_ADDRESS_SCOPE, 'Current Address'),
+            (SyntaxElement.IMMEDIATE_PREFIX, IMMEDIATE_PREFIX_SCOPE, 'Keyword - Immediate Prefix'),
             (
                 SyntaxElement.FLOW_OPERATOR,
                 'keyword.operator.flow',
@@ -258,6 +270,23 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
 
         shutil.rmtree(tmp_dir)
 
+    def _add_enclosed_addressing(self, contexts: dict) -> None:
+        """Color operands written in parentheses or braces like those in brackets, where the
+        instruction set has them. The rules go ahead of `numerical_expressions` in operands,
+        which would otherwise read parentheses as grouping."""
+        rules = []
+        for _, depth, begin, end in self._enclosed_addressing_patterns():
+            rule = copy.deepcopy(contexts['deferred_addressing' if depth == 2 else 'indirect_addressing'][0])
+            rule['match'] = begin
+            rule['push'][-1]['match'] = end
+            rules.append(rule)
+        if not rules:
+            return
+        contexts['enclosed_addressing'] = rules
+        for instruction_rule in contexts['instructions']:
+            push = instruction_rule['push']
+            push.insert(push.index({'include': 'numerical_expressions'}), {'include': 'enclosed_addressing'})
+
     def _generate_files_in_dir(self, destination_dir: str) -> None:
         if self.verbose >= 3:
             print(f'  Constructing files into temp dir: {destination_dir}')
@@ -297,6 +326,13 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
         # handle instructions
         update_instructions = False
         update_macros = False
+        # `*` as the current address and `<`/`>` as the low and high operators, where the
+        # instruction set turns them on. They go first so they win over multiply and comparison.
+        syntax_dict['contexts']['numerical_expressions'][:0] = [
+            {'match': pattern, 'scope': scope}
+            for pattern, scope in self._expression_operator_rules()
+        ]
+        self._add_enclosed_addressing(syntax_dict['contexts'])
         syntax_dict['file_extensions'] = [self.code_extension]
         syntax_dict['scope'] = f'source.bespokeasm.{self.code_extension}'
         for idx, instr_dict in enumerate(syntax_dict['contexts']['instructions']):
@@ -383,7 +419,7 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             directives_str.replace('##DIRECTIVES##', directives_regex)
 
         # data types
-        datatypes_regex = '|'.join(['\\.'+d for d in BYTECODE_DIRECTIVES_SET])
+        datatypes_regex = '|'.join(['\\.'+d for d in sorted(BYTECODE_DIRECTIVES_SET | set(self.model.directive_aliases))])
         datatypes_str = syntax_dict['contexts']['data_types_directives'][0]['match']
         syntax_dict['contexts']['data_types_directives'][0]['match'] = datatypes_str.replace('##DATATYPES##', datatypes_regex)
 
@@ -497,6 +533,10 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             'variable.other.flow.coordinate.usage' if self.model.flow_counters_enabled else '',
         )
         self._replace_token_in_file(hover_plugin_fp, '##PACKAGE_NAME##', self.language_name)
+        self._replace_token_in_file(
+            hover_plugin_fp, '##EXPRESSION_FUNCTION_NAMES##',
+            '|'.join(sorted(expression_functions_for_isa(self.model.flow_counters_enabled))),
+        )
         self._replace_token_in_file(hover_plugin_fp, '##LABEL_PATTERN##', self._label_pattern())
         self._replace_token_in_file(
             hover_plugin_fp,
@@ -504,6 +544,9 @@ class SublimeConfigGenerator(LanguageConfigGenerator):
             self._constant_pattern(),
         )
         self._replace_token_in_file(hover_plugin_fp, '##MNEMONIC_PATTERN##', self._mnemonic_pattern())
+        self._replace_token_in_file(
+            hover_plugin_fp, '##DATA_TYPE_ALIASES##', ' '.join(sorted(self.model.directive_aliases)),
+        )
         if self.model.registers:
             register_regex = self._replace_token_with_regex_list(
                 '##REGISTERS##', '##REGISTERS##', self.model.registers

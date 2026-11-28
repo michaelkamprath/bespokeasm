@@ -13,6 +13,8 @@ from bespokeasm.assembler.model import AssemblerModel
 from bespokeasm.assembler.symbol_scope import SymbolScope
 from ruamel.yaml import YAML
 
+from test.isa_configs import json_config_copy
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 M5_DIR = PROJECT_ROOT / 'test' / 'flow_harnesses' / 'm5'
@@ -1608,7 +1610,7 @@ def test_intel_8085_stack_pointer_replacement_can_be_reanchored(
     assert 'stack=2 → ?' in instruction_row
 
 
-def test_minimal_64x4_flow_stack_demo_compiles():
+def test_minimal_64x4_flow_stack_demo_compiles(tmp_path):
     """The original Minimal 64x4 example exercises its real stack contract."""
     assembler = Assembler(
         source_file=str(
@@ -1618,7 +1620,7 @@ def test_minimal_64x4_flow_stack_demo_compiles():
             / 'software'
             / 'flow-stack-demo.min64x4'
         ),
-        config_file=str(MINIMAL_64X4_CONFIG),
+        config_file=json_config_copy(MINIMAL_64X4_CONFIG, tmp_path),
         generate_binary=False,
         output_file=None,
         binary_start=0,
@@ -1648,7 +1650,7 @@ def test_minimal_64x4_spinit_macro_invalidates_and_can_be_reanchored(
         'spinit\n'
         '#resume stack = 0\n'
         '#endtrack stack\n',
-        config_path=MINIMAL_64X4_CONFIG,
+        config_path=json_config_copy(MINIMAL_64X4_CONFIG, tmp_path),
         pretty=True,
     )
     listing = capsys.readouterr().out

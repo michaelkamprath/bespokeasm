@@ -1,0 +1,168 @@
+# A subset of the Minimal 64x4 configuration (examples/slu4-minimal-64x4/slu4-minimal-64x4.yaml):
+# the instructions the slu4 migration samples use, with the same opcodes, operands and dialect.
+description: A subset of examples/slu4-minimal-64x4/slu4-minimal-64x4.yaml for the slu4 migration tests
+general:
+  address_size: 16
+  page_size: 256
+  multi_word_endian: little
+  origin: 0
+  identifier: {name: slu4-min64x4-subset, version: 1.0.0, extension: min64x4}
+  min_version: 0.10.0a1
+  low_high_operators: whole_expression
+  current_address: value_address
+  allow_embedded_strings: true
+predefined:
+  memory_zones:
+    - {name: ZERO_PAGE, start: 0x0000, end: 0x00FF}
+operand_sets:
+  absolute_address:
+    operand_values:
+      address:
+        type: address
+        argument: {size: 16, word_align: true, endian: little}
+  address_lsb:
+    operand_values:
+      address_lsb:
+        type: address
+        argument: {size: 8, word_align: true, endian: little, slice_lsb: true, match_address_msb: true,
+            match_on_argument_bytcode: true}
+  immediate_16bit:
+    operand_values:
+      int16:
+        type: numeric
+        argument: {size: 16, word_align: true, endian: little}
+  immediate_8bit:
+    operand_values:
+      int8:
+        type: numeric
+        argument: {size: 8, word_align: true, endian: little}
+  relative_address:
+    operand_values:
+      address:
+        type: address
+        argument: {size: 16, word_align: true, endian: little}
+  zero_page:
+    operand_values:
+      zp_addr:
+        type: address
+        argument: {size: 8, word_align: true, endian: little, slice_lsb: true, memory_zone: ZERO_PAGE}
+instructions:
+  nop:
+    bytecode: {value: 0, size: 8}
+  jpa:
+    bytecode: {value: 100, size: 8}
+    operands:
+      count: 1
+      operand_sets:
+        list: [absolute_address]
+  jps:
+    bytecode: {value: 103, size: 8}
+    operands:
+      count: 1
+      operand_sets:
+        list: [absolute_address]
+  rts:
+    bytecode: {value: 105, size: 8}
+  ldi:
+    bytecode: {value: 116, size: 8}
+    operands:
+      count: 1
+      operand_sets:
+        list: [immediate_8bit]
+  ldz:
+    bytecode: {value: 117, size: 8}
+    operands:
+      count: 1
+      operand_sets:
+        list: [zero_page]
+  ldr:
+    bytecode: {value: 120, size: 8}
+    operands:
+      count: 1
+      operand_sets:
+        list: [relative_address]
+  str:
+    bytecode: {value: 128, size: 8}
+    operands:
+      count: 1
+      operand_sets:
+        list: [relative_address]
+  miw:
+    bytecode: {value: 135, size: 8}
+    operands:
+      count: 2
+      operand_sets:
+        list: [immediate_16bit, absolute_address]
+  mib:
+    bytecode: {value: 131, size: 8}
+    operands:
+      count: 2
+      operand_sets:
+        list: [immediate_8bit, absolute_address]
+  inw:
+    bytecode: {value: 152, size: 8}
+    operands:
+      count: 1
+      operand_sets:
+        list: [absolute_address]
+  cib:
+    bytecode: {value: 234, size: 8}
+    operands:
+      count: 2
+      operand_sets:
+        list: [immediate_8bit, absolute_address]
+  fne:
+    bytecode: {value: 83, size: 8}
+    operands:
+      count: 1
+      operand_sets:
+        list: [address_lsb]
+  fcc:
+    bytecode: {value: 85, size: 8}
+    operands:
+      count: 1
+      operand_sets:
+        list: [address_lsb]
+  fpa:
+    bytecode: {value: 91, size: 8}
+    operands:
+      count: 1
+      operand_sets:
+        list: [address_lsb]
+  or.b:
+    aliases: [bor]
+    bytecode: {value: 75, size: 8}
+    operands:
+      count: 1
+      operand_sets:
+        list: [absolute_address]
+  xr.z:
+    aliases: [zxr]
+    bytecode: {value: 81, size: 8}
+    operands:
+      count: 1
+      operand_sets:
+        list: [zero_page]
+  aiw:
+    bytecode: {value: 180, size: 8}
+    operands:
+      count: 2
+      operand_sets:
+        list: [immediate_8bit, absolute_address]
+  siw:
+    bytecode: {value: 213, size: 8}
+    operands:
+      count: 2
+      operand_sets:
+        list: [immediate_8bit, absolute_address]
+migrations:
+  slu4:
+    description: Carsten Herting's Minimal 64x4 assembler (asm.cpp, Revision 1.1)
+    rules:
+    - split_statements
+    - bare_data: {sizing: slu4}
+    - string_escapes: {backslash: literal}
+    - char_literals: {double_quoted: true}
+    - terminated_strings
+    - muted_origin
+    - rename_directives: {org: .org, page: .align}

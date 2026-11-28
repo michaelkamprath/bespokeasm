@@ -26,6 +26,7 @@ class SyntaxElement(Enum):
     HEX_NUMBER = 'hex_number'
     BINARY_NUMBER = 'binary_number'
     DECIMAL_NUMBER = 'decimal_number'
+    OCTAL_NUMBER = 'octal_number'
     CHARACTER_NUMBER = 'character_number'
 
     # Labels and identifiers
@@ -65,8 +66,12 @@ class SyntaxElement(Enum):
     COMPILER_LABEL = 'compiler_label'
     PARAMETER = 'parameter'
     ANNOTATION_NAMESPACE = 'annotation_namespace'
+    MEMORY_ZONE = 'memory_zone'
     ANNOTATION_ARGUMENT = 'annotation_argument'
     ANNOTATION_VALUE = 'annotation_value'
+    OUTPUT_FORMAT_NAME = 'output_format_name'
+    OUTPUT_FORMAT_OPTION = 'output_format_option'
+    OUTPUT_FORMAT_VALUE = 'output_format_value'
 
     # Preprocessor and directives
     PREPROCESSOR = 'preprocessor'
@@ -76,6 +81,11 @@ class SyntaxElement(Enum):
     # Operators
     OPERATOR = 'operator'
     FLOW_OPERATOR = 'flow_operator'
+    # `<`/`>` as the low and high operators, and `*` as the current address
+    LOW_HIGH_OPERATOR = 'low_high_operator'
+    CURRENT_ADDRESS = 'current_address'
+    # `#` before an immediate value
+    IMMEDIATE_PREFIX = 'immediate_prefix'
 
     # Punctuation
     PUNCTUATION_SEPARATOR = 'punctuation_separator'
@@ -117,6 +127,7 @@ DEFAULT_COLOR_SCHEME = ColorScheme(
         SyntaxElement.HEX_NUMBER: '#ffe80b',
         SyntaxElement.BINARY_NUMBER: '#d6d300',
         SyntaxElement.DECIMAL_NUMBER: '#fffd80',
+        SyntaxElement.OCTAL_NUMBER: '#ffc933',
         SyntaxElement.CHARACTER_NUMBER: '#FFE880',
 
         # Labels and identifiers
@@ -155,8 +166,14 @@ DEFAULT_COLOR_SCHEME = ColorScheme(
         SyntaxElement.COMPILER_LABEL: '#abedc1',
         SyntaxElement.PARAMETER: '#abd7ed',
         SyntaxElement.ANNOTATION_NAMESPACE: '#ff00a2',
+        SyntaxElement.MEMORY_ZONE: '#ff00a2',
         SyntaxElement.ANNOTATION_ARGUMENT: '#c080ff',
         SyntaxElement.ANNOTATION_VALUE: '#89c616',
+        # `#output-format <format> <option> <value>`: colored as a memory zone's name and
+        # #annotate's argument names and values are.
+        SyntaxElement.OUTPUT_FORMAT_NAME: '#ff00a2',
+        SyntaxElement.OUTPUT_FORMAT_OPTION: '#c080ff',
+        SyntaxElement.OUTPUT_FORMAT_VALUE: '#89c616',
 
         # Preprocessor and directives
         SyntaxElement.PREPROCESSOR: '#c080ff',
@@ -166,6 +183,9 @@ DEFAULT_COLOR_SCHEME = ColorScheme(
         # Operators
         SyntaxElement.OPERATOR: '#cc99ff',
         SyntaxElement.FLOW_OPERATOR: '#e08ae4',
+        SyntaxElement.LOW_HIGH_OPERATOR: '#5fe0d0',
+        SyntaxElement.CURRENT_ADDRESS: '#ff0084',
+        SyntaxElement.IMMEDIATE_PREFIX: '#cc99ff',
 
         # Punctuation
         SyntaxElement.PUNCTUATION_SEPARATOR: '#ed80a2',

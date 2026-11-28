@@ -90,6 +90,7 @@ class NumericEnumerationOperand(NumericExpressionOperand):
                     line_id,
                     self._word_size,
                     self._word_segment_size,
+                    self.default_numeric_base,
                 )
             arg_part = None
             if self.has_argument_value_dict:
@@ -103,6 +104,7 @@ class NumericEnumerationOperand(NumericExpressionOperand):
                     line_id,
                     self._word_size,
                     self._word_segment_size,
+                    self.default_numeric_base,
                 )
             if bytecode_part is None and arg_part is None:
                 return None

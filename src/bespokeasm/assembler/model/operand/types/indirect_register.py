@@ -8,12 +8,14 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model.operand import OperandType
 from bespokeasm.assembler.model.operand import ParsedOperand
+from bespokeasm.assembler.parsing import encloses_whole
 
 from .register import RegisterOperand
 
 
 class IndirectRegisterOperand(RegisterOperand):
-    _BASE_PATTERN_TEMPLATE = r'\[\s*({0})\s*(?:(\+|\-)\s*([\s\w\.\+\-\*\/\&\|\^\(\)\$\%]+)\s*)?\]'
+    # `{0}` and `{2}` are the enclosure's opening and closing delimiters, `{1}` the register.
+    _BASE_PATTERN_TEMPLATE = r'{0}\s*({1})\s*(?:(\+|\-)\s*([\s\w\.\+\-\*\/\&\|\^\(\)\$\%]+)\s*)?{2}'
 
     def __init__(
         self,
@@ -62,6 +64,15 @@ class IndirectRegisterOperand(RegisterOperand):
         return OperandType.INDIRECT_REGISTER
 
     @property
+    def enclosure_depth(self) -> int:
+        return 1
+
+    @property
+    def _base_pattern(self) -> str:
+        opener, closer = (re.escape(delimiter) for delimiter in self.enclosure_delimiters)
+        return IndirectRegisterOperand._BASE_PATTERN_TEMPLATE.format(opener, self.register, closer)
+
+    @property
     def has_offset(self) -> bool:
         return ('offset' in self._config)
 
@@ -84,15 +95,15 @@ class IndirectRegisterOperand(RegisterOperand):
     @cached_property
     def match_pattern(self) -> str:
         if not self.has_decorator:
-            pattern_str = IndirectRegisterOperand._BASE_PATTERN_TEMPLATE.format(self.register)
+            pattern_str = self._base_pattern
         elif self.decorator_is_prefix:
             pattern_str = r'(?<!(?:\+|\-|\d|\w)){}{}'.format(
                 self.decorator_pattern,
-                IndirectRegisterOperand._BASE_PATTERN_TEMPLATE.format(self.register),
+                self._base_pattern,
             )
         else:
             pattern_str = r'{}{}(?!(?:\+|\-|\d|\w))'.format(
-                IndirectRegisterOperand._BASE_PATTERN_TEMPLATE.format(self.register),
+                self._base_pattern,
                 self.decorator_pattern,
             )
         return fr'{pattern_str}'
@@ -109,6 +120,11 @@ class IndirectRegisterOperand(RegisterOperand):
             self._parse_pattern,
             operand.strip(),
         )
+        # Under parentheses the offset may hold parentheses of its own; they must balance, so
+        # `(hl+5)+(3)` is not `(hl + "5)+(3")`.
+        if match is not None and match.group(3) is not None \
+                and not encloses_whole(f'({match.group(3)})', '(', ')'):
+            match = None
         if match is not None and len(match.groups()) > 0:
             bytecode_part = NumericByteCodePart(
                 self.bytecode_value,

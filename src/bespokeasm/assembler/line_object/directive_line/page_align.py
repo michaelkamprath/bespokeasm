@@ -68,7 +68,5 @@ class PageAlignLine(LineObject):
                 self.line_id,
                 f'.align value must be a positive integer, not {self._page_size}',
             )
-        if self._page_size == 1:
-            self._address = address
-        else:
-            self._address = address + (self._page_size - (address % self._page_size))
+        # An address already on a boundary stays where it is.
+        self._address = address + (-address % self._page_size)

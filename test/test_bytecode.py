@@ -5,6 +5,7 @@ from bespokeasm.assembler.bytecode.parts import CompositeByteCodePart
 from bespokeasm.assembler.bytecode.parts import ExpressionByteCodePart
 from bespokeasm.assembler.bytecode.parts import NumericByteCodePart
 from bespokeasm.assembler.bytecode.word import Word
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.symbol_scope import GlobalSymbolScope
@@ -68,9 +69,9 @@ class TestBytecodeObjects(unittest.TestCase):
         label_values.set_label_value('var1', 2, 1)
         label_values.set_label_value('var2', 0xF0, 2)
 
-        p1 = NumericByteCodePart(1, 3, True, 'big', 'big', test_line_id, 8, 8)
-        p2 = NumericByteCodePart(3, 2, True, 'big', 'big', test_line_id, 8, 8)
-        p3 = ExpressionByteCodePart('var1+13', 4, True, 'big', 'big', test_line_id, 8, 8)
+        p1 = NumericByteCodePart(1, 3, False, 'big', 'big', test_line_id, 8, 8)
+        p2 = NumericByteCodePart(3, 2, False, 'big', 'big', test_line_id, 8, 8)
+        p3 = ExpressionByteCodePart('var1+13', 4, False, 'big', 'big', test_line_id, 8, 8)
 
         c1 = CompositeByteCodePart([p1, p2], False, 'big', 'big', test_line_id, 8, 8)
         self.assertEqual(5, c1.value_size, 'bit size should match')
@@ -123,6 +124,19 @@ class TestBytecodeObjects(unittest.TestCase):
             ),
             'value should match'
         )
+
+    def test_composite_bytecode_part_rejects_a_word_aligned_part(self):
+        # A composite packs its parts end to end, so a word-aligned part would be given an
+        # address on the next word while its bits start mid-word. Until an operand type needs
+        # one, it is an error.
+        test_line_id = LineIdentifier(1, 'test_composite_bytecode_part_rejects_a_word_aligned_part')
+        partial = NumericByteCodePart(0xA, 4, False, 'big', 'big', test_line_id, 8, 8)
+        aligned = NumericByteCodePart(0xBB, 8, True, 'big', 'big', test_line_id, 8, 8)
+        with self.assertRaisesRegex(AssemblerError, 'word-aligned, which a composite bytecode part does not support'):
+            CompositeByteCodePart([partial, aligned], False, 'big', 'big', test_line_id, 8, 8)
+        # The composite itself may be word-aligned.
+        composite = CompositeByteCodePart([partial, partial], True, 'big', 'big', test_line_id, 8, 8)
+        self.assertEqual(composite.value_size, 8)
 
     def test_compact_parts_to_words(self):
         test_line_id = LineIdentifier(1, 'test_compact_parts_to_words')
@@ -196,6 +210,34 @@ class TestBytecodeObjects(unittest.TestCase):
             [Word(0x10002030, 32, 8, 'big')],
             'words should match',
         )
+
+    def test_compact_parts_keeps_order_when_a_whole_word_part_follows_partial_bits(self):
+        """A part that is a whole number of words but not word-aligned packs right after
+        partial bits still waiting to be written, rather than being written ahead of them."""
+        test_line_id = LineIdentifier(1, 'test_compact_parts_keeps_order')
+        label_values = GlobalSymbolScope({'a'})
+        scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
+
+        # 8-bit words: an opcode, a 4-bit field, an unaligned byte, then an aligned argument.
+        parts = [
+            NumericByteCodePart(0xEF, 8, False, 'big', 'big', test_line_id, 8, 8),
+            NumericByteCodePart(0x2, 4, False, 'big', 'big', test_line_id, 8, 8),
+            NumericByteCodePart(0xA9, 8, False, 'big', 'big', test_line_id, 8, 8),
+            NumericByteCodePart(0x55, 8, True, 'big', 'big', test_line_id, 8, 8),
+        ]
+        words = CompositeByteCodePart.compact_parts_to_words(parts, 8, 8, 'big', label_values, scopes, 0x8000, 4)
+        self.assertEqual(
+            words,
+            [Word(0xEF, 8, 8, 'big'), Word(0x2A, 8, 8, 'big'), Word(0x90, 8, 8, 'big'), Word(0x55, 8, 8, 'big')],
+        )
+
+        # A two-word part after partial bits is packed the same way.
+        parts = [
+            NumericByteCodePart(0xF, 4, False, 'big', 'big', test_line_id, 8, 8),
+            NumericByteCodePart(0x1234, 16, False, 'big', 'big', test_line_id, 8, 8),
+        ]
+        words = CompositeByteCodePart.compact_parts_to_words(parts, 8, 8, 'big', label_values, scopes, 0x8000, 3)
+        self.assertEqual(words, [Word(0xF1, 8, 8, 'big'), Word(0x23, 8, 8, 'big'), Word(0x40, 8, 8, 'big')])
 
     def test_bytecode_assembly_16bit_word(self):
         register_labels = {'a', 'i'}

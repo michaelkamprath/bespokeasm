@@ -6,8 +6,10 @@
 #   * The expected significant bytes can either be configured to a specific value (e.g., "zero page")
 #     or to match either the current instruction address or the emitted operand fetch page. If the
 #     operand's value has significant byte(s) that are not what is expected, the assembler raises an error.
+from bespokeasm.assembler.bytecode.parts import ExpressionByteCodePart
 from bespokeasm.assembler.bytecode.parts import ExpressionByteCodePartInMemoryZone
 from bespokeasm.assembler.bytecode.parts import NumericByteCodePart
+from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone import MemoryZone
 from bespokeasm.assembler.memory_zone.manager import GLOBAL_ZONE_NAME
@@ -15,8 +17,11 @@ from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
 from bespokeasm.assembler.model.operand import OperandType
 from bespokeasm.assembler.model.operand import ParsedOperand
 from bespokeasm.assembler.model.operand.types.numeric_expression import NumericExpressionOperand
+from bespokeasm.assembler.model.operand.value_selection import selects
 from bespokeasm.assembler.symbol_scope import SymbolScope
 from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
+from bespokeasm.expression import TokenType
+from bespokeasm.utilities import ExpressionSyntax
 
 
 class AddressByteCodePart(ExpressionByteCodePartInMemoryZone):
@@ -34,10 +39,13 @@ class AddressByteCodePart(ExpressionByteCodePartInMemoryZone):
         match_on_argument_bytcode: bool,
         word_size: int,
         word_segment_size: int,
+        default_numeric_base: str | ExpressionSyntax = 'decimal',
+        value_selected: bool = False,
     ) -> None:
         """Creates a new address bytecode part that is bound to a memory zone.
            The address value is sliced into the least significant bit(s) if `is_lsb_bytes` is true,
-           ensuring that the MSBs match the configured comparison page."""
+           ensuring that the MSBs match the configured comparison page. ``value_selected`` marks the
+           argument of a `select_by_value` operand, whose instruction was sized for the zone."""
         super().__init__(
             memzone,
             value_expression,
@@ -48,10 +56,12 @@ class AddressByteCodePart(ExpressionByteCodePartInMemoryZone):
             line_id,
             word_size,
             word_segment_size,
+            default_numeric_base,
         )
         self._is_lsb_bytes = is_lsb_bytes
         self._match_address_msb = match_address_msb
         self._match_on_argument_bytcode = match_on_argument_bytcode
+        self._value_selected = value_selected
 
     def __str__(self) -> str:
         return f'AddressByteCodePart<expression="{self._expression}",zone={self._memzone},' \
@@ -68,6 +78,12 @@ class AddressByteCodePart(ExpressionByteCodePartInMemoryZone):
     ) -> int:
         if instruction_address is None:
             raise ValueError('AddressByteCodePart.get_value had no instruction_address passed')
+        if self._value_selected:
+            self._check_selected_value(
+                ExpressionByteCodePart.get_value(
+                    self, symbol_scope, active_named_scopes, instruction_address, instruction_size, bytecode_address,
+                ),
+            )
         value = super().get_value(
             symbol_scope,
             active_named_scopes,
@@ -76,7 +92,11 @@ class AddressByteCodePart(ExpressionByteCodePartInMemoryZone):
             bytecode_address,
         )
 
-        if self._is_lsb_bytes and self._match_address_msb:
+        if self._is_lsb_bytes and self._match_address_msb and self._written_as_low_part():
+            # An operand written as a low byte, `<expr`, is that byte as given: self-modifying
+            # code writes a placeholder target this way. Its page isn't checked.
+            final_value = value & ((1 << self.value_size) - 1)
+        elif self._is_lsb_bytes and self._match_address_msb:
             # mask out the MSBs of the address value. The`value_size` is interpreted as the number of LSB bytes
             mask = (1 << self.value_size) - 1
             final_value = value & mask
@@ -97,6 +117,20 @@ class AddressByteCodePart(ExpressionByteCodePartInMemoryZone):
         else:
             final_value = value
         return final_value
+
+    def _written_as_low_part(self) -> bool:
+        return self._parsed_expression.token_type == TokenType.T_LOW_PART
+
+    def _check_selected_value(self, value: int) -> None:
+        # The value was in the zone when relaxation chose this form, but a value can move out as
+        # code shrinks, as `$1FF - label` does.
+        if not self._memzone.start <= value <= self._memzone.end:
+            shown = f'${value:04X}' if value >= 0 else f'-${-value:04X}'
+            raise AssemblerError(
+                self.line_id,
+                f'"{self._expression.strip()}" is {shown}, outside memory zone {self._memzone.name}, '
+                'after its instruction was sized for that zone',
+            )
 
 
 class AddressOperand(NumericExpressionOperand):
@@ -135,6 +169,11 @@ class AddressOperand(NumericExpressionOperand):
     @property
     def enforce_argument_valid_address(self) -> bool:
         return True
+
+    @property
+    def select_by_value(self) -> bool:
+        """Whether the operand matches only when its value lies in its memory zone."""
+        return self.config.get('select_by_value', False)
 
     def valid_memory_zone(self, memzone_manager: MemoryZoneManager) -> MemoryZone:
         """Returns the memory zone that the operand's argument must be a valid address in. Defaults
@@ -187,6 +226,7 @@ class AddressOperand(NumericExpressionOperand):
             self._word_size,
             self._word_segment_size,
         ) if self.bytecode_value is not None else None
+        memory_zone = self.valid_memory_zone(memzone_manager)
         arg_part = AddressByteCodePart(
             operand,
             self.argument_size,
@@ -194,14 +234,18 @@ class AddressOperand(NumericExpressionOperand):
             self.argument_multi_word_endian,
             self.argument_intra_word_endian,
             line_id,
-            self.valid_memory_zone(memzone_manager),
+            memory_zone,
             self.does_lsb_slice,
             self.match_address_msb,
             self.match_on_argument_bytcode,
             self._word_size,
             self._word_segment_size,
+            self.default_numeric_base,
+            value_selected=self.select_by_value,
         )
         if arg_part.contains_register_labels(register_labels):
+            return None
+        if self.select_by_value and not selects(arg_part, memory_zone):
             return None
         return ParsedOperand(
             self,

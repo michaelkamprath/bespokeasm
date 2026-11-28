@@ -65,7 +65,7 @@ class CounterCoordinateLine(LineObject):
                 offset_expression = parse_expression(
                     line_id,
                     coordinate_match.group(2),
-                    model.default_numeric_base,
+                    model.expression_syntax,
                     context=ExpressionUseContext.DATA_VALUE,
                 )
             except SyntaxError as error:

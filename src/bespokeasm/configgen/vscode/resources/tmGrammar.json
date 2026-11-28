@@ -179,7 +179,7 @@
       ]
     },
     "flow_operators": {
-      "match": "(?i)\\b(?:COORDINATE|COUNTER)\\b",
+      "match": "(?i)\\b(?:COORDINATE|COUNTER)\\b(?=\\s*\\()",
       "name": "keyword.operator.flow"
     },
     "deferred-addressing": {
@@ -233,6 +233,9 @@
     "directives": {
       "patterns": [
         {
+          "include": "#memory_zone_names"
+        },
+        {
           "begin": "(?<!\\w)(?:##DIRECTIVES##)\\b",
           "beginCaptures": {
             "0": {
@@ -242,6 +245,12 @@
           "end": "(?=(?:\\s*\\;|\\s*$))",
           "name": "meta.directive",
           "patterns": [
+            {
+              "include": "#directive_label_definitions"
+            },
+            {
+              "include": "#quoted_memory_zone"
+            },
             {
               "include": "#numeric-values"
             },
@@ -278,6 +287,15 @@
             },
             {
               "include": "#annotation_directive"
+            },
+            {
+              "include": "#output_format_directive"
+            },
+            {
+              "include": "#memory_zone_names"
+            },
+            {
+              "include": "#flow_counter_usages"
             },
             {
               "match": "(?<=\\#)(?:##PREPROCESSOR##)\\b",
@@ -608,15 +626,19 @@
           "name": "constant.numeric.integer.hexadecimal"
         },
         {
-          "match": "(?<!\\w)(?:(?:b|%)[01]+)\\b",
+          "match": "(?<!\\w)(?:(?:b|%)[01]+|[01]+[bB])\\b",
           "name": "constant.numeric.integer.binary"
+        },
+        {
+          "match": "(?<!\\w)(?:0o[0-7]+|[0-7]+[qQoO])\\b",
+          "name": "constant.numeric.integer.octal"
         },
         {
           "match": "(?<!\\w)(?:\\d+)\\b",
           "name": "constant.numeric.integer.decimal"
         },
         {
-          "match": "(?<!\\w)(?:\\'.\\')\\b",
+          "match": "(?<!\\w)'(?:\\\\.|[^'\\\\])'",
           "name": "constant.numeric.character"
         }
       ]
@@ -638,7 +660,7 @@
           "name": "keyword.operator.arithmetic"
         },
         {
-          "match": "[\\&\\|\\^]{1}",
+          "match": "[\\&\\|\\^\\~]{1}",
           "name": "keyword.operator.logical"
         },
         {
@@ -646,7 +668,7 @@
           "name": "keyword.operator.bitwise"
         },
         {
-          "match": "\\b(?:##EXPRESSION_FUNCTIONS##)\\b",
+          "match": "\\b(?:##EXPRESSION_FUNCTIONS##)\\b(?=\\s*\\()",
           "name": "keyword.operator.word"
         },
         {
@@ -667,7 +689,7 @@
         }
       },
       "contentName": "string.quoted",
-      "end": "(?<!\\\\)\\1",
+      "end": "\\1",
       "endCaptures": {
         "0": {
           "name": "punctuation.definition.string.end"
@@ -684,6 +706,120 @@
     "line_continuation": {
       "match": "\\\\(?=\\s*$)",
       "name": "punctuation.separator.continuation"
+    },
+    "memory_zone_names": {
+      "patterns": [
+        {
+          "comment": "The zone a #create_memzone line defines.",
+          "match": "(?<=\\#)(create_memzone)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "keyword.control.preprocessor"
+            },
+            "2": {
+              "name": "entity.name.section.memory-zone"
+            }
+          }
+        },
+        {
+          "comment": "The zone .memzone selects.",
+          "match": "(?<!\\w)(\\.memzone)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "keyword.other.directive"
+            },
+            "2": {
+              "name": "entity.name.section.memory-zone"
+            }
+          }
+        }
+      ]
+    },
+    "quoted_memory_zone": {
+      "comment": "The quoted zone .org counts its offset from, as in .org $10 \"RAM\".",
+      "match": "(\")([A-Za-z_][A-Za-z0-9_]*)(\")",
+      "captures": {
+        "1": {
+          "name": "punctuation.definition.string.begin"
+        },
+        "2": {
+          "name": "entity.name.section.memory-zone"
+        },
+        "3": {
+          "name": "punctuation.definition.string.end"
+        }
+      }
+    },
+    "directive_label_definitions": {
+      "comment": "A label after an origin or zone directive's argument: `.org $10 name:`.",
+      "patterns": [
+        {
+          "captures": {
+            "1": {
+              "name": "variable.other.label.definition"
+            },
+            "2": {
+              "name": "punctuation.definition.variable.colon.label"
+            }
+          },
+          "match": "(?<=\\s)(##GLOBAL_SYMBOL_PATTERN##)\\s*(\\:)(?!=)"
+        },
+        {
+          "captures": {
+            "1": {
+              "name": "variable.other.label.definition"
+            },
+            "2": {
+              "name": "punctuation.definition.variable.colon.label"
+            }
+          },
+          "match": "(?<=\\s)(##LOCAL_SYMBOL_PATTERN##)\\s*(\\:)(?!=)"
+        },
+        {
+          "captures": {
+            "1": {
+              "name": "variable.other.label.definition"
+            },
+            "2": {
+              "name": "punctuation.definition.variable.colon.label"
+            }
+          },
+          "match": "(?<=\\s)(##FILE_SYMBOL_PATTERN##)\\s*(\\:)(?!=)"
+        }
+      ]
+    },
+    "output_format_directive": {
+      "comment": "`#output-format <format> <option>=<value> ...`: the format's name, then its options and values.",
+      "begin": "(?<=\\#)(output-format)\\b(?:\\s+([A-Za-z_][A-Za-z0-9_]*))?",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.control.preprocessor"
+        },
+        "2": {
+          "name": "entity.name.output-format"
+        }
+      },
+      "end": "(?=\\s*;|\\s*$)",
+      "name": "meta.output-format",
+      "patterns": [
+        {
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\b(?:(=)(?:([A-Za-z_][A-Za-z0-9_]*)|(\\d+))?)?",
+          "captures": {
+            "1": {
+              "name": "variable.parameter.output-format"
+            },
+            "2": {
+              "name": "punctuation.separator.key-value.output-format"
+            },
+            "3": {
+              "name": "constant.other.output-format.value"
+            },
+            "4": {
+              "name": "constant.numeric.integer.decimal"
+            }
+          }
+        }
+      ]
     }
   },
   "scopeName": "source.asm"

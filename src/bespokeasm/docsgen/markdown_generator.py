@@ -70,6 +70,9 @@ class MarkdownGenerator:
         annotations = getattr(self.doc_model, 'annotations', None)
         if isinstance(annotations, list) and self._declared_annotations():
             sections.append(self._generate_annotations_section())
+        migrations = getattr(self.doc_model, 'migrations', None)
+        if isinstance(migrations, list) and migrations:
+            sections.append(self._generate_migrations_section())
 
         # Instructions section
         if self.doc_model.instruction_docs:
@@ -211,7 +214,40 @@ class MarkdownGenerator:
             rows,
             column_alignments=['left'] * 5,
         ))
+        for output_format in self.doc_model.output_formats:
+            options = output_format.get('options') or []
+            if not isinstance(options, list) or not options:
+                continue
+            name = output_format['name']
+            sections.append(f'## `{name}` Options')
+            sections.append(
+                f'Source can set these for the lines after it with `#output-format {name} <option>=<value>`, '
+                f'and return one to its default with `#output-format {name} <option>`.'
+            )
+            sections.append(self._generate_markdown_table(
+                ['Option', 'Values', 'Default', 'Effect'],
+                [
+                    [f"`{option['name']}`", option['values'], f"`{option['default']}`", option['description']]
+                    for option in options
+                ],
+                column_alignments=['left'] * 4,
+            ))
         return '\n\n'.join(sections)
+
+    def _generate_migrations_section(self) -> str:
+        """The assemblers whose source `bespokeasm migrate` can convert to this language."""
+        rows = [[f"`{dialect['name']}`", dialect['description']] for dialect in self.doc_model.migrations]
+        return '\n\n'.join([
+            '# Source Migration',
+            (
+                'Source written for these assemblers can be rewritten in this language with '
+                '`bespokeasm migrate -c <config> --from <dialect> <file>`. A line it can\'t convert is '
+                'kept as a `; MIGRATE:` comment and reported. See '
+                '[Migrating Source]'
+                '(https://github.com/michaelkamprath/bespokeasm/wiki/Installation-and-Usage#migrating-source).'
+            ),
+            self._generate_markdown_table(['Dialect', 'Source Assembler'], rows, column_alignments=['left'] * 2),
+        ])
 
     def _format_description(self, output_format: dict[str, Any]) -> str:
         """The format's description. A word-size requirement that this ISA meets says nothing, so
@@ -998,6 +1034,14 @@ class MarkdownGenerator:
         if string_section:
             table_sections.append(string_section)
 
+        expression_section = self._generate_expression_syntax_section(general.get('expression_syntax', {}))
+        if expression_section:
+            table_sections.append(expression_section)
+
+        aliases_section = self._generate_directive_aliases_section(general.get('directive_aliases', {}))
+        if aliases_section:
+            table_sections.append(aliases_section)
+
         if table_sections:
             sections.append('\n\n---\n\n'.join(table_sections))
 
@@ -1242,7 +1286,8 @@ class MarkdownGenerator:
 
             value_text = operand.get('value') or ''
             if value_text:
-                value_text = str(value_text).replace('\n', '<br>')
+                # A `|` would end the table cell, as in an index list like `(x | y)`.
+                value_text = str(value_text).replace('|', r'\|').replace('\n', '<br>')
             value_cell = value_text
 
             mode_value = operand.get('mode') or ''
@@ -1352,6 +1397,46 @@ class MarkdownGenerator:
             return ''
 
         return self._generate_attribute_table('String Handling', rows)
+
+    _BARE_NUMBER_BASES = {'hex': 'Hexadecimal', 'octal': 'Octal', 'binary': 'Binary'}
+    _LOW_HIGH_OPERATOR_TEXT = {
+        'tight': 'Low and high {unit} of the term that follows: `<label+1` is `(<label)+1`',
+        'whole_expression': (
+            'Low and high {unit} of everything after the operator, written at the start of an '
+            'expression or parenthesis: `<label+1` is `<(label+1)`'
+        ),
+    }
+    _CURRENT_ADDRESS_TEXT = {
+        'instruction_start': "The instruction's first byte; in data, the value's own address",
+        'value_address': "The address of the operand's own bytes; in data, the value's own address",
+    }
+
+    def _generate_expression_syntax_section(self, syntax: dict[str, Any]) -> str:
+        """Generate the Expression Syntax subsection: only what differs from the defaults, so an
+        instruction set with decimal bare numbers and no optional operators shows nothing."""
+        rows: list[tuple[str, str]] = []
+        base = self._BARE_NUMBER_BASES.get(str(syntax.get('default_numeric_base') or 'decimal'))
+        if base:
+            rows.append(('Bare Numbers', base))
+        if syntax.get('low_high_operators') in self._LOW_HIGH_OPERATOR_TEXT:
+            unit = 'byte' if syntax.get('word_size', 8) == 8 else f"{syntax['word_size']}-bit word"
+            rows.append((
+                '`<` and `>`',
+                self._LOW_HIGH_OPERATOR_TEXT[syntax['low_high_operators']].format(unit=unit),
+            ))
+        if syntax.get('current_address') in self._CURRENT_ADDRESS_TEXT:
+            rows.append(('`*`', self._CURRENT_ADDRESS_TEXT[syntax['current_address']]))
+        if not rows:
+            return ''
+        return self._generate_attribute_table('Expression Syntax', rows)
+
+    def _generate_directive_aliases_section(self, aliases: dict[str, str]) -> str:
+        """Generate the Directive Aliases subsection: the other names this instruction set gives
+        data and fill directives, such as `.word` for `.2byte`."""
+        rows = [(f'`.{alias}`', f'Same as `.{target}`') for alias, target in sorted(aliases.items())]
+        if not rows:
+            return ''
+        return self._generate_attribute_table('Directive Aliases', rows)
 
     def _generate_registers_section(self, registers: list[dict[str, Any]]) -> str:
         """Generate the Register Set subsection."""
@@ -1614,22 +1699,13 @@ class MarkdownGenerator:
                 table_style=table_style
             ))
 
-        # Effective flow metadata can differ per version. Keep these derived
-        # tables after every hand-authored modifies table so generated rows
-        # never reorder or duplicate authored documentation.
+        # Effective flow metadata can differ per version. One table, after every
+        # hand-authored modifies table, so generated rows never reorder or
+        # duplicate authored documentation.
         if multi_version:
-            for version in versions:
-                flow_modifies = version.get('flow_modifies', [])
-                if not flow_modifies:
-                    continue
-                sections.append(self._generate_modifies_table(
-                    flow_modifies,
-                    table_style=table_style,
-                    heading=(
-                        f"Modifies — Version {version.get('index')} "
-                        'Counter Effects'
-                    ),
-                ))
+            counter_table = self._generate_version_counter_table(versions, table_style)
+            if counter_table:
+                sections.append(counter_table)
 
         # Examples
         if instruction_doc.get('examples'):
@@ -1772,11 +1848,32 @@ class MarkdownGenerator:
             else:
                 description_cell = str(description_value).replace('\n', '<br>')
 
+            if table_style != 'ascii':
+                # A `|` would end the table cell, as in an index list like `(x | y)`.
+                operand_cell = operand_cell.replace('|', r'\|')
+                value_cell = value_cell.replace('|', r'\|')
             rows.append([operand_cell, operand_type, value_cell, description_cell])
 
         if table_style == 'ascii':
             return self._generate_ascii_table(headers, rows)
         return self._generate_markdown_table(headers, rows, column_alignments=alignments)
+
+    def _generate_version_counter_table(self, versions: list[dict[str, Any]], table_style: str) -> str:
+        """One table of every version's flow-counter effects, each row naming its version."""
+        rows = []
+        for version in versions:
+            title = version.get('title')
+            label = f"{version.get('index')} ({title})" if title else str(version.get('index'))
+            for modify in version.get('flow_modifies', []):
+                rows.append([label, modify.get('target', ''), modify.get('description', '').replace('\n', '<br>')])
+        if not rows:
+            return ''
+        headers = ['Version', 'Counter', 'Effect']
+        table = (
+            self._generate_ascii_table(headers, rows) if table_style == 'ascii'
+            else self._generate_markdown_table(headers, rows)
+        )
+        return '\n\n'.join(['#### Counter Effects', table]) if table else ''
 
     def _generate_modifies_table(
         self,

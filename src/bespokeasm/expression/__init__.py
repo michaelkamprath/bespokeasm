@@ -17,6 +17,8 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.symbol_scope import SymbolScope
 from bespokeasm.assembler.symbol_scope.flow_symbols import FlowSymbolError
 from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
+from bespokeasm.utilities import expression_syntax_of
+from bespokeasm.utilities import ExpressionSyntax
 from bespokeasm.utilities import is_explicit_numeric_string
 from bespokeasm.utilities import is_unprefixed_numeric_string
 from bespokeasm.utilities import is_valid_label
@@ -26,7 +28,7 @@ from bespokeasm.utilities import PATTERN_CHARACTER_ORDINAL
 from bespokeasm.utilities import PATTERN_HEX
 
 EXPRESSION_PARTS_PATTERN = \
-    r'(?:(?:\%|b)[01]+|{}|[\+\-\*\/\&\|\^\(\)]|>>|<<|%|COUNTER\(|LSB\(|BYTE\d\(|(?:\.|_)?\w+|{}|[><])'.format(
+    r'(?:(?:\%|b)[01]+|{}|[\+\-\*\/\&\|\^\(\)\~]|>>|<<|%|COUNTER\(|LSB\(|BYTE\d\(|(?:\.|_)?\w+|{}|[><])'.format(
         PATTERN_HEX,
         PATTERN_CHARACTER_ORDINAL,
     )
@@ -85,6 +87,29 @@ class TokenType(enum.Enum):
     T_RPAR = 17
     T_END = 18
     T_COUNTER = 19
+    T_COMPLEMENT = 20
+    T_LOW_PART = 21
+    T_HIGH_PART = 22
+    T_CURRENT_ADDRESS = 23
+
+
+# Prefix operators that apply to the single term after them.
+_TERM_PREFIX_TOKENS = (TokenType.T_COMPLEMENT, TokenType.T_LOW_PART, TokenType.T_HIGH_PART)
+_LOW_HIGH_TOKENS = (TokenType.T_LOW_PART, TokenType.T_HIGH_PART)
+# Tokens that open a parenthesized scope, and the prefixes that may come before a whole-expression
+# `<`/`>` at the start of one.
+_SCOPE_OPENING_TOKENS = (TokenType.T_LPAR, TokenType.T_LSB, TokenType.T_BYTE, TokenType.T_COUNTER)
+_SCOPE_START_PREFIX_TOKENS = (TokenType.T_COMPLEMENT, TokenType.T_MINUS, *_LOW_HIGH_TOKENS)
+# After any of these tokens the next token must be a value (a term), not an operator.
+_VALUE_EXPECTED_AFTER = {
+    TokenType.T_PLUS, TokenType.T_MINUS, TokenType.T_MULT, TokenType.T_DIV, TokenType.T_MOD,
+    TokenType.T_AND, TokenType.T_OR, TokenType.T_XOR, TokenType.T_LEFT_SHIFT, TokenType.T_RIGHT_SHIFT,
+    TokenType.T_LPAR, TokenType.T_LSB, TokenType.T_BYTE, TokenType.T_COUNTER,
+    TokenType.T_COMPLEMENT, TokenType.T_LOW_PART, TokenType.T_HIGH_PART,
+}
+CURRENT_ADDRESS_UNAVAILABLE_MESSAGE = (
+    '"*" (the current address) is only available in instruction operands and data values; use a label'
+)
 
 
 class ExpressionNode:
@@ -100,6 +125,7 @@ class ExpressionNode:
         TokenType.T_RIGHT_SHIFT: operator.rshift,
         TokenType.T_LEFT_SHIFT: operator.lshift,
         TokenType.T_NEGATION: operator.neg,
+        TokenType.T_COMPLEMENT: operator.invert,
     }
 
     def __init__(self, token_type: TokenType, value=None, default_numeric_base: str = 'decimal'):
@@ -108,6 +134,8 @@ class ExpressionNode:
         self.default_numeric_base = normalize_default_numeric_base(default_numeric_base)
         self.left_child: ExpressionNode = None
         self.right_child: ExpressionNode = None
+        # Set on a `<`/`>` that applies to the rest of its scope rather than one term.
+        self.applies_to_rest = False
         self._is_unary = token_type in [
             TokenType.T_BYTE,
             TokenType.T_LSB,
@@ -127,6 +155,9 @@ class ExpressionNode:
             TokenType.T_LSB,
             TokenType.T_COUNTER,
             TokenType.T_NEGATION,
+            TokenType.T_COMPLEMENT,
+            TokenType.T_LOW_PART,
+            TokenType.T_HIGH_PART,
         ]
 
     @property
@@ -231,10 +262,15 @@ class ExpressionNode:
         self,
         symbol_scope: SymbolScope,
         active_named_scopes: ActiveNamedScopeList,
-        line_id: LineIdentifier
+        line_id: LineIdentifier,
+        current_address: int | None = None,
     ) -> int:
         if self.token_type in [TokenType.T_NUM, TokenType.T_LABEL, TokenType.T_LABEL_OR_NUM]:
             return self._numeric_value(symbol_scope, active_named_scopes, line_id)
+        if self.token_type == TokenType.T_CURRENT_ADDRESS:
+            if current_address is None:
+                raise AssemblerError(line_id, CURRENT_ADDRESS_UNAVAILABLE_MESSAGE)
+            return current_address
         if self.token_type == TokenType.T_COUNTER:
             if hasattr(self, '_resolved_flow_value'):
                 return self._resolved_flow_value
@@ -248,11 +284,19 @@ class ExpressionNode:
                 'deferred flow expression reached numeric evaluation before '
                 'the static-analysis pass resolved it'
             )
+        if self.token_type in [TokenType.T_LOW_PART, TokenType.T_HIGH_PART]:
+            # `<` is the low word of the value and `>` the word above it; a `<`/`>` node's value
+            # is the instruction set's word size. With 8-bit words these are the low and high byte.
+            word_size = self.value
+            arg_value = int(self.left_child._compute(symbol_scope, active_named_scopes, line_id, current_address))
+            if self.token_type == TokenType.T_HIGH_PART:
+                arg_value >>= word_size
+            return arg_value & ((1 << word_size) - 1)
         if self.token_type in [TokenType.T_LSB, TokenType.T_BYTE]:
             byte_idx = 0
             if self.token_type == TokenType.T_BYTE:
                 byte_idx = int(self.value[4])
-            arg_value = int(self.left_child._compute(symbol_scope, active_named_scopes, line_id))
+            arg_value = int(self.left_child._compute(symbol_scope, active_named_scopes, line_id, current_address))
             byte_count = max(((abs(arg_value).bit_length() + 7) // 8), byte_idx+1)
             masked_arg = arg_value & (2**(8 * byte_count) - 1)
             try:
@@ -264,12 +308,15 @@ class ExpressionNode:
                 ) from oe
             return arg_value_bytes[byte_idx]
         elif self.token_type == TokenType.T_NEGATION:
-            arg_value = self.left_child._compute(symbol_scope, active_named_scopes, line_id)
+            arg_value = self.left_child._compute(symbol_scope, active_named_scopes, line_id, current_address)
             operation = ExpressionNode._operations[self.token_type]
             return operation(arg_value)
+        elif self.token_type == TokenType.T_COMPLEMENT:
+            arg_value = int(self.left_child._compute(symbol_scope, active_named_scopes, line_id, current_address))
+            return ~arg_value
         else:
-            left_result = self.left_child._compute(symbol_scope, active_named_scopes, line_id)
-            right_result = self.right_child._compute(symbol_scope, active_named_scopes, line_id)
+            left_result = self.left_child._compute(symbol_scope, active_named_scopes, line_id, current_address)
+            right_result = self.right_child._compute(symbol_scope, active_named_scopes, line_id, current_address)
             operation = ExpressionNode._operations[self.token_type]
             if self.token_type in [
                         TokenType.T_AND,
@@ -291,10 +338,22 @@ class ExpressionNode:
         self,
         symbol_scope: SymbolScope,
         active_named_scopes: ActiveNamedScopeList,
-        line_id: LineIdentifier
+        line_id: LineIdentifier,
+        current_address: int | None = None,
     ) -> int:
-        calculated_value = self._compute(symbol_scope, active_named_scopes, line_id)
+        """Evaluate the expression. ``current_address`` is the value of ``*``; when it is
+        ``None`` (constants, directives, preprocessor conditions) ``*`` is an error."""
+        calculated_value = self._compute(symbol_scope, active_named_scopes, line_id, current_address)
         return int(calculated_value)
+
+    def uses_current_address(self) -> bool:
+        """Whether the expression refers to ``*``, the current address."""
+        if self.token_type == TokenType.T_CURRENT_ADDRESS:
+            return True
+        return any(
+            child is not None and child.uses_current_address()
+            for child in (self.left_child, self.right_child)
+        )
 
     def contains_register_labels(self, register_labels: set[str]) -> bool:
         if self.token_type == TokenType.T_COUNTER:
@@ -314,7 +373,7 @@ class ExpressionNode:
             return set()
         if self.token_type == TokenType.T_LABEL:
             return {self.value}
-        elif self.token_type in [TokenType.T_NUM, TokenType.T_LABEL_OR_NUM]:
+        elif self.token_type in [TokenType.T_NUM, TokenType.T_LABEL_OR_NUM, TokenType.T_CURRENT_ADDRESS]:
             return set()
         left_result: set[str] = self.left_child.contained_labels()
         right_result: set[str] = set()
@@ -326,11 +385,15 @@ class ExpressionNode:
 def parse_expression(
     line_id: LineIdentifier,
     expression: str,
-    default_numeric_base: str = 'decimal',
+    default_numeric_base: str | ExpressionSyntax = 'decimal',
     *,
     context: ExpressionUseContext | None = None,
 ) -> ExpressionNode:
-    """Parse a source numeric expression with deferred flow-value support."""
+    """Parse a source numeric expression with deferred flow-value support.
+
+    ``default_numeric_base`` is a base name or the instruction set's ``ExpressionSyntax``, which
+    also turns on the ``<``/``>`` byte operators and ``*`` (the current address).
+    """
     ast = _parse_expression_ast(line_id, expression, default_numeric_base)
     flow_nodes = ast.deferred_flow_nodes()
     if flow_nodes and context is None:
@@ -356,7 +419,7 @@ def parse_deferred_flow_expression(
     line_id: LineIdentifier,
     expression: str,
     context: ExpressionUseContext,
-    default_numeric_base: str = 'decimal',
+    default_numeric_base: str | ExpressionSyntax = 'decimal',
 ) -> ExpressionNode:
     """Parse and context-tag flow operators without evaluating or exposing them.
 
@@ -375,9 +438,10 @@ def parse_deferred_flow_expression(
 def _parse_expression_ast(
     line_id: LineIdentifier,
     expression: str,
-    default_numeric_base: str,
+    default_numeric_base: str | ExpressionSyntax,
 ) -> ExpressionNode:
-    tokens = _lexical_analysis(line_id, expression, default_numeric_base)
+    syntax = expression_syntax_of(default_numeric_base)
+    tokens = _lexical_analysis(line_id, expression, syntax)
     ast = _parse_e(line_id, tokens)
     _match(line_id, tokens, TokenType.T_END)
     return ast
@@ -396,6 +460,7 @@ TOKEN_MAPPINGS = {
     '^': TokenType.T_XOR,
     '(': TokenType.T_LPAR,
     ')': TokenType.T_RPAR,
+    '~': TokenType.T_COMPLEMENT,
     'LSB(': TokenType.T_LSB,
     'COUNTER(': TokenType.T_COUNTER,
 }
@@ -404,10 +469,11 @@ TOKEN_MAPPINGS = {
 def _lexical_analysis(
     line_id: LineIdentifier,
     s: str,
-    default_numeric_base: str = 'decimal',
+    default_numeric_base: str | ExpressionSyntax = 'decimal',
 ) -> list[ExpressionNode]:
+    syntax = expression_syntax_of(default_numeric_base)
     expression_without_char_literals = _strip_character_ordinals_for_validation(line_id, s)
-    normalized_base = normalize_default_numeric_base(default_numeric_base)
+    normalized_base = normalize_default_numeric_base(syntax)
     tokens = []
     if '&&' in expression_without_char_literals or '||' in expression_without_char_literals:
         raise ExpressionSyntaxError(
@@ -437,12 +503,19 @@ def _lexical_analysis(
                 gap_str = gap.strip()
                 raise ExpressionSyntaxError(line_id, f'invalid token: {gap_str}')
         part = match.group(0)
-        if part in TOKEN_MAPPINGS:
+        expects_value = not tokens or tokens[-1].token_type in _VALUE_EXPECTED_AFTER
+        if part == '*' and expects_value and syntax.current_address is not None:
+            token = ExpressionNode(TokenType.T_CURRENT_ADDRESS, value=part)
+        elif part in ('<', '>'):
+            token = _low_high_operator_token(
+                line_id, part, syntax, expects_value, at_scope_start=_at_scope_start(tokens),
+            )
+        elif part in TOKEN_MAPPINGS:
             token_type = TOKEN_MAPPINGS[part]
             token = ExpressionNode(token_type, value=part)
         elif re.match(r'^BYTE\d\(', part):
             token = ExpressionNode(TokenType.T_BYTE, value=part)
-        elif is_explicit_numeric_string(part):
+        elif is_explicit_numeric_string(part, normalized_base):
             token = ExpressionNode(TokenType.T_NUM, value=parse_numeric_string(part))
         elif is_unprefixed_numeric_string(part, normalized_base):
             if is_valid_label(part):
@@ -473,6 +546,61 @@ def _lexical_analysis(
         raise ExpressionSyntaxError(line_id, f'invalid token: {gap_str}')
     tokens.append(ExpressionNode(TokenType.T_END))
     return tokens
+
+
+def low_high_operator_name(part: str, word_size: int) -> str:
+    """What ``<`` or ``>`` gives in an instruction set with ``word_size``-bit words: with 8-bit
+    words, the low or high byte."""
+    unit = 'byte' if word_size == 8 else 'word'
+    return f'{"low" if part == "<" else "high"} {unit}'
+
+
+def _low_high_operator_token(
+    line_id: LineIdentifier,
+    part: str,
+    syntax: ExpressionSyntax,
+    expects_value: bool,
+    at_scope_start: bool,
+) -> ExpressionNode:
+    """Return the token for a ``<`` (low word) or ``>`` (high word) prefix operator, or raise if
+    the instruction set doesn't allow one here."""
+    name = low_high_operator_name(part, syntax.word_size)
+    if syntax.low_high_operators is None:
+        hint = f'; use {"BYTE0" if part == "<" else "BYTE1"}(...)' if syntax.word_size == 8 else ''
+        raise ExpressionSyntaxError(
+            line_id,
+            f'"{part}" ({name}) is not available in this instruction set{hint}',
+        )
+    if not expects_value:
+        raise ExpressionSyntaxError(
+            line_id,
+            f'unexpected "{part}" in expression; "{part}" ({name}) goes before a value, and '
+            'comparisons are only available in preprocessor conditions',
+        )
+    if syntax.low_high_operators == 'whole_expression' and not at_scope_start:
+        raise ExpressionSyntaxError(
+            line_id,
+            f'"{part}" ({name}) applies to everything after it in this instruction set, so it may '
+            'only start an expression or a parenthesis, optionally after "~" or "-"',
+        )
+    token_type = TokenType.T_LOW_PART if part == '<' else TokenType.T_HIGH_PART
+    # The node carries the word size, so a copy of the expression (flow analysis keeps
+    # frozen copies) evaluates the same way.
+    node = ExpressionNode(token_type, value=syntax.word_size)
+    node.applies_to_rest = syntax.low_high_operators == 'whole_expression'
+    return node
+
+
+def _at_scope_start(tokens: list[ExpressionNode]) -> bool:
+    """True when the next token starts an expression or a parenthesis, after nothing but
+    prefix operators: `<x`, `~>x`, `(<x)`, `-(>x)`. A whole-expression `<`/`>` is only allowed
+    there, since it applies to everything after it up to the end of that scope."""
+    for token in reversed(tokens):
+        if token.token_type in _SCOPE_OPENING_TOKENS:
+            return True
+        if token.token_type not in _SCOPE_START_PREFIX_TOKENS:
+            return False
+    return True
 
 
 def _strip_character_ordinals_for_validation(line_id: LineIdentifier, expression: str) -> str:
@@ -567,8 +695,26 @@ def _parse_e3(line_id: LineIdentifier, tokens: list[ExpressionNode]) -> Expressi
 
 
 def _parse_e4(line_id: LineIdentifier, tokens: list[ExpressionNode]) -> ExpressionNode:
-    if tokens[0].token_type in [TokenType.T_NUM, TokenType.T_LABEL, TokenType.T_LABEL_OR_NUM]:
+    if tokens[0].token_type in [
+        TokenType.T_NUM,
+        TokenType.T_LABEL,
+        TokenType.T_LABEL_OR_NUM,
+        TokenType.T_CURRENT_ADDRESS,
+    ]:
         return tokens.pop(0)
+
+    if tokens[0].token_type in _LOW_HIGH_TOKENS and tokens[0].applies_to_rest:
+        # A whole-expression `<`/`>` applies to everything after it, up to the end of the
+        # expression or of the enclosing parenthesis: `~>x+1` is `~(>(x+1))`.
+        node = tokens.pop(0)
+        node.left_child = _parse_e(line_id, tokens)
+        return node
+
+    if tokens[0].token_type in _TERM_PREFIX_TOKENS:
+        # `~`, and `<`/`>` when they bind tightly, apply to the single term that follows.
+        node = tokens.pop(0)
+        node.left_child = _parse_e4(line_id, tokens)
+        return node
 
     if tokens[0].token_type in [
         TokenType.T_LSB,
@@ -580,10 +726,11 @@ def _parse_e4(line_id: LineIdentifier, tokens: list[ExpressionNode]) -> Expressi
         _match(line_id, tokens, TokenType.T_RPAR)
         return node
     elif tokens[0].token_type == TokenType.T_MINUS:
-        # if we are here, this should be a negation
+        # if we are here, this should be a negation, which applies to the single term that
+        # follows: `-1+2` is `(-1)+2`.
         node = ExpressionNode(TokenType.T_NEGATION, value=tokens[0].value)
         tokens.pop(0)
-        node.left_child = _parse_e(line_id, tokens)
+        node.left_child = _parse_e4(line_id, tokens)
         return node
     else:
         _match(line_id, tokens, TokenType.T_LPAR)

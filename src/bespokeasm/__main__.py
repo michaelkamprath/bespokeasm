@@ -115,12 +115,65 @@ def _vim_handler(config_file, verbose, editor_config_dir, language_name, languag
         generator.generate()
 
 
+def _migrate_handler(source_file, config_file, dialect_name, output_file, verbose):
+    import os
+
+    import click
+    from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
+    from bespokeasm.assembler.model import AssemblerModel
+    from bespokeasm.migrate.engine import migrate
+    from bespokeasm.migrate.isa import migration_context
+
+    model = AssemblerModel(os.path.abspath(os.path.expanduser(config_file)), verbose, DiagnosticReporter())
+    dialects = model.migrations
+    if dialect_name not in dialects:
+        if not dialects:
+            raise click.UsageError(f'{os.path.basename(config_file)} declares no dialects to migrate from')
+        choices = '\n'.join(
+            f'  {name}' + (f': {dialect.description}' if dialect.description else '')
+            for name, dialect in dialects.items()
+        )
+        problem = 'Name' if dialect_name is None else f'"{dialect_name}" is not one of them. Name'
+        raise click.UsageError(
+            f'{os.path.basename(config_file)} can migrate source from these assemblers. {problem} one '
+            f'with --from:\n{choices}'
+        )
+    if output_file is not None and os.path.exists(output_file) and os.path.samefile(output_file, source_file):
+        raise click.UsageError('--output-file is the source file; migrate never overwrites its input')
+
+    with open(source_file, encoding='utf-8', errors='surrogateescape', newline='') as handle:
+        text = handle.read()
+    result = migrate(text, dialects[dialect_name], migration_context(model))
+    if output_file is None:
+        click.echo(result.text, nl=False)
+    else:
+        with open(output_file, 'w', encoding='utf-8', errors='surrogateescape', newline='') as handle:
+            handle.write(result.text)
+
+    source_name = os.path.basename(source_file)
+    summary = [f'Migrated {source_name} from {dialect_name}: {len(result.lines)} lines']
+    summary.extend(f'  {count.kind}: {count.lines} lines' for count in result.rule_counts if count.lines)
+    reported = result.reported
+    if reported:
+        summary.append(
+            f'Reported, kept as "; MIGRATE:" comments ({result.reported_line_count} lines; port them by hand):'
+        )
+        summary.extend(f'  {source_name}:{line.number}: {"; ".join(line.reports)}' for line in reported)
+    if result.noted:
+        summary.append('Notes:')
+        summary.extend(f'  {source_name}:{line.number}: {"; ".join(line.notes)}' for line in result.noted)
+    click.echo('\n'.join(summary), err=True)
+    if reported:
+        sys.exit(1)
+
+
 _HANDLERS = CommandHandlers(
     compile=_compile_handler,
     docs=_docs_handler,
     vscode=_vscode_handler,
     sublime=_sublime_handler,
     vim=_vim_handler,
+    migrate=_migrate_handler,
 )
 
 
@@ -156,6 +209,7 @@ def entry_point():
         'vim',
         'install_completion',
         'install-completion',
+        'migrate',
     }
     first_non_option = next((arg for arg in args if not arg.startswith('-')), None)
     if first_non_option is None or first_non_option in known_subcommands:

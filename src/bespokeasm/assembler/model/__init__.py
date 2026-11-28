@@ -21,9 +21,11 @@ from bespokeasm.assembler.output_format.defined import DefinedFormat
 from bespokeasm.assembler.output_format.defined import format_scoped_names
 from bespokeasm.assembler.symbol_scope import SymbolScope
 from bespokeasm.assembler.symbol_scope import SymbolScopeType
+from bespokeasm.utilities import ExpressionSyntax
 from bespokeasm.utilities import is_unprefixed_numeric_string
 from bespokeasm.utilities import is_valid_label
 from bespokeasm.utilities import normalize_default_numeric_base
+from bespokeasm.utilities import operand_config_enclosure
 from packaging import version
 from ruamel.yaml import YAML
 
@@ -133,7 +135,7 @@ class AssemblerModel:
             self.word_size,
             self.word_segment_size,
             self._diagnostic_reporter,
-            default_numeric_base=self.default_numeric_base,
+            default_numeric_base=self.expression_syntax,
         )
         self._instructions = InstructionSet(
                 self._config['instructions'],
@@ -141,7 +143,7 @@ class AssemblerModel:
                 self._operand_sets,
                 self.multi_word_endianness,
                 self.intra_word_endianness,
-                self.default_numeric_base,
+                self.expression_syntax,
                 self.registers,
                 self.word_size,
                 self.word_segment_size,
@@ -205,6 +207,7 @@ class AssemblerModel:
         validator.validate()
         self._annotation_namespaces = validator.annotation_namespaces
         self._output_formats = validator.output_formats
+        self._migrations = validator.migrations
         ConfigAdvisor(self._config, self._config_file, self._diagnostic_reporter).advise()
 
         # Validate string_byte_packing option
@@ -910,8 +913,70 @@ class AssemblerModel:
         return self._config['general'].get('default_numeric_base', 'decimal')
 
     @property
+    def expression_syntax(self) -> ExpressionSyntax:
+        '''How this instruction set's source writes numbers and expressions: the default numeric
+        base, plus the optional `<`/`>` low and high operators and `*` current address.'''
+        general = self._config['general']
+        return ExpressionSyntax(
+            default_numeric_base=self.default_numeric_base,
+            low_high_operators=general.get('low_high_operators'),
+            current_address=general.get('current_address'),
+            word_size=self.word_size,
+        )
+
+    @property
+    def enclosed_operand_forms(self) -> set[tuple[str, int]]:
+        '''The enclosures operands are written in anywhere in the instruction set, each with its
+        depth: `('parentheses', 1)` for `(vec)`, `('brackets', 2)` for `[[vec]]`.'''
+        forms: set[tuple[str, int]] = set()
+
+        def visit(node) -> None:
+            if isinstance(node, dict):
+                form = operand_config_enclosure(node)
+                if form is not None:
+                    forms.add(form)
+                for value in node.values():
+                    visit(value)
+            elif isinstance(node, list):
+                for value in node:
+                    visit(value)
+
+        for section in ('operand_sets', 'instructions', 'macros'):
+            visit(self._config.get(section))
+        return forms
+
+    @property
+    def uses_immediate_prefix(self) -> bool:
+        '''Whether any operand is written after the `#` immediate prefix, as in `lda #$10`.'''
+        def visit(node) -> bool:
+            if isinstance(node, dict):
+                return 'prefix' in node or any(visit(value) for value in node.values())
+            if isinstance(node, list):
+                return any(visit(value) for value in node)
+            return False
+
+        return any(visit(self._config.get(section)) for section in ('operand_sets', 'instructions', 'macros'))
+
+    @property
+    def migrations(self) -> dict:
+        '''The dialects source can be migrated from, by name: see `bespokeasm migrate`.'''
+        return self._migrations
+
+    @property
+    def directive_aliases(self) -> dict[str, str]:
+        '''Other names for data and fill directives, lowercase and without the period, mapped to
+        the directive they stand for: `{'word': '2byte'}` makes `.word` the same as `.2byte`.'''
+        aliases = self._config['general'].get('directive_aliases') or {}
+        return {str(alias).lower(): str(target).lower() for alias, target in aliases.items()}
+
+    @property
     def registers(self) -> set[str]:
         return self._registers
+
+    @property
+    def config(self) -> dict:
+        '''the instruction set configuration as loaded'''
+        return self._config
 
     @property
     def operation_mnemonics(self) -> list[str]:

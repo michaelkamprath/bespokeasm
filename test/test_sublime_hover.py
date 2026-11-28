@@ -570,6 +570,33 @@ class _MockView:
         return self._window
 
 
+# BespokeAsmSemanticListener.on_close
+
+
+def test_closing_a_view_forgets_its_state_and_cancels_its_pending_update(monkeypatch):
+    """Closing a view drops its cached state, so a later view given the same id can't read the
+    closed view's lines, and a semantic update scheduled before the close does not run."""
+    hover = _load_sublime_hover_module()
+    scheduled, updated = [], []
+    monkeypatch.setattr(
+        hover, 'sublime',
+        types.SimpleNamespace(set_timeout_async=lambda callback, delay=0: scheduled.append(callback)),
+    )
+    monkeypatch.setattr(hover, '_update_semantic_regions', updated.append)
+    closed, other = _MockView(view_id=7), _MockView(view_id=8)
+    hover._VIEW_CACHE.update({7: {'lines': ['old']}, 8: {'lines': ['kept']}})
+    hover._schedule_semantic_update(closed)
+    hover._schedule_semantic_update(other)
+
+    hover.BespokeAsmSemanticListener().on_close(closed)
+    for callback in scheduled:
+        callback()
+
+    assert 7 not in hover._VIEW_CACHE and 7 not in hover._PENDING_SEMANTIC
+    assert hover._VIEW_CACHE[8] == {'lines': ['kept']}
+    assert updated == [other]
+
+
 # _get_expected_package_name
 
 
@@ -905,6 +932,32 @@ def test_sublime_code_block_colors_labels_strings_and_comments():
         ('"', 'punctuation_string'), ('Hi; there', 'string'), ('"', 'punctuation_string'),
         ('; greeting', 'comment'),
         ('.loop', 'label'), (':', 'label_colon'),
+    ]
+
+
+def test_sublime_code_block_colors_an_immediate_value_as_an_operand():
+    # A `#` before a value is the immediate prefix, not a preprocessor directive.
+    hover = _load_sublime_hover_module()
+    lines = ['lda #$10', 'lda # count', 'lda #count', '#include "x"', '  #if X']
+    assert _roles(hover._render_code_block(lines, ROLE_COLORS)) == [
+        ('lda', 'instruction'), ('#', 'punctuation'), ('$10', 'number'),
+        ('lda', 'instruction'), ('#', 'punctuation'), ('count', 'parameter'),
+        ('lda', 'instruction'), ('#', 'punctuation'), ('count', 'parameter'),
+        ('#', 'punctuation_preprocessor'), ('include', 'preprocessor'),
+        ('"', 'punctuation_string'), ('x', 'string'), ('"', 'punctuation_string'),
+        ('#', 'punctuation_preprocessor'), ('if', 'preprocessor'), ('X', 'parameter'),
+    ]
+
+
+def test_sublime_code_block_colors_directive_aliases_as_data_types():
+    hover = _load_sublime_hover_module()
+    # The generator fills in the instruction set's aliases; until then the template has none.
+    assert 'word' not in hover.CODE_DATA_TYPE_NAMES
+    assert ('word', 'data_type') not in _roles(hover._render_code_block(['.word 1'], ROLE_COLORS))
+    hover.CODE_DATA_TYPE_NAMES = hover.CODE_DATA_TYPE_NAMES | set('res word'.split())
+    assert _roles(hover._render_code_block(['.word 1', '.res 4'], ROLE_COLORS)) == [
+        ('.', 'data_type'), ('word', 'data_type'), ('1', 'number'),
+        ('.', 'data_type'), ('res', 'data_type'), ('4', 'number'),
     ]
 
 

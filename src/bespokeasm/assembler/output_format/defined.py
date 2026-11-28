@@ -15,6 +15,7 @@ from bespokeasm import BESPOKEASM_VERSION_STR
 from bespokeasm.assembler.output_format.base import OutputFormat
 from bespokeasm.assembler.output_format.base import RenderContext
 from bespokeasm.assembler.output_format.builtin import builtin_format_names
+from bespokeasm.assembler.output_format.builtin import REPLACEABLE_BUILTINS
 from bespokeasm.assembler.output_format.generators import build_generator
 from bespokeasm.assembler.output_format.generators import Generator
 from bespokeasm.assembler.output_format.generators import LoadEnvironment
@@ -64,6 +65,14 @@ class DefinedFormat(OutputFormat):
     @property
     def predefined_constants(self) -> list[dict]:
         return list(self._predefined.get('constants', []))
+
+    def source_options(self) -> list[tuple[Any, Any]]:
+        """Every option the format's generators accept from source, with the format's default."""
+        found: dict[str, tuple[Any, Any]] = {}
+        for generator in self._sections.values():
+            for option in generator.source_options:
+                found.setdefault(option.name, (option, generator.source_defaults[option.name]))
+        return list(found.values())
 
     def render(self, context: RenderContext) -> str:
         values: dict[str, Any] = {
@@ -306,8 +315,11 @@ def load_output_formats(section: Any, env: LoadEnvironment, shared_section: Any 
         path = f'output_formats.{name}'
         if not isinstance(name, str) or PATTERN_NAME.match(name) is None:
             env.error(path, 'is not a valid output format name (start with a letter; use letters, digits and "_")')
-        if name.lower() in builtin_names:
+        # A configuration may replace the built-in listing, to give it this ISA's defaults.
+        if name.lower() in builtin_names - REPLACEABLE_BUILTINS:
             env.error(path, f"cannot be defined: '{name}' is a built-in output format")
+        if name.lower() in REPLACEABLE_BUILTINS and name != name.lower():
+            env.error(path, f"replaces the built-in '{name.lower()}' format, so it must be written '{name.lower()}'")
         formats[name] = load_format_definition(name, config, env, shared_sets)
     used_sets = {output_format.shared for output_format in formats.values()}
     for set_name in shared_sets:

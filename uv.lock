@@ -22,7 +22,7 @@ wheels = [
 
 [[package]]
 name = "bespokeasm"
-version = "0.9.0"
+version = "0.10.0a1"
 source = { editable = "." }
 dependencies = [
     { name = "click" },

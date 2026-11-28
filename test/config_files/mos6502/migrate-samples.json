@@ -1,0 +1,12 @@
+{
+  "about": "Small ca65 and vasm oldstyle programs, and the bytes ca65 2.18 assembles them to (the vasm one through an equivalent ca65 port). The migration tests migrate each, assemble it with w65c02.yaml and compare; they never run ca65 or vasm.",
+  "origin": 32768,
+  "ca65": {
+    "source": "; A ca65 program for the migration tests.\n.setcpu \"65C02\"\n.debuginfo\nCOUNT := 3\nPTR   = $10\n.org $8000\nreset:  ldx #COUNT\n@loop:  dex\n        bne @loop\n:       lda z:PTR\n        beq :+\n        inc\n        bra :-\n:       sta $0200,x\n        lda #'A'\n        ldy #<message\n        jmp done\nmessage: .byt \"IT'S\", 0\n        .res 2, $EA\ndone:   .addr reset, message\n",
+    "bytes": "A2 03 CA D0 FD A5 10 F0 03 1A 80 F9 9D 00 02 A9 41 A0 16 4C 1D 80 49 54 27 53 00 EA EA 00 80 16 80"
+  },
+  "vasm": {
+    "source": "; A vasm oldstyle program for the migration tests.\nCOUNT   equ 3\nPTR     = $10\n        *= $8000\nreset   ldx #COUNT\n1$      dex\n        bne 1$\n:       lda PTR\n        beq :+\n        inc\n        bra :-\n:       sta $0200,x\n        jmp done\nmessage asciiz \"HI\"\n        dsb 2,$EA\ndone    word reset,message\n        byte 1,2\n",
+    "bytes": "A2 03 CA D0 FD A5 10 F0 03 1A 80 F9 9D 00 02 4C 17 80 48 49 00 EA EA 00 80 12 80 01 02"
+  }
+}

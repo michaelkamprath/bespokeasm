@@ -436,7 +436,7 @@ def test_m1_feature_enablement_and_inactive_condition_are_usage_gated(tmp_path):
     assert inactive == bytes([0])
 
 
-def test_m1_flow_keywords_are_reserved_only_for_enabled_isas(tmp_path):
+def test_m1_flow_keywords_are_not_reserved(tmp_path):
     no_flow_config = _without_flow_metadata(_load_config())
     for value, mnemonic in enumerate(
         (
@@ -482,22 +482,23 @@ def test_m1_flow_keywords_are_reserved_only_for_enabled_isas(tmp_path):
         0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0, 9,
     ])
 
+    # Directives are written with their `#`, so their names aren't reserved with flow counters
+    # either: an instruction may be named `assert`, and `track` may name a label.
     no_flow_config = _without_flow_metadata(_load_config())
     no_flow_config['instructions']['assert'] = {
         'bytecode': {'value': 0x72, 'size': 8},
     }
     flow_path = _write_config(tmp_path, no_flow_config, 'base-keywords.yaml')
-    with pytest.raises(SystemExit, match='also a BespokeASM keyword'):
-        _assembler(tmp_path, 'nop\n', config_path=flow_path)
+    _assembler(tmp_path, 'nop\n', config_path=flow_path)
 
     for flow_checks in (True, False):
-        with pytest.raises(SystemExit, match='is an assembler keyword'):
-            _assemble(
-                tmp_path,
-                'track:\nnop\n',
-                flow_checks=flow_checks,
-                output_name=f'flow-label-{flow_checks}.bin',
-            )
+        SymbolScope._global_scope = None
+        _assemble(
+            tmp_path,
+            'track:\nnop\n',
+            flow_checks=flow_checks,
+            output_name=f'flow-label-{flow_checks}.bin',
+        )
 
 
 def test_m1_disabled_checks_resolve_dependencies_but_require_capability(tmp_path):

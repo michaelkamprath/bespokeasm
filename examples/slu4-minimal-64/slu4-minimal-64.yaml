@@ -12,7 +12,12 @@ general:
     name: slu4-min64-asm
     version: "1.2.2"
     extension: min64
-  min_version: 0.7.0
+  min_version: '0.10.0a1'
+  # As in Carsten Herting's assembler: `<` and `>` lead an expression and take the low or
+  # high byte of all of it, so `<label+1` is the low byte of `label+1`.
+  low_high_operators: whole_expression
+  # As in Carsten Herting's assembler: `*` is the address of the operand's own bytes.
+  current_address: value_address
 operand_sets:
   immediate_8bit:
     # one byte is interpreted as an immediate value
@@ -1627,3 +1632,17 @@ macros:
           - "nob @ARG(0)+3"
           - "ldi 0"
           - "acb @ARG(0)+3"
+
+# Source migration (`bespokeasm migrate --from slu4`): converts programs written for Carsten
+# Herting's Minimal 64 assembler (asm.cpp) to this language.
+migrations:
+  slu4:
+    description: Carsten Herting's Minimal 64 assembler (asm.cpp)
+    rules:
+      - split_statements
+      - bare_data: {sizing: slu4}
+      - string_escapes: {backslash: literal}
+      - char_literals: {double_quoted: true}
+      - terminated_strings
+      - muted_origin
+      - rename_directives: {org: '.org'}

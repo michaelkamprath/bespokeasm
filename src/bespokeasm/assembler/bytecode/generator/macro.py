@@ -71,7 +71,7 @@ class MacroBytecodeGenerator:
                 split_operands(operands),
                 isa_model.registers,
                 memzone_manager,
-                isa_model.default_numeric_base,
+                isa_model.expression_syntax,
             ),
         )
 

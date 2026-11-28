@@ -71,9 +71,18 @@ The operand descriptions use the definitions provided by documentation for Minim
 * **BespokeASM** used a different syntax for some directives, notably the `.org` directive, which has the `#org` syntax in the Minimal 64 assembly. **BespokeASM** also has [a richer set of directives available](https://github.com/michaelkamprath/bespokeasm/wiki/Assembly-Language-Syntax#directives).
 * The Minimal 64's assembler has no data type directives. Instead, the assembler directly converts numeric values and strings to byte code exactly where it sits in the code. In **BespokeASM** one must declare a data type using [a data directive](https://github.com/michaelkamprath/bespokeasm/wiki/Assembly-Language-Syntax#data) when defining data in the byte code.
 * The Minimal 64 assembler emits byte code in the order it was in the original assembly code, while **BespokeASM** emits byte code in address order. For the most part, these two orderings can be pretty much the same, however, differences will show up if multiple `.org` directives are use or multiple additional source files are included.
-* The Minimal 64 uses a `<` and `>` to do byte slicing of constant values, with `<` meaning least significant byte and `>` meaning most significant byte (and it assumes a 2 byte value). **BespokeASM** using `BYTE0(..)` and `BYTE1(..)` [to accomplish the same goals](https://github.com/michaelkamprath/bespokeasm/wiki/Assembly-Language-Syntax#numeric-expressions) (respectively).
+* Carsten's `<` and `>`, the low and high byte of everything after them (`<label+1` is the low byte of `label+1`), work the same way in this configuration. `BYTE0(..)` and `BYTE1(..)` [do the same](https://github.com/michaelkamprath/bespokeasm/wiki/Assembly-Language-Syntax#numeric-expressions).
 
 There are several other features that **BespokeASM** provides over the Minimal 64 assembly syntax, such as richer math expressions for constant values and [several preprocessor directives](https://github.com/michaelkamprath/bespokeasm/wiki/Assembly-Language-Syntax#preprocessor), but the differences listed above are the ones that require code written for the Minimal 64 assembler to be altered to be assembled with **BespokeASM**.
+
+### Migrating Carsten Herting's Programs
+`bespokeasm migrate` converts programs written for his Minimal 64 assembler (`asm.cpp`) to this configuration's syntax:
+
+```sh
+bespokeasm migrate -c slu4-minimal-64.yaml --from slu4 os.asm -o os.min64
+```
+
+The `slu4` dialect puts each directive, run of data and label that shares a line with other statements on a line of its own; gives data its `.byte` or `.2byte` directive, sized the way his assembler sizes it; converts `"a"` character literals and backslashes in strings; writes a string ending in 0 as `.cstr`; and turns `#mute #org 0xfc00 #emit`, which assembles what follows for 0xfc00 while storing it where the bytes were going, into [`.phase 0xfc00`](https://github.com/michaelkamprath/bespokeasm/wiki/Assembly-Language-Syntax#phase). All 14 programs in the repository's `Programs/asm` directory, the operating system included, migrate with nothing reported and assemble to the same bytes as his assembler. A label that self-modifying code puts on an instruction's operand becomes an [operand label](https://github.com/michaelkamprath/bespokeasm/wiki/Assembly-Language-Syntax#operand-labels), `LDI @value: 0xff`, and a mnemonic used as a value becomes its opcode, which the command's summary notes.
 
 ### Predefined Compiler Constants
 The Minimal 64 operating system provided call vectors for a suite of API functions and system subroutines that are made available to user written programs. These API function labels are documented in the "API Functions" section of the Minimal 64 user guide. All documented API functions are implemented as predefined constants in this **BepsokeASM** port.

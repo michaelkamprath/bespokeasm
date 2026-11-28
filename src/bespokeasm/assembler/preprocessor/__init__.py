@@ -5,6 +5,7 @@ from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.preprocessor.symbol import PreprocessorSymbol
 from bespokeasm.assembler.preprocessor.symbol import SYMBOL_PATTERN
+from bespokeasm.utilities import ExpressionSyntax
 from packaging import version
 
 
@@ -38,7 +39,13 @@ class Preprocessor:
 
         # Add built-in language version symbols if ISA model is provided
         if isa_model is not None:
-            self._default_numeric_base = getattr(isa_model, 'default_numeric_base', 'decimal')
+            # The instruction set's expression syntax (base plus `<`/`>` and `*` settings) when it
+            # has one; a bare base name otherwise.
+            syntax = getattr(isa_model, 'expression_syntax', None)
+            self._default_numeric_base = (
+                syntax if isinstance(syntax, ExpressionSyntax)
+                else getattr(isa_model, 'default_numeric_base', 'decimal')
+            )
             self._add_language_version_symbols(isa_model)
             self._add_flow_counter_availability_symbol(isa_model)
 

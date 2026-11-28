@@ -1,5 +1,5 @@
 COMPILER_DIRECTIVES_SET = {
-    'org', 'memzone', 'align',
+    'org', 'memzone', 'align', 'phase', 'dephase',
 }
 
 BYTECODE_DIRECTIVES_SET = {
@@ -12,12 +12,18 @@ BASE_PREPROCESSOR_DIRECTIVES_SET = {
     'define', 'if', 'elif', 'else', 'endif', 'ifdef', 'ifndef',
     'mute', 'unmute', 'emit',
     'create-scope', 'use-scope', 'deactivate-scope',
-    'annotate', 'verbatim', 'endverbatim',
+    'annotate', 'verbatim', 'endverbatim', 'output-format',
 }
 
 FLOW_PREPROCESSOR_DIRECTIVES_SET = {
     'endtrack', 'entry', 'resume', 'set', 'suspend', 'track',
 }
+
+# The directives an instruction set may give another name with `general.directive_aliases`:
+# data and fill directives only. Porting other directives is `bespokeasm migrate`'s job.
+DIRECTIVE_ALIAS_TARGETS = (
+    'byte', '2byte', '4byte', '8byte', '16byte', 'cstr', 'asciiz', 'fill', 'zero', 'zerountil',
+)
 
 PREPROCESSOR_DIRECTIVES_SET = (
     BASE_PREPROCESSOR_DIRECTIVES_SET
@@ -50,28 +56,16 @@ BUILTIN_CONSTANTS_SET = {
     '__OUTPUT_FORMAT__',
 }
 
-ASSEMBLER_KEYWORD_SET = (
-    COMPILER_DIRECTIVES_SET
-    .union(BYTECODE_DIRECTIVES_SET)
-    .union(PREPROCESSOR_DIRECTIVES_SET)
-    .union(EXPRESSION_FUNCTIONS_SET)
-    .union(BUILTIN_CONSTANTS_SET)
-)
+# The names a label, constant, register or mnemonic can't take. Directives are always written
+# with their `.` or `#`, so a directive's name is not reserved: `entry:` and `error:` are labels.
+# Expression functions such as LSB() and COUNTER() are not reserved either: they are functions
+# only when written as a call, NAME(...).
+ASSEMBLER_KEYWORD_SET = frozenset(BUILTIN_CONSTANTS_SET)
 
 
 def assembler_keywords_for_isa(flow_counters_enabled: bool) -> set[str]:
     """Return names reserved by an ISA with the selected capabilities."""
-    keywords = (
-        COMPILER_DIRECTIVES_SET
-        .union(BYTECODE_DIRECTIVES_SET)
-        .union(BASE_PREPROCESSOR_DIRECTIVES_SET)
-        .union(BASE_EXPRESSION_FUNCTIONS_SET)
-        .union(BUILTIN_CONSTANTS_SET)
-    )
-    if flow_counters_enabled:
-        keywords.update(FLOW_PREPROCESSOR_DIRECTIVES_SET)
-        keywords.update(FLOW_EXPRESSION_FUNCTIONS_SET)
-    return keywords
+    return set(ASSEMBLER_KEYWORD_SET)
 
 
 def preprocessor_directives_for_isa(flow_counters_enabled: bool) -> set[str]:

@@ -58,32 +58,35 @@ class DataLine(LineWithWords):
             default_numeric_base: str = 'decimal',
             *,
             diagnostic_reporter,
+            directive_name: str | None = None,
     ) -> LineWithWords:
         """Tries to match the passed line string to the data directive pattern.
         If succcessful, returns a constructed DataLine object. If not, None is
-        returned.
+        returned. ``directive_name`` is the directive as written, for messages, when the line
+        used an alias (`.word` for `.2byte`).
         """
         data_match = re.search(DataLine.PATTERN_DATA_DIRECTIVE, line_str.strip())
         if data_match is None:
             return None
 
-        directive_str = data_match.group(1).strip()
+        directive_str = data_match.group(1).strip().lower()
+        directive_name = directive_name or data_match.group(1).strip()
         args_str = data_match.group(2).strip()
         if args_str == '':
             return None
 
-        value_items = DataLine._split_data_items(args_str, line_id, diagnostic_reporter, directive_str)
+        value_items = DataLine._split_data_items(args_str, line_id, diagnostic_reporter, directive_name)
         if len(value_items) == 0:
             return None
 
         values_list = []
         if directive_str in ('.cstr', '.asciiz'):
             if len(value_items) != 1:
-                diagnostic_reporter.error(line_id, f'{directive_str} data directive used with non-string value')
+                diagnostic_reporter.error(line_id, f'{directive_name} data directive used with non-string value')
             string_values = DataLine._extract_string_item(
                 value_items[0],
                 line_id,
-                directive_str,
+                directive_name,
                 diagnostic_reporter,
             )
             values_list.extend(string_values)
@@ -94,11 +97,11 @@ class DataLine(LineWithWords):
                     string_values = DataLine._extract_string_item(
                         item,
                         line_id,
-                        directive_str,
+                        directive_name,
                         diagnostic_reporter,
                     )
                     if directive_str != '.byte':
-                        diagnostic_reporter.error(line_id, f'{directive_str} data directive used with string value')
+                        diagnostic_reporter.error(line_id, f'{directive_name} data directive used with string value')
                     values_list.extend(string_values)
                 else:
                     values_list.append(item)
@@ -118,6 +121,7 @@ class DataLine(LineWithWords):
             string_byte_packing_fill,
             default_numeric_base,
             diagnostic_reporter=diagnostic_reporter,
+            directive_name=directive_name,
         )
 
     @staticmethod
@@ -205,6 +209,7 @@ class DataLine(LineWithWords):
             default_numeric_base: str = 'decimal',
             *,
             diagnostic_reporter,
+            directive_name: str | None = None,
     ) -> None:
         super().__init__(
             line_id,
@@ -227,6 +232,7 @@ class DataLine(LineWithWords):
             for item in value_list
         ]
         self._directive = directive_str
+        self._directive_name = directive_name or directive_str
         self._string_byte_packing = string_byte_packing
         self._string_byte_packing_fill = string_byte_packing_fill
 
@@ -297,18 +303,27 @@ class DataLine(LineWithWords):
                 )
             return
         # Default behavior
-        for arg_item in self._arg_value_list:
+        value_size = DataLine.DIRECTIVE_VALUE_BYTE_SIZE[self._directive]
+        value_word_bytes = self._word_size // 8
+        words_per_value = (
+            1 if value_word_bytes == 0 or value_size <= value_word_bytes
+            else math.ceil(value_size / value_word_bytes)
+        )
+        for item_index, arg_item in enumerate(self._arg_value_list):
             if isinstance(arg_item, int):
                 arg_val = arg_item
             elif isinstance(arg_item, ExpressionNode):
+                # `*` in a data value is the address of the value being written, so
+                # `.2byte *, *` writes two different addresses.
+                item_address = None if self.address is None else self.address + item_index * words_per_value
                 arg_val = arg_item.get_value(
                     self.symbol_scope,
                     self.active_named_scopes,
                     self.line_id,
+                    item_address,
                 )
             else:
                 self.diagnostic_reporter.error(self.line_id, f'unknown data item "{arg_item}"')
-            value_size = DataLine.DIRECTIVE_VALUE_BYTE_SIZE[self._directive]
             value_mask = DataLine.DIRECTIVE_VALUE_MASK[self._directive]
             masked_val = arg_val & value_mask
             if (
@@ -317,7 +332,7 @@ class DataLine(LineWithWords):
             ):
                 self.diagnostic_reporter.warn(
                     self.line_id,
-                    f'Data value {arg_val} truncated to {masked_val} for {self._directive}',
+                    f'Data value {arg_val} truncated to {masked_val} for {self._directive_name}',
                 )
             # If value size <= word size, put in its own word, zero-extended
             if value_size <= self._word_size // 8:

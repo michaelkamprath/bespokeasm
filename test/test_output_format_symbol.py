@@ -9,6 +9,7 @@ from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.symbol_scope import SymbolScope
 
 from test import config_files
+from test.isa_configs import json_config_copy
 
 # The Minimal 64x4 copy, whose xmin formats define the XMIN_USER_CODE zone.
 CONFIG = str(pkg_resources.files(config_files).joinpath('xmin', 'slu4-minimal-64x4.yaml'))
@@ -38,7 +39,7 @@ def _assemble(tmp_path, source, pretty_print=True, fmt='listing', explicit=True,
     SymbolScope._global_scope = None
     (tmp_path / 'main.asm').write_text(source)
     assembler = Assembler(
-        str(tmp_path / 'main.asm'), CONFIG, True, str(tmp_path / 'out.bin'), 0, None, 0,
+        str(tmp_path / 'main.asm'), json_config_copy(CONFIG, tmp_path), True, str(tmp_path / 'out.bin'), 0, None, 0,
         pretty_print, fmt, str(tmp_path / 'out.txt'), 0, [], [],
         warnings_as_errors=warnings_as_errors, pretty_print_format_explicit=explicit,
     )

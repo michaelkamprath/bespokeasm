@@ -1,6 +1,8 @@
 import re
 
 from bespokeasm.assembler.analysis import SourceIdentity
+from bespokeasm.assembler.bytecode.assembled import AssembledInstruction
+from bespokeasm.assembler.bytecode.parts import ExpressionByteCodePart
 from bespokeasm.assembler.diagnostic_reporter import AssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineWithWords
@@ -12,6 +14,8 @@ from bespokeasm.assembler.model.decorators import build_mnemonic_alternation
 from bespokeasm.assembler.model.decorators import MNEMONIC_TOKEN_PATTERN
 from bespokeasm.assembler.model.decorators import split_decorated_mnemonic
 from bespokeasm.assembler.model.instruction_parser import InstructioParser
+from bespokeasm.assembler.model.operand.value_selection import selecting_values
+from bespokeasm.assembler.model.operand.value_selection import ValueSelection
 from bespokeasm.assembler.parsing import split_line_comment
 from bespokeasm.assembler.symbol_scope.named_scope_manager import NamedScopeManager
 
@@ -142,17 +146,71 @@ class InstructionLine(LineWithWords):
         self._command = command_str
         self._argument_str = argument_str
         self._isa_model = isa_model
-        source_identity = None
+        self._memzone_manager = memzone_manager
+        self._parse_identity = None
         if isa_model.analysis_records_enabled:
-            source_identity = SourceIdentity.from_line_id(line_id, source_ordinal)
-            self._source_identity = source_identity
-        self._assembled_instruction = InstructioParser.parse_instruction(
-            self._isa_model,
-            line_id,
-            instruction,
-            memzone_manager,
-            source_identity=source_identity,
-        )
+            self._parse_identity = SourceIdentity.from_line_id(line_id, source_ordinal)
+            self._source_identity = self._parse_identity
+        # Values aren't known yet, so `select_by_value` operands don't match and the line takes
+        # another form; `relax` reconsiders it once pass 1 has set symbol values. A line with no
+        # other form takes the value-selected one, and pass 2 checks its value.
+        deferring = ValueSelection.deferring()
+        try:
+            self._assembled_instruction = self._match(deferring)
+        except (AssemblerError, SystemExit):
+            if not deferring.deferred:
+                raise
+            self._assembled_instruction = self._match(ValueSelection.assuming())
+            deferring.deferred = False
+        self._relaxable = deferring.deferred
+
+    def _match(self, selection: ValueSelection) -> AssembledInstruction:
+        with selecting_values(selection):
+            return InstructioParser.parse_instruction(
+                self._isa_model,
+                self.line_id,
+                self.instruction,
+                self._memzone_manager,
+                source_identity=self._parse_identity,
+            )
+
+    @property
+    def relaxable(self) -> bool:
+        """Whether a `select_by_value` form could still replace this line's form."""
+        return self._relaxable
+
+    def relax(self) -> bool:
+        """Re-match the line against the symbol values pass 1 has set. A `select_by_value` form
+        whose value is now in its zone replaces the line's form for good. Returns whether the
+        line's size changed."""
+        if not self._relaxable:
+            return False
+        # The line matched a form before, and known values only add forms, so this matches too.
+        evaluating = ValueSelection.evaluating(self._known_value)
+        assembled = self._match(evaluating)
+        if not evaluating.selected_any(assembled.parts):
+            return False
+        if assembled.word_count > self.word_count:
+            raise AssemblerError(
+                self.line_id,
+                f'the form that select_by_value selects for "{self.instruction.strip()}" is '
+                f'{assembled.word_count} words, longer than the {self.word_count}-word form it would replace; '
+                'a value-selected form must be no longer than the forms listed after it',
+            )
+        size_changed = assembled.word_count != self.word_count
+        self._assembled_instruction = assembled
+        self._relaxable = False
+        return size_changed
+
+    def _known_value(self, part: ExpressionByteCodePart) -> int | None:
+        """The value of an operand's expression with the symbols set so far, or None."""
+        try:
+            value = part.parsed_expression.get_value(
+                self.symbol_scope, self.active_named_scopes, self.line_id, self.address,
+            )
+        except (AssemblerError, ValueError, ArithmeticError):
+            return None
+        return value if isinstance(value, int) else None
 
     def __str__(self):
         return f'InstructionLine<{self.instruction.strip()} -> {self._assembled_instruction}>'
@@ -192,15 +250,16 @@ class InstructionLine(LineWithWords):
     def get_operand_label_addresses(self) -> list[tuple[str, int]]:
         return self._assembled_instruction.get_operand_label_addresses(self.address)
 
-    def register_operand_labels(self, named_scope_manager: NamedScopeManager) -> None:
+    def register_operand_labels(self, named_scope_manager: NamedScopeManager, relocating: bool = False) -> None:
         for label, value in self.get_operand_label_addresses():
             if not named_scope_manager.set_label_value(
                 label,
                 value,
                 self.line_id,
                 self.active_named_scopes,
+                relocating=relocating,
             ):
-                self.symbol_scope.set_label_value(label, value, self.line_id)
+                self.symbol_scope.set_label_value(label, value, self.line_id, relocating=relocating)
 
     def generate_words(self) -> bytearray:
         """Finalize the bytes for this line with the label assignemnts"""

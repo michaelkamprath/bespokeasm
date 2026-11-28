@@ -2,6 +2,7 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.model.instruction_base import InstructionBase
 from bespokeasm.assembler.model.operand.operand_label import contains_operand_label_annotation
 from bespokeasm.assembler.model.operand_parser import OperandParser
+from bespokeasm.assembler.model.operand_parser import share_enclosed_forms
 from bespokeasm.assembler.model.operand_set import OperandSetCollection
 
 
@@ -115,6 +116,7 @@ class InstructionMacro(InstructionBase):
                     default_numeric_base=default_numeric_base,
                 )
             )
+        share_enclosed_forms([variant._operand_parser for variant in self._variants])
 
     @property
     def variants(self) -> list[InstructionMacroVariant]:

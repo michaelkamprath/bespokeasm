@@ -250,10 +250,14 @@ function buildSemanticTokens(document) {
     const searchRanges = getSemanticSearchRanges(text);
     for (const range of searchRanges) {
       const segment = text.slice(range.start, range.end);
-      const regex = /(##LABEL_PATTERN##)/g;
+      // A symbol can't start inside a number or character literal: the E of $600E is not E.
+      const regex = /(?<![\w$%'])(##LABEL_PATTERN##)/g;
       let match;
       while ((match = regex.exec(segment)) !== null) {
         const word = match[1];
+        if (isFunctionCall(segment, word, match.index + word.length)) {
+          continue;
+        }
         const offset = range.start + match.index;
         if (constants.has(word)) {
           if (!(constDef && word === constDef && offset === constDefStart)) {
@@ -316,6 +320,13 @@ function buildMarkdownHover(doc) {
 const COMPILER_DIRECTIVE_RE = /\.(\w+)\b/gi;
 const PREPROCESSOR_DIRECTIVE_RE = /#(\S+)\b/gi;
 const REGISTER_RE = /(?:##REGISTERS##)/gi;
+// The instruction set's expression functions, such as LSB and COUNTER. A name is a function only
+// when written as a call, NAME(...); otherwise it may be a label or constant of the same name.
+const EXPRESSION_FUNCTION_NAMES = new Set('##EXPRESSION_FUNCTION_NAMES##'.toUpperCase().split('|'));
+
+function isFunctionCall(text, word, end) {
+  return EXPRESSION_FUNCTION_NAMES.has(word.toUpperCase()) && /^\s*\(/.test(text.slice(end));
+}
 const CONSTANT_VALUE_RE = /^\s*##CONSTANT_PATTERN##\s*(?:=|\bEQU\b)\s*(.+?)(?:\s*;.*)?$/;
 // Replaced at generation time: the coordinate operator spelling for a
 // flow-counter-enabled ISA, or the empty string when the feature is disabled
@@ -454,7 +465,7 @@ function extractConstantValue(document, token, constantMap) {
 
 function findReferences(document, token) {
   const refs = [];
-  const wordPattern = /(?:##MNEMONIC_PATTERN##|##LABEL_PATTERN##)/gi;
+  const wordPattern = /(?<![\w$%'])(?:##MNEMONIC_PATTERN##|##LABEL_PATTERN##)/gi;
 
   function scanLines(lines, uri) {
     for (let lineIdx = 0; lineIdx < lines.length; lineIdx += 1) {
@@ -468,7 +479,7 @@ function findReferences(document, token) {
         wordPattern.lastIndex = 0;
         let match;
         while ((match = wordPattern.exec(segment)) !== null) {
-          if (match[0] !== token) {
+          if (match[0] !== token || isFunctionCall(segment, token, match.index + token.length)) {
             continue;
           }
           const offset = range.start + match.index;
@@ -601,7 +612,7 @@ function activate(context) {
   const annotationDocs = hoverDocs.annotations || {};
   // Built-in preprocessor symbols such as __OUTPUT_FORMAT__ begin with two underscores, which
   // no label can, so the label pattern alone would read one as _OUTPUT_FORMAT__.
-  const wordPattern = /(?:__[A-Za-z0-9_]+__|##MNEMONIC_PATTERN##|##LABEL_PATTERN##)/i;
+  const wordPattern = /(?<![\w$%'])(?:__[A-Za-z0-9_]+__|##MNEMONIC_PATTERN##|##LABEL_PATTERN##)/i;
   const provider = {
     provideHover(document, position) {
       const hoverSettings = getHoverSettings(document, languageId);
@@ -671,7 +682,7 @@ function activate(context) {
           return new vscode.Hover(buildMarkdownHover(doc), range);
         }
         const exprDoc = exprFuncDocs[key];
-        if (exprDoc) {
+        if (exprDoc && isFunctionCall(lineText, token, range.end.character)) {
           return new vscode.Hover(buildMarkdownHover(exprDoc), range);
         }
       }

@@ -8,6 +8,7 @@ from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object.counter_coordinate_line import CounterCoordinateLine
 from bespokeasm.assembler.line_object.directive_line.factory import DirectiveLine
+from bespokeasm.assembler.line_object.directive_line.factory import resolve_directive_alias
 from bespokeasm.assembler.line_object.emdedded_string import EmbeddedString
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.line_object.label_line import LabelLine
@@ -73,6 +74,8 @@ class LineOjectFactory:
         """Reject flow operators before they can affect layout or selection."""
         if cls._FLOW_EXPRESSION_PATTERN.search(instruction) is None:
             return
+        # An alias such as `.res` for `.fill` follows the rules of the directive it stands for.
+        instruction, _ = resolve_directive_alias(instruction, model.directive_aliases)
         if (
             cls._COORDINATE_EXPRESSION_PATTERN.search(instruction)
             and ':=' not in instruction
@@ -109,8 +112,10 @@ class LineOjectFactory:
 
     _DIRECTIVE_ARGUMENT_HINTS = {
         '.org': 'requires an address, for example ".org 0x100"',
+        '.phase': 'requires the address to assemble for, for example ".phase 0xfc00"',
+        '.dephase': 'takes no arguments',
         '.memzone': 'requires the name of a memory zone, for example ".memzone GLOBAL"',
-        '.fill': 'requires a count and a fill value, for example ".fill 16, 0"',
+        '.fill': 'requires a count and an optional fill value, for example ".fill 16" or ".fill 16, $FF"',
         '.zero': 'requires a count, for example ".zero 16"',
         '.zerountil': 'requires an end address, for example ".zerountil 0x0FFF"',
         '.align': 'takes an optional alignment value, for example ".align 256"',
@@ -171,9 +176,12 @@ class LineOjectFactory:
         if text.startswith('.'):
             name_match = re.match(r'\.\w+', text)
             directive = name_match.group(0).lower() if name_match else first_word
-            if directive in cls._DIRECTIVE_ARGUMENT_HINTS:
-                reporter.error(line_id, f'{directive} directive {cls._DIRECTIVE_ARGUMENT_HINTS[directive]}')
-            known = sorted(f'.{name}' for name in COMPILER_DIRECTIVES_SET | BYTECODE_DIRECTIVES_SET)
+            aliases = model.directive_aliases
+            target = f'.{aliases[directive[1:]]}' if directive[1:] in aliases else directive
+            if target in cls._DIRECTIVE_ARGUMENT_HINTS:
+                hint = cls._DIRECTIVE_ARGUMENT_HINTS[target].replace(f'"{target} ', f'"{directive} ')
+                reporter.error(line_id, f'{directive} directive {hint}')
+            known = sorted(f'.{name}' for name in COMPILER_DIRECTIVES_SET | BYTECODE_DIRECTIVES_SET | set(aliases))
             reporter.error(line_id, f'unknown directive "{directive}"{cls._suggestion(directive, known)}')
 
         constant_match = re.fullmatch(fr'({PATTERN_SYMBOL})\s*(?:=|EQU)', text, flags=re.IGNORECASE)
@@ -286,7 +294,7 @@ class LineOjectFactory:
                     symbol_scope,
                     active_named_scopes,
                     current_memzone,
-                    default_numeric_base=model.default_numeric_base,
+                    default_numeric_base=model.expression_syntax,
                 )
                 if line_obj is not None:
                     if label_seen:

@@ -37,18 +37,54 @@ def split_operands(operand_str: str | None) -> list[str]:
         return []
     if operand_str.strip() == '':
         return []
-
     parts: list[str] = []
-    current: list[str] = []
+    start = 0
+    for index in top_level_indexes(operand_str, ','):
+        parts.append(operand_str[start:index].strip())
+        start = index + 1
+    parts.append(operand_str[start:].strip())
+    return parts
+
+
+def top_level_indexes(text: str, character: str) -> list[int]:
+    """The positions of ``character`` in ``text`` outside quotes and outside any `( )`, `[ ]`
+    or `{ }` group: in `$10 + [a+6]` only the first `+` is top level."""
+    indexes: list[int] = []
     in_quote: str | None = None
     escaped = False
-    paren_depth = 0
-    bracket_depth = 0
-    brace_depth = 0
-
-    for character in operand_str:
+    depth = {'(': 0, '[': 0, '{': 0}
+    closers = {')': '(', ']': '[', '}': '{'}
+    for index, current in enumerate(text):
         if in_quote is not None:
-            current.append(character)
+            if escaped:
+                escaped = False
+            elif current == '\\':
+                escaped = True
+            elif current == in_quote:
+                in_quote = None
+            continue
+        if current in ("'", '"'):
+            in_quote = current
+        elif current in depth:
+            depth[current] += 1
+        elif current in closers and depth[closers[current]] > 0:
+            depth[closers[current]] -= 1
+        elif current == character and not any(depth.values()):
+            indexes.append(index)
+    return indexes
+
+
+def encloses_whole(text: str, opener: str, closer: str) -> bool:
+    """Whether ``text`` starts with ``opener`` and the ``closer`` matching it is the last
+    character: true for `(vec)` and `((a+1)*2)`, false for `(a)+(b)`, `(a+1)*2` and `(a`.
+    Quoted characters, as in `(')')`, don't count."""
+    if len(text) < 2 or text[0] != opener or text[-1] != closer:
+        return False
+    depth = 0
+    in_quote: str | None = None
+    escaped = False
+    for index, character in enumerate(text):
+        if in_quote is not None:
             if escaped:
                 escaped = False
             elif character == '\\':
@@ -56,31 +92,23 @@ def split_operands(operand_str: str | None) -> list[str]:
             elif character == in_quote:
                 in_quote = None
             continue
-
         if character in ("'", '"'):
             in_quote = character
-            current.append(character)
-            continue
+        elif character == opener:
+            depth += 1
+        elif character == closer:
+            depth -= 1
+            if depth == 0:
+                return index == len(text) - 1
+    return False
 
-        if character == '(':
-            paren_depth += 1
-        elif character == ')' and paren_depth > 0:
-            paren_depth -= 1
-        elif character == '[':
-            bracket_depth += 1
-        elif character == ']' and bracket_depth > 0:
-            bracket_depth -= 1
-        elif character == '{':
-            brace_depth += 1
-        elif character == '}' and brace_depth > 0:
-            brace_depth -= 1
 
-        if character == ',' and paren_depth == 0 and bracket_depth == 0 and brace_depth == 0:
-            parts.append(''.join(current).strip())
-            current = []
-            continue
-
-        current.append(character)
-
-    parts.append(''.join(current).strip())
-    return parts
+def enclosure_depth(text: str, opener: str, closer: str) -> int:
+    """How many pairs of ``opener`` and ``closer`` wrap the whole of ``text``: 2 for `((vec))`,
+    1 for `((vec)+1)`, 0 for `vec` or `(a)+(b)`."""
+    depth = 0
+    text = text.strip()
+    while encloses_whole(text, opener, closer):
+        depth += 1
+        text = text[1:-1].strip()
+    return depth

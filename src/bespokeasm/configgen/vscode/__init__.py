@@ -1,3 +1,4 @@
+import copy
 import importlib.resources as pkg_resources
 import json
 import os
@@ -13,6 +14,9 @@ from bespokeasm.assembler.keywords import preprocessor_directives_for_isa
 from bespokeasm.configgen import LanguageConfigGenerator
 from bespokeasm.configgen.color_scheme import DEFAULT_COLOR_SCHEME
 from bespokeasm.configgen.color_scheme import SyntaxElement
+from bespokeasm.configgen.expression_scopes import CURRENT_ADDRESS_SCOPE
+from bespokeasm.configgen.expression_scopes import IMMEDIATE_PREFIX_SCOPE
+from bespokeasm.configgen.expression_scopes import LOW_HIGH_OPERATOR_SCOPE
 from bespokeasm.configgen.hover_docs import build_hover_docs
 
 
@@ -41,6 +45,7 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.HEX_NUMBER, 'constant.numeric.integer.hexadecimal', 'Numbers - Hex'),
             (SyntaxElement.BINARY_NUMBER, 'constant.numeric.integer.binary', 'Numbers - Binary'),
             (SyntaxElement.DECIMAL_NUMBER, 'constant.numeric.integer.decimal', 'Numbers - Decimal'),
+            (SyntaxElement.OCTAL_NUMBER, 'constant.numeric.integer.octal', 'Numbers - Octal'),
             (SyntaxElement.CHARACTER_NUMBER, 'constant.numeric.character', 'Numbers - Character'),
             (SyntaxElement.LABEL_DEFINITION, 'variable.other.label.definition', 'Label Definitions'),
             (SyntaxElement.LABEL_USAGE, 'variable.other.label.usage', 'Label Usages'),
@@ -66,8 +71,12 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.COMMENT, 'comment.line', 'Comments'),
             (SyntaxElement.PARAMETER, 'variable.parameter', 'Parameters'),
             (SyntaxElement.ANNOTATION_NAMESPACE, 'entity.name.namespace.annotation', 'Annotation Namespaces'),
+            (SyntaxElement.MEMORY_ZONE, 'entity.name.section.memory-zone', 'Memory Zones'),
             (SyntaxElement.ANNOTATION_ARGUMENT, 'variable.parameter.annotation', 'Annotation Arguments'),
             (SyntaxElement.ANNOTATION_VALUE, 'constant.other.annotation.value', 'Annotation Values'),
+            (SyntaxElement.OUTPUT_FORMAT_NAME, 'entity.name.output-format', 'Output Format Names'),
+            (SyntaxElement.OUTPUT_FORMAT_OPTION, 'variable.parameter.output-format', 'Output Format Options'),
+            (SyntaxElement.OUTPUT_FORMAT_VALUE, 'constant.other.output-format.value', 'Output Format Values'),
             (SyntaxElement.INSTRUCTION, 'variable.function.instruction', 'Functions - Instruction'),
             (SyntaxElement.MACRO, 'variable.function.macro', 'Functions - Macro'),
             (SyntaxElement.REGISTER, 'variable.language', 'Variables - Language'),
@@ -104,6 +113,9 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             (SyntaxElement.PREPROCESSOR, 'keyword.control.preprocessor', 'Keyword - Preprocessor'),
             (SyntaxElement.DATA_TYPE, 'storage.type', 'Data Types'),
             (SyntaxElement.OPERATOR, 'keyword.operator', 'Keyword - Operators'),
+            (SyntaxElement.LOW_HIGH_OPERATOR, LOW_HIGH_OPERATOR_SCOPE, 'Keyword - Low and High Operators'),
+            (SyntaxElement.CURRENT_ADDRESS, CURRENT_ADDRESS_SCOPE, 'Current Address'),
+            (SyntaxElement.IMMEDIATE_PREFIX, IMMEDIATE_PREFIX_SCOPE, 'Keyword - Immediate Prefix'),
             (
                 SyntaxElement.FLOW_OPERATOR,
                 'keyword.operator.flow',
@@ -199,6 +211,24 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             'tokenColors': token_colors
         }
 
+    def _add_enclosed_addressing(self, repository: dict) -> None:
+        """Color operands written in parentheses or braces like those in brackets, where the
+        instruction set has them. The rules go ahead of `#expressions` in operands, which would
+        otherwise read parentheses as grouping."""
+        includes = []
+        for enclosure, depth, begin, end in self._enclosed_addressing_patterns():
+            bracket_rule = 'deferred-addressing' if depth == 2 else 'indirect-addressing'
+            rule = copy.deepcopy(repository[bracket_rule])
+            rule['begin'] = begin
+            rule['end'] = end
+            repository[f'{bracket_rule}-{enclosure}'] = rule
+            includes.append({'include': f'#{bracket_rule}-{enclosure}'})
+        for context in ('instructions', 'macros'):
+            if includes and context in repository:
+                patterns = repository[context]['patterns']
+                position = patterns.index({'include': '#expressions'})
+                patterns[position:position] = copy.deepcopy(includes)
+
     @staticmethod
     def _verbatim_block_rule(namespace: str, parts: tuple[str, ...] = ()) -> dict:
         """A `#verbatim <namespace> [<part>]` ... `#endverbatim` block: the directives as
@@ -248,6 +278,12 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
         package_json['contributes']['grammars'][0]['language'] = self.language_id
         package_json['contributes']['grammars'][0]['scopeName'] = scope_name
         package_json['contributes']['snippets'][0]['language'] = self.language_id
+        # VS Code shows a color swatch and picker for anything that looks like a CSS color, such as
+        # `#160` where `#` marks an immediate value. Turn that off for languages that use the prefix.
+        if self.model.uses_immediate_prefix:
+            package_json['contributes']['configurationDefaults'] = {
+                f'[{self.language_id}]': {'editor.colorDecorators': False},
+            }
         package_json['activationEvents'] = [f'onLanguage:{self.language_id}']
         package_json['main'] = './extension.js'
         if 'semanticTokenScopes' in package_json['contributes']:
@@ -316,7 +352,7 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             preprocessor['patterns'] = [
                 pattern
                 for pattern in preprocessor['patterns']
-                if pattern.get('include') != '#flow_counter_directives'
+                if pattern.get('include') not in {'#flow_counter_directives', '#flow_counter_usages'}
             ]
         # handle instructions
         grammar_json['repository']['instructions']['begin'] = self._replace_token_with_regex_list(
@@ -360,6 +396,7 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
         else:
             # remove the registers syntax
             del grammar_json['repository']['registers']
+        self._add_enclosed_addressing(grammar_json['repository'])
 
         # handled predefined labels and built-in constants
         from bespokeasm.assembler.keywords import BUILTIN_CONSTANTS_SET
@@ -380,15 +417,17 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
 
         # handle bespokeasm directives
         for item in grammar_json['repository']['directives']['patterns']:
-            if 'meta.directive' == item['name']:
+            if 'meta.directive' == item.get('name'):
                 directives_regex = '|'.join(['\\.'+d for d in COMPILER_DIRECTIVES_SET])
                 directives_str = item['begin']
                 item['begin'] = directives_str.replace('##DIRECTIVES##', directives_regex)
-            elif 'storage.type' == item['name']:
-                datatypes_regex = '|'.join(['\\.'+d for d in BYTECODE_DIRECTIVES_SET])
+            elif 'storage.type' == item.get('name'):
+                datatypes_regex = '|'.join(
+                    ['\\.'+d for d in sorted(BYTECODE_DIRECTIVES_SET | set(self.model.directive_aliases))]
+                )
                 datatypes_str = item['match']
                 item['match'] = datatypes_str.replace('##DATATYPES##', datatypes_regex)
-            elif 'meta.preprocessor' == item['name']:
+            elif 'meta.preprocessor' == item.get('name'):
                 for pattern in item['patterns']:
                     if 'name' in pattern and 'keyword.control.preprocessor' == pattern['name']:
                         # Sort by length (desc) to avoid prefix matches like 'if' matching 'ifdef'
@@ -418,6 +457,13 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
                 ],
             }
             grammar_json['repository']['main']['patterns'].insert(0, {'include': '#verbatim_blocks'})
+
+        # `*` as the current address and `<`/`>` as the low and high operators, where the
+        # instruction set turns them on. They go first so they win over multiply and comparison.
+        grammar_json['repository']['operators']['patterns'][:0] = [
+            {'match': pattern, 'name': scope}
+            for pattern, scope in self._expression_operator_rules()
+        ]
 
         # handle expresion functions
         for item in grammar_json['repository']['operators']['patterns']:
@@ -486,6 +532,10 @@ class VSCodeConfigGenerator(LanguageConfigGenerator):
             self._constant_pattern(),
         )
         self._replace_token_in_file(extension_fp, '##MNEMONIC_PATTERN##', mnemonic_pattern)
+        self._replace_token_in_file(
+            extension_fp, '##EXPRESSION_FUNCTION_NAMES##',
+            '|'.join(sorted(expression_functions_for_isa(self.model.flow_counters_enabled))),
+        )
         self._replace_token_in_file(extension_fp, '##REGISTERS##', register_pattern)
         self._replace_token_in_file(label_hover_fp, '##LABEL_PATTERN##', label_pattern)
         self._replace_token_in_file(constants_hover_fp, '##LABEL_PATTERN##', label_pattern)

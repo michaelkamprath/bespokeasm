@@ -2,6 +2,12 @@ import re
 
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.configgen.expression_scopes import CURRENT_ADDRESS_PATTERN
+from bespokeasm.configgen.expression_scopes import CURRENT_ADDRESS_SCOPE
+from bespokeasm.configgen.expression_scopes import IMMEDIATE_PREFIX_PATTERN
+from bespokeasm.configgen.expression_scopes import IMMEDIATE_PREFIX_SCOPE
+from bespokeasm.configgen.expression_scopes import LOW_HIGH_OPERATOR_PATTERN
+from bespokeasm.configgen.expression_scopes import LOW_HIGH_OPERATOR_SCOPE
 from bespokeasm.utilities import PATTERN_CONSTANT_SYMBOL
 from bespokeasm.utilities import PATTERN_FILE_SYMBOL
 from bespokeasm.utilities import PATTERN_GLOBAL_SYMBOL
@@ -103,6 +109,45 @@ class LanguageConfigGenerator:
     def _local_symbol_pattern(self) -> str:
         """Return the canonical pattern for a local symbol."""
         return PATTERN_LOCAL_SYMBOL
+
+    def _expression_operator_rules(self) -> list[tuple[str, str]]:
+        """(regex, scope) rules for `*` as the current address, `<`/`>` as the low and high
+        operators and `#` as the immediate prefix, for the features this instruction set uses."""
+        syntax = self.model.expression_syntax
+        rules = []
+        if syntax.current_address is not None:
+            rules.append((CURRENT_ADDRESS_PATTERN, CURRENT_ADDRESS_SCOPE))
+        if syntax.low_high_operators is not None:
+            rules.append((LOW_HIGH_OPERATOR_PATTERN, LOW_HIGH_OPERATOR_SCOPE))
+        if self.model.uses_immediate_prefix:
+            rules.append((IMMEDIATE_PREFIX_PATTERN, IMMEDIATE_PREFIX_SCOPE))
+        return rules
+
+    def _enclosed_addressing_patterns(self) -> list[tuple[str, int, str, str]]:
+        """(enclosure, depth, begin, end) regexes for operands written in parentheses or braces,
+        deepest first, for the forms this instruction set configures. Brackets have rules of
+        their own in every grammar.
+
+        Braces never appear in an expression, so any `{` in an operand opens one. Parentheses
+        also group, and a grammar can't tell `(vec)` from grouping the way the assembler does,
+        per instruction, so it colors a parenthesized group as addressing when the group is a
+        whole operand: it follows whitespace or a comma and is followed by a comma, a comment or
+        the end of the line. `($10+1)*2` stays grouping. One level of inner parentheses is
+        recognized."""
+        body = r'(?:[^();\n]|\([^();\n]*\))*'
+        forms = sorted(
+            (form for form in self.model.enclosed_operand_forms if form[0] in ('parentheses', 'braces')),
+            key=lambda form: (-form[1], form[0]),
+        )
+        patterns = []
+        for enclosure, depth in forms:
+            if enclosure == 'parentheses':
+                opens, closes = r'\(' * depth, r'\)' * depth
+                begin = fr'(?<![^\s,]){opens}(?={body}{closes}\s*(?:[,;]|$))'
+                patterns.append((enclosure, depth, begin, closes))
+            else:
+                patterns.append((enclosure, depth, r'\{' * depth, r'\}' * depth))
+        return patterns
 
     def _replace_symbol_pattern_tokens(self, value):
         """Replace canonical symbol-pattern placeholders recursively."""

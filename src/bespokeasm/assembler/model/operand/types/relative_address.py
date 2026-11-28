@@ -14,6 +14,10 @@ from bespokeasm.assembler.model.operand.operand_label import parse_operand_label
 from bespokeasm.assembler.symbol_scope import SymbolScope
 from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.expression import EXPRESSION_PARTS_PATTERN
+from bespokeasm.utilities import DEFAULT_ENCLOSURE
+from bespokeasm.utilities import ExpressionSyntax
+from bespokeasm.utilities import operand_config_enclosure
+from bespokeasm.utilities import operand_config_offset_base
 from bespokeasm.utilities import PATTERN_SYMBOL
 
 
@@ -29,9 +33,10 @@ class RelativeAddressByteCodePart(ExpressionByteCodePartInMemoryZone):
                 min_relative_value: int,
                 max_relative_value: int,
                 memzone: MemoryZone,
-                offset_from_instruction_end: bool,
+                offset_base: str,
                 word_size: int,
                 word_segment_size: int,
+                default_numeric_base: str | ExpressionSyntax = 'decimal',
             ) -> None:
         super().__init__(
             memzone,
@@ -43,10 +48,17 @@ class RelativeAddressByteCodePart(ExpressionByteCodePartInMemoryZone):
             line_id,
             word_size,
             word_segment_size,
+            default_numeric_base,
         )
         self._min_relative_value = min_relative_value
         self._max_relative_value = max_relative_value
-        self._offset_from_instruction_end = offset_from_instruction_end
+        self._offset_base = offset_base
+        # In a macro, the words from the macro line's address to this part's own instruction, and
+        # that instruction's size. None outside macros, where the line is the instruction.
+        self._instruction_frame: tuple[int, int] | None = None
+
+    def place_in_instruction(self, word_offset: int, instruction_size: int) -> None:
+        self._instruction_frame = (word_offset, instruction_size)
 
     def get_value(
         self,
@@ -65,10 +77,16 @@ class RelativeAddressByteCodePart(ExpressionByteCodePartInMemoryZone):
             instruction_size,
             bytecode_address,
         )
+        # The offset is measured from this part's own instruction, even in a macro, where
+        # `instruction_address` is the macro line's address and `*` keeps meaning it.
+        if self._instruction_frame is not None:
+            word_offset, instruction_size = self._instruction_frame
+            instruction_address += word_offset
+        if self._offset_base == 'last_word':
+            instruction_address += instruction_size - 1
+        elif self._offset_base == 'next_instruction':
+            instruction_address += instruction_size
         relative_value = expression_value - instruction_address
-        if self._offset_from_instruction_end:
-            # minus one to account for the current address being 1 byte of instruction size
-            relative_value -= instruction_size - 1
         if self._max_relative_value is not None and relative_value > self._max_relative_value:
             raise AssemblerError(
                 self.line_id,
@@ -122,14 +140,21 @@ class RelativeAddressOperand(OperandWithArgument):
             fr'(?:{EXPRESSION_PARTS_PATTERN}|\s)+'
             r')'
         )
-        if self.uses_curly_braces:
-            return fr'\{{\s*{base_match_str}\s*\}}'
+        if self.enclosure_depth:
+            opener, closer = (re.escape(delimiter) for delimiter in self.enclosure_delimiters)
+            return fr'{opener}\s*{base_match_str}\s*{closer}'
         else:
             return base_match_str
 
     @property
-    def uses_curly_braces(self) -> bool:
-        return self.config.get('use_curly_braces', False)
+    def enclosure(self) -> str:
+        """What the operand is written in, if anything. The legacy `use_curly_braces: true`
+        means braces; see `operand_config_enclosure`."""
+        return (operand_config_enclosure(self.config) or (DEFAULT_ENCLOSURE, 0))[0]
+
+    @property
+    def enclosure_depth(self) -> int:
+        return 0 if operand_config_enclosure(self.config) is None else 1
 
     @property
     def max_offset(self) -> int:
@@ -140,8 +165,8 @@ class RelativeAddressOperand(OperandWithArgument):
         return self.config['argument'].get('min', None)
 
     @property
-    def offset_from_instruction_end(self) -> bool:
-        return self.config.get('offset_from_instruction_end', False)
+    def offset_base(self) -> str:
+        return operand_config_offset_base(self.config)
 
     def parse_operand(
         self,
@@ -150,6 +175,8 @@ class RelativeAddressOperand(OperandWithArgument):
         register_labels: set[str],
         memzone_manager: MemoryZoneManager,
     ) -> ParsedOperand:
+        # An enclosure that doesn't wrap the whole operand, as in `(a)+(b)`, leaves unbalanced
+        # text such as `a)+(b`, which is not an expression.
         match = re.match(fr'^{self.match_pattern}$', operand.strip())
         if match is None:
             return None
@@ -187,9 +214,10 @@ class RelativeAddressOperand(OperandWithArgument):
                 self.min_offset,
                 self.max_offset,
                 memzone_manager.global_zone,
-                self.offset_from_instruction_end,
+                self.offset_base,
                 self._word_size,
                 self._word_segment_size,
+                self.default_numeric_base,
             )
         except SyntaxError:
             return None

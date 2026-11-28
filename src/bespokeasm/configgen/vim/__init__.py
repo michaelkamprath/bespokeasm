@@ -9,6 +9,9 @@ from bespokeasm.assembler.keywords import preprocessor_directives_for_isa
 from bespokeasm.configgen import LanguageConfigGenerator
 from bespokeasm.configgen.color_scheme import DEFAULT_COLOR_SCHEME
 from bespokeasm.configgen.color_scheme import SyntaxElement
+from bespokeasm.configgen.expression_scopes import VIM_CURRENT_ADDRESS_PATTERN
+from bespokeasm.configgen.expression_scopes import VIM_IMMEDIATE_PREFIX_PATTERN
+from bespokeasm.configgen.expression_scopes import VIM_LOW_HIGH_OPERATOR_PATTERN
 from bespokeasm.configgen.hover_docs import build_hover_docs
 
 
@@ -115,6 +118,7 @@ class VimConfigGenerator(LanguageConfigGenerator):
             (f'{lang_group}HexNumber', SyntaxElement.HEX_NUMBER),
             (f'{lang_group}BinNumber', SyntaxElement.BINARY_NUMBER),
             (f'{lang_group}DecNumber', SyntaxElement.DECIMAL_NUMBER),
+            (f'{lang_group}OctNumber', SyntaxElement.OCTAL_NUMBER),
             (f'{lang_group}CharNumber', SyntaxElement.CHARACTER_NUMBER),
             (f'{lang_group}LabelName', SyntaxElement.LABEL_NAME),
             (f'{lang_group}LabelUsage', SyntaxElement.LABEL_USAGE),
@@ -129,9 +133,16 @@ class VimConfigGenerator(LanguageConfigGenerator):
             (f'{lang_group}Verbatim', SyntaxElement.VERBATIM_TEXT),
             (f'{lang_group}Param', SyntaxElement.PARAMETER),
             (f'{lang_group}AnnotationNamespace', SyntaxElement.ANNOTATION_NAMESPACE),
+            (f'{lang_group}MemoryZone', SyntaxElement.MEMORY_ZONE),
+            (f'{lang_group}MemoryZoneName', SyntaxElement.MEMORY_ZONE),
+            (f'{lang_group}MemoryZoneQuoted', SyntaxElement.MEMORY_ZONE),
             (f'{lang_group}AnnotationArgument', SyntaxElement.ANNOTATION_ARGUMENT),
             (f'{lang_group}AnnotationPunct', SyntaxElement.PUNCTUATION_SEPARATOR),
             (f'{lang_group}AnnotationValue', SyntaxElement.ANNOTATION_VALUE),
+            (f'{lang_group}OutputFormatName', SyntaxElement.OUTPUT_FORMAT_NAME),
+            (f'{lang_group}OutputFormatOption', SyntaxElement.OUTPUT_FORMAT_OPTION),
+            (f'{lang_group}OutputFormatValue', SyntaxElement.OUTPUT_FORMAT_VALUE),
+            (f'{lang_group}OutputFormatPunct', SyntaxElement.PUNCTUATION_SEPARATOR),
             (f'{lang_group}Separator', SyntaxElement.PUNCTUATION_SEPARATOR),
             (f'{lang_group}Continuation', SyntaxElement.PUNCTUATION_SEPARATOR),
             (f'{lang_group}Instruction', SyntaxElement.INSTRUCTION),
@@ -152,6 +163,9 @@ class VimConfigGenerator(LanguageConfigGenerator):
             (f'{lang_group}PreProcPunc', SyntaxElement.PUNCTUATION_PREPROCESSOR),
             (f'{lang_group}DataType', SyntaxElement.DATA_TYPE),
             (f'{lang_group}Operator', SyntaxElement.OPERATOR),
+            (f'{lang_group}LowHighOperator', SyntaxElement.LOW_HIGH_OPERATOR),
+            (f'{lang_group}CurrentAddress', SyntaxElement.CURRENT_ADDRESS),
+            (f'{lang_group}ImmediatePrefix', SyntaxElement.IMMEDIATE_PREFIX),
             (f'{lang_group}AssignOp', SyntaxElement.OPERATOR),
             (f'{lang_group}Directive', SyntaxElement.DIRECTIVE),
         ]
@@ -269,7 +283,7 @@ ctermbg=NONE gui=bold cterm=bold')
 
         # Directives and datatypes prefixed with '.'
         compiler_directives = ['.' + d for d in COMPILER_DIRECTIVES_SET]
-        data_types = ['.' + d for d in BYTECODE_DIRECTIVES_SET]
+        data_types = ['.' + d for d in sorted(BYTECODE_DIRECTIVES_SET | set(self.model.directive_aliases))]
 
         # Preprocessor directives (sorted by length desc to avoid prefix shadowing)
         preproc_directives = sorted(
@@ -312,28 +326,41 @@ ctermbg=NONE gui=bold cterm=bold')
             f'{lang_group}HexNumber',
             f'{lang_group}BinNumber',
             f'{lang_group}DecNumber',
+            f'{lang_group}OctNumber',
             f'{lang_group}CharNumber',
             f'{lang_group}CompilerLabel',
             f'{lang_group}OperandLabelAt',
             f'{lang_group}OperandLabelName',
             f'{lang_group}Operator',
+            f'{lang_group}LowHighOperator',
+            f'{lang_group}CurrentAddress',
             f'{lang_group}DoubleBracketExpr',
             f'{lang_group}BracketExpr',
             f'{lang_group}ParenExpr',
             f'{lang_group}Param',
             f'{lang_group}LabelUsage',
         ] + flow_contains)
-        operand_contains = ','.join([
+        # Operands in parentheses or braces, colored like brackets.
+        enclosed_forms = [(enclosure, depth) for enclosure, depth, _, _ in self._enclosed_addressing_patterns()]
+
+        def enclosed_group(enclosure: str, depth: int) -> str:
+            return f'{"Double" if depth == 2 else ""}{"Paren" if enclosure == "parentheses" else "Brace"}AddressExpr'
+
+        operand_contains = ','.join([f'{lang_group}{enclosed_group(*form)}' for form in enclosed_forms] + [
             f'{lang_group}String',
             f'{lang_group}Register',
             f'{lang_group}HexNumber',
             f'{lang_group}BinNumber',
             f'{lang_group}DecNumber',
+            f'{lang_group}OctNumber',
             f'{lang_group}CharNumber',
             f'{lang_group}CompilerLabel',
             f'{lang_group}OperandLabelAt',
             f'{lang_group}OperandLabelName',
             f'{lang_group}Operator',
+            f'{lang_group}LowHighOperator',
+            f'{lang_group}ImmediatePrefix',
+            f'{lang_group}CurrentAddress',
             f'{lang_group}Separator',
             f'{lang_group}DoubleBracketExpr',
             f'{lang_group}BracketExpr',
@@ -346,9 +373,12 @@ ctermbg=NONE gui=bold cterm=bold')
             f'{lang_group}HexNumber',
             f'{lang_group}BinNumber',
             f'{lang_group}DecNumber',
+            f'{lang_group}OctNumber',
             f'{lang_group}CharNumber',
             f'{lang_group}CompilerLabel',
             f'{lang_group}Operator',
+            f'{lang_group}LowHighOperator',
+            f'{lang_group}CurrentAddress',
             f'{lang_group}DoubleBracketExpr',
             f'{lang_group}BracketExpr',
             f'{lang_group}ParenExpr',
@@ -384,14 +414,21 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         lines.append(fr'syn match {lang_group}HexNumber /\<0x\x\+\>/')
         lines.append(fr'syn match {lang_group}HexNumber /\<[0-9A-Fa-f]\+H\>/')
         lines.append(fr'syn match {lang_group}BinNumber /\%\(b\|%\)[01]\+\>/')
+        lines.append(fr'syn match {lang_group}BinNumber /\<[01]\+[bB]\>/')
+        lines.append(fr'syn match {lang_group}OctNumber /\<\%\(0o[0-7]\+\|[0-7]\+[qQoO]\)\>/')
         lines.append(fr'syn match {lang_group}DecNumber /\<\d\+\>/')
-        lines.append(f"syn match {lang_group}CharNumber /'.'/")
+        lines.append(f"syn match {lang_group}CharNumber /'\\%(\\\\.\\|[^'\\\\]\\)'/")
         # Labels
         lines.append(
             fr'syn match {lang_group}LabelName '
             fr'/^\s*{symbol_pattern}\s*\ze:/ contained'
         )
         lines.append(fr'syn match {lang_group}LabelColon /:/ contained')
+        # A label after an origin or zone directive's argument: `.org $10 name:`.
+        lines.append(
+            fr'syn match {lang_group}DirectiveLabelName '
+            fr'/\%(\s\)\@<={symbol_pattern}\ze\s*:\%(=\)\@!/ contained'
+        )
         lines.append(
             fr'syn match {lang_group}LabelName '
             fr'/^\s*{symbol_pattern}\s*:/ '
@@ -454,7 +491,9 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
                 fr'matchgroup={lang_group}Directive '
                 fr'start=/\s*\.{self._vim_escape(w)}\>/ '
                 fr'end=/\s*\ze;\|$/ oneline '
-                fr'contains={directive_contains}'
+                # Only compiler directives name memory zones: `.memzone RAM`, `.org $10 "RAM"`.
+                fr'contains={directive_contains},{lang_group}MemoryZoneName,{lang_group}MemoryZoneQuoted,'
+                fr'{lang_group}DirectiveLabelName,{lang_group}LabelColon'
             )
         # A trailing \ continues a data directive or an embedded string on the next line. The
         # match is top level, for the continuation lines, and in the data directive region; an
@@ -477,14 +516,24 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
                 lines.append(fr'syn match {lang_group}PreProc /\<' + self._vim_escape(w) + r'\>/ contained')
         # Expression functions
         if expr_funcs_alt:
-            lines.append(fr'syn match {lang_group}Operator /\<' + expr_funcs_alt + r'\>/')
+            lines.append(fr'syn match {lang_group}Operator /\<' + expr_funcs_alt + r'\>\ze\s*(/')
         # Operators
         lines.append(
             rf'syn match {lang_group}Operator '
-            r'/==\|!=\|>=\|<=\|>>\|<<\|>\|<\|[+\-*/&|^]/'
+            r'/==\|!=\|>=\|<=\|>>\|<<\|>\|<\|[+\-*/&|^~]/'
         )
+        # `*` as the current address and `<`/`>` as the low and high operators, where the
+        # instruction set turns them on; defined after Operator so they win where both match.
+        syntax = self.model.expression_syntax
+        if syntax.current_address is not None:
+            lines.append(f'syn match {lang_group}CurrentAddress /{VIM_CURRENT_ADDRESS_PATTERN}/')
+        if syntax.low_high_operators is not None:
+            lines.append(f'syn match {lang_group}LowHighOperator /{VIM_LOW_HIGH_OPERATOR_PATTERN}/')
+        if self.model.uses_immediate_prefix:
+            lines.append(f'syn match {lang_group}ImmediatePrefix /{VIM_IMMEDIATE_PREFIX_PATTERN}/')
         lines.append(
-            f'syn keyword {lang_group}FlowOperator COORDINATE COUNTER'
+            # Function names are functions only as calls, so a symbol may share the name.
+            fr'syn match {lang_group}FlowOperator /\<\%(COORDINATE\|COUNTER\)\>\ze\s*(/'
         )
         # Registers
         if registers_kw:
@@ -529,6 +578,24 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
             fr'start=/(/ end=/)/ oneline '
             fr'contains={bracket_contains}'
         )
+        # Defined after ParenExpr so they win there, the deeper form last so `((vec))` is deferred.
+        # A parenthesized group counts when it is a whole operand: after whitespace or a comma,
+        # and followed by a comma, a comment or the end of the line. Braces never group.
+        paren_body = r'\%(\%([^();]\|([^();]*)\)*'
+        for enclosure, depth in sorted(enclosed_forms, key=lambda form: form[1]):
+            bracket_group = 'DoubleBracket' if depth == 2 else 'Bracket'
+            if enclosure == 'parentheses':
+                start = fr'\%([^[:space:],]\)\@1<!{"(" * depth}{paren_body}{")" * depth}\s*\%([,;]\|$\)\)\@='
+                end = ')' * depth
+            else:
+                start, end = '{' * depth, '}' * depth
+            lines.append(
+                fr'syn region {lang_group}{enclosed_group(enclosure, depth)} '
+                fr'matchgroup={lang_group}{bracket_group} '
+                fr'start=/{start}/ '
+                fr'end=/{end}/ oneline contained '
+                fr'contains={bracket_contains}'
+            )
 
         # #annotate: the namespace, argument names, '=' and word values, up to any comment.
         # Defined after the instruction, macro and label rules so these win a same-position tie
@@ -543,6 +610,22 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
             fr'/\%(^\s*#annotate\>[^;]*\)\@<=\<{self._alternation(arguments)}\>/'
         )
         lines.append(fr'syn match {lang_group}AnnotationPunct /\%(^\s*#annotate\>[^;]*\)\@<==/')
+        # #output-format <format> <option>=<value> ...: the format's name, then its options and values.
+        lines.append(fr'syn match {lang_group}OutputFormatName /\%(^\s*#output-format\s\+\)\@<=\h\w*/')
+        lines.append(
+            fr'syn match {lang_group}OutputFormatOption '
+            fr'/\%(^\s*#output-format\s\+\h\w*\s[^;]*\)\@<=\%(=\)\@<!\<\h\w*\>/'
+        )
+        lines.append(fr'syn match {lang_group}OutputFormatPunct /\%(^\s*#output-format\>[^;]*\)\@<==/')
+        lines.append(fr'syn match {lang_group}OutputFormatValue /\%(^\s*#output-format\>[^;]*=\)\@<=\w\+/')
+        # A memory zone's name where a line defines or selects it, or `.org` counts from it.
+        # Defined after the label and string rules so these win where both match.
+        lines.append(fr'syn match {lang_group}MemoryZone /\%(^\s*#create_memzone\s\+\)\@<=\h\w*/')
+        lines.append(fr'syn match {lang_group}MemoryZoneName /\%(\.memzone\s\+\)\@<=\h\w*/ contained')
+        lines.append(
+            fr'syn region {lang_group}MemoryZoneQuoted matchgroup={lang_group}StringPunc '
+            r'start=/"\ze\h\w*"/ end=/"/ oneline contained'
+        )
         lines.append(
             fr'syn match {lang_group}AnnotationValue '
             r'/\%(^\s*#annotate\>[^;]*=\s*\)\@<=\h\w*\>/'
@@ -611,8 +694,12 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         lines.append(f'hi def link {lang_group}HexNumber Number')
         lines.append(f'hi def link {lang_group}BinNumber Number')
         lines.append(f'hi def link {lang_group}DecNumber Number')
+        lines.append(f'hi def link {lang_group}OctNumber Number')
+        lines.append(f'hi def link {lang_group}LowHighOperator Operator')
+        lines.append(f'hi def link {lang_group}CurrentAddress Special')
         lines.append(f'hi def link {lang_group}CharNumber Number')
         lines.append(f'hi def link {lang_group}LabelName Label')
+        lines.append(f'hi def link {lang_group}DirectiveLabelName {lang_group}LabelName')
         lines.append(f'hi def link {lang_group}LabelUsage Identifier')
         lines.append(f'hi def link {lang_group}LabelColon Delimiter')
         lines.append(f'hi def link {lang_group}OperandLabelAt Delimiter')
@@ -642,9 +729,16 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
         lines.append(f'hi def link {lang_group}Continuation Delimiter')
         lines.append(f'hi def link {lang_group}Param Identifier')
         lines.append(f'hi def link {lang_group}AnnotationNamespace Identifier')
+        lines.append(f'hi def link {lang_group}MemoryZone Identifier')
+        lines.append(f'hi def link {lang_group}MemoryZoneName {lang_group}MemoryZone')
+        lines.append(f'hi def link {lang_group}MemoryZoneQuoted {lang_group}MemoryZone')
         lines.append(f'hi def link {lang_group}AnnotationArgument Identifier')
         lines.append(f'hi def link {lang_group}AnnotationPunct Delimiter')
         lines.append(f'hi def link {lang_group}AnnotationValue Constant')
+        lines.append(f'hi def link {lang_group}OutputFormatName Identifier')
+        lines.append(f'hi def link {lang_group}OutputFormatOption Identifier')
+        lines.append(f'hi def link {lang_group}OutputFormatValue Constant')
+        lines.append(f'hi def link {lang_group}OutputFormatPunct Delimiter')
         # BespokeASM color scheme from central configuration
         color_lines = self._generate_vim_color_lines(lang_group)
         lines.extend(color_lines)
@@ -693,15 +787,19 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
             "  for l:lnum in range(1, line('$'))",
             '    let l:line = getline(l:lnum)',
             "    let l:line = substitute(l:line, ';.*$', '', '')",
-            f"    let l:m = matchlist(l:line, '^\\s*\\({symbol_pattern}\\)\\s*:')",
+            # A label starts a line, or follows an origin or zone directive: `.org $10 name:`.
+            "    let l:m = matchlist(l:line, '\\c^\\s*\\%(\\.\\%(org\\|memzone\\|phase\\|dephase\\)\\>[^;:]*\\s\\)\\="
+            f"\\({symbol_pattern}\\)\\s*:\\%(=\\)\\@!')",
             '    if !empty(l:m)',
             '      let l:globals[l:m[1]] = 1',
-            '      continue',
             '    endif',
-            f"    let l:m = matchlist(l:line, '^\\s*@\\({symbol_pattern}\\)\\s*:')",
-            '    if !empty(l:m)',
-            '      let l:locals[l:m[1]] = 1',
-            '    endif',
+            # Operand labels may be anywhere on a line, and are referred to by their plain name.
+            '    let l:found = []',
+            f"    call substitute(l:line, '@\\({symbol_pattern}\\)\\s*:', '\\=add(l:found, submatch(1))', 'g')",
+            '    for l:name in l:found',
+            '      let l:locals[l:name] = 1',
+            '      let l:globals[l:name] = 1',
+            '    endfor',
             '  endfor',
             f'  let b:bespokeasm_{vim_filetype}_globals = keys(l:globals)',
             f'  let b:bespokeasm_{vim_filetype}_locals = keys(l:locals)',
@@ -711,7 +809,8 @@ skip=+\\.+ end=+'+ oneline contains={lang_group}Escape")
             f'  silent! syntax clear {vim_filetype}LabelUsage',
             f"  if !empty(get(b:, 'bespokeasm_{vim_filetype}_globals', []))",
             f"    let l:alt = join(map(copy(b:bespokeasm_{vim_filetype}_globals), 'escape(v:val, ''/\\.'')'), '\\|')",
-            f"    execute 'syntax match {vim_filetype}LabelUsage /\\<\\%(' . l:alt . '\\)\\>/ contained'",
+            # Not after `@`: that is an operand label's definition, which the next rule handles.
+            f"    execute 'syntax match {vim_filetype}LabelUsage /\\%(@\\)\\@<!\\<\\%(' . l:alt . '\\)\\>/ contained'",
             '  endif',
             f"  if !empty(get(b:, 'bespokeasm_{vim_filetype}_locals', []))",
             f"    let l:alt = join(map(copy(b:bespokeasm_{vim_filetype}_locals), 'escape(v:val, ''/\\.'')'), '\\|')",

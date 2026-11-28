@@ -9,7 +9,10 @@ general:
     name: slu4-mincpu-asm
     version: "1.6.0"
     extension: min-asm
-  min_version: 0.9.0
+  min_version: '0.10.0a1'
+  # As in Carsten Herting's assembler: `<` and `>` lead an expression and take the low or
+  # high byte of all of it, so `<label+1` is the low byte of `label+1`.
+  low_high_operators: whole_expression
 operand_sets:
   immediate:
     operand_values:
@@ -838,3 +841,19 @@ macros:
         - "sts @ARG(0)+2"
         - "lds @ARG(1)+3"
         - "sts @ARG(0)+3"
+
+# Source migration (`bespokeasm migrate --from slu4`): converts programs written for Carsten
+# Herting's Minimal CPU assembler (asm.py, Revision 1.3 and later) to this language.
+migrations:
+  slu4:
+    description: Carsten Herting's Minimal CPU assembler (asm.py, Revision 1.3 and later)
+    rules:
+      - split_statements
+      - bare_data: {sizing: slu4}
+      - string_escapes: {backslash: literal}
+      - terminated_strings
+      # Its #end and #begin stop and restart output, as #mute and #emit do.
+      - rename_directives: {end: '#mute', begin: '#emit'}
+      # Before its first #org, this assembler starts at address 0, not this configuration's origin.
+      - muted_origin: {image_start: 0x0000}
+      - rename_directives: {org: '.org'}

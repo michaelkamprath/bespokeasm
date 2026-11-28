@@ -37,8 +37,8 @@ def main() -> None:
     required_flow_text = (
         '# Flow Counters',
         '## Data Stack Depth (`stack`)',
-        '| Counter | stack | +1 physical effect. |',
-        '| Counter | stack | -ARG(0) physical effect. |',
+        '| Counter | stack | +1 |',
+        '| Counter | stack | -ARG(0) |',
         'before the instruction effect',
         'caller-visible net effect after return: +0',
         '| Invalidated By Writes To | `0xff` |',

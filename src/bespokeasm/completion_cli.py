@@ -12,6 +12,7 @@ _NOOP_HANDLERS = CommandHandlers(
     vscode=_noop,
     sublime=_noop,
     vim=_noop,
+    migrate=_noop,
 )
 
 

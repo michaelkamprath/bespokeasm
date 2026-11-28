@@ -9,6 +9,7 @@ from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.symbol_scope import SymbolScope
 
 from test import config_files
+from test.isa_configs import json_config_copy
 
 # The Minimal 64x4 copy: 8-bit words, embedded strings allowed, and the xmin formats.
 CONFIG = str(pkg_resources.files(config_files).joinpath('xmin', 'slu4-minimal-64x4.yaml'))
@@ -27,9 +28,10 @@ def _run(tmp_path, source: str, fmt: str = 'hex') -> str:
     SymbolScope._global_scope = None
     (tmp_path / 'main.asm').write_text(source)
     output_path = tmp_path / 'out.txt'
+    config_path = json_config_copy(CONFIG, tmp_path)
     with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
         Assembler(
-            str(tmp_path / 'main.asm'), CONFIG, False, None, 0, None, 0, True, fmt, str(output_path), 0, [], [],
+            str(tmp_path / 'main.asm'), config_path, False, None, 0, None, 0, True, fmt, str(output_path), 0, [], [],
         ).assemble_bytecode()
     return output_path.read_text()
 

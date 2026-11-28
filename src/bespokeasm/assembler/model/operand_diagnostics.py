@@ -13,10 +13,16 @@ from collections.abc import Iterable
 from bespokeasm.assembler.diagnostic_reporter import ExpressionSyntaxError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.assembler.model.operand import allowed_by_enclosure
+from bespokeasm.assembler.model.operand import EnclosureRequirement
 from bespokeasm.assembler.model.operand import Operand
 from bespokeasm.assembler.model.operand import OperandType
 from bespokeasm.assembler.model.operand_parser import OperandParser
+from bespokeasm.assembler.parsing import encloses_whole
+from bespokeasm.assembler.parsing import split_operands
 from bespokeasm.expression import parse_expression
+from bespokeasm.utilities import ENCLOSURES
+from bespokeasm.utilities import IMMEDIATE_PREFIX
 
 _EXPRESSION_OPERAND_TYPES = {
     OperandType.NUMERIC,
@@ -25,6 +31,7 @@ _EXPRESSION_OPERAND_TYPES = {
     OperandType.RELATIVE_ADDRESS,
     OperandType.INDIRECT_NUMERIC,
     OperandType.DEFERRED_NUMERIC,
+    OperandType.INDIRECT_INDEXED_NUMERIC,
 }
 
 
@@ -49,6 +56,23 @@ def _join_or(items: list[str]) -> str:
     return ', '.join(items[:-1]) + f', or {items[-1]}'
 
 
+def _without_enclosures(operand_text: str, candidates: list[Operand]) -> str:
+    """``operand_text`` without its enclosures, so `[[vec]]` and `($10,x)` leave `vec` and
+    `$10,x`. Brackets are always removed; parentheses only where a candidate is written in them,
+    since elsewhere they are part of the expression."""
+    depths = {'brackets': 2}
+    for candidate in candidates:
+        if candidate.enclosure_depth > 0:
+            depths[candidate.enclosure] = max(depths.get(candidate.enclosure, 0), candidate.enclosure_depth)
+    for enclosure, depth in depths.items():
+        opener, closer = ENCLOSURES[enclosure]
+        for _ in range(depth):
+            if not encloses_whole(operand_text, opener, closer):
+                break
+            operand_text = operand_text[1:-1].strip()
+    return operand_text
+
+
 def describe_operands(operands: list[Operand]) -> str:
     """Return a human-readable summary of the forms a set of operand definitions accepts."""
     registers: list[str] = []
@@ -65,26 +89,39 @@ def describe_operands(operands: list[Operand]) -> str:
             if name not in registers:
                 registers.append(name)
             continue
+        opener, closer = operand.enclosure_delimiters
         if kind == OperandType.INDIRECT_REGISTER:
-            text = f'[{operand.register}]'
+            text = f'{opener}{operand.register}{closer}'
             if getattr(operand, 'has_offset', False):
-                text = f'[{operand.register}] or [{operand.register} + offset]'
+                text = f'{text} or {opener}{operand.register} + offset{closer}'
         elif kind == OperandType.INDEXED_REGISTER:
             text = f'{operand.register} + index'
         elif kind == OperandType.INDIRECT_INDEXED_REGISTER:
-            text = f'[{operand.register} + index]'
+            text = f'{opener}{operand.register} + index{closer}'
         elif kind == OperandType.NUMERIC:
-            text = 'a numeric value or expression'
+            text = (
+                f'a "{operand.prefix}" immediate value' if getattr(operand, 'prefix', None)
+                else 'a numeric value or expression'
+            )
         elif kind == OperandType.NUMERIC_BYTECODE:
             text = f'a numeric value from {operand.bytecode_min} to {operand.bytecode_max}'
         elif kind == OperandType.ADDRESS:
             text = 'an address'
         elif kind == OperandType.RELATIVE_ADDRESS:
-            text = 'a relative address'
+            text = f'{opener}relative address{closer}' if operand.enclosure_depth else 'a relative address'
         elif kind == OperandType.INDIRECT_NUMERIC:
-            text = '[address]'
+            text = f'{opener}address{closer}'
+        elif kind == OperandType.INDIRECT_INDEXED_NUMERIC:
+            indexes = operand.index_operands
+            index = (
+                ' or '.join(index.register for index in indexes)
+                if all(index.type == OperandType.REGISTER and not index.has_decorator for index in indexes)
+                else 'index'
+            )
+            separator = ', ' if operand.index_separator == ',' else ' + '
+            text = f'{opener}address{separator}{index}{closer}'
         elif kind == OperandType.DEFERRED_NUMERIC:
-            text = '[[address]]'
+            text = f'{opener * 2}address{closer * 2}'
         elif kind == OperandType.DICTIONARY_KEY:
             keys = (
                 operand.argument_value_dict if operand.has_argument_value_dict
@@ -140,7 +177,7 @@ class OperandMismatchExplainer:
             if operand_text.strip() == '':
                 return f'operand {index + 1} of {self._subject} is empty'
 
-        best_failure: tuple[int, list[Operand]] | None = None
+        best_failure: tuple[int, list[Operand], EnclosureRequirement | None] | None = None
         for parser in self._parsers:
             if parser is None or given_count not in parser.source_operand_counts():
                 continue
@@ -156,14 +193,19 @@ class OperandMismatchExplainer:
                     )
                 continue
             if best_failure is None or failure[0] > best_failure[0]:
-                best_failure = failure
+                best_failure = (failure[0], list(failure[1]), failure[2])
+            elif failure[0] == best_failure[0]:
+                # Variants failing at the same position all say what it could have been, as for
+                # an instruction with one variant per addressing mode.
+                known = {id(candidate) for candidate in best_failure[1]}
+                best_failure[1].extend(candidate for candidate in failure[1] if id(candidate) not in known)
 
         if best_failure is None:
             return (
                 f'{self._subject} does not accept the operands {_quote_list(self._operands)}'
             )
-        position, candidates = best_failure
-        return self._explain_operand(position, candidates)
+        position, candidates, requirement = best_failure
+        return self._explain_operand(position, candidates, requirement)
 
     def _explain_count_mismatch(self, given_count: int, accepted_counts: set[int]) -> str:
         accepted = sorted(accepted_counts)
@@ -176,13 +218,18 @@ class OperandMismatchExplainer:
             given += f' ({_quote_list(self._operands)})'
         return f'{self._subject} takes {takes}, but {given}'
 
-    def _first_failing_position(self, parser: OperandParser, given_count: int) -> tuple[int, list[Operand]] | None:
+    def _first_failing_position(
+        self, parser: OperandParser, given_count: int,
+    ) -> tuple[int, list[Operand], EnclosureRequirement | None] | None:
+        requirements = parser.enclosure_requirements(self._operands)
         for position, operand_text in enumerate(self._operands):
             candidates = parser.candidate_operands(position, given_count)
-            if not candidates:
-                return position, candidates
-            if not any(self._accepts(candidate, operand_text) for candidate in candidates):
-                return position, candidates
+            requirement = requirements[position]
+            if not any(
+                self._accepts(candidate, operand_text)
+                for candidate in candidates if allowed_by_enclosure(candidate, requirement)
+            ):
+                return position, candidates, requirement
         return None
 
     def _accepts(self, candidate: Operand, operand_text: str) -> bool:
@@ -193,16 +240,46 @@ class OperandMismatchExplainer:
         except Exception:
             return False
 
-    def _explain_operand(self, position: int, candidates: list[Operand]) -> str:
+    def _explain_operand(
+        self, position: int, candidates: list[Operand], requirement: EnclosureRequirement | None,
+    ) -> str:
         operand_text = self._operands[position]
         prefix = f'operand {position + 1} {_quote(operand_text)} of {self._subject}'
+        if requirement is not None and any(
+            self._accepts(candidate, operand_text)
+            for candidate in candidates if not allowed_by_enclosure(candidate, requirement)
+        ):
+            # A form without the enclosure would take it, but the instruction gives the enclosure
+            # its own meaning at this position: `lda ($10)` when `lda` has `($10,x)`.
+            enclosure, depth = requirement
+            enclosed = describe_operands([
+                candidate for candidate in candidates
+                if candidate.enclosure_depth > 0 and allowed_by_enclosure(candidate, requirement)
+            ])
+            pairs = enclosure if depth == 1 else f'two pairs of {enclosure}'
+            return (
+                f'{prefix} is not valid; {pairs} around the whole operand select another form here'
+                + (f'; expected {enclosed}' if enclosed else '')
+            )
         expects_expression = any(candidate.type in _EXPRESSION_OPERAND_TYPES for candidate in candidates)
+        if operand_text.startswith(IMMEDIATE_PREFIX):
+            if not any(getattr(candidate, 'prefix', None) for candidate in candidates):
+                expected = describe_operands(candidates)
+                return (
+                    f'{prefix} is not valid; "{IMMEDIATE_PREFIX}" marks an immediate value, which this operand '
+                    f'does not take' + (f'; expected {expected}' if expected else '')
+                )
+            operand_text = operand_text[len(IMMEDIATE_PREFIX):].strip()
+            if not operand_text:
+                return f'{prefix}: "{IMMEDIATE_PREFIX}" must be followed by a value'
         if expects_expression:
-            expression_text = operand_text
-            for opener, closer in (('[[', ']]'), ('[', ']')):
-                if expression_text.startswith(opener) and expression_text.endswith(closer):
-                    expression_text = expression_text[len(opener):-len(closer)]
-                    break
+            expression_text = _without_enclosures(operand_text, candidates)
+        # A `+`-separated value and index isn't one expression, so report the expected form instead.
+        plus_indexed = any(
+            candidate.type == OperandType.INDIRECT_INDEXED_NUMERIC and candidate.index_separator == '+'
+            for candidate in candidates
+        )
+        if expects_expression and not plus_indexed and len(split_operands(expression_text)) == 1:
             try:
                 expression = parse_expression(self._line_id, expression_text, self._default_numeric_base)
             except ExpressionSyntaxError as error:

@@ -68,6 +68,11 @@ class AssembledInstruction:
     def parts(self):
         return self._parts
 
+    def instruction_placements(self) -> list[tuple[ByteCodePart, int, int]]:
+        """Each part, with the words from this instruction's address to the part's own
+        instruction and that instruction's size. A macro's parts are in several instructions."""
+        return [(part, 0, self.word_count) for part in self._parts]
+
     @property
     def analysis_record(self) -> InstructionAnalysisRecord | None:
         return getattr(self, '_analysis_record', None)
@@ -209,6 +214,19 @@ class CompositeAssembledInstruction(AssembledInstruction):
         ]
         super().__init__(line_id, parts, word_size, segment_size, multi_word_endian, intra_word_endian)
         self._instructions = instructions
+        # Tell each part where its own instruction is. A nested macro's parts were placed within
+        # it; placing them again here, from this macro's address, replaces that.
+        for part, word_offset, instruction_size in self.instruction_placements():
+            part.place_in_instruction(word_offset, instruction_size)
+
+    def instruction_placements(self) -> list[tuple[ByteCodePart, int, int]]:
+        placements = []
+        word_offset = 0
+        for instruction in self._instructions:
+            for part, offset, size in instruction.instruction_placements():
+                placements.append((part, word_offset + offset, size))
+            word_offset += instruction.word_count
+        return placements
 
     @property
     def instructions(self):

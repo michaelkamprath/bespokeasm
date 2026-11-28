@@ -95,6 +95,7 @@ class ColorDemo:
             ('HEX_NUMBER', 'Hexadecimal literals'),
             ('BINARY_NUMBER', 'Binary literals'),
             ('DECIMAL_NUMBER', 'Decimal literals'),
+            ('OCTAL_NUMBER', 'Octal literals'),
             ('CHARACTER_NUMBER', 'Character literals'),
         ]
 
@@ -110,6 +111,7 @@ class ColorDemo:
             ('STRING_ESCAPE', 'Escape sequences'),
             ('PUNCTUATION_STRING', 'String quotes'),
             ('COMMENT', 'Code comments'),
+            ('VERBATIM_TEXT', '#verbatim block text'),
             ('INSTRUCTION', 'CPU instructions'),
             ('MACRO', 'Macro calls'),
             ('REGISTER', 'CPU registers'),
@@ -124,13 +126,20 @@ class ColorDemo:
             ('COMPILER_LABEL', 'Compiler-generated labels'),
             ('PARAMETER', 'Function parameters'),
             ('ANNOTATION_NAMESPACE', '#annotate namespace names'),
+            ('MEMORY_ZONE', 'Memory zone names'),
             ('ANNOTATION_ARGUMENT', '#annotate argument names'),
             ('ANNOTATION_VALUE', '#annotate word values'),
+            ('OUTPUT_FORMAT_NAME', '#output-format format names'),
+            ('OUTPUT_FORMAT_OPTION', '#output-format option names'),
+            ('OUTPUT_FORMAT_VALUE', '#output-format option values'),
             ('PREPROCESSOR', 'Preprocessor directives'),
             ('DATA_TYPE', 'Data type keywords'),
             ('DIRECTIVE', 'Assembler directives'),
             ('OPERATOR', 'Operators'),
             ('FLOW_OPERATOR', 'Flow-counter expression operators'),
+            ('LOW_HIGH_OPERATOR', '< and > low/high byte operators'),
+            ('CURRENT_ADDRESS', '* as the current address'),
+            ('IMMEDIATE_PREFIX', '# before an immediate value'),
             ('PUNCTUATION_SEPARATOR', 'Punctuation separators'),
             ('PUNCTUATION_VARIABLE', 'Variable punctuation'),
             ('PUNCTUATION_PREPROCESSOR', 'Preprocessor punctuation'),
@@ -145,6 +154,12 @@ class ColorDemo:
             ('🔢 Number Literals', number_colors),
             ('🔤 Syntax Elements', syntax_colors),
         ]
+        # Elements added to the scheme but not to the lists above still get shown.
+        listed = {name for _, colors in categories for name, _ in colors}
+        unlisted = [(element.name, '(no description in color_demo.py)')
+                    for element in SyntaxElement if element.name not in listed]
+        if unlisted:
+            categories.append(('❔ Not Yet Described', unlisted))
 
         for category_name, colors in categories:
             print(f"\n{category_name}")

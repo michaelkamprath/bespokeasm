@@ -156,8 +156,10 @@ class NamedScopeManager:
         line_id: LineIdentifier,
         active_named_scopes: ActiveNamedScopeList,
         is_constant: bool = False,
+        relocating: bool = False,
     ) -> bool:
-        """Set the value of a label found in the active named scopes.
+        """Set the value of a label found in the active named scopes. ``relocating`` is as for
+        `SymbolScope.set_label_value`.
 
         If an appropriate named scope for label prefix is not found,
         returns False.
@@ -191,7 +193,7 @@ class NamedScopeManager:
                         # Label prefix matches but wrong file
                         # Let it fall back to normal scope hierarchy
                         return False
-                    scope.set_label_value(label, value, line_id, SymbolScopeType.NAMED)
+                    scope.set_label_value(label, value, line_id, SymbolScopeType.NAMED, relocating=relocating)
                     return True
         return False
 

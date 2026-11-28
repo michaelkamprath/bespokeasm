@@ -127,14 +127,11 @@ class TestSymbolScope(unittest.TestCase):
         with self.assertRaises(AssemblerError, msg='register labels cannot have values'):
             local_scope.get_label_value('a', 101)
 
-        with self.assertRaises(AssemblerError, msg='labels cannot be system keywords - local'):
-            local_scope.set_label_value('.cstr', 666, lineid)
-        with self.assertRaises(AssemblerError, msg='labels cannot be system keywords - file'):
-            file_scope.set_label_value('_cstr', 666, lineid)
-        with self.assertRaises(AssemblerError, msg='labels cannot be system keywords - file with local label'):
-            file_scope.set_label_value('.cstr', 666, lineid)
-        with self.assertRaises(AssemblerError, msg='labels cannot be system keywords - file with local label'):
-            local_scope.set_label_value('zero', 666, lineid)
+        # Directives are written with their `.` or `#`, so their names may be labels.
+        local_scope.set_label_value('.cstr', 666, lineid)
+        file_scope.set_label_value('_cstr', 667, lineid)
+        local_scope.set_label_value('zero', 668, lineid)
+        self.assertEqual(local_scope.get_label_value('zero', lineid), 668)
 
     def test_line_object_scope_assignment(self):
         fp = pkg_resources.files(config_files).joinpath('test_memory_zones.yaml')

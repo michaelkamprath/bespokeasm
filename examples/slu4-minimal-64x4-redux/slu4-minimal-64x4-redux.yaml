@@ -31,7 +31,12 @@ general:
     name: slu4-min64x4-redux-asm
     version: 1.4.0
     extension: min64x4r
-  min_version: '0.9.0'
+  min_version: '0.10.0a1'
+  # As in Carsten Herting's assembler: `<` and `>` lead an expression and take the low or
+  # high byte of all of it, so `<label+1` is the low byte of `label+1`.
+  low_high_operators: whole_expression
+  # As in Carsten Herting's assembler: `*` is the address of the operand's own bytes.
+  current_address: value_address
   allow_embedded_strings: true
   documentation:
     addressing_modes: {}
@@ -2024,6 +2029,8 @@ instructions:
       - register: A
         description: Updated
   an.z:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [zan]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -2044,6 +2051,8 @@ instructions:
       - register: A
         description: Updated
   an.b:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [ban]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -2064,6 +2073,8 @@ instructions:
       - register: A
         description: Updated
   an.t:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [tan]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -2083,6 +2094,8 @@ instructions:
       - register: A
         description: Updated
   an.r:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [ran]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -2197,6 +2210,8 @@ instructions:
       - register: A
         description: Updated
   or.z:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [zor]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -2217,6 +2232,8 @@ instructions:
       - register: A
         description: Updated
   or.b:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [bor]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -2237,6 +2254,8 @@ instructions:
       - register: A
         description: Updated
   or.t:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [tor]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -2256,6 +2275,8 @@ instructions:
       - register: A
         description: Updated
   or.r:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [ror]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -2370,6 +2391,8 @@ instructions:
       - register: A
         description: Updated
   xr.z:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [zxr]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -2390,6 +2413,8 @@ instructions:
       - register: A
         description: Updated
   xr.b:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [bxr]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -2410,6 +2435,8 @@ instructions:
       - register: A
         description: Updated
   xr.t:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [txr]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -2429,6 +2456,8 @@ instructions:
       - register: A
         description: Updated
   xr.r:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [rxr]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -3598,8 +3627,8 @@ instructions:
       count: 2
       operand_sets:
         list:
-        - immediate_8bit
-        - immediate_8bit
+        - absolute_address
+        - relative_address
     documentation:
       category: Memory Movement
       title: 'Move byte at adr1 to rel adr2: **adr2 = *adr1'
@@ -3714,10 +3743,8 @@ instructions:
     flow_effects:
       stack: 0
     flow_transfer: none
-    # The doc title says `*adr2 = **adr1`, a direct write to adr2, but this
-    # config declares both operands as 8-bit immediates rather than address
-    # operands, so the write target cannot be established here. Left without
-    # flow_write_operands rather than guessing (see mbr/mrr, likewise).
+    flow_write_operands: [1]
+    # `*adr2 = **adr1`: a direct write to adr2, the second operand.
     bytecode:
       value: 0x97
       size: 8
@@ -3725,8 +3752,8 @@ instructions:
       count: 2
       operand_sets:
         list:
-        - immediate_8bit
-        - immediate_8bit
+        - relative_address
+        - absolute_address
     documentation:
       category: Memory Movement
       title: 'Move byte at rel adr1 to adr2: *adr2 = **adr1'
@@ -3765,8 +3792,8 @@ instructions:
       count: 2
       operand_sets:
         list:
-        - immediate_8bit
-        - immediate_8bit
+        - relative_address
+        - relative_address
     documentation:
       category: Memory Movement
       title: 'Move byte at rel adr1 to rel adr2: **adr2 = **adr1'
@@ -4400,6 +4427,8 @@ instructions:
       - flag: Z
         description: Reflects result
   ad.z:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [zad]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -4426,6 +4455,8 @@ instructions:
       - flag: Z
         description: Reflects result
   ad.b:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [bad]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -4452,6 +4483,8 @@ instructions:
       - flag: Z
         description: Reflects result
   ad.t:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [tad]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -4477,6 +4510,8 @@ instructions:
       - flag: Z
         description: Reflects result
   ad.r:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [rad]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -5133,6 +5168,8 @@ instructions:
       - flag: Z
         description: Reflects result
   su.z:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [zsu]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -5159,6 +5196,8 @@ instructions:
       - flag: Z
         description: Reflects result
   su.b:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [bsu]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -5185,6 +5224,8 @@ instructions:
       - flag: Z
         description: Reflects result
   su.t:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [tsu]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -5210,6 +5251,8 @@ instructions:
       - flag: Z
         description: Reflects result
   su.r:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [rsu]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -6218,6 +6261,8 @@ instructions:
       - flag: Z
         description: Reflects result
   ac.z:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [zac]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -6294,6 +6339,8 @@ instructions:
       - flag: Z
         description: Reflects result
   sc.z:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [zsc]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -6806,3 +6853,18 @@ macros:
           count: 0
         instructions:
           - "SUI 0"
+
+# Source migration (`bespokeasm migrate --from slu4`): converts programs written for Carsten
+# Herting's Minimal 64x4 Redux assembler (asm.cpp, Revision 1.4) to this language.
+migrations:
+  slu4:
+    description: Carsten Herting's Minimal 64x4 Redux assembler (asm.cpp, Revision 1.4)
+    rules:
+      - split_statements
+      - bare_data: {sizing: slu4}
+      - string_escapes: {backslash: literal}
+      - char_literals: {double_quoted: true}
+      - terminated_strings
+      # Before its first #org, this assembler writes bytes from 0x2000 while addresses start at 0.
+      - muted_origin: {image_start: 0x2000}
+      - rename_directives: {org: '.org', page: '.align'}

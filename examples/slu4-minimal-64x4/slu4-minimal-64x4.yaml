@@ -24,7 +24,12 @@ general:
     name: slu4-min64x4-asm
     version: "1.1.0"
     extension: min64x4
-  min_version: "0.9.0"
+  min_version: '0.10.0a1'
+  # As in Carsten Herting's assembler: `<` and `>` lead an expression and take the low or
+  # high byte of all of it, so `<label+1` is the low byte of `label+1`.
+  low_high_operators: whole_expression
+  # As in Carsten Herting's assembler: `*` is the address of the operand's own bytes.
+  current_address: value_address
   allow_embedded_strings: true
   documentation:
     description: slu4 Minimal 64x4 Home Computer
@@ -2193,6 +2198,8 @@ instructions:
         - register: A
           description: Updated
   an.z:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [zan]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -2214,6 +2221,8 @@ instructions:
         - register: A
           description: Updated
   an.b:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [ban]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -2335,6 +2344,8 @@ instructions:
         - register: A
           description: Updated
   or.z:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [zor]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -2356,6 +2367,8 @@ instructions:
         - register: A
           description: Updated
   or.b:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [bor]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -2477,6 +2490,8 @@ instructions:
         - register: A
           description: Updated
   xr.z:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [zxr]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -2498,6 +2513,8 @@ instructions:
         - register: A
           description: Updated
   xr.b:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [bxr]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -4278,6 +4295,8 @@ instructions:
         - flag: Z
           description: Reflects result
   ad.z:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [zad]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -4305,6 +4324,8 @@ instructions:
         - flag: Z
           description: Reflects result
   ad.b:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [bad]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -4332,6 +4353,8 @@ instructions:
         - flag: Z
           description: Reflects result
   ad.t:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [tad]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -4358,6 +4381,8 @@ instructions:
         - flag: Z
           description: Reflects result
   ad.r:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [rad]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -5180,6 +5205,8 @@ instructions:
         - flag: Z
           description: Reflects result
   su.z:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [zsu]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -5207,6 +5234,8 @@ instructions:
         - flag: Z
           description: Reflects result
   su.b:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [bsu]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -5234,6 +5263,8 @@ instructions:
         - flag: Z
           description: Reflects result
   su.t:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [tsu]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -5260,6 +5291,8 @@ instructions:
         - flag: Z
           description: Reflects result
   su.r:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [rsu]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -5367,6 +5400,8 @@ instructions:
         - flag: Z
           description: Undefined
   sul:
+    # Carsten Herting's assembler spells this SU.L, or LSU.
+    aliases: [su.l, lsu]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -6368,6 +6403,8 @@ instructions:
         - flag: Z
           description: Reflects result
   ac.z:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [zac]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -6395,6 +6432,8 @@ instructions:
         - flag: Z
           description: Reflects result
   ac.b:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [bac]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -6554,6 +6593,8 @@ instructions:
         - flag: Z
           description: Reflects result
   sc.z:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [zsc]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -6581,6 +6622,8 @@ instructions:
         - flag: Z
           description: Reflects result
   sc.b:
+    # Carsten Herting's assembler also accepts the undotted spelling.
+    aliases: [bsc]
     flow_effects:
       stack: 0
     flow_transfer: none
@@ -7163,3 +7206,17 @@ macros:
     documentation:
       category: Memory Movement
       title: move 4 bytes long from immediate to zero-page long
+
+# Source migration (`bespokeasm migrate --from slu4`): converts programs written for Carsten
+# Herting's Minimal 64x4 assembler (asm.cpp, Revision 1.1) to this language.
+migrations:
+  slu4:
+    description: Carsten Herting's Minimal 64x4 assembler (asm.cpp, Revision 1.1)
+    rules:
+      - split_statements
+      - bare_data: {sizing: slu4}
+      - string_escapes: {backslash: literal}
+      - char_literals: {double_quoted: true}
+      - terminated_strings
+      - muted_origin
+      - rename_directives: {org: '.org', page: '.align'}

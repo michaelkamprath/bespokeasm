@@ -11,14 +11,23 @@ import sublime
 import sublime_plugin
 
 
-WORD_PATTERN = re.compile(r'(?:##MNEMONIC_PATTERN##|##LABEL_PATTERN##)', re.IGNORECASE)
+# A symbol can't start inside a number or character literal: the E of $600E is not a symbol E.
+SYMBOL_START = r"(?<![\w$%'])"
+WORD_PATTERN = re.compile(SYMBOL_START + r'(?:##MNEMONIC_PATTERN##|##LABEL_PATTERN##)', re.IGNORECASE)
 # Built-in preprocessor symbols such as __OUTPUT_FORMAT__ begin with two underscores, which no
 # label can, so the label pattern alone would read one as _OUTPUT_FORMAT__.
 BUILTIN_SYMBOL_PATTERN = r'__[A-Za-z0-9_]+__'
 HOVER_WORD_PATTERN = re.compile(
-    r'(?:' + BUILTIN_SYMBOL_PATTERN + r'|##MNEMONIC_PATTERN##|##LABEL_PATTERN##)', re.IGNORECASE
+    SYMBOL_START + r'(?:' + BUILTIN_SYMBOL_PATTERN + r'|##MNEMONIC_PATTERN##|##LABEL_PATTERN##)', re.IGNORECASE
 )
-LABEL_DEFINITION_PATTERN = re.compile(r'^\s*(?P<name>##LABEL_PATTERN##)\s*:(?!=)')
+# The instruction set's expression functions, such as LSB and COUNTER. A name is a function only
+# when written as a call, NAME(...); otherwise it may be a label or constant of the same name.
+EXPRESSION_FUNCTION_NAMES = frozenset('##EXPRESSION_FUNCTION_NAMES##'.upper().split('|'))
+CALL_FOLLOWS_PATTERN = re.compile(r'\s*\(')
+# A label starts a line, or follows an origin or zone directive: `.org $10 name:`.
+LABEL_DEFINITION_PATTERN = re.compile(
+    r'^\s*(?:(?i:\.(?:org|memzone|phase|dephase))\b[^;:]*?\s)?(?P<name>##LABEL_PATTERN##)\s*:(?!=)'
+)
 OPERAND_LABEL_DEFINITION_PATTERN = re.compile(r'@(?P<name>##LABEL_PATTERN##):\s*')
 CONSTANT_DEFINITION_PATTERN = re.compile(r'^\s*(?P<name>##CONSTANT_PATTERN##)\s*(?:=|\bEQU\b)')
 CONSTANT_VALUE_PATTERN = re.compile(r'^\s*##CONSTANT_PATTERN##\s*(?:=|\bEQU\b)\s*(?P<value>.+?)(?:\s*;.*)?$')
@@ -115,7 +124,9 @@ def _is_bespokeasm_view(view):
 
 
 def _get_expected_package_name():
-    if not PACKAGE_NAME or '##PACKAGE_NAME##' in PACKAGE_NAME:
+    # Test for the unfilled placeholder without spelling it out: the generator replaces every
+    # occurrence of it, which would turn this check into one that is always true.
+    if not PACKAGE_NAME or PACKAGE_NAME.startswith('##'):
         return None
     return PACKAGE_NAME
 
@@ -470,6 +481,21 @@ def _get_view_state(view):
     return state
 
 
+def _is_function_call(text, word, end):
+    """Whether ``word``, ending at ``end`` in ``text``, is an expression function call."""
+    return word.upper() in EXPRESSION_FUNCTION_NAMES and CALL_FOLLOWS_PATTERN.match(text, end) is not None
+
+
+def _is_function_call_at_point(view, point):
+    line_region = view.line(point)
+    line_text = view.substr(line_region)
+    column = point - line_region.begin()
+    for match in HOVER_WORD_PATTERN.finditer(line_text):
+        if match.start() <= column <= match.end():
+            return _is_function_call(line_text, match.group(0), match.end())
+    return False
+
+
 def _get_token_at_point(view, point):
     line_region = view.line(point)
     line_text = view.substr(line_region)
@@ -535,7 +561,7 @@ def _find_references(token, state):
             for start, end in _get_code_regions(text):
                 segment = text[start:end]
                 for match in WORD_PATTERN.finditer(segment):
-                    if match.group(0) != token:
+                    if match.group(0) != token or _is_function_call(segment, token, match.end()):
                         continue
                     col = start + match.start()
                     if label_defs is None:
@@ -922,13 +948,14 @@ def _heading_code_color(heading_text, hover_colors, color_override=None):
 
 
 # One token of a line of example code. Comments and strings come first, so a `;` or `#` inside a
-# string is part of it; directive forms (.2byte, #include) come before numbers and words.
+# string is part of it; directive forms (.2byte, #include) come before numbers and words. A `#`
+# before anything but a name, as in the immediate value `#$10`, is punctuation.
 CODE_TOKEN_PATTERN = re.compile(
     r'(?P<space>\s+)|'
     r'(?P<comment>;.*)|'
     r'(?P<string>"(?:[^"\\]|\\.)*"?|\'(?:[^\'\\]|\\.)*\'?)|'
-    r'(?P<directive>#[^\s;]+|\.\d*[A-Za-z]\w*)|'
-    r'(?P<number>0x[0-9a-fA-F]+|\$[0-9a-fA-F]+|\d+)|'
+    r'(?P<directive>#[A-Za-z_][\w-]*|\.\d*[A-Za-z]\w*)|'
+    r'(?P<number>0x[0-9a-fA-F]+|\$[0-9a-fA-F]+|0o[0-7]+|%[01]+|[0-7]+[qQoO]\b|[01]+[bB]\b|\d+)|'
     r'(?P<word>[A-Za-z_]\w*(?:\.\w+)*)|'      # a dotted mnemonic such as or.z is one word
     r'(?P<other>.)'
 )
@@ -938,13 +965,13 @@ CODE_PREPROCESSOR_NAMES = {
     'include', 'require', 'error', 'create_memzone', 'print',
     'define', 'if', 'elif', 'else', 'endif', 'ifdef', 'ifndef',
     'mute', 'unmute', 'emit', 'create-scope', 'use-scope', 'deactivate-scope',
-    'annotate', 'verbatim', 'endverbatim',
+    'annotate', 'verbatim', 'endverbatim', 'output-format',
 }
-CODE_COMPILER_DIRECTIVE_NAMES = {'org', 'memzone', 'align'}
+CODE_COMPILER_DIRECTIVE_NAMES = {'org', 'memzone', 'align', 'phase', 'dephase'}
 CODE_DATA_TYPE_NAMES = {
     'fill', 'zero', 'zerountil',
     'byte', '2byte', '4byte', '8byte', '16byte', 'cstr', 'asciiz',
-}
+} | set('##DATA_TYPE_ALIASES##'.split())   # the instruction set's directive aliases
 
 
 def _code_colors(hover_colors):
@@ -1022,6 +1049,10 @@ def _color_code_line(line, colors, state):
             parts.append(_code_span(prefix_color, text[0]))
             parts.append(_code_span(name_color, text[1:]))
             seen_mnemonic = True
+        elif group == 'directive' and text.startswith('#') and seen_mnemonic:
+            # An immediate value written with a name, such as `lda #count`.
+            parts.append(_code_span(colors['punctuation'], text[0]))
+            parts.append(_code_span(colors['parameter'], text[1:]))
         elif group == 'number':
             parts.append(_code_span(colors['number'], text))
         elif group == 'word' and kind in ('annotate', 'verbatim') and not namespace_seen:
@@ -1364,6 +1395,8 @@ def _update_semantic_regions(view):
             segment = text[region_start:region_end]
             for match in WORD_PATTERN.finditer(segment):
                 word = match.group(0)
+                if _is_function_call(segment, word, match.end()):
+                    continue
                 col = region_start + match.start()
                 if word in constants:
                     if (word, col) in constant_definition_starts:
@@ -1518,8 +1551,8 @@ class BespokeAsmHoverListener(sublime_plugin.EventListener):
                 _show_popup(view, popup_html, point, max_width)
                 return
 
-        # Check expression functions (BYTE0, LSB, etc.)
-        if docs and hover_mnemonics:
+        # Check expression functions (BYTE0, LSB, etc.), written as calls
+        if docs and hover_mnemonics and _is_function_call_at_point(view, point):
             expr_func_docs = docs.get('expression_functions', {})
             doc = expr_func_docs.get(token.upper())
             if doc:
@@ -1595,3 +1628,13 @@ class BespokeAsmSemanticListener(sublime_plugin.EventListener):
 
     def on_post_save_async(self, view):
         _schedule_semantic_update(view)
+
+    def on_close(self, view):
+        _forget_view(view.id())
+
+
+def _forget_view(view_id):
+    """Drop a closed view's cached state, so a later view given the same id can't read its
+    lines, and cancel its pending semantic update."""
+    _VIEW_CACHE.pop(view_id, None)
+    _PENDING_SEMANTIC.pop(view_id, None)

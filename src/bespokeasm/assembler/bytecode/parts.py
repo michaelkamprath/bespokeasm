@@ -14,6 +14,7 @@ from bespokeasm.assembler.symbol_scope import SymbolScope
 from bespokeasm.assembler.symbol_scope.named_scope_manager import ActiveNamedScopeList
 from bespokeasm.expression import ExpressionUseContext
 from bespokeasm.expression import parse_expression
+from bespokeasm.utilities import expression_syntax_of
 
 from .packed_bits import PackedBits
 
@@ -98,6 +99,11 @@ class ByteCodePart:
     @property
     def instruction_string(self) -> str:
         raise NotImplementedError(f'fetching ByteCodePart instruction string unimplemented for: {self}')
+
+    def place_in_instruction(self, word_offset: int, instruction_size: int) -> None:
+        """Tells a part of a macro's expansion where its own instruction is: ``word_offset`` words
+        after the macro line's address, ``instruction_size`` words long. Only parts measured from
+        their instruction, such as relative addresses, use it."""
 
     def get_value(
         self,
@@ -281,7 +287,9 @@ class ByteCodePart:
                         # Flush accumulated WordSlices before word-aligned part
                         if current_word_slices:
                             words.extend(flush_word_slices(word_size, segment_size, multi_word_endianness))
-                    if value_representation.bit_size % word_size == 0:
+                    # A whole-word part is written directly only when no partial bits are waiting;
+                    # otherwise it packs after them, or it would be written ahead of them.
+                    if value_representation.bit_size % word_size == 0 and not current_word_slices:
                         value = Value.from_word_slices(
                             [value_representation],
                             word_size,
@@ -375,6 +383,8 @@ class ExpressionByteCodePart(ByteCodePart):
             default_numeric_base,
             context=ExpressionUseContext.OPERAND_VALUE,
         )
+        # What `*` means in this operand: the instruction's first word, or this value's own words.
+        self._current_address_style = expression_syntax_of(default_numeric_base).current_address
 
     @property
     def instruction_string(self) -> str:
@@ -396,10 +406,14 @@ class ExpressionByteCodePart(ByteCodePart):
         instruction_size: int,
         bytecode_address: int | None = None,
     ) -> int:
+        current_address = instruction_address
+        if self._current_address_style == 'value_address' and bytecode_address is not None:
+            current_address = bytecode_address
         value = self._parsed_expression.get_value(
             symbol_scope,
             active_named_scopes,
             self.line_id,
+            current_address,
         )
         if isinstance(value, str):
             raise AssemblerError(
@@ -539,6 +553,7 @@ class ExpressionEnumerationByteCodePart(ExpressionByteCodePart):
                 line_id: LineIdentifier,
                 word_size: int,
                 segment_size: int,
+                default_numeric_base: str = 'decimal',
             ) -> None:
         super().__init__(
             value_expression,
@@ -549,6 +564,7 @@ class ExpressionEnumerationByteCodePart(ExpressionByteCodePart):
             line_id,
             word_size,
             segment_size,
+            default_numeric_base,
         )
         self._value_dict = value_dict
 
@@ -601,6 +617,18 @@ class CompositeByteCodePart(ByteCodePart):
 
         # Validate that all Value-based ByteCodePart objects have consistent word and segment sizes
         self._validate_value_consistency()
+        self._reject_word_aligned_parts()
+
+    def _reject_word_aligned_parts(self):
+        """A composite packs its parts end to end, but the address each part is given assumes a
+        word-aligned part starts on the next word, so such a part would get the wrong address.
+        No operand type builds one; until one needs to, it is an error rather than wrong bytes."""
+        for part in self._parts_list:
+            if part.word_align:
+                raise AssemblerError(
+                    self.line_id,
+                    f'internal error: {part} is word-aligned, which a composite bytecode part does not support',
+                )
 
     def _validate_value_consistency(self):
         """Validate that all Value-based ByteCodePart objects have consistent word and segment sizes."""

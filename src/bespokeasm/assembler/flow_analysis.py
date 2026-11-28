@@ -644,6 +644,11 @@ class FlowLinearAnalyzer:
             value = value[component]
         return value
 
+    def _operand_current_address(self, record, operand) -> int | None:
+        """The value of `*` in ``operand`` of the instruction ``record`` describes."""
+        address = self._record_addresses.get(id(record))
+        return None if address is None else address + operand.current_address_offset
+
     def _operand_semantic_value(self, line_object, record, index: int) -> int:
         """Resolve one ``ARG(n)`` to its source-level compile-time value."""
         if index >= len(record.operands):
@@ -676,6 +681,7 @@ class FlowLinearAnalyzer:
                 line_object.symbol_scope,
                 line_object.active_named_scopes,
                 line_object.line_id,
+                self._operand_current_address(record, operand),
             )
         except (
             ArithmeticError,
@@ -692,8 +698,7 @@ class FlowLinearAnalyzer:
             )
             return 0
 
-    @staticmethod
-    def _write_target_values(line_object, record) -> tuple[int | None, ...]:
+    def _write_target_values(self, line_object, record) -> tuple[int | None, ...]:
         """Resolve configured memory-write operands conservatively.
 
         A concrete integer is returned for a compile-time target. ``None``
@@ -722,6 +727,7 @@ class FlowLinearAnalyzer:
                         line_object.symbol_scope,
                         line_object.active_named_scopes,
                         line_object.line_id,
+                        self._operand_current_address(record, operand),
                     )
                 )
             except (
@@ -1234,6 +1240,7 @@ class FlowGraphAnalyzer(FlowLinearAnalyzer):
     def __init__(self, model, diagnostic_reporter) -> None:
         super().__init__(model, diagnostic_reporter)
         self._graph = None
+        self._record_addresses: dict[int, int] = {}
         self._line_objects = ()
         self._inputs: dict[int, _GraphInput] = {}
         self._queue = deque()
@@ -2366,6 +2373,7 @@ class FlowGraphAnalyzer(FlowLinearAnalyzer):
                     node.line_object.symbol_scope,
                     node.line_object.active_named_scopes,
                     node.line_object.line_id,
+                    node.address + operand.current_address_offset,
                 )
             except (
                 ArithmeticError,
@@ -2513,6 +2521,10 @@ class FlowGraphAnalyzer(FlowLinearAnalyzer):
         """Build the structural CFG and propagate scalar states to a fixed point."""
         self._line_objects = tuple(line_objects)
         self._graph = ControlFlowGraph.from_line_objects(self._line_objects)
+        # Each instruction record's address, for evaluating `*` in its operands.
+        self._record_addresses = {
+            id(node.record): node.address for node in self._graph.nodes if node.record is not None
+        }
         self._validate_coordinate_scopes()
         self._prepare_regions()
         self._prepare_entries()

@@ -120,7 +120,32 @@ COMPILER_DIRECTIVE_DOCS: dict[str, str] = {
         '```\n\n'
         'If `<page_size>` is omitted, the ISA-configured page size is used. '
         'The next emitted bytecode will start at an address that is a '
-        'multiple of the page size.'
+        'multiple of the page size. An address already on a boundary is kept.'
+    ),
+    'phase': (
+        '### `.phase` : Assemble for Another Address\n\n'
+        '---\n\n'
+        'Assembles the code that follows for `<address>`, while its bytes '
+        'continue at the current place in the image. Labels and `*` see the '
+        'new address. Use it for code that is copied to another address '
+        'before it runs.\n\n'
+        '**Usage:**\n\n'
+        '```\n'
+        '.phase <address>\n'
+        '.dephase\n'
+        '```\n\n'
+        'Another `.phase` starts a new one from the current place in the '
+        'image; `.dephase` or `.org` ends it.'
+    ),
+    'dephase': (
+        '### `.dephase` : End a Phase\n\n'
+        '---\n\n'
+        'Ends a `.phase`: addresses continue from the current place in the '
+        'image.\n\n'
+        '**Usage:**\n\n'
+        '```\n'
+        '.dephase\n'
+        '```'
     ),
 }
 
@@ -190,8 +215,9 @@ BYTECODE_DIRECTIVE_DOCS: dict[str, str] = {
         '**Usage:**\n\n'
         '```\n'
         '.fill <count>, <value>\n'
+        '.fill <count>\n'
         '```\n\n'
-        'Emits `<count>` words, each set to `<value>`.'
+        'Emits `<count>` words, each set to `<value>`. Without a value, the words are zero.'
     ),
     'zero': (
         '### `.zero` : Fill with Zeros\n\n'
@@ -470,6 +496,20 @@ PREPROCESSOR_DIRECTIVE_DOCS: dict[str, str] = {
         '---\n\n'
         'Ends the text block that `#verbatim` started.'
     ),
+    'output-format': (
+        '### `#output-format` : Set an Output Format Option\n\n'
+        '---\n\n'
+        'Sets options of an output format for the lines after it in this file. '
+        'An option without `=value` returns to the format\'s default.\n\n'
+        '**Usage:**\n\n'
+        '```\n'
+        '#output-format <format> <option>=<value> ...\n'
+        '#output-format <format> <option>\n'
+        '```\n\n'
+        'Only the options a format offers to source are accepted; the instruction set\'s '
+        'documentation lists them. For example, `#output-format listing overflow=wrap width=64` '
+        'wraps long lines in the listing.'
+    ),
     'create-scope': (
         '### `#create-scope` : Create Named Label Scope\n\n'
         '---\n\n'
@@ -711,3 +751,19 @@ ALL_DIRECTIVE_DOCS: dict[str, str] = {
     **PREPROCESSOR_DIRECTIVE_DOCS,
     **COUNTER_COORDINATE_DOCS,
 }
+
+
+def directive_alias_docs(aliases: dict[str, str]) -> dict[str, str]:
+    """Hover documentation for an instruction set's directive aliases: each alias gets the
+    documentation of the directive it stands for, under its own heading."""
+    docs = {}
+    for alias, target in aliases.items():
+        target_doc = BYTECODE_DIRECTIVE_DOCS[target]
+        body = target_doc.split('---\n\n', 1)[1] if '---\n\n' in target_doc else target_doc
+        docs[alias] = (
+            f'### `.{alias}` : Same as `.{target}`\n\n'
+            '---\n\n'
+            f'In this instruction set, `.{alias}` is another name for `.{target}`.\n\n'
+            f'{body}'
+        )
+    return docs

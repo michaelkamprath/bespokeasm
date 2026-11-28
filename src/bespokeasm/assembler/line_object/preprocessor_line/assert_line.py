@@ -167,7 +167,7 @@ class AssertLine(PreprocessorLine):
                 continue
             if is_unprefixed_numeric_string(
                 token,
-                self._isa_model.default_numeric_base,
+                self._isa_model.expression_syntax,
             ):
                 continue
             if token.startswith('__') and token.endswith('__'):
@@ -237,7 +237,7 @@ class AssertLine(PreprocessorLine):
             return parse_expression(
                 self.line_id,
                 expression,
-                self._isa_model.default_numeric_base,
+                self._isa_model.expression_syntax,
                 context=ExpressionUseContext.FLOW_DIRECTIVE,
             )
         except (SyntaxError, SystemExit, AssemblerError) as error:

@@ -151,6 +151,16 @@ def test_output_formats_section(markdown):
     assert 'shared set' not in section
 
 
+def test_output_formats_publish_their_source_options(markdown):
+    section = _section(markdown, '# Output Formats')
+    assert '## `listing` Options' in section
+    assert '`#output-format listing <option>=<value>`' in section
+    assert '| `overflow` | wrap, truncate or none | `none` |' in section
+    assert '| `width` | a whole number, at least 16 | `80` |' in section
+    # A format with no options for source, such as hex, has no options section.
+    assert '## `hex` Options' not in section
+
+
 def test_annotations_section(markdown):
     section = _section(markdown, '# Annotations')
     assert '## `xmin`\n\nExport a symbol to an xmin script.\n\nApplies to labels and constants, in global scope.' in section

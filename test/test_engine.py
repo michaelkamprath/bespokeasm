@@ -464,6 +464,17 @@ class TestAssemblerEngine(unittest.TestCase):
         )
         self.assertEqual(image, bytes([0x00, 0x00]))
 
+    def test_zero_word_data_before_a_gap_is_filled_over(self):
+        """A data line with no words, followed by a gap, used to hang the image loop: the
+        line sat at the address being filled, and its zero words never advanced it."""
+        image = self._assemble_to_binary(
+            '    .fill 0, 0\n'
+            '    .org 3\n'
+            '    nop\n',
+            fill_value=0xAA,
+        )
+        self.assertEqual(image, bytes([0xAA, 0xAA, 0xAA, 0x00]))
+
     def test_generate_bytes_from_line_objects_4bit_words_with_fill(self):
         # Simulate a 4-bit word ISA with a gap, so fill_word is used and must be packed
         class DummyLineWithWords(LineWithWords):

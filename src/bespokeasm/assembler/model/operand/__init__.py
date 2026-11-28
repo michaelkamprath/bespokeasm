@@ -8,28 +8,45 @@ from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.diagnostic_reporter import InternalAssemblerError
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.memory_zone.manager import MemoryZoneManager
+from bespokeasm.utilities import DEFAULT_ENCLOSURE
+from bespokeasm.utilities import ENCLOSURES
 
 
 class OperandType(enum.Enum):
     # these values double as sort order for processing in an operand set
     UNKNOWN = -1
     EMPTY = 1
-    NUMERIC = 9
-    NUMERIC_BYTECODE = 12
-    REGISTER = 8
-    INDEXED_REGISTER = 6
-    DICTIONARY_KEY = 7
+    NUMERIC = 10
+    NUMERIC_BYTECODE = 13
+    REGISTER = 9
+    INDEXED_REGISTER = 7
+    DICTIONARY_KEY = 8
     INDIRECT_REGISTER = 2
     INDIRECT_INDEXED_REGISTER = 3
     INDIRECT_NUMERIC = 4
-    DEFERRED_NUMERIC = 5
-    ADDRESS = 10
-    RELATIVE_ADDRESS = 11
+    INDIRECT_INDEXED_NUMERIC = 5
+    DEFERRED_NUMERIC = 6
+    ADDRESS = 11
+    RELATIVE_ADDRESS = 12
 
 
 class OperandBytecodePositionType(enum.Enum):
     PREFIX = 1
     SUFFIX = 2
+
+
+# An enclosure and a depth, as ('parentheses', 1) for `(vec)` or ('brackets', 2) for `[[vec]]`.
+EnclosureRequirement = tuple[str, int]
+
+
+def allowed_by_enclosure(operand: Operand, requirement: EnclosureRequirement | None) -> bool:
+    """Whether ``operand`` may take source text that must be read as ``requirement``.
+
+    When an instruction configures an enclosed form at an operand position, an operand there
+    wrapped wholly in that enclosure is that form: `lda ($10)` can't be `lda $10` when `lda`
+    has a `( )` form. An enclosed operand takes only text in its own enclosure, and registers
+    and enumeration keys never match a parenthesized operand, so the depth alone decides."""
+    return requirement is None or operand.enclosure_depth >= requirement[1]
 
 
 class Operand:
@@ -86,6 +103,22 @@ class Operand:
         return False
 
     @property
+    def enclosure(self) -> str:
+        '''What the operand is written in when it is indirect: `brackets` or `parentheses`.'''
+        return self._config.get('enclosure', DEFAULT_ENCLOSURE)
+
+    @property
+    def enclosure_delimiters(self) -> tuple[str, str]:
+        return ENCLOSURES[self.enclosure]
+
+    @property
+    def enclosure_depth(self) -> int:
+        '''How many pairs of its enclosure wrap the operand in source: 1 for an indirect operand
+        such as `[vec]` or an enclosed relative address such as `{label}`, 2 for a deferred one
+        such as `[[vec]]`, and 0 for a bare operand.'''
+        return 0
+
+    @property
     def has_bytecode(self) -> bool:
         return ('bytecode' in self._config)
 
@@ -105,6 +138,8 @@ class Operand:
 
     @property
     def bytecode_position(self) -> OperandBytecodePositionType:
+        # Suffix unless the operand's own bytecode says otherwise. An operand without bytecode of
+        # its own can still emit some from its index operands, as `[hl + a]` can.
         if self.has_bytecode:
             pos_str = self._config['bytecode'].get('position', 'suffix')
             if pos_str == 'suffix':
@@ -116,8 +151,7 @@ class Operand:
                     None,
                     f'ISA configuration assigned operand "{self.id}" with unknown bytecode position "{pos_str}"',
                 )
-        else:
-            return None
+        return OperandBytecodePositionType.SUFFIX
 
     @property
     def match_pattern(self) -> str:
@@ -220,10 +254,14 @@ class ParsedOperand:
         word_size: int,
         word_segment_size: int,
         operand_label: str | None = None,
+        trailing_arguments: list[ByteCodePart] | None = None,
     ):
         self._operand = operand
         self._bytecode = bytecode
         self._argument = argument
+        # Arguments emitted after `argument`, such as the offset of an indirect_indexed_numeric
+        # operand's index. `argument` stays the operand's value for operand labels and `@ARG`.
+        self._trailing_arguments = trailing_arguments or []
         self._operand_str = operand_str
         self._word_size = word_size
         self._word_segment_size = word_segment_size
@@ -250,6 +288,11 @@ class ParsedOperand:
     @property
     def argument(self) -> ByteCodePart:
         return self._argument
+
+    @property
+    def arguments(self) -> list[ByteCodePart]:
+        """Every argument the operand emits, in order."""
+        return ([self._argument] if self._argument is not None else []) + self._trailing_arguments
 
     @property
     def operand_string(self) -> str:

@@ -7,8 +7,11 @@ import json
 
 import pytest
 from bespokeasm import BESPOKEASM_VERSION_STR
+from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.engine import Assembler
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
+from bespokeasm.assembler.model import AssemblerModel
+from bespokeasm.assembler.output_format import find_output_format
 from bespokeasm.assembler.output_format.builtin import builtin_format_names
 from bespokeasm.assembler.output_format.builtin import builtin_formats
 from bespokeasm.assembler.output_format.builtin import BuiltinFormatError
@@ -27,6 +30,7 @@ from click.testing import CliRunner
 from ruamel.yaml import YAML
 
 from test import config_files
+from test.isa_configs import json_config_copy
 
 XMIN_ANNOTATION = {
     'applies_to': ['label', 'constant'],
@@ -772,7 +776,7 @@ def test_xmin_worked_example(tmp_path):
     stderr = io.StringIO()
     with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(stderr):
         Assembler(
-            str(source), str(fixture.joinpath('slu4-minimal-64x4.yaml')), False, None, 0, None, 0,
+            str(source), json_config_copy(fixture.joinpath('slu4-minimal-64x4.yaml'), tmp_path), False, None, 0, None, 0,
             True, 'xmin', str(output_path), 0, [], [],
         ).assemble_bytecode()
     assert stderr.getvalue() == ''
@@ -950,7 +954,8 @@ def test_xmin_listing_worked_example(tmp_path, monkeypatch):
     stderr = io.StringIO()
     with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(stderr):
         Assembler(
-            'addw.min64x4', 'slu4-minimal-64x4.yaml', False, None, 0, None, 0,
+            'addw.min64x4', json_config_copy(fixture.joinpath('slu4-minimal-64x4.yaml'), tmp_path), False, None, 0,
+            None, 0,
             True, 'xmin_listing', str(output_path), 0, [], [],
         ).assemble_bytecode()
     assert stderr.getvalue() == ''
@@ -1504,7 +1509,7 @@ def test_the_xmin_examples_in_the_config_assemble(tmp_path):
     """Every example in the xmin annotation's documentation compiles with -t xmin, with no warnings."""
     from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
     from bespokeasm.assembler.model import AssemblerModel
-    config = str(pkg_resources.files(config_files).joinpath('xmin', 'slu4-minimal-64x4.yaml'))
+    config = json_config_copy(pkg_resources.files(config_files).joinpath('xmin', 'slu4-minimal-64x4.yaml'), tmp_path)
     examples = AssemblerModel(config, 0, DiagnosticReporter()).annotation_namespaces['xmin'].examples
     assert len(examples) == 3
     for example in examples:
@@ -1518,7 +1523,7 @@ def test_the_xmin_examples_in_the_config_assemble(tmp_path):
 def test_xmin_addr_constant_is_a_16_bit_address(tmp_path):
     """In the Minimal 64x4 config, kind=addr on a constant writes its value in hex, as kind=addr
     on a label writes its address, so an I/O register above 0x7fff exports as an xmin int."""
-    config = str(pkg_resources.files(config_files).joinpath('xmin', 'slu4-minimal-64x4.yaml'))
+    config = json_config_copy(pkg_resources.files(config_files).joinpath('xmin', 'slu4-minimal-64x4.yaml'), tmp_path)
     source = (
         '.memzone XMIN_USER_CODE\n'
         '#annotate xmin kind=addr name=Go\ngo: RTS\n'
@@ -1547,8 +1552,9 @@ def test_builtin_formats_are_defined_or_python():
         assert isinstance(formats[name], DefinedFormat)
         assert formats[name].is_builtin and formats[name].requires_word_size == 8
         assert formats[name].description
-    for name in ('listing', 'symbols'):
-        assert isinstance(formats[name], PrinterFormat) and formats[name].is_builtin
+    assert isinstance(formats['listing'], DefinedFormat) and formats['listing'].is_builtin
+    assert formats['listing'].requires_word_size is None and formats['listing'].description
+    assert isinstance(formats['symbols'], PrinterFormat) and formats['symbols'].is_builtin
 
 
 def test_defined_builtin_on_another_word_size(tmp_path):
@@ -1578,3 +1584,103 @@ def test_builtin_definition_problems_are_bugs(definitions, problem):
     with pytest.raises(BuiltinFormatError) as exc_info:
         load_builtin_definitions(definitions)
     assert problem in str(exc_info.value)
+
+
+# ---- #output-format and the listing's overflow ------------------------------------------------
+
+LONG = '.byte 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13'
+
+
+def _listing_rows(output: str) -> list[str]:
+    """The instruction column of each listing row."""
+    return [row.split(' | ')[3].rstrip() for row in output.splitlines() if row.count(' | ') >= 4]
+
+
+def test_output_format_directive_wraps_truncates_and_resets(tmp_path):
+    source = (
+        '#output-format listing overflow=wrap\n'
+        '#output-format listing width=24\n'
+        f'table: {LONG}\n'
+        '#output-format listing overflow=truncate\n'
+        f'short: {LONG}\n'
+        '#output-format listing overflow\n'
+        f'wide: {LONG}\n'
+    )
+    output, _ = _run(tmp_path, source, _write_config(tmp_path), fmt='listing')
+    rows = _listing_rows(output)
+    # A directive's own line shows under the settings before it.
+    assert '#output-format listing width=24' in rows
+    table = rows.index('table:')
+    assert rows[table + 1:table + 4] == ['    .byte 1, 2, 3, 4, 5,', '      6, 7, 8, 9, 10,', '      11, 12, 13']
+    assert rows[rows.index('short:') + 1] == '    .byte 1, 2, 3, 4,...'
+    assert rows[rows.index('wide:') + 1] == f'    {LONG}'
+
+
+def test_an_included_file_starts_from_the_format_defaults(tmp_path):
+    (tmp_path / 'inc.asm').write_text(f'inc: {LONG}\n')
+    source = '#output-format listing overflow=truncate width=20\n#include "inc.asm"\n'
+    output, _ = _run(tmp_path, source, _write_config(tmp_path), fmt='listing')
+    assert f'    {LONG}' in _listing_rows(output)
+
+
+@pytest.mark.parametrize(('directive', 'expected'), [
+    ('#output-format listing', '#output-format takes a format and one or more options'),
+    ('#output-format paper width=20', "#output-format names unknown format 'paper'; the formats are listing,"),
+    ('#output-format hex width=20', "output format 'hex' has no option 'width' that source can set; "
+                                    'it offers no options to source'),
+    ('#output-format listing color=red', "output format 'listing' has no option 'color' that source can set; "
+                                         'it offers overflow, width'),
+    ('#output-format listing overflow=sideways', '#output-format listing overflow must be one of wrap, truncate, '
+                                                 "none, not 'sideways'"),
+    ('#output-format listing width=4', "#output-format listing width must be a whole number of at least 16, not '4'"),
+    ('#output-format listing width=20 width', "#output-format sets 'width' more than once"),
+])
+def test_output_format_directive_errors(tmp_path, directive, expected):
+    assert expected in _error(tmp_path, f'{directive}\nld a, b, c\n', _write_config(tmp_path), fmt='listing')
+
+
+LISTING_FORMAT = {
+    'template': '{listing}',
+    'sections': {'listing': {'generator': 'listing', 'overflow': 'truncate', 'width': 20}},
+}
+
+
+def test_a_configuration_listing_replaces_the_builtin_and_sets_its_defaults(tmp_path):
+    config = _write_config(tmp_path, {'listing': LISTING_FORMAT})
+    source = f'first: {LONG}\n#output-format listing overflow=none\nsecond: {LONG}\n'
+    rows = _listing_rows(_run(tmp_path, source, config, fmt='listing')[0])
+    assert rows[rows.index('first:') + 1] == '    .byte 1, 2, 3...'
+    assert rows[rows.index('second:') + 1] == f'    {LONG}'
+    model = AssemblerModel(config, 0, DiagnosticReporter())
+    listing = model.output_formats['listing']
+    assert not listing.is_builtin
+    defaults = [(option.name, default) for option, default in listing.source_options()]
+    assert defaults == [('overflow', 'truncate'), ('width', 20)]
+
+
+@pytest.mark.parametrize('spelling', ['Listing', 'LISTING'])
+def test_a_configuration_listing_replaces_the_builtin_under_any_case(tmp_path, spelling):
+    config = _write_config(tmp_path, {'listing': LISTING_FORMAT})
+    model = AssemblerModel(config, 0, DiagnosticReporter())
+    assert find_output_format(model, spelling) is model.output_formats['listing']
+    source = f'#output-format {spelling} width=16\nfirst: {LONG}\n'
+    rows = _listing_rows(_run(tmp_path, source, config, fmt=spelling)[0])
+    assert rows[rows.index('first:') + 1] == '    .byte 1,...'
+
+
+@pytest.mark.parametrize(('output_formats', 'expected'), [
+    ({'Listing': LISTING_FORMAT}, "output_formats.Listing replaces the built-in 'listing' format, so it must be "
+                                  "written 'listing'"),
+    ({'hex': LISTING_FORMAT}, "output_formats.hex cannot be defined: 'hex' is a built-in output format"),
+    ({'listing': {'template': '{listing}', 'sections': {'listing': {'generator': 'listing', 'overflow': 'up'}}}},
+     'output_formats.listing.sections.listing.overflow must be one of wrap, truncate, none'),
+])
+def test_listing_definition_errors(tmp_path, output_formats, expected):
+    assert expected in _config_error(tmp_path, output_formats)
+
+
+def test_the_builtin_listing_offers_overflow_and_width():
+    listing = builtin_formats()['listing']
+    defaults = [(option.name, default) for option, default in listing.source_options()]
+    assert defaults == [('overflow', 'none'), ('width', 80)]
+    assert builtin_formats()['hex'].source_options() == []

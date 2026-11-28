@@ -6,12 +6,15 @@ from bespokeasm.assembler.annotations.model import ExportModel
 from bespokeasm.assembler.assembly_file import AssemblyFile
 from bespokeasm.assembler.bytecode.word import Word
 from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
+from bespokeasm.assembler.diagnostic_reporter import InternalAssemblerError
 from bespokeasm.assembler.flow_analysis import FlowGraphAnalyzer
 from bespokeasm.assembler.flow_analysis import FlowLinearAnalyzer
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object import LineWithWords
+from bespokeasm.assembler.line_object.directive_line.address import AddressOrgLine
 from bespokeasm.assembler.line_object.directive_line.fill_data import FillUntilDataLine
+from bespokeasm.assembler.line_object.directive_line.phase import PhaseLine
 from bespokeasm.assembler.line_object.instruction_line import InstructionLine
 from bespokeasm.assembler.line_object.label_line import LabelLine
 from bespokeasm.assembler.line_object.predefined_data import PredefinedDataLine
@@ -203,52 +206,38 @@ class Assembler:
             )
 
         compilable_line_obs: list[LineObject] = [lobj for lobj in line_obs if lobj.compilable]
+        # First pass: assign addresses to labels. A line with a `select_by_value` form starts in its
+        # other form; relaxation re-matches it against the addresses pass 1 assigned and runs pass 1
+        # again, until no line's size changes. Only the last run reports, since an earlier layout
+        # is provisional: its longer forms can overflow a zone that the final layout fits.
+        relaxable_lines = [
+            lobj for lobj in compilable_line_obs if isinstance(lobj, InstructionLine) and lobj.relaxable
+        ]
+        if relaxable_lines:
+            self._assign_addresses(compilable_line_obs, named_scope_manager, report=False, relocating=False)
+            # A round that changes a size relaxes at least one line for good, and a relaxed line
+            # never changes back, so this many rounds always suffice.
+            round_limit = len(relaxable_lines) + 1
+            for _ in range(round_limit):
+                sizes_changed = False
+                for lobj in relaxable_lines:
+                    sizes_changed = lobj.relax() or sizes_changed
+                if not sizes_changed:
+                    break
+                memzone_manager.reset_current_addresses()
+                self._assign_addresses(compilable_line_obs, named_scope_manager, report=False, relocating=True)
+            else:
+                raise InternalAssemblerError(None, f'pass 1 did not settle after {round_limit} rounds')
+            memzone_manager.reset_current_addresses()
+        self._assign_addresses(
+            compilable_line_obs, named_scope_manager, report=True, relocating=bool(relaxable_lines),
+        )
         if self._model.analysis_records_enabled:
             self._analysis_source_index = AnalysisSourceIndex.from_line_objects(
                 lobj
                 for lobj in compilable_line_obs
                 if isinstance(lobj, InstructionLine)
             )
-        # First pass: assign addresses to labels
-        for lobj in compilable_line_obs:
-            lobj.set_start_address(lobj.memory_zone.current_address)
-            if lobj.address is None:
-                diagnostic_reporter.error(
-                    lobj.line_id,
-                    f'INTERNAL line object address is None. Memory zone = {lobj.memory_zone}',
-                )
-
-            try:
-                word_count = lobj.word_count
-                if isinstance(lobj, InstructionLine) and lobj.has_operand_labels:
-                    lobj.register_operand_labels(named_scope_manager)
-                if isinstance(lobj, FillUntilDataLine) and word_count == 0:
-                    diagnostic_reporter.warn(
-                        lobj.line_id,
-                        '.zerountil target address is before the current address; no bytes emitted',
-                    )
-                lobj.memory_zone.current_address = lobj.address + word_count
-            except ValueError as e:
-                diagnostic_reporter.error(
-                    lobj.line_id,
-                    str(e),
-                )
-
-            if isinstance(lobj, LabelLine) and not lobj.is_constant:
-                # Address labels: try to add to named scope first (only if in same file as scope creation)
-                # is_constant=False by default for address labels
-                if not named_scope_manager.set_label_value(
-                    lobj.get_label(),
-                    lobj.get_value(),
-                    lobj.line_id,
-                    lobj.active_named_scopes
-                ):
-                    # if not in an active named scope, set to the current scope
-                    lobj.symbol_scope.set_label_value(
-                        lobj.get_label(),
-                        lobj.get_value(),
-                        lobj.line_id,
-                    )
 
         # Addresses are final, so annotated labels' data runs and symbol arguments can be checked.
         self._export_model = ExportModel.build(line_obs)
@@ -284,7 +273,9 @@ class Assembler:
                 None,
                 'source file contains no compilable lines',
             )
-        compilable_line_obs.sort(key=lambda x: x.address)
+        # Bytes go in the image in order of their image positions, which differ from their
+        # addresses only inside a .phase.
+        compilable_line_obs.sort(key=lambda x: x.image_address)
         emitted_line_objects = [
             line_object
             for line_object in compilable_line_obs
@@ -292,17 +283,30 @@ class Assembler:
             and line_object.word_count > 0
             and not line_object.is_muted
         ]
+        address_space_end = memzone_manager.global_zone.end
+        for line_object in emitted_line_objects:
+            if (
+                line_object.image_address != line_object.address
+                and line_object.image_address + line_object.word_count - 1 > address_space_end
+            ):
+                diagnostic_reporter.error(
+                    line_object.line_id,
+                    f'the bytes of this line would go at image position {hex(line_object.image_address)}, '
+                    f'past the end of the address space ({hex(address_space_end)}); a .phase moves '
+                    'addresses, not where the bytes go',
+                )
         max_generated_address = max(
             (
-                line_object.address + line_object.word_count - 1
+                line_object.image_address + line_object.word_count - 1
                 for line_object in emitted_line_objects
             ),
             default=0,
         )
+        # A line with no words has nothing to place, and the image would never advance past it.
         line_dict = {
-            lobj.address: lobj
+            lobj.image_address: lobj
             for lobj in compilable_line_obs
-            if isinstance(lobj, LineWithWords) and not lobj.is_muted
+            if isinstance(lobj, LineWithWords) and not lobj.is_muted and lobj.word_count > 0
         }
 
         # second pass: build the machine code and check for overlaps
@@ -336,12 +340,16 @@ class Assembler:
                     f'Processing {lobj.line_id} = {lobj} at address ${lobj.address:x}',
                     min_verbosity=3,
                 )
-            if isinstance(lobj, LineWithWords):
-                if last_line is not None and (last_line.address + last_line.word_count) > lobj.address:
+            # A muted line puts no bytes in the image, so it can't overlap another line's.
+            if isinstance(lobj, LineWithWords) and not lobj.is_muted and lobj.word_count > 0:
+                if (
+                    last_line is not None
+                    and (last_line.image_address + last_line.word_count) > lobj.image_address
+                ):
                     diagnostic_reporter.error(
                         lobj.line_id,
                         'Address of byte code at this line overlaps with bytecode from '
-                        f'line <{last_line.line_id}> at address {hex(lobj.address)}\n'
+                        f'line <{last_line.line_id}> at address {hex(lobj.image_address)}\n'
                         f'  memory zone of current line <{lobj.line_id}> = {lobj.memory_zone}\n'
                         f'  memory zone of other line <{last_line.line_id}> = {last_line.memory_zone}',
                     )
@@ -390,6 +398,74 @@ class Assembler:
             else:
                 with open(self._pretty_print_output, 'w') as f:
                     f.write(pretty_str)
+
+    def _assign_addresses(
+        self,
+        line_objects: list[LineObject],
+        named_scope_manager: NamedScopeManager,
+        report: bool,
+        relocating: bool,
+    ) -> None:
+        """Pass 1: give each line its address and each address label its value. ``report`` says
+        whether this run's layout is final, so its problems are reported; ``relocating`` lets a
+        label that an earlier run defined take its new value."""
+        diagnostic_reporter = self._diagnostic_reporter
+        for lobj in line_objects:
+            zone = lobj.memory_zone
+            if isinstance(lobj, PhaseLine):
+                try:
+                    image_position = zone.current_address + zone.phase_offset
+                    address = image_position if lobj.is_dephase else lobj.phase_address()
+                    zone.current_address = address
+                    zone.phase_offset = image_position - address
+                except ValueError as e:
+                    if report:
+                        diagnostic_reporter.error(lobj.line_id, str(e))
+            elif isinstance(lobj, AddressOrgLine):
+                # `.org` places code at its address, ending any phase in the zone.
+                zone.phase_offset = 0
+            lobj.set_start_address(zone.current_address)
+            lobj.set_image_offset(zone.phase_offset)
+            if lobj.address is None:
+                diagnostic_reporter.error(
+                    lobj.line_id,
+                    f'INTERNAL line object address is None. Memory zone = {lobj.memory_zone}',
+                )
+
+            try:
+                word_count = lobj.word_count
+                if isinstance(lobj, InstructionLine) and lobj.has_operand_labels:
+                    lobj.register_operand_labels(named_scope_manager, relocating=relocating)
+                if report and isinstance(lobj, FillUntilDataLine) and word_count == 0:
+                    diagnostic_reporter.warn(
+                        lobj.line_id,
+                        '.zerountil target address is before the current address; no bytes emitted',
+                    )
+                lobj.memory_zone.current_address = lobj.address + word_count
+            except ValueError as e:
+                if report:
+                    diagnostic_reporter.error(
+                        lobj.line_id,
+                        str(e),
+                    )
+
+            if isinstance(lobj, LabelLine) and not lobj.is_constant:
+                # Address labels: try to add to named scope first (only if in same file as scope creation)
+                # is_constant=False by default for address labels
+                if not named_scope_manager.set_label_value(
+                    lobj.get_label(),
+                    lobj.get_value(),
+                    lobj.line_id,
+                    lobj.active_named_scopes,
+                    relocating=relocating,
+                ):
+                    # if not in an active named scope, set to the current scope
+                    lobj.symbol_scope.set_label_value(
+                        lobj.get_label(),
+                        lobj.get_value(),
+                        lobj.line_id,
+                        relocating=relocating,
+                    )
 
     def _select_output_format(self) -> OutputFormat | None:
         """The ``-t`` format when ``-p`` is given; a warning if ``-t`` was given without ``-p``."""

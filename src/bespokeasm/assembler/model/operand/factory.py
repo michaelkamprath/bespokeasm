@@ -4,6 +4,7 @@ from bespokeasm.assembler.model.operand.types import deferred_numeric
 from bespokeasm.assembler.model.operand.types import empty
 from bespokeasm.assembler.model.operand.types import enumeration_operand
 from bespokeasm.assembler.model.operand.types import indexed_register
+from bespokeasm.assembler.model.operand.types import indirect_indexed_numeric
 from bespokeasm.assembler.model.operand.types import indirect_indexed_register
 from bespokeasm.assembler.model.operand.types import indirect_numeric
 from bespokeasm.assembler.model.operand.types import indirect_register
@@ -91,6 +92,17 @@ class OperandFactory:
                 arg_config_dict,
                 default_multi_word_endian,
                 default_intra_word_endian,
+                word_size,
+                word_segment_size,
+                diagnostic_reporter,
+            )
+        elif type_str == 'indirect_indexed_numeric':
+            operand = indirect_indexed_numeric.IndirectIndexedNumericOperand(
+                operand_id,
+                arg_config_dict,
+                default_multi_word_endian,
+                default_intra_word_endian,
+                registers,
                 word_size,
                 word_segment_size,
                 diagnostic_reporter,

@@ -16,6 +16,7 @@ from bespokeasm.docsgen.markdown_generator import MarkdownGenerator
 from ruamel.yaml import YAML
 
 from test import config_files
+from test.isa_configs import json_config_copy
 
 SCRIPT_ANNOTATION = {
     'verbatim': {'documentation': {'description': 'Script text copied into the script file.'}},
@@ -176,8 +177,10 @@ def test_unterminated_block_is_an_error_even_when_excluded(tmp_path):
     assert '#verbatim block started on line 5 has no #endverbatim' in message
 
 
-def test_verbatim_is_a_reserved_word(tmp_path):
-    assert '"verbatim" is an assembler keyword' in _error(tmp_path, 'verbatim:\n    ld a, b, c\n')
+def test_verbatim_can_name_a_label(tmp_path):
+    """Directives are written with their `#`, so their names aren't reserved."""
+    _, stderr, _ = _run(tmp_path, 'verbatim:\n    ld a, b, c\n', _write_config(tmp_path))
+    assert 'keyword' not in stderr
 
 
 # ---- configuration ---------------------------------------------------------------------------
@@ -355,7 +358,7 @@ def test_generated_docs_say_which_namespaces_accept_blocks(tmp_path):
 def test_xmin_format_writes_the_header_part_after_the_generated_line(tmp_path):
     """The Minimal 64x4 xmin format, from the copied config: a header block, wherever it is in
     the source, comes right after the generated-by line, then a blank line and the declarations."""
-    config = str(pkg_resources.files(config_files).joinpath('xmin', 'slu4-minimal-64x4.yaml'))
+    config = json_config_copy(pkg_resources.files(config_files).joinpath('xmin', 'slu4-minimal-64x4.yaml'), tmp_path)
     source = (
         '.memzone XMIN_USER_CODE\n'
         '#annotate xmin kind=addr name=Go\ngo: RTS\n'
@@ -370,7 +373,7 @@ def test_xmin_format_writes_the_header_part_after_the_generated_line(tmp_path):
 
 def test_xmin_format_writes_blocks_between_the_declarations_and_the_asm_block(tmp_path):
     """The Minimal 64x4 xmin format, from the copied config."""
-    config = str(pkg_resources.files(config_files).joinpath('xmin', 'slu4-minimal-64x4.yaml'))
+    config = json_config_copy(pkg_resources.files(config_files).joinpath('xmin', 'slu4-minimal-64x4.yaml'), tmp_path)
     source = (
         '.memzone XMIN_USER_CODE\n'
         '#annotate xmin kind=addr name=Go\ngo: RTS\n'

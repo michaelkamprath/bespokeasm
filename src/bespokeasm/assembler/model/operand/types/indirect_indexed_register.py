@@ -1,10 +1,14 @@
+import re
+
 from bespokeasm.assembler.model.operand import OperandType
 
 from .indexed_register import IndexedRegisterOperand
 
 
 class IndirectIndexedRegisterOperand(IndexedRegisterOperand):
-    OPERAND_PATTERN_TEMPLATE = r'\[\s*({0})\s*(\+|\-)\s*({1})\s*\]'
+    # `{0}` and `{3}` are the enclosure's opening and closing delimiters, `{1}` the register and
+    # `{2}` the index operands' patterns.
+    OPERAND_PATTERN_TEMPLATE = r'{0}\s*({1})\s*(\+|\-)\s*({2})\s*{3}'
 
     def __init__(
         self,
@@ -36,20 +40,28 @@ class IndirectIndexedRegisterOperand(IndexedRegisterOperand):
         return OperandType.INDIRECT_INDEXED_REGISTER
 
     @property
+    def enclosure_depth(self) -> int:
+        return 1
+
+    @property
+    def _base_pattern(self) -> str:
+        opener, closer = (re.escape(delimiter) for delimiter in self.enclosure_delimiters)
+        return IndirectIndexedRegisterOperand.OPERAND_PATTERN_TEMPLATE.format(
+            opener, self.register, self._index_parse_pattern, closer,
+        )
+
+    @property
     def match_pattern(self) -> str:
         if not self.has_decorator:
-            pattern_str = IndirectIndexedRegisterOperand.OPERAND_PATTERN_TEMPLATE.format(
-                self.register,
-                self._index_parse_pattern,
-            )
+            pattern_str = self._base_pattern
         elif self.decorator_is_prefix:
             pattern_str = r'(?<!(?:\+|\-|\d|\w)){}{}'.format(
                 self.decorator_pattern,
-                IndirectIndexedRegisterOperand.OPERAND_PATTERN_TEMPLATE.format(self.register, self._index_parse_pattern),
+                self._base_pattern,
             )
         else:
             pattern_str = r'{}{}(?!(?:\+|\-|\d|\w))'.format(
-                IndirectIndexedRegisterOperand.OPERAND_PATTERN_TEMPLATE.format(self.register, self._index_parse_pattern),
+                self._base_pattern,
                 self.decorator_pattern,
             )
         return pattern_str

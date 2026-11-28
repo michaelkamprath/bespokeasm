@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 
 from bespokeasm.assembler.output_format.base import OutputFormat
 from bespokeasm.assembler.output_format.builtin import builtin_formats
+from bespokeasm.assembler.output_format.builtin import REPLACEABLE_BUILTINS
 
 if TYPE_CHECKING:
     from bespokeasm.assembler.model import AssemblerModel
@@ -24,10 +25,14 @@ def available_output_formats(model: AssemblerModel) -> dict[str, OutputFormat]:
 
 
 def find_output_format(model: AssemblerModel, name: str) -> OutputFormat | None:
-    """Built-in names match without regard to case; configuration names must match exactly."""
+    """Built-in names match without regard to case; configuration names must match exactly.
+    A configuration format that replaces a built-in one takes its place under any case."""
     if name in model.output_formats:
         return model.output_formats[name]
-    return builtin_formats().get(name.lower())
+    builtin_name = name.lower()
+    if builtin_name in REPLACEABLE_BUILTINS and builtin_name in model.output_formats:
+        return model.output_formats[builtin_name]
+    return builtin_formats().get(builtin_name)
 
 
 def resolve_output_format(model: AssemblerModel, name: str) -> OutputFormat:

@@ -19,7 +19,7 @@ class TestCompletionCli(unittest.TestCase):
         """Every slot of _NOOP_HANDLERS points to the same _noop function.
 
         Completion only needs the CLI's command/option surface, not real handler
-        execution, so all five slots reuse one no-op callable.
+        execution, so every slot reuses one no-op callable.
         """
         for slot in CommandHandlers._fields:
             self.assertIs(getattr(_NOOP_HANDLERS, slot), _noop)

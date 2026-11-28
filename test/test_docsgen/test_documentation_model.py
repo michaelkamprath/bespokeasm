@@ -199,6 +199,23 @@ class TestDocumentationModel(unittest.TestCase):
         self.assertEqual(len(mov2_doc['versions']), 1)
         self.assertEqual(len(mov2_doc['versions'][0]['signatures'][0]['operands']), 2)
 
+    def test_enclosed_relative_address_value_and_note(self):
+        """A relative address in an enclosure says so; the legacy `use_curly_braces` counts as braces."""
+        model = DocumentationModel(self.mock_isa_model, verbose=0)
+        for config, enclosure, placeholder in [
+            ({'enclosure': 'parentheses'}, 'parentheses', '(numeric_expression)'),
+            ({'use_curly_braces': True}, 'braces', '{numeric_expression}'),
+        ]:
+            config = {'type': 'relative_address', **config}
+            self.assertIn(
+                f'Relative address operand is written in {enclosure}.',
+                DocumentationModel._derive_operand_auto_details('relative_address', config, has_manual_description=False),
+            )
+            self.assertTrue(model._derive_operand_value('target', 'relative_address', config).startswith(placeholder))
+        bare = {'type': 'relative_address'}
+        self.assertEqual(DocumentationModel._derive_operand_auto_details('relative_address', bare, False), [])
+        self.assertTrue(model._derive_operand_value('target', 'relative_address', bare).startswith('numeric expression'))
+
     def test_address_operand_auto_details_describe_operand_fetch_page(self):
         notes = DocumentationModel._derive_operand_auto_details(
             'address',
@@ -967,6 +984,129 @@ class TestDocumentationModel(unittest.TestCase):
         signature = model.instruction_docs['ld']['versions'][0]['signatures'][0]
         operand = signature['operands'][0]
         self.assertEqual(operand['value'], 'numeric expression valued between 1 and 0xA expressed as 8 bit value')
+
+    def test_numeric_operand_syntax_shows_the_prefix(self):
+        """A numeric operand with `prefix: '#'` is written `#name`; one without stays `name`."""
+        self.mock_isa_model._config = {
+            'instructions': {
+                'lda': {
+                    'operands': {
+                        'count': 1,
+                        'specific_operands': {
+                            'imm': {'list': {'value': {
+                                'type': 'numeric', 'prefix': '#', 'argument': {'size': 8, 'word_align': True},
+                            }}},
+                            'abs': {'list': {'addr': {
+                                'type': 'numeric', 'argument': {'size': 16, 'word_align': True},
+                            }}},
+                        }
+                    }
+                }
+            }
+        }
+
+        model = DocumentationModel(self.mock_isa_model, verbose=0)
+        syntaxes = sorted(
+            signature['operands'][0]['syntax']
+            for version in model.instruction_docs['lda']['versions']
+            for signature in version['signatures']
+        )
+        self.assertEqual(syntaxes, ['#value', 'addr'])
+
+    def test_indirect_operand_syntax_shows_the_enclosure(self):
+        """Indirect operands are shown in the enclosure they are written in."""
+        byte = {'size': 8, 'word_align': True}
+        operands = {
+            'ind': {'type': 'indirect_numeric', 'argument': byte},
+            'pind': {'type': 'indirect_numeric', 'enclosure': 'parentheses', 'argument': byte},
+            'izx': {
+                'type': 'indirect_indexed_numeric', 'enclosure': 'parentheses', 'argument': byte,
+                'index_operands': {'x': {'type': 'register', 'register': 'x'}},
+            },
+            'pdef': {'type': 'deferred_numeric', 'enclosure': 'parentheses', 'argument': byte},
+            'hl': {'type': 'indirect_register', 'enclosure': 'parentheses', 'register': 'hl', 'offset': byte},
+            'ix': {
+                'type': 'indirect_indexed_register', 'enclosure': 'parentheses', 'register': 'ix',
+                'index_operands': {'a': {'type': 'register', 'register': 'a'}},
+            },
+        }
+        self.mock_isa_model._config = {'instructions': {'ld': {'operands': {
+            'count': 1,
+            'specific_operands': {name: {'list': {name: config}} for name, config in operands.items()},
+        }}}}
+
+        model = DocumentationModel(self.mock_isa_model, verbose=0)
+        syntaxes = sorted(
+            signature['operands'][0]['syntax']
+            for version in model.instruction_docs['ld']['versions']
+            for signature in version['signatures']
+        )
+        self.assertEqual(syntaxes, ['((pdef))', '(hl + offset)', '(ix + a)', '(izx, x)', '(pind)', '[ind]'])
+
+    def test_indirect_indexed_numeric_value_names_the_index(self):
+        model = DocumentationModel(self.mock_isa_model, verbose=0)
+        config = {
+            'type': 'indirect_indexed_numeric', 'enclosure': 'parentheses',
+            'index_operands': {'x': {'type': 'register', 'register': 'x'}, 'y': {'type': 'register', 'register': 'y'}},
+        }
+        self.assertEqual(
+            model._derive_operand_value('ind', 'indirect_indexed_numeric', config), 'numeric expression, indexed by `(x | y)`',
+        )
+
+    def test_indirect_indexed_numeric_syntax_shows_the_index_separator(self):
+        model = DocumentationModel(self.mock_isa_model, verbose=0)
+        index_operands = {'a': {'type': 'indirect_register', 'register': 'a', 'offset': {'size': 8, 'word_align': True}}}
+        self.assertEqual(
+            model._derive_operand_syntax('base', 'indirect_indexed_numeric', {
+                'type': 'indirect_indexed_numeric', 'index_separator': 'plus', 'index_operands': index_operands,
+            }),
+            '[base + [a + offset]]',
+        )
+        self.assertEqual(
+            model._derive_operand_syntax('base', 'indirect_indexed_numeric', {
+                'type': 'indirect_indexed_numeric', 'index_operands': index_operands,
+            }),
+            '[base, [a + offset]]',
+        )
+
+    def test_value_selected_address_notes_say_when_it_is_used(self):
+        argument = {'size': 8, 'word_align': True, 'memory_zone': 'ZERO_PAGE'}
+        selected = DocumentationModel._derive_operand_auto_details(
+            'address', {'type': 'address', 'select_by_value': True, 'argument': argument}, False,
+        )
+        self.assertEqual(selected, [
+            "Used when the address is in the `ZERO_PAGE` memory zone; other addresses use the instruction's other forms.",
+        ])
+        plain = DocumentationModel._derive_operand_auto_details('address', {'type': 'address', 'argument': argument}, False)
+        self.assertEqual(plain, ['Valid within `ZERO_PAGE` memory zone.'])
+
+    def test_relative_address_syntax_shows_the_enclosure(self):
+        byte = {'size': 8, 'word_align': True}
+        operands = {
+            'bare': {'type': 'relative_address', 'argument': byte},
+            'curly': {'type': 'relative_address', 'use_curly_braces': True, 'argument': byte},
+            'paren': {'type': 'relative_address', 'enclosure': 'parentheses', 'argument': byte},
+        }
+        self.mock_isa_model._config = {'instructions': {'br': {'operands': {
+            'count': 1,
+            'specific_operands': {name: {'list': {name: config}} for name, config in operands.items()},
+        }}}}
+        model = DocumentationModel(self.mock_isa_model, verbose=0)
+        syntaxes = sorted(
+            signature['operands'][0]['syntax']
+            for version in model.instruction_docs['br']['versions']
+            for signature in version['signatures']
+        )
+        self.assertEqual(syntaxes, ['(paren)', 'bare', '{curly}'])
+
+    def test_general_docs_list_directive_aliases(self):
+        """Aliases are listed lower case, without periods; none gives an empty mapping."""
+        self.mock_isa_model._config = {'general': {'directive_aliases': {'Word': '2BYTE', 'res': 'fill'}}}
+        model = DocumentationModel(self.mock_isa_model, verbose=0)
+        self.assertEqual(model.general_docs['directive_aliases'], {'word': '2byte', 'res': 'fill'})
+
+        self.mock_isa_model._config = {'general': {}}
+        self.assertEqual(DocumentationModel(self.mock_isa_model, verbose=0).general_docs['directive_aliases'], {})
 
     def test_invalid_documentation_formats(self):
         """Test handling of invalid documentation formats."""

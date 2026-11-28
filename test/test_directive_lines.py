@@ -8,8 +8,10 @@ from bespokeasm.assembler.diagnostic_reporter import DiagnosticReporter
 from bespokeasm.assembler.line_identifier import LineIdentifier
 from bespokeasm.assembler.line_object import LineObject
 from bespokeasm.assembler.line_object import LineWithWords
+from bespokeasm.assembler.line_object.data_line import DataLine
 from bespokeasm.assembler.line_object.directive_line.address import AddressOrgLine
 from bespokeasm.assembler.line_object.directive_line.factory import DirectiveLine
+from bespokeasm.assembler.line_object.directive_line.factory import resolve_directive_alias
 from bespokeasm.assembler.line_object.directive_line.fill_data import FillDataLine
 from bespokeasm.assembler.line_object.directive_line.fill_data import FillUntilDataLine
 from bespokeasm.assembler.line_object.directive_line.page_align import PageAlignLine
@@ -356,6 +358,80 @@ class TestDirectiveLines(unittest.TestCase):
                 TestDirectiveLines.isa_model.intra_word_endianness,
             ) for _ in range(168)
         ], 'truncated values')
+
+    def _words(self, values: list[int]) -> list[Word]:
+        model = TestDirectiveLines.isa_model
+        return [Word(v, model.word_size, model.word_segment_size, model.intra_word_endianness) for v in values]
+
+    def _generate(self, line: LineWithWords, label_values) -> list[Word]:
+        line.set_start_address(0)
+        line.symbol_scope = label_values
+        line.active_named_scopes = ActiveNamedScopeList(NamedScopeManager(self.diagnostic_reporter))
+        line.generate_words()
+        return line.get_words()
+
+    def test_fill_directive_with_only_a_count(self):
+        label_values = GlobalSymbolScope(['a', 'b', 'sp', 'mar'])
+        label_values.set_label_value('MAX_N', 20, 1)
+        for text, count in [(' .fill 3', 3), ('.fill 2*MAX_N', 40), ('.FILL 2', 2), ('.fill (1+1)*2', 4)]:
+            line = DirectiveLine.factory(
+                1234, text, 'zeros',
+                TestDirectiveLines.memzone, TestDirectiveLines.memory_zone_manager, TestDirectiveLines.isa_model,
+            )
+            self.assertIsInstance(line, FillDataLine, text)
+            self.assertEqual(line.instruction, text.strip())
+            self.assertEqual(self._generate(line, label_values), self._words([0] * count), text)
+        # with a value, the value still fills
+        line = DirectiveLine.factory(
+            1234, '.fill 2, 7', '',
+            TestDirectiveLines.memzone, TestDirectiveLines.memory_zone_manager, TestDirectiveLines.isa_model,
+        )
+        self.assertEqual(self._generate(line, label_values), self._words([7, 7]))
+
+    def test_resolve_directive_alias(self):
+        aliases = {'word': '2byte', 'res': 'fill'}
+        for text, expected in [
+            ('.word $1234', ('.2byte $1234', '.word')),
+            ('.WORD 1', ('.2byte 1', '.WORD')),         # aliases ignore case; the alias comes back as written
+            ('.word', ('.2byte', '.word')),
+            ('.res\t4, 1', ('.fill\t4, 1', '.res')),
+            ('.wordy 1', ('.wordy 1', None)),           # only the whole name
+            ('.word: .byte 1', ('.word: .byte 1', None)),  # a local label, not the alias
+            ('.byte 1', ('.byte 1', None)),
+            ('word 1', ('word 1', None)),               # no period
+        ]:
+            self.assertEqual(resolve_directive_alias(text, aliases), expected, text)
+        self.assertEqual(resolve_directive_alias('.word 1', {}), ('.word 1', None))
+
+    def test_directive_aliases(self):
+        label_values = GlobalSymbolScope(['a', 'b', 'sp', 'mar'])
+        local_isa_model = copy.deepcopy(TestDirectiveLines.isa_model)
+        local_isa_model._config['general']['directive_aliases'] = {'word': '2byte', 'res': 'fill', 'Text': 'BYTE'}
+
+        def line_for(text):
+            return DirectiveLine.factory(
+                1234, text, '',
+                TestDirectiveLines.memzone, TestDirectiveLines.memory_zone_manager, local_isa_model,
+            )
+
+        for text, line_type, values in [
+            ('.word $1234, $5678', DataLine, [0x12, 0x34, 0x56, 0x78]),   # big endian
+            ('.Word $1234', DataLine, [0x12, 0x34]),
+            ('.res 3, $EA', FillDataLine, [0xEA, 0xEA, 0xEA]),
+            ('.res 2', FillDataLine, [0, 0]),
+            ('.text "Hi", 0', DataLine, [0x48, 0x69, 0]),                # alias keys and targets ignore case
+        ]:
+            line = line_for(text)
+            self.assertIsInstance(line, line_type, text)
+            self.assertEqual(line.instruction, text, 'listed as written')
+            self.assertEqual(self._generate(line, label_values), self._words(values), text)
+        self.assertIsNone(line_for('.word'), 'no value, as with .2byte')
+        self.assertIsInstance(line_for('.2byte 1'), DataLine, 'the directive still works')
+        no_alias = DirectiveLine.factory(
+            1234, '.word 1', '',
+            TestDirectiveLines.memzone, TestDirectiveLines.memory_zone_manager, TestDirectiveLines.isa_model,
+        )
+        self.assertIsNone(no_alias, 'aliases exist only where the instruction set defines them')
 
     def test_filluntil_directive(self):
         label_values = SymbolScope(SymbolScopeType.GLOBAL, None, 'global')
